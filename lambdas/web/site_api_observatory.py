@@ -60,9 +60,39 @@ _MUSCLE_MAP = [
     (["leg extension", "leg curl", "hamstring curl", "nordic"], ["Quads", "Hamstrings"]),
     (["hip thrust", "glute bridge", "hip abduct", "hip adduct"], ["Glutes", "Hamstrings"]),
     (["calf", "calves"], ["Calves"]),
-    (["plank", "crunch", "ab ", "abs ", "core", "oblique", "sit up", "situp", "hanging leg", "windshield",
-      "leg raise", "knee raise", "russian twist", "hollow", "rollout", "ab wheel", "pallof", "anti-rotation",
-      "anti rotation", "dead bug", "deadbug", "bird dog", "carry", "carries", "farmer", "suitcase", "woodchop", "wood chop"], ["Core"]),
+    (
+        [
+            "plank",
+            "crunch",
+            "ab ",
+            "abs ",
+            "core",
+            "oblique",
+            "sit up",
+            "situp",
+            "hanging leg",
+            "windshield",
+            "leg raise",
+            "knee raise",
+            "russian twist",
+            "hollow",
+            "rollout",
+            "ab wheel",
+            "pallof",
+            "anti-rotation",
+            "anti rotation",
+            "dead bug",
+            "deadbug",
+            "bird dog",
+            "carry",
+            "carries",
+            "farmer",
+            "suitcase",
+            "woodchop",
+            "wood chop",
+        ],
+        ["Core"],
+    ),
 ]
 _LANDMARKS = {
     "Chest": {"MEV": 8, "MAV_lo": 12, "MAV_hi": 16, "MRV": 20},
@@ -112,8 +142,18 @@ def _compute_muscle_volume(hevy_items, num_weeks):
             status = "high"
         else:
             status = "over"
-        out.append({"muscle": m, "sets_per_week": spw, "total_sets": sets_by_muscle[m],
-                    "MEV": lm["MEV"], "MAV_lo": lm["MAV_lo"], "MAV_hi": lm["MAV_hi"], "MRV": lm["MRV"], "status": status})
+        out.append(
+            {
+                "muscle": m,
+                "sets_per_week": spw,
+                "total_sets": sets_by_muscle[m],
+                "MEV": lm["MEV"],
+                "MAV_lo": lm["MAV_lo"],
+                "MAV_hi": lm["MAV_hi"],
+                "MRV": lm["MRV"],
+                "status": status,
+            }
+        )
     return out
 
 
@@ -410,8 +450,7 @@ def handle_nutrition_overview() -> dict:
         "protein_distribution_score": round(sum(pds_vals) / len(pds_vals)) if pds_vals else None,
         "per_day_window": per_day_window[-14:],  # last 2 weeks for the ribbon
         "time_distribution": [
-            {"hour": h, "protein_g": round(bucket_protein[h], 1), "calories": round(bucket_cal.get(h, 0))}
-            for h in sorted(bucket_protein)
+            {"hour": h, "protein_g": round(bucket_protein[h], 1), "calories": round(bucket_cal.get(h, 0))} for h in sorted(bucket_protein)
         ],
         "reference_window_hrs": 8,  # the 16:8 reference (8h eating window)
         "days_with_meal_times": len(per_day_window),
@@ -597,6 +636,163 @@ def handle_nutrition_overview() -> dict:
                 "protein_distribution_score": (latest or {}).get("protein_distribution_score"),
                 "as_of": latest_date,
             },
+        },
+        cache_seconds=3600,
+    )
+
+
+def handle_deficit_sustainability() -> dict:
+    """
+    GET /api/deficit_sustainability — RQA-05. Port of the MCP get_deficit_sustainability
+    (BS-12): the multi-signal "is the cut costing you?" read. Monitors 5 channels over a
+    trailing 14-day window (phase-filtered → post-genesis only): HRV, sleep quality, recovery,
+    Tier-0 habit completion, training output. Each channel's first-third avg vs last-third avg
+    sets a direction; concurrent degradations → a severity. Deficit context uses MacroFactor's
+    real adaptive TDEE (consistent with /api/nutrition_overview), not a Harris-Benedict guess.
+    Honest empty state when <7 logged days. Correlative, n=1, never alarm-red.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = _experiment_date(14)
+    mf = _query_source("macrofactor", start, today)
+    if len(mf) < 7:
+        return _ok(
+            {
+                "deficit_sustainability": {
+                    "available": False,
+                    "days_logged": len(mf),
+                    "reason": "Needs ≥7 logged days; the cut is too new to read its cost yet.",
+                }
+            },
+            cache_seconds=3600,
+        )
+
+    def _f(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    cals = [_f(i.get("total_calories_kcal")) for i in mf]
+    cals = [c for c in cals if c]
+    avg_cal = round(sum(cals) / len(cals)) if cals else 0
+    latest = mf[-1]
+    tdee = _f(latest.get("tdee")) or _f(latest.get("expenditure"))
+    if not tdee:  # MCP fallback: Harris-Benedict from Withings weight (only if MF lacks TDEE)
+        wt = _query_source("withings", start, today)
+        if wt:
+            wkg = (_f(sorted(wt, key=lambda x: x.get("sk", ""))[-1].get("weight_lbs")) or 220) * 0.453592
+            tdee = round((10 * wkg + 6.25 * 182.88 - 5 * 35 + 5) * 1.55)
+        else:
+            tdee = 2400
+    deficit_kcal = round(tdee - avg_cal)
+    deficit_pct = round(deficit_kcal / tdee * 100, 1) if tdee else 0
+    in_deficit = deficit_kcal > 200
+    deficit_label = "aggressive" if deficit_pct > 25 else "moderate" if deficit_pct > 15 else "mild" if deficit_pct > 5 else "maintenance"
+
+    src = {s: sorted(_query_source(s, start, today), key=lambda x: x.get("sk", "")) for s in ("whoop", "habitify", "strava")}
+    whoop, habit, strava = src["whoop"], src["habitify"], src["strava"]
+
+    def trend_dir(vals):
+        v = [x for x in vals if x is not None]
+        if len(v) < 6:
+            return "insufficient_data", 0
+        third = len(v) // 3
+        first_avg = sum(v[:third]) / third
+        last_avg = sum(v[-third:]) / third
+        if first_avg == 0:
+            return "stable", 0
+        dp = round((last_avg - first_avg) / abs(first_avg) * 100, 1)
+        return ("declining", dp) if dp < -5 else ("improving", dp) if dp > 5 else ("stable", dp)
+
+    # Channel 1 — HRV
+    hrv = [_f(w.get("hrv")) for w in whoop if w.get("hrv")]
+    hrv_dir, hrv_d = trend_dir(hrv)
+    hrv_bad = hrv_dir == "declining" and abs(hrv_d) > 8
+    # Channel 2 — sleep quality (efficiency OR deep%)
+    eff = [
+        _f(w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage"))
+        for w in whoop
+        if (w.get("sleep_efficiency_pct") or w.get("sleep_efficiency_percentage"))
+    ]
+    deep = [
+        (_f(w.get("slow_wave_sleep_hours")) or 0) / max(_f(w.get("sleep_duration_hours")) or 1, 1) * 100
+        for w in whoop
+        if w.get("slow_wave_sleep_hours") and w.get("sleep_duration_hours")
+    ]
+    eff_dir, eff_d = trend_dir(eff)
+    deep_dir, deep_d = trend_dir(deep)
+    sleep_bad = (eff_dir == "declining" and abs(eff_d) > 3) or (deep_dir == "declining" and abs(deep_d) > 8)
+    # Surface the sub-signal that actually triggered the strain (deep% can flag while
+    # efficiency holds) so the displayed direction never reads "stable" next to "strain".
+    if sleep_bad and eff_dir != "declining":
+        eff_dir, eff_d = deep_dir, deep_d
+    # Channel 3 — recovery
+    rec = [_f(w.get("recovery_score")) for w in whoop if w.get("recovery_score")]
+    rec_dir, rec_d = trend_dir(rec)
+    rec_bad = rec_dir == "declining" and abs(rec_d) > 10
+    # Channel 4 — Tier-0 habit completion
+    t0 = [
+        _f(h.get("tier_0_completion_rate") or h.get("t0_rate"))
+        for h in habit
+        if (h.get("tier_0_completion_rate") or h.get("t0_rate")) is not None
+    ]
+    t0_dir, t0_d = trend_dir(t0)
+    t0_bad = t0_dir == "declining" and abs(t0_d) > 10
+    # Channel 5 — training output (Strava kJ/day)
+    daily_kj = {}
+    for s in strava:
+        d = s.get("sk", "").replace("DATE#", "")
+        daily_kj[d] = daily_kj.get(d, 0) + (_f(s.get("total_kilojoules")) or 0)
+    train = [daily_kj[d] for d in sorted(daily_kj)]
+    train_dir, train_d = trend_dir(train)
+    train_bad = train_dir == "declining" and abs(train_d) > 15
+
+    channels = [
+        {"name": "HRV", "status": "degraded" if hrv_bad else "stable", "direction": hrv_dir, "delta_pct": hrv_d},
+        {"name": "Sleep quality", "status": "degraded" if sleep_bad else "stable", "direction": eff_dir, "delta_pct": eff_d},
+        {"name": "Recovery", "status": "degraded" if rec_bad else "stable", "direction": rec_dir, "delta_pct": rec_d},
+        {"name": "Habit completion", "status": "degraded" if t0_bad else "stable", "direction": t0_dir, "delta_pct": t0_d},
+        {"name": "Training output", "status": "degraded" if train_bad else "stable", "direction": train_dir, "delta_pct": train_d},
+    ]
+    degraded = sum(1 for c in channels if c["status"] == "degraded")
+    if not in_deficit:
+        severity, verdict = "not_in_deficit", "No active deficit right now — nothing to strain."
+    elif degraded >= 4:
+        severity, verdict = (
+            "critical",
+            "Four-plus systems are bending under the deficit at once — the cut is outrunning recovery. Time to eat a little more and back off intensity.",
+        )
+    elif degraded >= 3:
+        severity, verdict = (
+            "warning",
+            "Three systems are slipping together — the deficit is starting to cost more than it's worth. A small bump in food and a deload would buy it back.",
+        )
+    elif degraded >= 2:
+        severity, verdict = "watch", "Two systems are showing strain — worth watching; this either settles or builds."
+    else:
+        severity, verdict = (
+            "sustainable",
+            "The body's absorbing the deficit — recovery, sleep, and output are holding while the weight comes off.",
+        )
+
+    return _ok(
+        {
+            "deficit_sustainability": {
+                "available": True,
+                "period": {"start": start, "end": today, "days": 14},
+                "deficit": {
+                    "in_deficit": in_deficit,
+                    "avg_intake_kcal": avg_cal,
+                    "tdee": round(tdee),
+                    "deficit_kcal": deficit_kcal,
+                    "deficit_pct": deficit_pct,
+                    "label": deficit_label,
+                },
+                "channels": channels,
+                "degraded_count": degraded,
+                "severity": severity,
+                "verdict": verdict,
+            }
         },
         cache_seconds=3600,
     )
@@ -944,8 +1140,11 @@ def handle_training_overview() -> dict:
         _tr = _query_source("training_reference", "2010-01-01", today)
         _latest_tr = sorted(_tr, key=lambda x: x.get("sk", ""))[-1] if _tr else None
         if _latest_tr:
-            training_blueprint = {"public": True, "confidence": _latest_tr.get("confidence"),
-                                  "note": "present training vs the proven loss-period blueprint"}
+            training_blueprint = {
+                "public": True,
+                "confidence": _latest_tr.get("confidence"),
+                "note": "present training vs the proven loss-period blueprint",
+            }
 
     # Weekly trend (for chart) — use flattened activities
     from collections import defaultdict as _dd

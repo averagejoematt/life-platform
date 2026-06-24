@@ -662,11 +662,41 @@ function cgmEmptyState() {
     `<div class="nut-coming cgm-ghost"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="cgm-svg" aria-hidden="true">${markers}<path class="cgm-curve" d="${curve}" vector-effect="non-scaling-stroke"/></svg>` +
     `<p class="rd-archive">When a CGM sensor is active, this marries each meal to its glucose response — the peak, the rise, the return to baseline, with the meal markers above. <strong>Sensor not active — fills in when you wear one.</strong> <span class="confidence conf-low">no sensor yet</span></p></div>`);
 }
+// RQA-05 — "is the cut costing you?" the five-channel deficit-sustainability read (ported from
+// the MCP get_deficit_sustainability). A degraded channel reads ember (the thing to look at),
+// a holding one muted ink — never red. Honest empty state until ≥7 logged days.
+function nutritionDeficitSustainability(ds) {
+  if (!ds) return "";
+  if (!ds.available) {
+    return sec("Is the cut costing you? — the five-channel read",
+      `<p class="rd-meta label">${esc(ds.reason || "The cut is too new to read its cost yet.")} It needs ~a week of logged days before the five recovery channels mean anything.</p>`);
+  }
+  const def = ds.deficit || {};
+  const ARROW = { improving: "↑", declining: "↓", stable: "→", insufficient_data: "·" };
+  const rows = (ds.channels || []).map((c) => {
+    const degraded = c.status === "degraded";
+    const insuf = c.direction === "insufficient_data";
+    const tone = degraded ? "dsx-strain" : insuf ? "dsx-none" : "dsx-hold";
+    const statusWord = degraded ? "strain" : insuf ? "too few days" : "holding";
+    const delta = (!insuf && c.delta_pct) ? ` ${c.delta_pct > 0 ? "+" : ""}${fmt(c.delta_pct)}%` : "";
+    return `<div class="dsx-row ${tone}"><span class="dsx-name">${esc(c.name)}</span>` +
+      `<span class="dsx-dir mono">${esc(ARROW[c.direction] || "·")}${esc(delta)}</span>` +
+      `<span class="dsx-status label">${esc(statusWord)}</span></div>`;
+  }).join("");
+  const sevTone = (ds.severity === "warning" || ds.severity === "critical") ? "dsx-sev-attn" : "dsx-sev-ok";
+  const defLine = def.in_deficit
+    ? `Running ~${fmt(def.avg_intake_kcal)} kcal against an estimated ${fmt(def.tdee)} TDEE — about a <strong>${fmt(def.deficit_kcal)} kcal/day (${fmt(def.deficit_pct)}%, ${esc(def.label)})</strong> deficit (TDEE is estimated, so read the % as a ballpark).`
+    : "No active deficit in the window.";
+  return sec("Is the cut costing you? — the five-channel read",
+    `<div class="dsx-verdict ${sevTone}"><span class="dsx-count mono">${ds.degraded_count}/5</span><span class="dsx-vtext">${esc(ds.verdict || "")}</span></div>` +
+    `<div class="dsx-rows">${rows}</div>` +
+    `<p class="rd-meta label">${defLine} The five channels — HRV, sleep quality, recovery, habit adherence, training output — are watched together: a deficit that's working shows up as the weight falling while these <em>hold</em>; one that's costing too much shows up as three or more slipping at once. A single strained channel is noise, not a verdict. Correlative, n=1 — an early signal, never alarm.</p>`);
+}
 async function renderNutrition(d) {
   // The API nests macros under d.nutrition (was read flat → blank); meal/protein field
   // names are frequency/food/avg_daily_g (were count/name/grams → empty tables).
   const n = (d && d.nutrition) || (d && !d.error ? d : {});
-  const [fm, ps] = await Promise.all([tryJSON("/api/frequent_meals"), tryJSON("/api/protein_sources")]);
+  const [fm, ps, ds] = await Promise.all([tryJSON("/api/frequent_meals"), tryJSON("/api/protein_sources"), tryJSON("/api/deficit_sustainability")]);
   const meals = (fm && fm.meals) || [];
   const prot = (ps && (ps.protein_sources || ps.sources || ps.proteins)) || [];
   const parts = [];
@@ -676,6 +706,9 @@ async function renderNutrition(d) {
   // ── §2 lead — the protein miss as THE weighted signal (P0.2).
   const lead = nutritionProteinLead(n);
   if (lead) parts.push(lead);
+  // RQA-05 — the five-channel "is the cut costing you?" read.
+  const dsx = nutritionDeficitSustainability(ds && ds.deficit_sustainability);
+  if (dsx) parts.push(dsx);
   // The one latest-day figure kept as "news".
   const news = figs([
     n.latest_calories != null && fig(fmt(n.latest_calories), `latest logged${n.latest_date ? " · " + fmtShort(n.latest_date) : ""}`),
