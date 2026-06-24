@@ -93,7 +93,7 @@
 - ✅ **RQA-03 — MacroFactor micronutrient sufficiency + protein-timing score** — `/api/nutrition_overview` + a panel (sufficiency bars + score figures). Beyond-macros depth.
 
 **Open (each = a new compute endpoint porting an MCP tool's logic + a panel — port carefully + verify vs the MCP output, don't rush):**
-- [ ] **RQA-04 — Readiness components on the Cockpit.** `computed_metrics.readiness_score` (73) + `component_scores` {recovery/sleep/movement/habits/hydration} are computed + stored but the Cockpit's readiness band is derived from raw vitals, not these. Surface the stored score + component breakdown (cheap — no reimplementation, just a new read).
+- ✅ **RQA-04 — Readiness components on the Cockpit (DONE, PR #202).** `_latest_readiness()` reads `computed_metrics.readiness_score` + `component_scores` into `/api/snapshot.readiness`; `/now/` renders the stored score + worded band (primed/moderate/go-easy, ember not red) + per-component bars (recovery/sleep/movement/habits) above the raw-vitals rows. Cheap read-only surface of a previously-hidden signal; live-verified (score 63 · moderate).
 - [ ] **RQA-05 — Deficit-sustainability panel** (`get_deficit_sustainability`) — the multi-signal "is the cut eating your sleep/HRV" thesis-fit piece. Highest narrative value; needs the channel-degradation logic ported.
 - [ ] **RQA-06 — Autonomic balance** (`get_autonomic_balance`, FLOW/STRESS quadrant) + **RQA-07 — Zone-2 breakdown** (`get_zone2_breakdown`, Z2 vs 150-min). New compute endpoints.
 - [ ] **RQA-08 — Recovery-vs-prior-day-deficit overlay** — dual-line (NO Pearson r at n=7; overlay + "too few points for a coefficient" caption).

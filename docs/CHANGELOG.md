@@ -1,3 +1,7 @@
+## RQA-04 — readiness score + component breakdown on the Cockpit — 2026-06-23
+
+Surfaced a previously-hidden signal: `computed_metrics.readiness_score` + `component_scores` (written daily by daily-metrics-compute) are now read into `/api/snapshot.readiness` via a new read-only `_latest_readiness()` helper, and `/now/` renders the stored score, a worded band (primed / moderate / go easy — ember-toned, never alarm-red), and per-component ember bars (recovery / sleep / movement / habits) above the existing raw-vitals rows. Before, the Cockpit only showed a band re-derived from raw vitals; the actual computed score and its breakdown were never displayed. Cheap (no reimplementation, no new endpoint, no extra client roundtrip, no DDB change); deployed + live-verified (score 63 · moderate). PR #202.
+
 ## Physical page redesign (P0→P2 — weight cockpit + composition arc + transparent PhenoAge) — 2026-06-23
 
 Reframed `/evidence/physical/` on the spine **"weight is the metronome; composition is the arc"** — a daily weight cockpit (Tier 1) over an episodic, countdown-driven composition arc (Tier 2). Per `docs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md`; 21 commits, one per P-item. **Deployed + live-verified (build `89c294fb` == HEAD); PR #201.** Fifth Evidence page (after Nutrition #193/#194 · Training #195 · Sleep #196 · Habits #197). Page renamed "Body composition" → "Weight & composition".
