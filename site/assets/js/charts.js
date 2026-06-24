@@ -201,6 +201,82 @@ export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", un
 }
 
 // Tiny inline sparkline (no axes/caption). values: [numbers].
+// Vitals component ring (P0.1) — a 0→1 arc with a centred value + label. tone ∈ {ember,
+// muted, alert}: ember = good/recovered, muted = neutral/forming, alert = reserved RED STATE
+// (run-down / out-of-range) — never used to encode a falling direction. The ring IS a
+// component (recovery / HRV / RHR / sleep) so the glance is decomposed, not a black-box grade.
+export function ring({ value = "", sub = "", label = "", fill = 0, tone = "ember", thin = false } = {}) {
+  const r = 42, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, Number(fill) || 0));
+  const dash = `${(f * c).toFixed(1)} ${(c - f * c).toFixed(1)}`;
+  const aria = `${label}: ${value}${sub ? " " + sub : ""}`;
+  return `<div class="vr vr-${escAttr(tone)}${thin ? " vr-thin" : ""}">` +
+    `<svg class="vr-svg" viewBox="0 0 100 100" role="img" aria-label="${escAttr(aria)}">` +
+    `<circle class="vr-track" cx="50" cy="50" r="${r}" fill="none"/>` +
+    `<circle class="vr-arc" cx="50" cy="50" r="${r}" fill="none" stroke-dasharray="${dash}" transform="rotate(-90 50 50)" stroke-linecap="round"/>` +
+    `</svg>` +
+    `<div class="vr-c"><span class="vr-v num">${escAttr(value)}</span>${sub ? `<span class="vr-sub label">${escAttr(sub)}</span>` : ""}</div>` +
+    `<span class="vr-l label">${escAttr(label)}</span></div>`;
+}
+
+// P1.2 — autonomic-recovery hero: RHR + HRV on ONE shared time frame. Each is normalised to
+// its own range; RHR is INVERTED (low RHR plots high) so that BOTH lines rising = the body
+// downshifting into recovery — direction reads ember-positive even though RHR falls. Never red.
+// Tick-spine signature. Refuses <4 points. hist items: {date, rhr_bpm, hrv_ms}.
+export function autonomicHero(hist, { height = 190, label = "" } = {}) {
+  const rhr = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.rhr_bpm) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
+  const hrv = (hist || []).map((h) => ({ d: String(h.date || ""), v: Number(h.hrv_ms) })).filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d)).sort((a, b) => a.d.localeCompare(b.d));
+  if (rhr.length < 4 || hrv.length < 4) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The autonomic hero draws once there are 4+ nights of resting-HR and HRV.</figcaption></figure>`;
+  }
+  const W = 600, H = height, P = 12;
+  const allD = [...rhr, ...hrv].map((p) => Date.parse(p.d));
+  const t0 = Math.min(...allD), t1 = Math.max(...allD), span = Math.max(1, t1 - t0);
+  const x = (d) => P + ((Date.parse(d) - t0) / span) * (W - 2 * P);
+  const norm = (arr, invert) => { const vs = arr.map((p) => p.v); const lo = Math.min(...vs), hi = Math.max(...vs); return arr.map((p) => ({ d: p.d, n: hi === lo ? 0.5 : (invert ? 1 - (p.v - lo) / (hi - lo) : (p.v - lo) / (hi - lo)) })); };
+  const y = (n) => P + (1 - n) * (H - 2 * P);
+  const path = (arr) => arr.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)} ${y(p.n).toFixed(1)}`).join(" ");
+  const rhrN = norm(rhr, true), hrvN = norm(hrv, false);
+  const _r = (n) => Math.round(n * 10) / 10;
+  const rhrDir = rhr[rhr.length - 1].v <= rhr[0].v ? "down" : "up";
+  const hrvDir = hrv[hrv.length - 1].v >= hrv[0].v ? "up" : "down";
+  const summary = `Autonomic hero: resting HR ${rhrDir} (${_r(rhr[0].v)}→${_r(rhr[rhr.length - 1].v)} bpm), HRV ${hrvDir} (${_r(hrv[0].v)}→${_r(hrv[hrv.length - 1].v)} ms). Both toward recovery read ember-positive.`;
+  return `<figure class="chart ah-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+    `<path class="ah-hrv" d="${path(hrvN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `<path class="ah-rhr" d="${path(rhrN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
+    `<circle class="chart-dot" cx="${x(hrvN[hrvN.length - 1].d).toFixed(1)}" cy="${y(hrvN[hrvN.length - 1].n).toFixed(1)}" r="3.2"/>` +
+    `<circle class="chart-dot" cx="${x(rhrN[rhrN.length - 1].d).toFixed(1)}" cy="${y(rhrN[rhrN.length - 1].n).toFixed(1)}" r="3.2"/></svg>` +
+    `<figcaption class="chart-cap label">${escAttr(label || "Autonomic recovery")} · <span class="ah-key"><i class="ah-sw ah-sw-hrv"></i>HRV ${escAttr(hrvDir)} (${_r(hrv[hrv.length - 1].v)} ms)</span> <span class="ah-key"><i class="ah-sw ah-sw-rhr"></i>resting HR ${escAttr(rhrDir)} (${_r(rhr[rhr.length - 1].v)} bpm, axis inverted)</span> · both lines rising = the body downshifting into recovery — early moves are partly water & novelty.</figcaption></figure>`;
+}
+
+// P2.1 — autonomic-balance 2×2: recovery (y) vs day strain (x), last 7-8 days as dots. Four
+// states — FLOW (recovered + working), RECOVERY (recovered + easy), STRESS (depleted + working),
+// LOW (depleted + easy). Today's dot is ember; the rest muted ink. A SNAPSHOT — no trajectory
+// arrows at n≈8. No red (a low day isn't an alarm). points: [{strain, recovery, date, today}].
+export function autonomicQuadrant(points, { size = 300 } = {}) {
+  const pts = (points || []).filter((p) => Number.isFinite(p.strain) && Number.isFinite(p.recovery));
+  if (pts.length < 3) {
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The autonomic 2×2 fills once there are a few days of strain + recovery.</figcaption></figure>`;
+  }
+  const W = 320, H = 320, P = 26, xmax = 21, ymax = 100;
+  const x = (s) => P + (Math.max(0, Math.min(xmax, s)) / xmax) * (W - 2 * P);
+  const y = (r) => P + (1 - Math.max(0, Math.min(ymax, r)) / ymax) * (H - 2 * P);
+  const xMid = x(10), yMid = y(50);
+  const labels = [
+    { t: "FLOW", x: (xMid + (W - P)) / 2, y: P + 12 },
+    { t: "RECOVERY", x: (P + xMid) / 2, y: P + 12 },
+    { t: "STRESS", x: (xMid + (W - P)) / 2, y: H - P - 6 },
+    { t: "LOW", x: (P + xMid) / 2, y: H - P - 6 },
+  ].map((l) => `<text class="aq-lab" x="${l.x.toFixed(0)}" y="${l.y.toFixed(0)}" text-anchor="middle">${l.t}</text>`).join("");
+  const dots = pts.map((p) => `<circle class="aq-dot${p.today ? " aq-today" : ""}" cx="${x(p.strain).toFixed(1)}" cy="${y(p.recovery).toFixed(1)}" r="${p.today ? 5 : 3.5}"><title>${escAttr((p.date || "") + " · recovery " + Math.round(p.recovery) + "% · strain " + (Math.round(p.strain * 10) / 10))}</title></circle>`).join("");
+  return `<figure class="chart aq-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Autonomic 2x2: recovery vs strain, last ${pts.length} days, today highlighted.">` +
+    `<line class="aq-div" x1="${xMid.toFixed(0)}" y1="${P}" x2="${xMid.toFixed(0)}" y2="${H - P}"/>` +
+    `<line class="aq-div" x1="${P}" y1="${yMid.toFixed(0)}" x2="${W - P}" y2="${yMid.toFixed(0)}"/>` +
+    labels + dots +
+    `<text class="aq-ax" x="${W / 2}" y="${H - 4}" text-anchor="middle">day strain →</text>` +
+    `<text class="aq-ax" x="8" y="${H / 2}" text-anchor="middle" transform="rotate(-90 8 ${H / 2})">recovery →</text>` +
+    `</svg><figcaption class="chart-cap label">Each dot a day; today is ember. A snapshot of where the body's sat lately — no trend arrow drawn at this n. Recovered + working = flow; depleted + working = stress; a low day is just low, not an alarm.</figcaption></figure>`;
+}
+
 export function sparkline(values, { height = 34 } = {}) {
   const pts = _points(values || [], "v", "d");
   if (pts.length < 2) return `<span class="spark spark--empty"></span>`;
