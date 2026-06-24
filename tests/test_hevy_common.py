@@ -150,10 +150,16 @@ def test_normalize_workout_duration(sample_workout_kg):
     assert rec["duration_sec"] == 3300
 
 
-def test_normalize_workout_raw_ref_points_at_s3(sample_workout_kg):
-    from hevy_common import normalize_workout
+def test_normalize_workout_raw_ref_points_at_s3(sample_workout_kg, monkeypatch):
+    # hevy_common.BUCKET is bound from $S3_BUCKET at IMPORT time (default
+    # "matthew-life-platform"). Several other test modules set S3_BUCKET="test-bucket",
+    # so in the full suite the value the import captured depends on which module ran
+    # first — this passed in isolation but failed in-suite. Pin the bucket so the path
+    # contract is asserted deterministically regardless of suite order.
+    import hevy_common
 
-    rec = normalize_workout(sample_workout_kg)
+    monkeypatch.setattr(hevy_common, "BUCKET", "matthew-life-platform")
+    rec = hevy_common.normalize_workout(sample_workout_kg)
     assert rec["raw_ref"] == "s3://matthew-life-platform/raw/hevy/wkt_abc123.json"
 
 
