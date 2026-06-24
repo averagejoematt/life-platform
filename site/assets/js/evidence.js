@@ -1759,8 +1759,27 @@ async function renderPulse(d) {
     `<p class="rd-meta label">Day strain against recovery, the last ${qpts.length} days — recovered <em>and</em> training hard is flow; depleted and still pushing is stress. A snapshot of the spread, not a trajectory; no arrow drawn at this n.</p>`));
   parts.push(vitalsSmallMultiples(hist)); // P2.2 — small-multiples grid (replaces the 8 equal charts) + P2.5 remove
   parts.push(vitalsBackgroundStrip(p)); // P2.3 — background vitals (honest empty until captured)
+  parts.push(vitalsCaptureBacklog(p)); // P3.1–P3.6 — capture + relationships, honestly gated
   parts.push(vitalsHubLinks()); // P2.4 — hub links out to the domain pages
   return parts.join("");
+}
+// P3.1–P3.6 — new-capture + relationships, honestly gated. Each is a real capability awaiting
+// data; none fabricate. P3.6 (cross-metric correlations) STAYS withheld until ≥2 weeks of
+// overlap — no coefficient is computed at ~10 days; it'll reuse the sleep correlation-board.
+function vitalsCaptureBacklog(p) {
+  const dayNum = p && p.day_number;
+  const wks = dayNum != null ? Math.max(0, 14 - dayNum) : null;
+  const cards = [
+    `<div class="cap-card"><h4 class="cap-h">Blood pressure <span class="cap-tag">needs a cuff</span></h4><p class="rd-meta label">The most valuable missing daily vital for a heavy man mid-cut — and the one that should improve visibly. A morning cuff reading would add a BP trend here. Not captured yet.</p></div>`,
+    `<div class="cap-card"><h4 class="cap-h">Hourly habit history <span class="cap-tag">upgrades the glyphs</span></h4><p class="rd-meta label">The glyph row shows "X of N today"; with hourly habit-completion history it would become "vs your average by this hour" — a real pace benchmark. Until that exists, the honest X-of-N stands (no faked hourly baseline).</p></div>`,
+    `<div class="cap-card"><h4 class="cap-h">Continuous / walking HR <span class="cap-tag">needs capture</span></h4><p class="rd-meta label">Feeds Zone-2 and the autonomic read with daytime heart rate, not just the overnight resting figure.</p></div>`,
+    `<div class="cap-card"><h4 class="cap-h">VO₂max trend <span class="cap-tag">arc cadence</span></h4><p class="rd-meta label">The longevity gold-standard fitness number — a slow-moving arc metric beside the daily vitals.</p></div>`,
+    `<div class="cap-card"><h4 class="cap-h">Subjective energy / mood <span class="cap-tag">needs capture</span></h4><p class="rd-meta label">A morning 1–5 "how do you actually feel" check-in — the ground-truth overlay the wearables miss, graded against the readiness read.</p></div>`,
+    `<div class="cap-card"><h4 class="cap-h">Cross-metric relationships <span class="cap-tag">unlocks ${wks != null && wks > 0 ? "in ~" + wks + " days" : "at 2 weeks"}</span></h4><p class="rd-meta label">Which vitals move together — sleep→recovery, strain→next-day HRV — stays <strong>withheld</strong> until ~2 weeks of overlapping days (day ${dayNum != null ? dayNum : "?"} now). At n≈10 it's noise, not signal; when it opens it reuses the self-policing correlation board from Sleep — direction-only first, a coefficient only once the window is honest. No chip is drawn early.</p></div>`,
+  ];
+  return sec("What sharpens the read — capture & relationships",
+    `<div class="cap-grid">${cards.join("")}</div>` +
+    `<p class="rd-meta label">Each is a real capability waiting on data or time, not a stub — ranked by what would move the daily read most. The correlations stay closed until the window earns them.</p>`);
 }
 // P2.2 — small-multiples grid: every signal as a labelled sparkline (latest value + trend +
 // temporal frame), replacing the eight big equal charts. P2.5: this IS the removal of the old
