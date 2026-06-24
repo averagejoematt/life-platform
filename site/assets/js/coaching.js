@@ -200,9 +200,14 @@ async function renderRead(s, id) {
       // The Third Wall, explicit: the AI's read (them) → Matthew's response (me).
       const ai = [["The AI's read", e.ai_present, "machine"], ["Worth watching", e.ai_cautionary, "machine"], ["Worth celebrating", e.ai_affirming, "machine"]].filter((v) => v[1]);
       const mattText = e.matthew_notes || e.matthew_agreement;
+      // P3.1 — the reply SLOT is first-class even while empty: the wall is a dialogue, and
+      // Matthew's half is HELD SPACE that's waiting, not absent. Inviting, never a nag; the
+      // reply mechanic itself is intentionally not wired here (his words, his hand).
       const mattVoice = mattText
         ? `<div class="voice human"><span class="who">Matthew</span><p class="what">${esc(mattText)}</p></div>`
-        : `<div class="voice human voice-pending"><span class="who">Matthew</span><p class="what">Pending Matthew's response — he hasn't weighed in on the AI's read of this week yet.</p></div>`;
+        : `<div class="voice human voice-pending"><span class="who">Matthew</span>` +
+          `<p class="what pending-lead">The other half of the wall — Matthew's reply — is held open for this week.</p>` +
+          `<p class="pending-sub label">He answers the AI on his own time; an empty slot is honest, not a gap. When he writes back, it lands right here, beside the machine's read.</p></div>`;
       const hasAny = ai.length || mattText;
       read.innerHTML = `<p class="dx-kicker label">field note · week ${esc(id)} · the AI's read ↔ Matthew's response${e.ai_tone ? ` · ${esc(e.ai_tone)}` : ""}</p>` +
         (hasAny ? ai.map(([who, txt, cls]) => `<div class="voice ${cls}"><span class="who">${esc(who)}</span><p class="what">${esc(txt)}</p></div>`).join("") + mattVoice
