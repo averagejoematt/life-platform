@@ -602,6 +602,9 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .vr-muted .vr-arc { stroke: var(--ink-muted); }
 .vr-alert .vr-arc { stroke: var(--alert); }
 .vr-thin .vr-arc { opacity: 0.72; }
+/* P0.4 — thin-data ring state: a dashed track signals the baseline is still forming, so a
+   10-day fill never reads as a settled normal. Pairs with the "N days in" band stamp. */
+.vr-thin .vr-track { stroke-dasharray: 3 5; opacity: 0.8; }
 .vr-c { position: absolute; top: calc(50% - 0.7em); left: 0; right: 0; display: flex; flex-direction: column; align-items: center; line-height: 1; }
 .vr-v { font-size: var(--fs-h4, 1.05rem); }
 .vr-ember .vr-v { color: var(--ember); }
