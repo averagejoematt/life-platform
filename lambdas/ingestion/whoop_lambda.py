@@ -410,6 +410,15 @@ _config = IngestionConfig(
     enable_secret_writeback=True,
     enable_item_size_guard=True,
     refresh_today=True,  # Whoop recovery score finalizes mid-morning
+    # Late-arriving workouts (2026-06-24): Whoop stores per-workout sub-records at
+    # DATE#{date}#WORKOUT#{id}, but gap detection keys off the DATE#{date} recovery
+    # record — so a workout that syncs from the band AFTER that day's recovery was
+    # stored lands on an already-"present" date and is silently dropped, exactly the
+    # Strava afternoon-walk class. Whoop runs hourly and has no rate-limit breaker, so
+    # re-fetching a short trailing window is safe and cheap; it re-emits the per-workout
+    # sub-records (keyed by id, idempotent) and picks up the late arrival. 2 days covers
+    # the band's continuous-sync latency with buffer.
+    refresh_trailing_days=2,
 )
 
 
