@@ -3,7 +3,7 @@
 # Runtime deps are in lambdas/ (stdlib only) or cdk/requirements.txt
 
 # Testing
-pytest==9.1.0
+pytest==9.1.1
 pytest-cov==7.1.0
 
 # Visual QA — Playwright browser automation (tests/visual_qa.py).
@@ -13,16 +13,16 @@ playwright==1.60.0
 # Linting & formatting (config in pyproject.toml). ruff owns lint + import-sort;
 # black owns formatting. (standalone isort removed — it fought ruff's sorter.)
 flake8==7.3.0
-ruff==0.15.17
+ruff==0.15.18
 black==26.5.1
 
 # Type checking (advisory — see tests/test_mypy_clean_modules.py + mypy.ini)
 mypy==2.1.0
 
 # AWS SDK (for tests that call boto3 directly)
-boto3==1.43.30
-botocore==1.43.30
+boto3==1.43.36
+botocore==1.43.36
 
 # CDK (synth + diff)
-aws-cdk-lib>=2.259.0
+aws-cdk-lib>=2.260.0
 constructs>=10.6.0
