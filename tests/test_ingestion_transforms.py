@@ -431,3 +431,23 @@ def test_gapfill_trailing_still_reports_genuine_older_gap():
     cfg = _cfg(refresh_trailing_days=3)
     missing = framework._find_missing_dates(_FakeTable(present), cfg, _NullLogger())
     assert _days_ago(5) in missing
+
+
+def test_trailing_refresh_policy_per_source():
+    """Pin the per-source refresh_trailing_days policy (late-sync drop hardening).
+
+    Sources that store late-arriving sub-records behind an already-present DATE#
+    record need a trailing re-fetch (the Jun 2026 Strava/Whoop drop class). Same-day-
+    finalized or rate-limit-fragile sources deliberately stay at 0. Pinning the policy
+    makes any change a conscious, re-justified decision rather than a silent drift.
+    """
+    from ingestion import garmin_lambda, strava_lambda, whoop_lambda
+
+    # Activity sources with late device-sync → trailing re-fetch ON.
+    assert strava_lambda._config.refresh_trailing_days == 3  # phone-uploaded walks, hours-to-days late
+    assert whoop_lambda._config.refresh_trailing_days == 2  # band workouts stored as DATE#..#WORKOUT# sub-records
+
+    # Garmin: activities already flow to Strava (covered); its unique data is same-day-
+    # finalized wellness; it 429-throttles aggressively (4x/day + a refresh breaker), so
+    # extra trailing re-fetches would be low-value and risk worsening the throttle.
+    assert getattr(garmin_lambda._config, "refresh_trailing_days", 0) == 0
