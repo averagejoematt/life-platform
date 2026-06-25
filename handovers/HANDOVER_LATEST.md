@@ -1,5 +1,18 @@
-# Handover — 2026-06-24 (inbox-noise triage → CI-health excavation + Strava/alarm fixes)
+# Handover — 2026-06-24 (inbox-noise triage → CI-health excavation + Strava/alarm fixes + continuation)
 
+Started as "reduce platform inbox noise — bugs vs one-offs?" Turned into peeling a **chain of masked CI gates**, then a data-integrity + privacy continuation. `main` @ `9fc9a996+`. **Everything CI-green and deployed except the low-urgency #215 email deploy (staged).**
+
+## Continuation after the CI-health work (same session, all merged)
+- **Dependabot cleared:** #200 (dev-tooling patches) + #198 (checkout v7) merged; #199 closed (superseded by #200). 0 open PRs.
+- **#214 — Whoop late-sync hardening — DEPLOYED + live.** Same class as the Strava bug: Whoop stores per-workout sub-records (`DATE#..#WORKOUT#id`), so a workout syncing after the day's recovery record was stored would drop. `refresh_trailing_days=2`. `test_trailing_refresh_policy_per_source` pins the policy and documents why Garmin (429-fragile; activities→Strava; same-day wellness) + eightsleep/withings/habitify (same-day finalized) are deliberately excluded. Deployed `LifePlatformIngestion`; verified.
+- **#215 — chronicle fallback privacy leak — MERGED, deploy STAGED.** `_FALLBACK_ELENA_PROMPT` (fires only on S3 config-load failure) still named real public figures (Attia/Huberman/Norton/Walker) → fictional roster (Reyes/Nakamura/Webb/Park). `test_no_real_names_in_chronicle.py` guards it. **Needs `cdk deploy LifePlatformEmail` (low urgency).**
+- **Verified-already-done (no work):** `get_freshness_status` MCP interior-gap parity — the CLAUDE.md "still high-water-mark only" follow-up was **stale**; B3 (2026-06-21) already wired `find_interior_gaps` → returns `interior_gaps` + `interior_gap_count`, test green. Don't re-chase it.
+
+**Session total: 8 PRs merged.** The only open action is the staged #215 email deploy (low urgency).
+
+---
+
+## Original CI-health writeup
 Started as "reduce platform inbox noise — bugs vs one-offs?" Turned into peeling a **chain of masked CI gates**. `main` @ `317aa865`. **Lint + Unit Tests are green; one deploy is PENDING Matthew (the only thing left).**
 
 ## TL;DR
