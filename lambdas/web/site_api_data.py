@@ -350,7 +350,11 @@ def handle_discoveries() -> dict:
                 {
                     "name": exp.get("name", ""),
                     "description": exp.get("description", ""),
-                    "hypothesis": exp.get("hypothesis_template", ""),
+                    # Substitute the {duration} token (was leaking literally on /protocols/discoveries:
+                    # "Tongkat Ali … for {duration} days"). Same fix the experiments handler already has.
+                    "hypothesis": (exp.get("hypothesis_template", "") or "").replace(
+                        "{duration}", str(exp.get("suggested_duration_days") or "several")
+                    ),
                     "protocol": exp.get("protocol_template", ""),
                     "pillar": exp.get("pillar", ""),
                     "evidence_tier": exp.get("evidence_tier", ""),

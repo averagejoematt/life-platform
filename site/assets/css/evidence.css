@@ -114,10 +114,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-grid { display: grid; gap: var(--bento-gap); }
 @media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
 .supp { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
-.supp-top { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
-.supp-name { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.1; flex: 1; min-width: 0; }
-.supp-dose { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
-.supp-timing { color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 1px 6px; }
+/* Grid so a long dose ("spectrum + intra-workout") can never overprint the title:
+   title wraps in col 1; dose + timing stack right-aligned in col 2. */
+.supp-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: var(--sp-3); row-gap: var(--sp-1); }
+.supp-name { grid-column: 1; font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.1; min-width: 0; }
+.supp-dose { grid-column: 2; justify-self: end; text-align: right; max-width: 13ch; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
+.supp-timing { grid-column: 2; justify-self: end; color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 1px 6px; white-space: nowrap; }
 .supp-why { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); }
 .supp-ev { margin-top: var(--sp-3); display: flex; align-items: center; gap: var(--sp-3); }
 .supp-evlabel { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
@@ -370,3 +372,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .mi-row { display: grid; gap: var(--sp-1); }
 .mi-in { max-width: 220px; }
 .mi-out { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); min-height: 18px; }
+
+/* v5 render-QA: wide data tables (e.g. inference "by model", 5 numeric cols) overflowed
+   the 390px viewport with values clipped off-screen. Let any readout table scroll
+   horizontally inside its own box on small screens instead of clipping. */
+@media (max-width: 560px) {
+  .readout .rd-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
