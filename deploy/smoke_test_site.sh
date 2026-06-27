@@ -64,7 +64,7 @@ check_status "Subscribe"            "$BASE/subscribe/"
 # Story sub-pages
 check_status "Story · chronicle"    "$BASE/story/chronicle/"
 check_status "Story · journal"      "$BASE/story/journal/"
-check_status "Story · lab-notes"    "$BASE/story/lab-notes/"
+check_status "Coaching · lab-notes" "$BASE/coaching/lab-notes/"
 check_status "Story · timeline"     "$BASE/story/timeline/"
 check_status "Story · about"        "$BASE/story/about/"
 # Evidence topics (sample across groups)
@@ -89,7 +89,7 @@ check_status "/character/ → 301"    "$BASE/character/"   "301"
 check_status "/glucose/ → 301"      "$BASE/glucose/"     "301"
 check_status "/sleep/ → 301"        "$BASE/sleep/"       "301"
 check_status "/habits/ → 301"       "$BASE/habits/"      "301"
-check_status "/data/ → 301"         "$BASE/data/"        "301"
+check_status "/evidence/ → 301"     "$BASE/evidence/"    "301"
 check_status "/board/ → 301"        "$BASE/board/"       "301"
 check_status "/platform/ → 301"     "$BASE/platform/"    "301"
 echo ""
@@ -139,7 +139,8 @@ if [[ "$QUICK" != "--quick" ]]; then
   check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"'
   check_body_contains "Home: door · the cockpit"      "$HOME_FILE"  'the cockpit'
   check_body_contains "Home: door · the story"        "$HOME_FILE"  'the story'
-  check_body_contains "Home: door · the evidence"     "$HOME_FILE"  'the evidence'
+  check_body_contains "Home: door · the data"         "$HOME_FILE"  'the data'
+  check_body_contains "Home: door · the protocols"    "$HOME_FILE"  'the protocols'
   # Cockpit: live data wiring
   check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'
   check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'
@@ -149,7 +150,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   # Evidence: registry + readout shell + the new live Pipeline-status topic
   check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  '__EVIDENCE_REGISTRY__'
   check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'
-  check_body_contains "Evidence: Pipeline-status topic" "$EVID_FILE" 'Pipeline status'
+  check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'
   check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness'
   # Subscribe form present
   check_body_contains "Subscribe: form present"       "$SUB_FILE"   'subscribe'
