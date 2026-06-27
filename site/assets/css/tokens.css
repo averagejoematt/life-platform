@@ -458,6 +458,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-down { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chart-dot { fill: var(--ember); }
+/* Interactive line-chart hover (wired by motion.js, data from data-cpts) — a focus dot
+   + cursor-following readout that make every trend chart explorable. */
+.chart-focus { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
+  background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); pointer-events: none; z-index: 3; }
+.chart-tip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); white-space: nowrap; pointer-events: none;
+  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-xs); padding: 2px 8px;
+  color: var(--ink); box-shadow: var(--shadow-soft); z-index: 4; }
+.chart-focus[hidden], .chart-tip[hidden] { display: none; }
 /* P0.1 — trend-weight hero: faint raw daily dots (scale noise) + confident ember trend +
    a muted genesis rule. Ember = the smoothed signal; dots are deliberately faint. */
 .wt-trend { stroke: var(--ember); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
