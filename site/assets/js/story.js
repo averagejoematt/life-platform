@@ -117,6 +117,7 @@ function renderNumbers(journey) {
     const up = lost < -0.05, even = Math.abs(lost) <= 0.05;
     const el = bind("lost");
     el.textContent = even ? "0" : String(Math.round(Math.abs(lost) * 10) / 10);
+    if (window.__moCount) window.__moCount(el);  // count-up once the real value lands
     const figEl = el.closest(".figure");
     if (figEl) {
       figEl.classList.toggle("is-up", up);
@@ -342,7 +343,7 @@ async function load() {
   // The review's "central number": a prominent day-of-experiment counter in the hero.
   const { dayN, weekN } = genesisCount();
   if (dayN >= 1) {
-    const dn = bind("dayNum"); if (dn) dn.textContent = String(dayN);
+    const dn = bind("dayNum"); if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }
     const dc = bind("dayCap"); if (dc) dc.textContent = dayN === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`;
   }
   dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
