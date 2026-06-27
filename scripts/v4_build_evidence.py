@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-v4_build_evidence.py — generate Door 3 (The Evidence) as a master-detail app.
+v4_build_evidence.py — generate the archive pillars (Data · Protocols · Method).
 
-Emits an app shell (horizontal GROUP tabs · left topic TILES · center readout
-that loads dynamically) at site/evidence/index.html AND a per-slug shell at
-site/evidence/<slug>/index.html (same app, pre-selected slug) so deep links and
-the old-URL redirects resolve on static hosting. The full registry is embedded
-as window.__EVIDENCE_REGISTRY__; assets/js/evidence.js does tabs/sidebar/routing
-and the bespoke, data-bound readouts. Editorial topics carry authored content;
-archive topics link to their preserved /legacy view.
+v5 (2026-06-27): the old single "Evidence" door is split into THREE pillars, all
+served by one base-aware engine (assets/js/evidence.js):
+  • /data/      — The body + Mind & accountability readouts (top-nav door)
+  • /protocols/ — supplements · experiments · challenges · discoveries (top-nav door)
+  • /method/    — how-it-holds-up + the-machine + reset-log (footer-tier, no door)
 
-Read-only inputs; writes only under site/evidence/. Run from repo root:
+Each pillar emits an app shell (horizontal GROUP tabs · left topic TILES · center
+readout) + per-slug shells, with __ARCHIVE_BASE__/__ARCHIVE_DOOR__/__ARCHIVE_TITLE__
+set per page so the shared engine routes within the right base. The registry is
+embedded as window.__EVIDENCE_REGISTRY__ (filtered to the pillar's groups).
+
+Read-only inputs; writes under site/{data,protocols,method}/. Run from repo root:
     python3 scripts/v4_build_evidence.py
 """
 from __future__ import annotations
@@ -18,8 +21,6 @@ from __future__ import annotations
 import html
 import json
 from pathlib import Path
-
-OUT = Path("site/evidence")
 
 # slug, title, blurb, group, mode, endpoint, root, legacy
 #   mode: data (fetch+render) · interactive (render+wire, no fetch) ·
