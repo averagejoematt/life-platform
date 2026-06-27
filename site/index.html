@@ -37,6 +37,7 @@
       } catch (e) {}
     })();
   </script>
+  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
 </head>
 <body>
   <a class="skip" href="#arc">Skip to the story</a>
@@ -48,9 +49,11 @@
     </a>
     <nav class="doors" aria-label="Doors">
       <a href="/now/" title="Today's live instrument — your daily numbers, read back to you">the cockpit</a>
-      <a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about">the story</a>
+      <a href="/data/" title="Every source the platform reads — trends now and over time">the data</a>
       <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements">the coaching</a>
-      <a href="/evidence/" title="The data, page by page — every metric, audited">the evidence</a>
+      <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries">the protocols</a>
+      <a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about">the story</a>
+      
       <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
     </nav>
   </header>
@@ -60,6 +63,7 @@
     <div class="hero-grid">
       <div class="hero-copy">
         <p class="kicker label">a measured life · proof, not promises</p>
+        <p class="hero-daycount"><span class="hd-num num" data-bind="dayNum" data-countup>··</span> <span class="hd-cap" data-bind="dayCap">days into the experiment</span></p>
         <p class="hero-day label" data-bind="genesisStamp" hidden></p>
         <p class="hero-proof" data-bind="hero-proof" hidden></p>
         <h1 class="hero-h">An honest documentary of an <em>ordinary</em> life, rebuilt with AI.</h1>
@@ -85,13 +89,29 @@
 
   <!-- ── THE ARC: scrollytelling waveform with honest down-beats ──────────── -->
   <main id="arc" class="arc">
+    <!-- The loop: what this site IS, in one screen — the through-line every door serves. -->
+    <section class="beat beat-loop" aria-label="What this is">
+      <p class="beat-kicker label">what this is · the loop</p>
+      <h2 class="beat-h">One feedback loop, documented in public.</h2>
+      <div class="loop">
+        <a class="loop-node" href="/data/"><span class="ln-name">The Data</span><span class="ln-role">Every source — the body, the mind — now and over time.</span></a>
+        <span class="loop-arrow" aria-hidden="true">→</span>
+        <a class="loop-node" href="/coaching/"><span class="ln-name">The Coaching</span><span class="ln-role">AI coaches read the data and argue about it.</span></a>
+        <span class="loop-arrow" aria-hidden="true">→</span>
+        <a class="loop-node" href="/protocols/"><span class="ln-name">The Protocols</span><span class="ln-role">The levers — what gets changed to move the data.</span></a>
+        <span class="loop-arrow" aria-hidden="true">→</span>
+        <a class="loop-node" href="/story/"><span class="ln-name">The Story</span><span class="ln-role">The human journey — chronicle, podcast, journal.</span></a>
+      </div>
+      <p class="beat-note">The protocols shift the data; the data feeds the coaching; the story narrates all of it — week by week. <a href="/now/">Today's slice lives in the cockpit →</a></p>
+    </section>
+
     <!-- P2.1 — the waveform LEADS the arc (the most shareable, least-braggy proof), right under
          the hero's claim; the numbers follow. Claim + proof share the opening screen. -->
     <section class="beat beat-waveform">
-      <p class="beat-kicker label">42 days · the shape of it</p>
+      <p class="beat-kicker label" data-bind="wave-window">the shape of it</p>
       <h2 class="beat-h">The climb isn't a straight line. Here's every day, including the ones that dipped.</h2>
       <figure class="waveform">
-        <div class="wave" data-bind="wave" role="img" aria-label="Daily whole-life score over the last 42 days"></div>
+        <div class="wave" data-bind="wave" role="img" aria-label="Daily whole-life score, every day since the experiment began"></div>
         <figcaption class="wave-legend label">
           <span class="lg lg-up">strong</span>
           <span class="lg lg-mid">holding</span>
@@ -105,13 +125,13 @@
     <section class="beat beat-numbers">
       <p class="beat-kicker label">where it started · where it is</p>
       <div class="numbers" data-bind="numbers">
-        <div class="figure"><span class="num big" data-bind="lost">··</span><span class="figure-cap label">lbs down</span></div>
+        <div class="figure"><span class="num big" data-bind="lost" data-countup>··</span><span class="figure-cap label">lbs down</span></div>
         <div class="figure"><span class="num" data-bind="current">···</span><span class="figure-cap label">lbs today</span></div>
         <div class="figure"><span class="num" data-bind="progress">··%</span><span class="figure-cap label">to goal</span></div>
       </div>
       <p class="beat-note" data-bind="projected"></p>
       <div data-bind="weightchart"></div>
-      <p class="beat-deeper"><a href="/evidence/results/" class="cta">The full results &amp; body composition →</a></p>
+      <p class="beat-deeper"><a href="/method/results/" class="cta">The full results &amp; body composition →</a></p>
     </section>
 
     <!-- The Third Wall: machine says / how Matthew actually felt -->
@@ -145,7 +165,7 @@
       <h2 class="close-h">An ordinary person did this with tools you already own.</h2>
       <p class="close-sub">Not a guru. Not a lab. A model, some wearables, and the willingness to publish the bad weeks too.</p>
       <p class="close-cta">
-        <a href="/evidence/" class="cta">See what it's built on →</a>
+        <a href="/data/" class="cta">See what it's built on →</a>
         <a href="/subscribe" class="cta cta-quiet">Follow the experiment</a>
       </p>
     </section>
@@ -156,6 +176,7 @@
     <span class="label asof" data-bind="asof"></span>
   </footer>
 
+  <script src="/assets/js/motion.js" defer></script>
   <script type="module" src="/assets/js/story.js"></script>
 </body>
 </html>

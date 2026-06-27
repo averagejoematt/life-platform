@@ -210,7 +210,7 @@ PAGE_BINDINGS = [
         "endpoints": [{"url": "/api/field_notes", "role": "primary", "metrics": []}],
     },
     {
-        "path": "/evidence/",
+        "path": "/data/",
         "name": "Evidence hub",
         "door": "evidence",
         "narrative_order": 9,
@@ -242,7 +242,7 @@ def _build_evidence_bindings():
             endpoints.append({"url": sec, "role": "secondary", "metrics": []})
         PAGE_BINDINGS.append(
             {
-                "path": f"/evidence/{slug}/",
+                "path": f"/data/{slug}/",
                 "name": f"Evidence · {slug}",
                 "door": "evidence",
                 "narrative_order": order,
@@ -346,7 +346,7 @@ def selfcheck():
 
     # every evidence primary must equal the live REGISTRY endpoint
     for b in PAGE_BINDINGS:
-        if b["door"] != "evidence" or b["path"] == "/evidence/":
+        if b["door"] != "evidence" or b["path"] == "/data/":
             continue
         slug = b["path"].strip("/").split("/")[-1]
         want = EVIDENCE_PRIMARY.get(slug)

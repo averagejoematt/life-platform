@@ -131,6 +131,26 @@ def _voice(speaker: str) -> str:
     return persona_registry.tts_voice(speaker, s3, S3_BUCKET) or (ELENA_VOICE_FALLBACK if speaker == ELENA else "en-US-Chirp3-HD-Charon")
 
 
+def _short_title(*candidates, max_words: int = 6, max_chars: int = 52) -> str:
+    """Reduce the first usable candidate to a short headline hook for an episode
+    title: strips any leading 'Week N:' / 'EPN ·', keeps only the first clause,
+    caps to max_words / max_chars, drops trailing punctuation. Returns "" if none."""
+    for c in candidates:
+        s = (c or "").strip()
+        if not s:
+            continue
+        s = re.sub(r"^\s*(week\s*\d+\s*[:\-–—]\s*|ep\s*\d+\s*[·:\-–—]\s*)", "", s, flags=re.I)
+        s = re.split(r"[.!?]", s, 1)[0].strip().strip(" ,;:—–-\"'“”")
+        words = s.split()
+        if len(words) > max_words:
+            s = " ".join(words[:max_words])
+        if len(s) > max_chars:
+            s = s[:max_chars].rsplit(" ", 1)[0].strip()
+        if s:
+            return s
+    return ""
+
+
 def _build_script(week, title, chronicle_text, coach_id, coach_out, coach_name) -> list:
     import bedrock_client
 
@@ -798,7 +818,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         Body=json.dumps(
             {
                 "week": 0,
-                "title": "Episode 0 — Welcome to The Measured Life",
+                "title": "EP0 · Welcome to The Measured Life",
                 "byline": "Elena + Dr. Eli Marsh",
                 "turns": [{"speaker": t["speaker"], "name": _name_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns],
             },
@@ -1004,7 +1024,8 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         f"{CONVO_DIRECTIVE} "
         'OUTPUT ONLY JSON: {"turns":[{"speaker":"elena"|"coach","line":"..."}], "open_bet":"<the one new falsifiable bet for next week>", '
         '"last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
-        '"pull_quote":"<one shareable line>"}. 14–22 turns. No fences.'
+        '"pull_quote":"<one shareable line>", '
+        '"episode_title":"<a SHORT episode title: 2–5 words, a hook — NOT a sentence, NO \'Week N\', NO ending punctuation>"}. 14–22 turns. No fences.'
     )
     _chron = beats.get("chronicle", "")
     _chron_block = (
@@ -1135,6 +1156,14 @@ def _hold_and_alert(week, reasons: list, draft: dict) -> dict:
         )
     except Exception as e:
         logger.warning("[panel] hold SNS alert failed — %s", e)
+    # Surface a PUBLIC-SAFE pending marker so the Panel tab explains the gap instead of
+    # going silent on a Friday. The raw `reasons` can name sensitive content, so they stay
+    # internal (SNS + private draft) — only a generic message is published.
+    _set_pending(
+        week,
+        "held_for_review",
+        "This week's episode is in final review — it'll drop here as soon as it clears the quality bar.",
+    )
     logger.warning("[panel] wk%s HELD — %s", week, reasons)
     return {"statusCode": 200, "body": json.dumps({"week": week, "held": True, "reasons": reasons})}
 
@@ -1418,9 +1447,16 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         existing = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
     except Exception:
         existing = []
+    _hook = _short_title(
+        script.get("episode_title"),
+        beats.get("title"),
+        script.get("pull_quote"),
+        review.get("pull_quote"),
+    )
     ep = {
         "week": week,
-        "title": f"Week {week}: {script.get('pull_quote') or review.get('pull_quote') or beats['title']}"[:120],
+        # EP{n} · short hook — episode number == week (intro is EP0). No long sentence titles.
+        "title": f"EP{week} · {_hook}" if _hook else f"EP{week}",
         "date": beats["date"],
         "url": f"/panelcast/wk{week}.wav",
         "bytes": len(audio),

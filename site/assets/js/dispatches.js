@@ -83,7 +83,7 @@ const ABOUT = `
   <p class="dx-prose">I've spent two decades making complicated systems reliable and getting people to actually use them. In early 2026 I turned that same thinking on myself — not a challenge, not a 30-day hack, but a proper system: the wearables already on my body, an AI that reads the numbers back to me every morning, and the discipline to publish the down weeks too.</p>
   <p class="dx-prose">This isn't Blueprint. No million-dollar lab, no team of doctors, no superhuman protocol — just consumer devices, Claude, and a commitment to keep it honest. Every number here is real; every failure is included. The bet is simple: <strong>numbers <em>and</em> meaning, kept personal.</strong> The anti-Blueprint.</p>
   <p class="dx-prose">A board of named AI experts argues about my data; Elena Voss writes the weekly chronicle; the Third Wall is where the machine's read meets how it actually felt. Everything here is correlative, never causal — patterns, flagged when thin, never dressed up as proof.</p>
-  <p class="dx-prose">The throughline I keep coming back to: <strong>you could do this too</strong>. The cockpit and the evidence hold the live data; this is the why. If something here resonates — you're going through something similar, or just curious — I'd genuinely love to hear from you: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a>.</p>`;
+  <p class="dx-prose">The throughline I keep coming back to: <strong>you could do this too</strong>. The cockpit and the data pages hold the live data; this is the why. If something here resonates — you're going through something similar, or just curious — I'd genuinely love to hear from you: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a>.</p>`;
 
 function entriesFor(s, data) {
   if (!data) return [];
@@ -307,6 +307,7 @@ async function renderRead(s, id) {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3><p class="dx-loading shimmer">Loading the timeline…</p>`;
     const d = await secFetch(s); const events = (d && d.events) || [];
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3>` +
+      `<p class="dx-prose">Milestones, life events, and <strong>character level-ups</strong> — the rare days a pillar climbs a tier. <a href="/method/character/">What's a character level?</a></p>` +
       (events.length ? `<ol class="dx-timeline">${events.map((e) => `<li class="dxt-item"><span class="dxt-date label">${esc(String(e.date || "").slice(0, 10))}</span><div><p class="dxt-title">${esc(e.title || e.type || "")}</p>${e.body ? `<p class="dxt-note">${esc(e.body)}</p>` : ""}</div></li>`).join("")}</ol>`
         : `<p class="dx-prose">No milestones logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</p>`);
     return;

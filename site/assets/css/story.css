@@ -36,11 +36,20 @@ body { overflow-x: hidden; }
 .theme-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--ink) 0 50%, transparent 50% 100%); border: 1px solid var(--ink-muted); }
 
 /* ── HERO ────────────────────────────────────────────────────────────────── */
-.hero { max-width: var(--container); margin-inline: auto; padding: clamp(2rem, 1rem + 6vw, 5rem) var(--gutter) var(--sp-7); }
+.hero { max-width: var(--container); margin-inline: auto; padding: clamp(2rem, 1rem + 6vw, 5rem) var(--gutter) var(--sp-7); position: relative; isolation: isolate; }
+/* v5 "forward" depth — a restrained warm bloom behind the hero + an EARNED glow on the
+   live day-counter. Adds dimension/premium-feel without touching the palette or contrast. */
+.hero::before { content: ""; position: absolute; z-index: -1; inset: -6% -4% auto -4%; height: 130%; pointer-events: none;
+  background: radial-gradient(54% 46% at 67% 30%, var(--ember-wash), transparent 72%); }
+.hero-daycount .hd-num { text-shadow: 0 0 24px var(--ember-soft); }
 .hero-grid { display: grid; gap: clamp(1.5rem, 1rem + 4vw, 4rem); align-items: center; }
 @media (min-width: 860px) { .hero-grid { grid-template-columns: 1.1fr 0.9fr; } }
 
 .kicker { color: var(--ember); }
+/* The central day-of-experiment counter (the review's "central number"). */
+.hero-daycount { margin: var(--sp-3) 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
+.hero-daycount .hd-num { font-size: var(--fs-data-xl); line-height: 1; color: var(--ember); font-variant-numeric: tabular-nums; }
+.hero-daycount .hd-cap { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
 .hero-day { color: var(--ink-muted); margin: var(--sp-2) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
 /* P2.1 — the live proof line paired with genesis, up in the hero. */
 .hero-proof { color: var(--ember); font-family: var(--font-mono); font-size: var(--fs-small); margin: var(--sp-1) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
@@ -122,8 +131,13 @@ body { overflow-x: hidden; }
 
 /* Waveform — honest down-beats in muted ink, never alarm-red */
 .waveform { margin-top: var(--sp-5); }
-.wave { display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
-.wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out); }
+.wave { position: relative; display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
+.wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out), filter 0.14s var(--ease-out), transform 0.14s var(--ease-out); transform-origin: bottom; cursor: crosshair; }
+.wave .bar:hover { filter: brightness(1.28); transform: scaleY(1.05); }
+/* cursor-following readout for the interactive waveform */
+.wave-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-xs); padding: 2px 8px; color: var(--ink); box-shadow: var(--shadow-soft); z-index: 2; }
+.wave-tip[hidden] { display: none; }
 .wave .bar.up { background: var(--ember); }
 .wave .bar.mid { background: var(--ink-muted); }
 .wave .bar.down { background: var(--ink-faint); opacity: 0.55; box-shadow: inset 0 -2px 0 0 var(--ink-muted); }
@@ -372,12 +386,20 @@ body { overflow-x: hidden; }
 .coach-daily { margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); border-left: 2px solid var(--ember-line); background: var(--surface-raised); border-radius: var(--radius-sm); }
 .cd-text { margin-top: var(--sp-2); color: var(--ink); font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
 
-/* ── Coach/Panel page type consistency (2026-06-14) ───────────────────────────
-   Fix mixed fonts: coaches SPEAK in serif (human voice); labels, dates, rates,
-   chips, names stay mono (machine & data). One rule so sections stop alternating. */
+/* ── Coach/Panel page type consistency (v5 Coherence, 2026-06-27) ──────────────
+   The site's body voice is SANS everywhere (Data, Story prose). Coach pages had
+   been forced to SERIF wholesale (2026-06-14), which made them read as a different
+   design and left sans .dx-prose fallbacks alternating mid-page — the "fonts all
+   over the place under each coach" report. Align coach NARRATIVE to the sans body;
+   SERIF is reserved for genuine voice moments (the daily-reflection callout, the
+   philosophy/voice pull-quotes — handled by their own rules below). Labels, dates,
+   rates, chips, names stay mono (machine & data). */
 .coach-stance, .coach-progress, .coach-report, .coach-journey, .coach-rel,
 .coach-daily, .team-focus, .team-tension, .team-huddle,
-.coach-char, .coach-hyp, .coach-voice, .coach-more, .team-lead { font-family: var(--font-serif); }
+.coach-char, .coach-hyp, .coach-voice, .coach-more, .team-lead { font-family: var(--font-sans); }
+/* genuine "voice" moments stay serif (these win by being more specific) */
+.cd-text, .tl-bio, .tl-philosophy, .cv-example,
+.coach-voice blockquote, .coach-char blockquote, .coach-hyp blockquote { font-family: var(--font-serif); }
 /* The disclosed-section wrapper (F-06): coaches speak serif inside it; its summary
    stays a mono kicker like every other section header. One type system. */
 .coach-more { margin-top: var(--sp-4); }

@@ -57,9 +57,9 @@ jobs:
           sys.exit(1 if bad else 0)
           PY
 
-      - name: Three v4 doors present
+      - name: Core v4 doors present
         run: |
-          for f in site/index.html site/now/index.html site/evidence/index.html site/assets/css/tokens.css; do
+          for f in site/index.html site/now/index.html site/data/index.html site/protocols/index.html site/coaching/index.html site/story/index.html site/assets/css/tokens.css; do
             test -f "$f" || { echo "::error::missing required v4 file: $f"; exit 1; }
           done
-          echo "✓ Story, Cockpit, Evidence + tokens present"
+          echo "✓ Home, Cockpit, Data, Protocols, Coaching, Story + tokens present"

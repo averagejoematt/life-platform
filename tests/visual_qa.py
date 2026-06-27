@@ -72,7 +72,7 @@ PAGES = [
                 "desc": "7 pillar nodes drawn in the constellation",
             },
             {
-                "selector": "a[href='/now/'], a[href='/story/'], a[href='/evidence/']",
+                "selector": "a[href='/now/'], a[href='/story/'], a[href='/data/']",
                 "min_count": 2,
                 "desc": "the three door links present",
             },
@@ -100,7 +100,7 @@ PAGES = [
                 "min_count": 1,
                 "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered",
             },
-            {"selector": "a[href='/evidence/'], a[href='/now/']", "min_count": 1, "desc": "door links present"},
+            {"selector": "a[href='/data/'], a[href='/now/']", "min_count": 1, "desc": "door links present"},
         ],
     },
     {
@@ -121,17 +121,29 @@ PAGES = [
     # NB: "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20);
     # their page defs now live in the PAGES.extend([...]) Coaching block below.
     {
-        "path": "/evidence/",
-        "name": "Evidence hub",
+        "path": "/data/",
+        "name": "Data hub",
         "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "evidence readout rendered"}],
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "data readout rendered"}],
+    },
+    {
+        "path": "/protocols/",
+        "name": "Protocols hub",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "protocols readout rendered"}],
+    },
+    {
+        "path": "/method/character/",
+        "name": "Method · character explainer",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "character explainer rendered"}],
     },
 ]
 # Evidence live-data topics — readout must render; chart topics get a soft chart check + crop.
 for _slug in EVIDENCE_TOPICS:
     PAGES.append(
         {
-            "path": f"/evidence/{_slug}/",
+            "path": f"/data/{_slug}/",
             "name": f"Evidence · {_slug}",
             "wait_for": "[data-readout]",
             "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
