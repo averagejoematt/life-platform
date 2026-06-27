@@ -122,9 +122,21 @@ PAGES = [
     # their page defs now live in the PAGES.extend([...]) Coaching block below.
     {
         "path": "/data/",
-        "name": "Evidence hub",
+        "name": "Data hub",
         "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "evidence readout rendered"}],
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "data readout rendered"}],
+    },
+    {
+        "path": "/protocols/",
+        "name": "Protocols hub",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "protocols readout rendered"}],
+    },
+    {
+        "path": "/method/character/",
+        "name": "Method · character explainer",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "character explainer rendered"}],
     },
 ]
 # Evidence live-data topics — readout must render; chart topics get a soft chart check + crop.
