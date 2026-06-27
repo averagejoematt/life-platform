@@ -772,6 +772,16 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .hspine-intake::after { background: var(--ember); }
 .hspine-v { font-size: var(--fs-data-lg); line-height: 1; }
 .hspine-k { color: var(--ink-faint); }
+/* targetSpine only (Zone-2 etc.): taller rail + smaller labels, value ABOVE the rule and
+   target BELOW — vertical stagger that prevents the two endpoint labels colliding when
+   value≈target horizontally (the "150 min210 min" overlap). Scoped so the nutrition spine
+   is untouched. */
+.spine-fig--targets .hspine { height: 88px; }
+.spine-fig--targets .hspine-rule { top: 42px; }
+.spine-fig--targets .hspine-mark::after { top: 38px; height: 22px; }
+.spine-fig--targets .hspine-v { font-size: var(--fs-h4, 1.05rem); }
+.spine-fig--targets .hspine-lab { bottom: auto; top: 6px; }
+.spine-fig--targets .hspine-lab.hspine-lab-below { top: 62px; }
 
 /* Sufficiency bars (nutrient intake vs target, P0.4) — horizontal 0→100%, worst-first.
    Value in its own grid column so it never clips the right edge; the track's right edge
