@@ -91,7 +91,7 @@ def operational_personas(s3_client=None, bucket=None):
 
 
 def board_personas(s3_client=None, bucket=None):
-    """Non-operational personas (the broader Board — lives on /evidence/board/)."""
+    """Non-operational personas (the broader Board — lives on /method/board/)."""
     return {k: v for k, v in personas(s3_client, bucket).items() if not v.get("operational")}
 
 

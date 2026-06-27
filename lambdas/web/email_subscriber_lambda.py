@@ -390,7 +390,7 @@ A few things worth looking at while you're here:
 
 -> Start from the beginning — the first dispatch: {SITE_URL}/story/chronicle/
 -> The live cockpit (today's score, updated every morning): {SITE_URL}/now/
--> The evidence (every number, every source): {SITE_URL}/evidence/
+-> The evidence (every number, every source): {SITE_URL}/data/
 -> The Story (why I started): {SITE_URL}/story/
 
 See you Wednesday.

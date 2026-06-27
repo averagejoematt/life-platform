@@ -2,7 +2,7 @@
 # smoke_test_site.sh — Post-deploy verification for averagejoematt.com (v4 "The Measured Life")
 #
 # Verifies the three-door v4 site (ADR-071): Cockpit (/now/), Story (/story/),
-# Evidence (/evidence/), over the unchanged read-only engine. Checks live pages (200),
+# Evidence (/data/), over the unchanged read-only engine. Checks live pages (200),
 # legacy v3 URLs (301 → v4), assets, API endpoints + freshness, content markers,
 # cache headers, and stale-copy. Run after `bash deploy/sync_site_to_s3.sh`.
 #
@@ -59,23 +59,23 @@ echo "── v4 pages (HTTP 200) ───────────────�
 check_status "Home"                 "$BASE/"
 check_status "Cockpit (/now/)"      "$BASE/now/"
 check_status "Story hub"            "$BASE/story/"
-check_status "Evidence hub"         "$BASE/evidence/"
+check_status "Evidence hub"         "$BASE/data/"
 check_status "Subscribe"            "$BASE/subscribe/"
 # Story sub-pages
 check_status "Story · chronicle"    "$BASE/story/chronicle/"
 check_status "Story · journal"      "$BASE/story/journal/"
-check_status "Story · lab-notes"    "$BASE/story/lab-notes/"
+check_status "Coaching · lab-notes" "$BASE/coaching/lab-notes/"
 check_status "Story · timeline"     "$BASE/story/timeline/"
 check_status "Story · about"        "$BASE/story/about/"
 # Evidence topics (sample across groups)
-check_status "Evidence · vitals"    "$BASE/evidence/vitals/"
-check_status "Evidence · glucose"   "$BASE/evidence/glucose/"
-check_status "Evidence · sleep"     "$BASE/evidence/sleep/"
-check_status "Evidence · labs"      "$BASE/evidence/labs/"
-check_status "Evidence · board"     "$BASE/evidence/board/"
-check_status "Evidence · platform"  "$BASE/evidence/platform/"
-check_status "Evidence · data"      "$BASE/evidence/data/"
-check_status "Evidence · pipeline"  "$BASE/evidence/pipeline/"
+check_status "Evidence · vitals"    "$BASE/data/vitals/"
+check_status "Evidence · glucose"   "$BASE/data/glucose/"
+check_status "Evidence · sleep"     "$BASE/data/sleep/"
+check_status "Evidence · labs"      "$BASE/data/labs/"
+check_status "Evidence · board"     "$BASE/method/board/"
+check_status "Evidence · platform"  "$BASE/method/platform/"
+check_status "Evidence · data"      "$BASE/method/data/"
+check_status "Evidence · pipeline"  "$BASE/method/pipeline/"
 check_status "404 page"             "$BASE/nonexistent-page-xyz" "404"
 check_status "www redirect"         "https://www.averagejoematt.com/" "200"
 echo ""
@@ -89,7 +89,7 @@ check_status "/character/ → 301"    "$BASE/character/"   "301"
 check_status "/glucose/ → 301"      "$BASE/glucose/"     "301"
 check_status "/sleep/ → 301"        "$BASE/sleep/"       "301"
 check_status "/habits/ → 301"       "$BASE/habits/"      "301"
-check_status "/data/ → 301"         "$BASE/data/"        "301"
+check_status "/evidence/ → 301"     "$BASE/evidence/"    "301"
 check_status "/board/ → 301"        "$BASE/board/"       "301"
 check_status "/platform/ → 301"     "$BASE/platform/"    "301"
 echo ""
@@ -130,8 +130,8 @@ if [[ "$QUICK" != "--quick" ]]; then
   HOME_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
   NOW_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/now/" > "$NOW_FILE"
   STORY_FILE=$(mktemp);  curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
-  EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/evidence/" > "$EVID_FILE"
-  PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/evidence/pipeline/" > "$PIPE_FILE"
+  EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/data/" > "$EVID_FILE"
+  PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/method/pipeline/" > "$PIPE_FILE"
   SUB_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
@@ -139,7 +139,8 @@ if [[ "$QUICK" != "--quick" ]]; then
   check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"'
   check_body_contains "Home: door · the cockpit"      "$HOME_FILE"  'the cockpit'
   check_body_contains "Home: door · the story"        "$HOME_FILE"  'the story'
-  check_body_contains "Home: door · the evidence"     "$HOME_FILE"  'the evidence'
+  check_body_contains "Home: door · the data"         "$HOME_FILE"  'the data'
+  check_body_contains "Home: door · the protocols"    "$HOME_FILE"  'the protocols'
   # Cockpit: live data wiring
   check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'
   check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'
@@ -149,7 +150,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   # Evidence: registry + readout shell + the new live Pipeline-status topic
   check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  '__EVIDENCE_REGISTRY__'
   check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'
-  check_body_contains "Evidence: Pipeline-status topic" "$EVID_FILE" 'Pipeline status'
+  check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'
   check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness'
   # Subscribe form present
   check_body_contains "Subscribe: form present"       "$SUB_FILE"   'subscribe'

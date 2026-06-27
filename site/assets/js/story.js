@@ -39,11 +39,11 @@ const NODES = {
   relationships:{ x: 68,  y: 118, label: "People" },
   consistency:  { x: 180, y: 185, label: "Hold" },
 };
-// Each pillar in the hero links into its deeper Evidence page (the story → sub-pages).
+// Each pillar in the hero links into its deeper Data page (the story → sub-pages).
 const NODE_LINK = {
-  sleep: "/evidence/sleep/", movement: "/evidence/training/", nutrition: "/evidence/nutrition/",
-  metabolic: "/evidence/glucose/", mind: "/evidence/mind/", relationships: "/evidence/mind/",
-  consistency: "/evidence/habits/",
+  sleep: "/data/sleep/", movement: "/data/training/", nutrition: "/data/nutrition/",
+  metabolic: "/data/glucose/", mind: "/data/mind/", relationships: "/data/mind/",
+  consistency: "/data/habits/",
 };
 // How the pillars pull on each other (the synthesis, drawn).
 const EDGES = [
@@ -92,7 +92,7 @@ function drawConstellation(pillars) {
     if (href) {
       const a = document.createElementNS(SVGNS, "a");
       a.setAttribute("href", href);
-      a.setAttribute("aria-label", `${pos.label} — open the evidence`);
+      a.setAttribute("aria-label", `${pos.label} — open the data`);
       a.appendChild(g);
       nodeG.appendChild(a);
     } else {
@@ -117,6 +117,7 @@ function renderNumbers(journey) {
     const up = lost < -0.05, even = Math.abs(lost) <= 0.05;
     const el = bind("lost");
     el.textContent = even ? "0" : String(Math.round(Math.abs(lost) * 10) / 10);
+    if (window.__moCount) window.__moCount(el);  // count-up once the real value lands
     const figEl = el.closest(".figure");
     if (figEl) {
       figEl.classList.toggle("is-up", up);
@@ -178,9 +179,22 @@ function renderWave(days) {
     bar.className = `bar ${d.score == null ? "none" : meaningfulSpread ? tierOfRel(pos) : "up"}`;
     const h = d.score ? 14 + (pos || 0) * 86 : 6;
     bar.style.height = `${h}%`;
-    bar.title = `${d.date || ""}: ${d.score ?? "no data"}`;
+    bar.title = `${d.date || ""}: ${d.score ?? "no data"}`; // a11y / no-JS fallback
+    bar.dataset.tip = `${d.date || ""} · ${d.score == null ? "no data" : "score " + d.score}`;
     return bar;
   }));
+  // Styled, cursor-following tooltip — the waveform becomes a thing you explore.
+  let tip = wrap.querySelector(".wave-tip");
+  if (!tip) { tip = document.createElement("span"); tip.className = "wave-tip label"; tip.hidden = true; wrap.appendChild(tip); }
+  wrap.onmousemove = (e) => {
+    const bar = e.target.closest && e.target.closest(".bar");
+    if (!bar || !bar.dataset.tip) { tip.hidden = true; return; }
+    tip.textContent = bar.dataset.tip;
+    tip.hidden = false;
+    const wr = wrap.getBoundingClientRect();
+    tip.style.left = `${Math.max(0, Math.min(wr.width, e.clientX - wr.left))}px`;
+  };
+  wrap.onmouseleave = () => { tip.hidden = true; };
 }
 
 /* ── the Third Wall ──────────────────────────────────────────────────────── */
@@ -339,6 +353,12 @@ async function load() {
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
   stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix
+  // The review's "central number": a prominent day-of-experiment counter in the hero.
+  const { dayN, weekN } = genesisCount();
+  if (dayN >= 1) {
+    const dn = bind("dayNum"); if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }
+    const dc = bind("dayCap"); if (dc) dc.textContent = dayN === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`;
+  }
   dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
@@ -346,10 +366,17 @@ async function load() {
 
   const wp = weight.status === "fulfilled" ? (weight.value.weight_progress || weight.value) : [];
   const wc = bind("weightchart");
-  if (wc) wc.innerHTML = lineChart(Array.isArray(wp) ? wp : [], { valueKey: "weight_lbs", goal: journeyV && journeyV.goal_weight_lbs, unit: " lb", label: "Weight · the actual line", emptyMsg: "The weight line fills in as weigh-ins accrue." });
+  // HARD RULE 4: the goal (185) must NOT anchor the y-axis — passing it flattened the real
+  // slope into a sliver at the top (the "empty chart" bug). Axis comes from the weight data
+  // alone; goal progress already lives in the numbers above. spine adds the min/max scale.
+  if (wc) wc.innerHTML = lineChart(Array.isArray(wp) ? wp : [], { valueKey: "weight_lbs", unit: " lb", spine: true, label: "Weight · the actual line", emptyMsg: "The weight line fills in as weigh-ins accrue." });
 
-  const waveV = wave.status === "fulfilled" ? (wave.value.days || wave.value.waveform || wave.value) : null;
+  const waveResp = wave.status === "fulfilled" ? wave.value : null;
+  const waveV = waveResp ? (waveResp.days || waveResp.waveform || waveResp) : null;
   renderWave(Array.isArray(waveV) ? waveV : (waveV && waveV.days) || []);
+  // Dynamic wave label — the window now tracks the experiment (genesis→today), not a fixed 42.
+  const ww = bind("wave-window");
+  if (ww && waveResp && waveResp.day_n) ww.textContent = `${waveResp.day_n} day${waveResp.day_n === 1 ? "" : "s"} · the shape of it`;
 
   const charV = character.status === "fulfilled" ? character.value : null;
   const pillars = (charV && (charV.pillars || (charV.character && charV.character.pillars))) || [];

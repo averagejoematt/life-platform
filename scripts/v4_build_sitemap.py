@@ -18,7 +18,9 @@ from pathlib import Path
 
 SITE = Path("site")
 BASE = "https://averagejoematt.com"
-SKIP_TOP = {"legacy", "now", "assets", "api", "config", "data", "404"}
+# NB: "data" is NOT skipped — it's now the Data pillar (HTML pages). The JSON data
+# files under /data/ aren't *.html so they're never picked up regardless.
+SKIP_TOP = {"legacy", "now", "assets", "api", "config", "404"}
 
 
 def url_for(p: Path) -> str:
@@ -52,7 +54,7 @@ def main() -> int:
 
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for u in urls:
-        prio = "1.0" if u == f"{BASE}/" else ("0.8" if u.rstrip("/").endswith("/evidence") else "0.6")
+        prio = "1.0" if u == f"{BASE}/" else ("0.8" if u.rstrip("/").endswith(("/data", "/protocols", "/coaching", "/story")) else "0.6")
         lines.append(f"  <url><loc>{u}</loc><lastmod>{today}</lastmod>" f"<priority>{prio}</priority></url>")
     lines.append("</urlset>")
     (SITE / "sitemap.xml").write_text("\n".join(lines) + "\n", encoding="utf-8")

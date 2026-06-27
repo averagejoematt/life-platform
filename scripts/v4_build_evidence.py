@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """
-v4_build_evidence.py — generate Door 3 (The Evidence) as a master-detail app.
+v4_build_evidence.py — generate the archive pillars (Data · Protocols · Method).
 
-Emits an app shell (horizontal GROUP tabs · left topic TILES · center readout
-that loads dynamically) at site/evidence/index.html AND a per-slug shell at
-site/evidence/<slug>/index.html (same app, pre-selected slug) so deep links and
-the old-URL redirects resolve on static hosting. The full registry is embedded
-as window.__EVIDENCE_REGISTRY__; assets/js/evidence.js does tabs/sidebar/routing
-and the bespoke, data-bound readouts. Editorial topics carry authored content;
-archive topics link to their preserved /legacy view.
+v5 (2026-06-27): the old single "Evidence" door is split into THREE pillars, all
+served by one base-aware engine (assets/js/evidence.js):
+  • /data/      — The body + Mind & accountability readouts (top-nav door)
+  • /protocols/ — supplements · experiments · challenges · discoveries (top-nav door)
+  • /method/    — how-it-holds-up + the-machine + reset-log (footer-tier, no door)
 
-Read-only inputs; writes only under site/evidence/. Run from repo root:
+Each pillar emits an app shell (horizontal GROUP tabs · left topic TILES · center
+readout) + per-slug shells, with __ARCHIVE_BASE__/__ARCHIVE_DOOR__/__ARCHIVE_TITLE__
+set per page so the shared engine routes within the right base. The registry is
+embedded as window.__EVIDENCE_REGISTRY__ (filtered to the pillar's groups).
+
+Read-only inputs; writes under site/{data,protocols,method}/. Run from repo root:
     python3 scripts/v4_build_evidence.py
 """
 from __future__ import annotations
@@ -18,8 +21,6 @@ from __future__ import annotations
 import html
 import json
 from pathlib import Path
-
-OUT = Path("site/evidence")
 
 # slug, title, blurb, group, mode, endpoint, root, legacy
 #   mode: data (fetch+render) · interactive (render+wire, no fetch) ·
@@ -218,6 +219,16 @@ REGISTRY = [
         None,
         None,
         "/legacy/methodology/",
+    ),
+    (
+        "character",
+        "The character",
+        "What the Character Level means — 7 pillars, 100 levels, 5 tiers, and why level-ups are rare.",
+        "Credibility & the machine",
+        "editorial",
+        None,
+        None,
+        None,
     ),
     (
         "build",
@@ -423,6 +434,7 @@ _REGROUP = {
     "postmortems": "How it holds up",
     "survival": "How it holds up",
     "methodology": "How it holds up",
+    "character": "How it holds up",
     "predictions": "How it holds up",
     "benchmarks": "How it holds up",
     "biology": "How it holds up",
@@ -458,6 +470,24 @@ EDITORIAL = {
         '<section class="rd-sec"><h2 class="rd-h">Confidence vocabulary</h2>'
         '<p class="rd-prose">Everything is correlative, never causal. Fewer than 12 observations is a <strong>preliminary pattern</strong>; fewer than 30 is <strong>low confidence</strong>. The character model rolls these into a Level (1–100) across five tiers — Foundation → Momentum → Discipline → Mastery → Elite — over seven pillars: Sleep, Movement, Nutrition, Metabolic, Mind, Relationships, and Consistency.</p></section>'
         '<p class="correlative">The model never computes in prose — it interprets pre-computed numbers only. <span class="confidence conf-low">N=1</span></p>'
+    ),
+    "character": (
+        '<p class="rd-lede">The experiment has one number that tries to answer "is this actually working?" — a single RPG-style Character Level built from everything else. Here\'s what it means.</p>'
+        '<section class="rd-sec"><h2 class="rd-h">One level, seven pillars</h2>'
+        '<p class="rd-prose">Every day the engine scores seven pillars of the life — <strong>Sleep, Movement, Nutrition, Metabolic health, Mind, Relationships, and Consistency</strong> — each from its own real data (wearables, the food log, habits, labs). Those seven are weighted and rolled into one overall <strong>Character Level</strong> from 1 to 100. It\'s the closest thing to a single answer to the only question that matters over months: is the whole life trending up, or just one corner of it?</p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">Five tiers</h2>'
+        '<p class="rd-prose">The 100 levels are grouped into five tiers, each a band of twenty:</p>'
+        '<ul class="rd-tierlist">'
+        "<li>🔨 <strong>Foundation</strong> — levels 1–20. Laying the base: the habits and the floor.</li>"
+        "<li>🔥 <strong>Momentum</strong> — levels 21–40. The base holds and starts compounding.</li>"
+        "<li>⚔️ <strong>Discipline</strong> — levels 41–60. Consistency under load, not just on good weeks.</li>"
+        "<li>🏆 <strong>Mastery</strong> — levels 61–80. The system runs itself most days.</li>"
+        "<li>👑 <strong>Elite</strong> — levels 81–100. The far end of what an N=1 can reach.</li>"
+        "</ul>"
+        '<p class="rd-prose">So "<strong>Level 8 · Foundation</strong>" — what the cockpit shows today — means level 8 of 100, still in the first tier: early, building the base, exactly where a few weeks in should be. The tier is the chapter; the level is the page.</p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">Why level-ups are rare (and mean something)</h2>'
+        '<p class="rd-prose">A level only moves after a sustained shift — roughly <strong>five or more days of real improvement</strong> to go up, and <strong>seven or more of decline</strong> to go down. That deliberate stickiness means a single great (or terrible) day can\'t swing it, and an "up" is earned, not noise. Expect only a handful of level events in a month. When a pillar crosses a tier line, that\'s a genuine milestone — the kind of thing the weekly chronicle writes about.</p>'
+        '<p class="correlative">It\'s a motivational lens on real data, not a medical score — every input is correlative and N=1. <span class="confidence conf-low">N=1</span></p></section>'
     ),
     "kitchen": (
         '<p class="rd-archive">The Kitchen is personalised meal intelligence — built from CGM response, macro tracking, and your real eating patterns. It needs data to work, and fills in automatically once daily nutrition logging and CGM readings accumulate over the first weeks. Until then, see Nutrition and Glucose &amp; meals for what\'s already flowing.</p>'
@@ -518,21 +548,81 @@ THEME = (
     '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
     'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
 )
-TOPBAR = (
-    '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
-    '<span class="brand-name">averagejoematt</span> <span class="brand-door label">evidence</span></a>'
-    '<nav class="doors" aria-label="Doors"><a href="/now/">the cockpit</a><a href="/story/">the story</a><a href="/coaching/">the coaching</a><a href="/evidence/" aria-current="page">the evidence</a>'
-    '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>'
+# Motion layer (v5): fail-open head guard + the deferred motion.js. Reveal-on-scroll,
+# chart draw-in, hover lifts — reduced-motion aware; content shows if motion.js never runs.
+MOTION_HEAD = (
+    '<script>(function(){try{if(!("IntersectionObserver" in window))return;'
+    'if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;'
+    'document.documentElement.classList.add("mo");'
+    'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
 )
+MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
+# The five doors, in loop order: cockpit · data · coaching · protocols · story.
+DOORS = [
+    ("/now/", "the cockpit", "cockpit"),
+    ("/data/", "the data", "data"),
+    ("/coaching/", "the coaching", "coaching"),
+    ("/protocols/", "the protocols", "protocols"),
+    ("/story/", "the story", "story"),
+]
+
+
+def topbar(active_key: str, brand_door: str) -> str:
+    links = "".join(f'<a href="{href}"{" aria-current=\"page\"" if key == active_key else ""}>{label}</a>' for href, label, key in DOORS)
+    return (
+        '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
+        f'<span class="brand-name">averagejoematt</span> <span class="brand-door label">{esc(brand_door)}</span></a>'
+        f'<nav class="doors" aria-label="Doors">{links}'
+        '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>'
+    )
 
 
 def esc(s):
     return html.escape(str(s), quote=True)
 
 
-def registry_json():
+# ── The three archive pillars, all served by one engine (assets/js/evidence.js).
+#    Data + Protocols are top-nav doors; Method is footer-tier (the user's choice:
+#    the machine / how-it-holds-up / reset-log demoted below the main pillars). ──
+PILLARS = [
+    {
+        "dir": "data",
+        "base": "/data/",
+        "door": "data",
+        "title": "Data",
+        "nav_key": "data",
+        "h1": "The Data",
+        "lede": "Every source the platform reads — the body, the mind, and the signals the engine finds across them. Live now and over time. Correlative, read-only, flagged when thin.",
+        "groups": ["The body", "Mind & accountability"],
+    },
+    {
+        "dir": "protocols",
+        "base": "/protocols/",
+        "door": "protocols",
+        "title": "Protocols",
+        "nav_key": "protocols",
+        "h1": "The Protocols",
+        "lede": "The levers — supplements, experiments, challenges, and the discoveries they chase. What gets changed to move the data, and whether it moved.",
+        "groups": ["Protocol & experiments"],
+    },
+    {
+        "dir": "method",
+        "base": "/method/",
+        "door": "method",
+        "title": "Method",
+        "nav_key": "data",  # footer-tier: no door of its own; nav keeps 5 doors
+        "h1": "The Method",
+        "lede": "Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.",
+        "groups": ["How it holds up", "The machine", "The reset log"],
+    },
+]
+
+
+def registry_json(groups):
     out = []
     for slug, title, blurb, group, mode, endpoint, root, legacy in REGISTRY:
+        if group not in groups:
+            continue
         e = {
             "slug": slug,
             "title": title,
@@ -549,10 +639,27 @@ def registry_json():
     return out
 
 
-def shell(start_slug: str, canonical: str, title: str, desc: str) -> str:
-    reg = json.dumps(registry_json())
+# Shared footer (5 doors + the footer-tier Method links) — one map on every archive page.
+FOOTER = (
+    '<footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map">'
+    '<div class="sf-col"><p class="sf-h label">The Story</p>'
+    '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>'
+    '<div class="sf-col"><p class="sf-h label">The Data</p>'
+    '<a href="/data/">All topics</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Nutrition</a><a href="/data/sleep/">Sleep</a></div>'
+    '<div class="sf-col"><p class="sf-h label">The Protocols</p>'
+    '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
+    '<div class="sf-col"><p class="sf-h label">The Coaching</p>'
+    '<a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>'
+    '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
+    '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>'
+    '</nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p></footer>'
+)
+
+
+def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str:
+    reg = json.dumps(registry_json(pillar["groups"]))
     return f"""<!DOCTYPE html>
-<html lang="en" data-door="evidence">
+<html lang="en" data-door="{pillar["door"]}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -564,16 +671,17 @@ def shell(start_slug: str, canonical: str, title: str, desc: str) -> str:
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/evidence.css">
   {THEME}
+  {MOTION_HEAD}
 </head>
 <body>
-  <a class="skip" href="#ev">Skip to the evidence</a>
-  {TOPBAR}
+  <a class="skip" href="#ev">Skip to the content</a>
+  {topbar(pillar["nav_key"], pillar["door"])}
   <main id="ev" class="ev-app">
     <div class="ev-head">
-      <h1 class="ev-h1">The Evidence</h1>
-      <p class="ev-lede">What's the protocol, what's it built on, and does it hold up? Pick a section, then a topic — everything's correlative, read-only, and flagged when thin.</p>
+      <h1 class="ev-h1">{esc(pillar["h1"])}</h1>
+      <p class="ev-lede">{esc(pillar["lede"])}</p>
     </div>
-    <nav class="ev-tabs" data-tabs aria-label="Evidence sections"></nav>
+    <nav class="ev-tabs" data-tabs aria-label="Sections"></nav>
     <div class="ev-layout">
       <aside class="ev-side" data-side aria-label="Topics"></aside>
       <section class="ev-main" data-main>
@@ -585,22 +693,10 @@ def shell(start_slug: str, canonical: str, title: str, desc: str) -> str:
       </section>
     </div>
   </main>
-  <footer class="site-foot">
-    <nav class="site-foot-cols" aria-label="Site map">
-      <div class="sf-col"><p class="sf-h label">The Story</p>
-        <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
-      <div class="sf-col"><p class="sf-h label">The Coaching</p>
-        <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
-      <div class="sf-col"><p class="sf-h label">The Evidence</p>
-        <a href="/evidence/">All topics</a><a href="/evidence/board/">The board</a><a href="/evidence/labs/">Labs</a><a href="/evidence/training/">Training</a><a href="/evidence/nutrition/">Nutrition</a></div>
-      <div class="sf-col"><p class="sf-h label">The Cockpit</p>
-        <a href="/now/">Live data</a><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a></div>
-      <div class="sf-col"><p class="sf-h label">Context</p>
-        <a href="/evidence/methodology/">Methodology</a><a href="/story/about/">About the experiment</a><a href="/privacy/">Privacy</a></div>
-    </nav>
-    <p class="sf-base label"><span>averagejoematt · the evidence</span><a href="/">← home</a></p>
-  </footer>
-  <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};</script>
+  {FOOTER}
+  <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};
+window.__ARCHIVE_BASE__ = {json.dumps(pillar["base"])}; window.__ARCHIVE_DOOR__ = {json.dumps(pillar["door"])}; window.__ARCHIVE_TITLE__ = {json.dumps(pillar["title"])};</script>
+  {MOTION_SCRIPT}
   <script type="module" src="/assets/js/evidence.js"></script>
 </body>
 </html>
@@ -608,27 +704,32 @@ def shell(start_slug: str, canonical: str, title: str, desc: str) -> str:
 
 
 def main() -> int:
-    OUT.mkdir(parents=True, exist_ok=True)
-    first = REGISTRY[0][0]
-    (OUT / "index.html").write_text(
-        shell(
-            first,
-            "/evidence/",
-            "The Evidence — averagejoematt",
-            "The archival index of the experiment — correlative, read-only, browsable.",
-        ),
-        encoding="utf-8",
-    )
-    n = 0
-    for slug, title, blurb, *_ in REGISTRY:
-        d = OUT / slug
-        d.mkdir(parents=True, exist_ok=True)
-        (d / "index.html").write_text(
-            shell(slug, f"/evidence/{slug}/", f"{title} — The Evidence — averagejoematt", blurb), encoding="utf-8"
+    total = 0
+    for pillar in PILLARS:
+        out = Path("site") / pillar["dir"]
+        out.mkdir(parents=True, exist_ok=True)
+        slugs = [r[0] for r in REGISTRY if r[3] in pillar["groups"]]
+        if not slugs:
+            continue
+        first = slugs[0]
+        (out / "index.html").write_text(
+            shell(first, pillar["base"], f"The {pillar['title']} — averagejoematt", pillar["lede"], pillar),
+            encoding="utf-8",
         )
-        n += 1
-    data_n = sum(1 for t in REGISTRY if t[4] in ("data", "interactive"))
-    print(f"evidence app: index + {n} per-slug shells under {OUT}/ " f"({data_n} data/interactive, {n - data_n} editorial).")
+        n = 0
+        for slug, title, blurb, group, *_ in REGISTRY:
+            if group not in pillar["groups"]:
+                continue
+            d = out / slug
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "index.html").write_text(
+                shell(slug, f"{pillar['base']}{slug}/", f"{title} — The {pillar['title']} — averagejoematt", blurb, pillar),
+                encoding="utf-8",
+            )
+            n += 1
+        total += n
+        print(f"  {pillar['base']}: index + {n} topic shells")
+    print(f"archive app: {total} topic shells across {len(PILLARS)} pillars (data · protocols · method).")
     return 0
 
 

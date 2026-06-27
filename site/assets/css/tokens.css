@@ -458,6 +458,14 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .chart-goal { stroke: var(--ink-faint); stroke-width: 1; stroke-dasharray: 3 4; }
 .chart-down { stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .chart-dot { fill: var(--ember); }
+/* Interactive line-chart hover (wired by motion.js, data from data-cpts) — a focus dot
+   + cursor-following readout that make every trend chart explorable. */
+.chart-focus { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
+  background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); pointer-events: none; z-index: 3; }
+.chart-tip { position: absolute; transform: translate(-50%, calc(-100% - 10px)); white-space: nowrap; pointer-events: none;
+  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-xs); padding: 2px 8px;
+  color: var(--ink); box-shadow: var(--shadow-soft); z-index: 4; }
+.chart-focus[hidden], .chart-tip[hidden] { display: none; }
 /* P0.1 — trend-weight hero: faint raw daily dots (scale noise) + confident ember trend +
    a muted genesis rule. Ember = the smoothed signal; dots are deliberately faint. */
 .wt-trend { stroke: var(--ember); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
@@ -772,6 +780,16 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .hspine-intake::after { background: var(--ember); }
 .hspine-v { font-size: var(--fs-data-lg); line-height: 1; }
 .hspine-k { color: var(--ink-faint); }
+/* targetSpine only (Zone-2 etc.): taller rail + smaller labels, value ABOVE the rule and
+   target BELOW — vertical stagger that prevents the two endpoint labels colliding when
+   value≈target horizontally (the "150 min210 min" overlap). Scoped so the nutrition spine
+   is untouched. */
+.spine-fig--targets .hspine { height: 88px; }
+.spine-fig--targets .hspine-rule { top: 42px; }
+.spine-fig--targets .hspine-mark::after { top: 38px; height: 22px; }
+.spine-fig--targets .hspine-v { font-size: var(--fs-h4, 1.05rem); }
+.spine-fig--targets .hspine-lab { bottom: auto; top: 6px; }
+.spine-fig--targets .hspine-lab.hspine-lab-below { top: 62px; }
 
 /* Sufficiency bars (nutrient intake vs target, P0.4) — horizontal 0→100%, worst-first.
    Value in its own grid column so it never clips the right edge; the track's right edge
@@ -917,3 +935,115 @@ a.vg-lit:hover { background: var(--ember-wash); }
 
 /* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */
 .build-stamp { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); opacity: 0.6; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   11. SHARED CONTENT & PAGE KIT — v5 "Coherence" (docs/DESIGN_SYSTEM_V5.md)
+   The pieces that make every door read as one package. Additive: opt a page in
+   by adding the class — nothing changes until adopted.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── .prose — the ONE wrapper for all injected / long-form / AI-generated HTML
+   (chronicle posts, coach reads, evidence readouts, journal, about pages).
+   Apply to the CONTAINER; it pins the triad's jobs on every descendant so
+   model-emitted <h2>/<ul>/<blockquote> render identically everywhere. This is
+   the fix for "fonts all over the place" — replaces ad-hoc per-section type. */
+.prose { color: var(--ink); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.prose > :first-child { margin-top: 0; }
+.prose > * + * { margin-top: var(--sp-4); }
+.prose h2 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h2); line-height: var(--lh-snug); margin-top: var(--sp-6); }
+.prose h3 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h3); line-height: var(--lh-snug); margin-top: var(--sp-5); }
+.prose h4 { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); margin-top: var(--sp-5); }
+.prose p { max-width: var(--measure); }
+.prose a { color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.prose a:hover { border-color: var(--ember); }
+.prose strong, .prose b { font-weight: var(--weight-med); color: var(--ink); }
+.prose em, .prose i { font-style: italic; }
+.prose ul, .prose ol { padding-left: 1.3em; max-width: var(--measure); }
+.prose li { line-height: var(--lh-relaxed); }
+.prose li + li { margin-top: var(--sp-2); }
+.prose blockquote { font-family: var(--font-serif); font-style: italic; font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); border-left: 2px solid var(--ember); padding-left: var(--sp-4); }
+.prose code, .prose kbd, .prose samp { font-family: var(--font-mono); font-size: 0.9em; }
+.prose hr { border: 0; border-top: var(--honest-border); margin: var(--sp-6) 0; }
+.prose figure, .prose img { max-width: 100%; }
+.prose small, .prose .prose-meta { color: var(--ink-faint); font-size: var(--fs-small); }
+/* compact variant for sidebars / cards / disclosed sub-sections */
+.prose.prose-sm { font-size: var(--fs-body); }
+.prose.prose-sm > * + * { margin-top: var(--sp-3); }
+
+/* ── .page-hero — the "which part of the loop am I" banner. Identical on all
+   five doors so a visitor always orients the same way. */
+.page-hero { max-width: var(--container); margin-inline: auto; padding: var(--sp-7) var(--gutter) var(--sp-5); }
+.page-hero .ph-kicker { color: var(--ember); }
+.page-hero .ph-title { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1); line-height: var(--lh-tight); margin-top: var(--sp-3); }
+.page-hero .ph-promise { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
+
+/* ── The loop ribbon — the platform's spine made literal: where you are in
+   Data → Coaching → Protocols → Story. Lives in the page-hero and the footer
+   so the through-line is on every page. The current door is marked ember. */
+.loop-ribbon { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
+.loop-ribbon a { color: var(--ink-faint); text-decoration: none; }
+.loop-ribbon a:hover { color: var(--ink-muted); }
+.loop-ribbon .lr-here { color: var(--ember); border-bottom: 1px solid var(--ember); }
+.loop-ribbon .lr-arrow { color: var(--ember); opacity: 0.55; }
+
+/* ── The loop diagram — the full causal-loop card row (Home + About). */
+.loop { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--sp-2); margin: var(--sp-5) 0; }
+.loop-node { flex: 1 1 9rem; min-width: 8rem; border: var(--border-hair); border-radius: var(--radius-sm);
+  padding: var(--sp-4); text-decoration: none; color: var(--ink); display: flex; flex-direction: column; gap: var(--sp-1); }
+.loop-node:hover { border-color: var(--ember-line); }
+.loop-node .ln-name { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.1; }
+.loop-node .ln-role { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.45; }
+.loop-arrow { align-self: center; color: var(--ember); font-family: var(--font-mono); flex: 0 0 auto; }
+@media (max-width: 720px) { .loop { flex-direction: column; } .loop-arrow { transform: rotate(90deg); } }
+
+/* ── .provenance — every number says where it came from and how fresh. The
+   "elite / trustworthy" signal, standardized so it's free on every readout. */
+.provenance { margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint); display: inline-flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); }
+.provenance .pv-src { color: var(--ink-muted); }
+.provenance .pv-stale { color: var(--ember); }
+
+/* ── .tabset — accessible tab strip (Coaching profiles, Protocols sub-sections).
+   Pair buttons (role=tab, aria-selected) with .tabpanel regions. */
+.tabset { display: flex; flex-wrap: wrap; gap: var(--sp-1); border-bottom: var(--border-hair); margin-bottom: var(--sp-5); }
+.tabset .tab { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+  padding: var(--sp-2) var(--sp-3); margin-bottom: -1px; font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.tabset .tab:hover { color: var(--ink-muted); }
+.tabset .tab[aria-selected="true"] { color: var(--ember); border-bottom-color: var(--ember); }
+.tabset .tab:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.tabpanel[hidden] { display: none; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   12. MOTION LAYER — v5 "alive". Purposeful, restrained, reduced-motion-aware.
+   The hidden state is gated on html.mo (set by a tiny head script ONLY when
+   motion is safe) so if motion.js never runs, a failsafe removes .mo and all
+   content shows — motion fails OPEN, never hides content.
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  html.mo .hero, html.mo .page-hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat,
+  html.mo .loop, html.mo .rd-sec, html.mo .two-voice, html.mo .coach-daily, html.mo .coach-progress,
+  html.mo .coach-report, html.mo .coach-stance, html.mo .team-lead, html.mo .team-focus,
+  html.mo .team-tension, html.mo .team-huddle, html.mo .supp, html.mo .rd-card, html.mo .cap-card,
+  html.mo .vr-row, html.mo .figs, html.mo .ml-ladder {
+    opacity: 0; transform: translateY(16px);
+    transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+  }
+  html.mo .is-in { opacity: 1 !important; transform: none !important; }
+
+  /* Hover lifts — pure CSS, zero risk, no flash. */
+  .loop-node, .vh-link, .dx-item, .ev-tile, .supp { transition: transform 0.18s var(--ease-out), border-color 0.18s var(--ease-out); }
+  .loop-node:hover, .ev-tile:hover { transform: translateY(-2px); }
+
+  /* The pillar constellation breathes (home hero) — barely-there life. */
+  .constellation [data-nodes] > * { animation: mo-breathe 6s var(--ease-inout) infinite; }
+  @keyframes mo-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+
+  /* The loop flows — arrows pulse Data → Coaching → Protocols → Story in sequence,
+     so the site's core thesis reads as a living cycle, not a static diagram. */
+  .loop > .loop-arrow { animation: mo-flow 2.6s var(--ease-inout) infinite; }
+  .loop > .loop-arrow:nth-child(4) { animation-delay: 0.35s; }
+  .loop > .loop-arrow:nth-child(6) { animation-delay: 0.7s; }
+  @keyframes mo-flow { 0%, 100% { opacity: 0.4; } 45% { opacity: 1; transform: translateX(2px); } }
+}
