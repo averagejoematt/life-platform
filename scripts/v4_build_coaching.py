@@ -58,9 +58,10 @@ SHELL = """<!DOCTYPE html>
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the coaching</span></a>
     <nav class="doors" aria-label="Doors">
       <a href="/now/">the cockpit</a>
-      <a href="/story/">the story</a>
+      <a href="/data/">the data</a>
       <a href="/coaching/" aria-current="page">the coaching</a>
-      <a href="/evidence/">the evidence</a>
+      <a href="/protocols/">the protocols</a>
+      <a href="/story/">the story</a>
       <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
     </nav>
   </header>
@@ -69,7 +70,7 @@ SHELL = """<!DOCTYPE html>
       <p class="beat-kicker label">the coaching · the AI team reading the data</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
       <h1 class="dx-h1">The Coaching</h1>
-      <p class="dx-lede">A board of named AI coaches reads the data and argues about it — each with a stance, a track record, and a voice. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. The live data lives in <a href="/now/">the cockpit</a> and <a href="/evidence/">the evidence</a>; the writing's in <a href="/story/">the story</a>.</p>
+      <p class="dx-lede">A board of named AI coaches reads the data and argues about it — each with a stance, a track record, and a voice. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. The live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>; the writing's in <a href="/story/">the story</a>.</p>
     </div>
     <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
     <div class="dx-layout">
@@ -83,12 +84,12 @@ SHELL = """<!DOCTYPE html>
         <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
       <div class="sf-col"><p class="sf-h label">The Coaching</p>
         <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
-      <div class="sf-col"><p class="sf-h label">The Evidence</p>
-        <a href="/evidence/">All topics</a><a href="/evidence/board/">The board</a><a href="/evidence/labs/">Labs</a><a href="/evidence/training/">Training</a><a href="/evidence/nutrition/">Nutrition</a></div>
-      <div class="sf-col"><p class="sf-h label">The Cockpit</p>
-        <a href="/now/">Live data</a><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a></div>
-      <div class="sf-col"><p class="sf-h label">Context</p>
-        <a href="/evidence/methodology/">Methodology</a><a href="/story/about/">About the experiment</a><a href="/privacy/">Privacy</a></div>
+      <div class="sf-col"><p class="sf-h label">The Data</p>
+        <a href="/data/">All topics</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Nutrition</a><a href="/data/sleep/">Sleep</a></div>
+      <div class="sf-col"><p class="sf-h label">The Protocols</p>
+        <a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>
+      <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
+        <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>
     </nav>
     <p class="sf-base label"><span>averagejoematt · the coaching</span><a href="/">← home</a></p>
   </footer>

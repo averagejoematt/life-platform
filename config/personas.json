@@ -2,7 +2,7 @@
   "version": "1",
   "_meta": {
     "purpose": "Canonical persona registry (CC-00). The single source of truth that reconciles the three historically-divergent coach name-spaces: config/coaches/*.json keys, the engine COACH_IDS, and the board_of_directors.json personas. A coach's public byline must provably be the coach that authored the data — this file is what makes that true.",
-    "model": "distinct-but-linked: operational coaches are the 8 personas with a live coach_config_key + daily outputs; the broader Board (the_chair, narrators, real-expert inspirations, non-coach advisors) stays on /evidence/board/, cross-linked via board_persona_key.",
+    "model": "distinct-but-linked: operational coaches are the 8 personas with a live coach_config_key + daily outputs; the broader Board (the_chair, narrators, real-expert inspirations, non-coach advisors) stays on /method/board/, cross-linked via board_persona_key.",
     "links": {
       "voice_specs": "config/coaches/<coach_config_key>.json",
       "board": "config/<user>/board_of_directors.json (member keys = board_persona_key)",

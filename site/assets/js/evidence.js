@@ -1,10 +1,10 @@
 /*
-  evidence.js — Door 3 as a master-detail app (/evidence/)
+  evidence.js — Door 3 as a master-detail app (/data/)
   ----------------------------------------------------------------------------
   Horizontal GROUP tabs (top) · topic TILES (left) · readout loads in the CENTER
   dynamically — no page jumps. Repeat-user browse per the Brief (§5: archival
   index, structured, browsable) + the disclosure model (detail in place, lateral
-  movement). Deep links (/evidence/<slug>/) and the old-URL redirects still work
+  movement). Deep links (/data/<slug>/) and the old-URL redirects still work
   via the History API. Renderers are bespoke + data-bound to the real shapes;
   empty domains render an honest "ready, no data yet" state.
 
@@ -18,6 +18,13 @@ import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpi
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
 const GROUPS = [...new Set(REG.map((t) => t.group))];
+// v5: one engine serves three archive pillars (/data/, /protocols/, /method/).
+// The builder sets the route base + door label per page; defaults keep the
+// legacy /data/ door working if a page omits them.
+const BASE = window.__ARCHIVE_BASE__ || "/data/";
+const DOOR = window.__ARCHIVE_DOOR__ || "evidence";
+const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
+const slugFromPath = () => { const seg = location.pathname.split("/").filter(Boolean); return seg.length ? seg[seg.length - 1] : ""; };
 
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
@@ -71,7 +78,7 @@ function kvtable(o, f) {
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */
 function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); return `<article class="supp"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}${s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}</header>${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
-// ── /evidence/physical/ — two tiers: the weight cockpit (daily) + the composition arc
+// ── /data/physical/ — two tiers: the weight cockpit (daily) + the composition arc
 // (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.
 const PHYS_GENESIS = "2026-06-14";
 // P0.1 — trend-weight hero (dual-layer). Faint raw daily dots + a confident ember smoothed
@@ -292,7 +299,7 @@ function physicalPhenoAge(pa) {
   }).join("");
   return sec("Biological age — PhenoAge (transparent, replaces the black box)",
     `<div class="pa-dial"><span class="pa-v mono">${esc(String(pa.phenoage))}</span><span class="pa-unit label">phenotypic age · years</span></div>` +
-    `<p class="rd-meta label">Levine Phenotypic Age (2018), computed from 9 standard blood markers — the transparent replacement for the DEXA "biological age" black box; every input is shown below. ${pa.as_of ? `Recomputed per blood draw · <strong>${esc(pa.as_of)}</strong>.` : ""} <strong>Chronological age isn't shown, by design</strong> — this can't be used to back out a real age. <strong>Caveats:</strong> population-level, not a diagnosis; this is blood-based <em>Phenotypic</em> Age, NOT the DNAm epigenetic clock; it's volatile to single markers (a CRP spike from a cold can swing it). <a href="/evidence/labs/">See the full bloodwork →</a></p>` +
+    `<p class="rd-meta label">Levine Phenotypic Age (2018), computed from 9 standard blood markers — the transparent replacement for the DEXA "biological age" black box; every input is shown below. ${pa.as_of ? `Recomputed per blood draw · <strong>${esc(pa.as_of)}</strong>.` : ""} <strong>Chronological age isn't shown, by design</strong> — this can't be used to back out a real age. <strong>Caveats:</strong> population-level, not a diagnosis; this is blood-based <em>Phenotypic</em> Age, NOT the DNAm epigenetic clock; it's volatile to single markers (a CRP spike from a cold can swing it). <a href="/data/labs/">See the full bloodwork →</a></p>` +
     `<details class="pa-details"><summary class="pa-sum label">The 9 markers driving it — show the inputs</summary><div class="pa-drivers">${driverRows}</div>` +
     `<p class="rd-meta label">Ember = the marker is pushing the number <em>younger</em> vs a healthy reference; muted = older; faint = neutral. Lymphocyte % is derived from absolute lymphocytes ÷ WBC.</p></details>`);
 }
@@ -993,14 +1000,14 @@ async function renderSleep(d) {
   if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
     parts.push(sec("Recovery — what the sleep defends",
       figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) +
-      `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/evidence/training/">Training</a> for what it buys.</p>`));
+      `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/data/training/">Training</a> for what it buys.</p>`));
   }
   // §6b — last-meal-time cross-link (P1.2): reuse the nutrition eating window, observation-only.
   const _ew = nut && nut.eating_window;
   if (_ew && _ew.avg_last_meal) {
     parts.push(sec("Last meal → sleep — the cross-link",
       figs([fig(esc(_ew.avg_last_meal), "avg last meal"), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
-      `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/evidence/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
+      `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/data/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
   }
   // §8 — the cross-source signal board (P2.1+).
   const board = sleepCorrelationBoard(corr && corr.cards);
@@ -1022,7 +1029,7 @@ async function renderSleep(d) {
   if (!parts.length) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
   return parts.join("") + note("Correlative — tonight's forecast leads; last night and the trend are the evidence it earns its place against.");
 }
-// ── /evidence/mind/ — "the layer the machine can't see, awaiting its human." The MOST
+// ── /data/mind/ — "the layer the machine can't see, awaiting its human." The MOST
 // sensitive page: vices NEVER named (private unnamed streaks); a relapse is a muted RESET, never
 // red, never shame (the site-wide reserved-red is EXCLUDED here); capture is invitation, never
 // obligation. `d` = /api/mind_overview.
@@ -1340,15 +1347,15 @@ function habitsGroupTrends(history, groupAvgs) {
 // §7 goal linkage (P0.8) — each habit group links UP to the goal/pillar it serves + a
 // cross-link to the Evidence page that measures it. Copy-driven.
 const _HABIT_GOAL_LINKS = {
-  recovery: { goal: "hold the cut without breaking", link: "/evidence/sleep/", label: "Sleep" },
-  nutrition: { goal: "a deficit you can hold", link: "/evidence/nutrition/", label: "Nutrition" },
-  movement: { goal: "build the engine", link: "/evidence/training/", label: "Training" },
-  fitness: { goal: "build the engine", link: "/evidence/training/", label: "Training" },
-  training: { goal: "build the engine", link: "/evidence/training/", label: "Training" },
-  discipline: { goal: "the consistency pillar — skin in the game", link: "/evidence/vices/", label: "Vice streaks" },
-  mind: { goal: "the inner-life pillar", link: "/evidence/mind/", label: "Mind" },
-  hydration: { goal: "a deficit you can hold", link: "/evidence/nutrition/", label: "Nutrition" },
-  sleep: { goal: "the recovery that protects the cut", link: "/evidence/sleep/", label: "Sleep" },
+  recovery: { goal: "hold the cut without breaking", link: "/data/sleep/", label: "Sleep" },
+  nutrition: { goal: "a deficit you can hold", link: "/data/nutrition/", label: "Nutrition" },
+  movement: { goal: "build the engine", link: "/data/training/", label: "Training" },
+  fitness: { goal: "build the engine", link: "/data/training/", label: "Training" },
+  training: { goal: "build the engine", link: "/data/training/", label: "Training" },
+  discipline: { goal: "the consistency pillar — skin in the game", link: "/data/vices/", label: "Vice streaks" },
+  mind: { goal: "the inner-life pillar", link: "/data/mind/", label: "Mind" },
+  hydration: { goal: "a deficit you can hold", link: "/data/nutrition/", label: "Nutrition" },
+  sleep: { goal: "the recovery that protects the cut", link: "/data/sleep/", label: "Sleep" },
 };
 function habitsGoalLinkage(groupAvgs) {
   const groups = Object.keys(groupAvgs || {});
@@ -1691,7 +1698,7 @@ function renderAsk() {
 function renderExplorer(d) { const v = (d.vitals && d.vitals.vitals) || d.vitals || {}; const ch = (d.character && d.character.character) || {}; const j = (d.journey && d.journey.journey) || d.journey || {}; const rows = { weight_lbs: j.current_weight_lbs, character_level: ch.level, ...Object.fromEntries(Object.entries(v).filter(([k, x]) => ["string", "number"].includes(typeof x)).slice(0, 12)) }; return `<p class="rd-archive">Today's raw record, straight from the pipeline. For the full historical day-by-day browser, open the preserved Explorer below.</p>` + sec("Today", kvtable(rows)) + note("The unfiltered daily record."); }
 
 // Live Pulse — current status narrative + daily vitals trends (the old /live).
-// ── /evidence/vitals/ — the landing page, glance-first, three altitudes. "An instant, honest
+// ── /data/vitals/ — the landing page, glance-first, three altitudes. "An instant, honest
 // tell at the top; the full documentary as you scroll." `d` = /api/pulse.
 // P0.1 — decompose the day into 4 component reads (recovery / HRV / RHR / sleep). Each becomes
 // a ring whose fill is the metric's own value or its position in the recent range. tone: ember
@@ -1779,7 +1786,7 @@ function vitalsGlyphs(p, habitsToday) {
   }).filter(Boolean);
   if (habitsToday && habitsToday.total) {
     const lit = habitsToday.done > 0;
-    chips.unshift(`<a class="vg ${lit ? "vg-lit" : "vg-off"}" href="/evidence/habits/"><span class="vg-dot" aria-hidden="true"></span><span class="vg-word">habits</span><span class="vg-val mono">${habitsToday.done} of ${habitsToday.total}</span></a>`);
+    chips.unshift(`<a class="vg ${lit ? "vg-lit" : "vg-off"}" href="/data/habits/"><span class="vg-dot" aria-hidden="true"></span><span class="vg-word">habits</span><span class="vg-val mono">${habitsToday.done} of ${habitsToday.total}</span></a>`);
   }
   if (!chips.length) return "";
   return sec("Today, so far — the signals that have fired",
@@ -1896,9 +1903,9 @@ function vitalsBackgroundStrip(p) {
 // P2.4 — hub links: the landing page is the front door; each domain links out to its page.
 function vitalsHubLinks() {
   const links = [
-    ["recovery & sleep", "/evidence/sleep/"], ["strain & training", "/evidence/training/"],
-    ["weight & composition", "/evidence/physical/"], ["nutrition & the deficit", "/evidence/nutrition/"],
-    ["habits", "/evidence/habits/"], ["bloodwork", "/evidence/labs/"],
+    ["recovery & sleep", "/data/sleep/"], ["strain & training", "/data/training/"],
+    ["weight & composition", "/data/physical/"], ["nutrition & the deficit", "/data/nutrition/"],
+    ["habits", "/data/habits/"], ["bloodwork", "/data/labs/"],
   ];
   return sec("From here — the full documentary",
     `<div class="vh-row">${links.map(([t, h]) => `<a class="vh-link" href="${h}">${esc(t)} →</a>`).join("")}</div>` +
@@ -2105,7 +2112,7 @@ function buildSide() {
 async function renderCenter() {
   const t = BYSLUG[current]; if (!t) return;
   const main = $("[data-main]");
-  main.querySelector("[data-crumb]").innerHTML = `evidence / ${esc(t.slug)}`;
+  main.querySelector("[data-crumb]").innerHTML = `${esc(DOOR)} / ${esc(t.slug)}`;
   main.querySelector("[data-title]").textContent = t.title;
   main.querySelector("[data-blurb]").textContent = t.blurb;
   const ro = main.querySelector("[data-readout]");
@@ -2129,11 +2136,11 @@ async function renderCenter() {
 function select(slug, push = true) {
   if (!BYSLUG[slug]) return;
   current = slug;
-  if (push) history.pushState({ slug }, "", `/evidence/${slug}/`);
-  document.title = `${BYSLUG[slug].title} — The Evidence — averagejoematt`;
+  if (push) history.pushState({ slug }, "", `${BASE}${slug}/`);
+  document.title = `${BYSLUG[slug].title} — The ${DOORTITLE} — averagejoematt`;
   buildTabs(); buildSide(); renderCenter();
 }
-window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || (location.pathname.match(/\/evidence\/([^/]+)\//) || [])[1] || (REG[0] && REG[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
+window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || slugFromPath() || (REG[0] && REG[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
 
 function wireTheme() { const b = $(".theme-toggle"); if (!b) return; b.addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = cur === "light" ? "dark" : "light"; try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {} }); }
 

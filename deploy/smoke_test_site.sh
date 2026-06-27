@@ -2,7 +2,7 @@
 # smoke_test_site.sh — Post-deploy verification for averagejoematt.com (v4 "The Measured Life")
 #
 # Verifies the three-door v4 site (ADR-071): Cockpit (/now/), Story (/story/),
-# Evidence (/evidence/), over the unchanged read-only engine. Checks live pages (200),
+# Evidence (/data/), over the unchanged read-only engine. Checks live pages (200),
 # legacy v3 URLs (301 → v4), assets, API endpoints + freshness, content markers,
 # cache headers, and stale-copy. Run after `bash deploy/sync_site_to_s3.sh`.
 #
@@ -59,7 +59,7 @@ echo "── v4 pages (HTTP 200) ───────────────�
 check_status "Home"                 "$BASE/"
 check_status "Cockpit (/now/)"      "$BASE/now/"
 check_status "Story hub"            "$BASE/story/"
-check_status "Evidence hub"         "$BASE/evidence/"
+check_status "Evidence hub"         "$BASE/data/"
 check_status "Subscribe"            "$BASE/subscribe/"
 # Story sub-pages
 check_status "Story · chronicle"    "$BASE/story/chronicle/"
@@ -68,14 +68,14 @@ check_status "Story · lab-notes"    "$BASE/story/lab-notes/"
 check_status "Story · timeline"     "$BASE/story/timeline/"
 check_status "Story · about"        "$BASE/story/about/"
 # Evidence topics (sample across groups)
-check_status "Evidence · vitals"    "$BASE/evidence/vitals/"
-check_status "Evidence · glucose"   "$BASE/evidence/glucose/"
-check_status "Evidence · sleep"     "$BASE/evidence/sleep/"
-check_status "Evidence · labs"      "$BASE/evidence/labs/"
-check_status "Evidence · board"     "$BASE/evidence/board/"
-check_status "Evidence · platform"  "$BASE/evidence/platform/"
-check_status "Evidence · data"      "$BASE/evidence/data/"
-check_status "Evidence · pipeline"  "$BASE/evidence/pipeline/"
+check_status "Evidence · vitals"    "$BASE/data/vitals/"
+check_status "Evidence · glucose"   "$BASE/data/glucose/"
+check_status "Evidence · sleep"     "$BASE/data/sleep/"
+check_status "Evidence · labs"      "$BASE/data/labs/"
+check_status "Evidence · board"     "$BASE/method/board/"
+check_status "Evidence · platform"  "$BASE/method/platform/"
+check_status "Evidence · data"      "$BASE/method/data/"
+check_status "Evidence · pipeline"  "$BASE/method/pipeline/"
 check_status "404 page"             "$BASE/nonexistent-page-xyz" "404"
 check_status "www redirect"         "https://www.averagejoematt.com/" "200"
 echo ""
@@ -130,8 +130,8 @@ if [[ "$QUICK" != "--quick" ]]; then
   HOME_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
   NOW_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/now/" > "$NOW_FILE"
   STORY_FILE=$(mktemp);  curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
-  EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/evidence/" > "$EVID_FILE"
-  PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/evidence/pipeline/" > "$PIPE_FILE"
+  EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/data/" > "$EVID_FILE"
+  PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/method/pipeline/" > "$PIPE_FILE"
   SUB_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/subscribe/" > "$SUB_FILE"
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
