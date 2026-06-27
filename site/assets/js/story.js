@@ -352,7 +352,10 @@ async function load() {
 
   const wp = weight.status === "fulfilled" ? (weight.value.weight_progress || weight.value) : [];
   const wc = bind("weightchart");
-  if (wc) wc.innerHTML = lineChart(Array.isArray(wp) ? wp : [], { valueKey: "weight_lbs", goal: journeyV && journeyV.goal_weight_lbs, unit: " lb", label: "Weight · the actual line", emptyMsg: "The weight line fills in as weigh-ins accrue." });
+  // HARD RULE 4: the goal (185) must NOT anchor the y-axis — passing it flattened the real
+  // slope into a sliver at the top (the "empty chart" bug). Axis comes from the weight data
+  // alone; goal progress already lives in the numbers above. spine adds the min/max scale.
+  if (wc) wc.innerHTML = lineChart(Array.isArray(wp) ? wp : [], { valueKey: "weight_lbs", unit: " lb", spine: true, label: "Weight · the actual line", emptyMsg: "The weight line fills in as weigh-ins accrue." });
 
   const waveResp = wave.status === "fulfilled" ? wave.value : null;
   const waveV = waveResp ? (waveResp.days || waveResp.waveform || waveResp) : null;
