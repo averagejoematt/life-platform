@@ -5,6 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Documentation Index
 
 Deep documentation lives in `docs/`. Start here when context is needed:
+- **Website redesign / uplevel? Read these four first (the v5 brief):**
+  - `docs/PLATFORM_NORTH_STAR.md` — the durable **why**: purpose, the causal-loop thesis, the 4 audiences, the success bar
+  - `docs/SITE_MAP_AND_INTENT.md` — **what each page is for** and why it matters to the platform (one scannable registry)
+  - `docs/DESIGN_SYSTEM_V5.md` — the **standards**: type triad, tokens, `.prose`, the page kit, the motion/interaction layer, the "earned glow / no gloss" rule
+  - `docs/SITE_UPLEVEL_PLAYBOOK.md` — **how to change it well**: render-sweep→fix→verify loop + the hard-won gotchas (stored-artifact regen, CloudFront viewer-path, CDK-bundled lambdas)
 - `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
