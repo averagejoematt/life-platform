@@ -372,12 +372,20 @@ body { overflow-x: hidden; }
 .coach-daily { margin-top: var(--sp-4); padding: var(--sp-3) var(--sp-4); border-left: 2px solid var(--ember-line); background: var(--surface-raised); border-radius: var(--radius-sm); }
 .cd-text { margin-top: var(--sp-2); color: var(--ink); font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); max-width: var(--measure); }
 
-/* ── Coach/Panel page type consistency (2026-06-14) ───────────────────────────
-   Fix mixed fonts: coaches SPEAK in serif (human voice); labels, dates, rates,
-   chips, names stay mono (machine & data). One rule so sections stop alternating. */
+/* ── Coach/Panel page type consistency (v5 Coherence, 2026-06-27) ──────────────
+   The site's body voice is SANS everywhere (Data, Story prose). Coach pages had
+   been forced to SERIF wholesale (2026-06-14), which made them read as a different
+   design and left sans .dx-prose fallbacks alternating mid-page — the "fonts all
+   over the place under each coach" report. Align coach NARRATIVE to the sans body;
+   SERIF is reserved for genuine voice moments (the daily-reflection callout, the
+   philosophy/voice pull-quotes — handled by their own rules below). Labels, dates,
+   rates, chips, names stay mono (machine & data). */
 .coach-stance, .coach-progress, .coach-report, .coach-journey, .coach-rel,
 .coach-daily, .team-focus, .team-tension, .team-huddle,
-.coach-char, .coach-hyp, .coach-voice, .coach-more, .team-lead { font-family: var(--font-serif); }
+.coach-char, .coach-hyp, .coach-voice, .coach-more, .team-lead { font-family: var(--font-sans); }
+/* genuine "voice" moments stay serif (these win by being more specific) */
+.cd-text, .tl-bio, .tl-philosophy, .cv-example,
+.coach-voice blockquote, .coach-char blockquote, .coach-hyp blockquote { font-family: var(--font-serif); }
 /* The disclosed-section wrapper (F-06): coaches speak serif inside it; its summary
    stays a mono kicker like every other section header. One type system. */
 .coach-more { margin-top: var(--sp-4); }

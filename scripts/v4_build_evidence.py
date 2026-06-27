@@ -220,6 +220,16 @@ REGISTRY = [
         "/legacy/methodology/",
     ),
     (
+        "character",
+        "The character",
+        "What the Character Level means — 7 pillars, 100 levels, 5 tiers, and why level-ups are rare.",
+        "Credibility & the machine",
+        "editorial",
+        None,
+        None,
+        None,
+    ),
+    (
         "build",
         "How it's built",
         "Build-in-public — the AI agents, the budget governor, and keeping a model honest about my own data.",
@@ -423,6 +433,7 @@ _REGROUP = {
     "postmortems": "How it holds up",
     "survival": "How it holds up",
     "methodology": "How it holds up",
+    "character": "How it holds up",
     "predictions": "How it holds up",
     "benchmarks": "How it holds up",
     "biology": "How it holds up",
@@ -458,6 +469,24 @@ EDITORIAL = {
         '<section class="rd-sec"><h2 class="rd-h">Confidence vocabulary</h2>'
         '<p class="rd-prose">Everything is correlative, never causal. Fewer than 12 observations is a <strong>preliminary pattern</strong>; fewer than 30 is <strong>low confidence</strong>. The character model rolls these into a Level (1–100) across five tiers — Foundation → Momentum → Discipline → Mastery → Elite — over seven pillars: Sleep, Movement, Nutrition, Metabolic, Mind, Relationships, and Consistency.</p></section>'
         '<p class="correlative">The model never computes in prose — it interprets pre-computed numbers only. <span class="confidence conf-low">N=1</span></p>'
+    ),
+    "character": (
+        '<p class="rd-lede">The experiment has one number that tries to answer "is this actually working?" — a single RPG-style Character Level built from everything else. Here\'s what it means.</p>'
+        '<section class="rd-sec"><h2 class="rd-h">One level, seven pillars</h2>'
+        '<p class="rd-prose">Every day the engine scores seven pillars of the life — <strong>Sleep, Movement, Nutrition, Metabolic health, Mind, Relationships, and Consistency</strong> — each from its own real data (wearables, the food log, habits, labs). Those seven are weighted and rolled into one overall <strong>Character Level</strong> from 1 to 100. It\'s the closest thing to a single answer to the only question that matters over months: is the whole life trending up, or just one corner of it?</p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">Five tiers</h2>'
+        '<p class="rd-prose">The 100 levels are grouped into five tiers, each a band of twenty:</p>'
+        '<ul class="rd-tierlist">'
+        "<li>🔨 <strong>Foundation</strong> — levels 1–20. Laying the base: the habits and the floor.</li>"
+        "<li>🔥 <strong>Momentum</strong> — levels 21–40. The base holds and starts compounding.</li>"
+        "<li>⚔️ <strong>Discipline</strong> — levels 41–60. Consistency under load, not just on good weeks.</li>"
+        "<li>🏆 <strong>Mastery</strong> — levels 61–80. The system runs itself most days.</li>"
+        "<li>👑 <strong>Elite</strong> — levels 81–100. The far end of what an N=1 can reach.</li>"
+        "</ul>"
+        '<p class="rd-prose">So "<strong>Level 8 · Foundation</strong>" — what the cockpit shows today — means level 8 of 100, still in the first tier: early, building the base, exactly where a few weeks in should be. The tier is the chapter; the level is the page.</p></section>'
+        '<section class="rd-sec"><h2 class="rd-h">Why level-ups are rare (and mean something)</h2>'
+        '<p class="rd-prose">A level only moves after a sustained shift — roughly <strong>five or more days of real improvement</strong> to go up, and <strong>seven or more of decline</strong> to go down. That deliberate stickiness means a single great (or terrible) day can\'t swing it, and an "up" is earned, not noise. Expect only a handful of level events in a month. When a pillar crosses a tier line, that\'s a genuine milestone — the kind of thing the weekly chronicle writes about.</p>'
+        '<p class="correlative">It\'s a motivational lens on real data, not a medical score — every input is correlative and N=1. <span class="confidence conf-low">N=1</span></p></section>'
     ),
     "kitchen": (
         '<p class="rd-archive">The Kitchen is personalised meal intelligence — built from CGM response, macro tracking, and your real eating patterns. It needs data to work, and fills in automatically once daily nutrition logging and CGM readings accumulate over the first weeks. Until then, see Nutrition and Glucose &amp; meals for what\'s already flowing.</p>'

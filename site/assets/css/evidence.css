@@ -289,6 +289,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-lede { color: var(--ink-muted); font-size: var(--fs-body-lg); max-width: var(--measure); }
 .rd-prose { margin-top: var(--sp-3); color: var(--ink); line-height: var(--lh-relaxed); max-width: var(--measure); }
 .rd-prose em { font-style: italic; } .rd-prose strong { color: var(--ink); font-weight: var(--weight-med); }
+/* Tier ladder (the character explainer) — one row per tier, hairline-separated. */
+.rd-tierlist { list-style: none; margin: var(--sp-3) 0 0; max-width: var(--measure); }
+.rd-tierlist li { padding: var(--sp-3) 0; border-top: var(--border-hair); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.rd-tierlist li strong { color: var(--ink); }
 
 /* Ask the data — interactive */
 .ask-form { margin-top: var(--sp-5); }

@@ -155,38 +155,61 @@ async function renderCoachPage(read, id) {
   let d;
   try { d = await getJSON(`/api/coach/${encodeURIComponent(id)}`); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
-  h += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
-  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
-  // Lead with the two essentials: today's reflection (if any), the stance, the report card.
-  if (typeof d.daily === "string" && d.daily.trim()) {
-    h += `<section class="coach-daily"><p class="dx-kicker label">today's reflection</p><p class="cd-text">${esc(d.daily)}</p></section>`;
-  }
-  h += coachStanceHTML(d.stance && d.stance.rung);
+  // Header
+  let head = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
+  head += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
+  if (d.disclosure) head += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   const ro = d.recent_outputs || [];
-  h += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
-  h += ro.length
+
+  // ── Tab 1: Current read — today's reflection, the stance, how it's going ──
+  let cur = "";
+  if (typeof d.daily === "string" && d.daily.trim()) {
+    cur += `<section class="coach-daily"><p class="dx-kicker label">today's reflection</p><p class="cd-text">${esc(d.daily)}</p></section>`;
+  }
+  cur += coachStanceHTML(d.stance && d.stance.rung);
+  cur += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
+  cur += ro.length
     ? `<p class="coach-latest"><span class="label">${esc(ro[0].date || "")}</span> ${esc(ro[0].summary || "")}</p>`
     : `<p class="dx-prose">Tracking begins as data arrives — this coach narrates honest progress against its watches here, down-weeks included.</p>`;
-  h += `</section>`;
-  h += coachReportHTML(d.report_card);
-  // Disclose the deeper context so the page isn't one long scroll (F-06).
-  h += disclose("the character — who they are, how they show up", coachCharacterHTML(d.character));
-  h += disclose("working hypotheses · live bets", coachHypothesesHTML(d.working_hypotheses));
+  cur += `</section>`;
+
+  // ── Tab 2: Track record — report card, live bets, the daily journey ──
+  let track = coachReportHTML(d.report_card) + coachHypothesesHTML(d.working_hypotheses) + coachJourneyHTML(ro);
+  if (!track.trim()) track = `<p class="dx-prose">No track record yet — predictions and the daily journey land here as the experiment runs.</p>`;
+
+  // ── Tab 3: Bio — who they are, their voice, where they sit on the team ──
+  let bio = coachCharacterHTML(d.character);
   const v = d.voice || {};
   if (typeof v.few_shot_example === "string" && v.few_shot_example.trim()) {
-    h += disclose("voice signature", `<section class="coach-voice"><blockquote class="cv-example">${esc(v.few_shot_example)}</blockquote></section>`);
+    bio += `<section class="coach-voice"><p class="dx-kicker label">voice signature</p><blockquote class="cv-example">${esc(v.few_shot_example)}</blockquote></section>`;
   }
   const rel = d.relationships || {};
   const edge = (e) => `${esc(String(e.coach || "").replace("_coach", ""))} (${esc(e.weight)})`;
   if ((rel.leans_on || []).length || (rel.leaned_on_by || []).length) {
-    let rh = `<section class="coach-rel">`;
+    let rh = `<section class="coach-rel"><p class="dx-kicker label">on the team</p>`;
     if ((rel.leans_on || []).length) rh += `<p class="cr-edges"><span class="label">leans on</span> ${rel.leans_on.map(edge).join(" · ")}</p>`;
     if ((rel.leaned_on_by || []).length) rh += `<p class="cr-edges"><span class="label">leaned on by</span> ${rel.leaned_on_by.map(edge).join(" · ")}</p>`;
-    h += disclose("on the team", rh + `</section>`);
+    bio += rh + `</section>`;
   }
-  h += disclose("the daily journey", coachJourneyHTML(ro));
+  if (!bio.trim()) bio = `<p class="dx-prose">Bio fills in from this coach's profile.</p>`;
+
+  // ── Assemble the tabset (the review's ask: Bio / track record / current feedback) ──
+  const tabs = [
+    { key: "current", label: "Current read", html: cur },
+    { key: "track", label: "Track record", html: track },
+    { key: "bio", label: "Bio", html: bio },
+  ];
+  let h = head;
+  h += `<div class="tabset" role="tablist" aria-label="Coach views">` +
+    tabs.map((t, i) => `<button class="tab" role="tab" type="button" data-coachtab="${t.key}" aria-selected="${i === 0 ? "true" : "false"}">${esc(t.label)}</button>`).join("") +
+    `</div>`;
+  h += tabs.map((t, i) => `<div class="tabpanel" role="tabpanel" data-coachpanel="${t.key}"${i === 0 ? "" : " hidden"}>${t.html}</div>`).join("");
   read.innerHTML = h;
+  read.querySelectorAll("[data-coachtab]").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.coachtab;
+    read.querySelectorAll("[data-coachtab]").forEach((x) => x.setAttribute("aria-selected", x === b ? "true" : "false"));
+    read.querySelectorAll("[data-coachpanel]").forEach((p) => { p.hidden = p.dataset.coachpanel !== k; });
+  }));
   enhanceCoachNames(read);
 }
 
