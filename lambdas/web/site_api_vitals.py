@@ -22,7 +22,7 @@ Endpoints:
 
 import hashlib  # used by handle_achievements stable-event-key hash
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 from boto3.dynamodb.conditions import Key
@@ -32,6 +32,7 @@ from web.site_api_common import (
     CORS_HEADERS,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START,
+    PT,
     USER_ID,
     USER_PREFIX,
     _clamp_today,
@@ -223,6 +224,10 @@ def handle_journey() -> dict:
         projected_goal_date = (datetime.now(timezone.utc) + timedelta(days=days)).strftime("%Y-%m-%d")
         days_to_goal = int(days)
 
+    # Day-of-experiment counter (1-indexed, experiment TZ) — the home/cockpit
+    # "what day are we on" number. Single source so labels stay in sync.
+    _day_n = max((datetime.now(PT).date() - date.fromisoformat(EXPERIMENT_START)).days + 1, 0)
+
     return _ok(
         {
             "journey": {
@@ -238,6 +243,8 @@ def handle_journey() -> dict:
                 "projected_goal_date": projected_goal_date,
                 "days_to_goal": days_to_goal,
                 "started_date": EXPERIMENT_START,
+                "day_n": _day_n,
+                "week_n": (max(_day_n - 1, 0) // 7) + 1,
                 # Height (profile, authoritative) so the page can show a de-emphasized BMI
                 # without deriving height from DEXA indices (which disagree ~1.5 in). Not
                 # sensitive — already used in the waist-height ratio. P0.7.
@@ -806,13 +813,20 @@ def handle_journey_timeline() -> dict:
 def handle_journey_waveform() -> dict:
     """
     GET /api/journey_waveform
-    Returns 42 days of daily pillar-sum scores for the Story page emotional waveform.
+    Returns the daily pillar-sum scores for the Story/Home emotional waveform.
+    Window = the experiment so far (genesis → today, in experiment TZ), so the
+    "shape of it" matches the day-counter instead of a fixed 42-day box that
+    bleeds into pre-genesis/empty days. Capped at 365 days for older cycles.
     Score = sum of 7 pillar level_scores (0–700 range).
     Color tiers: green (>=250), amber (>=150), red (<150), gray (no data).
     Cache: 3600s (1 hr).
     """
-    today = datetime.now(timezone.utc).date()
-    start_date = (today - timedelta(days=41)).isoformat()
+    today = datetime.now(PT).date()
+    genesis = date.fromisoformat(EXPERIMENT_START)
+    day_count = max((today - genesis).days + 1, 1)  # 1-indexed Day-N
+    window = min(day_count, 365)
+    start = today - timedelta(days=window - 1)
+    start_date = start.isoformat()
     end_date = today.isoformat()
 
     PILLARS = [
@@ -854,10 +868,10 @@ def handle_journey_waveform() -> dict:
                         pass
         by_date[date_str] = round(total, 1)
 
-    # Build ordered 42-day series
+    # Build ordered genesis→today series (one point per experiment day)
     days = []
-    for i in range(42):
-        d = (today - timedelta(days=41 - i)).isoformat()
+    for i in range(window):
+        d = (today - timedelta(days=window - 1 - i)).isoformat()
         score = by_date.get(d)
         if score is None:
             color = "gray"
@@ -875,7 +889,10 @@ def handle_journey_waveform() -> dict:
         {
             "days": days,
             "max_score": max_score,
-            "window": 42,
+            "window": window,
+            "day_n": day_count,
+            "week_n": ((day_count - 1) // 7) + 1,
+            "genesis": EXPERIMENT_START,
         },
         cache_seconds=3600,
     )
