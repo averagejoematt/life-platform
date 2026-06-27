@@ -1006,3 +1006,29 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .tabset .tab[aria-selected="true"] { color: var(--ember); border-bottom-color: var(--ember); }
 .tabset .tab:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
 .tabpanel[hidden] { display: none; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   12. MOTION LAYER — v5 "alive". Purposeful, restrained, reduced-motion-aware.
+   The hidden state is gated on html.mo (set by a tiny head script ONLY when
+   motion is safe) so if motion.js never runs, a failsafe removes .mo and all
+   content shows — motion fails OPEN, never hides content.
+   ════════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  html.mo .hero, html.mo .page-hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat,
+  html.mo .loop, html.mo .rd-sec, html.mo .two-voice, html.mo .coach-daily, html.mo .coach-progress,
+  html.mo .coach-report, html.mo .coach-stance, html.mo .team-lead, html.mo .team-focus,
+  html.mo .team-tension, html.mo .team-huddle, html.mo .supp, html.mo .rd-card, html.mo .cap-card,
+  html.mo .vr-row, html.mo .figs, html.mo .ml-ladder {
+    opacity: 0; transform: translateY(16px);
+    transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+  }
+  html.mo .is-in { opacity: 1 !important; transform: none !important; }
+
+  /* Hover lifts — pure CSS, zero risk, no flash. */
+  .loop-node, .vh-link, .dx-item, .ev-tile, .supp { transition: transform 0.18s var(--ease-out), border-color 0.18s var(--ease-out); }
+  .loop-node:hover, .ev-tile:hover { transform: translateY(-2px); }
+
+  /* The pillar constellation breathes (home hero) — barely-there life. */
+  .constellation [data-nodes] > * { animation: mo-breathe 6s var(--ease-inout) infinite; }
+  @keyframes mo-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+}
