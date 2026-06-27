@@ -548,6 +548,15 @@ THEME = (
     '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
     'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
 )
+# Motion layer (v5): fail-open head guard + the deferred motion.js. Reveal-on-scroll,
+# chart draw-in, hover lifts — reduced-motion aware; content shows if motion.js never runs.
+MOTION_HEAD = (
+    '<script>(function(){try{if(!("IntersectionObserver" in window))return;'
+    'if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;'
+    'document.documentElement.classList.add("mo");'
+    'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
+)
+MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 # The five doors, in loop order: cockpit · data · coaching · protocols · story.
 DOORS = [
     ("/now/", "the cockpit", "cockpit"),
@@ -662,6 +671,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/evidence.css">
   {THEME}
+  {MOTION_HEAD}
 </head>
 <body>
   <a class="skip" href="#ev">Skip to the content</a>
@@ -686,6 +696,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   {FOOTER}
   <script>window.__EVIDENCE_REGISTRY__ = {reg}; window.__START_SLUG__ = {json.dumps(start_slug)};
 window.__ARCHIVE_BASE__ = {json.dumps(pillar["base"])}; window.__ARCHIVE_DOOR__ = {json.dumps(pillar["door"])}; window.__ARCHIVE_TITLE__ = {json.dumps(pillar["title"])};</script>
+  {MOTION_SCRIPT}
   <script type="module" src="/assets/js/evidence.js"></script>
 </body>
 </html>
