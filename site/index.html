@@ -62,6 +62,7 @@
     <div class="hero-grid">
       <div class="hero-copy">
         <p class="kicker label">a measured life · proof, not promises</p>
+        <p class="hero-daycount"><span class="hd-num num" data-bind="dayNum">··</span> <span class="hd-cap" data-bind="dayCap">days into the experiment</span></p>
         <p class="hero-day label" data-bind="genesisStamp" hidden></p>
         <p class="hero-proof" data-bind="hero-proof" hidden></p>
         <h1 class="hero-h">An honest documentary of an <em>ordinary</em> life, rebuilt with AI.</h1>
@@ -87,13 +88,29 @@
 
   <!-- ── THE ARC: scrollytelling waveform with honest down-beats ──────────── -->
   <main id="arc" class="arc">
+    <!-- The loop: what this site IS, in one screen — the through-line every door serves. -->
+    <section class="beat beat-loop" aria-label="What this is">
+      <p class="beat-kicker label">what this is · the loop</p>
+      <h2 class="beat-h">One feedback loop, documented in public.</h2>
+      <div class="loop">
+        <a class="loop-node" href="/data/"><span class="ln-name">The Data</span><span class="ln-role">Every source — the body, the mind — now and over time.</span></a>
+        <span class="loop-arrow" aria-hidden="true">→</span>
+        <a class="loop-node" href="/coaching/"><span class="ln-name">The Coaching</span><span class="ln-role">AI coaches read the data and argue about it.</span></a>
+        <span class="loop-arrow" aria-hidden="true">→</span>
+        <a class="loop-node" href="/protocols/"><span class="ln-name">The Protocols</span><span class="ln-role">The levers — what gets changed to move the data.</span></a>
+        <span class="loop-arrow" aria-hidden="true">→</span>
+        <a class="loop-node" href="/story/"><span class="ln-name">The Story</span><span class="ln-role">The human journey — chronicle, podcast, journal.</span></a>
+      </div>
+      <p class="beat-note">The protocols shift the data; the data feeds the coaching; the story narrates all of it — week by week. <a href="/now/">Today's slice lives in the cockpit →</a></p>
+    </section>
+
     <!-- P2.1 — the waveform LEADS the arc (the most shareable, least-braggy proof), right under
          the hero's claim; the numbers follow. Claim + proof share the opening screen. -->
     <section class="beat beat-waveform">
-      <p class="beat-kicker label">42 days · the shape of it</p>
+      <p class="beat-kicker label" data-bind="wave-window">the shape of it</p>
       <h2 class="beat-h">The climb isn't a straight line. Here's every day, including the ones that dipped.</h2>
       <figure class="waveform">
-        <div class="wave" data-bind="wave" role="img" aria-label="Daily whole-life score over the last 42 days"></div>
+        <div class="wave" data-bind="wave" role="img" aria-label="Daily whole-life score, every day since the experiment began"></div>
         <figcaption class="wave-legend label">
           <span class="lg lg-up">strong</span>
           <span class="lg lg-mid">holding</span>

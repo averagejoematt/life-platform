@@ -339,6 +339,12 @@ async function load() {
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
   stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix
+  // The review's "central number": a prominent day-of-experiment counter in the hero.
+  const { dayN, weekN } = genesisCount();
+  if (dayN >= 1) {
+    const dn = bind("dayNum"); if (dn) dn.textContent = String(dayN);
+    const dc = bind("dayCap"); if (dc) dc.textContent = dayN === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`;
+  }
   dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
@@ -348,8 +354,12 @@ async function load() {
   const wc = bind("weightchart");
   if (wc) wc.innerHTML = lineChart(Array.isArray(wp) ? wp : [], { valueKey: "weight_lbs", goal: journeyV && journeyV.goal_weight_lbs, unit: " lb", label: "Weight · the actual line", emptyMsg: "The weight line fills in as weigh-ins accrue." });
 
-  const waveV = wave.status === "fulfilled" ? (wave.value.days || wave.value.waveform || wave.value) : null;
+  const waveResp = wave.status === "fulfilled" ? wave.value : null;
+  const waveV = waveResp ? (waveResp.days || waveResp.waveform || waveResp) : null;
   renderWave(Array.isArray(waveV) ? waveV : (waveV && waveV.days) || []);
+  // Dynamic wave label — the window now tracks the experiment (genesis→today), not a fixed 42.
+  const ww = bind("wave-window");
+  if (ww && waveResp && waveResp.day_n) ww.textContent = `${waveResp.day_n} day${waveResp.day_n === 1 ? "" : "s"} · the shape of it`;
 
   const charV = character.status === "fulfilled" ? character.value : null;
   const pillars = (charV && (charV.pillars || (charV.character && charV.character.pillars))) || [];

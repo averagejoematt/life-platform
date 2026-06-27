@@ -41,6 +41,10 @@ body { overflow-x: hidden; }
 @media (min-width: 860px) { .hero-grid { grid-template-columns: 1.1fr 0.9fr; } }
 
 .kicker { color: var(--ember); }
+/* The central day-of-experiment counter (the review's "central number"). */
+.hero-daycount { margin: var(--sp-3) 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
+.hero-daycount .hd-num { font-size: var(--fs-data-xl); line-height: 1; color: var(--ember); font-variant-numeric: tabular-nums; }
+.hero-daycount .hd-cap { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
 .hero-day { color: var(--ink-muted); margin: var(--sp-2) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
 /* P2.1 — the live proof line paired with genesis, up in the hero. */
 .hero-proof { color: var(--ember); font-family: var(--font-mono); font-size: var(--fs-small); margin: var(--sp-1) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
