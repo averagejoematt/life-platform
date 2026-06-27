@@ -278,7 +278,7 @@ async function loadPillarRead(key) {
     const dir = trendOf(p.xp_delta);
     const moving = dir === "up" ? "climbing" : dir === "down" ? "slipping" : "holding";
     text = `${PILLAR_LABEL[key]} is at ${Math.round(p.raw_score ?? 0)} and ${moving} (${p.tier || "Foundation"}). ` +
-           `Correlative read only — open the Evidence door for the components behind it.`;
+           `Correlative read only — open the Data door for the components behind it.`;
   }
   const out = { text: escapeHTML(text).replace(/^&gt;\s*/, ""), action, confidence: confidence || "correlative" };
   state.coachCache[key] = out;
@@ -392,7 +392,7 @@ async function renderWeek() {
 function showScopeSoon(scope) {
   hideDaily();
   const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Scope";
-  bind("verdict").innerHTML = `The ${scope} view fills in as the record deepens — for now, the 42-day arc lives in <a href="/">the Story</a> and longer trends in <a href="/evidence/">the Evidence</a>.`;
+  bind("verdict").innerHTML = `The ${scope} view fills in as the record deepens — for now, the 42-day arc lives in <a href="/">the Story</a> and longer trends in <a href="/data/">the Data</a>.`;
 }
 
 /* ── scope + theme controls ──────────────────────────────────────────────── */
