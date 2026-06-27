@@ -16,10 +16,47 @@
 */
 (function () {
   var root = document.documentElement;
-  function showAll() { root.classList.remove("mo"); }
-  try {
-    if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) { showAll(); return; }
-  } catch (e) { showAll(); return; }
+
+  // ── Interactive line charts (ALWAYS on — interaction, not motion, so it runs even
+  //    under prefers-reduced-motion). lineChart embeds data-cpts (normalized coords +
+  //    label per point); we draw a focus dot + tooltip that track the cursor. ──
+  function wireChart(svg) {
+    if (svg.__ix) return; svg.__ix = 1;
+    var cpts; try { cpts = JSON.parse(svg.getAttribute("data-cpts")); } catch (e) { return; }
+    if (!cpts || !cpts.length) return;
+    var fig = svg.closest(".chart"); if (!fig) return;
+    if (getComputedStyle(fig).position === "static") fig.style.position = "relative";
+    var dot = document.createElement("span"); dot.className = "chart-focus"; dot.hidden = true;
+    var tip = document.createElement("span"); tip.className = "chart-tip label"; tip.hidden = true;
+    fig.appendChild(dot); fig.appendChild(tip);
+    svg.addEventListener("mousemove", function (e) {
+      var r = svg.getBoundingClientRect(), fr = fig.getBoundingClientRect();
+      var ratio = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+      var pt = cpts[Math.round(ratio * (cpts.length - 1))]; if (!pt) return;
+      var px = (r.left - fr.left) + pt.x * r.width, py = (r.top - fr.top) + pt.y * r.height;
+      dot.style.left = px + "px"; dot.style.top = py + "px"; dot.hidden = false;
+      tip.textContent = pt.l; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.hidden = false;
+    });
+    svg.addEventListener("mouseleave", function () { dot.hidden = true; tip.hidden = true; });
+  }
+  function wireCharts(scope) {
+    if (!scope.querySelectorAll) return;
+    Array.prototype.forEach.call(scope.querySelectorAll(".chart svg[data-cpts]"), wireChart);
+    if (scope.matches && scope.matches(".chart svg[data-cpts]")) wireChart(scope);
+  }
+
+  var reduce;
+  try { reduce = !("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { reduce = true; }
+  if (reduce) {
+    root.classList.remove("mo"); // motion off — but charts stay interactive
+    wireCharts(document);
+    try {
+      new MutationObserver(function (muts) {
+        muts.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.nodeType === 1) wireCharts(n); }); });
+      }).observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
+    return;
+  }
   clearTimeout(window.__moFail); // we're alive — cancel the fail-open timer
 
   var SEL = ".hero, .page-hero, .ev-head, .dx-head, .beat, .loop, .rd-sec, .two-voice, .coach-daily, " +
@@ -46,6 +83,7 @@
       // already on screen at arm time? reveal next frame (entrance), else observe.
       io.observe(el);
     });
+    wireCharts(scope); // make any line charts in this scope explorable
   }
 
   // SVG line charts draw themselves in when their section reveals.

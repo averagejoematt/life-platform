@@ -64,7 +64,10 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
   const spineEl = spine
     ? `<div class="chart-spine" aria-hidden="true"><span class="chart-spine-v mono">${_r(max)}${escAttr(unit)}</span><span class="chart-spine-v mono">${_r(min)}${escAttr(unit)}</span></div>`
     : "";
-  return `<figure class="chart${spine ? " chart--spined" : ""}">${spineEl}<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+  // Interactive hover data — normalized (0–1) coords + a label per point. motion.js reads
+  // data-cpts and draws a focus dot + tooltip, making every lineChart explorable at once.
+  const cpts = pts.map((p, i) => ({ x: +(x(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: (p.d ? _short(p.d) + " · " : "") + _r(p.v) + unit }));
+  return `<figure class="chart${spine ? " chart--spined" : ""}">${spineEl}<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<path class="chart-fill" d="${area}"/>${goalLine}` +
     `<path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(pts.length - 1).toFixed(1)}" cy="${y(last.v).toFixed(1)}" r="3.5"/></svg>` +
