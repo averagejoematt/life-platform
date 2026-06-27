@@ -307,6 +307,7 @@ async function renderRead(s, id) {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3><p class="dx-loading shimmer">Loading the timeline…</p>`;
     const d = await secFetch(s); const events = (d && d.events) || [];
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3>` +
+      `<p class="dx-prose">Milestones, life events, and <strong>character level-ups</strong> — the rare days a pillar climbs a tier. <a href="/method/character/">What's a character level?</a></p>` +
       (events.length ? `<ol class="dx-timeline">${events.map((e) => `<li class="dxt-item"><span class="dxt-date label">${esc(String(e.date || "").slice(0, 10))}</span><div><p class="dxt-title">${esc(e.title || e.type || "")}</p>${e.body ? `<p class="dxt-note">${esc(e.body)}</p>` : ""}</div></li>`).join("")}</ol>`
         : `<p class="dx-prose">No milestones logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</p>`);
     return;
