@@ -1031,4 +1031,11 @@ a.vg-lit:hover { background: var(--ember-wash); }
   /* The pillar constellation breathes (home hero) — barely-there life. */
   .constellation [data-nodes] > * { animation: mo-breathe 6s var(--ease-inout) infinite; }
   @keyframes mo-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+
+  /* The loop flows — arrows pulse Data → Coaching → Protocols → Story in sequence,
+     so the site's core thesis reads as a living cycle, not a static diagram. */
+  .loop > .loop-arrow { animation: mo-flow 2.6s var(--ease-inout) infinite; }
+  .loop > .loop-arrow:nth-child(4) { animation-delay: 0.35s; }
+  .loop > .loop-arrow:nth-child(6) { animation-delay: 0.7s; }
+  @keyframes mo-flow { 0%, 100% { opacity: 0.4; } 45% { opacity: 1; transform: translateX(2px); } }
 }

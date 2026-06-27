@@ -179,9 +179,22 @@ function renderWave(days) {
     bar.className = `bar ${d.score == null ? "none" : meaningfulSpread ? tierOfRel(pos) : "up"}`;
     const h = d.score ? 14 + (pos || 0) * 86 : 6;
     bar.style.height = `${h}%`;
-    bar.title = `${d.date || ""}: ${d.score ?? "no data"}`;
+    bar.title = `${d.date || ""}: ${d.score ?? "no data"}`; // a11y / no-JS fallback
+    bar.dataset.tip = `${d.date || ""} · ${d.score == null ? "no data" : "score " + d.score}`;
     return bar;
   }));
+  // Styled, cursor-following tooltip — the waveform becomes a thing you explore.
+  let tip = wrap.querySelector(".wave-tip");
+  if (!tip) { tip = document.createElement("span"); tip.className = "wave-tip label"; tip.hidden = true; wrap.appendChild(tip); }
+  wrap.onmousemove = (e) => {
+    const bar = e.target.closest && e.target.closest(".bar");
+    if (!bar || !bar.dataset.tip) { tip.hidden = true; return; }
+    tip.textContent = bar.dataset.tip;
+    tip.hidden = false;
+    const wr = wrap.getBoundingClientRect();
+    tip.style.left = `${Math.max(0, Math.min(wr.width, e.clientX - wr.left))}px`;
+  };
+  wrap.onmouseleave = () => { tip.hidden = true; };
 }
 
 /* ── the Third Wall ──────────────────────────────────────────────────────── */

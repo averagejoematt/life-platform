@@ -126,8 +126,13 @@ body { overflow-x: hidden; }
 
 /* Waveform — honest down-beats in muted ink, never alarm-red */
 .waveform { margin-top: var(--sp-5); }
-.wave { display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
-.wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out); }
+.wave { position: relative; display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
+.wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out), filter 0.14s var(--ease-out), transform 0.14s var(--ease-out); transform-origin: bottom; cursor: crosshair; }
+.wave .bar:hover { filter: brightness(1.28); transform: scaleY(1.05); }
+/* cursor-following readout for the interactive waveform */
+.wave-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-xs); padding: 2px 8px; color: var(--ink); box-shadow: var(--shadow-soft); z-index: 2; }
+.wave-tip[hidden] { display: none; }
 .wave .bar.up { background: var(--ember); }
 .wave .bar.mid { background: var(--ink-muted); }
 .wave .bar.down { background: var(--ink-faint); opacity: 0.55; box-shadow: inset 0 -2px 0 0 var(--ink-muted); }
