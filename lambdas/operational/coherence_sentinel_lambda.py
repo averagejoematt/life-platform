@@ -129,15 +129,22 @@ def _gather_predictions():
             ev = rec.get("evaluation") or {}
             created = rec.get("created_date")
             window = int(ev.get("evaluation_window_days") or 14)
+            # GRADABLE = the evaluator could actually decide it: a directional spec, or a
+            # machine spec carrying a threshold. Qualitative and the legacy machine-
+            # threshold=None C-3 casualties can NEVER decide, so counting them as "should
+            # have graded" made prediction_health perma-red on dead cruft. The actionable
+            # signal is "do GRADABLE predictions, whose windows have closed, fail to grade".
+            etype = ev.get("type")
+            gradable = etype == "directional" or (etype == "machine" and ev.get("threshold") is not None)
             closed = False
-            if created:
+            if created and gradable:
                 try:
                     close_date = datetime.strptime(created, "%Y-%m-%d") + timedelta(days=window)
                     # Closed = window elapsed AND not so long ago it's just stale cruft.
                     closed = close_date < today and (today - close_date).days <= _RECENT_CLOSE_DAYS
                 except (ValueError, TypeError):
                     closed = False
-            out.append({"status": rec.get("status", "pending"), "closed": closed, "eval_type": ev.get("type")})
+            out.append({"status": rec.get("status", "pending"), "closed": closed, "eval_type": etype})
     return out
 
 
