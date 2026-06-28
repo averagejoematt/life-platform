@@ -23,6 +23,9 @@ import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
   { key: "by-coach", label: "By Coach", kicker: "each coach's read on your data", kind: "bycoach", url: "/api/coaches" },
+  // Scorecard — the board's falsifiable track record: every call graded by the
+  // daily evaluator (confirmed/refuted/pending). Honest-empty until calls resolve.
+  { key: "scorecard", label: "Scorecard", kicker: "the board's track record", kind: "scorecard", url: "/api/predictions" },
   { key: "team", label: "The Team", kicker: "who they are · how they're built", kind: "team", url: "/api/coaches" },
   { key: "lab-notes", label: "AI lab notes", kicker: "the AI's read ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
   // Reader Q&A — ask a question (form) AND read the ones the board has answered
@@ -57,6 +60,20 @@ function entriesFor(s, data) {
   if (s.kind === "bycoach" || s.kind === "team")
     return (data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
+  if (s.kind === "scorecard") {
+    const o = (data && data.overall) || {};
+    const out = [{ id: "all", title: "The whole board", date: o.decided ? `${o.decided} decided` : `${o.total || 0} calls` }];
+    const byc = (data && data.by_coach) || {};
+    const names = {};
+    for (const p of (data && data.predictions) || []) names[p.coach_id] = p.coach_name;
+    Object.keys(byc).sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0)).forEach((cid) => {
+      const c = byc[cid];
+      if (!c.total) return;
+      const rate = c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : `${c.decided || 0} decided`;
+      out.push({ id: cid, title: names[cid] || cid, date: rate });
+    });
+    return out;
+  }
   return [];
 }
 
@@ -352,7 +369,89 @@ async function renderRead(s, id) {
   if (s.kind === "bycoach") return renderByCoach(read, id);
   if (s.kind === "team") return renderTeamCoach(read, id);
   if (s.kind === "fieldnotes") return renderFieldNote(read, id);
+  if (s.kind === "scorecard") return renderScorecard(read, id);
   if (s.kind === "qa") { if (String(id) === "ask") return renderAskBoard(read); return renderAnswer(read, id); }
+}
+
+// THE SCORECARD — the board's falsifiable record. Every call the coaches make is
+// graded by the daily evaluator (EWMA-trend directional / machine). Honest about
+// the early state: most calls are still inside their 2–4 week resolution window.
+const _STATUS_LABEL = { confirmed: "confirmed", refuted: "refuted", pending: "still open", inconclusive: "no signal", expired: "expired" };
+async function renderScorecard(read, id) {
+  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Tallying the board's calls…</span></p>`;
+  const data = (await tryJSON("/api/predictions")) || {};
+  const o = data.overall || {};
+  const byc = data.by_coach || {};
+  const preds = data.predictions || [];
+  const names = {};
+  for (const p of preds) names[p.coach_id] = p.coach_name;
+  const decided = o.decided || 0;
+
+  if (String(id) === "all" || !id) {
+    let h = `<p class="dx-kicker label">the scorecard · every call, graded</p><h2 class="dx-title">The board's track record</h2>`;
+    h += `<p class="dx-prose">The coaches don't just talk — they make falsifiable calls, and a deterministic evaluator grades each one against the data once its window closes. This is the honest tally. <span class="label">Self-assessment of the board's own calls, not external validation.</span></p>`;
+    // The headline tiles.
+    h += `<div class="sc-tiles">` +
+      `<div class="sc-tile"><span class="sc-n">${decided ? `${o.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${decided ? ` · ${decided} decided` : ""}</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${o.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${o.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${o.pending || 0}</span><span class="sc-l label">still open</span></div>` +
+      `</div>`;
+    if (!decided) {
+      h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far; none have resolved yet — each one grades only after its 2–4 week window closes${o.inconclusive ? `, and ${o.inconclusive} came back with no clear signal` : ""}. The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
+    }
+    // Per-coach rows.
+    const rows = Object.keys(byc).filter((c) => byc[c].total).sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0));
+    if (rows.length) {
+      h += `<p class="dx-kicker label sc-sub">by coach</p><ul class="sc-coachlist">`;
+      for (const cid of rows) {
+        const c = byc[cid];
+        const rate = c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : "—";
+        h += `<li class="sc-row"><button type="button" class="sc-coachbtn" data-coach="${esc(cid)}">` +
+          `<span class="sc-coach">${esc(names[cid] || cid)}</span>` +
+          `<span class="sc-rate label">${esc(rate)}</span>` +
+          `<span class="sc-mix label">${c.confirmed || 0}✓ · ${c.refuted || 0}✗ · ${c.pending || 0} open</span></button></li>`;
+      }
+      h += `</ul>`;
+    }
+    // Recent decided calls (the real signal once they exist).
+    const decidedCalls = preds.filter((p) => p.status === "confirmed" || p.status === "refuted").slice(0, 8);
+    if (decidedCalls.length) {
+      h += `<p class="dx-kicker label sc-sub">recently graded</p>` + decidedCalls.map(_scCallHTML).join("");
+    }
+    read.innerHTML = h;
+    read.querySelectorAll(".sc-coachbtn").forEach((b) => b.addEventListener("click", () => selectEntry(BYKEY.scorecard, b.dataset.coach)));
+    enhanceCoachNames(read);
+    return;
+  }
+
+  // A single coach's record.
+  const c = byc[id] || {};
+  const name = names[id] || id;
+  const mine = preds.filter((p) => p.coach_id === id);
+  const decidedC = c.decided || 0;
+  let h = `<p class="dx-kicker label">scorecard · one coach</p><h2 class="dx-title">${esc(name)}</h2>`;
+  h += `<div class="sc-tiles">` +
+    `<div class="sc-tile"><span class="sc-n">${decidedC ? `${c.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${decidedC ? ` · ${decidedC} decided` : ""}</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${c.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${c.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
+    `<div class="sc-tile"><span class="sc-n">${c.pending || 0}</span><span class="sc-l label">still open</span></div>` +
+    `</div>`;
+  if (!decidedC) h += `<p class="dx-prose sc-note">${esc(name)} has ${c.total || 0} calls on the board; none have resolved yet. Each grades after its window closes.</p>`;
+  const show = mine.slice(0, 14);
+  if (show.length) h += `<p class="dx-kicker label sc-sub">the calls</p>` + show.map(_scCallHTML).join("");
+  h += `<p class="bc-datalink label"><a href="/coaching/scorecard/#all">← the whole board</a></p>`;
+  read.innerHTML = h;
+  read.querySelectorAll("[data-coach]").forEach((b) => b.addEventListener("click", () => selectEntry(BYKEY.scorecard, b.dataset.coach)));
+  enhanceCoachNames(read);
+}
+function _scCallHTML(p) {
+  const st = p.status || "pending";
+  return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
+    `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
+    `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}</div>` +
+    `<p class="sc-call-claim">${esc(p.text || "")}</p>` +
+    `${p.outcome_notes ? `<p class="sc-call-why label">${esc(p.outcome_notes)}</p>` : ""}</div>`;
 }
 
 // A single board-answered reader question (PG-ENG-2 static feed).
