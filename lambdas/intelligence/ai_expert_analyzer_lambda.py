@@ -139,26 +139,13 @@ def _load_canonical_facts():
         return _CANON_FACTS_CACHE["facts"]
     facts = {}
     try:
-        rec = _latest_item("computed_metrics") or {}
+        # Phase 2 (Coherence Program): the field list + units + rounding now live in
+        # ONE schema (canonical_facts.build_canonical_facts) that the Coherence Sentinel
+        # also reads — so the value a coach is grounded on is exactly the value the
+        # Sentinel checks the narrative against. No more per-site dict construction.
+        from canonical_facts import build_canonical_facts
 
-        def _f(k):
-            v = rec.get(k)
-            try:
-                return round(float(v), 1) if v is not None else None
-            except (TypeError, ValueError):
-                return None
-
-        facts = {
-            "recovery_pct": _f("recovery_pct"),
-            "hrv_ms": _f("hrv_ms"),
-            "rhr_bpm": _f("rhr_bpm"),
-            "protein_g_avg": _f("protein_g_avg"),
-            "protein_g_target": _f("protein_g_target"),
-            "protein_g_floor": _f("protein_g_floor"),
-            "latest_weight": _f("latest_weight"),
-            "weekly_rate_lbs": _f("weekly_rate_lbs"),
-            "as_of": rec.get("date"),
-        }
+        facts = build_canonical_facts(_latest_item("computed_metrics") or {})
     except Exception as _e:
         logger.warning("canonical facts load failed: %s", _e)
     _CANON_FACTS_CACHE["facts"] = facts
