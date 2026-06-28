@@ -210,8 +210,17 @@ def gather_data_for_expert(expert_key):
 
     elif expert_key == "nutrition":
         items = _query_source("macrofactor", d30, today)
+        # Nutrition is a manual end-of-day upload — structurally ~24h behind. The latest
+        # COMPLETE day (normally yesterday) is the live state; an absent current day is
+        # EXPECTED and is never a logging failure. Surfaced so the coach never says so.
+        _recency_note = "Nutrition logs at end of day (manual upload), so data runs through the latest complete day; an absent current day is expected pipeline lag, never a logging failure — do not frame it as one."
         if not items:
-            return {"expert_key": "nutrition", "period": f"experiment days 1-{days_in_experiment}", "note": "No nutrition data available"}
+            return {
+                "expert_key": "nutrition",
+                "period": f"experiment days 1-{days_in_experiment}",
+                "note": "No nutrition data available",
+                "recency_note": _recency_note,
+            }
         cal_vals = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal")]
         pro_vals = [float(i["total_protein_g"]) for i in items if i.get("total_protein_g")]
         fiber_vals = [float(i["total_fiber_g"]) for i in items if i.get("total_fiber_g")]
@@ -234,6 +243,7 @@ def gather_data_for_expert(expert_key):
             "protein_adherence_pct": round(adherence),
             "days_tracked": len(items),
             "zero_calorie_days": zero_cal_days,
+            "recency_note": _recency_note,
         }
 
     elif expert_key == "training":

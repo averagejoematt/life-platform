@@ -730,6 +730,12 @@ async function renderNutrition(d) {
   // ── §0 Hero — the verdict (P0.1). Folds calories/TDEE/deficit out of the tile row.
   const hero = nutritionHero(n);
   if (hero) parts.push(hero);
+  // Nutrition is a manual end-of-day upload — always a day behind BY DESIGN. Frame the
+  // latest COMPLETE day as the live state so the trailing gap reads as expected, never
+  // as "hasn't logged today". Uses n.as_of / n.today_pending from the API.
+  if (n.as_of) {
+    parts.push(`<p class="rd-meta label nut-asof">Nutrition reflects complete days — through <strong>${esc(fmtShort(n.as_of))}</strong>${n.today_pending ? ". Today's intake uploads after the day ends." : "."}</p>`);
+  }
   // ── §2 lead — the protein miss as THE weighted signal (P0.2).
   const lead = nutritionProteinLead(n);
   if (lead) parts.push(lead);
