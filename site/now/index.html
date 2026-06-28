@@ -163,6 +163,15 @@
           <p class="circ-weak label" data-bind="circ-weak" hidden></p>
         </section>
 
+        <!-- Predict the week (PG-ENG-1): a reader bets which way a leading signal
+             moves — not the outcome (weight), the levers. Present-tense, hidden when
+             there's no active weekly challenge with predict_metrics. -->
+        <section class="predict" data-predict hidden aria-label="Predict the week">
+          <p class="cap label">your read · the week ahead</p>
+          <div class="predict-body" data-bind="predict-body"></div>
+          <p class="predict-foot label">No streaks, no nags — just your instinct against the board's. The result shows up next week.</p>
+        </section>
+
         <!-- Week scope: six instruments, seven days (S-03) — real /api/observatory_week reads -->
         <section class="weekview" data-weekview hidden aria-label="The week's instruments">
           <p class="cap label">seven days, by instrument</p>

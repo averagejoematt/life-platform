@@ -296,6 +296,102 @@ function renderBoardline(priority) {
   }
 }
 
+/* ── Predict the week (PG-ENG-1) ─────────────────────────────────────────────
+   A reader bets which way a leading SIGNAL moves this week — not the outcome.
+   Honest small-n: the reader % only appears past a threshold, rounds to 5% while
+   thin, and a wrong call is never red. No streaks, no nags. Hides itself when
+   there's no active weekly challenge with predict_metrics. */
+const PREDICT_DIRS = [
+  { key: "up", glyph: "▲", label: "up" },
+  { key: "flat", glyph: "›", label: "hold" },
+  { key: "down", glyph: "▼", label: "down" },
+];
+function _predictKey(week, metric) { return `ajm-predict-${week}-${metric}`; }
+function _predictPrior(week, metric) { try { return localStorage.getItem(_predictKey(week, metric)); } catch (e) { return null; } }
+function _dirChip(key) { const d = PREDICT_DIRS.find((x) => x.key === key); return d ? `<span class="predict-pick">${d.glyph} ${d.label}</span>` : escapeHTML(String(key)); }
+function _pctOf(n, total, round5) { const p = total ? (100 * n) / total : 0; return round5 ? Math.round(p / 5) * 5 : Math.round(p); }
+
+async function renderPredict() {
+  const sec = $("[data-predict]");
+  if (!sec) return;
+  let d;
+  try { d = await getJSON(`${API}/predict_week`); } catch (e) { d = null; }
+  if (!d || !d.active || !d.metrics || !Object.keys(d.metrics).length) { sec.hidden = true; return; }
+  const week = d.week_id;
+  const result = d.result || null;
+  const body = bind("predict-body");
+  body.innerHTML = "";
+  for (const [metric, label] of Object.entries(d.metrics)) {
+    const tallies = (d.tallies && d.tallies[metric]) || { up: 0, down: 0, flat: 0 };
+    const item = document.createElement("div");
+    item.className = "predict-item";
+    _renderPredictItem(item, week, metric, label, tallies, result, _predictPrior(week, metric));
+    body.appendChild(item);
+  }
+  sec.hidden = false;
+}
+
+function _predictTallyLine(tallies) {
+  const total = (tallies.up || 0) + (tallies.down || 0) + (tallies.flat || 0);
+  if (total < 8) return `<span class="predict-n label">early · ${total} ${total === 1 ? "vote" : "votes"}</span>`;
+  const round5 = total < 20;
+  return `<span class="predict-tally label">` +
+    PREDICT_DIRS.map((dir) => `<span class="pt-seg pt-${dir.key}">${dir.glyph} ${_pctOf(tallies[dir.key] || 0, total, round5)}%</span>`).join(" · ") +
+    `</span>`;
+}
+
+function _renderPredictItem(item, week, metric, label, tallies, result, prior) {
+  // Week closed — the honest reveal (never red for a wrong call).
+  if (result && result.metric === metric && result.direction) {
+    const actual = PREDICT_DIRS.find((x) => x.key === result.direction);
+    const youRight = prior && prior === result.direction;
+    item.innerHTML =
+      `<p class="predict-q">${escapeHTML(label)}</p>` +
+      `<p class="predict-reveal">readers said ${_predictTallyLine(tallies)}` +
+      (prior ? ` · you said ${_dirChip(prior)}${youRight ? ' <span class="predict-hit">✓</span>' : ""}` : "") +
+      ` · <span class="predict-actual">actual: ${actual ? actual.glyph + " " + actual.label : escapeHTML(String(result.direction))}</span></p>`;
+    return;
+  }
+  // Already predicted this week — your pick + the reader read.
+  if (prior) {
+    item.innerHTML =
+      `<p class="predict-q">${escapeHTML(label)}</p>` +
+      `<p class="predict-state">you said ${_dirChip(prior)} · ${_predictTallyLine(tallies)}</p>`;
+    return;
+  }
+  // Not yet — the vote row.
+  item.innerHTML =
+    `<p class="predict-q">Will <strong>${escapeHTML(label)}</strong> go up, hold, or down this week?</p>` +
+    `<div class="predict-vote" role="group" aria-label="Your prediction">` +
+    PREDICT_DIRS.map((dir) => `<button class="predict-btn" type="button" data-choice="${dir.key}"><span class="pb-g" aria-hidden="true">${dir.glyph}</span><span>${dir.label}</span></button>`).join("") +
+    `</div><p class="predict-tallyrow">${_predictTallyLine(tallies)}</p>`;
+  item.querySelectorAll(".predict-btn").forEach((b) => b.addEventListener("click", () => _castPredict(item, week, metric, label, b.dataset.choice)));
+}
+
+async function _castPredict(item, week, metric, label, choice) {
+  item.querySelectorAll(".predict-btn").forEach((b) => (b.disabled = true));
+  try {
+    const res = await fetch(`${API}/predict_week`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ week_id: week, metric, choice }),
+    });
+    if (res.ok) {
+      try { localStorage.setItem(_predictKey(week, metric), choice); } catch (e) {}
+      const data = await res.json().catch(() => ({}));
+      _renderPredictItem(item, week, metric, label, (data && data.tallies) || {}, null, choice);
+    } else if (res.status === 429) {
+      // Already counted (other tab / cleared storage) — honor it, show the voted state.
+      try { localStorage.setItem(_predictKey(week, metric), choice); } catch (e) {}
+      _renderPredictItem(item, week, metric, label, {}, null, choice);
+    } else {
+      item.querySelectorAll(".predict-btn").forEach((b) => (b.disabled = false));
+    }
+  } catch (e) {
+    item.querySelectorAll(".predict-btn").forEach((b) => (b.disabled = false));
+  }
+}
+
 /* ── Tonight's forecast: circadian-compliance (predictive) ─────────────────── */
 async function renderCircadian() {
   const sec = $("[data-circadian]");
@@ -524,6 +620,7 @@ async function load(dateStr) {
     renderVerdict(pri);
     renderBoardline(pri);
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
+    renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
 
     if (character.as_of_date) bind("asof").textContent = `as of ${character.as_of_date}`;
     main.dataset.state = "ready";
@@ -539,7 +636,7 @@ async function load(dateStr) {
     bind("day").textContent = "";
     gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
     gone("[data-readiness]"); gone(".cap-today");
-    gone(".domains"); gone(".band"); gone(".voice.human"); gone("[data-circadian]");
+    gone(".domains"); gone(".band"); gone(".voice.human"); gone("[data-circadian]"); gone("[data-predict]");
     bind("verdict").innerHTML = "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
     $(".panel").setAttribute("aria-busy", "false");
   }
