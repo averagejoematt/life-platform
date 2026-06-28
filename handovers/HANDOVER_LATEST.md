@@ -46,6 +46,14 @@ Greening the ruff gate (#227) **unmasked the gating Visual+AI-vision QA job**, w
 ## State (final)
 `main` @ post-**#228** (Phase 3+4b **#226**, ruff-greener **#227**, docs **#228**). **Main CI: Lint ✓ Unit Tests ✓ Plan ✓ Deploy ✓** — the only red is visual-qa on the pre-existing Home overflow above. **0 open PRs.** New `tests/test_phase3_grounding.py`. CLAUDE.md layer ref reads **v91**; top Verified line dated 2026-06-28. Live build-fingerprint `f7369057` (deployed from worktree, content-identical to merged `3927e1a5`) — cosmetic. Memories: `project_truth_audit` (COMPLETE), `project_home_overflow_followup` (new, OPEN), `reference_ci_masking_and_creds`.
 
+## Follow-up RESOLVED (continuation later 2026-06-28) — #230, main now fully green
+The Home overflow is fixed, deployed, and verified. Matthew gave express deploy permission again for this continuation.
+- **Real root cause** (bisected + browser-verified — NOT a content element / inline CSS): the decorative **`.hero::before` warm-bloom** (`site/assets/css/story.css`, `inset: -6% -4% auto -4%`) bleeds the glow ~4% (~15.6px) past each hero side; at full-width mobile the right bleed lands off-screen and pushes document width (16px @ 390px, 31px @ 768px). `body{overflow-x:hidden}` never contained it because `visual_qa._mobile_overflow` measures `document.documentElement.scrollWidth` (the `<html>` box).
+- **Fix:** `overflow-x: clip` on `.hero` (one line). `clip` (not `overflow:hidden`) keeps `overflow-y: visible` so the bloom still bleeds DOWN into the arc; no scroll container / sticky side-effects. Visually lossless.
+- **Diagnosis method worth remembering:** every hero *child* fit inside the viewport on `getBoundingClientRect` yet `scrollWidth` was still +16 — the tell that it's a pseudo-element / non-flow decorative box. Found it by bisecting (hide subtrees, re-measure) then reading `getComputedStyle('.hero','::before')` (width 421px, inset -15.6px).
+- **Deploy + verify:** PR **#230** merged `5de962f0`; `bash deploy/sync_site_to_s3.sh` (CF invalidation `I8UJWG87NATYDNA0TEAWJN2QAC`); live `version.json` build `066e3656` (worktree commit, content-identical — cosmetic). Live overflow **0 at 360/390/414/768px**; `visual_qa.py --page /` → **1 passed**; re-ran the red `ci-cd.yml` run `28312156590` `--failed` → **Visual+AI QA success → entire run green**.
+- A pure-CSS/site change triggers only the lightweight **"v4 site gate"** workflow (it passed), NOT the full `ci-cd.yml` (path-filtered to Python/Lambda/CDK) — that's why re-running the prior failed `ci-cd.yml` job was the way to officially green the gating visual-QA.
+- Memory `project_home_overflow_followup` → **RESOLVED**.
+
 ## Next-session quick-start
-1. **Fix the Home `/` 16px mobile overflow** (browser-verified) → greens visual-qa → fully green main. See `project_home_overflow_followup`.
-2. Optional: full 50-agent `/accuracy-review full` for exhaustive re-attestation (the 15 findings were verified directly; `accuracy_audit --live` = 0 HIGH).
+1. Main is fully green and 0 open follow-ups. Optional: full 50-agent `/accuracy-review full` for exhaustive re-attestation (the 15 findings were verified directly; `accuracy_audit --live` = 0 HIGH).
