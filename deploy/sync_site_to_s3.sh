@@ -17,6 +17,30 @@
 
 set -euo pipefail
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CLOBBER GUARD (Coherence Program Phase 3). sync_site_to_s3.sh pushes the WHOLE
+# site/ tree, so syncing from a branch that's MISSING site/ commits which are
+# already on origin/main silently OVERWRITES live site content. This is exactly
+# what bit us 2026-06-28: parallel feature branches cut from clean main, each
+# full-package sync clobbering the last. Block when origin/main has site/ commits
+# this checkout lacks. Fail-soft (offline / not-a-git-repo → skip, never break a
+# deploy). Override with ALLOW_STALE_SITE=1 for an intentional rollback.
+if [ "${1:-}" != "--dry-run" ] && [ "${ALLOW_STALE_SITE:-0}" != "1" ] && git rev-parse --git-dir >/dev/null 2>&1; then
+  if git fetch origin main --quiet 2>/dev/null; then
+    _missing="$(git rev-list --count HEAD..origin/main -- site/ 2>/dev/null || echo 0)"
+    if [ "${_missing:-0}" -gt 0 ]; then
+      echo "⛔ CLOBBER GUARD: origin/main has $_missing site/ commit(s) this checkout doesn't." >&2
+      echo "   Syncing now would OVERWRITE live site changes you don't have locally." >&2
+      echo "   Fix: git merge origin/main  (or rebase), then re-run." >&2
+      echo "   Override (intentional rollback only): ALLOW_STALE_SITE=1 bash deploy/sync_site_to_s3.sh" >&2
+      exit 1
+    fi
+    echo "→ clobber guard: site/ is up to date with origin/main ✓"
+  else
+    echo "  ⚠️  clobber guard skipped (couldn't fetch origin/main — offline?)"
+  fi
+fi
+
 # Regenerate rss.xml from the live published chronicle (best-effort — never block a
 # deploy if offline). Keeps the feed's pubDates/lastBuildDate correct on every sync.
 if [ "${1:-}" != "--dry-run" ]; then
