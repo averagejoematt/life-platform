@@ -543,7 +543,12 @@ EDITORIAL = {
     ),
 }
 
-FONTS = '<link rel="stylesheet" href="/assets/css/fonts.css">'
+FONTS = (
+    '<link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="stylesheet" href="/assets/css/fonts.css">'
+)
 THEME = (
     '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
     'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
