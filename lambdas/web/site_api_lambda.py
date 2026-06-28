@@ -62,6 +62,7 @@ from web.site_api_coach import (
     handle_coach_team,
     handle_coach_timeline,
     handle_coaches,
+    handle_experiment_synthesis,
     handle_field_notes,
     handle_panel_ledger,
     handle_predictions,
@@ -393,6 +394,7 @@ ROUTES = {
     "/api/ai_analysis": None,  # GET with ?expert= query param, handled in lambda_handler
     "/api/coach_analysis": None,  # GET with ?domain= query param, handled in lambda_handler (Coach Intelligence)
     "/api/weekly_priority": None,  # GET — integrator synthesis, handled in lambda_handler
+    "/api/experiment_synthesis": handle_experiment_synthesis,  # C-1 — cross-week experiment arc
     # BL-03: The Ledger / Snake Fund
     "/api/ledger": handle_ledger,
     # BL-04: Field Notes

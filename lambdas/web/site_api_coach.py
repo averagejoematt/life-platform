@@ -583,6 +583,30 @@ def handle_field_notes(event):
     # AI Analysis (GET with ?expert= query param)
 
 
+def handle_experiment_synthesis():
+    """GET /api/experiment_synthesis — the board's cross-week arc of the whole run (C-1).
+
+    Reads the precomputed EXPERT#experiment_arc record (written by ai-expert-analyzer
+    once >=2 weeks of lab notes exist). Honest-null before then; the Experiment view
+    falls back to its week-by-week tone list.
+    """
+    ai_pk = f"{USER_PREFIX}ai_analysis"
+    item = table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item")
+    if not item:
+        return _ok({"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None}, cache_seconds=300)
+    item = _decimal_to_float(item)
+    return _ok(
+        {
+            "arc": item.get("arc"),
+            "throughline": item.get("throughline"),
+            "chapters": item.get("chapters", []),
+            "week_count": int(item.get("week_count") or 0),
+            "generated_at": item.get("generated_at"),
+        },
+        cache_seconds=300,
+    )
+
+
 def handle_ai_analysis(event):
     """GET /api/ai_analysis"""
     qs = event.get("queryStringParameters") or {}
