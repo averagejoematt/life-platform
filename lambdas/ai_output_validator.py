@@ -149,6 +149,9 @@ _GENERIC_USELESS_PHRASES = [
 # ── TB7-19: Metric claim patterns for hallucination detection ─────────────────
 # Each tuple: (health_context_key, regex_extracting_the_number, display_label)
 # Tolerance: 25% deviation between number mentioned in text and actual context value.
+# HRV stated in bpm (a heart-rate unit) — HRV is milliseconds. Category error.
+_HRV_WRONG_UNIT_RE = re.compile(r"\bHRV\b[^.]{0,20}?\b\d+(?:\.\d+)?\s*bpm\b", re.IGNORECASE)
+
 # WARN tier only — hallucinated claims are suspicious but not always wrong (rounding, etc.).
 _METRIC_PATTERNS = [
     ("recovery_score", r"recovery\s+(?:score\s+)?(?:is|was|of|at|:)?\s*(\d+(?:\.\d+)?)\s*%?", "recovery score"),
@@ -316,6 +319,13 @@ def validate_ai_output(
     if ctx:
         hallucination_warnings = _check_hallucinated_metrics(stripped, ctx)
         result.warnings.extend(hallucination_warnings)
+
+    # ── Check 13: HRV labeled in the wrong unit (WARN) ────────────────────────
+    # HRV (RMSSD) is milliseconds; "HRV 44.7 bpm" is a category error the health-
+    # literate audience catches. Deterministic — the prompt is the first line, this
+    # is the backstop.
+    if _HRV_WRONG_UNIT_RE.search(stripped):
+        result.warnings.append("HRV labeled in bpm — HRV is milliseconds (ms), not bpm")
 
     if result.blocked:
         logger.error("[ai_validator] Output blocked: %s | %s", output_type, result.block_reason)
