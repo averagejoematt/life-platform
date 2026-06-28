@@ -39,7 +39,7 @@ function coachStanceHTML(st) {
   if (!st) return "";
   const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
   let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
-  h += `<h4 class="cs-headline">${esc(st.headline || "")}</h4><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
+  h += `<h3 class="cs-headline">${esc(st.headline || "")}</h3><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
   if ((st.cares_most || []).length) h += `<p class="cs-care"><span class="label">caring most about right now</span> ${list(st.cares_most)}</p>`;
   if ((st.cares_less_right_now || []).length) h += `<p class="cs-careless"><span class="label">deliberately ignoring for now</span> ${list(st.cares_less_right_now)}</p>`;
   if (st.plan) h += `<p class="dx-prose"><strong>The plan:</strong> ${esc(st.plan)}</p>`;
@@ -107,7 +107,7 @@ async function renderTeamView(read) {
   let d;
   try { d = await getJSON("/api/coach_team"); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h3 class="dx-title">My Team</h3>`;
+  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h2 class="dx-title">My Team</h2>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   if (d.lead) {
     const L = d.lead;
@@ -157,7 +157,7 @@ async function renderCoachPage(read, id) {
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
   // Header
   let head = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
-  head += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
+  head += `<h2 class="dx-title">${esc(d.name || "")}</h2>`;
   if (d.disclosure) head += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   const ro = d.recent_outputs || [];
 

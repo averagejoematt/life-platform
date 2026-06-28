@@ -79,7 +79,7 @@ async function secFetch(s) { if (!s.url) return null; if (cache[s.key]) return c
 // Matt's review of the voice before deploy.
 const ABOUT = `
   <p class="dx-kicker label">the experiment, in context</p>
-  <h3 class="dx-title">An ordinary person, rebuilt in public — with AI.</h3>
+  <h2 class="dx-title">An ordinary person, rebuilt in public — with AI.</h2>
   <p class="dx-prose">I've spent two decades making complicated systems reliable and getting people to actually use them. In early 2026 I turned that same thinking on myself — not a challenge, not a 30-day hack, but a proper system: the wearables already on my body, an AI that reads the numbers back to me every morning, and the discipline to publish the down weeks too.</p>
   <p class="dx-prose">This isn't Blueprint. No million-dollar lab, no team of doctors, no superhuman protocol — just consumer devices, Claude, and a commitment to keep it honest. Every number here is real; every failure is included. The bet is simple: <strong>numbers <em>and</em> meaning, kept personal.</strong> The anti-Blueprint.</p>
   <p class="dx-prose">A board of named AI experts argues about my data; Elena Voss writes the weekly chronicle; the Third Wall is where the machine's read meets how it actually felt. Everything here is correlative, never causal — patterns, flagged when thin, never dressed up as proof.</p>
@@ -100,7 +100,7 @@ function coachStanceHTML(st) {
   if (!st) return "";
   const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
   let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
-  h += `<h4 class="cs-headline">${esc(st.headline || "")}</h4><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
+  h += `<h3 class="cs-headline">${esc(st.headline || "")}</h3><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
   if ((st.cares_most || []).length) h += `<p class="cs-care"><span class="label">caring most about right now</span> ${list(st.cares_most)}</p>`;
   if ((st.cares_less_right_now || []).length) h += `<p class="cs-careless"><span class="label">deliberately ignoring for now</span> ${list(st.cares_less_right_now)}</p>`;
   if (st.plan) h += `<p class="dx-prose"><strong>The plan:</strong> ${esc(st.plan)}</p>`;
@@ -124,7 +124,7 @@ async function renderTeamView(read) {
   let d;
   try { d = await getJSON("/api/coach_team"); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h3 class="dx-title">My Team</h3>`;
+  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h2 class="dx-title">My Team</h2>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   if (d.lead) {
     const L = d.lead;
@@ -225,7 +225,7 @@ async function renderCoachPage(read, id) {
   try { d = await getJSON(`/api/coach/${encodeURIComponent(id)}`); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
   let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
-  h += `<h3 class="dx-title">${esc(d.name || "")}</h3>`;
+  h += `<h2 class="dx-title">${esc(d.name || "")}</h2>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
   if (typeof d.daily === "string" && d.daily.trim()) {
@@ -292,7 +292,7 @@ async function renderRead(s, id) {
     read.innerHTML =
       pendingHTML +
       `<p class="dx-kicker label">the podcast · weekly review · two AI voices</p>` +
-      `<h3 class="dx-title">${esc(ent.title)}</h3>` +
+      `<h2 class="dx-title">${esc(ent.title)}</h2>` +
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
       `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
@@ -304,9 +304,9 @@ async function renderRead(s, id) {
     return;
   }
   if (s.kind === "timeline") {
-    read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3><p class="dx-loading shimmer">Loading the timeline…</p>`;
+    read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2><p class="dx-loading shimmer">Loading the timeline…</p>`;
     const d = await secFetch(s); const events = (d && d.events) || [];
-    read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h3 class="dx-title">The journey so far</h3>` +
+    read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2>` +
       `<p class="dx-prose">Milestones, life events, and <strong>character level-ups</strong> — the rare days a pillar climbs a tier. <a href="/method/character/">What's a character level?</a></p>` +
       (events.length ? `<ol class="dx-timeline">${events.map((e) => `<li class="dxt-item"><span class="dxt-date label">${esc(String(e.date || "").slice(0, 10))}</span><div><p class="dxt-title">${esc(e.title || e.type || "")}</p>${e.body ? `<p class="dxt-note">${esc(e.body)}</p>` : ""}</div></li>`).join("")}</ol>`
         : `<p class="dx-prose">No milestones logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</p>`);
@@ -343,7 +343,7 @@ async function renderRead(s, id) {
     ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round((episode.bytes || 0) / 1024 / 1024 / 0.12))} min)</span></div>`
     : "";
   read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
-    `<h3 class="dx-title">${esc(ent.title)}</h3>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
+    `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   const rf = read.querySelector(".dx-readfull");
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));

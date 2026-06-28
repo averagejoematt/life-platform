@@ -177,6 +177,50 @@ class OperationalStack(Stack):
         cdk.CfnOutput(self, "AlertDigestQueueUrl", value=digest_queue.queue_url)
         cdk.CfnOutput(self, "AlertDigestLambdaArn", value=digest_lambda.function_arn)
 
+        # ── 2c. Weekly traffic digest (privacy-clean returnability measurement) ──
+        # CloudFront standard access logs (first-party server logs — no cookies, no
+        # client JS, no third party) land in this bucket; the Lambda aggregates the
+        # past 7 days (IPs hashed-then-discarded) and emails a digest. ObjectOwnership
+        # = BUCKET_OWNER_PREFERRED so CloudFront standard logging can grant itself the
+        # awslogsdelivery ACL. Enabling logging on the (non-CDK) site distribution is
+        # a one-time manual step — see docs/SITE_UPLEVEL_PLAYBOOK.md.
+        cf_log_bucket = s3.Bucket(
+            self,
+            "CfLogBucket",
+            bucket_name="matthew-life-platform-cf-logs",
+            object_ownership=s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
+            encryption=s3.BucketEncryption.S3_MANAGED,
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            lifecycle_rules=[s3.LifecycleRule(expiration=Duration.days(90))],  # logs are transient
+            removal_policy=cdk.RemovalPolicy.RETAIN,
+        )
+        traffic_digest = create_platform_lambda(
+            self,
+            "TrafficDigest",
+            function_name="life-platform-traffic-digest",
+            source_file="lambdas/operational/traffic_digest_lambda.py",
+            handler="operational.traffic_digest_lambda.lambda_handler",
+            # cron(0 16 ? * MON *) = 16:00 UTC Mondays = 9 AM PT (UTC-fixed, no DST drift).
+            schedule="cron(0 16 ? * MON *)",
+            timeout_seconds=120,
+            memory_mb=256,
+            environment={
+                "LOG_BUCKET": cf_log_bucket.bucket_name,
+                "LOG_PREFIX": "cf/",
+                "SITE_HOST": "averagejoematt.com",
+                "EMAIL_RECIPIENT": "awsdev@mattsusername.com",
+                "EMAIL_SENDER": "awsdev@mattsusername.com",
+            },
+            custom_policies=rp.operational_traffic_digest(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+            alarm_name="traffic-digest-errors",
+        )
+        cdk.CfnOutput(self, "CfLogBucketName", value=cf_log_bucket.bucket_name)
+        cdk.CfnOutput(self, "TrafficDigestLambdaArn", value=traffic_digest.function_arn)
+
         # ── 3. Canary — every 4 hours
         canary = create_platform_lambda(
             self,
