@@ -36,5 +36,16 @@ Deleted leaking at-rest chronicle records (not live — feed verified clean): `D
 - **Did NOT re-invoke `daily-brief`** (it re-sends Matthew's email; the 11am brief already went out, day-selection is unit-tested + the canonical record is verified). Next 11am brief validates the primary_whoop fix naturally.
 - **Did NOT run the full 50-agent `/accuracy-review full`** — verified the specific 15 findings directly + `accuracy_audit --live` 0 HIGH. Run `/accuracy-review full` if you want the exhaustive milestone re-attestation.
 
-## State
-`main` post-#227. New `tests/test_phase3_grounding.py`. CLAUDE.md layer ref should read **v91**. The build-fingerprint on the live site is `f7369057` (deployed from the worktree, content-identical to merged `3927e1a5`) — cosmetic. Memory updated: `project_truth_audit` (remediation COMPLETE).
+## Post-deploy discovery (after the #228 docs commit) — ONE open follow-up
+Greening the ruff gate (#227) **unmasked the gating Visual+AI-vision QA job**, which had been `skipped` on every main push since #220 (Lint red → everything downstream skipped). It now **runs and fails on ONE pre-existing bug:**
+
+- **Home page (`/`) horizontal overflow at 390px — content exceeds viewport by 16px.** All 25 other pages pass (24 passed, 1 failed, 26 warnings) — *including every page Phase 4b changed*. This is a **v5-redesign-era bug** (`site/index.html`, #216/#217), NOT the accuracy work — it was masked behind the red lint. (The one earlier run where visual-QA executed, #217 `431ba4cd`, also failed on it.)
+- **Impact:** reds the CI run (a "CI failed" email) but does **NOT** roll back deploys — `rollback`'s `needs` excludes visual-qa. All live accuracy work is safe.
+- **Deferred to next session (Matthew's call), browser-verified.** Memory: `project_home_overflow_followup`. Don't blind-patch `overflow-x:hidden` (clips content) — reproduce at 390px (Chrome MCP / `tests/visual_qa.py --screenshot` / `/qa`), find the ~16px-too-wide element. Home CSS is external (no inline culprit in `index.html`).
+
+## State (final)
+`main` @ post-**#228** (Phase 3+4b **#226**, ruff-greener **#227**, docs **#228**). **Main CI: Lint ✓ Unit Tests ✓ Plan ✓ Deploy ✓** — the only red is visual-qa on the pre-existing Home overflow above. **0 open PRs.** New `tests/test_phase3_grounding.py`. CLAUDE.md layer ref reads **v91**; top Verified line dated 2026-06-28. Live build-fingerprint `f7369057` (deployed from worktree, content-identical to merged `3927e1a5`) — cosmetic. Memories: `project_truth_audit` (COMPLETE), `project_home_overflow_followup` (new, OPEN), `reference_ci_masking_and_creds`.
+
+## Next-session quick-start
+1. **Fix the Home `/` 16px mobile overflow** (browser-verified) → greens visual-qa → fully green main. See `project_home_overflow_followup`.
+2. Optional: full 50-agent `/accuracy-review full` for exhaustive re-attestation (the 15 findings were verified directly; `accuracy_audit --live` = 0 HIGH).
