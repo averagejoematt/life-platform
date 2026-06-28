@@ -44,6 +44,17 @@ def test_catches_recovery_contradiction():
     assert c[0]["claimed"] == 86
 
 
+def test_catches_gross_hrv_contradiction():
+    # labs: "HRV holding in the 50-52 range" vs canonical 25.2 — a ~2x error.
+    c = az._hard_canonical_contradictions("Your HRV is holding in the 50-52 range this week.", FACTS)
+    assert len(c) == 1 and c[0]["metric"] == "HRV" and c[0]["claimed"] == 50
+
+
+def test_hrv_within_daily_swing_does_not_fire():
+    # 30 vs 25.2 is a 19% swing — normal HRV day-to-day variance, not a contradiction.
+    assert az._hard_canonical_contradictions("HRV ticked up to 30 ms overnight.", FACTS) == []
+
+
 def test_correct_numbers_do_not_fire():
     clean = "Resting HR sits at 64 bpm and recovery is 30% — both as reported."
     assert az._hard_canonical_contradictions(clean, FACTS) == []

@@ -154,17 +154,16 @@ def _load_canonical_facts():
 
 
 def _hard_canonical_contradictions(text, facts):
-    """Pure: does the narrative state an RHR or recovery number that hard-contradicts
-    the canonical facts? Returns [{metric, claimed, canonical, detail}], empty if clean.
+    """Pure: does the narrative state an RHR, recovery, or HRV number that hard-
+    contradicts the canonical facts? Returns [{metric, claimed, canonical, detail}].
 
-    Scoped to the two STABLE, high-confidence metrics that the truth audit + the
-    Coherence Sentinel caught coaches inventing (RHR 53 vs 64; recovery 30-vs-86) —
-    NOT weight or HRV: weight-loss totals ("13.8 pounds") are deltas, not the
-    bodyweight, and HRV has high day-to-day variance, so both invite false positives.
-    The layer validator (ai_output_validator) misses these because its RHR regex only
-    matches "resting heart rate"/"resting HR" (not the "RHR" abbreviation the coaches
-    used) and its 25% tolerance lets a 17% RHR error through. This is tighter and
-    catches the abbreviation; it stays local so no layer rebuild is needed.
+    Scoped to the three physiological metrics the Coherence Sentinel caught coaches
+    inventing across a re-run (RHR 53/56-57 vs 64; recovery 73 vs 30; HRV 50 vs 25.2).
+    NOT weight: loss totals ("13.8 pounds") are deltas, not bodyweight, and invite
+    false positives. Tolerances are per-metric — RHR/recovery are stable (tight),
+    HRV swings day-to-day (loose 40%, only catches a ~2x error). The layer validator
+    misses these (its RHR regex needs "resting heart rate"/"resting HR", not the "RHR"
+    abbreviation; 25% tolerance lets a 17% miss through); this is local — no layer dance.
     """
     import re as _re
 
@@ -203,6 +202,21 @@ def _hard_canonical_contradictions(text, facts):
                         "claimed": claimed,
                         "canonical": rec,
                         "detail": f"narrative says recovery ~{claimed:g}%, but the authoritative Whoop recovery is {rec:g}%",
+                    }
+                )
+    hrv = facts.get("hrv_ms")
+    if hrv is not None:
+        m = _re.search(r"hrv[^.\d]{0,20}(\d{1,3}(?:\.\d+)?)", low)
+        if m:
+            claimed = float(m.group(1))
+            # HRV swings day-to-day — only flag a gross (>40% AND >8 ms) miss, e.g. 50 vs 25.2.
+            if abs(claimed - hrv) > 8 and abs(claimed - hrv) / max(hrv, 1) > 0.40:
+                out.append(
+                    {
+                        "metric": "HRV",
+                        "claimed": claimed,
+                        "canonical": hrv,
+                        "detail": f"narrative says HRV ~{claimed:g}, but the authoritative HRV is {hrv:g} ms",
                     }
                 )
     return out
@@ -821,7 +835,11 @@ def _build_shared_system_prompt():
         if fact_lines:
             parts.append(
                 "AUTHORITATIVE FACTS (cite these EXACT numbers; do not invent, round away, or "
-                "substitute a target/floor for an actual value):\n" + "\n".join(fact_lines)
+                "substitute a target/floor for an actual value):\n" + "\n".join(fact_lines) + "\n"
+                "HARD RULE for resting HR, HRV, and recovery: state ONLY the exact value above. "
+                "Do NOT invent a trend, a range, a multi-day figure, or a 'climbed/dropped from X to Y' "
+                "for these — you do not have that history. If you have no specific number for a claim, "
+                "describe the pattern qualitatively instead of inventing a figure."
             )
     except Exception as _fe:
         logger.warning("Authoritative facts injection failed: %s", _fe)
