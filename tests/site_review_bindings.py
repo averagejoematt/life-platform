@@ -253,6 +253,29 @@ def _build_evidence_bindings():
         order += 1
 
 
+# v5 pillars the visual_qa sweep covers beyond the /data/ topics: the Protocols hub
+# and the Method character explainer (door-coverage for protocols + method).
+PAGE_BINDINGS.append(
+    {
+        "path": "/protocols/",
+        "name": "The Protocols",
+        "door": "protocols",
+        "narrative_order": 80,
+        "story_intent": "the levers — what gets changed to move the data",
+        "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/method/character/",
+        "name": "Method · the character",
+        "door": "method",
+        "narrative_order": 81,
+        "story_intent": "what the character level means — 7 pillars, 100 levels, 5 tiers",
+        "endpoints": [],
+    }
+)
+
 _build_evidence_bindings()
 
 

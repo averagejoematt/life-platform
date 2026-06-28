@@ -6,6 +6,9 @@ spacing, signatures). v5 gives us the *through-line*: one editorial spine and a
 small shared kit so every page reads as a single package, not a pile of features.
 
 > Context for this work: `~/.claude/plans/soft-baking-toast.md` (the redesign brief).
+> Companions: [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) (the why),
+> [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) (what each page is for),
+> [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) (how to change it safely).
 
 ---
 
@@ -111,3 +114,39 @@ families, `.cb-*` correlation cards, `.dis-*` disagreement cards, coach popover.
 `python3 tests/visual_qa.py --screenshot --ai-qa` (gating `visual-qa` CI job) for visual
 coherence; the `/site-review` skill for the holistic "does each page's story land" pass.
 Local render without deploy: Playwright + `http.server` + route-mocked API.
+
+---
+
+## 7. The motion & interaction layer (v5 "alive")
+
+Added after the coherence pass to take the site from *tasteful-but-static* toward *fascinating*.
+Source: `site/assets/js/motion.js` + `tokens.css` §11–12. **All of it is reduced-motion-aware and
+fails OPEN** — the hidden reveal state is gated on `html.mo` (set by a tiny inline head script only
+when motion is safe), with a head-side failsafe that removes `.mo` after ~2.6s, so if `motion.js`
+never runs, content is always shown. Motion can never hide content.
+
+- **Scroll reveals** — sections (`.beat`, `.rd-sec`, `.page-hero`, coach/team sections, cards…) fade
+  + rise as they enter view via IntersectionObserver. Works for SPA-injected content too (MutationObserver).
+- **Chart draw-in** — SVG line strokes animate on reveal (`stroke-dashoffset`).
+- **Count-up** — opt-in via `[data-countup]`; numbers tick from 0. JS that sets a value *after* load
+  (e.g. `story.js` for the day counter) calls `window.__moCount(el)` to trigger it.
+- **Interactive line charts** — `lineChart` embeds `data-cpts` (normalized coords + a label per
+  point); `motion.js` draws a focus dot + cursor-following tooltip. One change → every trend chart
+  is explorable. **Runs even under reduced-motion** (it's interaction, not animation).
+- **Hover lifts**, **constellation breathe**, **the loop flows** (arrows pulse Data→Coaching→Protocols→Story).
+
+### Earned glow — the "forward depth" rule
+The bolder/"2026-forward" feel comes from *restrained depth*, never gloss: a faint warm radial bloom
+behind the **home hero** and **cockpit panel** (`--ember-wash`), and a soft ember glow on **truly-live
+signals only** (the day counter). **Glow is earned — only on ember/"this-is-up" elements, never
+decorative.** A neutral number (e.g. the cockpit's ink-colored level) gets depth, not glow. The test:
+if it would read as "AI-template gloss," it's wrong. Restraint is the credibility moat.
+
+### Wiring (every page)
+The motion head-guard goes in `<head>` after the theme script; `<script src="/assets/js/motion.js" defer>`
+goes before the page's main module script. The three builders inject both (evidence/coaching/dispatches
+shells); the hand-authored Home + Cockpit have them inline.
+
+### Headroom (not yet done)
+Only `lineChart` is interactive — `barChart`/`dualLineChart`/rings/scatters are not yet. The identity
+swing was kept deliberately restrained.

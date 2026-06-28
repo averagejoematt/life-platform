@@ -1199,6 +1199,24 @@ def operational_alert_digest() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_traffic_digest() -> list[iam.PolicyStatement]:
+    """Weekly traffic digest: reads CloudFront access logs from the log bucket
+    (aggregate-only, IPs hashed-then-discarded, no PII retained) + one SES email."""
+    log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
+    return [
+        iam.PolicyStatement(
+            sid="ReadCFLogs",
+            actions=["s3:GetObject", "s3:ListBucket"],
+            resources=[log_bucket_arn, f"{log_bucket_arn}/*"],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ),
+    ]
+
+
 def operational_dlq_consumer() -> list[iam.PolicyStatement]:
     """DLQ consumer: reads the DLQ, re-drives transient failures to the source
     Lambda, archives permanent failures to S3, sends an SES summary."""
