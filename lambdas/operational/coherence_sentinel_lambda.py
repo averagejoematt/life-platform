@@ -45,10 +45,16 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 SITE_BASE = os.environ.get("SITE_BASE", "https://averagejoematt.com")
 CW_NAMESPACE = "LifePlatform/Coherence"
+LOG_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+# Durable findings record. The coherence-overall alarm only carries "OverallAlarm
+# >= 1"; this artifact is WHAT failed, so the remediation agent (read-only) and a
+# human can triage from the actual digest instead of re-deriving it.
+COHERENCE_LOG_PREFIX = "coherence-log"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE)
 _cw = boto3.client("cloudwatch", region_name=REGION)
+_s3 = boto3.client("s3", region_name=REGION)
 
 COACH_IDS = [
     "sleep_coach",
@@ -349,6 +355,31 @@ def _emit_overall(worst, semantic):
         logger.warning("coherence: overall metric emit failed: %s", e)
 
 
+def build_record(findings, semantic, digest, worst):
+    """Pure: the durable findings payload (also the Lambda response body). Kept
+    separate from I/O so it's testable and identical across S3 + the response."""
+    return {
+        "date": _today(),
+        "status": worst,
+        "alarms": [f.name for f in findings if f.is_alarm],
+        "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
+        "semantic": semantic,
+        "digest": digest,
+    }
+
+
+def _persist(record):
+    """Write the findings record to S3 (latest.json + a dated history copy) so the
+    remediation agent and a human can see WHAT failed. Fail-soft — a write error
+    must never break detection (metrics/alarm already emitted)."""
+    body = json.dumps(record, indent=2, default=str).encode()
+    for key in (f"{COHERENCE_LOG_PREFIX}/latest.json", f"{COHERENCE_LOG_PREFIX}/{record['date']}.json"):
+        try:
+            _s3.put_object(Bucket=LOG_BUCKET, Key=key, Body=body, ContentType="application/json")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("coherence: persist %s failed: %s", key, e)
+
+
 def lambda_handler(event, context):
     try:
         findings, semantic = run_checks()
@@ -358,19 +389,9 @@ def lambda_handler(event, context):
         logger.info(digest)
         worst = ci.overall_status(findings)
         _emit_overall(worst, semantic)
-        return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "status": worst,
-                    "alarms": [f.name for f in findings if f.is_alarm],
-                    "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
-                    "semantic": semantic,
-                    "digest": digest,
-                },
-                default=str,
-            ),
-        }
+        record = build_record(findings, semantic, digest, worst)
+        _persist(record)
+        return {"statusCode": 200, "body": json.dumps(record, default=str)}
     except Exception as e:  # noqa: BLE001
         logger.error("Coherence Sentinel failed: %s", e)
         raise

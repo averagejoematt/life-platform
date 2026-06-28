@@ -1520,7 +1520,8 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
 def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
     """Coherence Sentinel: read-only DDB (predictions, computed metrics, served
     narratives) + emit LifePlatform/Coherence metrics + a budget-gated Bedrock
-    (Haiku) semantic pass. No platform writes."""
+    (Haiku) semantic pass + persist its digest to a scoped audit prefix. No
+    platform writes (coherence-log/ is an out-of-band audit trail, not site/data)."""
     return _operational_base(
         ddb_actions=["dynamodb:GetItem", "dynamodb:Query"],
         extra_statements=[
@@ -1528,6 +1529,14 @@ def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
                 sid="CoherenceMetrics",
                 actions=["cloudwatch:PutMetricData"],
                 resources=["*"],  # PutMetricData only accepts "*"
+            ),
+            iam.PolicyStatement(
+                sid="CoherenceAuditLog",
+                # Durable findings record so the remediation agent (and a human) can
+                # see WHAT failed when the coherence-overall alarm fires — the alarm
+                # itself only carries "OverallAlarm >= 1". Scoped to the audit prefix.
+                actions=["s3:PutObject"],
+                resources=_s3("coherence-log/*"),
             ),
             _bedrock_statement(),
             iam.PolicyStatement(

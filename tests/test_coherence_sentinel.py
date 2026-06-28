@@ -7,6 +7,7 @@ state (the C-3 all-inconclusive board + a 30-vs-86 narrative split) and assert
 run_checks() surfaces the alarms and the digest renders — no AWS, no HTTP.
 """
 
+import json
 import os
 import sys
 
@@ -60,6 +61,34 @@ def test_digest_renders(monkeypatch):
     digest = sentinel._digest(findings, semantic)
     assert "COHERENCE SENTINEL — ALARM" in digest
     assert "prediction_health" in digest
+
+
+def test_build_record_is_serializable_and_complete(monkeypatch):
+    _patch_bad_state(monkeypatch)
+    findings, semantic = sentinel.run_checks()
+    digest = sentinel._digest(findings, semantic)
+    worst = sentinel.ci.overall_status(findings)
+    record = sentinel.build_record(findings, semantic, digest, worst)
+    # The agent reads these keys to triage; they must all be present + JSON-safe.
+    assert set(record) >= {"date", "status", "alarms", "findings", "digest"}
+    assert "prediction_health" in record["alarms"]
+    assert json.loads(json.dumps(record, default=str))  # round-trips
+
+
+def test_persist_writes_latest_and_dated_and_is_fail_soft(monkeypatch):
+    puts = []
+    monkeypatch.setattr(sentinel._s3, "put_object", lambda **kw: puts.append(kw["Key"]))
+    record = {"date": "2026-06-28", "status": "alarm", "alarms": ["prediction_health"], "findings": [], "digest": "x"}
+    sentinel._persist(record)
+    assert "coherence-log/latest.json" in puts
+    assert "coherence-log/2026-06-28.json" in puts
+
+    # A persist failure must NOT propagate — detection already emitted metrics.
+    def _boom(**kw):
+        raise RuntimeError("s3 down")
+
+    monkeypatch.setattr(sentinel._s3, "put_object", _boom)
+    sentinel._persist(record)  # no raise
 
 
 def test_healthy_state_is_ok(monkeypatch):
