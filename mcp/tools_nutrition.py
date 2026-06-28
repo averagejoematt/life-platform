@@ -49,6 +49,20 @@ from mcp.helpers import (
     query_chronicling,
 )
 
+
+def _nutrition_through_date():
+    """The latest COMPLETE nutrition day — the default end of any nutrition range.
+
+    MacroFactor is a manual end-of-day Dropbox upload, so it is ALWAYS ~24h behind
+    by design: today's intake doesn't exist until tomorrow. Defaulting a range to
+    `today` (the old behavior across these tools) makes Claude read an absent today
+    as "0 calories / hasn't logged today" — a pipeline characteristic mis-framed as
+    a user failure. Anchor to yesterday (the latest complete day), matching
+    tool_get_food_log. Callers may still pass an explicit end_date.
+    """
+    return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
 # ── MacroFactor reference data ──
 
 # RDA: NIH DRI for adult males 31-50. "optimal": longevity targets per Attia/Patrick (not official guidelines). "upper": NIH Tolerable Upper Intake Level.
@@ -95,7 +109,7 @@ def tool_get_micronutrient_report(args):
     Flags chronic deficiencies (avg < 60% RDA), near-miss gaps (60-90%), upper-limit exceedances,
     omega-6:omega-3 ratio, and generates actionable longevity commentary.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("macrofactor", start_date, end_date)
@@ -201,7 +215,7 @@ def tool_get_meal_timing(args):
     across morning/midday/evening/late, circadian consistency (SD of meal times),
     and overlap with sleep onset. Based on Satchin Panda / Salk Institute TRF research.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("macrofactor", start_date, end_date)
@@ -364,7 +378,7 @@ def tool_get_nutrition_biometrics_correlation(args):
     This is the personalized insight layer — what does YOUR diet actually predict about
     YOUR recovery, sleep, HRV, and weight?
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
     lag_days = int(args.get("lag_days", 1))
 
@@ -460,7 +474,7 @@ def tool_get_nutrition_summary(args):
     Returns per-day rows and period averages for calories, protein, carbs, fat, fiber,
     sodium, caffeine, omega-3, and key micronutrients.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=29)).strftime("%Y-%m-%d"))
 
     items = query_source("macrofactor", start_date, end_date)
@@ -546,7 +560,7 @@ def tool_get_macro_targets(args):
     Pulls recent Withings weight to compute TDEE-based calorie target,
     then scores daily adherence to each macro goal.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     days = int(args.get("days", 30))
     start_date = args.get("start_date") or ((datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d"))
     calorie_target = args.get("calorie_target")  # optional override
@@ -719,7 +733,7 @@ def tool_get_deficit_sustainability(args):
     When 3+ of 5 degrade concurrently during an active deficit → flag.
     Attia / Huberman: aggressive deficits destroy adherence and muscle.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     days = int(args.get("days", 14))
     start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
@@ -902,7 +916,7 @@ def tool_get_metabolic_adaptation(args):
     Lyle McDonald / Layne Norton: metabolic adaptation = TDEE suppression beyond
     what weight loss alone predicts. Key signal for diet breaks and reverse diets.
     """
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    end_date = args.get("end_date", _nutrition_through_date())
     weeks = int(args.get("weeks", 8))
     start_date = args.get("start_date") or (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(weeks=weeks)).strftime("%Y-%m-%d")
 

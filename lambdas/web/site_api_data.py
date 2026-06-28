@@ -2556,6 +2556,14 @@ def handle_observatory_week(qs: dict = None) -> dict:
             ]
             avg_protein = sum(proteins) / len(proteins) if proteins else 0
 
+            # Nutrition uploads at end of day, so today is structurally never logged yet.
+            # Counting it in the denominator (the old "X/7") made perfect logging read as a
+            # gap. Denominator = COMPLETE days in the window (through yesterday); today's
+            # absence is expected, surfaced via current_day_pending — not a miss.
+            try:
+                _complete_days = max(1, (datetime.strptime(end_date, "%Y-%m-%d") - datetime.strptime(start_date, "%Y-%m-%d")).days)
+            except Exception:
+                _complete_days = 6
             summary = {
                 "primary": {
                     "label": "Avg Calories",
@@ -2567,7 +2575,12 @@ def handle_observatory_week(qs: dict = None) -> dict:
                     "sparkline": [round(c) for c in cals],
                 },
                 "highlight": {"label": "Avg Protein", "value": f"{round(avg_protein)}g/day", "detail": ""},
-                "lowlight": {"label": "Logged Days", "value": f"{len(cals)}/7", "detail": ""},
+                "lowlight": {
+                    "label": "Days logged",
+                    "value": f"{len(cals)}/{_complete_days}",
+                    "detail": "complete days · today uploads tonight",
+                },
+                "current_day_pending": True,
             }
             notable = f"Protein averaged {round(avg_protein)}g/day this week"
 
