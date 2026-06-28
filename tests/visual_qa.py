@@ -179,10 +179,16 @@ PAGES.extend(
             ],
         },
         {
-            "path": "/coaching/coaches/#sleep_coach",
-            "name": "Coaching · coach page (deep-link)",
+            "path": "/coaching/by-coach/#training_coach",
+            "name": "Coaching · By Coach (read-on-data, deep-link)",
             "wait_for": "[data-dx-read]",
-            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach page (stance + report) rendered"}],
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach read + domain data rendered"}],
+        },
+        {
+            "path": "/coaching/team/",
+            "name": "Coaching · The Team (roster/config)",
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "team roster/profile rendered"}],
         },
         {
             "path": "/coaching/lab-notes/",
