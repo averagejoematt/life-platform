@@ -123,12 +123,23 @@ def handle_vitals() -> dict:
         _night_of = (datetime.strptime(_as_of[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     except Exception:
         _night_of = None
+    # Nutrition is a manual end-of-day upload — structurally ~24h behind. Its freshness
+    # is the latest COMPLETE day (normally yesterday), NOT today. Hardcoding _today_iso
+    # here (the old behavior) made the nutrition page read "as of now" when today's
+    # intake simply hasn't been uploaded yet. Mirror /physical's weight_as_of pattern.
+    _nutrition_as_of = None
+    try:
+        _mf = _query_source("macrofactor", (datetime.now(timezone.utc) - timedelta(days=10)).strftime("%Y-%m-%d"), today)
+        _mf_dates = [(m.get("date") or m.get("sk", "").replace("DATE#", "")) for m in _mf]
+        _nutrition_as_of = max([d for d in _mf_dates if d], default=None)
+    except Exception:
+        _nutrition_as_of = None
     page_freshness = {
         "/live": _today_iso,
         "/character": _today_iso,
         "/sleep": _as_of + "T12:00:00Z" if _as_of else _today_iso,
         "/glucose": _today_iso,
-        "/nutrition": _today_iso,
+        "/nutrition": _nutrition_as_of + "T12:00:00Z" if _nutrition_as_of else _today_iso,
         "/training": _today_iso,
         "/physical": weight_as_of + "T12:00:00Z" if weight_as_of else _today_iso,
         "/habits": _today_iso,

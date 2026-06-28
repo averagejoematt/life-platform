@@ -198,7 +198,14 @@ def handle_nutrition_overview() -> dict:
                     "avg_deficit": None,
                     "cal_7d_avg": None,
                     "pro_7d_avg": None,
-                    "latest_date": today,
+                    # Nutrition is a manual end-of-day upload, so it is ALWAYS ~24h
+                    # behind by design — "live" nutrition is the latest COMPLETE day.
+                    # Never assert today as the latest (the old `latest_date: today`
+                    # read as "logged today, zero calories"). today_pending says the
+                    # current day's intake simply hasn't arrived yet — not a failure.
+                    "latest_date": None,
+                    "as_of": None,
+                    "today_pending": True,
                     "latest_calories": None,
                     "latest_protein_g": None,
                 },
@@ -611,6 +618,12 @@ def handle_nutrition_overview() -> dict:
                 "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
                 "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
                 "latest_date": latest_date,
+                # The latest COMPLETE day is the live nutrition state (manual end-of-day
+                # upload → always ~24h behind by design). today_pending true means the
+                # current day's intake simply hasn't been uploaded yet — expected, not a
+                # logging gap. Front-end labels "through <as_of>", never "not logged today".
+                "as_of": latest_date,
+                "today_pending": bool(latest_date and latest_date < today),
                 "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") else None,
                 "latest_protein_g": (
                     round(_mf(latest, "protein_g", "total_protein_g"), 1) if _mf(latest, "protein_g", "total_protein_g") else None

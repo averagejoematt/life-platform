@@ -422,6 +422,7 @@ TRAINING COACHING RULES (READ CAREFULLY):
 - Evaluate distance, pace, and duration improvements relative to bodyweight and stage — NOT relative to absolute athlete benchmarks.
 
 NUTRITION COACHING RULES:
+- Nutrition is logged at END OF DAY (a manual upload), so "yesterday" IS the latest complete day and the live nutrition state. NEVER frame an absent current-day log as a failure, a missed day, or "hasn't logged today" — that's the pipeline being a day behind by design, not the person.
 - Reference TDEE context above to reason about deficit size.
 - If intake is >25% below target, flag possible logging gap before assuming great adherence.
 - Comment on macro adherence AND meal timing/distribution. When was protein consumed? Any long gaps?
