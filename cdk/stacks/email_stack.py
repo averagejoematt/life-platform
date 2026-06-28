@@ -124,7 +124,10 @@ class EmailStack(Stack):
             handler="emails.nutrition_review_lambda.lambda_handler",
             source_file="lambdas/emails/nutrition_review_lambda.py",
             schedule="cron(0 17 ? * SAT *)",
-            timeout_seconds=120,
+            # Verified at 63% of ceiling (max 75.5s / 120s over 30d) — the AI review's
+            # only at-risk scheduled generator; 300s gives a slow-Bedrock-day cushion so
+            # it can't follow coach-history-summarizer into the DLQ. (Audit 2026-06-28.)
+            timeout_seconds=300,
             memory_mb=256,
             environment=_email_env,
             custom_policies=rp.email_nutrition_review(),
