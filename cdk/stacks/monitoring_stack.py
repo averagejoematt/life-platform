@@ -178,6 +178,23 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # Coherence Sentinel: the intelligence layer produced INCOHERENT-but-green
+        # output. Fires when any invariant ALARMed (predictions never grading, a
+        # served narrative contradicting the canonical facts, an all-zero endpoint,
+        # cross-surface counts disagreeing) or the AI semantic pass flagged it.
+        # The class of failure every existing liveness check is blind to. Digest.
+        _alarm(
+            "CoherenceOverall",
+            "coherence-overall",
+            "LifePlatform/Coherence",
+            "OverallAlarm",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════

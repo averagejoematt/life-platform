@@ -319,23 +319,42 @@ def _digest(findings, semantic):
     return "\n".join(lines)
 
 
+def _emit_overall(worst, semantic):
+    """A single dimensionless gauge the alarm watches: 1 when anything is wrong
+    (any invariant ALARM, or the AI semantic pass flagged incoherence)."""
+    semantic_bad = bool(semantic and semantic.get("coherent") is False)
+    val = 1.0 if (worst == ci.ALARM or semantic_bad) else 0.0
+    try:
+        _cw.put_metric_data(
+            Namespace=CW_NAMESPACE,
+            MetricData=[{"MetricName": "OverallAlarm", "Value": val, "Unit": "Count"}],
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("coherence: overall metric emit failed: %s", e)
+
+
 def lambda_handler(event, context):
-    findings, semantic = run_checks()
-    for f in findings:
-        _emit(f)
-    digest = _digest(findings, semantic)
-    logger.info(digest)
-    worst = ci.overall_status(findings)
-    return {
-        "statusCode": 200,
-        "body": json.dumps(
-            {
-                "status": worst,
-                "alarms": [f.name for f in findings if f.is_alarm],
-                "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
-                "semantic": semantic,
-                "digest": digest,
-            },
-            default=str,
-        ),
-    }
+    try:
+        findings, semantic = run_checks()
+        for f in findings:
+            _emit(f)
+        digest = _digest(findings, semantic)
+        logger.info(digest)
+        worst = ci.overall_status(findings)
+        _emit_overall(worst, semantic)
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "status": worst,
+                    "alarms": [f.name for f in findings if f.is_alarm],
+                    "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
+                    "semantic": semantic,
+                    "digest": digest,
+                },
+                default=str,
+            ),
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.error("Coherence Sentinel failed: %s", e)
+        raise
