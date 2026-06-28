@@ -433,6 +433,28 @@ class OperationalStack(Stack):
             alerts_topic=None,
         )
 
+        # ── 8b. Coherence Sentinel — does the intelligence layer still make sense?
+        # Daily 10:45 AM PT (after compute 9:40 + prediction-evaluator 10:00). Runs the
+        # pure invariants (coherence_invariants.py, bundled with the lambdas/ asset)
+        # against live state and emits LifePlatform/Coherence metrics → DIGEST alarms in
+        # monitoring_stack. Read-only; budget-gated Haiku semantic pass on top. (ADR: the
+        # Self-Management & Coherence Program — detect incoherent-but-green output.)
+        create_platform_lambda(
+            self,
+            "CoherenceSentinel",
+            function_name="life-platform-coherence-sentinel",
+            source_file="lambdas/operational/coherence_sentinel_lambda.py",
+            handler="operational.coherence_sentinel_lambda.lambda_handler",
+            schedule="cron(45 18 ? * * *)",
+            timeout_seconds=120,
+            memory_mb=256,
+            custom_policies=rp.operational_coherence_sentinel(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+        )
+
         # ── 9. Insight Email Parser — SES inbound trigger (previously unmanaged)
         insight_parser = create_platform_lambda(
             self,
