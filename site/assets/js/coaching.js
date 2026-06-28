@@ -275,6 +275,60 @@ function wireTheme() {
   const b = $(".theme-toggle"); if (!b) return;
   b.addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = cur === "light" ? "dark" : "light"; try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {} });
 }
+/* ── Ask the board (PG-ENG-2) — capture, not a live answer. A reader's question is
+   submitted to a moderation queue; Matthew picks one and the board answers it in an
+   upcoming lab note. JS-injected after the header so the generated shell needs no
+   rebuild. The /api/board_ask cost gate is never touched here — this only stores. */
+function wireAskBoard() {
+  const head = $(".dx-head");
+  if (!head) return;
+  const card = document.createElement("section");
+  card.className = "askboard";
+  card.setAttribute("aria-label", "Ask the board");
+  card.innerHTML =
+    `<p class="askboard-k label">ask the board</p>` +
+    `<p class="askboard-lede">Got a question for the AI team? Submit it — Matthew picks one and the board answers it in an upcoming lab note.</p>` +
+    `<form class="askboard-form" novalidate>` +
+    `<textarea class="askboard-in" name="q" rows="2" maxlength="500" placeholder="e.g. Is the glucose spike the supplement, or just a bad night's sleep?" aria-label="Your question for the board"></textarea>` +
+    `<div class="askboard-row">` +
+    `<input class="askboard-email" name="email" type="email" maxlength="254" placeholder="email (optional — for a reply)" aria-label="Email, optional" />` +
+    `<button class="askboard-btn" type="submit">Ask the board</button>` +
+    `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>`;
+  head.insertAdjacentElement("afterend", card);
+
+  const form = card.querySelector(".askboard-form");
+  const out = card.querySelector(".askboard-out");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = form.q.value.trim();
+    const email = form.email.value.trim();
+    if (q.length < 10) { out.textContent = "A little more detail — at least 10 characters."; return; }
+    const btn = form.querySelector(".askboard-btn");
+    btn.disabled = true; out.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/board_question", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(email ? { question: q, email } : { question: q }),
+      });
+      if (res.ok) {
+        form.q.value = ""; form.email.value = "";
+        out.textContent = "Question received — Matthew reviews these, and the board answers a selection in the lab notes.";
+      } else if (res.status === 429) {
+        out.textContent = "You've sent a few already — give it an hour and try again.";
+      } else {
+        const d = await res.json().catch(() => ({}));
+        out.textContent = (d && d.error) || "Couldn't send that just now — try again shortly.";
+      }
+    } catch (err) {
+      out.textContent = "Network hiccup — try again in a moment.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 wireTheme();
 build();
+wireAskBoard();
 stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)

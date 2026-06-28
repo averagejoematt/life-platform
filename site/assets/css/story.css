@@ -449,3 +449,27 @@ body { overflow-x: hidden; }
 .tx-turn { scroll-margin-top: var(--sp-6); }
 .tx-who { display: block; color: var(--ember); margin-bottom: 2px; }
 .tx-line { font-family: var(--font-serif); color: var(--ink); line-height: var(--lh-relaxed); max-width: var(--measure); margin: 0; }
+
+/* ── Ask the board (PG-ENG-2) — a capture card under the coaching header. Submits a
+   reader question to a moderation queue; the board answers a selection in the lab
+   notes. Ember-accented like the dispatch subscribe card; calm, never bait. ── */
+.askboard { max-width: var(--measure); margin: var(--sp-5) 0 0; padding: var(--sp-4) var(--sp-5);
+  border: var(--border-hair); border-left: 3px solid var(--ember); border-radius: var(--radius); background: var(--ember-wash); }
+.askboard-k { color: var(--ember); margin: 0; }
+.askboard-lede { margin: var(--sp-2) 0 var(--sp-4); color: var(--ink-muted); line-height: 1.5; }
+.askboard-form { display: grid; gap: var(--sp-3); }
+.askboard-in { width: 100%; resize: vertical; min-height: 60px; background: var(--surface); border: var(--border-hair);
+  border-radius: var(--radius-sm); color: var(--ink); font-family: var(--font-sans); font-size: var(--fs-body);
+  line-height: 1.5; padding: var(--sp-3) var(--sp-4); }
+.askboard-in:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.askboard-row { display: flex; gap: var(--sp-2); flex-wrap: wrap; align-items: center; }
+.askboard-email { flex: 1 1 180px; min-width: 0; background: var(--surface); border: var(--border-hair);
+  border-radius: var(--radius-sm); color: var(--ink); font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-2) var(--sp-3); }
+.askboard-email:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.askboard-btn { cursor: pointer; background: var(--ember); color: var(--page); border: 0; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; padding: var(--sp-2) var(--sp-5); min-height: 40px; white-space: nowrap; }
+.askboard-btn:hover { filter: brightness(1.06); }
+.askboard-btn:disabled { opacity: 0.55; cursor: progress; }
+.askboard-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.askboard-out { margin: 0; min-height: 1.2em; color: var(--ink-muted); }
+@media (max-width: 440px) { .askboard-email { flex-basis: 100%; } .askboard-btn { width: 100%; } }

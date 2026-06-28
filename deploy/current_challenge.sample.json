@@ -1,0 +1,10 @@
+{
+  "_README": "Drop-in template for the weekly reader-prediction subject. Fill it in, then upload to activate predict-the-week on the cockpit: aws s3 cp deploy/current_challenge.sample.json s3://matthew-life-platform/site/config/current_challenge.json --content-type application/json . predict_metrics are the LEVERS / leading signals readers bet on — NOT weight (the outcome). 1-2 per week. After the week closes, set `result` to the truth and re-upload; the cockpit then shows 'readers said X . actual Y'. To turn predictions off, just delete the S3 object (the widget hides, fail-closed). week_id is any unique weekly string (ISO week recommended).",
+  "week_id": "2026-W27",
+  "title": "The week the running block starts",
+  "predict_metrics": [
+    { "key": "recovery", "label": "weekly average recovery" },
+    { "key": "movement", "label": "the Movement pillar" }
+  ],
+  "result": null
+}

@@ -131,6 +131,35 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cockpit-intro__x:hover { color: var(--ink); }
 .cockpit-intro :focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
 
+/* ── Predict the week (PG-ENG-1) — a glanceable bet card, ember-accented like the
+   intro; honest small-n (muted reader %), wrong calls never red. ── */
+.predict { margin-top: var(--sp-5); padding: var(--sp-4) var(--sp-5); background: var(--surface);
+  border: var(--border-hair); border-left: 3px solid var(--ember); border-radius: var(--radius); }
+.predict .cap { color: var(--ember); }
+.predict-body { display: grid; gap: var(--sp-4); margin-top: var(--sp-2); }
+.predict-item { display: grid; gap: var(--sp-2); }
+.predict-q { color: var(--ink); line-height: 1.4; }
+.predict-q strong { color: var(--ink); font-weight: var(--weight-med); }
+.predict-vote { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.predict-btn { appearance: none; cursor: pointer; flex: 1 1 0; min-width: 84px; min-height: 44px;
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  background: var(--ember-wash); color: var(--ink); border: 1px solid var(--ember-line);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.02em;
+  transition: background var(--dur-fast), border-color var(--dur-fast); }
+.predict-btn .pb-g { color: var(--ember); font-size: 1.05em; }
+.predict-btn:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); border-color: var(--ember); }
+.predict-btn:disabled { opacity: 0.5; cursor: progress; }
+.predict-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.predict-state, .predict-reveal { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.predict-pick { color: var(--ember); font-family: var(--font-mono); }
+.predict-tally, .predict-n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.predict-tallyrow { margin-top: 2px; }
+.predict-actual { color: var(--ink); }            /* the outcome — neutral ink, never red */
+.predict-hit { color: var(--ember); }
+.predict-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
+@media (max-width: 420px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
+
 /* Signature 1 — the measuring-rule spine */
 .spine {
   width: var(--spine-width); flex-shrink: 0; position: relative;
