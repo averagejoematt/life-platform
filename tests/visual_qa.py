@@ -40,6 +40,7 @@ SITE_URL = "https://averagejoematt.com"
 # "N readings so far" text instead of a chart when data is sparse, per
 # site/assets/js/charts.js's >=4-points rule — so missing-chart is a WARNING.)
 CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training"}
+# /data/ door topics — the body + mind/accountability readouts.
 EVIDENCE_TOPICS = [
     "vitals",
     "physical",
@@ -49,11 +50,13 @@ EVIDENCE_TOPICS = [
     "training",
     "nutrition",
     "habits",
+]
+# /method/ door topics — "how it holds up" + "the machine" (footer-tier in the v5 IA).
+# These were 404ing under /data/ because the harness used the wrong base path
+# (truth audit C1, 2026-06-27); they are live at /method/<slug>/.
+METHOD_TOPICS = [
     "board",
     "pipeline",
-    # S-05 (2026-06-06): the 3 bespoke renderers added by S-02. Empty this
-    # genesis week (honest empty-states), rich readouts as data accrues —
-    # the [data-readout] not_empty check covers both states.
     "intelligence",
     "predictions",
     "benchmarks",
@@ -148,6 +151,16 @@ for _slug in EVIDENCE_TOPICS:
             "wait_for": "[data-readout]",
             "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
             "charts": ["[data-readout] svg"] if _slug in CHART_TOPICS else [],
+        }
+    )
+# Method-tier topics live under /method/<slug>/, not /data/.
+for _slug in METHOD_TOPICS:
+    PAGES.append(
+        {
+            "path": f"/method/{_slug}/",
+            "name": f"Method · {_slug}",
+            "wait_for": "[data-readout]",
+            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
         }
     )
 
