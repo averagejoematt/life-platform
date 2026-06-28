@@ -82,7 +82,8 @@ Matthew**, do not run from the agent):
    - the log bucket `matthew-life-platform-cf-logs` (BUCKET_OWNER_PREFERRED ACL so
      CloudFront can write; 90-day lifecycle; `RETAIN` on stack delete), and
    - the `life-platform-traffic-digest` Lambda on `cron(0 16 ? * MON *)` (9 AM PT Mondays),
-     env `LOG_BUCKET`/`LOG_PREFIX=cf/`, alarm `traffic-digest-errors`.
+     env `LOG_BUCKET`/`LOG_PREFIX=cf/`. No error alarm by design (a weekly digest
+     failing is low-stakes — same as the other `alerts_topic=None` operational Lambdas).
    Run `npx cdk diff LifePlatformOperational` first — expect **no IAM changes to existing
    roles**, one new role + bucket + function.
 2. **Enable CloudFront logging** — point dist `E3S424OXQZ8NBE`'s standard logging at the
