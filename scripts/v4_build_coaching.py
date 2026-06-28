@@ -37,6 +37,15 @@ SHELL = """<!DOCTYPE html>
   <title>{title}</title>
   <meta name="description" content="{desc}">
   <link rel="canonical" href="https://averagejoematt.com/coaching/{canon}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com/coaching/{canon}">
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{desc}">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{desc}">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
@@ -86,7 +95,7 @@ SHELL = """<!DOCTYPE html>
       <div class="sf-col"><p class="sf-h label">The Coaching</p>
         <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
       <div class="sf-col"><p class="sf-h label">The Data</p>
-        <a href="/data/">All topics</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Nutrition</a><a href="/data/sleep/">Sleep</a></div>
+        <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
       <div class="sf-col"><p class="sf-h label">The Protocols</p>
         <a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>
       <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
