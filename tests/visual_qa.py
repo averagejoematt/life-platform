@@ -185,6 +185,12 @@ PAGES.extend(
             "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach read + domain data rendered"}],
         },
         {
+            "path": "/coaching/scorecard/",
+            "name": "Coaching · Scorecard (graded track record)",
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "scorecard tiles + per-coach record rendered"}],
+        },
+        {
             "path": "/coaching/team/",
             "name": "Coaching · The Team (roster/config)",
             "wait_for": "[data-dx-read]",

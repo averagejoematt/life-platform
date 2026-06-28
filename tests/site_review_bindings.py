@@ -207,6 +207,14 @@ PAGE_BINDINGS = [
         ],
     },
     {
+        "path": "/coaching/scorecard/",
+        "name": "Coaching · Scorecard (graded track record)",
+        "door": "coaching",
+        "narrative_order": 72.3,
+        "story_intent": "the board's falsifiable record — every coach call graded confirmed/refuted/open by the evaluator",
+        "endpoints": [{"url": "/api/predictions", "role": "primary", "metrics": []}],
+    },
+    {
         "path": "/coaching/team/",
         "name": "Coaching · The Team (roster/config)",
         "door": "coaching",

@@ -1229,8 +1229,187 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
         return None
 
 
+def generate_experiment_arc():
+    """
+    Cross-week synthesis (C-1): Dr. Kai Nakamura reads the board's weekly lab notes
+    across the WHOLE run so far and writes the experiment's arc — where it started,
+    the turns, where it stands, the throughline. Richer than the per-week tone list
+    the Experiment view shows today. Reads field_notes WEEK# (chronological), writes
+    EXPERT#experiment_arc. Honest-skip when fewer than 2 weeks exist.
+    """
+    fn_pk = f"{USER_PREFIX}field_notes"
+    # ADR-058: hide pre-genesis pilot weeks (phase=pilot) so the arc only synthesizes
+    # the CURRENT experiment's run — matching what the Experiment view's week list shows.
+    from phase_filter import with_phase_filter
+
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(fn_pk) & Key("sk").begins_with("WEEK#"),
+                    "ScanIndexForward": True,  # oldest → newest, so the arc reads in order
+                    "Limit": 52,
+                }
+            )
+        )
+        weeks = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:  # noqa: BLE001
+        logger.error("Experiment-arc: field_notes query failed: %s", e)
+        return None
+
+    if len(weeks) < 2:
+        logger.info("Experiment-arc skipped — only %d week(s) of lab notes (need >=2)", len(weeks))
+        return None
+
+    # Compose the week-by-week material the board has already written.
+    blocks = []
+    for w in weeks:
+        label = w.get("week_label") or w.get("week") or "Week"
+        tone = w.get("ai_tone", "mixed")
+        present = (w.get("ai_present") or "").strip()
+        bits = [f"[{label}] tone={tone}"]
+        if present:
+            bits.append(present[:600])
+        if w.get("ai_affirming"):
+            bits.append(f"AFFIRMING: {str(w['ai_affirming'])[:200]}")
+        if w.get("ai_cautionary"):
+            bits.append(f"CAUTIONARY: {str(w['ai_cautionary'])[:200]}")
+        blocks.append("\n".join(bits))
+    weeks_text = "\n\n".join(blocks)
+
+    try:
+        goals = load_goals_config() if _HAS_INTELLIGENCE_COMMON else {}
+    except Exception:  # noqa: BLE001
+        goals = {}
+    goals_json = json.dumps(
+        {"mission": goals.get("mission", ""), "targets": goals.get("targets", {}), "philosophy": goals.get("philosophy", "")},
+        indent=2,
+        default=str,
+    )
+    _f = _load_canonical_facts()
+    _fact_bits = []
+    if _f.get("latest_weight") is not None:
+        _fact_bits.append(f"current weight {_f['latest_weight']:g} lb")
+    if _f.get("recovery_pct") is not None:
+        _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
+    facts_block = (
+        ("\nAUTHORITATIVE FACTS (cite these exact numbers; invent no others): " + "; ".join(_fact_bits) + "\n") if _fact_bits else ""
+    )
+
+    prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've read the board's weekly lab notes across Matthew's entire experiment so far. Your job: step back and tell the ARC — not this week, but the whole trajectory.
+
+Matthew's goals: {goals_json}
+{facts_block}
+The board's read, week by week (oldest first):
+{weeks_text}
+
+Write in first person as Nakamura — direct, warm, on Matthew's side.
+
+HOW TO JUDGE THE ARC (read before writing):
+- Judge the trajectory against where Matthew STARTED, not the end goal. He is early in a long experiment; a slow-moving outcome is expected to lag and is NOT failure.
+- Tell the real story: where this began, what shifted, what held steady, where it stands now. Name the turning points honestly but never catastrophize and never diagnose his character from thin data.
+- Credit the throughline of effort and consistency. If the weeks rhymed (the same pattern recurring), say so plainly — that's the signal.
+- Only {len(weeks)} weeks exist; do not pretend to more history than the notes contain.
+
+Produce EXACTLY this JSON (no markdown, no preamble):
+{{
+  "arc": "2-3 short paragraphs. The trajectory of the experiment to date — the start, the turns, the throughline, where it stands now. Specific, drawn from the weekly notes. The voice of a coach who has watched the whole run.",
+  "throughline": "One sentence — the single sentence that names what this experiment has actually been about so far.",
+  "chapters": [
+    {{ "week_label": "the week's label exactly as given", "headline": "4-8 words naming what that week was, in the arc" }}
+  ]
+}}
+
+For chapters: one entry per week given, in order. The headline is the chapter title that week earns in the larger story."""
+
+    api_key = _get_api_key()
+
+    def _build_req():
+        body = json.dumps({"model": AI_MODEL, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]})
+        return urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body.encode(),
+            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        )
+
+    from retry_utils import call_anthropic_raw
+
+    def _parse(text):
+        import re
+
+        s = (text or "").strip()
+        if s.startswith("```"):
+            s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        if s.endswith("```"):
+            s = s[:-3]
+        a, b = s.find("{"), s.rfind("}")
+        core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
+        for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
+            try:
+                return json.loads(cand)
+            except Exception:  # noqa: BLE001
+                pass
+        m = re.search(r'"arc"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
+        if m:
+            try:
+                arc = json.loads(f'"{m.group(1)}"')
+            except Exception:  # noqa: BLE001
+                arc = m.group(1)
+            logger.warning("Experiment-arc full-JSON parse failed — used arc regex fallback")
+            return {"arc": arc, "throughline": "", "chapters": [], "_partial": True}
+        return None
+
+    parsed = None
+    last_err = None
+    for attempt in (1, 2):
+        try:
+            result = call_anthropic_raw(_build_req(), timeout=60)
+            text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+            parsed = _parse(text)
+            if parsed and parsed.get("arc"):
+                break
+            last_err = f"no arc parsed (attempt {attempt})"
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            logger.error("Experiment-arc call failed (attempt %d/2): %s", attempt, e)
+    if not parsed or not parsed.get("arc"):
+        logger.error("Experiment-arc generation failed after retries: %s", last_err)
+        return None
+
+    try:
+        now = datetime.now(timezone.utc)
+        item = {
+            "pk": CACHE_PK,
+            "sk": "EXPERT#experiment_arc",
+            "expert_key": "experiment_arc",
+            "arc": parsed.get("arc", ""),
+            "throughline": parsed.get("throughline", ""),
+            "chapters": parsed.get("chapters", []),
+            "week_count": len(weeks),
+            "generated_at": now.isoformat(),
+            "ttl": int((now + timedelta(days=10)).timestamp()),
+        }
+        table.put_item(Item=item)
+        logger.info("Experiment-arc cached: %d weeks, %d chars, %d chapters", len(weeks), len(item["arc"]), len(item["chapters"]))
+        return parsed
+    except Exception as e:  # noqa: BLE001
+        logger.error("Experiment-arc cache write failed: %s", e)
+        return None
+
+
 def lambda_handler(event, context):
     try:
+        # C-1: refresh just the cross-week arc without re-running the 8 narratives
+        # (manual/test repopulate). The daily 'all' pass also regenerates it.
+        if event.get("arc_only"):
+            arc = generate_experiment_arc()
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {"experiment_arc": {"status": "ok", "weeks": arc.get("week_count")} if arc else {"status": "skipped"}},
+                    default=str,
+                ),
+            }
         target = event.get("expert", "all")
         experts_to_run = EXPERTS if target == "all" else [target]
         results = {}
@@ -1261,6 +1440,16 @@ def lambda_handler(event, context):
             except Exception as e:
                 logger.error(f"Synthesis failed: {e}")
                 results["integrator"] = {"status": "error", "error": str(e)}
+
+            # C-1: cross-week experiment arc — the whole-run synthesis for the
+            # Experiment view (honest-skips when <2 weeks of lab notes exist).
+            try:
+                arc = generate_experiment_arc()
+                if arc:
+                    results["experiment_arc"] = {"status": "ok", "weeks": arc.get("week_count") or len(arc.get("chapters", []))}
+            except Exception as e:
+                logger.error(f"Experiment-arc failed: {e}")
+                results["experiment_arc"] = {"status": "error", "error": str(e)}
 
         return {
             "statusCode": 200,
