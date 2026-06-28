@@ -67,10 +67,36 @@ def gate():
 
 # ── Signal gathering (deterministic, no LLM) ────────────────────────────────
 
+def _coherence_findings():
+    """The Coherence Sentinel's latest durable findings (coherence-log/latest.json).
+
+    The agent already ingests the `coherence-overall` CloudWatch alarm for free,
+    but that alarm only says "OverallAlarm >= 1" — it doesn't say WHICH invariant
+    failed. This is WHAT: the same findings record the Sentinel persisted. Cheap S3
+    GET; fail-soft. Only surfaced when it's actually flagging (an OK record is noise)."""
+    try:
+        obj = _s3.get_object(Bucket=LOG_BUCKET, Key="coherence-log/latest.json")
+        rec = json.loads(obj["Body"].read().decode())
+    except Exception as e:
+        print(f"[warn] coherence findings: {e}")
+        return None
+    if not (isinstance(rec, dict) and rec.get("status") in ("warn", "alarm")):
+        return None
+    return {
+        "status": rec.get("status"),
+        "date": rec.get("date"),
+        "alarms": rec.get("alarms", []),
+        # Only the findings that are actually flagging — drop the OK ones.
+        "findings": [f for f in rec.get("findings", []) if f.get("status") in ("warn", "alarm")],
+        "semantic": rec.get("semantic"),
+        "digest": rec.get("digest"),
+    }
+
+
 def gather_signals(event_payload):
     """Collect the last 24h of technical signals into a structured dict."""
     since = datetime.now(timezone.utc) - timedelta(hours=24)
-    signals = {"alarms": [], "ci_failures": [], "dlq": [], "urgent": None}
+    signals = {"alarms": [], "ci_failures": [], "dlq": [], "coherence": None, "urgent": None}
 
     # CloudWatch alarms currently in ALARM + recent transitions
     try:
@@ -105,6 +131,10 @@ def gather_signals(event_payload):
         signals["dlq"] = {"depth": int(attrs["Attributes"]["ApproximateNumberOfMessages"]), "url": url}
     except Exception as e:
         print(f"[warn] dlq depth: {e}")
+
+    # Coherence Sentinel findings (content/correctness — the "alive but not right"
+    # class). Adds WHAT failed to the bare coherence-overall alarm above.
+    signals["coherence"] = _coherence_findings()
 
     # Event-driven urgent payload (from repository_dispatch)
     if event_payload:
@@ -244,7 +274,7 @@ def main():
     event_payload = json.loads(os.environ.get("DISPATCH_PAYLOAD", "null") or "null")
     signals = gather_signals(event_payload)
     if not (signals["alarms"] or signals["ci_failures"]
-            or (signals["dlq"] or {}).get("depth") or signals["urgent"]):
+            or (signals["dlq"] or {}).get("depth") or signals["coherence"] or signals["urgent"]):
         print("no actionable signals — clean run")
         if mode != "auto":          # in auto, automerge.py sends the single final email
             email_report({}, mode)
