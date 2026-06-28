@@ -153,6 +153,61 @@ def _load_canonical_facts():
     return facts
 
 
+def _hard_canonical_contradictions(text, facts):
+    """Pure: does the narrative state an RHR or recovery number that hard-contradicts
+    the canonical facts? Returns [{metric, claimed, canonical, detail}], empty if clean.
+
+    Scoped to the two STABLE, high-confidence metrics that the truth audit + the
+    Coherence Sentinel caught coaches inventing (RHR 53 vs 64; recovery 30-vs-86) —
+    NOT weight or HRV: weight-loss totals ("13.8 pounds") are deltas, not the
+    bodyweight, and HRV has high day-to-day variance, so both invite false positives.
+    The layer validator (ai_output_validator) misses these because its RHR regex only
+    matches "resting heart rate"/"resting HR" (not the "RHR" abbreviation the coaches
+    used) and its 25% tolerance lets a 17% RHR error through. This is tighter and
+    catches the abbreviation; it stays local so no layer rebuild is needed.
+    """
+    import re as _re
+
+    low = (text or "").lower()
+    out = []
+    rhr = facts.get("rhr_bpm")
+    if rhr is not None:
+        # "RHR", "resting HR", "resting heart rate" + a 2-3 digit number nearby.
+        m = _re.search(r"\b(?:rhr|resting\s+(?:heart\s+rate|hr))\b[^.\d]{0,18}(\d{2,3})", low)
+        if m:
+            claimed = float(m.group(1))
+            # RHR is physiologically stable; flag a >4 bpm AND >7% miss (kills rounding noise).
+            if abs(claimed - rhr) > 4 and abs(claimed - rhr) / max(rhr, 1) > 0.07:
+                out.append(
+                    {
+                        "metric": "resting HR",
+                        "claimed": claimed,
+                        "canonical": rhr,
+                        "detail": f"narrative says RHR ~{claimed:g}, but the authoritative resting HR is {rhr:g} bpm",
+                    }
+                )
+    rec = facts.get("recovery_pct")
+    if rec is not None:
+        # % optional ("recovery at 86" / "recovery of 30%" / "86% recovery"), but reject a
+        # trailing time/weight word ("recovery over 4 weeks") — the Sentinel's _NO_TIME lesson.
+        m = _re.search(
+            r"recovery[^.\d]{0,14}(\d{1,3})(?!\s*(?:week|day|month|year|pound|lb|hour|min))|(\d{1,3})\s*%\s*recovery",
+            low,
+        )
+        if m:
+            claimed = float(m.group(1) or m.group(2))
+            if claimed <= 100 and abs(claimed - rec) > 10:  # recovery 0-100; a >10-pt miss is a real contradiction
+                out.append(
+                    {
+                        "metric": "Whoop recovery",
+                        "claimed": claimed,
+                        "canonical": rec,
+                        "detail": f"narrative says recovery ~{claimed:g}%, but the authoritative Whoop recovery is {rec:g}%",
+                    }
+                )
+    return out
+
+
 def _latest_date(items):
     """Newest DATE# present in a list of records (by sk), or None."""
     dates = [str(i.get("sk", ""))[5:15] for i in items if str(i.get("sk", "")).startswith("DATE#")]
@@ -1016,6 +1071,53 @@ def generate_and_cache(expert_key, shared_system=None):
                     logger.warning("[grounding] %s: %s", expert_key, _gr.warnings[:5])
         except Exception as _ge2:
             logger.warning("grounding backstop failed for %s: %s", expert_key, _ge2)
+
+    # Phase-4 SELF-CORRECTION: log-only wasn't enough — coaches kept serving a wrong RHR
+    # (53 vs the canonical 64) that the Coherence Sentinel caught daily. When a stable
+    # canonical metric is hard-contradicted, regenerate the narrative ONCE with the exact
+    # correction, and keep it only if the contradiction is gone (never make it worse).
+    # Self-contained (Compute lambda); reuses the Mode-B correction call shape.
+    if analysis_text:
+        try:
+            _contras = _hard_canonical_contradictions(analysis_text, _load_canonical_facts())
+            if _contras:
+                logger.warning("[grounding] %s hard contradiction(s): %s", expert_key, [c["detail"] for c in _contras])
+                _fix_lines = ["CORRECTION REQUIRED — your draft states numbers that contradict the authoritative facts:\n"]
+                for _i, _c in enumerate(_contras, 1):
+                    _fix_lines.append(f"{_i}. {_c['detail']}. Use {_c['canonical']:g}, or omit the metric — never invent one.")
+                _fix_lines.append(
+                    "\nRewrite the analysis with these corrected. Keep your voice and length; " "do not mention that a correction was made."
+                )
+                _fix_prompt = prompt + "\n\n" + "\n".join(_fix_lines)
+                from retry_utils import call_anthropic_raw
+
+                _fix_req = urllib.request.Request(
+                    "https://api.anthropic.com/v1/messages",
+                    data=json.dumps(
+                        {"model": AI_MODEL, "max_tokens": 1200, "messages": [{"role": "user", "content": _fix_prompt}]}
+                    ).encode(),
+                    headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+                )
+                _fix_res = call_anthropic_raw(_fix_req, timeout=60)
+                _fixed = "".join(b["text"] for b in _fix_res.get("content", []) if b.get("type") == "text")
+                if "KEY RECOMMENDATION:" in _fixed:
+                    _fixed = _fixed.rsplit("KEY RECOMMENDATION:", 1)[0].rstrip()
+                # Keep ONLY if the rewrite actually removed contradictions (never regress).
+                if _fixed.strip() and len(_hard_canonical_contradictions(_fixed, _load_canonical_facts())) < len(_contras):
+                    analysis_text = _fixed
+                    table.update_item(
+                        Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"},
+                        UpdateExpression="SET analysis = :a",
+                        ExpressionAttributeValues={":a": analysis_text},
+                    )
+                    logger.info(
+                        "[grounding] %s self-corrected: %d→%d contradiction(s)",
+                        expert_key,
+                        len(_contras),
+                        len(_hard_canonical_contradictions(analysis_text, _load_canonical_facts())),
+                    )
+        except Exception as _sc:
+            logger.warning("grounding self-correction failed for %s: %s", expert_key, _sc)
 
     # V2.1: Thread extraction — extract and write coach thread entry
     if _HAS_INTELLIGENCE_COMMON and analysis_text:
