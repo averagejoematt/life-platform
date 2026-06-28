@@ -233,24 +233,28 @@ def _build_evidence_bindings():
     import visual_qa  # noqa: E402
 
     order = 10
-    for slug in visual_qa.EVIDENCE_TOPICS:
-        endpoints = []
-        primary = EVIDENCE_PRIMARY.get(slug)
-        if primary:
-            endpoints.append({"url": primary, "role": "primary", "metrics": []})
-        for sec in EVIDENCE_SECONDARY.get(slug, []):
-            endpoints.append({"url": sec, "role": "secondary", "metrics": []})
-        PAGE_BINDINGS.append(
-            {
-                "path": f"/data/{slug}/",
-                "name": f"Evidence · {slug}",
-                "door": "evidence",
-                "narrative_order": order,
-                "story_intent": _EVIDENCE_INTENT.get(slug, f"the {slug} evidence"),
-                "endpoints": endpoints,
-            }
-        )
-        order += 1
+    for base, door, topics in (
+        ("/data", "evidence", visual_qa.EVIDENCE_TOPICS),
+        ("/method", "method", visual_qa.METHOD_TOPICS),
+    ):
+        for slug in topics:
+            endpoints = []
+            primary = EVIDENCE_PRIMARY.get(slug)
+            if primary:
+                endpoints.append({"url": primary, "role": "primary", "metrics": []})
+            for sec in EVIDENCE_SECONDARY.get(slug, []):
+                endpoints.append({"url": sec, "role": "secondary", "metrics": []})
+            PAGE_BINDINGS.append(
+                {
+                    "path": f"{base}/{slug}/",
+                    "name": f"{'Evidence' if door == 'evidence' else 'Method'} · {slug}",
+                    "door": door,
+                    "narrative_order": order,
+                    "story_intent": _EVIDENCE_INTENT.get(slug, f"the {slug} evidence"),
+                    "endpoints": endpoints,
+                }
+            )
+            order += 1
 
 
 # v5 pillars the visual_qa sweep covers beyond the /data/ topics: the Protocols hub
