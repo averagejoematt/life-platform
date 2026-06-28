@@ -513,3 +513,12 @@ body { overflow-x: hidden; }
 .ms-ex-list { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: 4px; }
 .ms-ex-list li { display: flex; gap: var(--sp-2); align-items: baseline; justify-content: space-between; border-bottom: var(--border-hair); padding-bottom: 4px; }
 .ms-ex { font-family: var(--font-sans); color: var(--ink); }
+/* Experiment-to-date arc — the board's read week by week (clickable into lab notes). */
+.exp-arc { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.exp-btn { width: 100%; text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair); border-left: 3px solid var(--ember); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); display: grid; gap: 4px; }
+.exp-btn:hover { filter: brightness(1.04); }
+.exp-top { display: flex; gap: var(--sp-2); align-items: baseline; justify-content: space-between; }
+.exp-wkn { font-family: var(--font-serif); color: var(--ink); }
+.exp-tone { color: var(--ink-muted); }
+.exp-tone.tone-cautionary, .exp-tone.tone-urgent { color: var(--ember); }
+.exp-date { color: var(--ink-faint); }
