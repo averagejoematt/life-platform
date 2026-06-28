@@ -364,10 +364,21 @@ def _emit_overall(worst, semantic):
 
 def build_record(findings, semantic, digest, worst):
     """Pure: the durable findings payload (also the Lambda response body). Kept
-    separate from I/O so it's testable and identical across S3 + the response."""
+    separate from I/O so it's testable and identical across S3 + the response.
+
+    `status` MIRRORS the coherence-overall alarm (see _emit_overall): a semantic-only
+    incoherence (deterministic all-green, but the Haiku pass flagged a contradiction)
+    fires the alarm, so the record must read alarm too — otherwise the remediation
+    agent's status filter drops it and the alarm fires with no detail (the exact gap
+    this whole program closes). `deterministic_status` preserves the invariant-only
+    verdict for clarity."""
+    semantic_bad = bool(semantic and semantic.get("coherent") is False)
+    status = ci.ALARM if (worst == ci.ALARM or semantic_bad) else worst
     return {
         "date": _today(),
-        "status": worst,
+        "status": status,
+        "deterministic_status": worst,
+        "semantic_incoherent": semantic_bad,
         "alarms": [f.name for f in findings if f.is_alarm],
         "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
         "semantic": semantic,
