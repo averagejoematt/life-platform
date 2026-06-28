@@ -178,12 +178,30 @@ async function renderReadWeek(read) {
   read.innerHTML = h;
   enhanceCoachNames(read);
 }
-function renderReadExperiment(read) {
-  // Experiment-to-date cross-week synthesis is a Phase-B compute. Honest placeholder + the anchor.
-  read.innerHTML =
-    `<p class="dx-kicker label">the experiment · the arc so far</p><h2 class="dx-title">The experiment to date</h2>` +
-    `<p class="dx-prose">The board's <strong>today</strong> read and <strong>this week</strong> read are above. The experiment-to-date synthesis — how the board's view has shifted across the whole run — is the next thing being built; until then, the arc lives in the <a href="/coaching/lab-notes/">AI lab notes</a> (week by week) and the <a href="/story/chronicle/">chronicle</a>.</p>` +
-    `<p class="hero-day label" data-bind="genesisStamp"></p>`;
+async function renderReadExperiment(read) {
+  // The arc, composed from the weekly lab notes the board has written across the run —
+  // each week's tone is how the board landed that week; click to read it. Grows over time.
+  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the arc…</span></p>`;
+  const fn = await tryJSON("/api/field_notes");
+  const entries = (fn && fn.entries) || [];
+  let h = `<p class="dx-kicker label">the experiment · the board's read, week by week</p><h2 class="dx-title">The experiment to date</h2>`;
+  h += `<p class="dx-prose">How the board has read you across the whole run. Each week's lab note is the AI's read against how the week actually felt; the tone is how the board landed that week.</p>`;
+  if (entries.length) {
+    h += `<ol class="exp-arc">`;
+    for (const e of entries) {
+      const wk = e.week_label || `Week ${e.week || ""}`;
+      h += `<li class="exp-wk"><button type="button" class="exp-btn" data-week="${esc(e.week)}">` +
+        `<span class="exp-top"><span class="exp-wkn">${esc(wk)}</span><span class="exp-tone label tone-${esc(e.ai_tone || "")}">${esc(e.ai_tone || "—")}</span></span>` +
+        `<span class="exp-date label">${esc(String(e.ai_generated_at || "").slice(0, 10))}${e.has_matthew_response ? " · Matthew replied" : ""}</span></button></li>`;
+    }
+    h += `</ol>`;
+    h += `<p class="bc-datalink label"><a href="/coaching/lab-notes/">read the full lab notes ↗</a> · <a href="/story/chronicle/">the chronicle ↗</a></p>`;
+  } else {
+    h += `<p class="dx-prose">The week-by-week arc fills in as the lab notes accrue. <a href="/story/chronicle/">The chronicle ↗</a> carries the narrative meanwhile.</p>`;
+  }
+  h += `<p class="hero-day label" data-bind="genesisStamp"></p>`;
+  read.innerHTML = h;
+  read.querySelectorAll(".exp-btn").forEach((btn) => btn.addEventListener("click", () => selectSection("lab-notes", btn.dataset.week)));
   stampGenesis();
 }
 
