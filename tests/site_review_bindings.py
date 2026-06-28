@@ -184,22 +184,35 @@ PAGE_BINDINGS = [
     # keeps it story-adjacent (7.x via 71-73 to avoid renumbering the evidence block at 10-22).
     {
         "path": "/coaching/",
-        "name": "Coaching hub (My Team)",
+        "name": "Coaching · The Read (default)",
         "door": "coaching",
         "narrative_order": 71,
-        "story_intent": "meet the AI team reading the data — the collective read + how they disagree",
+        "story_intent": "what the AI board is saying about you right now — the priority, the disagreements, each coach's live read",
         "endpoints": [
-            {"url": "/api/coaches", "role": "primary", "metrics": []},
+            {"url": "/api/coaching-dashboard", "role": "primary", "metrics": []},
             {"url": "/api/coach_team", "role": "primary", "metrics": []},
+            {"url": "/api/weekly_priority", "role": "secondary", "metrics": []},
         ],
     },
     {
-        "path": "/coaching/coaches/#sleep_coach",
-        "name": "Coaching · coach page (deep-link)",
+        "path": "/coaching/by-coach/#training_coach",
+        "name": "Coaching · By Coach (read-on-data, deep-link)",
         "door": "coaching",
         "narrative_order": 72,
-        "story_intent": "one coach in depth — stance, track record, the calls they made",
-        "endpoints": [{"url": "/api/coach/sleep_coach", "role": "primary", "metrics": []}],
+        "story_intent": "a coach's read sitting on top of the actual domain data — cardio/lifts/volume this week",
+        "endpoints": [
+            {"url": "/api/coach/training_coach", "role": "primary", "metrics": []},
+            {"url": "/api/coach_analysis?domain=training", "role": "primary", "metrics": []},
+            {"url": "/api/observatory_week?domain=training", "role": "secondary", "metrics": []},
+        ],
+    },
+    {
+        "path": "/coaching/team/",
+        "name": "Coaching · The Team (roster/config)",
+        "door": "coaching",
+        "narrative_order": 72.5,
+        "story_intent": "who the coaches are — personalities, voice, how each is built (reference)",
+        "endpoints": [{"url": "/api/coaches", "role": "primary", "metrics": []}],
     },
     {
         "path": "/coaching/lab-notes/",
