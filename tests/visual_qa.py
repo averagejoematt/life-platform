@@ -336,7 +336,7 @@ def _navigate_with_fallback(page, url, primary_timeout=15000, fallback_timeout=2
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def capture_page(context, page_def, screenshot_dir, save_screenshots=False):
+def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capture_prose=False):
     """Drive one page def in an open browser context and return its result dict.
 
     Pure capture: navigate, scroll/reveal, run element/chart/interaction checks,
@@ -444,6 +444,17 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False):
                         shots.append({"kind": "chart", "path": crop, "selector": sel})
                     except Exception:
                         pass
+
+        # ── rendered prose dump (accuracy-audit / Axis B+C reads the visitor's text) ──
+        # Default off so the CI visual sweep is unchanged; site_review/accuracy_audit opt in.
+        if capture_prose and screenshot_dir:
+            try:
+                prose = page.evaluate("() => document.body.innerText") or ""
+                with open(os.path.join(screenshot_dir, f"{slug}.txt"), "w") as pf:
+                    pf.write(prose)
+                shots.append({"kind": "prose", "path": os.path.join(screenshot_dir, f"{slug}.txt")})
+            except Exception:
+                pass
 
         # ── responsive overflow @ 390px ──
         page.set_viewport_size({"width": 390, "height": 844})

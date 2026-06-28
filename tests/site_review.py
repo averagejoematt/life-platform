@@ -99,7 +99,7 @@ def capture_screenshots(pages, run_dir):
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
         for page_def in pages:
-            r = visual_qa.capture_page(context, page_def, run_dir, save_screenshots=True)
+            r = visual_qa.capture_page(context, page_def, run_dir, save_screenshots=True, capture_prose=True)
             results.append(r)
             icon = "✅" if not r["issues"] else "❌"
             print(f"  {icon} {r['page']} ({r['path']})")
