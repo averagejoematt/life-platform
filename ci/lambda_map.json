@@ -242,6 +242,9 @@
     "lambdas/operational/alert_digest_lambda.py": {
       "function": "life-platform-alert-digest"
     },
+    "lambdas/operational/traffic_digest_lambda.py": {
+      "function": "life-platform-traffic-digest"
+    },
     "lambdas/operational/canary_lambda.py": {
       "function": "life-platform-canary"
     },

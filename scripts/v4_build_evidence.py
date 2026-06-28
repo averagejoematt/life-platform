@@ -543,7 +543,12 @@ EDITORIAL = {
     ),
 }
 
-FONTS = '<link rel="stylesheet" href="/assets/css/fonts.css">'
+FONTS = (
+    '<link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>'
+    '<link rel="stylesheet" href="/assets/css/fonts.css">'
+)
 THEME = (
     '<script>(function(){try{var t=localStorage.getItem("ajm-theme");'
     'if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>'
@@ -645,7 +650,7 @@ FOOTER = (
     '<div class="sf-col"><p class="sf-h label">The Story</p>'
     '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>'
     '<div class="sf-col"><p class="sf-h label">The Data</p>'
-    '<a href="/data/">All topics</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/nutrition/">Nutrition</a><a href="/data/sleep/">Sleep</a></div>'
+    '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>'
     '<div class="sf-col"><p class="sf-h label">The Protocols</p>'
     '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
     '<div class="sf-col"><p class="sf-h label">The Coaching</p>'
@@ -666,6 +671,15 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   <title>{esc(title)}</title>
   <meta name="description" content="{esc(desc)}">
   <link rel="canonical" href="https://averagejoematt.com{canonical}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com{canonical}">
+  <meta property="og:title" content="{esc(title)}">
+  <meta property="og:description" content="{esc(desc)}">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{esc(title)}">
+  <meta name="twitter:description" content="{esc(desc)}">
   <link rel="icon" href="/favicon.ico">
   {FONTS}
   <link rel="stylesheet" href="/assets/css/tokens.css">
