@@ -69,24 +69,12 @@ COACH_IDS = [
     "explorer_coach",
 ]
 
-# Metric → DynamoDB source mapping
-METRIC_SOURCES = {
-    "hrv": "whoop",
-    "hrv_7day_avg": "whoop",
-    "recovery_score": "whoop",
-    "resting_heart_rate": "whoop",
-    "sleep_duration_hours": "whoop",
-    "sleep_score": "whoop",
-    "deep_pct": "whoop",
-    "rem_pct": "whoop",
-    "weight_lbs": "withings",
-    "total_calories_kcal": "macrofactor",
-    "total_protein_g": "macrofactor",
-    "steps": "apple_health",
-    "blood_glucose_avg": "apple_health",
-    "blood_glucose_std_dev": "apple_health",
-    "body_fat_pct": "dexa",
-}
+# Metric → DynamoDB source mapping. CONSOLIDATED 2026-06-28 (Coherence Program
+# Phase 2): this was a hand-synced duplicate of coach_state_updater's allowlist —
+# drift silently broke prediction grading. Single source now; MEASURABLE_METRICS is
+# DERIVED from this map, so the extractor's allowlist and the evaluator's source-map
+# cannot diverge. See lambdas/measurable_metrics.py.
+from measurable_metrics import METRIC_SOURCES  # noqa: E402
 
 # Domain-appropriate minimum evaluation windows (days).
 # Predictions with shorter windows are clamped to these minimums.

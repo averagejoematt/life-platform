@@ -66,79 +66,14 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 # Measurable-metric allowlist for prediction extraction
 # ══════════════════════════════════════════════════════════════════════════════
-# Mirrors METRIC_SOURCES in coach_prediction_evaluator.py. Predictions whose
-# metric_hint does not normalize to one of these keys are stored as
-# evaluation.type="qualitative" (the evaluator skips qualitative predictions
-# rather than churning daily "inconclusive: no data" outcomes).
-#
-# Aggregate suffixes (_7day_avg, _14day_avg, _30day_avg) are valid extensions
-# of any base key — the evaluator computes those on-the-fly.
-#
-# Keep in sync with lambdas/coach_prediction_evaluator.py:65 (METRIC_SOURCES).
-MEASURABLE_METRICS = frozenset(
-    {
-        # whoop
-        "hrv",
-        "hrv_7day_avg",
-        "recovery_score",
-        "resting_heart_rate",
-        "sleep_duration_hours",
-        "sleep_score",
-        "deep_pct",
-        "rem_pct",
-        # withings
-        "weight_lbs",
-        # macrofactor
-        "total_calories_kcal",
-        "total_protein_g",
-        # apple_health
-        "steps",
-        "blood_glucose_avg",
-        "blood_glucose_std_dev",
-        # dexa
-        "body_fat_pct",
-    }
-)
-
-# Substring → measurable-metric mapping for normalizing prose-y metric hints.
-# Checked in declared order — first match wins, so multi-word/specific patterns
-# come BEFORE single-word ones to avoid wrong-match ordering bugs (e.g.
-# "hours of sleep needed for optimal recovery" must hit sleep before recovery).
-# Tuned for the actual coach-prediction language patterns observed in the
-# LEARNING# audit (see v7.15.0 changelog: 504 predictions, 100% inconclusive,
-# all due to unmapped metrics).
-_METRIC_HINT_NORMALIZERS = (
-    # Multi-word specific patterns first (precedence)
-    ("heart rate variability", "hrv"),
-    ("resting heart rate", "resting_heart_rate"),
-    ("resting hr", "resting_heart_rate"),
-    ("hours of sleep", "sleep_duration_hours"),
-    ("sleep duration", "sleep_duration_hours"),
-    ("sleep score", "sleep_score"),
-    ("sleep quality", "sleep_score"),
-    ("sleep efficiency", "sleep_score"),
-    ("deep sleep", "deep_pct"),
-    ("rem sleep", "rem_pct"),
-    ("rem percentage", "rem_pct"),
-    ("blood glucose", "blood_glucose_avg"),
-    ("glucose variability", "blood_glucose_std_dev"),
-    ("glucose excursion", "blood_glucose_avg"),
-    ("postprandial glucose", "blood_glucose_avg"),
-    ("post-meal glucose", "blood_glucose_avg"),
-    ("body fat", "body_fat_pct"),
-    ("step count", "steps"),
-    ("daily steps", "steps"),
-    ("recovery score", "recovery_score"),
-    ("recovery", "recovery_score"),
-    # Single-word fallbacks (checked last)
-    ("hrv", "hrv"),
-    ("weight", "weight_lbs"),
-    ("calorie", "total_calories_kcal"),
-    ("kcal", "total_calories_kcal"),
-    ("protein", "total_protein_g"),
-    ("glucose", "blood_glucose_avg"),
-    ("steps", "steps"),
-)
+# CONSOLIDATED 2026-06-28 (Coherence Program Phase 2): the allowlist, the metric-
+# hint normalizer, AND coach_prediction_evaluator's METRIC_SOURCES used to be three
+# hand-synced copies — when they drifted, predictions silently dropped to qualitative
+# and never graded (the v7.15.0 504-inconclusive bug; the Coherence Sentinel's
+# prediction_health invariant exists for exactly this). They now live in ONE place,
+# DERIVED so they cannot diverge. See lambdas/measurable_metrics.py.
+from measurable_metrics import MEASURABLE_METRICS  # noqa: E402,F401
+from measurable_metrics import normalize_metric_hint as _normalize_metric_hint  # noqa: E402
 
 
 def _parse_confidence(raw) -> float:
@@ -162,29 +97,6 @@ def _parse_confidence(raw) -> float:
         return max(0.0, min(1.0, val))
     except (ValueError, TypeError):
         return 0.5
-
-
-def _normalize_metric_hint(hint: str) -> str | None:
-    """Map an LLM-produced metric_hint to a measurable key, or None.
-
-    Used by the post-extraction normalizer in `_write_prediction_records`. If
-    the hint already names an allowlisted key, returns it as-is. Otherwise
-    walks the substring map. Returns None when nothing matches — caller marks
-    the prediction qualitative so the evaluator skips it.
-    """
-    if not hint:
-        return None
-    h = hint.strip().lower()
-    # Direct hit (covers aggregate-suffixed forms too — `hrv_7day_avg` etc.)
-    if h in MEASURABLE_METRICS:
-        return h
-    # Substring map — try with underscores-as-spaces too so snake_case prose
-    # like "sleep_efficiency" matches the "sleep efficiency" needle.
-    h_spaced = h.replace("_", " ")
-    for needle, target in _METRIC_HINT_NORMALIZERS:
-        if needle in h or needle in h_spaced:
-            return target
-    return None
 
 
 # Direction keyword maps for the gradability inference (Scorecard / C-3). The
