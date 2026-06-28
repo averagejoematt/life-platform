@@ -215,8 +215,12 @@ class OperationalStack(Stack):
             table=local_table,
             bucket=local_bucket,
             dlq=None,
+            # No error alarm by design — a weekly digest failing is low-stakes (you miss
+            # one traffic email; the CF logs are retained, so the next run still sees the
+            # window). Consistent with the other alerts_topic=None operational Lambdas
+            # (canary, qa_smoke, cost_governor). To add a failure signal later, pass
+            # alerts_topic=local_alerts_topic + digest_topic=local_digest_topic + digest=True.
             alerts_topic=None,
-            alarm_name="traffic-digest-errors",
         )
         cdk.CfnOutput(self, "CfLogBucketName", value=cf_log_bucket.bucket_name)
         cdk.CfnOutput(self, "TrafficDigestLambdaArn", value=traffic_digest.function_arn)
