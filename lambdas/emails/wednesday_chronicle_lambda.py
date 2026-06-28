@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import privacy_guard  # deterministic real-name + vice gate (layer module)
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -2241,6 +2242,19 @@ def lambda_handler(event, context):
         )
 
     blog_url_draft = f"https://averagejoematt.com/blog/week-{week_num:02d}.html"
+
+    # ── Privacy gate (fail-closed) — never publish OR store a leaking installment.
+    # Prompt rules are the first line; this deterministic gate is the guarantee.
+    # Catches the truth-audit class: a real public figure named as a coach/source,
+    # or a vice/substance named outright. A violation HOLDS the whole installment.
+    try:
+        privacy_guard.assert_clean(f"{title}\n{stats_line}\n{raw_installment}", context=f"chronicle week {week_num}")
+    except privacy_guard.PrivacyViolation as e:
+        logger.error(f"[privacy] BLOCKED chronicle week {week_num} — {e}")
+        return {
+            "statusCode": 200,
+            "body": json.dumps({"status": "privacy_hold", "week": week_num, "violations": [t for _, t in e.violations]}),
+        }
 
     if PREVIEW_MODE:
         # ── FEAT-12: Build all HTML artifacts without publishing ─────────────
