@@ -45,10 +45,16 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 SITE_BASE = os.environ.get("SITE_BASE", "https://averagejoematt.com")
 CW_NAMESPACE = "LifePlatform/Coherence"
+LOG_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+# Durable findings record. The coherence-overall alarm only carries "OverallAlarm
+# >= 1"; this artifact is WHAT failed, so the remediation agent (read-only) and a
+# human can triage from the actual digest instead of re-deriving it.
+COHERENCE_LOG_PREFIX = "coherence-log"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE)
 _cw = boto3.client("cloudwatch", region_name=REGION)
+_s3 = boto3.client("s3", region_name=REGION)
 
 COACH_IDS = [
     "sleep_coach",
@@ -149,22 +155,29 @@ def _gather_predictions():
 
 
 def _gather_facts_and_narratives():
-    """Canonical facts (computed_metrics) + the day's served narratives."""
+    """Canonical facts (computed_metrics) + the day's served narratives.
+
+    Facts come from `canonical_facts.build_canonical_facts` — the SAME schema the
+    coaches are grounded on (ai_expert_analyzer._load_canonical_facts). That closes
+    the grounding↔detection loop: the Sentinel checks served narratives against the
+    exact extraction the coaches were handed, and the semantic pass now sees the
+    protein avg/target/floor distinctly (the 140/170/190 confusion it flagged live).
+    Fail-soft to the 4 invariant-required fields if the module isn't importable."""
     cm = _latest("computed_metrics")
+    try:
+        from canonical_facts import build_canonical_facts
 
-    def _f(k):
-        v = cm.get(k)
-        try:
-            return round(float(v), 1) if v is not None else None
-        except (TypeError, ValueError):
-            return None
+        facts = {k: v for k, v in build_canonical_facts(cm).items() if k != "as_of"}
+    except Exception:  # noqa: BLE001 — bundled module; degrade to the core 4
 
-    facts = {
-        "recovery_pct": _f("recovery_pct"),
-        "hrv_ms": _f("hrv_ms"),
-        "rhr_bpm": _f("rhr_bpm"),
-        "latest_weight": _f("latest_weight"),
-    }
+        def _f(k):
+            v = cm.get(k)
+            try:
+                return round(float(v), 1) if v is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        facts = {k: _f(k) for k in ("recovery_pct", "hrv_ms", "rhr_bpm", "latest_weight")}
     narratives, labels = [], []
     # The served coach essays + the integrator synthesis.
     ai_pk = f"{USER_PREFIX}ai_analysis"
@@ -349,6 +362,31 @@ def _emit_overall(worst, semantic):
         logger.warning("coherence: overall metric emit failed: %s", e)
 
 
+def build_record(findings, semantic, digest, worst):
+    """Pure: the durable findings payload (also the Lambda response body). Kept
+    separate from I/O so it's testable and identical across S3 + the response."""
+    return {
+        "date": _today(),
+        "status": worst,
+        "alarms": [f.name for f in findings if f.is_alarm],
+        "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
+        "semantic": semantic,
+        "digest": digest,
+    }
+
+
+def _persist(record):
+    """Write the findings record to S3 (latest.json + a dated history copy) so the
+    remediation agent and a human can see WHAT failed. Fail-soft — a write error
+    must never break detection (metrics/alarm already emitted)."""
+    body = json.dumps(record, indent=2, default=str).encode()
+    for key in (f"{COHERENCE_LOG_PREFIX}/latest.json", f"{COHERENCE_LOG_PREFIX}/{record['date']}.json"):
+        try:
+            _s3.put_object(Bucket=LOG_BUCKET, Key=key, Body=body, ContentType="application/json")
+        except Exception as e:  # noqa: BLE001
+            logger.warning("coherence: persist %s failed: %s", key, e)
+
+
 def lambda_handler(event, context):
     try:
         findings, semantic = run_checks()
@@ -358,19 +396,9 @@ def lambda_handler(event, context):
         logger.info(digest)
         worst = ci.overall_status(findings)
         _emit_overall(worst, semantic)
-        return {
-            "statusCode": 200,
-            "body": json.dumps(
-                {
-                    "status": worst,
-                    "alarms": [f.name for f in findings if f.is_alarm],
-                    "findings": [{"name": f.name, "status": f.status, "value": f.value, "detail": f.detail} for f in findings],
-                    "semantic": semantic,
-                    "digest": digest,
-                },
-                default=str,
-            ),
-        }
+        record = build_record(findings, semantic, digest, worst)
+        _persist(record)
+        return {"statusCode": 200, "body": json.dumps(record, default=str)}
     except Exception as e:  # noqa: BLE001
         logger.error("Coherence Sentinel failed: %s", e)
         raise

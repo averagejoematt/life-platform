@@ -7,6 +7,7 @@ state (the C-3 all-inconclusive board + a 30-vs-86 narrative split) and assert
 run_checks() surfaces the alarms and the digest renders — no AWS, no HTTP.
 """
 
+import json
 import os
 import sys
 
@@ -60,6 +61,51 @@ def test_digest_renders(monkeypatch):
     digest = sentinel._digest(findings, semantic)
     assert "COHERENCE SENTINEL — ALARM" in digest
     assert "prediction_health" in digest
+
+
+def test_facts_use_canonical_schema_closing_the_grounding_loop(monkeypatch):
+    # The Sentinel grounds on the SAME canonical_facts the coaches do — so the
+    # protein avg/target/floor are distinct (the 140/170/190 confusion) and HRV
+    # is ms. Patch _latest to a known computed_metrics record; the narratives loop
+    # fail-softs to empty (table is a stub here).
+    monkeypatch.setattr(
+        sentinel,
+        "_latest",
+        lambda src: {"recovery_pct": 30, "hrv_ms": 25.18, "protein_g_avg": 140.7, "protein_g_target": 190, "protein_g_floor": 170},
+    )
+    monkeypatch.setattr(sentinel, "table", None)  # narratives query → except → []
+    facts, narratives, labels = sentinel._gather_facts_and_narratives()
+    assert facts["protein_g_avg"] == 140.7
+    assert facts["protein_g_target"] == 190 and facts["protein_g_floor"] == 170
+    assert facts["hrv_ms"] == 25.2 and "as_of" not in facts  # ms, no stray non-numeric key
+
+
+def test_build_record_is_serializable_and_complete(monkeypatch):
+    _patch_bad_state(monkeypatch)
+    findings, semantic = sentinel.run_checks()
+    digest = sentinel._digest(findings, semantic)
+    worst = sentinel.ci.overall_status(findings)
+    record = sentinel.build_record(findings, semantic, digest, worst)
+    # The agent reads these keys to triage; they must all be present + JSON-safe.
+    assert set(record) >= {"date", "status", "alarms", "findings", "digest"}
+    assert "prediction_health" in record["alarms"]
+    assert json.loads(json.dumps(record, default=str))  # round-trips
+
+
+def test_persist_writes_latest_and_dated_and_is_fail_soft(monkeypatch):
+    puts = []
+    monkeypatch.setattr(sentinel._s3, "put_object", lambda **kw: puts.append(kw["Key"]))
+    record = {"date": "2026-06-28", "status": "alarm", "alarms": ["prediction_health"], "findings": [], "digest": "x"}
+    sentinel._persist(record)
+    assert "coherence-log/latest.json" in puts
+    assert "coherence-log/2026-06-28.json" in puts
+
+    # A persist failure must NOT propagate — detection already emitted metrics.
+    def _boom(**kw):
+        raise RuntimeError("s3 down")
+
+    monkeypatch.setattr(sentinel._s3, "put_object", _boom)
+    sentinel._persist(record)  # no raise
 
 
 def test_healthy_state_is_ok(monkeypatch):
