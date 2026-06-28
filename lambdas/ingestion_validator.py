@@ -302,10 +302,20 @@ _SCHEMAS: dict[str, dict] = {
         "typed_fields": {
             "day_grade_score": (int, float),
             "readiness_score": (int, float),
+            "recovery_pct": (int, float),
+            "hrv_ms": (int, float),
+            "rhr_bpm": (int, float),
+            "protein_g_avg": (int, float),
         },
         "range_checks": {
             "day_grade_score": (0, 100),
             "readiness_score": (0, 100),
+            # Phase-3 canonical vitals — impossible values warn (CTL/ATL ≥0 already
+            # clamped at compute; these catch a bad recovery/HRV slipping through).
+            "recovery_pct": (0, 100),
+            "hrv_ms": (0, 400),
+            "rhr_bpm": (20, 150),
+            "protein_g_avg": (0, 400),
         },
         "at_least_one_of": ["day_grade_score", "component_scores"],
     },

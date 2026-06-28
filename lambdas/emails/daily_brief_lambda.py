@@ -553,10 +553,17 @@ def gather_daily_data(profile, yesterday):
         }
     )
 
+    # Phase-3 day-selection: ONE chosen whoop for every "last night" surface — today's
+    # record if it already carries a finalized recovery_score, else yesterday's. The
+    # vitals block, the recovery line, and the AI narrative all read this, so the brief
+    # can't show recovery 30 in the headline while the prose says 86.
+    primary_whoop = whoop_today if safe_float(whoop_today, "recovery_score") is not None else whoop
+
     return {
         "date": yesterday,
         "whoop": whoop,
         "whoop_today": whoop_today,
+        "primary_whoop": primary_whoop,
         "sleep": sleep,
         "apple": apple,
         "macrofactor": macrofactor,
@@ -993,9 +1000,10 @@ def compute_readiness(data):
     # Sleep 25% (not 30%) to stay aligned with daily_metrics_compute.compute_readiness
     # and the live MCP get_readiness_score model — keep all three in sync.
     components = []
-    whoop_today = data.get("whoop_today")
-    whoop_yest = data.get("whoop")
-    recovery = safe_float(whoop_today, "recovery_score") or safe_float(whoop_yest, "recovery_score")
+    # Phase-3: the ONE chosen whoop (today-if-finalized else yesterday), so readiness
+    # uses the same recovery the vitals block and narrative show (no 30-vs-86 split).
+    primary_whoop = data.get("primary_whoop") or data.get("whoop_today") or data.get("whoop")
+    recovery = safe_float(primary_whoop, "recovery_score")
     if recovery is not None:
         components.append(("recovery", float(recovery), 0.40))
     sleep_score = safe_float(data.get("sleep"), "sleep_score")
@@ -1664,8 +1672,11 @@ def lambda_handler(event, context):
     # AI-3: Validate all AI outputs before delivery
     if api_key and _HAS_AI_VALIDATOR:
         try:
+            _primary_whoop = data.get("primary_whoop") or data.get("whoop") or {}
             _health_ctx = {
-                "recovery_score": (data.get("whoop") or {}).get("recovery_score"),
+                "recovery_score": _primary_whoop.get("recovery_score"),
+                "hrv": _primary_whoop.get("hrv"),
+                "resting_heart_rate": _primary_whoop.get("resting_heart_rate"),
                 "tsb": data.get("tsb"),
             }
             _validated = validate_daily_brief_outputs(
@@ -1940,7 +1951,10 @@ def lambda_handler(event, context):
             from site_writer import write_public_stats
 
             # Build vitals from data already gathered above
-            _w = data.get("whoop") or data.get("whoop_today") or {}
+            # Phase-3: the ONE chosen whoop (today-if-finalized else yesterday) — the
+            # same record the recovery line and AI narrative read, so the vitals block
+            # can't disagree with the prose on the same page.
+            _w = data.get("primary_whoop") or data.get("whoop_today") or data.get("whoop") or {}
             _wt = data.get("withings") or {}
             _hrv = data["hrv"]
             _rec = safe_float(_w, "recovery_score") or 0

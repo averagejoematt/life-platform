@@ -537,6 +537,7 @@ def store_computed_metrics(
     ctl=None,
     atl=None,
     weight_traj=None,
+    vitals=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
@@ -577,6 +578,22 @@ def store_computed_metrics(
             item["projected_goal_date"] = weight_traj["projected_goal_date"]
         if weight_traj.get("days_to_goal") is not None:
             item["days_to_goal"] = _to_dec(weight_traj["days_to_goal"])
+
+    # Phase-3 canonical vitals + protein — the single chosen-day recovery/HRV/RHR and
+    # the window protein avg+target+floor, with units in the field names. Every surface
+    # (brief vitals block, AI narrative, website, coaches) reads these instead of
+    # re-deriving, so the same number can't appear two ways on one page.
+    if vitals:
+        for field, val in [
+            ("recovery_pct", vitals.get("recovery_pct")),
+            ("hrv_ms", vitals.get("hrv_ms")),
+            ("rhr_bpm", vitals.get("rhr_bpm")),
+            ("protein_g_avg", vitals.get("protein_g_avg")),
+            ("protein_g_target", vitals.get("protein_g_target")),
+            ("protein_g_floor", vitals.get("protein_g_floor")),
+        ]:
+            if val is not None:
+                item[field] = _to_dec(val)
 
     # Component scores
     cs_dec = {k: Decimal(str(v)) for k, v in component_scores.items() if v is not None}
@@ -911,15 +928,31 @@ def assemble_data(yesterday_str, profile):
     # the ONE shared computation (weight_trend); the brief/public_stats read this, so the
     # rate is identical to the website's /api/journey instead of a divergent 7-day delta.
     withings_28d = fetch_range("withings", (today - timedelta(days=28)).isoformat(), yesterday_str)
-    _wt_series = [
-        (w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in withings_28d if safe_float(w, "weight_lbs")
-    ]
+    _wt_series = [(w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in withings_28d if safe_float(w, "weight_lbs")]
     weight_traj = weight_trend.weight_trajectory(
         _wt_series, latest_weight, float(profile.get("goal_weight_lbs", 185.0)), ref_dt=datetime.now(timezone.utc)
     )
 
     # Habitify 7-day (tier-2 habit frequency scoring)
     habitify_7d = fetch_range("habitify", (today - timedelta(days=7)).isoformat(), yesterday_str)
+
+    # Phase-3 canonical vitals — the chosen day's whoop (this record is keyed to the
+    # complete day `yesterday_str`, so its vitals ARE that day's whoop). Stored with
+    # explicit units in the field names so every consumer reads ONE recovery/HRV/RHR
+    # and the brief can't show 30 in the headline while the prose says 86.
+    primary_recovery_pct = safe_float(whoop, "recovery_score")
+    primary_hrv_ms = safe_float(whoop, "hrv")
+    primary_rhr_bpm = safe_float(whoop, "resting_heart_rate")
+
+    # Protein: the window average is what the coaches narrate (the "stuck at ~140g"
+    # read); store it here once, with the canonical target/floor from profile, so no
+    # surface re-derives or invents the number (kills the 140/170/190 split at source).
+    mf_window = fetch_range("macrofactor", (today - timedelta(days=30)).isoformat(), yesterday_str)
+    _pro_vals = [safe_float(m, "total_protein_g") for m in mf_window]
+    _pro_vals = [v for v in _pro_vals if v is not None]
+    protein_g_avg = round(sum(_pro_vals) / len(_pro_vals), 1) if _pro_vals else None
+    protein_g_target = float(profile.get("protein_target_g", 190))
+    protein_g_floor = float(profile.get("protein_floor_g", 170))
 
     elapsed = time.time() - t0_timer
     logger.info(
@@ -964,6 +997,13 @@ def assemble_data(yesterday_str, profile):
         "week_ago_weight": week_ago_weight,
         "avatar_weight": avatar_weight,
         "weight_traj": weight_traj,
+        # Phase-3 canonical vitals + protein (one source; units in the names)
+        "recovery_pct": primary_recovery_pct,
+        "hrv_ms": primary_hrv_ms,
+        "rhr_bpm": primary_rhr_bpm,
+        "protein_g_avg": protein_g_avg,
+        "protein_g_target": protein_g_target,
+        "protein_g_floor": protein_g_floor,
     }
     return data, hrv_7d_avg, hrv_30d_avg
 
@@ -1124,6 +1164,14 @@ def lambda_handler(event, context):
         ctl=data.get("ctl"),
         atl=data.get("atl"),
         weight_traj=data.get("weight_traj"),
+        vitals={
+            "recovery_pct": data.get("recovery_pct"),
+            "hrv_ms": data.get("hrv_ms"),
+            "rhr_bpm": data.get("rhr_bpm"),
+            "protein_g_avg": data.get("protein_g_avg"),
+            "protein_g_target": data.get("protein_g_target"),
+            "protein_g_floor": data.get("protein_g_floor"),
+        },
     )
 
     if day_grade_score is not None:

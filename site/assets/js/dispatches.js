@@ -90,7 +90,25 @@ function entriesFor(s, data) {
   if (s.kind === "coaches") return [{ id: "team", title: "🧭 My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" })));
   if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, guest_id: e.guest_id, guest_name: e.guest_name, excerpt: e.excerpt }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
-  if (s.kind === "posts") { const ps = data.posts || data.entries || (Array.isArray(data) ? data : []); return ps.map((p) => ({ id: p.week, title: p.title || `Week ${p.week}`, date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url })); }
+  if (s.kind === "posts") {
+    const ps = data.posts || data.entries || (Array.isArray(data) ? data : []);
+    // Genesis-anchored labels (truth-audit Phase 4b): installments before the genesis
+    // date are the Prologue (numbered by date); after it they're Week N counted from
+    // genesis. The raw `week` field can repeat (two "Week 1" shipped), so it never
+    // drives the displayed label.
+    const GENESIS = "2026-06-14";
+    const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
+    const pre = ps.filter((p) => p.date && p.date < GENESIS).sort((a, b) => (a.date < b.date ? -1 : 1));
+    const partOf = new Map(pre.map((p, i) => [p, ROMAN[i] || String(i + 1)]));
+    const labelOf = (p) => {
+      if (!p.date) return p.week ? `Week ${p.week}` : "";
+      if (p.date < GENESIS) return pre.length > 1 ? `Prologue · Part ${partOf.get(p)}` : "Prologue";
+      return `Week ${Math.max(1, Math.floor((Date.parse(p.date) - Date.parse(GENESIS)) / 6048e5) + 1)}`;
+    };
+    // id = date (unique) for selection/routing; week kept separately for podcast lookup.
+    // The raw `week` repeated (two "Week 1"), so using it as the id collided two posts.
+    return ps.map((p) => ({ id: p.date || String(p.week), week: p.week, label: labelOf(p), title: p.title || labelOf(p), date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url }));
+  }
   return [];
 }
 
@@ -338,11 +356,11 @@ async function renderRead(s, id) {
   const readmore = ent.url
     ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
     : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
-  const episode = s.key === "chronicle" ? await podcastEpisode(ent.id) : null;
+  const episode = s.key === "chronicle" ? await podcastEpisode(ent.week ?? ent.id) : null;
   const listen = episode
     ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round((episode.bytes || 0) / 1024 / 1024 / 0.12))} min)</span></div>`
     : "";
-  read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"} · week ${esc(ent.id)}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+  read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   const rf = read.querySelector(".dx-readfull");
