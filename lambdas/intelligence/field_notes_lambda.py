@@ -120,7 +120,8 @@ def gather_week_data(start_date, end_date):
         data["sleep"] = {
             "nights": len(sleep_items),
             "avg_hours": round(sum(hrs) / len(hrs), 1) if hrs else None,
-            "avg_hrv": round(sum(hrvs) / len(hrvs), 1) if hrvs else None,
+            # Unit in the key so the model can't guess "bpm" (HRV is milliseconds).
+            "avg_hrv_ms": round(sum(hrvs) / len(hrvs), 1) if hrvs else None,
         }
 
     # Nutrition (MacroFactor)
@@ -251,6 +252,7 @@ Requirements:
 - Write in first person as the platform's AI advisor
 - Be honest and direct — Matthew chose radical transparency
 - Reference specific numbers from the data
+- UNITS: HRV is in milliseconds (ms), never bpm. Heart rate is in bpm. Never swap them.
 - Do NOT use bullet points — flowing prose only
 - If a data domain has no entries, acknowledge the gap briefly
 - Tone should match the data: don't be affirming when the data is concerning"""
