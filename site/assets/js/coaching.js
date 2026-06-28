@@ -185,10 +185,12 @@ function renderReadExperiment(read) {
 async function renderByCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
   const dom = domainOf(id);
-  const [coach, analysis, obs] = await Promise.all([
+  const wantsSession = dom === "training" || dom === "physical";
+  const [coach, analysis, obs, sessions] = await Promise.all([
     tryJSON(`/api/coach/${encodeURIComponent(id)}`),
     tryJSON(`/api/coach_analysis?domain=${encodeURIComponent(dom)}`),
     OBS_DOMAINS.has(dom) ? tryJSON(`/api/observatory_week?domain=${encodeURIComponent(dom)}`) : Promise.resolve(null),
+    wantsSession ? tryJSON("/api/workouts") : Promise.resolve(null),
   ]);
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
   let h = `<p class="dx-kicker label">${esc(coach.emoji || "")} ${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2>`;
@@ -216,6 +218,21 @@ async function renderByCoach(read, id) {
       `<p class="bc-datalink label"><a href="/data/${esc(dom)}/">see the full ${esc(dom)} data ↗</a></p></section>`;
   } else if (OBS_DOMAINS.has(dom)) {
     h += `<section class="bc-data"><p class="dx-kicker label">the data</p><p class="dx-prose">The 7-day ${esc(dom)} numbers aren't in yet — the read above is what the coach has so far. <a href="/data/${esc(dom)}/">Full ${esc(dom)} data ↗</a></p></section>`;
+  }
+
+  // 2.5) MOST RECENT SESSION — the owner's "my most recent session, how does it compare".
+  const w = sessions && sessions.workouts && sessions.workouts[0];
+  if (w) {
+    const top = (w.exercises || []).slice(0, 5).map((ex) => {
+      const best = (ex.sets || []).filter((s) => s.weight_kg != null).sort((a, b) => (b.weight_kg || 0) - (a.weight_kg || 0))[0];
+      const detail = best ? `${esc(best.reps != null ? best.reps : "")}×${esc(best.weight_kg)}kg` : ((ex.sets || []).length ? `${(ex.sets || []).length} sets` : "");
+      return `<li><span class="ms-ex">${esc(ex.name || "")}</span>${detail ? ` <span class="label">${detail}</span>` : ""}</li>`;
+    }).join("");
+    const meta = [w.duration_min ? `${esc(w.duration_min)} min` : "", w.exercise_count != null ? `${esc(w.exercise_count)} exercises` : "", w.set_count != null ? `${esc(w.set_count)} sets` : "", w.total_volume_kg ? `${Math.round(w.total_volume_kg)} kg volume` : ""].filter(Boolean).join(" · ");
+    h += `<section class="bc-session"><p class="dx-kicker label">most recent session · ${esc(w.date || "")}</p>` +
+      `<p class="ms-title">${esc(w.title || "Workout")}${meta ? ` <span class="label">${meta}</span>` : ""}</p>` +
+      (top ? `<ul class="ms-ex-list">${top}</ul>` : "") +
+      `<p class="bc-datalink label"><a href="/data/training/">full training log ↗</a></p></section>`;
   }
 
   // 3) LIVE BETS + a thin track strip (the accountability, not a whole section).

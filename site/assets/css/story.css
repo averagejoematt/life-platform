@@ -508,3 +508,8 @@ body { overflow-x: hidden; }
 .bc-datalink a, .bc-track { color: var(--ember); }
 .bc-track { display: block; margin: var(--sp-3) 0; }
 .dx-item-sub { display: block; margin-top: 4px; font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); line-height: 1.4; }
+.bc-session { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
+.ms-title { margin: var(--sp-2) 0 0; font-family: var(--font-serif); color: var(--ink); }
+.ms-ex-list { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: 4px; }
+.ms-ex-list li { display: flex; gap: var(--sp-2); align-items: baseline; justify-content: space-between; border-bottom: var(--border-hair); padding-bottom: 4px; }
+.ms-ex { font-family: var(--font-sans); color: var(--ink); }
