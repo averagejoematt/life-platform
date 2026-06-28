@@ -210,11 +210,13 @@ async function renderByCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
   const dom = domainOf(id);
   const wantsSession = dom === "training" || dom === "physical";
-  const [coach, analysis, obs, sessions] = await Promise.all([
+  const wantsTraining = dom === "training";
+  const [coach, analysis, obs, sessions, training] = await Promise.all([
     tryJSON(`/api/coach/${encodeURIComponent(id)}`),
     tryJSON(`/api/coach_analysis?domain=${encodeURIComponent(dom)}`),
     OBS_DOMAINS.has(dom) ? tryJSON(`/api/observatory_week?domain=${encodeURIComponent(dom)}`) : Promise.resolve(null),
     wantsSession ? tryJSON("/api/workouts") : Promise.resolve(null),
+    wantsTraining ? tryJSON("/api/training_overview") : Promise.resolve(null),
   ]);
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
   let h = `<p class="dx-kicker label">${esc(coach.emoji || "")} ${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2>`;
@@ -257,6 +259,42 @@ async function renderByCoach(read, id) {
       `<p class="ms-title">${esc(w.title || "Workout")}${meta ? ` <span class="label">${meta}</span>` : ""}</p>` +
       (top ? `<ul class="ms-ex-list">${top}</ul>` : "") +
       `<p class="bc-datalink label"><a href="/data/training/">full training log ↗</a></p></section>`;
+  }
+
+  // 2.7) CARDIO vs STRENGTH + MUSCLE BALANCE — the owner's "my cardio, my lifts, my volume,
+  // the exercises, how that compares" (all from /api/training_overview, already computed).
+  if (training) {
+    const mods = (training.modality_breakdown || []).filter((m) => (m.count_30d || 0) > 0);
+    const isStrength = (t) => /weight|strength|lift/i.test(t || "");
+    const cardio = mods.filter((m) => !isStrength(m.type)).sort((a, b) => (b.total_minutes_30d || 0) - (a.total_minutes_30d || 0));
+    const strength = mods.filter((m) => isStrength(m.type));
+    if (cardio.length || strength.length) {
+      h += `<section class="bc-modality"><p class="dx-kicker label">cardio vs lifts · last 30 days</p>`;
+      if (cardio.length) {
+        h += `<p class="bc-mod-h label">cardio</p><ul class="bc-mod-list">`;
+        for (const m of cardio) {
+          const bits = [`${esc(m.count_30d)}×`, m.total_minutes_30d ? `${esc(m.total_minutes_30d)} min` : "", m.total_distance_mi ? `${esc(m.total_distance_mi)} mi` : "", m.z2_minutes ? `${esc(m.z2_minutes)} Z2 min` : ""].filter(Boolean).join(" · ");
+          h += `<li><span class="bc-mod-t">${esc(m.type)}</span> <span class="label">${bits}</span></li>`;
+        }
+        h += `</ul>`;
+      }
+      if (strength.length) {
+        const s = strength[0];
+        h += `<p class="bc-mod-h label">lifts</p><ul class="bc-mod-list"><li><span class="bc-mod-t">${esc(s.type)}</span> <span class="label">${esc(s.count_30d)}× · ${esc(s.total_minutes_30d || 0)} min</span></li></ul>`;
+      }
+      h += `</section>`;
+    }
+    // Per-muscle balance — sets/week vs MEV/MAV/MRV, status-colored (the lifts detail).
+    const mv = (training.muscle_volume || []).filter((m) => m.muscle);
+    if (mv.length) {
+      h += `<section class="bc-muscle"><p class="dx-kicker label">muscle balance · sets per week vs the optimal range</p><ul class="bc-musc-list">`;
+      for (const m of mv) {
+        h += `<li class="bc-musc musc-${esc(m.status || "")}"><span class="bc-musc-m">${esc(m.muscle)}</span>` +
+          `<span class="bc-musc-n label">${esc(m.sets_per_week)}/wk</span>` +
+          `<span class="bc-musc-s label">${esc(m.status || "")}${m.MAV_lo ? ` · optimal ${esc(m.MAV_lo)}–${esc(m.MAV_hi)}` : ""}</span></li>`;
+      }
+      h += `</ul><p class="bc-datalink label"><a href="/data/training/">full training breakdown ↗</a></p></section>`;
+    }
   }
 
   // 3) LIVE BETS + a thin track strip (the accountability, not a whole section).
