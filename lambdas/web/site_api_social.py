@@ -1292,3 +1292,234 @@ def _handle_experiment_suggest(event: dict) -> dict:
     except Exception as e:
         logger.error(f"[site_api] experiment_suggest failed: {e}")
         return _error(500, "Failed to submit suggestion")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Reader engagement loop — "predict the week" + "ask the board".
+# Both reuse the existing sanctioned write surface (atomic VOTES# counters with a
+# per-IP dedup row; S3 capture for Matthew to moderate). No new AI is called here:
+# "ask the board" only CAPTURES a question — the answer reuses the already-gated
+# /api/board_ask. The predict-week DDB writes need no IAM change (the site_api role
+# already writes the table unconditionally); the board-question S3 write needs
+# generated/board_questions/* added to the role (one additive line).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_PREDICT_CHOICES = {"up", "down", "flat"}
+BOARD_QUESTION_RATE_LIMIT = 3  # per IP per hour
+
+
+def _predict_subject():
+    """The current week's prediction subject from current_challenge.json, or None.
+
+    Returns {"week_id", "metrics": {key: label}, "result": {...}|None} when the
+    weekly challenge defines a `predict_metrics` list; None otherwise, so the
+    feature fails *closed* — the widget doesn't render and POSTs are rejected when
+    there's no active subject. Read fresh (no module cache) so a new Monday
+    challenge is picked up without waiting for a cold start.
+    """
+    try:
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        data = json.loads(s3.get_object(Bucket=bucket, Key="site/config/current_challenge.json")["Body"].read())
+    except Exception:
+        return None
+    metrics = data.get("predict_metrics") or []
+    week_id = (data.get("week_id") or data.get("id") or "").strip()
+    mmap = {}
+    for m in metrics:
+        k = (m.get("key") or "").strip().lower()
+        if k:
+            mmap[k] = m.get("label") or k
+    if not week_id or not mmap:
+        return None
+    return {"week_id": week_id, "metrics": mmap, "result": data.get("result")}
+
+
+def _predict_tallies(week_id, metric):
+    """Aggregate {up,down,flat: count} for one week+metric from VOTES#predict_week."""
+    out = {"up": 0, "down": 0, "flat": 0}
+    try:
+        resp = table.query(KeyConditionExpression=Key("pk").eq("VOTES#predict_week") & Key("sk").begins_with(f"WK#{week_id}#M#{metric}#C#"))
+        for it in resp.get("Items", []):
+            c = it.get("choice")
+            if c in out:
+                out[c] = int(it.get("vote_count", 0))
+    except Exception as e:
+        logger.error(f"[predict_week] tally read failed: {e}")
+    return out
+
+
+def _handle_predict_week(event: dict) -> dict:
+    """POST /api/predict_week — a reader predicts which way this week's metric moves.
+
+    Body: {"week_id", "metric", "choice"} with choice ∈ {up, down, flat}.
+    One prediction per IP per week per metric (DynamoDB dedup row, 8-day TTL).
+    Validated against the live current_challenge's predict_metrics (fail-closed).
+    """
+    source_ip = _extract_client_ip(event)
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON body")
+
+    subj = _predict_subject()
+    if subj is None:
+        return _error(404, "No active prediction this week")
+
+    week_id = (body.get("week_id") or "").strip()
+    metric = (body.get("metric") or "").strip().lower()
+    choice = (body.get("choice") or "").strip().lower()
+    if week_id != subj["week_id"]:
+        return _error(409, "That prediction window has closed")
+    if metric not in subj["metrics"]:
+        return _error(404, "Unknown metric")
+    if choice not in _PREDICT_CHOICES:
+        return _error(400, "choice must be up, down, or flat")
+
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    now_epoch = int(datetime.now(timezone.utc).timestamp())
+    try:
+        table.put_item(
+            Item={
+                "pk": "VOTES#rate_limit",
+                "sk": f"PRED#{ip_hash}#{week_id}#{metric}",
+                "voted_at": now_epoch,
+                "ttl": now_epoch + 8 * 86400,
+            },
+            ConditionExpression="attribute_not_exists(pk)",
+        )
+    except Exception as e:
+        if "ConditionalCheckFailedException" in str(e):
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "You already predicted this metric this week"}),
+            }
+        logger.error(f"[predict_week] dedup check failed: {e}")
+        return _error(500, "Prediction rate check failed")
+
+    try:
+        table.update_item(
+            Key={"pk": "VOTES#predict_week", "sk": f"WK#{week_id}#M#{metric}#C#{choice}"},
+            UpdateExpression="ADD vote_count :one SET week_id = :w, metric = :m, choice = :c, last_voted = :ts",
+            ExpressionAttributeValues={":one": 1, ":w": week_id, ":m": metric, ":c": choice, ":ts": now_epoch},
+        )
+    except Exception as e:
+        logger.error(f"[predict_week] increment failed: {e}")
+        return _error(500, "Failed to record prediction")
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({"week_id": week_id, "metric": metric, "tallies": _predict_tallies(week_id, metric)}),
+    }
+
+
+def handle_predict_week_tally(event: dict) -> dict:
+    """GET /api/predict_week — read-only reader-consensus tallies for the week.
+
+    Returns {"active": False} when there's no prediction subject (the widget then
+    hides). Otherwise returns the metrics, per-metric tallies, and the actual
+    outcome (`result`) once Matthew sets it on the challenge — so the front-end can
+    show "readers said UP 64% · it actually went DOWN."
+    """
+    subj = _predict_subject()
+    if subj is None:
+        return _ok({"active": False}, cache_seconds=120)
+    qs = (event.get("queryStringParameters") or {}) or {}
+    metric = (qs.get("metric") or "").strip().lower()
+    if metric and metric not in subj["metrics"]:
+        return _error(404, "Unknown metric")
+    metrics = [metric] if metric else list(subj["metrics"].keys())
+    tallies = {m: _predict_tallies(subj["week_id"], m) for m in metrics}
+    return _ok(
+        {
+            "active": True,
+            "week_id": subj["week_id"],
+            "metrics": subj["metrics"],
+            "result": subj.get("result"),
+            "tallies": tallies,
+        },
+        cache_seconds=60,
+    )
+
+
+def _handle_board_question(event: dict) -> dict:
+    """POST /api/board_question — capture a reader question for the AI board.
+
+    A near-clone of _handle_submit_finding: rate-limited per IP, HTML-stripped and
+    length-capped, vice-filtered, written to S3 with status=pending for Matthew to
+    moderate. NO AI is invoked here — the answer is produced later via the already
+    budget/rate-gated /api/board_ask and published as a dispatch. The optional email
+    is stored privately for a reply and is never echoed back or published.
+    """
+    import time as _time  # noqa: F401 (parity with submit_finding; fallback path)
+
+    source_ip = _extract_client_ip(event)
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+
+    if _RATE_LIMITER_READY:
+        allowed, remaining, _retry = _ddb_rate_check(
+            table, endpoint="board_question", ip_hash=ip_hash, limit=BOARD_QUESTION_RATE_LIMIT, window_seconds=3600, fail_open=True
+        )
+    else:
+        allowed, remaining = True, BOARD_QUESTION_RATE_LIMIT
+    if not allowed:
+        _emit_rate_limit_metric("board_question")
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+            "body": json.dumps({"error": "Rate limit reached. 3 questions per hour."}),
+        }
+
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON")
+
+    question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
+    email = re.sub(r"<[^>]+>", "", (body.get("email") or "").strip())[:254]
+    if not question or len(question) < 10:
+        return _error(400, "Question must be at least 10 characters.")
+    if email and "@" not in email:
+        return _error(400, "Invalid email format.")
+    # Fail-closed on blocked-vice terms (privacy). Capture is moderated by Matthew
+    # before any answer is published, but reject the obvious cases at the door.
+    if _is_blocked_vice(question):
+        return _error(400, "That question can't be submitted.")
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+    # Content-based id so a same-month retry overwrites rather than duplicating.
+    qid = hashlib.sha256(f"{ip_hash}:{question}".encode()).hexdigest()[:12]
+    record = {
+        "id": qid,
+        "question": question,
+        "email": email if email else None,
+        "submitted_at": timestamp,
+        "ip_hash": ip_hash,
+        "status": "pending",
+    }
+
+    S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    s3_key = f"generated/board_questions/{month}_{qid}.json"
+    try:
+        s3_client = boto3.client("s3", region_name=S3_REGION)
+        s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=json.dumps(record, indent=2), ContentType="application/json")
+        logger.info(f"[board_question] Stored: {s3_key}")
+    except Exception as e:
+        logger.error(f"[board_question] S3 write failed: {e}")
+        return _error(503, "Unable to store question. Try again later.")
+
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps(
+            {
+                "success": True,
+                "id": qid,
+                "message": "Question received — Matthew reviews these and the board answers a selection.",
+                "remaining": remaining,
+            }
+        ),
+    }

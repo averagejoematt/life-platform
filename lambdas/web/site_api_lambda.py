@@ -149,6 +149,7 @@ from web.site_api_observatory import (
 
 # P1.1 Phase B step 4 (2026-05-26): social cluster extracted to sibling module.
 from web.site_api_social import (
+    _handle_board_question,
     _handle_challenge_checkin,
     _handle_challenge_follow,
     _handle_challenge_vote,
@@ -157,12 +158,14 @@ from web.site_api_social import (
     _handle_experiment_suggest,
     _handle_experiment_vote,
     _handle_nudge,
+    _handle_predict_week,
     _handle_submit_finding,
     _handle_verify_subscriber,
     handle_challenge_catalog,
     handle_challenges,
     handle_current_challenge,
     handle_experiment_library,
+    handle_predict_week_tally,
     handle_subscriber_count,
 )
 
@@ -444,6 +447,13 @@ _COLD_START = True
 # stay inline in lambda_handler. Full router-with-handler-extraction is the
 # multi-week P4.5 work; this is the scoped subset that pays for itself today.
 
+
+def _route_predict_week(event):
+    """GET → read-only tallies; POST → record a prediction (one handler, two verbs)."""
+    method = ((event.get("requestContext", {}).get("http", {}) or {}).get("method") or event.get("httpMethod") or "GET").upper()
+    return _handle_predict_week(event) if method == "POST" else handle_predict_week_tally(event)
+
+
 _SIMPLE_ROUTES = {
     "/api/verify_subscriber": ({"GET", "OPTIONS"}, _handle_verify_subscriber),
     "/api/nudge": ({"POST"}, _handle_nudge),
@@ -455,6 +465,8 @@ _SIMPLE_ROUTES = {
     "/api/challenge_vote": ({"POST"}, _handle_challenge_vote),
     "/api/challenge_follow": ({"POST"}, _handle_challenge_follow),
     "/api/experiment_detail": (None, _handle_experiment_detail),
+    "/api/predict_week": ({"GET", "POST"}, _route_predict_week),
+    "/api/board_question": ({"POST"}, _handle_board_question),
 }
 
 
