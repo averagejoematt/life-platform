@@ -529,6 +529,11 @@ body { overflow-x: hidden; }
 .exp-tone { color: var(--ink-muted); }
 .exp-tone.tone-cautionary, .exp-tone.tone-urgent { color: var(--ember); }
 .exp-date { color: var(--ink-faint); }
+.exp-headline { display: block; font-family: var(--font-sans); color: var(--ink); font-size: 0.95em; margin-top: 2px; }
+/* The board's cross-week arc synthesis above the week list (C-1). */
+.exp-synth { margin: var(--sp-4) 0 var(--sp-5); padding: var(--sp-4) var(--sp-5); border-left: 2px solid var(--ember); background: var(--surface); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.exp-synth-k { color: var(--ember); margin: 0 0 var(--sp-2); }
+.exp-throughline { font-family: var(--font-serif); font-size: 1.18em; line-height: 1.4; color: var(--ink); margin: 0 0 var(--sp-3); }
 /* Cardio-vs-lifts + per-muscle balance on the training coach (C-2). */
 .bc-modality, .bc-muscle { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
 .bc-mod-h { margin: var(--sp-2) 0 var(--sp-1); color: var(--ember); }
