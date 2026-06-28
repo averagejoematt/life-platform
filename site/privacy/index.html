@@ -85,8 +85,8 @@
       line-height: var(--lh-body);
     }
     .policy-section ul li { margin-bottom: var(--space-2); }
-    .policy-section a { color: var(--accent); text-decoration: none; }
-    .policy-section a:hover { text-decoration: underline; }
+    .policy-section a { color: var(--accent); text-decoration: underline; text-underline-offset: 0.15em; }
+    .policy-section a:hover { text-decoration-thickness: 2px; }
     .tl-dr {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -119,15 +119,11 @@
     <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
   </nav>
 </header>
-</div>
 
 
 
 
-
-
-
-<div class="policy-layout">
+<main class="policy-layout">
 
   <h1 class="policy-title">Privacy<br>Policy</h1>
   <p class="policy-updated">Last updated April 2026</p>
@@ -195,7 +191,7 @@
     <a href="/subscribe" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;text-decoration:none;">← Back to subscribe</a>
   </div>
 
-</div>
+</main>
 
 <!-- Mobile bottom nav -->
 <footer class="dx-foot-bar"><span class="label">averagejoematt · privacy</span> <span class="label"><a href="/">← home</a></span></footer>
