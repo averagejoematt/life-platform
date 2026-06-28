@@ -1,64 +1,49 @@
-# HANDOVER — Coherence Program (Phases 1–3 done) + Coaching + Nutrition — 2026-06-28
+# HANDOVER — Coherence Program COMPLETE (Phase 4 shipped + live-validated) — 2026-06-28
 
-**Next up:** Phase 4 of the Self-Management & Coherence Program (self-healing eyes on content). This handover is written to start Phase 4 cleanly after a compaction.
-
----
-
-## What shipped this session (12 PRs merged to `main`, #237–248)
-
-### Coaching (#237–243) — all merged + deployed
-- `/coaching/` recut **commentary-first** (The Read · By Coach · Scorecard · Team · lab-notes · Reader Q&A).
-- **C-1** experiment arc — `generate_experiment_arc()` in `ai_expert_analyzer_lambda.py` → `/api/experiment_synthesis`.
-- **C-2** cardio-vs-lifts + per-muscle balance on the training coach (front-end off `/api/training_overview`).
-- **C-3** gradable predictions + `/coaching/scorecard/`. Root cause: 248/248 machine preds had `threshold=None`. Fix: metric+direction → directional/EWMA evaluator (`coach_state_updater._build_prediction_eval_spec` + `_infer_direction`); `handle_predictions` reads real `PREDICTION#`. **Did NOT** backfill the 296 legacy dead preds (unsafe + would freeze natural expiry — see `project_coaching_redesign`).
-
-### Nutrition 24h-lag (#244) — merged + deployed + live
-MacroFactor is a manual end-of-day upload → **always ~24h behind by design**. Every surface now treats the latest COMPLETE day as live, never "not logged today". See `project_nutrition_24h_lag`. ⚠️ The `ai_calls.py` coach guardrail is a **layer module** — merged but **NOT live until the next layer rebuild** (low urgency; the brief coach is already "yesterday"-framed).
-
-### Coherence Program Phases 1–3 — built + merged (Phase 1 deployed + LIVE)
-**Thesis:** the platform proves it's ALIVE but not RIGHT. Every silent-incoherence bug (predictions 100%-inconclusive-for-weeks, 30-vs-86, arc 7-vs-3, `handle_predictions` all-zero) is *incoherent-but-green* from implicit producer/consumer contracts.
-
-- **Phase 1 — Coherence Sentinel (#245, DEPLOYED + LIVE).** `lambdas/operational/coherence_sentinel_lambda.py` (function `life-platform-coherence-sentinel`, daily 10:45 AM PT, read-only). Runs 5 pure invariants in `lambdas/coherence_invariants.py` (each unit-tested by replaying a real past outage) → emits `LifePlatform/Coherence` metrics → the `coherence-overall` DIGEST alarm (`monitoring_stack.py`), plus a budget-gated Haiku semantic pass. **It found real bugs on its first live run** (coaches inventing weight-loss numbers; protein 140/170/190 still in narratives). Deterministic facts check hardened for precision over 3 live iterations. `prediction_health` now counts only **gradable** predictions → currently GREEN.
-- **Phase 2 — shared contracts (#246/#247).** `lambdas/measurable_metrics.py` (MEASURABLE_METRICS derived from METRIC_SOURCES — un-driftable) + `lambdas/canonical_facts.py` (one facts schema + units + a producer-contract test). Both behavior-identical.
-- **Phase 3 — deploy hygiene (#248).** Clobber guard in `deploy/sync_site_to_s3.sh` + `deploy/session_postflight.py` (layer uniformity + config drift).
-
-**All three new shared modules are bundled with the `lambdas/` asset (NOT the layer) — no layer dance to deploy.**
+**The 4-phase Self-Management & Coherence Program is now fully done, deployed, and live-validated.** Phase 4 (self-healing eyes on content) shipped this session as PRs #250/#251/#252, all merged + deployed. Matthew authorized all deploys this session.
 
 ---
 
-## State of `main`
-- All 12 PRs merged. `main` contains everything. Phase 1 is **deployed live** (`LifePlatformOperational` + `LifePlatformMonitoring` deployed; the sentinel function + alarm exist). Phases 2–3 are merged but **behavior-identical / not behaviorally deployed yet** (no urgency — they only remove drift surface; pick up on the next relevant deploy).
-- The Coherence Sentinel currently reads **GREEN** when invoked (`aws lambda invoke --function-name life-platform-coherence-sentinel ... '{}'`).
+## What shipped this session (3 PRs, #250–252, all merged + deployed)
+
+### Phase 4 — self-healing gets eyes on content
+The remediation agent could only triage **infra** (alarms, CI, DLQ). It now also sees the **"alive but not right"** class — the content/correctness failures the Coherence Sentinel catches.
+
+- **#250 — Sentinel persists findings + grounds on canonical_facts.**
+  - Writes its findings record to `s3://matthew-life-platform/coherence-log/{latest,<date>}.json` every run. The `coherence-overall` alarm only carries "OverallAlarm>=1"; this is *what* failed, so the agent (and a human) can triage from the real digest. `build_record()` is pure. Fail-soft.
+  - New scoped IAM: `s3:PutObject` on `coherence-log/*` only (an audit prefix, not site/data). → `cdk deploy LifePlatformOperational` (done).
+  - Folded in the grounding↔detection follow-up: `_gather_facts_and_narratives` now uses `canonical_facts.build_canonical_facts` — the SAME schema the coaches are grounded on. The semantic pass now sees protein avg/target/floor distinctly.
+- **#251 — agent eyes + content taxonomy.** `agent.py::_coherence_findings()` reads the artifact as a `coherence` signal (no new IAM — the role already had `s3:GetObject`). `docs/REMEDIATION_TAXONOMY.md` gains a "Content & coherence signals" section routing each invariant to **Bucket B or C only — never auto-merge**. Content/AI surfaces added to the hard denylist. **A test asserts the auto-merge ALLOWLIST contains no content path** (the safety invariant). The agent runs from the repo → merge = live, no deploy.
+- **#252 — fix: persisted status mirrors the alarm.** The first live run exposed a gap in the wiring itself: the AI semantic pass flagged a coach narrative incoherent while all deterministic invariants were green. `_emit_overall` fires the alarm on that (semantic_bad), but `build_record` set `status` to the deterministic verdict only ("ok") — so the alarm would fire while the agent's status filter dropped the record (alarm-with-no-detail). Fix: `status` now mirrors `_emit_overall` (ALARM when deterministic-worst is ALARM **or** semantic incoherent); adds `deterministic_status` + `semantic_incoherent`. → redeployed.
+
+### The live validation (this is the headline)
+On the first run after deploy, the semantic pass — now grounded on `canonical_facts` — **caught a real content bug the platform is serving**: a coach narrative claims **"RHR dropped to 53"** when the authoritative fact is `rhr_bpm=64`, plus self-contradictory weight numbers (**"13.8 lbs over four weeks"** AND **"15.8 lbs in fifteen days"** in the same essay). `coherence-overall` is now a **true-positive ALARM**. The auto-mode agent's next daily run (~07:45 PT) will surface it as a needs-human content finding and **cannot** auto-fix it.
 
 ---
 
-## Open follow-ups (small, do early in Phase 4 or alongside)
-1. **Sentinel adopts `canonical_facts`** — `coherence_sentinel_lambda._gather_facts_and_narratives` still builds its facts dict inline; both it and `canonical_facts.py` are now on main, so swap it to `build_canonical_facts(...)`. Closes the grounding↔detection loop (the coach is grounded on, and the Sentinel checks against, the *same* extraction). Redeploy the sentinel single-fn (`deploy/deploy_lambda.sh life-platform-coherence-sentinel lambdas/operational/coherence_sentinel_lambda.py --extra-files lambdas/coherence_invariants.py`).
-2. **email-subscriber config drift** — `session_postflight.py` found CDK=15s vs live=30s. Decide: align the CDK value or `cdk deploy LifePlatformOperational`.
-3. **`ai_calls.py` nutrition guardrail** rides the next layer rebuild (build_layer → bump SHARED_LAYER_VERSION → cdk deploy LifePlatformCore → redeploy consumers).
+## State of `main` + production
+- All 3 PRs merged. **main is GREEN through Plan** (Lint ✓, Unit Tests ✓, Plan ✓). The Deploy job sits at the manual production-approval gate (intentional — the meaningful infra+code was `cdk deploy`'d directly this session).
+- `LifePlatformOperational` deployed twice (the IAM grant + sentinel code, then the #252 build_record fix). Sentinel verified live: writes `coherence-log/latest.json`, status=alarm on the semantic finding.
+- Remediation mode = `auto`.
+
+### ⚠️ CI lesson (recurring) — see memory `reference_ci_masking_and_creds`
+#250/#251 main runs went RED on the ENFORCED **ruff I001** gate — a **pre-existing** break since Phase-2 #246 (the `measurable_metrics` import block was un-sorted in `coach_state_updater.py`). Because Lint is first and Unit Tests/Plan/Deploy `needs` it, this masked the whole pipeline on every push since #246. The local flake8 fail-loud subset (`E9,F63,F7,F82`) does NOT run ruff's isort rules — **run full `ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/` before merging.** #252 folded in the `ruff --fix`; main is green again.
 
 ---
 
-## Phase 4 — self-healing eyes on content (the next task)
-**Goal:** the remediation agent gains awareness of *content/correctness* failures (today it only triages infra: CloudWatch alarms, failed CI, DLQ).
-
-**Key files:** `remediation/agent.py` (triage loop — gathers signals, invokes Claude on Bedrock, opens PRs), `remediation/automerge.py` (deterministic auto-merge gate — ALLOWLIST/DENYLIST, ≤60 lines, daily cap 3), `docs/REMEDIATION_TAXONOMY.md`, `.github/workflows/remediation-agent.yml`. Kill-switch: SSM `/life-platform/remediation-mode` (off|shadow|auto).
-
-**Approach (scoped, SAFE-FIRST — this touches the auto-merge/kill-switch machinery):**
-1. **Check first** whether the agent already ingests the `coherence-overall` alarm — it pulls CloudWatch alarms in ALARM state, and `coherence-overall` is now a real alarm, so item 1 may be largely free. Verify in `remediation/agent.py` how it lists alarms.
-2. Add Coherence Sentinel findings as a triage signal source if not already covered by the alarm.
-3. Add **content-remediation classes** to `docs/REMEDIATION_TAXONOMY.md` (e.g. "re-run a stuck compute", "re-trigger prediction extraction") — start as **open-PR / needs-human, NOT auto-merge** (content stays OFF the deterministic allowlist until proven).
-4. Optionally: a scheduled monthly deep **semantic audit** via the `Workflow` harness (multi-agent `/accuracy-review` pattern).
-
-**DO NOT** widen the auto-merge allowlist to content without explicit sign-off — the whole safety model is that the agent (read-only role) only opens PRs and a deterministic gate merges a narrow allowlist.
+## Open follow-ups
+1. **The real content bug the Sentinel caught** (live, user-facing): a served coach narrative cites RHR 53 (vs fact 64) + self-contradictory weight numbers. Likely a **stale served `EXPERT#` record** or a coach ignoring the canonical-facts grounding. Decide: **re-run `ai-expert-analyzer`** (operational; likely clears a stale record) vs a grounding-prompt fix (Bucket B). This is exactly the Bucket-C "human decides" path the taxonomy describes.
+2. **email-subscriber config drift** — `session_postflight.py` found CDK=15s vs live=30s. Align the CDK value or `cdk deploy LifePlatformOperational`.
+3. **`ai_calls.py` nutrition guardrail** rides the next layer rebuild.
+4. **Optional:** a scheduled monthly deep semantic-audit `Workflow` (multi-agent `/accuracy-review`). Not built — needs explicit opt-in.
 
 ---
 
 ## Verification / commands
-- Sentinel live: `aws lambda invoke --function-name life-platform-coherence-sentinel --region us-west-2 --cli-read-timeout 0 --payload '{}' /tmp/s.json && python3 -c "import json;print(json.loads(json.load(open('/tmp/s.json'))['body'])['digest'])"`
-- Postflight: `python3 deploy/session_postflight.py`
-- Tests: `python3 -m pytest tests/ -k "coherence or measurable or canonical or gradability" -q`
-- Deploy authority: Matthew authorized deploys this session; the "I run deploys" boundary is per-change for new IAM (the cdk deploy of the sentinel needed explicit sign-off, which he gave).
+- Sentinel + artifact: `aws lambda invoke --function-name life-platform-coherence-sentinel --region us-west-2 --cli-read-timeout 0 --payload '{}' /tmp/s.json` then `aws s3 cp s3://matthew-life-platform/coherence-log/latest.json -`
+- Agent eyes (offline): `tests/test_remediation_agent.py` — coherence OK→noise, alarm→flagging-only, fail-soft, + the auto-merge safety assertions.
+- Full lint gate before any merge: `black --check ... && ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/`
+- Tests: `python3 -m pytest tests/ -k "coherence or remediation or measurable or canonical or gradability" -q`
 
 ## Memories updated
-`project_coaching_redesign`, `project_reader_engagement_loop`, `project_nutrition_24h_lag` (new), the Self-Management & Coherence Program pointer in `MEMORY.md`.
+The Self-Management & Coherence Program pointer in `MEMORY.md` (Phase 4 DONE + the live content-bug finding + the recurring ruff-masking lesson).
