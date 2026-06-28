@@ -2167,7 +2167,50 @@ window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.sl
 
 function wireTheme() { const b = $(".theme-toggle"); if (!b) return; b.addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = cur === "light" ? "dark" : "light"; try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {} }); }
 
+/* ── First-run orientation — mirrors the Cockpit's PG-02 card ─────────────────
+   A dismissible "what am I looking at" card for first-time visitors to the Data
+   archive. Shown once (localStorage), non-modal, sits above the instrument — never
+   blocks the dense view a repeat reader uses. Injected from JS so the generated
+   shells need no rebuild; scoped to the Data door for v1. Renders pre-fetch so it
+   appears even when /api/* is unreachable (e.g. local QA). */
+const INTRO_KEY = "ajm-data-intro-v1";
+function wireFirstRun() {
+  if (DOOR !== "data") return;
+  let seen;
+  try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
+  if (seen) return;
+  const head = $(".ev-head");
+  if (!head) return;
+
+  const intro = document.createElement("aside");
+  intro.className = "ev-intro";
+  intro.setAttribute("aria-label", "What you're looking at");
+  intro.innerHTML = `
+    <button class="ev-intro__x" type="button" aria-label="Dismiss orientation">&times;</button>
+    <p class="ev-intro__k label">new here?</p>
+    <h2 class="ev-intro__h">Every source this one life is measured by.</h2>
+    <ul class="ev-intro__list">
+      <li><strong>Pick a topic</strong> on the left — grouped into <em>the body</em> and <em>mind &amp; accountability</em>. Its trend loads in the center; no page jumps.</li>
+      <li>Labels like <em>N=1</em> or <em>preliminary</em> mean a correlation from a single life, not proof — and thin data is flagged, never faked.</li>
+      <li><strong>Read-only.</strong> The numbers are the real ones; nothing here is medical advice.</li>
+    </ul>
+    <button class="ev-intro__go" type="button">Got it &mdash; show me the data</button>
+    <p class="ev-intro__note label">Shown once. It won't interrupt again.</p>`;
+
+  const onKey = (e) => { if (e.key === "Escape") dismiss(); };
+  function dismiss() {
+    try { localStorage.setItem(INTRO_KEY, "1"); } catch (e) {}
+    document.removeEventListener("keydown", onKey);
+    intro.remove();
+  }
+  intro.querySelector(".ev-intro__x").addEventListener("click", dismiss);
+  intro.querySelector(".ev-intro__go").addEventListener("click", dismiss);
+  document.addEventListener("keydown", onKey);
+  head.insertAdjacentElement("afterend", intro);
+}
+
 wireTheme();
+wireFirstRun();
 buildTabs();
 buildSide();
 renderCenter();
