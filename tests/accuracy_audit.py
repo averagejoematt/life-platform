@@ -172,11 +172,78 @@ def sanity_scan(run_dir):
     return findings
 
 
+def live_checks():
+    """Live-fetch checks that need NO prior capture (CI-friendly, post-deploy):
+    (1) every harness page must resolve — catches the /data-vs-/method drift class +
+        any dropped page (a 404 page renders HTTP 404 or a 'SIGNAL LOST' body);
+    (2) impossible computed values in public_stats — negative CTL/ATL (the -955 class)
+        and out-of-range percentages.
+    Returns a list of findings (severity high/warn)."""
+    import urllib.error
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import visual_qa as VQ
+
+    findings = []
+    for pg in VQ.PAGES:
+        path = pg["path"].split("#")[0]
+        try:
+            req = urllib.request.Request(SR.SITE_URL + path, headers={"User-Agent": "accuracy-audit/1.0"})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                status = resp.status
+                body = resp.read(4000).decode("utf-8", "replace")
+            broken = status != 200 or "SIGNAL LOST" in body
+        except urllib.error.HTTPError as e:
+            status, broken = e.code, True
+        except Exception as e:  # noqa: BLE001
+            status, broken = f"ERR:{type(e).__name__}", True
+        if broken:
+            findings.append({"check": "page_resolves", "severity": "high", "path": pg["path"], "status": status})
+
+    try:
+        ps = _fetch_json("/public_stats.json")
+        t = ps.get("training", {})
+        for k in ("ctl_fitness", "atl_fatigue", "ctl", "atl"):
+            v = t.get(k)
+            if isinstance(v, (int, float)) and v < 0:
+                findings.append(
+                    {"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"}
+                )
+        for blk_name in ("journey", "vitals"):
+            for k, v in (ps.get(blk_name, {}) or {}).items():
+                if k.endswith("_pct") and isinstance(v, (int, float)) and not (0 <= v <= 100):
+                    findings.append(
+                        {
+                            "check": "impossible_value",
+                            "severity": "high",
+                            "field": f"{blk_name}.{k}",
+                            "value": v,
+                            "note": "pct out of [0,100]",
+                        }
+                    )
+    except Exception as e:  # noqa: BLE001
+        findings.append({"check": "impossible_value", "severity": "warn", "note": f"public_stats fetch failed: {e}"})
+    return findings
+
+
 def main():
     ap = argparse.ArgumentParser(description="Axis-A deterministic accuracy audit (numbers + consistency + sentinels).")
     ap.add_argument("--run-dir", help="Capture dir from site_review.py (default: latest qa-screenshots/<date>)")
     ap.add_argument("--no-ddb", action="store_true", help="Skip the live-DDB ground-truth pass")
+    ap.add_argument(
+        "--live", action="store_true", help="Live-fetch checks only (per-page 404 + impossible values); no capture needed — for CI"
+    )
     args = ap.parse_args()
+
+    if args.live:
+        live = live_checks()
+        bad = [f for f in live if f["severity"] == "high"]
+        print(f"Live checks (per-page resolve + impossible values): {len(bad)} HIGH finding(s)")
+        for f in live:
+            icon = "❌" if f["severity"] == "high" else "⚠️ "
+            print(f"  {icon} {f.get('check')}: {f.get('path') or f.get('field') or ''} {f.get('status','')} {f.get('note','')}".rstrip())
+        print(f"\n{'❌ HIGH findings present' if bad else '✅ all pages resolve, no impossible values'}")
+        sys.exit(1 if bad else 0)
 
     run_dir = args.run_dir or _latest_run_dir()
     if not run_dir or not os.path.isdir(run_dir):

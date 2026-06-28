@@ -949,6 +949,13 @@ jobs:
         run: |
           python3 tests/visual_qa.py --screenshot --ai-qa
 
+      - name: Accuracy gate (per-page resolves + no impossible numbers)
+        run: |
+          # Truth-audit guardrail: every harness page must resolve (catches the
+          # /data-vs-/method drift class) and public_stats must carry no impossible
+          # value (negative CTL/ATL, out-of-range %). Gating — a HIGH finding fails.
+          python3 tests/accuracy_audit.py --live
+
       - name: Upload screenshots + report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
