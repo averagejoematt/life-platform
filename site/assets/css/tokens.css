@@ -938,7 +938,8 @@ a.vg-lit:hover { background: var(--ember-wash); }
 }
 
 /* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */
-.build-stamp { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); opacity: 0.6; }
+/* muted, but NOT below AA: --ink-faint is AA-tuned (4.9:1 on paper); the old opacity:0.6 dropped it to 2.34. */
+.build-stamp { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
 
 /* ════════════════════════════════════════════════════════════════════════════
    11. SHARED CONTENT & PAGE KIT — v5 "Coherence" (docs/DESIGN_SYSTEM_V5.md)
