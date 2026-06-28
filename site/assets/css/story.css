@@ -284,8 +284,9 @@ body { overflow-x: hidden; }
 .dx-head { max-width: var(--measure); }
 .dx-h1 { font-family: var(--font-serif); font-size: var(--fs-h1); line-height: 1.06; margin-top: var(--sp-2); }
 .dx-lede { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); }
-.dx-lede a { color: var(--ember); text-decoration: none; }
-.dx-lede a:hover { text-decoration: underline; }
+/* underlined so the link is distinguishable without relying on colour (WCAG 1.4.1) */
+.dx-lede a { color: var(--ember); text-decoration: underline; text-underline-offset: 0.15em; }
+.dx-lede a:hover { text-decoration-thickness: 2px; }
 .dx-page .dx-tabs { flex-wrap: wrap; }
 .dx-foot-bar { max-width: var(--container); margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-8); display: flex; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; color: var(--ink-faint); border-top: var(--border-hair); }
 .dx-foot-bar a { color: var(--ink-faint); text-decoration: none; }
