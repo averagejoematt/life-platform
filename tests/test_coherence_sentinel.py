@@ -92,6 +92,23 @@ def test_build_record_is_serializable_and_complete(monkeypatch):
     assert json.loads(json.dumps(record, default=str))  # round-trips
 
 
+def test_build_record_status_mirrors_alarm_on_semantic_only_incoherence():
+    # Deterministic all-green, but the Haiku pass flagged a contradiction. The
+    # coherence-overall alarm fires on this (semantic_bad), so the persisted status
+    # MUST read alarm — else the agent's status filter drops it and the alarm fires
+    # with no detail. deterministic_status preserves the invariant-only verdict.
+    ok = [sentinel.ci.Finding("prediction_health", sentinel.ci.OK, 0.0, "fine")]
+    semantic = {"coherent": False, "issues": ["a coach invented a weight-loss number"]}
+    record = sentinel.build_record(ok, semantic, "digest", sentinel.ci.OK)
+    assert record["status"] == sentinel.ci.ALARM
+    assert record["deterministic_status"] == sentinel.ci.OK
+    assert record["semantic_incoherent"] is True
+
+    # And the clean case stays ok.
+    clean = sentinel.build_record(ok, {"coherent": True, "issues": []}, "d", sentinel.ci.OK)
+    assert clean["status"] == sentinel.ci.OK and clean["semantic_incoherent"] is False
+
+
 def test_persist_writes_latest_and_dated_and_is_fail_soft(monkeypatch):
     puts = []
     monkeypatch.setattr(sentinel._s3, "put_object", lambda **kw: puts.append(kw["Key"]))
