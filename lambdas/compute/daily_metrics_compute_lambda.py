@@ -40,6 +40,7 @@ from decimal import Decimal
 
 import boto3
 import scoring_engine
+import weight_trend  # shared weekly-rate + projection (layer module)
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -322,6 +323,18 @@ def compute_tsb(strava_60d, today, hevy_60d=None):
     fitness/fatigue. Back-compat — called with two args (no hevy_60d) it behaves
     exactly as before.
     """
+    _ctl, _atl, tsb = compute_ctl_atl_tsb(strava_60d, today, hevy_60d)
+    return tsb
+
+
+def compute_ctl_atl_tsb(strava_60d, today, hevy_60d=None):
+    """Banister CTL (42d fitness), ATL (7d fatigue), and TSB = CTL − ATL.
+
+    Returns all three so consumers stop reverse-engineering CTL/ATL from TSB with
+    magic offsets (the bug that produced an impossible fitness of -955). CTL/ATL are
+    exponentially-weighted loads and are mathematically non-negative — clamped here so
+    a degenerate input can never surface a negative fitness/fatigue to a reader.
+    """
     load_by_day, _ = _daily_training_load(strava_60d, hevy_60d, today)
     ctl = atl = 0.0
     cd = math.exp(-1 / 42)
@@ -331,7 +344,9 @@ def compute_tsb(strava_60d, today, hevy_60d=None):
         load = load_by_day.get(day, 0)
         ctl = ctl * cd + load * (1 - cd)
         atl = atl * ad + load * (1 - ad)
-    return round(ctl - atl, 1)
+    ctl = max(0.0, round(ctl, 1))
+    atl = max(0.0, round(atl, 1))
+    return ctl, atl, round(ctl - atl, 1)
 
 
 def tsb_load_basis(strava_60d, hevy_60d, today):
@@ -519,6 +534,9 @@ def store_computed_metrics(
     avatar_weight,
     source_fingerprints=None,
     tsb_load_basis=None,
+    ctl=None,
+    atl=None,
+    weight_traj=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
@@ -539,6 +557,8 @@ def store_computed_metrics(
         item["readiness_score"] = _to_dec(readiness_score)
     for field, val in [
         ("tsb", tsb),
+        ("ctl", ctl),  # Banister fitness (>=0) — stored so consumers stop reverse-engineering it from tsb
+        ("atl", atl),  # Banister fatigue (>=0)
         ("hrv_7d", hrv_7d),
         ("hrv_30d", hrv_30d),
         ("latest_weight", latest_weight),
@@ -547,6 +567,16 @@ def store_computed_metrics(
     ]:
         if val is not None:
             item[field] = _to_dec(val)
+
+    # Weight trajectory (regression rate + suppressed-when-provisional projection) —
+    # the authoritative numbers the brief/public_stats read instead of re-deriving.
+    if weight_traj:
+        item["weekly_rate_lbs"] = _to_dec(weight_traj.get("weekly_rate_lbs"))
+        item["rate_provisional"] = bool(weight_traj.get("rate_provisional"))
+        if weight_traj.get("projected_goal_date"):
+            item["projected_goal_date"] = weight_traj["projected_goal_date"]
+        if weight_traj.get("days_to_goal") is not None:
+            item["days_to_goal"] = _to_dec(weight_traj["days_to_goal"])
 
     # Component scores
     cs_dec = {k: Decimal(str(v)) for k, v in component_scores.items() if v is not None}
@@ -849,7 +879,7 @@ def assemble_data(yesterday_str, profile):
     # instead of collapsing fitness/fatigue to zero. tsb_load_basis records which.
     strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), yesterday_str)
     hevy_60d = fetch_range("hevy", (today - timedelta(days=60)).isoformat(), yesterday_str)
-    tsb = compute_tsb(strava_60d, today, hevy_60d)
+    ctl, atl, tsb = compute_ctl_atl_tsb(strava_60d, today, hevy_60d)
     tsb_basis = tsb_load_basis(strava_60d, hevy_60d, today)
 
     # Sleep debt (7-day cumulative vs profile target)
@@ -876,6 +906,17 @@ def assemble_data(yesterday_str, profile):
     if not avatar_weight:
         withings_30d = fetch_range("withings", (today - timedelta(days=30)).isoformat(), yesterday_str)
         avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_30d) if safe_float(w, "weight_lbs")), None)
+
+    # Weight trajectory (28d regression rate + suppressed-when-provisional projection) —
+    # the ONE shared computation (weight_trend); the brief/public_stats read this, so the
+    # rate is identical to the website's /api/journey instead of a divergent 7-day delta.
+    withings_28d = fetch_range("withings", (today - timedelta(days=28)).isoformat(), yesterday_str)
+    _wt_series = [
+        (w.get("sk", "").replace("DATE#", ""), safe_float(w, "weight_lbs")) for w in withings_28d if safe_float(w, "weight_lbs")
+    ]
+    weight_traj = weight_trend.weight_trajectory(
+        _wt_series, latest_weight, float(profile.get("goal_weight_lbs", 185.0)), ref_dt=datetime.now(timezone.utc)
+    )
 
     # Habitify 7-day (tier-2 habit frequency scoring)
     habitify_7d = fetch_range("habitify", (today - timedelta(days=7)).isoformat(), yesterday_str)
@@ -915,11 +956,14 @@ def assemble_data(yesterday_str, profile):
             "hrv_yesterday": safe_float(whoop, "hrv"),
         },
         "tsb": tsb,
+        "ctl": ctl,
+        "atl": atl,
         "tsb_load_basis": tsb_basis,
         "sleep_debt_7d_hrs": round(sleep_debt_hrs, 1),
         "latest_weight": latest_weight,
         "week_ago_weight": week_ago_weight,
         "avatar_weight": avatar_weight,
+        "weight_traj": weight_traj,
     }
     return data, hrv_7d_avg, hrv_30d_avg
 
@@ -1077,6 +1121,9 @@ def lambda_handler(event, context):
         data.get("avatar_weight"),
         source_fingerprints=source_fps,
         tsb_load_basis=data.get("tsb_load_basis"),
+        ctl=data.get("ctl"),
+        atl=data.get("atl"),
+        weight_traj=data.get("weight_traj"),
     )
 
     if day_grade_score is not None:

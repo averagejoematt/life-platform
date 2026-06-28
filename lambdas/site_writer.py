@@ -95,7 +95,7 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
     current_weight = journey.get("current_weight_lbs") or vitals.get("weight_lbs")
     lost_lbs = journey.get("lost_lbs")
     progress_pct = journey.get("progress_pct")
-    goal_date = journey.get("projected_goal_date", "")
+    goal_date = journey.get("projected_goal_date") or ""  # None while provisional → no finish line
 
     return {
         "why_paragraph": HERO_WHY_PARAGRAPH,
