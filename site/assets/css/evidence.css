@@ -121,6 +121,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-dose { grid-column: 2; justify-self: end; text-align: right; max-width: 13ch; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
 .supp-timing { grid-column: 2; justify-self: end; color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 1px 6px; white-space: nowrap; }
 .supp-why { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); }
+/* Paused supplements: dimmed + an honest badge, so a compound Matthew stopped
+   taking can't read as part of the active stack (truth-audit Phase 4b). */
+.supp--paused { opacity: 0.62; }
+.supp-flag { grid-column: 2; justify-self: end; color: var(--ink-faint); border: 1px solid var(--border-hair-color, currentColor); border-radius: var(--radius-xs); padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.supp-paused-note { margin-top: var(--sp-1); color: var(--ink-faint); font-style: italic; }
 .supp-ev { margin-top: var(--sp-3); display: flex; align-items: center; gap: var(--sp-3); }
 .supp-evlabel { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 .supp-meter { flex: 1; height: 3px; background: var(--rule); border-radius: 3px; overflow: hidden; }

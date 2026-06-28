@@ -62,6 +62,14 @@ except ImportError:
     _HAS_INTELLIGENCE_COMMON = False
     logger.warning("intelligence_common not available — preamble injection disabled")
 
+# Phase-3 grounding backstop: deviation + HRV-unit checks against the shared facts.
+try:
+    import ai_output_validator as _aiv
+
+    _HAS_AI_VALIDATOR = True
+except ImportError:
+    _HAS_AI_VALIDATOR = False
+
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
@@ -114,6 +122,48 @@ def _latest_item(source):
 
 
 from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
+
+_CANON_FACTS_CACHE = {}
+
+
+def _load_canonical_facts():
+    """The ONE authoritative set of cross-cutting daily numbers every coach shares.
+
+    Read from the latest `computed_metrics` record (Phase-3: daily_metrics_compute is
+    the single computer of these). Every coach prompt cites these exact figures and the
+    grounding pass checks against them, so the same metric can't appear as 140/170/190
+    across coaches or 30-vs-86 across a page. Returns floats (or None when absent);
+    cached per warm container per run.
+    """
+    if _CANON_FACTS_CACHE.get("_loaded"):
+        return _CANON_FACTS_CACHE["facts"]
+    facts = {}
+    try:
+        rec = _latest_item("computed_metrics") or {}
+
+        def _f(k):
+            v = rec.get(k)
+            try:
+                return round(float(v), 1) if v is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        facts = {
+            "recovery_pct": _f("recovery_pct"),
+            "hrv_ms": _f("hrv_ms"),
+            "rhr_bpm": _f("rhr_bpm"),
+            "protein_g_avg": _f("protein_g_avg"),
+            "protein_g_target": _f("protein_g_target"),
+            "protein_g_floor": _f("protein_g_floor"),
+            "latest_weight": _f("latest_weight"),
+            "weekly_rate_lbs": _f("weekly_rate_lbs"),
+            "as_of": rec.get("date"),
+        }
+    except Exception as _e:
+        logger.warning("canonical facts load failed: %s", _e)
+    _CANON_FACTS_CACHE["facts"] = facts
+    _CANON_FACTS_CACHE["_loaded"] = True
+    return facts
 
 
 def _latest_date(items):
@@ -168,7 +218,10 @@ def gather_data_for_expert(expert_key):
         avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else 0
         avg_pro = round(sum(pro_vals) / len(pro_vals), 1) if pro_vals else 0
         avg_fiber = round(sum(fiber_vals) / len(fiber_vals), 1) if fiber_vals else None
-        protein_target = 190
+        # Phase-3: target from the canonical facts (computed_metrics), not a hardcoded 190
+        # that drifts from scoring_engine/profile. avg_pro is the real intake (~140).
+        _facts = _load_canonical_facts()
+        protein_target = int(_facts.get("protein_g_target") or 190)
         adherence = sum(1 for v in pro_vals if v >= protein_target) / max(len(pro_vals), 1) * 100
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
         return {
@@ -693,6 +746,34 @@ def _build_shared_system_prompt():
         except Exception as _e:
             logger.warning("Shared system prompt generation failed: %s", _e)
 
+    # Phase-3 AUTHORITATIVE FACTS — the single shared snapshot every coach must cite from.
+    # Prevents the cross-coach number drift the truth audit found (protein 140/170/190,
+    # recovery 30-vs-86): if you mention one of these metrics, use THIS number, verbatim.
+    try:
+        _facts = _load_canonical_facts()
+        fact_lines = []
+        if _facts.get("protein_g_avg") is not None:
+            fact_lines.append(
+                f"  - Protein INTAKE averages {_facts['protein_g_avg']:g} g/day "
+                f"(target {int(_facts.get('protein_g_target') or 190)} g, floor {int(_facts.get('protein_g_floor') or 170)} g). "
+                f"His actual intake is ~{_facts['protein_g_avg']:g} g — never state intake as the target or floor."
+            )
+        if _facts.get("recovery_pct") is not None:
+            fact_lines.append(f"  - Latest Whoop recovery: {_facts['recovery_pct']:g}%")
+        if _facts.get("hrv_ms") is not None:
+            fact_lines.append(f"  - Latest HRV: {_facts['hrv_ms']:g} ms (HRV is in MILLISECONDS, never bpm)")
+        if _facts.get("rhr_bpm") is not None:
+            fact_lines.append(f"  - Latest resting HR: {_facts['rhr_bpm']:g} bpm")
+        if _facts.get("latest_weight") is not None:
+            fact_lines.append(f"  - Latest weight: {_facts['latest_weight']:g} lb")
+        if fact_lines:
+            parts.append(
+                "AUTHORITATIVE FACTS (cite these EXACT numbers; do not invent, round away, or "
+                "substitute a target/floor for an actual value):\n" + "\n".join(fact_lines)
+            )
+    except Exception as _fe:
+        logger.warning("Authoritative facts injection failed: %s", _fe)
+
     # Format instructions (identical for all experts)
     parts.append(
         """OBSERVATORY ANALYSIS FORMAT:
@@ -918,6 +999,27 @@ def generate_and_cache(expert_key, shared_system=None):
         except Exception as _ve:
             logger.warning("Intelligence validator failed for %s: %s", expert_key, _ve)
 
+    # Phase-3 grounding backstop: cross-ref the coach's cited recovery/HRV/RHR/weight
+    # against the shared canonical facts (>25% deviation WARNs) and catch HRV-in-bpm.
+    # The protein 140/170/190 split is solved structurally by the AUTHORITATIVE FACTS
+    # block (avg/target/floor are all legitimate numbers, so they're not deviation-checked).
+    if _HAS_AI_VALIDATOR and analysis_text:
+        try:
+            _f = _load_canonical_facts()
+            _ground_ctx = {
+                "recovery_score": _f.get("recovery_pct"),
+                "hrv": _f.get("hrv_ms"),
+                "resting_heart_rate": _f.get("rhr_bpm"),
+                "latest_weight": _f.get("latest_weight"),
+            }
+            _ground_ctx = {k: v for k, v in _ground_ctx.items() if v is not None}
+            if _ground_ctx:
+                _gr = _aiv.validate_ai_output(analysis_text, _aiv.AIOutputType.GENERIC, health_context=_ground_ctx, max_length=10_000)
+                if _gr.warnings:
+                    logger.warning("[grounding] %s: %s", expert_key, _gr.warnings[:5])
+        except Exception as _ge2:
+            logger.warning("grounding backstop failed for %s: %s", expert_key, _ge2)
+
     # V2.1: Thread extraction — extract and write coach thread entry
     if _HAS_INTELLIGENCE_COMMON and analysis_text:
         try:
@@ -978,10 +1080,28 @@ def generate_synthesis(all_coach_outputs):
         default=str,
     )
 
+    # Phase-3: the integrator gets the same AUTHORITATIVE FACTS as the coaches, so it
+    # can't invent figures (the audit caught it citing "HRV 42, lowest in 41 nights").
+    _f = _load_canonical_facts()
+    _fact_bits = []
+    if _f.get("protein_g_avg") is not None:
+        _fact_bits.append(f"protein intake avg {_f['protein_g_avg']:g} g (target {int(_f.get('protein_g_target') or 190)} g)")
+    if _f.get("recovery_pct") is not None:
+        _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
+    if _f.get("hrv_ms") is not None:
+        _fact_bits.append(f"HRV {_f['hrv_ms']:g} ms")
+    if _f.get("latest_weight") is not None:
+        _fact_bits.append(f"weight {_f['latest_weight']:g} lb")
+    facts_block = (
+        ("\nAUTHORITATIVE FACTS (cite these exact numbers; do not invent any others): " + "; ".join(_fact_bits) + "\n")
+        if _fact_bits
+        else ""
+    )
+
     prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
 
 Matthew's goals: {goals_json}
-
+{facts_block}
 Coach assessments:
 {coach_sections}
 

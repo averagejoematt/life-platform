@@ -76,7 +76,7 @@ function kvtable(o, f) {
 }
 
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */
-function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); return `<article class="supp"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}${s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}</header>${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
+function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); const paused = !!s.paused; const pausedNote = paused && (s.pausedReason || "Paused — not currently taken"); return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
 // ── /data/physical/ — two tiers: the weight cockpit (daily) + the composition arc
 // (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.
@@ -172,13 +172,33 @@ function physicalRateTempo(readings, j) {
   const today = ws[ws.length - 1].d;
   const since = (days) => { const cut = new Date(Date.parse(today) - days * 86400000).toISOString().slice(0, 10); return ws.filter((p) => p.d >= cut); };
   const genDays = Math.max(1, Math.round((Date.parse(today) - Date.parse(PHYS_GENESIS)) / 86400000));
+  const spanOf = (pts) => (pts.length ? Math.max(1, Math.round((Date.parse(today) - Date.parse(pts[0].d)) / 86400000)) : 0);
   const windows = [
-    { k: "7-day", pts: since(7), flag: "early = water" },
-    { k: "30-day", pts: since(30) },
-    { k: "90-day", pts: since(90) },
+    { k: "7-day", days: 7, pts: since(7), flag: "early = water" },
+    { k: "30-day", days: 30, pts: since(30) },
+    { k: "90-day", days: 90, pts: since(90) },
     { k: "since genesis", pts: ws.filter((p) => p.d >= PHYS_GENESIS), sub: `${genDays}d` },
   ];
-  const rates = windows.map((w) => { const s = _slopePerDay(w.pts); return { ...w, wk: s == null ? null : Math.round(s * 7 * 10) / 10 }; });
+  // Honest windows (truth-audit Phase 4b): with only ~13 days of data the 30/90-day
+  // windows hold the SAME points and render identical bars. Label a window that doesn't
+  // actually reach back its nominal length with the real span, and drop any window whose
+  // point-set is identical to one already shown (no duplicate bars).
+  const seen = new Set();
+  const rates = [];
+  for (const w of windows) {
+    if (!w.pts.length) continue;
+    const sig = w.pts.length + ":" + w.pts[0].d;
+    const span = spanOf(w.pts);
+    if (w.days && span < w.days - 1) {
+      if (seen.has(sig)) continue; // identical to a shorter window — don't repeat the bar
+      w.k = `${span}-day`; // be honest: it's a span-day window, not a full 30/90
+    } else if (seen.has(sig)) {
+      continue;
+    }
+    seen.add(sig);
+    const s = _slopePerDay(w.pts);
+    rates.push({ ...w, wk: s == null ? null : Math.round(s * 7 * 10) / 10 });
+  }
   const maxMag = Math.max(0.5, ...rates.map((r) => (r.wk == null ? 0 : Math.abs(r.wk))));
   const row = (r) => {
     if (r.wk == null) return `<div class="rt-row"><span class="rt-label">${esc(r.k)}</span><span class="rt-gauge"></span><span class="rt-v mono rt-na">—  too few weigh-ins</span></div>`;
@@ -190,7 +210,7 @@ function physicalRateTempo(readings, j) {
       `<span class="rt-gauge"><span class="rt-fill ${tone}" style="width:${width.toFixed(0)}%;opacity:${op}"></span></span>` +
       `<span class="rt-v mono">${r.wk > 0 ? "+" : ""}${fmt(r.wk)} lb/wk</span>${r.flag ? `<span class="rt-flag label">${esc(r.flag)}</span>` : ""}</div>`;
   };
-  return sec("Rate tempo — the pace, four ways",
+  return sec("Rate tempo — the pace across windows",
     `<div class="rt-strip">${rates.map(row).join("")}</div>` +
     `<p class="rd-meta label">Each bar is a loss rate; the longer and more saturated, the faster. The 7-day runs hot early because a new cut sheds water — it isn't fat coming off that fast, and it will slow. A gain window would read muted ink, never an alarm.</p>`);
 }
@@ -1817,7 +1837,10 @@ function vitalsNarrative(p, comps) {
   const rec = get("recovery"), hrv = get("hrv"), rhr = get("rhr");
   const machine = (p.narrative && !isBad(p.narrative)) ? p.narrative
     : [p.date, p.status, p.signals_reporting != null && `${p.signals_reporting}/${p.signals_total} signals`].filter(Boolean).join(" · ");
-  const recovered = rec.tone === "ember";
+  // Only tell the "downshifting into recovery" story when recovery is high AND HRV is
+  // actually at/above its recent range and RHR isn't elevated — otherwise the caption
+  // claims "HRV holding their ground" on a day HRV is down (truth-audit Phase 4b).
+  const recovered = rec.tone === "ember" && hrv.tone === "ember" && rhr.tone !== "alert";
   const serif = recovered
     ? `The autonomic read is the story under the numbers: recovery sitting at ${rec.value}, with resting heart rate and HRV holding their ground. That's the parasympathetic side doing its job — the body downshifting into repair overnight, which is exactly what a cut leans on to keep the work absorbable.`
     : `The autonomic system is the story under the numbers — recovery at ${rec.value}, HRV ${hrv.value}${hrv.sub || ""}, resting HR ${rhr.value}${rhr.sub || ""}. Read the direction of the pair over the next days, not any single morning: recovery is the body's nightly accounting of how much it could repair.`;

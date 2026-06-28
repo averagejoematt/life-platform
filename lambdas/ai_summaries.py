@@ -35,10 +35,14 @@ def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[st
     habitify = data.get("habitify") or {}
     apple = data.get("apple") or {}
     sleep = data.get("sleep") or {}
+    # Phase-3: narrate the SAME whoop the numeric vitals block shows (the chosen
+    # "primary" day — today-if-finalized else yesterday), falling back to the legacy
+    # yesterday record when a caller hasn't set primary_whoop.
+    _pw = data.get("primary_whoop") or data.get("whoop")
     return {
         "date": data.get("date"),
-        "recovery_score": _safe_float(data.get("whoop"), "recovery_score"),
-        "strain": _safe_float(data.get("whoop"), "strain"),
+        "recovery_score": _safe_float(_pw, "recovery_score"),
+        "strain": _safe_float(_pw, "strain"),
         "sleep_score": _safe_float(sleep, "sleep_score"),
         "sleep_duration_hrs": _safe_float(sleep, "sleep_duration_hours"),
         "sleep_efficiency_pct": _safe_float(sleep, "sleep_efficiency_pct"),
