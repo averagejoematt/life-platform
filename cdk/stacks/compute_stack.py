@@ -449,7 +449,11 @@ class ComputeStack(Stack):
             handler="coach.coach_history_summarizer.lambda_handler",
             source_file="lambdas/coach/coach_history_summarizer.py",
             schedule="cron(0 17 ? * SUN *)",  # Sunday 10:00 AM PT (before weekly digest)
-            timeout_seconds=120,
+            # 120s was too tight for the Haiku history-summarization call — the Sunday
+            # run timed out and dumped its scheduled event into the ingestion DLQ
+            # (reddening the I9 post-deploy check). 600s matches the ai-expert-analyzer
+            # precedent for AI-calling scheduled Lambdas; Lambda hard max is 900s.
+            timeout_seconds=600,
             memory_mb=256,
             environment={
                 "ANTHROPIC_SECRET": "life-platform/ai-keys",
