@@ -257,6 +257,9 @@
     "lambdas/operational/data_reconciliation_lambda.py": {
       "function": "life-platform-data-reconciliation"
     },
+    "lambdas/operational/coherence_sentinel_lambda.py": {
+      "function": "life-platform-coherence-sentinel"
+    },
     "lambdas/operational/delete_user_data_lambda.py": {
       "function": "life-platform-delete-user-data"
     },

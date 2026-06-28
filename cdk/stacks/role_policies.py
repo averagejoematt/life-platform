@@ -1517,6 +1517,28 @@ def operational_data_reconciliation() -> list[iam.PolicyStatement]:
     )
 
 
+def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
+    """Coherence Sentinel: read-only DDB (predictions, computed metrics, served
+    narratives) + emit LifePlatform/Coherence metrics + a budget-gated Bedrock
+    (Haiku) semantic pass. No platform writes."""
+    return _operational_base(
+        ddb_actions=["dynamodb:GetItem", "dynamodb:Query"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="CoherenceMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],  # PutMetricData only accepts "*"
+            ),
+            _bedrock_statement(),
+            iam.PolicyStatement(
+                sid="BudgetTierRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+            ),
+        ],
+    )
+
+
 def operational_og_image_generator() -> list[iam.PolicyStatement]:
     """OG image generator: reads public_stats.json, writes PNG images to S3, invalidates CloudFront."""
     return [
