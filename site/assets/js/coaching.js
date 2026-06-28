@@ -182,16 +182,33 @@ async function renderReadExperiment(read) {
   // The arc, composed from the weekly lab notes the board has written across the run —
   // each week's tone is how the board landed that week; click to read it. Grows over time.
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the arc…</span></p>`;
-  const fn = await tryJSON("/api/field_notes");
+  const [fn, syn] = await Promise.all([tryJSON("/api/field_notes"), tryJSON("/api/experiment_synthesis")]);
   const entries = (fn && fn.entries) || [];
   let h = `<p class="dx-kicker label">the experiment · the board's read, week by week</p><h2 class="dx-title">The experiment to date</h2>`;
   h += `<p class="dx-prose">How the board has read you across the whole run. Each week's lab note is the AI's read against how the week actually felt; the tone is how the board landed that week.</p>`;
+  // The board's cross-week synthesis (C-1) — Nakamura's read of the whole trajectory,
+  // written once >=2 weeks of lab notes exist. Sits above the week-by-week list.
+  if (syn && syn.arc) {
+    const chapMap = {};
+    for (const c of syn.chapters || []) if (c && c.week_label) chapMap[c.week_label] = c.headline || "";
+    h += `<section class="exp-synth"><p class="exp-synth-k label">Dr. Kai Nakamura · the arc${syn.week_count ? ` · ${esc(syn.week_count)} weeks` : ""}</p>`;
+    if (syn.throughline) h += `<p class="exp-throughline">${esc(syn.throughline)}</p>`;
+    for (const para of String(syn.arc).split(/\n\n+/).filter(Boolean)) h += `<p class="dx-prose">${esc(para)}</p>`;
+    h += `</section>`;
+    // hand the per-week headlines down to the list below
+    renderReadExperiment._chapters = chapMap;
+  } else {
+    renderReadExperiment._chapters = {};
+  }
   if (entries.length) {
     h += `<ol class="exp-arc">`;
+    const chapters = renderReadExperiment._chapters || {};
     for (const e of entries) {
       const wk = e.week_label || `Week ${e.week || ""}`;
+      const headline = chapters[wk] || chapters[e.week_label] || "";
       h += `<li class="exp-wk"><button type="button" class="exp-btn" data-week="${esc(e.week)}">` +
         `<span class="exp-top"><span class="exp-wkn">${esc(wk)}</span><span class="exp-tone label tone-${esc(e.ai_tone || "")}">${esc(e.ai_tone || "—")}</span></span>` +
+        (headline ? `<span class="exp-headline">${esc(headline)}</span>` : "") +
         `<span class="exp-date label">${esc(String(e.ai_generated_at || "").slice(0, 10))}${e.has_matthew_response ? " · Matthew replied" : ""}</span></button></li>`;
     }
     h += `</ol>`;
