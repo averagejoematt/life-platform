@@ -92,6 +92,30 @@ class TestFactsAgreement:
         f = ci.check_facts_agreement(narratives, self.FACTS)
         assert f.status == ci.OK
 
+    # ── Precision regressions from the first LIVE run (these WERE false positives) ──
+    def test_weight_loss_amount_is_not_a_current_weight_claim(self):
+        # "lost 13.8 pounds" is a DELTA, not a contradiction of the 300.8 lb canonical.
+        narratives = ["You've lost 13.8 pounds over four weeks — visceral fat down 3.21 pounds."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert f.status == ci.OK
+
+    def test_recovery_over_n_weeks_is_a_duration_not_a_value(self):
+        narratives = ["Recovery has been suppressed over 4 weeks now."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert f.status == ci.OK
+
+    def test_hrv_ms_and_rhr_bpm_in_one_sentence_no_unit_error(self):
+        # HRV in ms and RHR in bpm coexisting must NOT read as "HRV cited in bpm".
+        narratives = ["HRV is 25 ms and your resting heart rate sits at 58 bpm."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert f.status == ci.OK
+
+    def test_real_weight_contradiction_still_fires(self):
+        # A plausible-but-wrong current weight (270 vs 300.8) must still fire.
+        narratives = ["The scale read 270 lbs this morning.", "Down to 268 pounds."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert f.status in (ci.WARN, ci.ALARM)
+
 
 class TestEndpointShape:
     def test_all_zero_predictions_fires(self):

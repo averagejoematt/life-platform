@@ -145,14 +145,33 @@ def check_computed_coherence(checks) -> Finding:
 # value for one metric can't be misread as another's — proximity scanning
 # cross-contaminates (RHR 58 in the same sentence as HRV looks like an HRV value).
 # Capturing group 1 is the cited number.
+# A captured number followed by a time/count word isn't a metric reading — it's a
+# duration ("recovery over 4 WEEKS", "53 over 14 DAYS"). The live run flagged these.
+# Reject a captured number that's really part of a larger figure or a duration/count:
+# `(?!\d|,\d)` kills "4" in "4,000 steps" (comma-then-digit) WITHOUT rejecting a
+# sentence comma ("86, you're primed"); _NO_TIME kills "4 weeks"/"4 points".
+_NOT_PART = r"(?!\d|,\d)"
+_NO_TIME = r"(?!\s*(?:week|day|month|night|hour|min|session|time|point|pt|step|k\b|x\b))"
 _FACT_PATTERNS = {
-    "recovery_pct": ([r"recovery[^.\d]{0,14}(\d{1,3}(?:\.\d+)?)\s*%?", r"(\d{1,3}(?:\.\d+)?)\s*%\s*recovery"], 0.20),
+    "recovery_pct": (
+        [r"recovery[^.\d]{0,14}(\d{1,3}(?:\.\d+)?)" + _NOT_PART + r"\s*%?" + _NO_TIME, r"(\d{1,3}(?:\.\d+)?)\s*%\s*recovery"],
+        0.20,
+    ),
     # HRV value must carry the ms unit to count (the bpm form is the unit-error check below).
     "hrv_ms": ([r"hrv[^.\d]{0,14}(\d{1,3}(?:\.\d+)?)\s*ms", r"(\d{1,3}(?:\.\d+)?)\s*ms[^.]{0,14}hrv"], 0.25),
-    "rhr_bpm": ([r"(?:resting heart rate|resting hr|rhr)[^.\d]{0,14}(\d{2,3})", r"(\d{2,3})\s*bpm[^.]{0,18}rest"], 0.20),
+    "rhr_bpm": (
+        [r"(?:resting heart rate|resting hr|rhr)[^.\d]{0,14}(\d{2,3})" + _NOT_PART + _NO_TIME, r"(\d{2,3})\s*bpm[^.]{0,18}rest"],
+        0.20,
+    ),
     # Weight requires an explicit lb/lbs/pounds unit so a "190 g protein" can't match.
     "latest_weight": ([r"(\d{2,3}(?:\.\d+)?)\s*(?:lbs|lb|pounds)\b"], 0.04),
 }
+# A cited number only competes as a claim about THAT metric if it's in the metric's
+# plausible range. Without this, "lost 13.8 POUNDS" reads as a current-weight claim
+# contradicting a 300 lb canonical (a weight DELTA, not the weight). Multiplicative
+# band vs the canonical; metrics not listed accept any value (recovery can be 0–100,
+# so a real 30-vs-86 split must still fire). Tuned from the first live run.
+_PLAUSIBILITY = {"latest_weight": (0.6, 1.5)}
 
 
 def _cited_for_metric(low_text: str, patterns):
@@ -169,7 +188,8 @@ def _cited_for_metric(low_text: str, patterns):
 def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
     """`narratives`: list of served text blobs. `facts`: the canonical dict
     ({recovery_pct, hrv_ms, rhr_bpm, latest_weight}). Flags a cited number that
-    contradicts a fact by > its tolerance, and HRV quoted in bpm."""
+    contradicts a fact by > its tolerance, and HRV quoted in bpm. Tuned for
+    PRECISION (a false alarm erodes trust) — the AI semantic pass carries recall."""
     f = Finding("facts_agreement", value=0.0)
     offenders = []
     labels = surfaces or [f"narrative_{i}" for i in range(len(narratives))]
@@ -177,8 +197,10 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
         if not text:
             continue
         low = text.lower()
-        # HRV-unit error: HRV tied to a bpm reading (HRV is milliseconds).
-        if re.search(r"hrv[^.]{0,30}\bbpm\b", low) or re.search(r"\bbpm\b[^.]{0,12}hrv", low):
+        # HRV-unit error: an HRV value directly carried in bpm (HRV is milliseconds).
+        # Require number-then-bpm right after HRV so "HRV 25 ms and RHR 64 bpm" — two
+        # different metrics in one sentence — does NOT false-fire (the live-run trap).
+        if re.search(r"hrv[^.\d]{0,12}\d{1,3}(?:\.\d+)?\s*bpm", low):
             offenders.append(f"{label}: HRV cited in bpm (HRV is milliseconds)")
         for key, (patterns, tol) in _FACT_PATTERNS.items():
             true_val = facts.get(key)
@@ -186,7 +208,10 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
                 continue
             true_val = float(true_val)
             band = abs(true_val) * tol
+            lo, hi = _PLAUSIBILITY.get(key, (0.0, 1e9))
             for cited in _cited_for_metric(low, patterns):
+                if not (lo * true_val <= cited <= hi * true_val):
+                    continue  # outside the metric's plausible range — not a claim about it
                 if cited > 0 and abs(cited - true_val) > band:
                     offenders.append(f"{label}: cited {cited:g} for '{key}' but canonical is {true_val:g}")
                     break

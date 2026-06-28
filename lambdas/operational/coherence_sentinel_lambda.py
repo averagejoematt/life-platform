@@ -101,8 +101,15 @@ def _get_json(path):
 
 
 # ── Data adapters: live state → each invariant's input contract ──────────────
+# A window that closed longer ago than this is "stale" — those predictions have
+# already expired and shouldn't count toward "should be grading NOW". The actionable
+# signal is RECENT predictions failing to grade, not a backlog of ancient dead ones.
+_RECENT_CLOSE_DAYS = 45
+
+
 def _gather_predictions():
-    """All current-cycle PREDICTION# records → [{status, closed, eval_type}]."""
+    """Current-cycle PREDICTION# → [{status, closed, eval_type}], where `closed`
+    means the window elapsed RECENTLY (so the call should have graded by now)."""
     today = datetime.strptime(_today(), "%Y-%m-%d")
     out = []
     for cid in COACH_IDS:
@@ -125,7 +132,9 @@ def _gather_predictions():
             closed = False
             if created:
                 try:
-                    closed = (datetime.strptime(created, "%Y-%m-%d") + timedelta(days=window)) < today
+                    close_date = datetime.strptime(created, "%Y-%m-%d") + timedelta(days=window)
+                    # Closed = window elapsed AND not so long ago it's just stale cruft.
+                    closed = close_date < today and (today - close_date).days <= _RECENT_CLOSE_DAYS
                 except (ValueError, TypeError):
                     closed = False
             out.append({"status": rec.get("status", "pending"), "closed": closed, "eval_type": ev.get("type")})
