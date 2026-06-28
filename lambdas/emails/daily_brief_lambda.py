@@ -1356,6 +1356,16 @@ def lambda_handler(event, context):
             data["week_ago_weight"] = float(_computed["week_ago_weight"])
         if _computed.get("avatar_weight"):
             data["avatar_weight"] = float(_computed["avatar_weight"])
+        # CTL/ATL + weight trajectory — read the authoritative computed values so
+        # public_stats stops reverse-engineering CTL/ATL and recomputing a 7-day rate.
+        if _computed.get("ctl") is not None:
+            data["ctl"] = float(_computed["ctl"])
+        if _computed.get("atl") is not None:
+            data["atl"] = float(_computed["atl"])
+        if _computed.get("weekly_rate_lbs") is not None:
+            data["weekly_rate_lbs"] = float(_computed["weekly_rate_lbs"])
+        data["rate_provisional"] = bool(_computed.get("rate_provisional"))
+        data["projected_goal_date"] = _computed.get("projected_goal_date")  # None when provisional
         logger.info("Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
     else:
         # Fallback: compute inline and store (pre-computed Lambda not yet run)
@@ -1967,9 +1977,13 @@ def lambda_handler(event, context):
             except Exception:
                 _days_in = 0
 
-            # Weekly rate: negative = losing weight (good). Guard: only if week_ago_weight exists.
+            # Weekly rate: the authoritative regression value from computed_metrics
+            # (weight_trend) — identical to the website's /api/journey. Falls back to a
+            # 7-day delta only if the computed value is missing (compute not yet run).
             _week_ago = data.get("week_ago_weight")
-            _weekly_rate = round(_curr_wt - float(_week_ago), 2) if _week_ago and _curr_wt else None
+            _weekly_rate = data.get("weekly_rate_lbs")
+            if _weekly_rate is None:
+                _weekly_rate = round(_curr_wt - float(_week_ago), 2) if _week_ago and _curr_wt else None
 
             # ACWR from computed_metrics if available
             _cm = data.get("computed_metrics") or {}
@@ -2121,14 +2135,19 @@ def lambda_handler(event, context):
                     "remaining_lbs": _remain,
                     "progress_pct": _prog_pct,
                     "weekly_rate_lbs": _weekly_rate,
-                    "projected_goal_date": profile.get("goal_date", "2026-07-31"),
+                    # Computed projection (regression-based, suppressed while provisional) —
+                    # NOT the stale static profile field that implied 115 lb in 5 weeks.
+                    "projected_goal_date": data.get("projected_goal_date"),
+                    "rate_provisional": bool(data.get("rate_provisional")),
                     "started_date": profile.get("journey_start_date", EXPERIMENT_START_DATE),
                     "current_phase": (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,
                     "days_in": _days_in,
                 },
                 training={
-                    "ctl_fitness": float(data.get("tsb") or 0) + 6.0,
-                    "atl_fatigue": float(data.get("tsb") or 0) + 6.5,
+                    # Authoritative CTL/ATL from computed_metrics (>=0) — no more
+                    # reverse-engineering them from TSB with magic offsets (the -955 bug).
+                    "ctl_fitness": float(data.get("ctl") if data.get("ctl") is not None else 0),
+                    "atl_fatigue": float(data.get("atl") if data.get("atl") is not None else 0),
                     "tsb_form": float(data.get("tsb") or 0),
                     "acwr": _acwr,
                     "form_status": _cm.get("zone", "neutral"),
