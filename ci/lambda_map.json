@@ -343,6 +343,7 @@
       "lambdas/auth_breaker.py",
       "lambdas/bedrock_client.py",
       "lambdas/budget_guard.py",
+      "lambdas/privacy_guard.py",
       "lambdas/weight_trend.py",
       "lambdas/board_loader.py",
       "lambdas/character_engine.py",
