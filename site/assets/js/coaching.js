@@ -25,7 +25,9 @@ const SECTIONS = [
   { key: "by-coach", label: "By Coach", kicker: "each coach's read on your data", kind: "bycoach", url: "/api/coaches" },
   { key: "team", label: "The Team", kicker: "who they are · how they're built", kind: "team", url: "/api/coaches" },
   { key: "lab-notes", label: "AI lab notes", kicker: "the AI's read ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
-  { key: "qa", label: "Ask the board", kicker: "your question → a lab note", kind: "qa" },
+  // Reader Q&A — ask a question (form) AND read the ones the board has answered
+  // (PG-ENG-2 static feed published by scripts/publish_board_answer.py; empty-but-honest).
+  { key: "qa", label: "Reader Q&A", kicker: "ask · the board answers", kind: "qa", url: "/board_answers/answers.json" },
 ];
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 // Coaches whose 7-day domain data is available via /api/observatory_week.
@@ -46,7 +48,11 @@ const domainOf = (pid) => String(pid || "").replace(/_coach$/, "");
 
 function entriesFor(s, data) {
   if (s.kind === "read") return READ_SCOPES.slice();
-  if (s.kind === "qa") return [{ id: "ask", title: "Ask a question", date: "to the whole board" }];
+  // Reader Q&A — the ask form first, then any questions the board has answered.
+  if (s.kind === "qa")
+    return [{ id: "ask", title: "✍️ Ask a question", date: "to the whole board" }].concat(
+      (((data && data.answers) || []).slice().reverse()).map((a) => ({ id: String(a.id), title: a.question, date: a.answered_at || "" }))
+    );
   if (!data) return [];
   if (s.kind === "bycoach" || s.kind === "team")
     return (data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
@@ -328,7 +334,22 @@ async function renderRead(s, id) {
   if (s.kind === "bycoach") return renderByCoach(read, id);
   if (s.kind === "team") return renderTeamCoach(read, id);
   if (s.kind === "fieldnotes") return renderFieldNote(read, id);
-  if (s.kind === "qa") return renderAskBoard(read);
+  if (s.kind === "qa") { if (String(id) === "ask") return renderAskBoard(read); return renderAnswer(read, id); }
+}
+
+// A single board-answered reader question (PG-ENG-2 static feed).
+async function renderAnswer(read, id) {
+  const data = await tryJSON("/board_answers/answers.json");
+  const a = ((data && data.answers) || []).find((x) => String(x.id) === String(id));
+  if (!a) { read.innerHTML = `<p class="dx-prose">That question isn't here yet.</p>`; return; }
+  const resp = (a.responses && a.responses.length)
+    ? a.responses.map((r) => `<div class="voice machine"><span class="who">${esc(r.name || r.coach || "The board")}</span><p class="what">${esc(r.text)}</p></div>`).join("")
+    : (a.answer ? `<div class="voice machine"><span class="who">The board</span><p class="what">${esc(a.answer)}</p></div>` : `<p class="dx-prose">An answer is on the way.</p>`);
+  read.innerHTML =
+    `<p class="dx-kicker label">a reader asked${a.answered_at ? ` · ${esc(a.answered_at)}` : ""}</p>` +
+    `<h2 class="dx-title">${esc(a.question)}</h2>` +
+    (a.note ? `<p class="dx-prose">${esc(a.note)}</p>` : "") + resp;
+  enhanceCoachNames(read);
 }
 
 // On the By-Coach / Team lists, enrich each card subtitle with the coach's live one-line read.

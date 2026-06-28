@@ -38,7 +38,11 @@ SECTIONS = [
         "AI lab notes",
         "What the AI saw each week, and how it actually felt — the Third Wall, the AI's read against Matthew's response.",
     ),
-    ("qa", "Ask the board", "Submit a question for the AI team — Matthew picks one and the board answers it in an upcoming lab note."),
+    (
+        "qa",
+        "Reader Q&A",
+        "Ask the AI board a question — and read the ones it has answered. Matthew picks a selection and the board responds.",
+    ),
 ]
 
 SHELL = """<!DOCTYPE html>
