@@ -72,8 +72,10 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # and never graded (the v7.15.0 504-inconclusive bug; the Coherence Sentinel's
 # prediction_health invariant exists for exactly this). They now live in ONE place,
 # DERIVED so they cannot diverge. See lambdas/measurable_metrics.py.
-from measurable_metrics import MEASURABLE_METRICS  # noqa: E402,F401
-from measurable_metrics import normalize_metric_hint as _normalize_metric_hint  # noqa: E402
+from measurable_metrics import (
+    MEASURABLE_METRICS,  # noqa: E402,F401
+    normalize_metric_hint as _normalize_metric_hint,  # noqa: E402
+)
 
 
 def _parse_confidence(raw) -> float:
