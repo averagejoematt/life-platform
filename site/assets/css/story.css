@@ -36,7 +36,11 @@ body { overflow-x: hidden; }
 .theme-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--ink) 0 50%, transparent 50% 100%); border: 1px solid var(--ink-muted); }
 
 /* ── HERO ────────────────────────────────────────────────────────────────── */
-.hero { max-width: var(--container); margin-inline: auto; padding: clamp(2rem, 1rem + 6vw, 5rem) var(--gutter) var(--sp-7); position: relative; isolation: isolate; }
+/* overflow-x: clip contains the ::before bloom's -4% side-bleed at the hero box so it
+   can't push document width (16px scroll at 390px / 31px at 768px); clip (not hidden)
+   keeps overflow-y visible so the bloom still bleeds DOWN into the arc, and creates no
+   scroll container. */
+.hero { max-width: var(--container); margin-inline: auto; padding: clamp(2rem, 1rem + 6vw, 5rem) var(--gutter) var(--sp-7); position: relative; isolation: isolate; overflow-x: clip; }
 /* v5 "forward" depth — a restrained warm bloom behind the hero + an EARNED glow on the
    live day-counter. Adds dimension/premium-feel without touching the palette or contrast. */
 .hero::before { content: ""; position: absolute; z-index: -1; inset: -6% -4% auto -4%; height: 130%; pointer-events: none;
