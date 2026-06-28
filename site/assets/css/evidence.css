@@ -384,3 +384,44 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 @media (max-width: 560px) {
   .readout .rd-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
+
+/* ── First-run orientation card — mirrors the Cockpit's .cockpit-intro (PG-02).
+   Shown once to a first-time Data-archive visitor (JS-injected after .ev-head),
+   non-modal, never blocks the dense view. Uses only shared tokens. ── */
+.ev-intro {
+  position: relative;
+  background: var(--surface); box-shadow: var(--shadow-panel);
+  border: var(--border-hair); border-left: 3px solid var(--ember);
+  border-radius: var(--radius);
+  padding: var(--sp-5) var(--sp-6); margin: var(--sp-5) 0 0;
+  animation: introIn 240ms ease-out both;
+}
+@keyframes introIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ev-intro { animation: none; } }
+.ev-intro__k { margin: 0; color: var(--ember); }
+.ev-intro__h {
+  font-family: var(--font-serif); font-weight: var(--weight-med);
+  font-size: clamp(1.15rem, 2.4vw, 1.4rem); line-height: 1.1;
+  margin: var(--sp-2) 0 var(--sp-4); max-width: 30ch;
+}
+.ev-intro__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
+.ev-intro__list li { color: var(--ink-muted); line-height: 1.5; max-width: 64ch; }
+.ev-intro__list strong { color: var(--ink); font-weight: var(--weight-med); }
+.ev-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: 0.85em; color: var(--ember); }
+.ev-intro__go {
+  appearance: none; cursor: pointer; margin-top: var(--sp-5);
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
+  color: var(--ember); background: var(--ember-wash);
+  border: 1px solid var(--ember-line); padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-xs); transition: background var(--dur-fast);
+}
+.ev-intro__go:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); }
+.ev-intro__note { margin: var(--sp-3) 0 0; color: var(--ink-muted); opacity: 0.8; }
+.ev-intro__x {
+  position: absolute; top: var(--sp-3); right: var(--sp-3);
+  appearance: none; cursor: pointer; background: transparent; border: 0;
+  font-size: 20px; line-height: 1; color: var(--ink-muted); padding: 2px 8px;
+  border-radius: var(--radius-xs); transition: color var(--dur-fast);
+}
+.ev-intro__x:hover { color: var(--ink); }
+.ev-intro :focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }

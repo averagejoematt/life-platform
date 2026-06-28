@@ -564,16 +564,19 @@ MOTION_HEAD = (
 MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 # The five doors, in loop order: cockpit · data · coaching · protocols · story.
 DOORS = [
-    ("/now/", "the cockpit", "cockpit"),
-    ("/data/", "the data", "data"),
-    ("/coaching/", "the coaching", "coaching"),
-    ("/protocols/", "the protocols", "protocols"),
-    ("/story/", "the story", "story"),
+    ("/now/", "the cockpit", "cockpit", "Today's live instrument — your daily numbers, read back to you"),
+    ("/data/", "the data", "data", "Every source the platform reads — trends now and over time"),
+    ("/coaching/", "the coaching", "coaching", "The AI team & their arguments — stances, track records, disagreements"),
+    ("/protocols/", "the protocols", "protocols", "The levers — supplements, experiments, challenges, discoveries"),
+    ("/story/", "the story", "story", "The writing & the why — chronicle, journal, timeline, about"),
 ]
 
 
 def topbar(active_key: str, brand_door: str) -> str:
-    links = "".join(f'<a href="{href}"{" aria-current=\"page\"" if key == active_key else ""}>{label}</a>' for href, label, key in DOORS)
+    links = "".join(
+        f'<a href="{href}" title="{esc(title)}"{" aria-current=\"page\"" if key == active_key else ""}>{label}</a>'
+        for href, label, key, title in DOORS
+    )
     return (
         '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
         f'<span class="brand-name">averagejoematt</span> <span class="brand-door label">{esc(brand_door)}</span></a>'
