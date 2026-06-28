@@ -198,6 +198,13 @@ body { overflow-x: hidden; }
 @media (min-width: 760px) { .dx-layout { grid-template-columns: 260px 1fr; } }
 .dx-list { list-style: none; display: grid; gap: var(--sp-2); }
 @media (min-width: 760px) { .dx-list { position: sticky; top: var(--sp-4); } }
+/* Coaching on mobile: the rail becomes a horizontal chip strip so the READ sits near the
+   top, not ~2 screens below an 8-coach vertical list (COACHING_SECTION_REVIEW mobile fix). */
+@media (max-width: 759px) {
+  [data-door="coaching"] .dx-list { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; padding-bottom: var(--sp-2); scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+  [data-door="coaching"] .dx-item { width: auto; white-space: nowrap; }
+  [data-door="coaching"] .dx-item-sub { display: none; }
+}
 .dx-item { width: 100%; text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair);
   border-left: 2px solid transparent; border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); display: grid; gap: 2px; color: inherit; }
 .dx-item:hover { border-color: var(--rule-strong); }
