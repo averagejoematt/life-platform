@@ -122,6 +122,10 @@ body { overflow-x: hidden; }
 
 /* Numbers beat */
 .numbers { display: flex; gap: clamp(1.5rem, 1rem + 4vw, 4rem); flex-wrap: wrap; margin-top: var(--sp-5); }
+/* Reserve space for async-injected containers so filling them doesn't shove content
+   down (cuts cumulative layout shift on the home). */
+[data-bind="weightchart"] { display: block; min-height: 150px; }
+[data-bind="wall"] { display: block; min-height: 116px; }
 .figure { display: grid; gap: var(--sp-1); }
 .figure .num { font-family: var(--font-mono); font-weight: var(--weight-med); font-size: var(--fs-data-lg); line-height: 1; }
 .figure .num.big { font-size: var(--fs-data-xl); color: var(--ember); }
