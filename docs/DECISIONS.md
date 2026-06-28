@@ -2679,3 +2679,19 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Out of scope (Phase 1 is private instrumentation).** Phase 2 — the loop-back into routine descriptions + cross-exercise pattern detection (n-floored ≥3, correlative) — is what justifies the build (Viktor's gate) but ships only after Phase 1 is eyeballed against real notes for ~1–2 weeks. `deviation` (pushed-vs-performed diff) ships as a tested pure function but its ingest wiring waits on a template_id↔movement_key map (the pushed IR keys by internal `movement_key`, the performed workout by Hevy `template_id`). No public/website surface.
 
 ---
+
+## ADR-095: Privacy-clean traffic measurement — weekly digest from CloudFront access logs
+
+**Status:** ✅ Active — 2026-06-27
+
+**Context.** The v5 site goal is graded partly on **returnability** (docs/PLATFORM_NORTH_STAR.md), but the platform had no way to know whether anyone visited or came back — and the site's stated ethos is "no tracking cookies, no third-party analytics." The need (measure traffic) collided with the principle (don't track people). The two obvious instruments both fail the principle or the bar: a JS analytics tag (GA/Plausible) is exactly the third-party tracking the privacy page disavows; web push needs a permission prompt + per-visitor subscription state. Neither fits a no-tracking, single-owner site.
+
+**Decision.** Measure from **CloudFront standard access logs** — the first-party request records the CDN already keeps — and aggregate them weekly into an email. `lambdas/operational/traffic_digest_lambda.py` (cron Mon 9 AM PT) parses the trailing 7 days into page views / unique visitors / returning visitors / top pages / external referrers and sends via SES. **No raw IP is ever stored, logged, or emailed:** a visitor key is `sha256(ip|ua)[:16]`, computed in memory only to count distinct/returning, then discarded; output is aggregate totals. Bots, assets, /api, /legacy, and non-200s are filtered. Logs land in a dedicated bucket `matthew-life-platform-cf-logs` (90-day lifecycle, RETAIN) with **BUCKET_OWNER_PREFERRED** ownership so CloudFront's log-delivery account can be granted the write ACL. The privacy page documents the practice verbatim.
+
+**Why this honors the no-tracking claim.** Access logs are infrastructure telemetry the server generates regardless — not client-side instrumentation injected into the visitor's browser, no cookie, no cross-site identifier, no third party in the page. Hashing-then-discarding the IP means the digest can say "N distinct, M returned on a 2nd day" without the system ever retaining who they were.
+
+**Alternatives rejected.** *Third-party analytics JS* — the exact tracking the site disavows. *Web push for re-engagement* — needs a permission prompt + stored per-visitor subscriptions (visitor state the site otherwise never keeps). *Storing IPs for richer cohorting* — violates the discard-immediately rule for marginal value. *An error alarm on the digest Lambda* — omitted by design (a weekly digest failing is low-stakes; the CF logs are retained so the next run still sees the window), consistent with the other `alerts_topic=None` operational Lambdas.
+
+**Deploy.** Infra is CDK (`LifePlatformOperational`); enabling CloudFront standard logging on dist `E3S424OXQZ8NBE` → the bucket (prefix `cf/`) is a one-time manual step. Runbook: docs/SITE_UPLEVEL_PLAYBOOK.md. Tests: tests/test_traffic_digest.py (incl. an assertion that no raw IP survives parsing). Both shipped 2026-06-27 (#217).
+
+---
