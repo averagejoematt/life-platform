@@ -25,8 +25,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
-from boto3.dynamodb.conditions import Key
 import privacy_guard  # deterministic real-name + vice scrub (layer module)
+from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
 
