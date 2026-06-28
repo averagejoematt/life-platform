@@ -20,13 +20,25 @@ from pathlib import Path
 OUT = Path("site/coaching")
 
 # key, label, one-line description (for the per-section <meta>/<title>)
+# 2026-06-28 commentary-first re-cut (COACHING_SECTION_REVIEW): read-first, roster demoted.
 SECTIONS = [
-    ("coaches", "The Team", "The AI team reading the data — each coach's stance, report card, and the team's collective read."),
+    (
+        "read",
+        "The Read",
+        "What the AI board is saying about the data right now — today and this week, the disagreements, and each coach's live read.",
+    ),
+    (
+        "by-coach",
+        "By Coach",
+        "Each coach's read on a domain, on top of the actual data — cardio, lifts, volume, sleep, glucose — this week.",
+    ),
+    ("team", "The Team", "Who the coaches are — their personalities, voice, and how each one is built."),
     (
         "lab-notes",
         "AI lab notes",
         "What the AI saw each week, and how it actually felt — the Third Wall, the AI's read against Matthew's response.",
     ),
+    ("qa", "Ask the board", "Submit a question for the AI team — Matthew picks one and the board answers it in an upcoming lab note."),
 ]
 
 SHELL = """<!DOCTYPE html>
@@ -83,7 +95,7 @@ SHELL = """<!DOCTYPE html>
       <p class="beat-kicker label">the coaching · the AI team reading the data</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
       <h1 class="dx-h1">The Coaching</h1>
-      <p class="dx-lede">A board of named AI coaches reads the data and argues about it — each with a stance, a track record, and a voice. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. The live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>; the writing's in <a href="/story/">the story</a>.</p>
+      <p class="dx-lede">A board of named AI coaches reads the data and argues about it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>.</p>
     </div>
     <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
     <div class="dx-layout">
@@ -96,7 +108,7 @@ SHELL = """<!DOCTYPE html>
       <div class="sf-col"><p class="sf-h label">The Story</p>
         <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
       <div class="sf-col"><p class="sf-h label">The Coaching</p>
-        <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
+        <a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
       <div class="sf-col"><p class="sf-h label">The Data</p>
         <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
       <div class="sf-col"><p class="sf-h label">The Protocols</p>
@@ -124,9 +136,9 @@ def main() -> None:
         OUT / "index.html",
         SHELL.format(
             title="The Coaching — averagejoematt",
-            desc="The AI team reading the data — each coach's stance and track record, plus the weekly lab notes.",
+            desc="What the AI board is saying about the data right now — the read, by coach, the disagreements, and the weekly lab notes.",
             canon="",
-            start="coaches",
+            start="read",
         ),
     )
     for key, label, desc in SECTIONS:
