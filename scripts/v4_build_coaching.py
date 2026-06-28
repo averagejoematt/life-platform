@@ -32,6 +32,11 @@ SECTIONS = [
         "By Coach",
         "Each coach's read on a domain, on top of the actual data — cardio, lifts, volume, sleep, glucose — this week.",
     ),
+    (
+        "scorecard",
+        "Scorecard",
+        "The board's falsifiable track record — every call the coaches make, graded confirmed/refuted/open by a deterministic evaluator.",
+    ),
     ("team", "The Team", "Who the coaches are — their personalities, voice, and how each one is built."),
     (
         "lab-notes",
@@ -112,7 +117,7 @@ SHELL = """<!DOCTYPE html>
       <div class="sf-col"><p class="sf-h label">The Story</p>
         <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
       <div class="sf-col"><p class="sf-h label">The Coaching</p>
-        <a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
+        <a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
       <div class="sf-col"><p class="sf-h label">The Data</p>
         <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
       <div class="sf-col"><p class="sf-h label">The Protocols</p>
