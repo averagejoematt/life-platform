@@ -529,3 +529,13 @@ body { overflow-x: hidden; }
 .exp-tone { color: var(--ink-muted); }
 .exp-tone.tone-cautionary, .exp-tone.tone-urgent { color: var(--ember); }
 .exp-date { color: var(--ink-faint); }
+/* Cardio-vs-lifts + per-muscle balance on the training coach (C-2). */
+.bc-modality, .bc-muscle { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
+.bc-mod-h { margin: var(--sp-2) 0 var(--sp-1); color: var(--ember); }
+.bc-mod-list, .bc-musc-list { list-style: none; margin: 0 0 var(--sp-2); padding: 0; display: grid; gap: 4px; }
+.bc-mod-list li { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; }
+.bc-mod-t, .bc-musc-m { font-family: var(--font-sans); color: var(--ink); }
+.bc-musc { display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-2); align-items: baseline; border-bottom: var(--border-hair); padding-bottom: 4px; }
+.bc-musc-n { font-family: var(--font-mono); }
+.bc-musc.musc-over .bc-musc-s, .bc-musc.musc-high .bc-musc-s { color: var(--ember); }
+.bc-musc.musc-under .bc-musc-s { color: var(--ink-faint); }
