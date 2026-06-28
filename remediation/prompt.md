@@ -29,6 +29,16 @@ what genuinely needs them.
 - **D — STALE/IGNORE**: alarm already OK, deploy-window artifact, or a duplicate.
   Collapse it.
 
+## Coherence signals (content/correctness)
+The `coherence` signal (when present) comes from the Coherence Sentinel — it means
+the platform is serving something that doesn't make sense (a prediction that won't
+grade, a coach number that contradicts the canonical facts, a degenerate endpoint).
+Use the `digest` and the flagging `findings` to triage by invariant per the
+Taxonomy's "Content & coherence signals" table. **These are ALWAYS Bucket B or C —
+never auto-fix-safe.** Never hand-edit a served narrative; a content fix is a prompt/
+grounding/compute PR (B) or an operator re-run/judgment (C). When unsure → C, citing
+the exact invariant + offenders.
+
 ## Hard rules
 - **Never** edit a denylisted path (see Taxonomy): `bedrock_client.py`,
   `budget_guard.py`, anything `auth`/`secret`/`credential`, deploy scripts, the

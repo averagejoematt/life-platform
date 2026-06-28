@@ -56,6 +56,43 @@ The stable set the operator must handle — the agent gives the *specific* actio
 
 ---
 
+## Content & coherence signals (the "alive but not right" class)
+
+A distinct signal source: the **Coherence Sentinel** (`coherence_sentinel_lambda`)
+runs daily, checks whether the served *intelligence* still makes sense (predictions
+actually grade, narratives agree with the canonical facts, cross-surface counts
+match, endpoints aren't degenerate), and persists its findings to
+`s3://matthew-life-platform/coherence-log/latest.json`. When it flags, the
+`coherence-overall` alarm fires AND the agent receives the findings record in the
+`coherence` signal (status, the flagging invariants, the AI semantic read, the digest).
+
+**These are CONTENT/CORRECTNESS failures, not infra.** They are governed by one
+hard rule:
+
+> **Coherence findings are NEVER Bucket A. Content never auto-merges.** A wrong
+> number in a coach essay, a prediction that won't grade, a 30-vs-86 split — fixing
+> these means touching prompts, grounding, evaluators, or re-running compute. None
+> of that is on the auto-merge allowlist, and it never will be without explicit
+> human sign-off. Route every coherence finding to **B** or **C** only.
+
+Triage by *which invariant* failed (the finding `name` tells you):
+
+| Invariant flagged | Likely root cause | Bucket | Action |
+|---|---|---|---|
+| **prediction_health** (gradable preds closed but 0 decided) | evaluator regression, or eval-spec extraction broke | **C** (or B if a clear code fix) | "Coach predictions aren't grading — inspect `coach_prediction_evaluator` / `coach_state_updater._build_prediction_eval_spec`; re-run extraction." Don't backfill legacy machine-threshold=None preds (they expire by design). |
+| **facts_agreement** (a narrative number contradicts the canonical facts) | coach grounding gap, or a stale narrative served | **C** | "A served coach essay states a number that contradicts `canonical_facts` — re-run `ai-expert-analyzer` for the day; if it recurs, the grounding prompt needs a fix (PR)." NEVER hand-edit the served essay. |
+| **computed_coherence** (grade letter ≠ its own score band) | scoring desync in `daily_metrics_compute` | **B** | open a PR against the compute logic (behavior change → review). |
+| **endpoint_shape** (a key endpoint degenerate/empty) | a serving handler returning all-zeros (the `handle_predictions` class) | **B** | PR the handler; this is the silent-incoherence pattern the program exists to catch. |
+| **count_agreement** (arc weeks ≠ field-notes weeks) | two surfaces deriving the same count differently | **B** | PR to make both read one source. |
+| **AI semantic read = incoherent** (Haiku flagged contradiction) | as above; the semantic pass carries recall | **C** | report the specific issue(s) it cited; a human decides prompt fix vs re-run. |
+
+When in doubt on a coherence finding → **C (needs-human)** with the specific
+invariant, the offenders, and the digest line. The goal is that the operator sees
+*"the platform is serving something wrong, here's exactly what,"* never an
+auto-merged content edit.
+
+---
+
 ## Operational remediations (direct, not a code PR)
 
 A few fixes are idempotent operational actions the agent does via its scoped role
@@ -75,6 +112,12 @@ These NEVER include arbitrary AWS writes — only the three above.
 `deploy/setup_github_oidc.sh`, `deploy/*deploy*.sh`, `.github/workflows/remediation-agent.yml`
 (the agent's own workflow), `cdk/app.py`, anything matching `*secret*`/`*credential*`,
 and any change that adds/removes an IAM **principal** or widens a resource to `*`.
+
+**Content/correctness is also denylisted from auto-merge:** AI/coach **prompts**,
+grounding/canonical-facts logic, narrative generation, the prediction
+extractor/evaluator, and anything a coherence finding points at. These are always
+B or C — see "Content & coherence signals" above. A content edit is never a Bucket
+A template, regardless of diff size.
 
 ## Guardrails
 - Auto-merge max 3/day; if exceeded, switch remaining to PR + flag in the report.
