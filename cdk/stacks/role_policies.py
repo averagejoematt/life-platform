@@ -1655,7 +1655,13 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="S3FindingsWrite",
             actions=["s3:PutObject"],
-            resources=[f"{BUCKET_ARN}/generated/findings/*"],
+            # generated/findings/* — /api/submit_finding (reader correlation findings)
+            # generated/board_questions/* — /api/board_question (reader questions for the AI board)
+            # Both are moderation queues Matthew reviews; capture only, never auto-published.
+            resources=[
+                f"{BUCKET_ARN}/generated/findings/*",
+                f"{BUCKET_ARN}/generated/board_questions/*",
+            ],
         ),
         iam.PolicyStatement(
             sid="AiKeySecret",
