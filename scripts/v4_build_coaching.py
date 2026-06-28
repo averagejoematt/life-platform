@@ -70,11 +70,11 @@ SHELL = """<!DOCTYPE html>
   <header class="story-top">
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the coaching</span></a>
     <nav class="doors" aria-label="Doors">
-      <a href="/now/">the cockpit</a>
-      <a href="/data/">the data</a>
-      <a href="/coaching/" aria-current="page">the coaching</a>
-      <a href="/protocols/">the protocols</a>
-      <a href="/story/">the story</a>
+      <a href="/now/" title="Today's live instrument — your daily numbers, read back to you">the cockpit</a>
+      <a href="/data/" title="Every source the platform reads — trends now and over time">the data</a>
+      <a href="/coaching/" aria-current="page" title="The AI team &amp; their arguments — stances, track records, disagreements">the coaching</a>
+      <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries">the protocols</a>
+      <a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about">the story</a>
       <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
     </nav>
   </header>

@@ -49,6 +49,18 @@ def _safe_float(d, key):
         return None
 
 
+def _recovery_status(recovery):
+    """Status color for a recovery %, or None when there's no reading.
+
+    Never returns a color without a number behind it — that was the honesty bug
+    (recovery_pct: null paired with recovery_status: "red", which read as "recovery
+    is bad" when it was actually just missing). Callers must pair this with a null %.
+    """
+    if recovery is None:
+        return None
+    return "green" if recovery >= 67 else "yellow" if recovery >= 34 else "red"
+
+
 def _get_latest(table, source, days_back=2):
     """Return most recent DynamoDB record for source, or {}."""
     today = date.today().isoformat()
@@ -75,6 +87,42 @@ def _get_latest(table, source, days_back=2):
         return dict(items[0]) if items else {}
     except Exception as e:
         print(f"[WARN] DynamoDB read failed ({source}): {e}")
+        return {}
+
+
+def _get_latest_finalized(table, source, field, days_back=3):
+    """Most recent record for `source` whose `field` is actually populated, or {}.
+
+    Whoop's recovery_score isn't scored until the night's sleep syncs, so the newest
+    record can carry a null recovery_score. Selecting the latest FINALIZED reading
+    (today-if-scored else the most recent scored day) is the Phase-3 today-else-yesterday
+    parity — it's what keeps recovery_pct from going null beside a stale status color.
+    """
+    today = date.today().isoformat()
+    start = (date.today() - timedelta(days=days_back)).isoformat()
+    try:
+        from phase_filter import with_phase_filter
+
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                    "ExpressionAttributeValues": {
+                        ":pk": f"USER#{USER_ID}#SOURCE#{source}",
+                        ":s": f"DATE#{start}",
+                        ":e": f"DATE#{today}",
+                    },
+                    "ScanIndexForward": False,
+                    "Limit": days_back + 2,
+                }
+            )
+        )
+        for item in resp.get("Items", []):
+            if _safe_float(item, field) is not None:
+                return dict(item)
+        return {}
+    except Exception as e:
+        print(f"[WARN] DynamoDB read failed ({source}.{field}): {e}")
         return {}
 
 
@@ -111,9 +159,14 @@ def lambda_handler(event, context):
     ev = existing.get("vitals", {})
 
     # ── 4. Build fresh vitals ────────────────────────────────────────────────
-    recovery = _safe_float(whoop, "recovery_score")
-    hrv = _safe_float(whoop, "hrv")
-    rhr = _safe_float(whoop, "resting_heart_rate")
+    # Recovery/HRV/RHR are read from the latest FINALIZED-recovery record so the
+    # three move together from one morning's Whoop reading — and so recovery_pct is
+    # never null while the status still shows a stale color (the honesty bug). Sleep
+    # finalizes separately, so it stays on the newest record.
+    whoop_rec = _get_latest_finalized(table, "whoop", "recovery_score") or whoop
+    recovery = _safe_float(whoop_rec, "recovery_score")
+    hrv = _safe_float(whoop_rec, "hrv")
+    rhr = _safe_float(whoop_rec, "resting_heart_rate")
     sleep = _safe_float(whoop, "sleep_duration_hours")
     weight = _safe_float(withings, "weight_lbs")
 
@@ -128,7 +181,10 @@ def lambda_handler(event, context):
         weight = ev.get("weight_lbs")
         weight_as_of = ev.get("weight_as_of")
 
-    rec_status = "green" if (recovery or 0) >= 67 else "yellow" if (recovery or 0) >= 34 else "red"
+    # Status MUST track the %: never a color without a number behind it (the
+    # "recovery_pct: null + recovery_status: red" honesty bug). Both null together
+    # when there's no finalized reading; the front-end already omits a null-% row.
+    rec_status = _recovery_status(recovery)
 
     fresh_vitals = {
         "weight_lbs": round(weight) if weight else None,
@@ -138,8 +194,8 @@ def lambda_handler(event, context):
         "hrv_trend": ev.get("hrv_trend"),
         "rhr_bpm": round(rhr, 1) if rhr else ev.get("rhr_bpm"),
         "rhr_trend": ev.get("rhr_trend"),
-        "recovery_pct": round(recovery, 0) if recovery else None,
-        "recovery_status": rec_status if recovery else ev.get("recovery_status"),
+        "recovery_pct": round(recovery, 0) if recovery is not None else None,
+        "recovery_status": rec_status,
         "sleep_hours": round(sleep, 1) if sleep else ev.get("sleep_hours"),
         "sleep_hours_30d_avg": ev.get("sleep_hours_30d_avg"),
     }
