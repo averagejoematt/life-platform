@@ -187,6 +187,97 @@ def _normalize_metric_hint(hint: str) -> str | None:
     return None
 
 
+# Direction keyword maps for the gradability inference (Scorecard / C-3). The
+# extractor now emits `direction` directly; these are the deterministic fallback
+# when it doesn't, so a metric-backed claim still routes to the directional
+# evaluator (EWMA trend) instead of dying as threshold=None machine→inconclusive.
+_DIR_UP_WORDS = (
+    "improve",
+    "increase",
+    "rise",
+    "rising",
+    "higher",
+    "climb",
+    "go up",
+    "goes up",
+    "recover",
+    "rebound",
+    "gain",
+    "grow",
+    "strengthen",
+    "trend up",
+    "bounce back",
+)
+_DIR_DOWN_WORDS = (
+    "drop",
+    "decrease",
+    "decline",
+    "fall",
+    "lower",
+    "reduce",
+    "shrink",
+    "lose",
+    "loss",
+    "go down",
+    "goes down",
+    "come down",
+    "dip",
+    "trend down",
+    "ease",
+)
+
+
+def _infer_direction(extractor_direction, claim_natural: str) -> str | None:
+    """Resolve a prediction's expected direction → 'up' | 'down' | None.
+
+    Prefers the extractor's explicit `direction`; falls back to keyword
+    inference from the claim. Used to route metric-backed predictions to the
+    directional (EWMA) evaluator so they can actually be graded.
+    """
+    d = (extractor_direction or "").strip().lower()
+    if d in ("up", "rise", "increase", "higher"):
+        return "up"
+    if d in ("down", "fall", "decrease", "lower"):
+        return "down"
+    c = (claim_natural or "").lower()
+    up = any(w in c for w in _DIR_UP_WORDS)
+    down = any(w in c for w in _DIR_DOWN_WORDS)
+    if up and not down:
+        return "up"
+    if down and not up:
+        return "down"
+    return None  # ambiguous or none → caller keeps it qualitative
+
+
+def _build_prediction_eval_spec(metric_hint, direction, window_days):
+    """Build the PREDICTION# `evaluation` block, choosing the gradable type.
+
+    metric + direction → directional (EWMA trend, no threshold needed) — this is
+    the path that lets the daily evaluator actually confirm/refute. Without a
+    resolvable direction (or metric) we stay qualitative rather than writing a
+    machine spec with threshold=None that can only ever go inconclusive.
+    """
+    if metric_hint and direction in ("up", "down"):
+        return {
+            "type": "directional",
+            "metric": metric_hint,
+            "condition": direction,  # the directional evaluator reads 'up'/'down'
+            "threshold": None,
+            "evaluation_window_days": window_days,
+            "null_hypothesis": None,
+            "beats_null_if": None,
+        }
+    return {
+        "type": "qualitative",
+        "metric": metric_hint or None,
+        "condition": None,
+        "threshold": None,
+        "evaluation_window_days": window_days,
+        "null_hypothesis": None,
+        "beats_null_if": None,
+    }
+
+
 # Maximum opening history to keep in voice state
 MAX_RECENT_OPENINGS = 10
 
@@ -430,6 +521,12 @@ EXTRACTION_SYSTEM_PROMPT = (
     "the coach's claim doesn't map cleanly to one of these, return null — "
     "the system will track it as qualitative instead of pretending it can "
     "be machine-verified.\n"
+    "   - direction: which way the metric is expected to move — one of "
+    "['up', 'down', null]. 'up' if the claim expects the metric to rise/"
+    "improve/increase, 'down' if it expects a fall/drop/decrease. null only "
+    "if the claim names a specific target number instead of a direction, or "
+    "genuinely has no direction. This is what lets the evaluator grade the "
+    "call against the trend.\n"
     "   - timeframe_hint: when the prediction should be evaluable\n"
     "   - confidence_stated: any confidence level the coach expressed "
     "(null if not stated)\n\n"
@@ -887,6 +984,9 @@ def lambda_handler(event, context):
             )
         timeframe_hint = pred.get("timeframe_hint", "")
         confidence_stated = pred.get("confidence_stated")
+        # C-3 gradability: resolve the expected direction so a metric-backed claim
+        # routes to the directional (EWMA) evaluator instead of a dead machine spec.
+        direction = _infer_direction(pred.get("direction"), claim) if metric_hint else None
 
         # Build a slug-based prediction ID
         import re
@@ -929,15 +1029,7 @@ def lambda_handler(event, context):
             "coach_id": coach_id,
             "created_date": generation_date,
             "claim_natural": claim,
-            "evaluation": {
-                "type": "machine" if metric_hint else "qualitative",
-                "metric": metric_hint or None,
-                "condition": "gt",  # default — may need refinement
-                "threshold": None,  # extracted from claim if possible
-                "evaluation_window_days": window_days,
-                "null_hypothesis": None,
-                "beats_null_if": None,
-            },
+            "evaluation": _build_prediction_eval_spec(metric_hint, direction, window_days),
             "confidence": _parse_confidence(confidence_stated),
             "subdomain": subdomain,
             "confounders_noted": [],

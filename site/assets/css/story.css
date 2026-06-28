@@ -529,3 +529,42 @@ body { overflow-x: hidden; }
 .exp-tone { color: var(--ink-muted); }
 .exp-tone.tone-cautionary, .exp-tone.tone-urgent { color: var(--ember); }
 .exp-date { color: var(--ink-faint); }
+.exp-headline { display: block; font-family: var(--font-sans); color: var(--ink); font-size: 0.95em; margin-top: 2px; }
+/* The board's cross-week arc synthesis above the week list (C-1). */
+.exp-synth { margin: var(--sp-4) 0 var(--sp-5); padding: var(--sp-4) var(--sp-5); border-left: 2px solid var(--ember); background: var(--surface); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.exp-synth-k { color: var(--ember); margin: 0 0 var(--sp-2); }
+.exp-throughline { font-family: var(--font-serif); font-size: 1.18em; line-height: 1.4; color: var(--ink); margin: 0 0 var(--sp-3); }
+/* Cardio-vs-lifts + per-muscle balance on the training coach (C-2). */
+.bc-modality, .bc-muscle { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
+.bc-mod-h { margin: var(--sp-2) 0 var(--sp-1); color: var(--ember); }
+.bc-mod-list, .bc-musc-list { list-style: none; margin: 0 0 var(--sp-2); padding: 0; display: grid; gap: 4px; }
+.bc-mod-list li { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; }
+.bc-mod-t, .bc-musc-m { font-family: var(--font-sans); color: var(--ink); }
+.bc-musc { display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-2); align-items: baseline; border-bottom: var(--border-hair); padding-bottom: 4px; }
+.bc-musc-n { font-family: var(--font-mono); }
+.bc-musc.musc-over .bc-musc-s, .bc-musc.musc-high .bc-musc-s { color: var(--ember); }
+.bc-musc.musc-under .bc-musc-s { color: var(--ink-faint); }
+/* The Scorecard — the board's graded track record (C-3). */
+.sc-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); margin: var(--sp-4) 0 var(--sp-5); }
+.sc-tile { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); text-align: center; }
+.sc-n { font-family: var(--font-mono); font-size: 1.6em; line-height: 1; color: var(--ink); }
+.sc-l { color: var(--ink-faint); }
+.sc-note { color: var(--ink-soft); }
+.sc-sub { margin-top: var(--sp-5); }
+.sc-coachlist { list-style: none; margin: var(--sp-2) 0; padding: 0; display: grid; gap: 4px; }
+.sc-coachbtn { width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-3); align-items: baseline; padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.sc-coachbtn:hover { border-color: var(--ember); }
+.sc-coach { font-family: var(--font-sans); color: var(--ink); }
+.sc-rate { font-family: var(--font-mono); color: var(--ink); }
+.sc-mix { color: var(--ink-faint); }
+.sc-call { margin: var(--sp-2) 0; padding: var(--sp-3); border-left: 2px solid var(--border); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface); }
+.sc-call-top { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; margin-bottom: 4px; }
+.sc-call-st { text-transform: uppercase; letter-spacing: 0.04em; }
+.sc-call-claim { margin: 0; font-family: var(--font-serif); color: var(--ink); }
+.sc-call-why { color: var(--ink-faint); margin: 4px 0 0; }
+.sc-confirmed { border-left-color: var(--good, #5a8f6b); }
+.sc-confirmed .sc-call-st { color: var(--good, #5a8f6b); }
+.sc-refuted { border-left-color: var(--ember); }
+.sc-refuted .sc-call-st { color: var(--ember); }
+.sc-call-m { font-family: var(--font-mono); color: var(--ink-faint); }
+@media (max-width: 560px) { .sc-tiles { grid-template-columns: repeat(2, 1fr); } }

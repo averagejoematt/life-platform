@@ -583,6 +583,30 @@ def handle_field_notes(event):
     # AI Analysis (GET with ?expert= query param)
 
 
+def handle_experiment_synthesis():
+    """GET /api/experiment_synthesis — the board's cross-week arc of the whole run (C-1).
+
+    Reads the precomputed EXPERT#experiment_arc record (written by ai-expert-analyzer
+    once >=2 weeks of lab notes exist). Honest-null before then; the Experiment view
+    falls back to its week-by-week tone list.
+    """
+    ai_pk = f"{USER_PREFIX}ai_analysis"
+    item = table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item")
+    if not item:
+        return _ok({"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None}, cache_seconds=300)
+    item = _decimal_to_float(item)
+    return _ok(
+        {
+            "arc": item.get("arc"),
+            "throughline": item.get("throughline"),
+            "chapters": item.get("chapters", []),
+            "week_count": int(item.get("week_count") or 0),
+            "generated_at": item.get("generated_at"),
+        },
+        cache_seconds=300,
+    )
+
+
 def handle_ai_analysis(event):
     """GET /api/ai_analysis"""
     qs = event.get("queryStringParameters") or {}
@@ -892,55 +916,62 @@ def handle_predictions(event):
         scan_coaches = [coach_filter] if coach_filter else _pred_coach_ids
         all_predictions = []
         by_coach = {}
+        # The real graded calls live in PREDICTION# records (status set by the daily
+        # coach-prediction-evaluator), NOT in OUTPUT#.predictions (which was a list of
+        # natural-language strings with no status — the old read returned all-zero).
+        _BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired")
 
         for cid in scan_coaches:
             coach_pk = f"COACH#{_pred_coach_id_map[cid]}"
-            by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0}
+            by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
 
             try:
-                out_resp = table.query(
+                resp = table.query(
                     **with_phase_filter(
                         {  # ADR-058: hide pilot predictions
-                            "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("OUTPUT#"),
-                            "ScanIndexForward": False,
-                            "Limit": 12,
+                            "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
+                            "ScanIndexForward": False,  # pred_id is date-prefixed → newest first
+                            "Limit": 300,
                         }
                     )
                 )
-                for out_item in out_resp.get("Items", []):
-                    out_item = _decimal_to_float(out_item)
-                    preds = out_item.get("predictions", [])
-                    out_date = out_item.get("sk", "").replace("OUTPUT#", "")
-                    if not isinstance(preds, list):
+                for rec in resp.get("Items", []):
+                    rec = _decimal_to_float(rec)
+                    p_status = rec.get("status", "pending")
+                    if p_status not in _BUCKETS:
+                        p_status = "pending"
+                    by_coach[cid]["total"] += 1
+                    by_coach[cid][p_status] += 1
+                    if p_status in ("confirmed", "refuted"):
+                        by_coach[cid]["decided"] += 1
+
+                    if status_filter != "all" and p_status != status_filter:
                         continue
-                    for p in preds:
-                        if not isinstance(p, dict):
-                            continue
-                        p_status = p.get("status", "pending")
-                        by_coach[cid]["total"] += 1
-                        if p_status in ("confirmed", "refuted", "pending"):
-                            by_coach[cid][p_status] += 1
-                        else:
-                            by_coach[cid]["pending"] += 1
 
-                        if status_filter != "all" and p_status != status_filter:
-                            continue
+                    ev = rec.get("evaluation") or {}
+                    all_predictions.append(
+                        {
+                            "coach_id": cid,
+                            "coach_name": _pred_coach_names[cid],
+                            "text": rec.get("claim_natural", ""),
+                            "confidence": rec.get("confidence", "medium"),
+                            "status": p_status,
+                            "date": rec.get("created_date", ""),
+                            "metric": ev.get("metric"),
+                            "eval_type": ev.get("type"),
+                            "outcome_notes": rec.get("outcome_notes") or "",
+                            "subdomain": rec.get("subdomain", ""),
+                        }
+                    )
+            except Exception as _qe:
+                logger.warning(f"[/api/predictions] {cid}: {_qe}")
 
-                        all_predictions.append(
-                            {
-                                "coach_id": cid,
-                                "coach_name": _pred_coach_names[cid],
-                                "text": p.get("text", p.get("prediction", "")),
-                                "confidence": p.get("confidence", "medium"),
-                                "status": p_status,
-                                "date": out_date,
-                                "target_date": p.get("target_date", ""),
-                            }
-                        )
-            except Exception:
-                pass
+            decided = by_coach[cid]["decided"]
+            by_coach[cid]["hit_rate_pct"] = round(by_coach[cid]["confirmed"] / decided * 100, 1) if decided else None
 
-        # Sort predictions by date descending
+        # Surface decided calls first (the scorecard signal), then by recency.
+        _order = {"confirmed": 0, "refuted": 0, "pending": 1, "inconclusive": 1, "expired": 2}
+        all_predictions.sort(key=lambda x: (_order.get(x.get("status"), 1), x.get("date", "")), reverse=False)
         all_predictions.sort(key=lambda x: x.get("date", ""), reverse=True)
         all_predictions = all_predictions[:limit]
 
@@ -949,6 +980,8 @@ def handle_predictions(event):
         confirmed = sum(c["confirmed"] for c in by_coach.values())
         refuted = sum(c["refuted"] for c in by_coach.values())
         pending = sum(c["pending"] for c in by_coach.values())
+        inconclusive = sum(c["inconclusive"] for c in by_coach.values())
+        expired = sum(c["expired"] for c in by_coach.values())
         resolved = confirmed + refuted
         accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else 0
 
@@ -959,6 +992,9 @@ def handle_predictions(event):
                     "confirmed": confirmed,
                     "refuted": refuted,
                     "pending": pending,
+                    "inconclusive": inconclusive,
+                    "expired": expired,
+                    "decided": resolved,
                     "accuracy_pct": accuracy_pct,
                 },
                 "by_coach": by_coach,
