@@ -1,0 +1,55 @@
+name: Dependabot Validate
+# SS-04 (self-sustainability): validate a Dependabot **dev-tooling** bump on the PR
+# itself, so the auto-merge workflow has a trustworthy green signal to gate on.
+#
+# Why this exists: the main CI/CD pipeline (Lint + Unit Tests) only runs on
+# push-to-main — PRs get no Python validation. So a Dependabot bump today is
+# effectively unvalidated until it's already merged (and can red main). This job
+# runs the SAME enforced gates (black --check, ruff, the flake8 fail-loud subset,
+# the offline unit suite) on the PR, with a READ-ONLY token, against the *bumped*
+# tool versions — catching a breaking bump before merge.
+#
+# Scope is deliberately narrow: ONLY the root pip dev-tooling group. It never runs
+# for /cdk, github-actions, or runtime deps (their branches don't match the prefix).
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    # dependabot[bot] author + the root dev-tooling group branch prefix. The cdk
+    # toolchain (dependabot/pip/cdk/…) and the github-actions group do NOT match.
+    if: github.actor == 'dependabot[bot]' && startsWith(github.head_ref, 'dependabot/pip/dev-tooling')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      # Install the BUMPED dev toolchain (requirements-dev.txt is what this PR edits)
+      # plus the test deps the suite needs. If a bump breaks any gate below, validate
+      # fails → the bump is NOT auto-merged (left for a human).
+      - name: Install dev toolchain (bumped versions)
+        run: |
+          pip install -r requirements-dev.txt
+          pip install pytest boto3 botocore
+
+      - name: Format gate (black --check — ENFORCED)
+        run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+      - name: Lint gate (ruff — ENFORCED)
+        run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+      - name: flake8 fail-loud subset
+        run: flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Offline unit suite
+        run: python3 -m pytest tests/ --tb=short -q --ignore=tests/test_integration_aws.py
