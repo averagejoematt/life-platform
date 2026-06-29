@@ -406,6 +406,10 @@ body { overflow-x: hidden; }
 .cs-care .label, .cs-careless .label, .cr-edges .label { display: block; color: var(--ember); margin-bottom: 2px; }
 .cs-careless { color: var(--ink-muted); }   /* the "ignoring for now" candor reads softer */
 .cs-gate { display: block; margin-top: var(--sp-3); color: var(--ink-faint); }
+/* the evolution — the serial gold; marked with an ember rule, not faint */
+.cs-evolve { margin-top: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--ember);
+  color: var(--ink); font-size: var(--fs-body); line-height: var(--lh-relaxed); max-width: var(--measure); }
+.cs-evolve .label { display: block; color: var(--ember); margin-bottom: 2px; }
 .coach-outputs { list-style: none; padding: 0; margin: var(--sp-3) 0 0; }
 .coach-outputs li { margin-top: var(--sp-2); color: var(--ink); }
 .coach-outputs .label { color: var(--ink-faint); margin-right: var(--sp-2); }

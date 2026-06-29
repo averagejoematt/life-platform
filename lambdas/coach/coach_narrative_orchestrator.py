@@ -411,6 +411,13 @@ def _gather_all_state(coach_id):
     if not active_predictions:
         logger.info("No active predictions for %s", coach_id)
 
+    # 10. Current stance — the coach-opinion engine's evolving read of Matthew
+    # (coach_history_summarizer writes STANCE#latest). Absent pre-data; when
+    # present it leads the generation framing over the static goal block.
+    current_stance = _get_item(coach_pk, "STANCE#latest")
+    if not current_stance:
+        logger.info("No stance yet for %s — first cycles", coach_id)
+
     return {
         "target_compressed": target_compressed,
         "other_compressed": other_compressed,
@@ -421,6 +428,22 @@ def _gather_all_state(coach_id):
         "voice_state": voice_state,
         "open_threads": open_threads,
         "active_predictions": active_predictions,
+        "current_stance": current_stance,
+    }
+
+
+def _stance_for_brief(stance):
+    """Trim a STANCE#latest record to the fields that steer generation (drop the
+    internal bookkeeping — grounding_flag, generated_at, evidence_basis)."""
+    if not isinstance(stance, dict):
+        return None
+    return {
+        "headline_read": stance.get("headline_read", ""),
+        "focused_on_now": stance.get("focused_on_now", []),
+        "set_aside_for_now": stance.get("set_aside_for_now", []),
+        "stage": stance.get("stage", {}),
+        "how_my_read_changed": stance.get("how_my_read_changed", ""),
+        "as_of": stance.get("as_of"),
     }
 
 
@@ -546,6 +569,18 @@ def _build_user_message(state, coach_id, today):
     # Empty right after a reset; fills as the evaluator resolves predictions.
     parts.append("## Your Track Record (resolved predictions, last 60 days)")
     parts.append(_track_record_block(coach_id))
+    parts.append("")
+
+    # Current stance (2026-06-29): the coach's evolving, evidence-derived read of
+    # Matthew. Steers the narrative beat/focus so generation follows the opinion
+    # the coach has actually formed — not a static weight goal. Injected into the
+    # brief deterministically downstream; surfaced here so PLANNING is stance-aware.
+    parts.append("## Current Stance (your evolving read of Matthew)")
+    if state.get("current_stance"):
+        parts.append(json.dumps(_stance_for_brief(state["current_stance"]), indent=2, default=str))
+        parts.append("Align the narrative beat and focus with this stance. If the data now contradicts it, that tension is the story.")
+    else:
+        parts.append("No stance yet — first cycles. Establish the read.")
     parts.append("")
 
     parts.append("## Instructions")
@@ -717,6 +752,15 @@ def lambda_handler(event, context):
         if not brief:
             logger.warning("No fallback brief available — using default for %s", coach_id)
             brief = _build_default_brief(coach_id, today)
+
+    # Inject the coach's current stance into the brief DETERMINISTICALLY (not via
+    # the LLM) so its evolving read of Matthew reaches generation verbatim, on every
+    # path including fallback/default. Absent pre-data — the coach then leans on its
+    # goal framing as before (ai_calls.py). The brief flows verbatim into the coach
+    # prompt, so this is the seam that closes the stance→generation loop.
+    stance = state.get("current_stance")
+    if stance and isinstance(brief.get("generation_brief"), dict):
+        brief["generation_brief"]["current_stance"] = _stance_for_brief(stance)
 
     # Cache the brief for fallback use
     _cache_brief(coach_id, brief, today)
