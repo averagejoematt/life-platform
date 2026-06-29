@@ -169,3 +169,46 @@ def test_overall_status_takes_worst():
         ci.Finding("c", ci.ALARM),
     ]
     assert ci.overall_status(findings) == ci.ALARM
+
+
+class TestExperimentContinuity:
+    """SS-05: a continuous experiment is fine; a counter that disagrees with genesis
+    (the ADR-077 stale-pre-reset leak) is not."""
+
+    GEN = "2026-06-14"
+
+    def test_coherent_continuous_experiment_ok(self):
+        # ~2 weeks past genesis; surfaced weeks match → OK (counters grow forever, fine).
+        f = ci.check_experiment_continuity(self.GEN, "2026-06-29", [{"name": "arc", "week": 3}])
+        assert f.status == ci.OK
+        assert f.value == 3.0  # derived week
+
+    def test_stale_pre_reset_high_week_alarms(self):
+        # genesis ~2 weeks ago, but a stale week-27 post leaked back into selection.
+        f = ci.check_experiment_continuity(self.GEN, "2026-06-29", [{"name": "latest_chronicle_week", "week": 27}])
+        assert f.is_alarm
+        assert "27" in f.detail
+
+    def test_one_week_boundary_overcount_is_tolerated(self):
+        # derived=3, a current-week post one ahead → within tolerance → OK.
+        f = ci.check_experiment_continuity(self.GEN, "2026-06-29", [{"name": "arc", "week": 4}])
+        assert f.status == ci.OK
+
+    def test_small_overcount_warns_not_alarms(self):
+        # derived=3, week=5 (derived+2) → over tolerance but not egregious → WARN.
+        f = ci.check_experiment_continuity(self.GEN, "2026-06-29", [{"name": "arc", "week": 5}])
+        assert f.status == ci.WARN
+
+    def test_genesis_in_future_alarms(self):
+        f = ci.check_experiment_continuity("2026-07-01", "2026-06-29", [])
+        assert f.is_alarm
+        assert "underflow" in f.detail or "<1" in f.detail
+
+    def test_week_below_one_alarms(self):
+        f = ci.check_experiment_continuity(self.GEN, "2026-06-29", [{"name": "arc", "week": 0}])
+        assert f.is_alarm
+
+    def test_unparseable_genesis_skips(self):
+        f = ci.check_experiment_continuity("not-a-date", "2026-06-29", [{"name": "arc", "week": 3}])
+        assert f.status == ci.OK
+        assert "skipped" in f.detail
