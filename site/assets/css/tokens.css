@@ -1096,3 +1096,18 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .coach-head .dx-kicker { margin: 0; }
 .coach-head .dx-title { margin: 0.1em 0 0; }
 
+/* ── Editorial imagery (Part II) — atmospheric, free-license cover art on the
+   narrative Story surfaces ONLY (chronicle · podcast · blog). A warm duotone
+   treatment ties any photo to the ember/ink palette so it reads as editorial
+   texture, never a literal data claim. Always carries attribution. */
+.editorial-img { position: relative; margin: 0 0 var(--sp-5); border-radius: var(--radius); overflow: hidden;
+  aspect-ratio: 21 / 9; background: var(--surface-sunken); isolation: isolate; }
+.editorial-cover { aspect-ratio: 16 / 10; max-width: 420px; }
+.editorial-img .img-duotone { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(0.62) contrast(1.04); }
+/* The warm wash — soft-light so the photo stays legible (no gloss, no flatten). */
+.editorial-img::after { content: ""; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: soft-light;
+  background: linear-gradient(180deg, color-mix(in oklch, var(--ember) 24%, transparent), transparent 55%,
+    color-mix(in oklch, var(--page) 28%, transparent)); }
+.img-credit { position: absolute; right: var(--sp-2); bottom: var(--sp-2); margin: 0; padding: 2px 7px;
+  border-radius: var(--radius-xs); background: color-mix(in oklch, #000 48%, transparent); color: #ECE3D2; }
+
