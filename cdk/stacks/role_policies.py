@@ -870,8 +870,9 @@ def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
     return _email_base(
         # generated/panelcast/* = published episodes; panelcast-holds/* = NON-public
         # human-review drafts when the QA/compassion gate holds an episode.
-        needs_s3_write=["generated/panelcast/*", "panelcast-holds/*"],
-        extra_secrets=["life-platform/google-tts"],
+        # editorial/* = atmospheric cover art (Part II, fail-soft, kill-switch off).
+        needs_s3_write=["generated/panelcast/*", "panelcast-holds/*", "generated/assets/images/editorial/*"],
+        extra_secrets=["life-platform/google-tts", "life-platform/pexels"],
         extra_statements=[
             iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
             # Loud HOLD + new-episode notify: SNS to life-platform-alerts.
@@ -892,7 +893,11 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
     """Wednesday chronicle: DDB read, S3 config, ai-keys, SES, writes blog/* + site/journal/* to S3.
     site/journal/posts/week-{nn}/index.html + site/journal/posts.json written via publish_to_journal.
     """
-    return _email_base(needs_s3_write=["blog/*", "site/journal/*", "generated/journal/*"])
+    # editorial/* = atmospheric cover art (Part II, fail-soft, kill-switch off); pexels = image API key.
+    return _email_base(
+        needs_s3_write=["blog/*", "site/journal/*", "generated/journal/*", "generated/assets/images/editorial/*"],
+        extra_secrets=["life-platform/pexels"],
+    )
 
 
 def email_weekly_plate() -> list[iam.PolicyStatement]:

@@ -92,7 +92,7 @@ body { overflow-x: hidden; }
 .constellation .node circle { fill: var(--surface-raised); stroke: var(--ink-faint); stroke-width: 1; transition: r var(--dur) var(--ease-out); }
 /* Earned glow — only the pillars that are UP get the warm halo (design system §12:
    glow is reserved for "this is up", never decorative). Filters don't affect layout. */
-.constellation .node.up circle { stroke: var(--ember); fill: color-mix(in oklch, var(--ember) 14%, var(--surface)); filter: drop-shadow(0 0 5px var(--ember-soft)); }
+.constellation .node.up circle { stroke: var(--ember); stroke-width: 1.5; fill: color-mix(in oklch, var(--ember) 18%, var(--surface)); filter: drop-shadow(0 0 8px var(--ember-soft)); }
 .constellation .node text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-muted); text-anchor: middle; }
 .constellation .node .score { fill: var(--ink); font-size: 11px; }
 .constellation figcaption { color: var(--ink-faint); max-width: 38ch; }

@@ -1257,6 +1257,41 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     cur_label = _series_label(date_str)
     cur_seq = _seq_for(date_str)
 
+    # Editorial cover image (Part II — atmospheric, free-license; fail-soft, kill-switch
+    # default OFF). Carry past images forward from the existing manifest so we only fetch
+    # for the NEW post (skip-if-set). ANY failure → no image, normal publish.
+    cur_url = f"/journal/posts/week-{cur_seq:02d}/"
+    _prior_imgs = {}
+    cur_image = {}
+    try:
+        import editorial_image
+
+        if editorial_image.enabled():
+            try:
+                _pj = json.loads(s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")["Body"].read())
+                for _p in _pj.get("posts", []):
+                    if _p.get("image_url"):
+                        _prior_imgs[_p.get("url")] = {"image_url": _p["image_url"], "image_credit": _p.get("image_credit", "")}
+            except Exception:
+                _prior_imgs = {}
+            cur_image = (
+                _prior_imgs.get(cur_url)
+                or editorial_image.fetch_and_store("chronicle", f"week-{cur_seq:02d}", cur_seq, s3_client=s3, secrets_client=secrets)
+                or {}
+            )
+    except Exception:
+        cur_image = {}
+
+    _art_html = ""
+    if cur_image.get("image_url"):
+        _art_html = (
+            '<figure class="post-header__art" style="margin:0 0 22px;border-radius:10px;overflow:hidden;position:relative;aspect-ratio:21/9;background:#16130E">'
+            f'<img src="{cur_image["image_url"]}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;filter:saturate(.62) contrast(1.03)">'
+            f'<figcaption style="position:absolute;right:8px;bottom:6px;font:11px/1.4 ui-monospace,monospace;color:#e7dccb;'
+            f'background:rgba(0,0,0,.5);padding:2px 7px;border-radius:4px">{cur_image.get("image_credit", "")}</figcaption>'
+            "</figure>"
+        )
+
     # Extract read time (~250 words/min)
     word_count = len(body_html.split())
     read_min = max(4, round(word_count / 250))
@@ -1346,6 +1381,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
   <div class="nav__status"><div class="pulse" style="background:var(--accent)"></div><span>The Measured Life</span></div>
 </nav>
 <div class="post-header">
+  {_art_html}
   <div class="post-header__series">The Measured Life &middot; {cur_label} &middot; By Elena Voss</div>
   <h1 class="post-header__title">&ldquo;{title}&rdquo;</h1>
   <div class="post-header__meta">
@@ -1391,6 +1427,9 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     for inst in sorted(all_installments, key=lambda x: x.get("date", ""), reverse=True):
         idate = inst.get("date", "")
         seq = _seq_for(idate)
+        _u = f"/journal/posts/week-{seq:02d}/"
+        # current post → freshly fetched image; past posts → carried forward from the prior manifest.
+        _im = cur_image if idate == date_str else _prior_imgs.get(_u, {})
         posts_manifest.append(
             {
                 "week": int(inst.get("week_number", 0) or 0),
@@ -1398,10 +1437,12 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
                 "title": inst.get("title", ""),
                 "date": idate,
                 "stats_line": inst.get("stats_line", ""),
-                "url": f"/journal/posts/week-{seq:02d}/",
+                "url": _u,
                 "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
                 "word_count": inst.get("word_count", 0),
                 "has_board_interview": inst.get("has_board_interview", False),
+                "image_url": _im.get("image_url", ""),
+                "image_credit": _im.get("image_credit", ""),
             }
         )
     posts_json_str = json.dumps(
