@@ -628,6 +628,11 @@ def lambda_handler(event, context):
     if path == "/api/character" and (event.get("queryStringParameters") or {}).get("date"):
         return handle_character(date=event["queryStringParameters"]["date"].strip())
 
+    # Phase 4 historical window (2026-06-29): /api/vitals?date=YYYY-MM-DD — the
+    # cockpit as of a past date. Dateless requests fall through to the ROUTES default.
+    if path == "/api/vitals" and (event.get("queryStringParameters") or {}).get("date"):
+        return handle_vitals(date=event["queryStringParameters"]["date"].strip())
+
     # Phase 1: Observatory week (GET with query params)
     if path == "/api/observatory_week":
         qs = event.get("queryStringParameters") or {}

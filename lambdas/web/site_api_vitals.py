@@ -41,6 +41,7 @@ from web.site_api_common import (
     _error,
     _get_profile,
     _latest_item,
+    _latest_item_asof,
     _ok,
     _query_source,
     logger,
@@ -48,19 +49,30 @@ from web.site_api_common import (
 )
 
 
-def handle_vitals() -> dict:
+def handle_vitals(date: str | None = None) -> dict:
     """
-    GET /api/vitals
+    GET /api/vitals[?date=YYYY-MM-DD]
     Returns: current weight, HRV, recovery, RHR, sleep hours, 30d trends.
     Cache: 300s (5 min) — feels real-time, Lambda fires ~12x/hour at 50k traffic.
+    With ?date= (Phase 4 historical window): the cockpit AS OF that date — latest
+    readings on-or-before it, 30d trends ending there, pilot/prior-cycle records
+    included, a future date clamps to today, cached a day (the past is immutable).
     """
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    d30 = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
-    d7 = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    import re as _re
+
+    if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return _error(400, "date must be YYYY-MM-DD")
+    ip = bool(date)  # ADR-058: include pilot/prior-cycle records only when time-travelling
+    _now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    anchor = min(date, _now) if date else _now  # clamp a future scrub to today
+    _anchor_dt = datetime.strptime(anchor, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    today = anchor
+    d30 = (_anchor_dt - timedelta(days=30)).strftime("%Y-%m-%d")
+    d7 = (_anchor_dt - timedelta(days=7)).strftime("%Y-%m-%d")
 
     # Whoop (recovery, HRV, RHR, sleep)
-    whoop_7d = _query_source("whoop", d7, today)
-    whoop_30d = _query_source("whoop", d30, today)
+    whoop_7d = _query_source("whoop", d7, today, include_pilot=ip)
+    whoop_30d = _query_source("whoop", d30, today, include_pilot=ip)
 
     # Latest reading
     latest = sorted([w for w in whoop_7d if w.get("recovery_score") is not None], key=lambda x: x.get("sk", ""), reverse=True)
@@ -83,8 +95,9 @@ def handle_vitals() -> dict:
             return "declining"
         return "stable"
 
-    # G-3: Latest weight — check Withings first, fall back to Apple Health (HAE)
-    withings_latest = _latest_item("withings")
+    # G-3: Latest weight — check Withings first, fall back to Apple Health (HAE).
+    # Time-travel: the latest weigh-in on-or-before the anchor (else the live latest).
+    withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings")
     current_weight = None
     weight_as_of = None
     if withings_latest:
@@ -94,7 +107,7 @@ def handle_vitals() -> dict:
             weight_as_of = withings_latest.get("sk", "").replace("DATE#", "") or withings_latest.get("date")
     # v1.4.2: Check apple_health for more recent weight (HAE fallback)
     try:
-        ah_latest = _latest_item("apple_health")
+        ah_latest = _latest_item_asof("apple_health", today, ip) if date else _latest_item("apple_health")
         if ah_latest and ah_latest.get("weight_lbs"):
             ah_date = ah_latest.get("sk", "").replace("DATE#", "")[:10]
             if not weight_as_of or ah_date > weight_as_of:
@@ -103,7 +116,7 @@ def handle_vitals() -> dict:
     except Exception:
         pass
 
-    withings_30d = _query_source("withings", d30, today)
+    withings_30d = _query_source("withings", d30, today, include_pilot=ip)
     weight_vals = [float(w["weight_lbs"]) for w in withings_30d if w.get("weight_lbs")]
     weight_delta_30d = round(weight_vals[-1] - weight_vals[0], 1) if len(weight_vals) >= 2 else None
 
@@ -166,10 +179,11 @@ def handle_vitals() -> dict:
                 # same-day. night_of is the evening those readings came from.
                 "frame": "last_night",
                 "night_of": _night_of,
+                "time_travel": ip,
             },
             "page_freshness": page_freshness,
         },
-        cache_seconds=300,
+        cache_seconds=86400 if ip else 300,  # the past is immutable
     )
 
 

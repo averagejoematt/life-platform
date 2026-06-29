@@ -577,20 +577,28 @@ async function load(dateStr) {
     // verdict/boardline stay present-tense only, so they're replaced by an
     // honest note rather than faked for the past.
     if (dateStr) {
-      const charBody = await getJSON(`${API}/character?date=${encodeURIComponent(dateStr)}`);
+      // Phase 4 historical window: the cockpit AS OF that date — the character sheet,
+      // the REAL vitals from that morning (no longer hidden — /api/vitals?date= serves
+      // them), and a cross-link into the chronicle installment that narrates the week.
+      const [charBody, vitBody, posts] = await Promise.all([
+        getJSON(`${API}/character?date=${encodeURIComponent(dateStr)}`),
+        getJSON(`${API}/vitals?date=${encodeURIComponent(dateStr)}`).catch(() => null),
+        getJSON(`/journal/posts.json`).catch(() => null),
+      ]);
       const character = charBody?.character;
       state.pillars = {};
       for (const p of charBody?.pillars || []) state.pillars[p.name] = p;
       if (!character || !Object.keys(state.pillars).length) throw new Error("no sheet for that date");
       renderHub(character);
       renderDomains();
-      // No raw vitals on the dated /character sheet → the last-night band can't be
-      // honest about a past night, so hide it (like the boardline/forecast).
-      const rd = $("[data-readiness]"); if (rd) rd.hidden = true;
+      // Real readings from that date (renderReadiness self-hides if the date has none).
+      renderReadiness(vitBody?.vitals || null);
       bind("boardline").hidden = true;
+      const post = nearestPost(posts, dateStr);
+      const xlink = post ? ` <a href="/story/chronicle/#${escapeHTML(post.date)}">Read ${escapeHTML(post.label || ("Week " + post.week))} &rarr;</a>` : "";
       bind("verdict").innerHTML =
-        `<span class="mark">&rsaquo;</span> Time travel — this is the sheet as of <strong>${escapeHTML(character.as_of_date || dateStr)}</strong>. ` +
-        `The board speaks only in the present. <a href="/now/">Back to today →</a>`;
+        `<span class="mark">&rsaquo;</span> Time travel — the cockpit as of <strong>${escapeHTML(character.as_of_date || dateStr)}</strong>. ` +
+        `The board speaks only in the present.${xlink} <a href="/now/">Back to today →</a>`;
       bind("asof").textContent = `as of ${character.as_of_date || dateStr} (history)`;
       main.dataset.state = "ready";
       $(".panel").setAttribute("aria-busy", "false");
@@ -647,6 +655,15 @@ function escapeHTML(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+// Phase 4: the chronicle installment that narrates a given date = the soonest week
+// ending on/after it (mirrors the timeline's postFor). Null-safe; decorative.
+function nearestPost(pj, date) {
+  const arr = (pj && pj.posts) || [];
+  let best = null;
+  for (const p of arr) { if (!p.date) continue; if (p.date >= date && (!best || p.date < best.date)) best = p; }
+  return best || arr[0] || null;
 }
 
 function wireScrub() {

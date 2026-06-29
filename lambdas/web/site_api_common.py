@@ -204,6 +204,25 @@ def _latest_item(source: str, include_pilot: bool = False) -> dict | None:
     return items[0] if items else None
 
 
+def _latest_item_asof(source: str, date: str, include_pilot: bool = False) -> dict | None:
+    """Most-recent item on-or-before `date` (DATE#YYYY-MM-DD) — the time-travel
+    counterpart of _latest_item. Phase 4 historical windows: 'the latest reading as it
+    stood that morning'. ADR-058: pass include_pilot=True when time-travelling so
+    prior-cycle history is visible (mirrors handle_character)."""
+    pk = f"{USER_PREFIX}{source}"
+    kwargs = with_phase_filter(
+        {
+            "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between("DATE#0000-00-00", f"DATE#{date}"),
+            "ScanIndexForward": False,
+            "Limit": 1,
+        },
+        include_pilot=include_pilot,
+    )
+    resp = table.query(**kwargs)
+    items = _decimal_to_float(resp.get("Items", []))
+    return items[0] if items else None
+
+
 def _get_profile() -> dict:
     """Read PROFILE#v1 from DynamoDB. Cached after first call in warm container."""
     global _profile_cache
