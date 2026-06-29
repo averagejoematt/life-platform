@@ -35,7 +35,7 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
 SHARED_LAYER_VERSION = (
-    91  # v91: ai_summaries (primary_whoop day-selection) + ingestion_validator (canonical-vitals guards) — accuracy Phase 3
+    92  # v92: ai_calls ACTIVE PROTOCOLS steering — coaches react to active site challenges/experiments (backend serial phase 2)
 )
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
