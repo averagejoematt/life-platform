@@ -1,90 +1,80 @@
-# HANDOVER — Backend serial phase 2: the coaches-review-the-site loop — 2026-06-29
+# HANDOVER — Backend serial phase 3: Elena "previously on" recaps — 2026-06-29
 
-Phase 2 of four backend serial phases. Coaches now **react to the challenges/experiments Matthew
-has committed to on the site** instead of treating those protocol surfaces as separate from the
-coaching. Built, deployed live (full layer dance), and verified end-to-end.
+Phase 3 of four backend serial phases. A serial-TV cold-open so a reader arriving months in can catch
+up fast — **Elena Voss** (the embedded narrator who writes the weekly Chronicle; NOT the PI, that's
+Dr. Eli Marsh) produces a "previously on" recap grounded ONLY in **published** chronicle installments +
+the narrative arc. Built, deployed live, verified end-to-end.
 
-**2 PRs, both MERGED + DEPLOYED:** **#273** (the feature) · **#274** (the `SHARED_LAYER_VERSION`
-91→92 hygiene bump). Matthew merged both and authorized "do all the deploys" this session.
-**main == live, fleet uniform on layer v92, 0 open PRs, no drift.**
+**1 feature PR: #276 (MERGED + DEPLOYED).** Plus #275 (the phase-2 wrap docs) merged this session.
+Matthew authorized "you run the deploys." **main == live, 0 open PRs.**
 
 ---
 
 ## 1. What shipped (all live, verified)
 
-Phase 1 (the coach-opinion engine) made `coach_narrative_orchestrator._gather_all_state` the seam each
-coach reads its evolving context from. **Phase 2 extends that same seam** — one new gather step.
+**Low-fabrication by construction — generate-at-draft, commit-at-publish.** The recap is built as a
+`draft_recap_json` when the weekly Chronicle is drafted and only written to `RECAP#latest` when that week
+actually publishes (approve OR the auto-publish sweep). So it can never run ahead of the history it
+summarizes.
 
-- **`coach_narrative_orchestrator.py`** — new `_gather_site_protocols(coach_id)`:
-  - Reads active **challenges** (clean `domain` field) + **experiments** (routed by `tags`), filtered
-    per-coach via a deterministic `COACH_DOMAINS` map. `explorer_coach` (domains=None) sees all; an
-    experiment whose tags match no domain falls through to explorer **only** — never mis-attributed,
-    never silently dropped.
-  - Reads go through `_query_begins_with` → **ADR-058 phase-filtered**, so the coach sees exactly the
-    active set the site/MCP surface (`_apply_phase_filter`). Confirmed: challenge writes set **no**
-    `phase` attr → active items pass `attribute_not_exists`; stale pre-genesis `pilot` candidates stay
-    hidden.
-  - **Fail-soft** (wrapped → returns `{}`; the daily run can't be aborted by this gather).
-  - `_protocols_for_brief` trims/caps (≤5 per surface, drops nulls); surfaced in the planning message
-    and **injected into the brief deterministically on every path** (success/fallback/default) — the
-    exact seam `current_stance` uses.
-- **`ai_calls.py`** — one ACTIVE PROTOCOLS instruction: acknowledge commitments BY NAME, **never invent**
-  progress/streak/adherence numbers (ground in real data or say it's not visible yet); the N=1 /
-  decision-class ceilings still apply.
-- **`coach_history_summarizer.py`** (folded-in stance polish) — the stance no-numbers rule now explicitly
-  covers **TARGETS and GAPS-TO-TARGET, even accurate ones** ("running short of the protein target", NOT
-  "26% short of 190g"). Clears labs_coach's persistent `grounding_flag` while keeping the one-invariant
-  guard (a stance is an opinion, never a readout). Takes effect on the next weekly summarizer run.
+- **`wednesday_chronicle_lambda.build_recap()`** — deterministic gather → one grounded Sonnet call (the
+  chronicle's LOCAL `call_anthropic`, NOT the `ai_calls` layer module → no layer rebuild) → 5 guards:
+  1. **Deterministic date cross-check (strongest):** any beat whose `date` isn't a real
+     published-installment date is dropped — never trust an LLM-emitted date.
+  2. raw-vitals strip on beats; 3. raw-vitals reject on the headline paragraph; 4. privacy gate
+     (fail-closed — no real public figures/vices); 5. thin-history blanking (<2 published →
+     `story_so_far` only). All wrapped **fail-soft** — a recap error never aborts the chronicle.
+  Grounds in published installments + `NARRATIVE#arc` + `EXPERT#experiment_arc` (prose summaries only,
+  never raw vitals). Stored as `draft_recap_json`; written directly to `RECAP#` on the non-preview path.
+  New `{"recap_only": true}` invoke mode bootstraps/regenerates from existing published history without
+  forcing a new installment.
+- **`chronicle_approve_lambda._commit_recap()`** — writes `RECAP#latest` + `RECAP#{date}` from
+  `draft_recap_json` on BOTH the approve path and the auto-publish sweep; `draft_recap_json` cleaned up
+  by `_mark_published`.
+- **`site_api_coach.handle_recap` + `/api/recap`** — honest-null before the first recap; withholds a
+  stale record (`experiment_day > current day`) like `handle_ai_analysis`.
+- **`dispatches.js` + `story.css`** — the `/story/timeline/` "story so far" leads with Elena's recap
+  (story + dated beats linking into the chronicle reader), **falling back** to the existing front-end
+  stat aside when `/api/recap` is null (no regression). New `.tl-recap-elena` styles.
 
-**Scope held tight (board recommendation):** challenges + experiments only. **Habits DEFERRED** — the
-65-item registry is ongoing behavior whose adherence already reaches coaches via `domain_data`;
-re-surfacing risks number-fabrication. No persisted protocol-read record (phase 3/4). No site-api /
-read-path changes.
+`RECAP#` is under `USER#…#SOURCE#chronicle` → already `EXPERIMENT_SCOPED`, wiped on reset (**zero
+taxonomy change**, asserted in tests). New `tests/test_chronicle_recap.py` (14). 14/14 pass; ruff +
+black clean; 368 related tests green. (The `NARRATIVE#arc` inline-pk literal tripped `test_ddb_patterns`
+until moved to a variable — the same way the orchestrator's `_get_item` helper avoids it.)
 
-**Tests:** +10 in `tests/test_coach_stance_engine.py` (domain routing, active-only, tag routing,
-explorer-catches-untagged, trim/cap, brief surfacing + deterministic injection, omit-when-empty,
-fail-soft). **30/30 pass; ruff + black clean; 198 coach tests green** (creds-blanked per the CI lesson).
+## 2. Deploy (lighter than phase 2 — NO layer dance; Matthew authorized)
 
-## 2. Deploy — the full layer dance (Matthew authorized "do all the deploys")
+Every step behind a `cdk diff` / verify read:
+- **`cdk diff`+deploy `LifePlatformEmail`** (chronicle + approve) — diff was the benign shared-`lambdas/`
+  bundle re-hash across all email lambdas, **zero destroys/IAM/layer change** (`SHARED_LAYER_VERSION`
+  unchanged at v92).
+- **site-api via `deploy/deploy_site_api.sh /api/recap`** (full `web/` package + route verify → 200) —
+  NOT `cdk deploy LifePlatformWeb`.
+- **Front-end via `sync_site_to_s3.sh`** (clobber guard passed; CloudFront invalidated `/story/*`).
 
-`ai_calls.py` is a **layer module**; the orchestrator + summarizer are standalone Compute assets. Sequence
-(every `cdk diff` read first — layer re-point + benign shared-asset re-hash, **zero destroys, zero IAM**):
+**Verified live:** bootstrapped the first recap (`recap_only` invoke → `RECAP#latest`, `as_of
+2026-06-20`, day 7, 3 beats). `/api/recap` serves it in production. **All 3 beat dates are real
+published-installment dates** (the cross-check working). The story faithfully summarizes the published
+prologue (recovery-12 morning, immaculate-infrastructure/empty-journal, the June-14 launch); the surname
+"Walker" appears 2× in published installments (grounded, not fabricated). **main == live, no
+constants/layer change → no reverse squash-drift trap.**
 
-1. `bash deploy/build_layer.sh`
-2. `cdk diff`+`deploy LifePlatformCore` → publishes **layer v92** (diff was ONLY the layer content hash).
-3. Bump `SHARED_LAYER_VERSION` 91→92 in `cdk/stacks/constants.py` (→ #274).
-4. **Redeploy ALL 5 consumer stacks** (Compute + Ingestion + Email + MCP + Operational) so the whole fleet
-   attaches v92 — **fleet uniformity** is the gate (the v89 lesson: a mixed fleet trips the Plan
-   layer-consistency check). Compute also carried the orchestrator + summarizer code.
+## 3. ⚠️ Honest watch item
 
-The Operational site-api `Code` S3Key change was the **known-benign `Code.from_asset` re-hash**, not a
-code revert: `lambdas/web/` matched origin/main exactly, so the CDK asset == live. (Reminder: the targeted
-site-api deploy path is `deploy/deploy_site_api.sh`, but a `cdk deploy LifePlatformOperational` for a layer
-bump is safe when web/ == main, as it was here.)
-
-**Verified live:** fleet histogram **71/71 layer-attached functions on v92**; orchestrator + summarizer
-fresh code on v92; **live smoke invoke** of `coach-narrative-orchestrator` → `200`, no error → the new
-gather path runs clean against the real phase-filtered partitions, **correctly omits `site_protocols`**
-(nothing active right now → the block surfaces the moment Matthew activates a challenge), and
-`current_stance` intact (no phase-1 regression).
-
-## 3. ⚠️ The reverse squash-drift trap (handled)
-
-The `SHARED_LAYER_VERSION` bump HAD to land on main (#274) or a future `cdk deploy` from main would
-revert the fleet to `:91`. Main was one constant behind live until #274 merged. Now reconciled —
-main == live for both code (#273) and layer version (#274).
+The raw-vitals guard is **digit-based**, so spelled-out numbers ("recovery score of *twelve* … climbed to
+*twenty*") pass through. In the bootstrap recap they're grounded (faithful to the published installment),
+so it's correct — but it's the same spelled-number gap the stance engine has. Watch across future weekly
+recaps; don't over-engineer now. (If it ever surfaces a *fabricated* spelled number, tighten the guard to
+catch number-words after vital keywords.)
 
 ## 4. ⚠️ OUTSTANDING — next sessions
 
-- **Backend serial phases 3–4 (each its own session + deploys):** Elena-written "previously on" recaps;
-  arbitrary historical-window APIs (`/api/character?date=` already time-travels — extend to data/waveform);
-  data→chronicle cross-links. All extend the same `_gather_all_state` hook.
+- **Backend serial phase 4 (its own session + deploys):** historical-window APIs — `/api/character?date=`
+  already time-travels; extend the pattern to data/waveform endpoints; data→chronicle cross-links. This
+  is the last of the four backend serial phases.
 - **SS tail (B/C):** SS-08 monthly "what changed" · SS-09 podcast format rotation · SS-11 editorial-image
   guard.
-- **Watch:** labs_coach `grounding_flag` across the next few weekly summarizer runs — the prompt fix
-  should clear it; if it persists, tighten further (don't chase stochastic output, but a persistent flag
-  is signal). The summarizer still caps OUTPUT# at 20 but NOT threads/predictions (52/39) — a longer-term
-  input-bound follow-up.
-- **To see it work:** activate a challenge (MCP `activate_challenge`) → the relevant coach reacts to it
-  by name on the next daily run; `jq '.generation_brief.site_protocols'` on an orchestrator invoke
-  confirms.
+- **Watch:** the spelled-number recap gap (above); labs_coach `grounding_flag` across weekly summarizer
+  runs.
+- **To regenerate a recap any time:** `aws lambda invoke --function-name wednesday-chronicle --payload
+  '{"recap_only":true}' …` → rewrites `RECAP#latest` from the latest published history.
