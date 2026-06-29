@@ -646,7 +646,15 @@ def _compress_coach(coach_id, state):
         result = _call_haiku(
             system=COMPRESSION_SYSTEM_PROMPT,
             user_message=user_message,
-            max_tokens=1500,
+            # 2026-06-29: was 1500 — too small once threads/predictions accrued.
+            # A rich coach (50+ threads, 40+ predictions) produces a compressed
+            # JSON that exceeded 1500 tokens, truncated mid-object, never emitted
+            # the closing ```json fence, failed to parse, and EVERY coach silently
+            # fell back to a structural-only stub — degrading the orchestrator's
+            # context AND blocking the stance engine (which won't ground on a
+            # fallback). 4000 gives headroom; you only pay for tokens generated.
+            # (Same failure mode + fix as the orchestrator's 2000→6000 bump.)
+            max_tokens=4000,
             temperature=0.2,
         )
 
@@ -930,7 +938,7 @@ def _generate_stance(coach_id, compressed, track, prior_stance):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     user_message = _build_stance_message(coach_id, compressed, track, prior_stance)
-    result = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=user_message, max_tokens=900, temperature=0.3)
+    result = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=user_message, max_tokens=1400, temperature=0.3)
     if not isinstance(result, dict):
         logger.warning("[stance] LLM returned non-dict for %s — skipping stance this run", coach_id)
         return None
@@ -941,7 +949,7 @@ def _generate_stance(coach_id, compressed, track, prior_stance):
             "\n\nSTRICT CORRECTION: your previous attempt cited raw numeric values (HRV/RHR/"
             "weights/percentages). Rewrite with ZERO numbers — describe patterns and positions only."
         )
-        retry = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=strict, max_tokens=900, temperature=0.2)
+        retry = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=strict, max_tokens=1400, temperature=0.2)
         if isinstance(retry, dict) and _vital_hits(retry) < _vital_hits(result):
             result = retry
 
