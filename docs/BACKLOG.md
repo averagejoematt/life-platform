@@ -185,7 +185,60 @@ Front-end-only redesign shipped (status rings, autonomic hero, 2×2, small-multi
 | **🌐 v4 website + ops follow-ups** | 5 | S-01 ✅ + S-02 ✅ + S-06 ✅ deployed · B-03 ✅ · S-03/S-04/S-05 open · S-07 deferred |
 | **🚀 Product & Growth (PG)** | 7 | NEW 2026-06-07 summit. PG-00 ✅ · **PG-01/02/03/05/06 ✅ deployed; PG-04 ✅ native-SES (CI-deploy pending); PG-14 ✅ Tier-A productionized 2026-06-09 → CHANGELOG** · PG-04b/PG-13 remain · **PG-07 gate-blocked on D-05 (~2026-06-17)** |
 | **🔬 External-Review rigor (ER)** | 3 | NEW 2026-06-09 external-lens review. **Done: ER-01 ✅ ER-02 ✅ ER-03 Layer 1 ✅ (objective-gap Tier 1) + ER-05 ✅ ER-06 ✅ (cheap-honesty Tier 2).** Remaining: ER-03 Layer 2 (LLM judge, deferred) + ER-04 / ER-07 / ER-08 (recorded-decision items). Full spec: `docs/specs/ER_EXTERNAL_REVIEW_RIGOR_2026-06-09.md` |
+| **🛡️ Self-Sustainability (SS)** | 11 | NEW 2026-06-29 from the "hands-off 6-month" simulation. The engine self-sustains; the seam is failures that **go dark/decay silently**. Top leverage: SS-01 chronicle dark-out · SS-03 loud decay alarms · SS-04 dependabot auto-merge. Spec: plan `soft-baking-toast.md` |
 | **TOTAL OPEN** | **~38** | 2026-06-09: ER-01 + ER-02 + PG-14 ✅ closed; +8 ER from external-review lens. 2026-06-07: +14 PG from summit; PG-00/01/02/03/04/05/06 + PG-14-spike closed same day; PG-04b logged |
+
+---
+
+## 🛡️ Self-Sustainability & 6-Month Foresight (SS-series) — 2026-06-29
+
+**Source:** the "hands-off except data entry" 6-month simulation (plan `soft-baking-toast.md`;
+3-agent ground-truth on the cron fleet, decay timers, and human-in-the-loop gates).
+**Thesis:** the ~50-Lambda engine self-sustains and *gets richer* with data; the seam is that
+several failures **go dark / decay silently** instead of **running and telling you loudly**. The
+engineer/QS audience is best-served; **friends & family are worst-hit** (the public weekly story
+stops). Ordered by leverage.
+
+### A. Self-sustainability hardening (highest leverage)
+- **SS-01 — Chronicle auto-publish fallback · 🔴 HIGH.** The #1 dark-out: `wednesday_chronicle` runs
+  `PREVIEW_MODE=true`, so an un-clicked approval link means it **never publishes** (week-1 silent
+  stop). Fix = auto-publish after an N-hour approval window (privacy/vice guards stay fail-closed),
+  OR a decision to flip `PREVIEW_MODE=false`. **DECISION FORK** (timed-fallback vs flip).
+- **SS-02 — Podcast HOLD-aging escape · 🟠 MED.** One soft flag holds an episode forever in
+  `panelcast-holds/`. Auto-release **soft** (QA/sensitivity) holds after a window; the **hard**
+  safety gate stays fail-closed.
+- **SS-03 — Loud source-specific decay alarms · 🔴 HIGH.** The missing monitors: Garmin-staleness
+  (distinct from the lenient generic freshness — the 44-day-outage class), per-source
+  token-expiry-7d warning, **budget-tier ≥2 loud alert**, podcast-HOLD-aging, Dependabot-PR-age.
+  Most live in the agent ALLOWLIST (`monitoring_stack` / `freshness_checker`). Extends ER-01.
+- **SS-04 — Dependabot safe-auto-merge · 🟠 MED.** Dev-toolchain group on green CI (grouped weekly),
+  scoped to NOT touch cdk/runtime deps — so the PR backlog can't block the eventual `cdk deploy`.
+- **SS-05 — Experiment continuity decision · 🟡 LOW-MED.** Counters drift unbounded (week 27+) with
+  no manual `restart_pipeline.py`. Decide auto-roll cycles vs "runs continuously" + a Sentinel
+  counter-sanity invariant. (PHASE_TAXONOMY / ADR-077.)
+- **SS-06 — Enforce gradable predictions · 🟠 MED.** Reject/repair `threshold=None` at write time so
+  the track record actually fills (a flagship credibility surface). Maps to **D-05 / D-02**.
+
+### B. Novelty / engagement engine (sustain returnability)
+- **SS-07 — "Predict the week" reader loop** — already **PG-07** (gated on D-05, now unblockable).
+- **SS-08 — Monthly longitudinal "what changed" · 🟡.** Surfaces cumulative change + newly-unlocked
+  correlations as windows open, so a flat day still shows motion. Reuses `longitudinal_summary` +
+  the correlation engine. Builds on RQA-06/07.
+- **SS-09 — Rotate the podcast/brief format · 🟡.** A format/question-rotation lever so the weekly
+  show doesn't feel formulaic by episode 26.
+
+### C. Correctness / credibility rigor
+- **SS-10 — Coach-grounding frontier · 🟠.** Push fabrication from detect-and-email → block-and-regen
+  at generation time. The known its-own-session item + the `ai_calls.py` nutrition guardrail (rides
+  the next layer rebuild).
+- **SS-11 — Editorial-image guardrail · 🟡.** Optional human-approve or a quality/denylist check
+  before an auto-picked Pexels cover ships (counterweight to "fully automatic"; from the 2026-06-29
+  visual-uplevel work).
+- **PRE-13** (genome/lab publication granularity) — already deferred; revisit before publishing
+  deeper raw data.
+
+**Pending/known (don't re-invent):** B-01 concurrency 10→100 (AWS Support); N-02 subscriber-token
+scaling; N-05 V2 audit drift (~2026-08-17).
 
 ---
 
