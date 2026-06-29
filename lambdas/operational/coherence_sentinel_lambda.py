@@ -354,10 +354,14 @@ def _digest(findings, semantic):
 
 
 def _emit_overall(worst, semantic):
-    """A single dimensionless gauge the alarm watches: 1 when anything is wrong
-    (any invariant ALARM, or the AI semantic pass flagged incoherence)."""
-    semantic_bad = bool(semantic and semantic.get("coherent") is False)
-    val = 1.0 if (worst == ci.ALARM or semantic_bad) else 0.0
+    """A single dimensionless gauge the alarm watches: 1 when a DETERMINISTIC invariant
+    is ALARM. The Haiku semantic pass is ADVISORY only — it lists confirmations as
+    "issues" and flips `coherent` false on borderline variance, so letting it drive a
+    daily-emailing CloudWatch alarm makes the alarm permanently red = ignored. The
+    deterministic invariants now cover the egregious numeric contradictions (RHR/HRV/
+    recovery/weight with grounding-aware precision); the semantic read stays in the
+    digest + record for a human/agent to weigh, but doesn't trip the alarm alone."""
+    val = 1.0 if worst == ci.ALARM else 0.0
     try:
         _cw.put_metric_data(
             Namespace=CW_NAMESPACE,
@@ -371,14 +375,12 @@ def build_record(findings, semantic, digest, worst):
     """Pure: the durable findings payload (also the Lambda response body). Kept
     separate from I/O so it's testable and identical across S3 + the response.
 
-    `status` MIRRORS the coherence-overall alarm (see _emit_overall): a semantic-only
-    incoherence (deterministic all-green, but the Haiku pass flagged a contradiction)
-    fires the alarm, so the record must read alarm too — otherwise the remediation
-    agent's status filter drops it and the alarm fires with no detail (the exact gap
-    this whole program closes). `deterministic_status` preserves the invariant-only
-    verdict for clarity."""
+    `status` MIRRORS the coherence-overall alarm (see _emit_overall): the DETERMINISTIC
+    invariant verdict drives it, so the agent triages a precise signal. `semantic_incoherent`
+    is kept as an ADVISORY flag (the Haiku read is too noisy to alarm on — it lists
+    confirmations as issues), surfaced in the digest/record for a human to weigh."""
     semantic_bad = bool(semantic and semantic.get("coherent") is False)
-    status = ci.ALARM if (worst == ci.ALARM or semantic_bad) else worst
+    status = worst
     return {
         "date": _today(),
         "status": status,
