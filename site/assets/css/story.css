@@ -88,9 +88,11 @@ body { overflow-x: hidden; }
 .constellation { display: grid; gap: var(--sp-3); }
 .constellation svg { width: 100%; height: auto; aspect-ratio: 1; overflow: visible; }
 .constellation .edge { stroke: var(--rule); stroke-width: 1; fill: none; }
-.constellation .edge.live { stroke: var(--ember-line); }
+.constellation .edge.live { stroke: var(--ember-line); stroke-width: 1.5; }
 .constellation .node circle { fill: var(--surface-raised); stroke: var(--ink-faint); stroke-width: 1; transition: r var(--dur) var(--ease-out); }
-.constellation .node.up circle { stroke: var(--ember); fill: color-mix(in oklch, var(--ember) 12%, var(--surface)); }
+/* Earned glow — only the pillars that are UP get the warm halo (design system §12:
+   glow is reserved for "this is up", never decorative). Filters don't affect layout. */
+.constellation .node.up circle { stroke: var(--ember); fill: color-mix(in oklch, var(--ember) 14%, var(--surface)); filter: drop-shadow(0 0 5px var(--ember-soft)); }
 .constellation .node text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-muted); text-anchor: middle; }
 .constellation .node .score { fill: var(--ink); font-size: 11px; }
 .constellation figcaption { color: var(--ink-faint); max-width: 38ch; }
@@ -428,7 +430,7 @@ body { overflow-x: hidden; }
 /* ── The lead / Principal Investigator card — head of the team (2026-06-13) ──── */
 .team-lead { margin: var(--sp-4) 0; padding: var(--sp-4); border: 1px solid var(--ember-line); border-left: 3px solid #0ea5e9; background: var(--surface-raised); border-radius: var(--radius-sm); }
 .team-lead .label { font-family: var(--font-mono); }
-.tl-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-1); }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-1); }
 .tl-name { font-family: var(--font-serif); font-size: var(--fs-h4, 1.25rem); font-weight: 600; color: var(--ink); }
 .tl-role { color: var(--ink-dim); }
 .tl-bio { margin-top: var(--sp-2); font-family: var(--font-serif); }
