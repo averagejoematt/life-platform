@@ -26,22 +26,26 @@ def _iso(hours_ago):
     return (datetime.now(timezone.utc) - timedelta(hours=hours_ago)).isoformat()
 
 
-def test_find_stale_drafts_filters_by_status_and_age(mod):
+def test_find_stale_drafts_window(mod):
     items = [
-        {"sk": "DATE#2026-06-10", "date": "2026-06-10", "status": "draft", "generated_at": _iso(72), "week_number": 1},  # stale draft ✓
-        {"sk": "DATE#2026-06-17", "date": "2026-06-17", "status": "draft", "generated_at": _iso(3), "week_number": 2},  # fresh draft ✗
-        {"sk": "DATE#2026-06-03", "date": "2026-06-03", "status": "published", "generated_at": _iso(200), "week_number": 0},  # published ✗
+        {"sk": "DATE#a", "date": "a", "status": "draft", "generated_at": _iso(72), "week_number": 1},  # in window ✓ (3d old)
+        {"sk": "DATE#b", "date": "b", "status": "draft", "generated_at": _iso(3), "week_number": 2},  # too fresh ✗ (<48h)
+        {"sk": "DATE#c", "date": "c", "status": "draft", "generated_at": _iso(24 * 20), "week_number": 3},  # too old ✗ (>10d)
+        {"sk": "DATE#d", "date": "d", "status": "published", "generated_at": _iso(72), "week_number": 0},  # published ✗
     ]
     with mock.patch.object(mod.table, "query", return_value={"Items": items}):
-        stale = mod._find_stale_drafts(48)
-    assert [s["date"] for s in stale] == ["2026-06-10"]
+        stale = mod._find_stale_drafts(48, 10)
+    assert [s["date"] for s in stale] == ["a"]
 
 
-def test_missing_timestamp_is_treated_stale(mod):
-    items = [{"sk": "DATE#2026-06-10", "date": "2026-06-10", "status": "draft", "week_number": 1}]  # no generated_at
+def test_missing_or_old_timestamp_is_skipped(mod):
+    items = [
+        {"sk": "DATE#x", "date": "x", "status": "draft", "week_number": 1},  # no generated_at → skip
+        {"sk": "DATE#y", "date": "y", "status": "draft", "generated_at": _iso(24 * 30), "week_number": 2},  # 30d old → skip
+    ]
     with mock.patch.object(mod.table, "query", return_value={"Items": items}):
-        stale = mod._find_stale_drafts(48)
-    assert len(stale) == 1
+        stale = mod._find_stale_drafts(48, 10)
+    assert stale == []
 
 
 def test_sweep_publishes_via_approve_path(mod):

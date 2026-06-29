@@ -316,7 +316,8 @@ class EmailStack(Stack):
             environment={
                 "CF_DIST_ID": CF_DIST_ID,
                 "CHRONICLE_EMAIL_SENDER_ARN": chronicle_sender.function_arn,
-                "CHRONICLE_AUTOPUBLISH_HOURS": "48",
+                "CHRONICLE_AUTOPUBLISH_HOURS": "48",  # publish a draft unapproved for this long…
+                "CHRONICLE_AUTOPUBLISH_MAX_DAYS": "10",  # …but never resurrect one abandoned past this
             },
             custom_policies=rp.email_chronicle_approve(),
             **shared,
