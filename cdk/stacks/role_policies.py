@@ -1022,7 +1022,8 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
-            actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+            # Query added for the SS-01 daily sweep (find stale drafts to auto-publish).
+            actions=["dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(

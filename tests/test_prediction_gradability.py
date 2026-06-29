@@ -65,3 +65,38 @@ class TestEvalSpecRouting:
         assert spec["type"] == "directional"
         assert spec["threshold"] is None
         assert spec["condition"] in ("up", "down")
+
+
+class TestGradabilityMetric:
+    """SS-06: the write-time gradable-share metric (leading indicator of
+    extraction drift, ahead of the Sentinel's daily closed-window check)."""
+
+    def _capture(self, monkeypatch, gradable, qualitative):
+        calls = {}
+
+        class _CW:
+            def put_metric_data(self, **kw):
+                calls["kw"] = kw
+
+        monkeypatch.setattr(m, "_cw", _CW())
+        m._emit_prediction_gradability(gradable, qualitative)
+        return calls
+
+    def test_emits_counts_and_share(self, monkeypatch):
+        calls = self._capture(monkeypatch, 3, 1)
+        data = {d["MetricName"]: d["Value"] for d in calls["kw"]["MetricData"]}
+        assert calls["kw"]["Namespace"] == "LifePlatform/Predictions"
+        assert data["PredictionsGradable"] == 3.0
+        assert data["PredictionsQualitative"] == 1.0
+        assert abs(data["PredictionGradableShare"] - 0.75) < 1e-9
+
+    def test_empty_run_emits_nothing(self, monkeypatch):
+        # No predictions written → no metric (so an idle run doesn't read as 0% gradable).
+        calls = self._capture(monkeypatch, 0, 0)
+        assert calls == {}
+
+    def test_all_qualitative_is_zero_share(self, monkeypatch):
+        # The exact regression signature SS-06 must surface at the source.
+        calls = self._capture(monkeypatch, 0, 4)
+        data = {d["MetricName"]: d["Value"] for d in calls["kw"]["MetricData"]}
+        assert data["PredictionGradableShare"] == 0.0

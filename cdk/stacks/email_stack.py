@@ -19,6 +19,8 @@ import aws_cdk as cdk
 from aws_cdk import (
     Stack,
     aws_dynamodb as dynamodb,
+    aws_events as events,
+    aws_events_targets as targets,
     aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
@@ -154,7 +156,7 @@ class EmailStack(Stack):
         # "The Panel" — weekly two-host show (Elena + a rotating coach). Runs at
         # 16:20 UTC, ~40 min after the chronicle podcast, so posts.json + the
         # week's COACH#/OUTPUT# are settled. Bedrock script-gen + Google Chirp 3: HD.
-        create_platform_lambda(
+        coach_panel_podcast = create_platform_lambda(
             self,
             "CoachPanelPodcast",
             function_name="coach-panel-podcast",
@@ -168,6 +170,26 @@ class EmailStack(Stack):
             environment=_email_env,
             custom_policies=rp.email_coach_panel_podcast(),
             **shared,
+        )
+
+        # SS-02 hold-aging sweep: a soft (quality) HOLD used to strand an episode in
+        # panelcast-holds/ forever (the Friday cron moves on to the next week). This
+        # Mon+Wed 18:00 UTC rule passes {"sweep_holds": true} to auto-RETRY a quality
+        # hold on the current week (a fresh generation through every gate) once a review
+        # window has lapsed — so a fixable flag can't permanently silence the show.
+        # Safety/sensitivity holds are NEVER auto-retried (fail-closed in the handler).
+        # Twice-weekly (not daily) keeps the regeneration spend low; the retry cap bounds it.
+        panel_hold_sweep = events.Rule(
+            self,
+            "PanelHoldSweep",
+            schedule=events.Schedule.cron(minute="0", hour="18", week_day="MON,WED"),
+            description="SS-02: retry a soft (quality) Panel HOLD on the current week after the review window",
+        )
+        panel_hold_sweep.add_target(
+            targets.LambdaFunction(
+                coach_panel_podcast,
+                event=events.RuleTargetInput.from_object({"sweep_holds": True}),
+            )
         )
 
         wednesday_chronicle = create_platform_lambda(
@@ -307,11 +329,17 @@ class EmailStack(Stack):
             function_name="chronicle-approve",
             handler="emails.chronicle_approve_lambda.lambda_handler",
             source_file="lambdas/emails/chronicle_approve_lambda.py",
-            timeout_seconds=30,
+            timeout_seconds=60,
             memory_mb=256,
+            # SS-01: a daily sweep auto-publishes any draft older than the review window
+            # (CHRONICLE_AUTOPUBLISH_HOURS) so the weekly story never goes dark unattended.
+            # The scheduled invoke arrives as source=aws.events → handled as a sweep.
+            schedule="cron(0 18 * * ? *)",  # daily 10:00 AM PT
             environment={
                 "CF_DIST_ID": CF_DIST_ID,
                 "CHRONICLE_EMAIL_SENDER_ARN": chronicle_sender.function_arn,
+                "CHRONICLE_AUTOPUBLISH_HOURS": "48",  # publish a draft unapproved for this long…
+                "CHRONICLE_AUTOPUBLISH_MAX_DAYS": "10",  # …but never resurrect one abandoned past this
             },
             custom_policies=rp.email_chronicle_approve(),
             **shared,

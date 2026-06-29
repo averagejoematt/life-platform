@@ -313,6 +313,65 @@ def check_count_agreement(pairs) -> Finding:
     return f
 
 
+def check_experiment_continuity(genesis: str, today: str, surfaced_weeks) -> Finding:
+    """SS-05 — the experiment runs CONTINUOUSLY (a reset is an explicit, manual
+    `restart_pipeline.py` act, never automated), so week/day counters legitimately
+    grow without bound. What is NOT legitimate is a counter that DISAGREES with the
+    genesis date: a surfaced week far ABOVE the one the genesis date implies is the
+    ADR-077 reset signature (stale pre-reset high-week posts leaking back into
+    selection — the "arc counts 7 weeks vs the 3 the UI shows" class), and a
+    genesis-derived week below 1 means a misconfigured/future genesis.
+
+    Pure (no clock): the caller passes `genesis` and `today` as 'YYYY-MM-DD' and
+    `surfaced_weeks` as a list of {name, week} actually shown to readers (latest
+    chronicle week, experiment-arc week_count, …). Verifies each is within the band
+    [1, derived_week + tolerance]. ALARM on a genesis underflow or a week wildly
+    above the derived value; WARN on a small over-count.
+    """
+    import datetime as _dt
+
+    f = Finding("experiment_continuity", value=0.0)
+    try:
+        g = _dt.date.fromisoformat(genesis[:10])
+        t = _dt.date.fromisoformat(today[:10])
+    except Exception:
+        f.detail = "could not parse genesis/today — skipped"
+        return f
+    derived_week = ((t - g).days // 7) + 1
+    f.value = float(derived_week)
+    if derived_week < 1:
+        f.status = ALARM
+        f.detail = f"genesis {genesis} is after today {today} → derived week {derived_week} (<1): counter underflow / bad genesis"
+        return f
+
+    tolerance = 1  # a current-week post can be one ahead of the strict genesis math at a week boundary
+    offenders = []
+    for s in surfaced_weeks or []:
+        wk = s.get("week")
+        if wk is None:
+            continue
+        try:
+            wk = int(wk)
+        except (TypeError, ValueError):
+            continue
+        if wk < 1:
+            offenders.append(f"{s.get('name', 'week')}={wk} (<1)")
+        elif wk > derived_week + tolerance:
+            offenders.append(f"{s.get('name', 'week')}={wk} (genesis implies ~{derived_week})")
+    if offenders:
+        # A week far above derived is the stale-pre-reset leak (ADR-077); a small
+        # over-count is more likely a boundary/timezone artifact → WARN unless egregious.
+        egregious = any("(<1)" in o for o in offenders) or any(
+            int(s.get("week", 0) or 0) > derived_week + 2 for s in surfaced_weeks or [] if str(s.get("week", "")).lstrip("-").isdigit()
+        )
+        f.status = ALARM if egregious else WARN
+        f.offenders = offenders
+        f.detail = "experiment counter disagrees with genesis: " + "; ".join(offenders[:5])
+    else:
+        f.detail = f"continuous experiment coherent at ~week {derived_week} (genesis {genesis})"
+    return f
+
+
 def overall_status(findings) -> str:
     """Worst severity across a set of findings."""
     worst = OK
