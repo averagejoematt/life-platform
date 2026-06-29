@@ -211,10 +211,21 @@ stops). Ordered by leverage.
   are NEVER auto-released** (deviation from the original note, which lumped sensitivity as soft — an
   acute-crisis week must stay human). Bounded: review window / max-days / retry-cap. Deploy:
   `LifePlatformEmail` (new EventBridge rule + lambda).
-- **SS-03 — Loud source-specific decay alarms · 🔴 HIGH.** The missing monitors: Garmin-staleness
-  (distinct from the lenient generic freshness — the 44-day-outage class), per-source
-  token-expiry-7d warning, **budget-tier ≥2 loud alert**, podcast-HOLD-aging, Dependabot-PR-age.
-  Most live in the agent ALLOWLIST (`monitoring_stack` / `freshness_checker`). Extends ER-01.
+- **SS-03 — Loud source-specific decay alarms · 🟢 LARGELY DONE (2026-06-29).** On inspection most of
+  the proposed monitors **already exist** — the one real gap was the budget kill-switch:
+  - ✅ **budget-tier hard-stop alarm** (NEW, `monitoring_stack`): `budget-tier-hardstop` (BudgetTier
+    ≥3 → **urgent**: all Bedrock off, the daily brief itself goes data-only). The ≥2-→-digest case
+    (website AI paused) was *already* covered by `life-platform-budget-tier-escalation`, but it
+    conflated tier 2 with the categorically-worse tier 3; the new alarm pages promptly on a hard-stop
+    instead of waiting for the overnight digest. `cost_governor` already emits the `BudgetTier` metric.
+  - ✔︎ **Garmin-staleness** → already covered by `ingest-liveness-unhealthy` (ER-01, "the signal the
+    silent 44-day Garmin outage lacked") + Garmin's activity backstop (Strava) is freshness-monitored.
+  - ✔︎ **podcast-HOLD-aging** → already surfaced by `panelcast-no-episode-7d` (a HELD episode doesn't
+    emit `PanelcastPublished`, so 7 silent days fires). The *auto-release* of soft holds is SS-02.
+  - ⏭ **token-expiry-7d** → DEFERRED. Freshness already alarms OAuth >60d / manual-rotation >120d;
+    a 7-day early-warning tier maps poorly (we track "last changed", not an expiry timestamp) and
+    would be noisy. Revisit only if a token actually expires inside an absence.
+  - ⏭ **Dependabot-PR-age** → belongs to **SS-04** (a GitHub-API/workflow check, not a CW alarm).
 - **SS-04 — Dependabot safe-auto-merge · ✅ DONE (2026-06-29).** Two workflows: `dependabot-validate`
   (`on: pull_request`, read-only) runs the enforced lint + offline tests against the *bumped* tool
   versions (the main CI/CD only runs on push-to-main, so PRs had no Python validation); and
