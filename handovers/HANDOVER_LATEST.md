@@ -1,77 +1,90 @@
-# HANDOVER — Coach-opinion engine: an evolving, evidence-derived stance per coach — 2026-06-29
+# HANDOVER — Backend serial phase 2: the coaches-review-the-site loop — 2026-06-29
 
-The first **backend serial phase** (of four). Each coach's public "read of Matthew" is now a
-first-class, **evidence-derived stance that evolves** — replacing the bodyweight-keyed ladder. Built,
-deployed live, verified end-to-end, plus a real pre-existing bug caught and fixed mid-deploy.
+Phase 2 of four backend serial phases. Coaches now **react to the challenges/experiments Matthew
+has committed to on the site** instead of treating those protocol surfaces as separate from the
+coaching. Built, deployed live (full layer dance), and verified end-to-end.
 
-**2 PRs, both MERGED + DEPLOYED:** **#270** (the engine) · **#271** (the compression-truncation fix it
-surfaced). Matthew merged both and authorized the deploys.
+**2 PRs, both MERGED + DEPLOYED:** **#273** (the feature) · **#274** (the `SHARED_LAYER_VERSION`
+91→92 hygiene bump). Matthew merged both and authorized "do all the deploys" this session.
+**main == live, fleet uniform on layer v92, 0 open PRs, no drift.**
 
 ---
 
 ## 1. What shipped (all live, verified)
 
-The bodyweight-band ladder (`config/coaches/*_stance.json` + `coach_stance.py`) had a *sleep* coach
-"graduating" Matthew foundation→architecture because he lost weight — incoherent-but-green on the
-most-visited coach surface. Board decision (asked "what would the product board recommend") =
-**"replace, enriched":** the evidence-stance becomes the single public read AND carries a
-domain-appropriate stage; the ladder is demoted to a **silent fallback** (pre-data / engine lag), never
-a parallel read.
+Phase 1 (the coach-opinion engine) made `coach_narrative_orchestrator._gather_all_state` the seam each
+coach reads its evolving context from. **Phase 2 extends that same seam** — one new gather step.
 
-**The loop (all deployed):**
-- **Stance engine** — `coach_history_summarizer.py` (weekly): after compression, `_generate_stance`
-  writes a grounded `STANCE#{date}` + `STANCE#latest` per coach. Grounded ONLY on the coach's own
-  validated artifacts (`LEARNING#`/`CONFIDENCE#` track record + `COMPRESSED` positions/corrections) —
-  speaks to patterns, never raw vitals. `_RAW_VITAL_RE` guard self-corrects ONCE then sets an internal
-  `grounding_flag`; a `how_my_read_changed` claim survives only with a real signal (a logged correction
-  or a stage shift), else blanked; first runs blank it. Fail-soft (`_run_stance`): a stance error never
-  aborts compression; skips on a compression `_fallback`.
-- **Generation** — `coach_narrative_orchestrator` reads `STANCE#latest` and injects `current_stance`
-  into the brief **deterministically** (not via the LLM) so it reaches the coach verbatim on every path;
-  `ai_calls.py` lets the stance lead framing over the static 185-lb goal block.
-- **Render** — `site_api_coach._stance_block` prefers `STANCE#latest` in a **normalized shape** both the
-  coach page and the My Team view consume; ladder mapped into the same keys as fallback (keeps canonical
-  `stage_id` for the team's all-same check). `handle_coach` adds `stance_history` for the trail.
-- **Front-end** — `coaching.js` + `dispatches.js`: the stance LEADS the coach page; "how this read has
-  evolved" prefers the dated `STANCE#` trail. New `.cs-evolve` ember-rule CSS.
+- **`coach_narrative_orchestrator.py`** — new `_gather_site_protocols(coach_id)`:
+  - Reads active **challenges** (clean `domain` field) + **experiments** (routed by `tags`), filtered
+    per-coach via a deterministic `COACH_DOMAINS` map. `explorer_coach` (domains=None) sees all; an
+    experiment whose tags match no domain falls through to explorer **only** — never mis-attributed,
+    never silently dropped.
+  - Reads go through `_query_begins_with` → **ADR-058 phase-filtered**, so the coach sees exactly the
+    active set the site/MCP surface (`_apply_phase_filter`). Confirmed: challenge writes set **no**
+    `phase` attr → active items pass `attribute_not_exists`; stale pre-genesis `pilot` candidates stay
+    hidden.
+  - **Fail-soft** (wrapped → returns `{}`; the daily run can't be aborted by this gather).
+  - `_protocols_for_brief` trims/caps (≤5 per surface, drops nulls); surfaced in the planning message
+    and **injected into the brief deterministically on every path** (success/fallback/default) — the
+    exact seam `current_stance` uses.
+- **`ai_calls.py`** — one ACTIVE PROTOCOLS instruction: acknowledge commitments BY NAME, **never invent**
+  progress/streak/adherence numbers (ground in real data or say it's not visible yet); the N=1 /
+  decision-class ceilings still apply.
+- **`coach_history_summarizer.py`** (folded-in stance polish) — the stance no-numbers rule now explicitly
+  covers **TARGETS and GAPS-TO-TARGET, even accurate ones** ("running short of the protein target", NOT
+  "26% short of 190g"). Clears labs_coach's persistent `grounding_flag` while keeping the one-invariant
+  guard (a stance is an opinion, never a readout). Takes effect on the next weekly summarizer run.
 
-`STANCE#` is under `COACH#*` → already `EXPERIMENT_SCOPED` (wiped on reset, no taxonomy change). New
-tests: `tests/test_coach_stance_engine.py` (20).
+**Scope held tight (board recommendation):** challenges + experiments only. **Habits DEFERRED** — the
+65-item registry is ongoing behavior whose adherence already reaches coaches via `domain_data`;
+re-surfacing risks number-fabrication. No persisted protocol-read record (phase 3/4). No site-api /
+read-path changes.
 
-**Verified live:** all 8 coaches serve `source=stance` via `/api/coach/<id>`, each a distinct
-evidence-derived stage (sleep: "energy-availability hypothesis"; nutrition: "decision gate / protocol
-transition"; …). 7/8 `grounding_flag=False`; labs_coach flagged on a derived "26%" — the guard working
-(internal signal only; the front-end doesn't render the flag, page reads fine).
+**Tests:** +10 in `tests/test_coach_stance_engine.py` (domain routing, active-only, tag routing,
+explorer-catches-untagged, trim/cap, brief surfacing + deterministic injection, omit-when-empty,
+fail-soft). **30/30 pass; ruff + black clean; 198 coach tests green** (creds-blanked per the CI lesson).
 
-## 2. ⚠️ The pre-existing bug the bootstrap surfaced (#271)
+## 2. Deploy — the full layer dance (Matthew authorized "do all the deploys")
 
-Bootstrapping the engine, all 8 stances came back skipped — because **compression itself was falling
-back for every coach**. Root cause: as `THREAD#`/`PREDICTION#` accrued since genesis (sleep_coach: 52
-threads, 39 predictions), the compressed-history JSON outgrew the `max_tokens=1500` cap, **truncated
-before its closing ` ```json ` fence**, failed to parse, and fell back to a structural stub. This had
-been degrading the orchestrator's `COMPRESSED#latest` context for weeks (it plans on that) AND blocked
-the stance engine (which correctly won't ground on a fallback). Fix: compression 1500→4000, stance
-900→1400 (same failure mode + fix as the orchestrator's earlier 2000→6000 bump). Banked as a memory
-(`reference_llm_json_maxtokens_truncation`) — a 200 + a `_fallback` flag is the tell.
+`ai_calls.py` is a **layer module**; the orchestrator + summarizer are standalone Compute assets. Sequence
+(every `cdk diff` read first — layer re-point + benign shared-asset re-hash, **zero destroys, zero IAM**):
 
-## 3. Deploys done this session (Matthew authorized; each behind a `cdk diff` read)
-- `LifePlatformCompute` (twice — once for #270, once for the #271 fix). Both diffs: asset re-hashes
-  only, no destroys/IAM. No squash-drift (verified `git diff --stat origin/main..HEAD -- lambdas/ cdk/`
-  empty before each deploy).
-- Site-api via **`deploy/deploy_site_api.sh /api/coach_team`** (full `web/` package + route verify) —
-  **NOT** `cdk deploy LifePlatformWeb` (that stack only carries EmailSubscriber + OG; the site-api
-  lambda lives in Operational and ships via the script — codified gotcha).
-- Site sync (`sync_site_to_s3.sh`) — the clobber guard correctly blocked until `origin/main` was merged
-  in first.
-- Bootstrap: one-off `coach-history-summarizer` invoke → all 8 `STANCE#latest` populated live.
+1. `bash deploy/build_layer.sh`
+2. `cdk diff`+`deploy LifePlatformCore` → publishes **layer v92** (diff was ONLY the layer content hash).
+3. Bump `SHARED_LAYER_VERSION` 91→92 in `cdk/stacks/constants.py` (→ #274).
+4. **Redeploy ALL 5 consumer stacks** (Compute + Ingestion + Email + MCP + Operational) so the whole fleet
+   attaches v92 — **fleet uniformity** is the gate (the v89 lesson: a mixed fleet trips the Plan
+   layer-consistency check). Compute also carried the orchestrator + summarizer code.
+
+The Operational site-api `Code` S3Key change was the **known-benign `Code.from_asset` re-hash**, not a
+code revert: `lambdas/web/` matched origin/main exactly, so the CDK asset == live. (Reminder: the targeted
+site-api deploy path is `deploy/deploy_site_api.sh`, but a `cdk deploy LifePlatformOperational` for a layer
+bump is safe when web/ == main, as it was here.)
+
+**Verified live:** fleet histogram **71/71 layer-attached functions on v92**; orchestrator + summarizer
+fresh code on v92; **live smoke invoke** of `coach-narrative-orchestrator` → `200`, no error → the new
+gather path runs clean against the real phase-filtered partitions, **correctly omits `site_protocols`**
+(nothing active right now → the block surfaces the moment Matthew activates a challenge), and
+`current_stance` intact (no phase-1 regression).
+
+## 3. ⚠️ The reverse squash-drift trap (handled)
+
+The `SHARED_LAYER_VERSION` bump HAD to land on main (#274) or a future `cdk deploy` from main would
+revert the fleet to `:91`. Main was one constant behind live until #274 merged. Now reconciled —
+main == live for both code (#273) and layer version (#274).
 
 ## 4. ⚠️ OUTSTANDING — next sessions
-- **Backend serial phases 2–4 (each its own session + deploys):** the **coaches-review-the-site loop**
-  (feed `challenges`/`habits`/`experiments` into the SAME `coach_narrative_orchestrator._gather_all_state`
-  hook the stance now reads); Elena-written "previously on" recaps; arbitrary historical-window APIs
-  (`/api/character?date=` already time-travels — extend to data/waveform).
+
+- **Backend serial phases 3–4 (each its own session + deploys):** Elena-written "previously on" recaps;
+  arbitrary historical-window APIs (`/api/character?date=` already time-travels — extend to data/waveform);
+  data→chronicle cross-links. All extend the same `_gather_all_state` hook.
 - **SS tail (B/C):** SS-08 monthly "what changed" · SS-09 podcast format rotation · SS-11 editorial-image
   guard.
-- **Watch:** labs_coach `grounding_flag` (re-evaluate if it persists across weekly runs — don't chase
-  stochastic output, but a persistent flag means tighten the prompt). The summarizer caps OUTPUT# at 20
-  but NOT threads/predictions (52/39) — a longer-term input-bound follow-up.
+- **Watch:** labs_coach `grounding_flag` across the next few weekly summarizer runs — the prompt fix
+  should clear it; if it persists, tighten further (don't chase stochastic output, but a persistent flag
+  is signal). The summarizer still caps OUTPUT# at 20 but NOT threads/predictions (52/39) — a longer-term
+  input-bound follow-up.
+- **To see it work:** activate a challenge (MCP `activate_challenge`) → the relevant coach reacts to it
+  by name on the next daily run; `jq '.generation_brief.site_protocols'` on an orchestrator invoke
+  confirms.
