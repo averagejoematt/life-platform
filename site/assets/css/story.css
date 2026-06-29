@@ -327,6 +327,15 @@ body { overflow-x: hidden; }
 .tl-recap-em { color: var(--ember); }
 .tl-recap-s { color: var(--ink-muted); font-size: var(--fs-small); margin: var(--sp-1) 0 0; }
 .tl-recap-s a, .tl-x { color: var(--ember); }
+/* Phase 3 — Elena's "previously on" cold-open (richer than the stat aside) */
+.tl-recap-elena { border-left: 3px solid var(--ember); }
+.tl-recap-story { color: var(--ink); font-size: 1.02rem; line-height: 1.6; margin: var(--sp-2) 0 0; }
+.tl-recap-beats { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-1); }
+.tl-recap-beat { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
+.tl-recap-beat-k { color: var(--ink-faint); margin-right: var(--sp-1); }
+.tl-recap-beat-k a { color: var(--ember); }
+.tl-recap-now { color: var(--ink); font-size: var(--fs-small); margin: var(--sp-3) 0 0; font-style: italic; }
+.tl-recap-by { color: var(--ink-faint); margin: var(--sp-3) 0 0; text-align: right; }
 .tl { list-style: none; margin: var(--sp-4) 0 0; padding-left: var(--sp-5); border-left: var(--border-hair); display: grid; gap: 0; }
 .tl-month { margin: var(--sp-4) 0 var(--sp-1); }
 .tl-month:first-child { margin-top: 0; }
