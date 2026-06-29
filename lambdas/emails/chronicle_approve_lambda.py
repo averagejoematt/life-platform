@@ -254,13 +254,75 @@ def _invoke_email_sender() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# AUTO-PUBLISH SWEEP (SS-01) — the self-sustaining fail-safe: a chronicle draft must
+# never stay dark just because the approve link wasn't clicked. A daily schedule
+# sweeps drafts older than the review window and publishes them via the SAME path the
+# approve click uses (privacy/vice guards already ran at draft time). "Editor review
+# window + a fail-safe" — how a real team keeps the weekly running.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _find_stale_drafts(hours: float) -> list[dict]:
+    """Chronicle DATE# records still in `draft` and older than `hours`."""
+    from boto3.dynamodb.conditions import Key
+
+    cutoff = datetime.now(timezone.utc).timestamp() - hours * 3600.0
+    out = []
+    try:
+        resp = table.query(KeyConditionExpression=Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"))
+    except Exception as exc:
+        logger.error("sweep: DDB query failed: %s", exc)
+        return out
+    for it in resp.get("Items", []):
+        if it.get("status") != "draft":
+            continue
+        ga = str(it.get("generated_at") or "")
+        try:
+            ts = datetime.fromisoformat(ga.replace("Z", "+00:00")).timestamp()
+        except Exception:
+            ts = 0.0  # missing/unparseable timestamp → treat as stale (publish it)
+        if ts <= cutoff:
+            out.append(it)
+    return out
+
+
+def _sweep_stale_drafts(hours: float, dry_run: bool = False) -> list[dict]:
+    """Publish every stale draft via the approve path. Returns what was (would be) published."""
+    drafts = _find_stale_drafts(hours)
+    published = []
+    for item in drafts:
+        date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
+        wk = item.get("week_number", "?")
+        if dry_run:
+            published.append({"date": date_str, "week": wk, "dry_run": True})
+            continue
+        try:
+            paths = _publish_to_s3(item)
+            _invalidate_cloudfront(paths)
+            _mark_published(date_str)
+            published.append({"date": date_str, "week": wk})
+            logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
+        except Exception as exc:
+            logger.warning("sweep: auto-publish failed for %s: %s", date_str, exc)
+    if published and not dry_run:
+        _invoke_email_sender()  # one subscriber-delivery trigger for the batch
+    logger.info("chronicle auto-publish sweep: %d draft(s) handled (hours=%s, dry_run=%s)", len(published), hours, dry_run)
+    return published
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # HANDLER
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def lambda_handler(event, context):
-    """Handle GET requests from the preview email approve/request_changes links."""
+    """Approve/request-changes (Function-URL GET) — or a scheduled auto-publish sweep."""
     logger.info("chronicle-approve: invoked")
+    # SS-01 — scheduled sweep (EventBridge sends {"sweep": true} or source=aws.events).
+    if isinstance(event, dict) and (event.get("sweep") or event.get("source") == "aws.events"):
+        hours = float(os.environ.get("CHRONICLE_AUTOPUBLISH_HOURS", "48"))
+        published = _sweep_stale_drafts(hours, dry_run=bool(event.get("dry_run")))
+        return {"statusCode": 200, "swept": published}
     try:
         return _handle(event)
     except Exception as exc:
