@@ -294,15 +294,89 @@ def _recent_outputs(coach_id, limit=25):  # CC-07: depth for the daily-journey t
     return out
 
 
+def _stance_latest(coach_id):
+    """The coach-opinion engine's current evidence-derived stance (STANCE#latest),
+    written weekly by coach_history_summarizer. None pre-data / during engine lag."""
+    try:
+        item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "STANCE#latest"}).get("Item")
+        return _decimal_to_float(item) if item else None
+    except Exception:
+        return None
+
+
+def _stance_history(coach_id, limit=8):
+    """Recent STANCE# snapshots (newest first) for the 'how this read evolved' trail.
+    Skips the STANCE#latest pointer — the dated series IS the history."""
+    out = []
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("STANCE#"),
+                    "ScanIndexForward": False,
+                    "Limit": limit + 1,  # +1: STANCE#latest sorts among the dated keys
+                }
+            )
+        )
+        for it in resp.get("Items", []):
+            it = _decimal_to_float(it)
+            sk = it.get("sk", "")
+            if sk == "STANCE#latest":
+                continue
+            out.append(
+                {
+                    "as_of": it.get("as_of") or sk.replace("STANCE#", ""),
+                    "headline_read": it.get("headline_read", ""),
+                    "stage": it.get("stage", {}),
+                    "how_my_read_changed": it.get("how_my_read_changed", ""),
+                }
+            )
+    except Exception:
+        pass
+    return out[:limit]
+
+
 def _stance_block(coach_id, weight_lbs):
-    """Resolve the coach's current stance rung from real data (CC-09).
-    Falls back to the entry rung when the band metric isn't available yet."""
-    stance = coach_stance.load_stance(coach_id, _S3, _S3_BUCKET)
+    """The coach's public read of Matthew, in a single normalized shape both the
+    coach page (CC-01) and the My Team view (CC-10) consume.
+
+    Prefers the evolving, evidence-derived STANCE#latest (the coach-opinion engine).
+    Falls back to the hand-authored weight-band ladder (CC-09) ONLY when no stance
+    exists yet — a silent scaffold so the page never blanks, never a parallel read.
+    """
+    latest = _stance_latest(coach_id)
+    if latest:
+        return {
+            "source": "stance",
+            "headline_read": latest.get("headline_read", ""),
+            "focused_on_now": latest.get("focused_on_now", []),
+            "set_aside_for_now": latest.get("set_aside_for_now", []),
+            "stage": latest.get("stage", {}) or {},
+            "how_my_read_changed": latest.get("how_my_read_changed", ""),
+            "confidence_note": latest.get("confidence_note", ""),
+            "as_of": latest.get("as_of"),
+            "grounding_flag": bool(latest.get("grounding_flag")),
+        }
+
+    # ── Fallback: weight-band ladder, mapped into the same normalized keys ──
+    stance = coach_stance.load_stance(coach_id, _S3, _S3_BUCKET) if coach_stance else {}
     ladder = stance.get("stage_ladder", [])
     metric = stance.get("band_metric")
     value = weight_lbs if metric == "weight_lbs" else None
-    rung = coach_stance.resolve_stage(ladder, value) or (ladder[0] if ladder else None)
+    rung = (coach_stance.resolve_stage(ladder, value) if coach_stance else None) or (ladder[0] if ladder else None)
+    rung = rung or {}
     return {
+        "source": "ladder",
+        "headline_read": rung.get("read_of_him", ""),
+        "focused_on_now": rung.get("cares_most", []),
+        "set_aside_for_now": rung.get("cares_less_right_now", []),
+        "stage": {"label": rung.get("headline") or rung.get("stage_id"), "rationale": rung.get("read_of_him", "")},
+        "how_my_read_changed": "",
+        "confidence_note": "",
+        "as_of": None,
+        "grounding_flag": False,
+        # ladder-only extras (kept for the scaffold's graduation framing)
+        "graduation_gate": rung.get("graduation_gate"),
         "band_metric": metric,
         "current_value": value,
         "rung": rung,
@@ -431,22 +505,27 @@ def handle_coach_team(event):
             p = ops.get(pid)
             if not p:
                 continue
-            rung = _stance_block(pid, weight).get("rung") or {}
-            stages[pid] = rung.get("stage_id")
-            cares = rung.get("cares_most") or []
+            sb = _stance_block(pid, weight)
+            stage = sb.get("stage") or {}
+            # Canonical id for the cross-coach 'all same stage' check: the ladder's
+            # stage_id on the fallback (a shared id space), else the evidence stage
+            # label (stances have no shared id space — each coach's stage is its own).
+            stage_id = (sb.get("rung") or {}).get("stage_id") or stage.get("label")
+            stages[pid] = stage_id
+            cares = sb.get("focused_on_now") or []
             if cares:
                 focus.append(cares[0])
-            watches = rung.get("watches") or []
             huddle.append(
                 {
                     "persona_id": pid,
                     "name": p.get("name"),
                     "emoji": p.get("emoji"),
-                    "stage_id": rung.get("stage_id"),
-                    "headline": rung.get("headline"),
-                    "read_of_him": rung.get("read_of_him"),
-                    "watch": watches[0] if watches else None,
-                    "graduation_gate": rung.get("graduation_gate"),
+                    "stage_id": stage_id,
+                    "headline": stage.get("label"),
+                    "read_of_him": sb.get("headline_read"),
+                    "watch": cares[0] if cares else None,
+                    "graduation_gate": sb.get("graduation_gate"),  # ladder-only; absent on stance
+                    "source": sb.get("source"),
                 }
             )
         seen = set()
@@ -496,6 +575,7 @@ def handle_coach(event):
                 "character": _character(p),
                 "working_hypotheses": _working_hypotheses(pid),
                 "stance": _stance_block(pid, weight),
+                "stance_history": _stance_history(pid),
                 "voice": _voice_subset(p["coach_config_key"]),
                 "relationships": _relationships(pid),
                 "report_card": {

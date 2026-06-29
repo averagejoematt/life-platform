@@ -79,14 +79,21 @@ function entriesFor(s, data) {
 }
 
 // ── Coach page sub-renderers (one type system: coaches SPEAK serif; labels/data mono) ──
+// The coach's evolving, evidence-derived read of Matthew (the coach-opinion
+// engine's STANCE#latest). Consumes the normalized stance shape the API returns
+// for BOTH the live stance and the weight-ladder fallback (graduation_gate is
+// present only on the fallback).
 function coachStanceHTML(st) {
-  if (!st) return "";
+  if (!st || (!st.headline_read && !(st.stage && st.stage.label))) return "";
   const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
+  const stage = st.stage || {};
   let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
-  h += `<h3 class="cs-headline">${esc(st.headline || "")}</h3><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
-  if ((st.cares_most || []).length) h += `<p class="cs-care"><span class="label">caring most about right now</span> ${list(st.cares_most)}</p>`;
-  if ((st.cares_less_right_now || []).length) h += `<p class="cs-careless"><span class="label">deliberately ignoring for now</span> ${list(st.cares_less_right_now)}</p>`;
-  if (st.plan) h += `<p class="dx-prose"><strong>The plan:</strong> ${esc(st.plan)}</p>`;
+  if (stage.label) h += `<h3 class="cs-headline">${esc(stage.label)}</h3>`;
+  if (st.headline_read) h += `<p class="dx-prose">${esc(st.headline_read)}</p>`;
+  if ((st.focused_on_now || []).length) h += `<p class="cs-care"><span class="label">focused on right now</span> ${list(st.focused_on_now)}</p>`;
+  if ((st.set_aside_for_now || []).length) h += `<p class="cs-careless"><span class="label">set aside for now</span> ${list(st.set_aside_for_now)}</p>`;
+  if (st.how_my_read_changed) h += `<p class="cs-evolve"><span class="label">how my read has changed</span> ${esc(st.how_my_read_changed)}</p>`;
+  if (st.confidence_note) h += `<p class="cs-conf label">${esc(st.confidence_note)}</p>`;
   if (st.graduation_gate) h += `<p class="cs-gate label">graduates when — ${esc(st.graduation_gate)}</p>`;
   return h + `</section>`;
 }
@@ -256,6 +263,10 @@ async function renderByCoach(read, id) {
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
   let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}"><span class="sigil-lg">${sigil(coach, { title: "" })}</span><div><p class="dx-kicker label">${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2></div></div>`;
 
+  // 0) THE STANCE — the coach's evolving, evidence-derived read of Matthew (the
+  //    durable "where I think you are", above this week's domain detail).
+  h += coachStanceHTML(coach.stance);
+
   // 1) THE READ — lead with the coach's actual verdict on the domain.
   if (analysis && (analysis.analysis || analysis.key_recommendation)) {
     h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week</p>`;
@@ -338,19 +349,30 @@ async function renderByCoach(read, id) {
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     h += `<p class="bc-track label">track record: ${tr.hit_rate_pct != null ? esc(tr.hit_rate_pct) + "% hit-rate " + esc(tr.n_note || "") : "accruing"}</p>`;
   }
-  // 3.5) THE EVOLVING READ — this coach's recent dated commentary, so a reader can trace
-  //      how their take on Matthew has moved over the journey (the serial/evolution surface).
-  const ro = (coach.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
-  if (ro.length) {
-    h += disclose(`how this read has evolved · ${ro.length} recent`,
-      `<ol class="ce-trail">${ro.slice(0, 8).map((o) =>
-        `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
-        (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
-        ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") +
-        `</li>`).join("")}</ol>`);
+  // 3.5) THE EVOLVING READ — prefer the dated STANCE# trail (how the coach's read of
+  //      Matthew actually moved, week to week), falling back to recent dated commentary.
+  const sh = (coach.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
+  if (sh.length) {
+    h += disclose(`how this read has evolved · ${sh.length}`,
+      `<ol class="ce-trail">${sh.slice(0, 8).map((s) => {
+        const stage = (s.stage && s.stage.label) ? " · " + esc(s.stage.label) : "";
+        const say = s.how_my_read_changed || s.headline_read || "";
+        return `<li class="ce-item"><span class="ce-date label">${esc(String(s.as_of || "").slice(0, 10))}${stage}</span>` +
+          (say ? `<p class="ce-say">${esc(say)}</p>` : "") + `</li>`;
+      }).join("")}</ol>`);
+  } else {
+    const ro = (coach.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
+    if (ro.length) {
+      h += disclose(`how this read has evolved · ${ro.length} recent`,
+        `<ol class="ce-trail">${ro.slice(0, 8).map((o) =>
+          `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
+          (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
+          ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") +
+          `</li>`).join("")}</ol>`);
+    }
   }
-  // 4) The bio is one disclosure click down — not the lead.
-  h += disclose("who this coach is · their voice", coachCharacterHTML(coach.character) + (coach.stance && coach.stance.rung ? coachStanceHTML(coach.stance.rung) : ""));
+  // 4) The bio is one disclosure click down — not the lead (the stance now leads).
+  h += disclose("who this coach is · their voice", coachCharacterHTML(coach.character));
   read.innerHTML = h;
   enhanceCoachNames(read);
 }

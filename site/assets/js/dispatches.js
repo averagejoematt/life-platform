@@ -115,14 +115,19 @@ function entriesFor(s, data) {
 
 // CC-01/02 — a coach's page: stance (lead) · how it's going · report card · voice · relationships.
 // Pure surfacing of /api/coach/{id}; honest empty-states before the data accrues.
+// The coach's evolving, evidence-derived read of Matthew (STANCE#latest), in the
+// normalized shape the API returns for both the live stance and the ladder fallback.
 function coachStanceHTML(st) {
-  if (!st) return "";
+  if (!st || (!st.headline_read && !(st.stage && st.stage.label))) return "";
   const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
+  const stage = st.stage || {};
   let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
-  h += `<h3 class="cs-headline">${esc(st.headline || "")}</h3><p class="dx-prose">${esc(st.read_of_him || "")}</p>`;
-  if ((st.cares_most || []).length) h += `<p class="cs-care"><span class="label">caring most about right now</span> ${list(st.cares_most)}</p>`;
-  if ((st.cares_less_right_now || []).length) h += `<p class="cs-careless"><span class="label">deliberately ignoring for now</span> ${list(st.cares_less_right_now)}</p>`;
-  if (st.plan) h += `<p class="dx-prose"><strong>The plan:</strong> ${esc(st.plan)}</p>`;
+  if (stage.label) h += `<h3 class="cs-headline">${esc(stage.label)}</h3>`;
+  if (st.headline_read) h += `<p class="dx-prose">${esc(st.headline_read)}</p>`;
+  if ((st.focused_on_now || []).length) h += `<p class="cs-care"><span class="label">focused on right now</span> ${list(st.focused_on_now)}</p>`;
+  if ((st.set_aside_for_now || []).length) h += `<p class="cs-careless"><span class="label">set aside for now</span> ${list(st.set_aside_for_now)}</p>`;
+  if (st.how_my_read_changed) h += `<p class="cs-evolve"><span class="label">how my read has changed</span> ${esc(st.how_my_read_changed)}</p>`;
+  if (st.confidence_note) h += `<p class="cs-conf label">${esc(st.confidence_note)}</p>`;
   if (st.graduation_gate) h += `<p class="cs-gate label">graduates when — ${esc(st.graduation_gate)}</p>`;
   return h + `</section>`;
 }
@@ -249,7 +254,7 @@ async function renderCoachPage(read, id) {
   if (typeof d.daily === "string" && d.daily.trim()) {
     h += `<section class="coach-daily"><p class="dx-kicker label">today's reflection</p><p class="cd-text">${esc(d.daily)}</p></section>`;  // CC-08
   }
-  h += coachStanceHTML(d.stance && d.stance.rung);
+  h += coachStanceHTML(d.stance);
   h += coachHypothesesHTML(d.working_hypotheses);
   const ro = d.recent_outputs || [];
   h += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
