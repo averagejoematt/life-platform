@@ -263,9 +263,14 @@ def _semantic_pass(facts, narratives):
         joined = "\n\n".join(n[:600] for n in narratives[:8])
         prompt = (
             "You are a QA auditor for an AI health platform. Below are the authoritative facts for the day, "
-            "then several coach narratives served to the user. Flag ONLY hard incoherence: a narrative stating "
-            "a number that contradicts the facts, a self-contradiction across narratives, or a unit error "
-            "(HRV is milliseconds, not bpm). Ignore tone/style. Respond with strict JSON: "
+            "then several coach narratives served to the user. Flag ONLY a HARD, unambiguous incoherence: "
+            "a narrative stating a number that clearly contradicts a fact (off by MORE than 25%), a direct "
+            "self-contradiction between narratives, or a unit error (HRV is milliseconds, not bpm). "
+            "Do NOT flag any of the following — these are NOT incoherence: a metric simply not being mentioned; "
+            "a number within ~25% of the fact (normal day-to-day variance); a cumulative total vs a weekly rate "
+            "(e.g. 'lost 13.8 lbs' alongside a -7.3 lb/week rate — different framings, both can be true); a "
+            "historical or trend value cited alongside the current one. When unsure, treat it as coherent. "
+            "Ignore tone/style. Respond with strict JSON: "
             '{"coherent": true|false, "issues": ["..."]}.\n\n'
             f"AUTHORITATIVE FACTS: {facts_line}\n\nNARRATIVES:\n{joined}"
         )
