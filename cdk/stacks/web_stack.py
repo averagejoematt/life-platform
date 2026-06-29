@@ -294,7 +294,10 @@ class WebStack(Stack):
             dlq=subscriber_dlq,
             alerts_topic=None,
             custom_policies=rp.operational_email_subscriber(),
-            timeout_seconds=15,
+            # 30s matches the live value (was bumped from 15s — the SES send + DDB
+            # write path needs headroom). CDK now reflects reality; no deploy needed,
+            # and session_postflight's config-drift check goes green.
+            timeout_seconds=30,
             memory_mb=256,
             environment={
                 "USER_ID": "matthew",
