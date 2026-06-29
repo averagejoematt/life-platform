@@ -92,21 +92,23 @@ def test_build_record_is_serializable_and_complete(monkeypatch):
     assert json.loads(json.dumps(record, default=str))  # round-trips
 
 
-def test_build_record_status_mirrors_alarm_on_semantic_only_incoherence():
-    # Deterministic all-green, but the Haiku pass flagged a contradiction. The
-    # coherence-overall alarm fires on this (semantic_bad), so the persisted status
-    # MUST read alarm — else the agent's status filter drops it and the alarm fires
-    # with no detail. deterministic_status preserves the invariant-only verdict.
+def test_semantic_incoherence_is_advisory_not_alarm_driving():
+    # The Haiku semantic read is too noisy to drive a daily-emailing alarm (it lists
+    # confirmations as "issues"). So a semantic-only flag with all deterministic
+    # invariants green stays status=ok (the alarm won't fire), but semantic_incoherent
+    # is recorded as advisory context for a human/agent to weigh.
     ok = [sentinel.ci.Finding("prediction_health", sentinel.ci.OK, 0.0, "fine")]
-    semantic = {"coherent": False, "issues": ["a coach invented a weight-loss number"]}
+    semantic = {"coherent": False, "issues": ["borderline HRV variance"]}
     record = sentinel.build_record(ok, semantic, "digest", sentinel.ci.OK)
-    assert record["status"] == sentinel.ci.ALARM
+    assert record["status"] == sentinel.ci.OK  # deterministic drives the alarm
     assert record["deterministic_status"] == sentinel.ci.OK
-    assert record["semantic_incoherent"] is True
+    assert record["semantic_incoherent"] is True  # but the advisory flag is preserved
 
-    # And the clean case stays ok.
-    clean = sentinel.build_record(ok, {"coherent": True, "issues": []}, "d", sentinel.ci.OK)
-    assert clean["status"] == sentinel.ci.OK and clean["semantic_incoherent"] is False
+
+def test_deterministic_alarm_still_drives_status():
+    bad = [sentinel.ci.Finding("facts_agreement", sentinel.ci.ALARM, 2.0, "two contradictions")]
+    record = sentinel.build_record(bad, {"coherent": True, "issues": []}, "d", sentinel.ci.ALARM)
+    assert record["status"] == sentinel.ci.ALARM
 
 
 def test_persist_writes_latest_and_dated_and_is_fail_soft(monkeypatch):
