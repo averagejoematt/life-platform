@@ -400,6 +400,30 @@ class MonitoringStack(Stack):
             GTE,
         )
 
+        # ══════════════════════════════════════════════════════════════
+        # SS-03: budget-tier HARD-STOP alarm — the kill-switch can't be silent.
+        # cost_governor writes a tier 0-3 to SSM AND emits LifePlatform/Budget
+        # BudgetTier (the computed tier, even in observe mode). Tier >= 2 (website AI
+        # paused) is already surfaced to the DIGEST by `life-platform-budget-tier-
+        # escalation` below. But that digest alarm conflates tier 2 with tier 3, and
+        # tier 3 is categorically worse: ALL Bedrock paused, so the *daily brief
+        # itself* goes data-only — the flagship output silently degrades. A digest
+        # line is too quiet for that. This alarm escalates tier 3 specifically to the
+        # URGENT topic so a hard-stop pages promptly instead of waiting for someone to
+        # read the overnight digest (the 6-month hands-off failure mode is "AI dies,
+        # nobody notices for weeks"). Hourly Maximum matches the escalation alarm's
+        # cadence; NOT_BREACHING (the _alarm default) so a missed emit never false-fires.
+        _alarm(
+            "BudgetTierHardStop",
+            "budget-tier-hardstop",
+            "LifePlatform/Budget",
+            "BudgetTier",
+            3600,
+            "Maximum",
+            3,
+            GTE,
+        )
+
         # 2026-05-29: the ~46 per-Lambda ingestion-error-* alarms ($4.60/mo) were
         # removed (error_alarm=False in ingestion_stack). No aggregate replaces them:
         # CloudWatch rejects SEARCH in alarms and caps metric-math alarms at ~10
