@@ -200,24 +200,40 @@ engineer/QS audience is best-served; **friends & family are worst-hit** (the pub
 stops). Ordered by leverage.
 
 ### A. Self-sustainability hardening (highest leverage)
-- **SS-01 — Chronicle auto-publish fallback · 🔴 HIGH.** The #1 dark-out: `wednesday_chronicle` runs
-  `PREVIEW_MODE=true`, so an un-clicked approval link means it **never publishes** (week-1 silent
-  stop). Fix = auto-publish after an N-hour approval window (privacy/vice guards stay fail-closed),
-  OR a decision to flip `PREVIEW_MODE=false`. **DECISION FORK** (timed-fallback vs flip).
-- **SS-02 — Podcast HOLD-aging escape · 🟠 MED.** One soft flag holds an episode forever in
-  `panelcast-holds/`. Auto-release **soft** (QA/sensitivity) holds after a window; the **hard**
-  safety gate stays fail-closed.
+- **SS-01 — Chronicle auto-publish fallback · ✅ DONE (2026-06-29, #265).** A daily bounded sweep on
+  `chronicle-approve` auto-publishes a draft unapproved past the review window (via the same approve
+  publish path), bounded `[HOURS=48, MAX_DAYS=10]` so it catches a forgot-to-click draft but never
+  resurrects an abandoned one. Deployed + verified live.
+- **SS-02 — Podcast HOLD-aging escape · ✅ DONE (2026-06-29).** Holds are now tagged
+  `hold_class` (safety|quality); a Mon+Wed sweep (`{"sweep_holds": true}`) auto-**retries** a
+  *quality* hold on the current week by RE-GENERATING it through every gate (publishes only if a
+  fresh attempt clears the bar — never ships the flagged draft as-is). **Safety/sensitivity holds
+  are NEVER auto-released** (deviation from the original note, which lumped sensitivity as soft — an
+  acute-crisis week must stay human). Bounded: review window / max-days / retry-cap. Deploy:
+  `LifePlatformEmail` (new EventBridge rule + lambda).
 - **SS-03 — Loud source-specific decay alarms · 🔴 HIGH.** The missing monitors: Garmin-staleness
   (distinct from the lenient generic freshness — the 44-day-outage class), per-source
   token-expiry-7d warning, **budget-tier ≥2 loud alert**, podcast-HOLD-aging, Dependabot-PR-age.
   Most live in the agent ALLOWLIST (`monitoring_stack` / `freshness_checker`). Extends ER-01.
-- **SS-04 — Dependabot safe-auto-merge · 🟠 MED.** Dev-toolchain group on green CI (grouped weekly),
-  scoped to NOT touch cdk/runtime deps — so the PR backlog can't block the eventual `cdk deploy`.
-- **SS-05 — Experiment continuity decision · 🟡 LOW-MED.** Counters drift unbounded (week 27+) with
-  no manual `restart_pipeline.py`. Decide auto-roll cycles vs "runs continuously" + a Sentinel
-  counter-sanity invariant. (PHASE_TAXONOMY / ADR-077.)
-- **SS-06 — Enforce gradable predictions · 🟠 MED.** Reject/repair `threshold=None` at write time so
-  the track record actually fills (a flagship credibility surface). Maps to **D-05 / D-02**.
+- **SS-04 — Dependabot safe-auto-merge · ✅ DONE (2026-06-29).** Two workflows: `dependabot-validate`
+  (`on: pull_request`, read-only) runs the enforced lint + offline tests against the *bumped* tool
+  versions (the main CI/CD only runs on push-to-main, so PRs had no Python validation); and
+  `dependabot-automerge` (`on: workflow_run` of a successful validate) approves + squash-merges the
+  in-scope root **dev-tooling** group only. Safe-by-construction: self-gated on validate success (no
+  branch-protection/`allow_auto_merge` dependency), no PR-code execution under a write token, never
+  touches /cdk or runtime, and leaves the PR for a human if a review gate blocks it. **No deploy**
+  (workflows activate on merge to main). *(Optional: enabling repo `allow_auto_merge` + required
+  checks would make it even tighter, but that's a security-posture toggle left to Matthew.)*
+- **SS-05 — Experiment continuity · ✅ DONE (2026-06-29).** **DECISION: runs continuously** — a reset
+  is a deliberate manual `restart_pipeline.py` act, never automated; counters legitimately grow
+  unbounded. Added a Sentinel `check_experiment_continuity` invariant that ALARMs only when a
+  surfaced week DISAGREES with the genesis date (the ADR-077 stale-pre-reset leak) or genesis is
+  misconfigured. Deploy: `LifePlatformOperational` (bundled-asset, no layer).
+- **SS-06 — Enforce gradable predictions · ✅ DONE (2026-06-29).** The C-3 fix already eliminated the
+  `machine`/`threshold=None` spec (routes metric+direction → gradable `directional`, else
+  `qualitative`); the residual gap was *write-time visibility*. `coach_state_updater` now emits
+  `LifePlatform/Predictions::PredictionGradableShare` per run — a leading indicator of an extraction
+  regression (the Sentinel needs ≥8 *closed* preds to see it). Deploy: the coach stack (bundled asset).
 
 ### B. Novelty / engagement engine (sustain returnability)
 - **SS-07 — "Predict the week" reader loop** — already **PG-07** (gated on D-05, now unblockable).
