@@ -9,6 +9,7 @@
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
+import { sigil } from "/assets/js/sigils.js";
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -147,7 +148,7 @@ async function renderTeamView(read) {
   if (d.lead) {
     const L = d.lead;
     h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
-    h += `<div class="tl-head"><span class="tl-name">${esc(L.emoji || "")} ${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
+    h += `<div class="tl-head" style="--coach:${esc(L.color || "")}"><span class="sigil-lg">${sigil(L, { title: "" })}</span><span class="tl-name">${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
     if (L.short_bio) h += `<p class="dx-prose tl-bio">${esc(L.short_bio)}</p>`;
     if (L.philosophy) h += `<blockquote class="tl-philosophy">${esc(L.philosophy)}</blockquote>`;
     if ((L.staff_focus || []).length) h += `<p class="tl-focus label">what he's got the staff focused on: ${L.staff_focus.map(esc).join(" · ")}</p>`;
@@ -166,7 +167,7 @@ async function renderTeamView(read) {
   h += `</section>`;
   h += `<section class="team-huddle"><p class="dx-kicker label">the huddle — each coach's current read</p><ul class="th-list">`;
   for (const c of d.huddle || []) {
-    h += `<li class="th-item" data-coach="${esc(c.persona_id)}"><button type="button" class="th-btn"><span class="th-name">${esc(c.emoji || "")} ${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
+    h += `<li class="th-item" data-coach="${esc(c.persona_id)}" style="--coach:${esc(c.color || "")}"><button type="button" class="th-btn"><span class="th-name"><span class="coach-mark">${sigil(c, { title: "" })}</span>${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
   }
   h += `</ul></section>`;
   read.innerHTML = h;
@@ -242,8 +243,7 @@ async function renderCoachPage(read, id) {
   let d;
   try { d = await getJSON(`/api/coach/${encodeURIComponent(id)}`); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p>`;
-  h += `<h2 class="dx-title">${esc(d.name || "")}</h2>`;
+  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}"><span class="sigil-lg">${sigil(d, { title: "" })}</span><div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
   if (typeof d.daily === "string" && d.daily.trim()) {
