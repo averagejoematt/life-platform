@@ -2476,25 +2476,41 @@ def handle_changes_since(qs: dict = None) -> dict:
 
 
 def handle_observatory_week(qs: dict = None) -> dict:
-    """GET /api/observatory_week?domain=sleep — Returns 7-day summary for a domain."""
+    """GET /api/observatory_week?domain=sleep[&date=YYYY-MM-DD] — 7-day domain summary.
+
+    With ?date= (Phase 4 historical window): the 7-day window AS OF that date — records
+    served verbatim (gaps stay gaps, never interpolated), pilot/prior-cycle records
+    included (history is explicitly cross-cycle, mirroring handle_character), a future
+    date clamps to today, and the response caches a full day (the past is immutable).
+    """
     qs = qs or {}
     domain = (qs.get("domain") or "sleep").lower().strip()
     valid_domains = {"sleep", "glucose", "nutrition", "training", "mind", "physical"}
     if domain not in valid_domains:
         return _error(400, f"Invalid domain. Use: {', '.join(sorted(valid_domains))}")
 
+    import re as _re
     from datetime import datetime, timedelta, timezone
 
+    date = (qs.get("date") or "").strip()
+    if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return _error(400, "date must be YYYY-MM-DD")
+    ip = bool(date)  # ADR-058: include pilot/prior-cycle records only when time-travelling
+
     now = datetime.now(timezone.utc)
-    end_date = now.strftime("%Y-%m-%d")
-    start_date = max((now - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    prev_start = max((now - timedelta(days=14)).strftime("%Y-%m-%d"), EXPERIMENT_START)
-    prev_end = max((now - timedelta(days=8)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    # Anchor the window to `date` (clamped to today so a future scrub shows the live week),
+    # else to now. start/prev_* derive off the anchor — every domain branch below is unchanged.
+    anchor = min(date, now.strftime("%Y-%m-%d")) if date else now.strftime("%Y-%m-%d")
+    _anchor = datetime.strptime(anchor, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    end_date = anchor
+    start_date = max((_anchor - timedelta(days=7)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    prev_start = max((_anchor - timedelta(days=14)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+    prev_end = max((_anchor - timedelta(days=8)).strftime("%Y-%m-%d"), EXPERIMENT_START)
 
     try:
         if domain == "sleep":
-            items = _query_source("whoop", start_date, end_date)
-            prev_items = _query_source("whoop", prev_start, prev_end)
+            items = _query_source("whoop", start_date, end_date, include_pilot=ip)
+            prev_items = _query_source("whoop", prev_start, prev_end, include_pilot=ip)
 
             durations = [float(i.get("sleep_duration_hours", 0)) for i in items if i.get("sleep_duration_hours")]
             prev_durations = [float(i.get("sleep_duration_hours", 0)) for i in prev_items if i.get("sleep_duration_hours")]
@@ -2536,8 +2552,8 @@ def handle_observatory_week(qs: dict = None) -> dict:
             notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
 
         elif domain == "nutrition":
-            items = _query_source("macrofactor", start_date, end_date)
-            prev_items = _query_source("macrofactor", prev_start, prev_end)
+            items = _query_source("macrofactor", start_date, end_date, include_pilot=ip)
+            prev_items = _query_source("macrofactor", prev_start, prev_end, include_pilot=ip)
 
             cals = [
                 float(i.get("total_calories_kcal") or i.get("calories") or 0)
@@ -2585,7 +2601,7 @@ def handle_observatory_week(qs: dict = None) -> dict:
             notable = f"Protein averaged {round(avg_protein)}g/day this week"
 
         elif domain == "training":
-            items = _query_source("whoop", start_date, end_date)
+            items = _query_source("whoop", start_date, end_date, include_pilot=ip)
             strains = [float(i.get("strain", 0)) for i in items if i.get("strain")]
             recoveries = [float(i.get("recovery_score", 0)) for i in items if i.get("recovery_score")]
             avg_strain = sum(strains) / len(strains) if strains else 0
@@ -2607,7 +2623,7 @@ def handle_observatory_week(qs: dict = None) -> dict:
             notable = f"Average recovery {round(avg_recovery)}% this week"
 
         elif domain == "glucose":
-            items = _query_source("apple_health", start_date, end_date)
+            items = _query_source("apple_health", start_date, end_date, include_pilot=ip)
             tirs = [float(i.get("blood_glucose_time_in_range_pct", 0)) for i in items if i.get("blood_glucose_time_in_range_pct")]
             avg_tir = sum(tirs) / len(tirs) if tirs else 0
             avg_glucoses = [float(i.get("blood_glucose_avg", 0)) for i in items if i.get("blood_glucose_avg")]
@@ -2633,7 +2649,7 @@ def handle_observatory_week(qs: dict = None) -> dict:
             notable = f"Average time-in-range {round(avg_tir)}% this week"
 
         elif domain == "mind":
-            items = _query_source("journal", start_date, end_date)
+            items = _query_source("journal", start_date, end_date, include_pilot=ip)
             moods = [float(i.get("mood_valence", 0)) for i in items if i.get("mood_valence") is not None]
             avg_mood = sum(moods) / len(moods) if moods else 0
 
@@ -2653,7 +2669,7 @@ def handle_observatory_week(qs: dict = None) -> dict:
             notable = f"{len(items)} journal entries this week"
 
         elif domain == "physical":
-            items = _query_source("withings", start_date, end_date)
+            items = _query_source("withings", start_date, end_date, include_pilot=ip)
             weights = [float(i.get("weight_lbs", 0)) for i in items if i.get("weight_lbs")]
             if weights:
                 start_w = weights[0]
@@ -2699,8 +2715,10 @@ def handle_observatory_week(qs: dict = None) -> dict:
                 "summary": summary,
                 "notable": notable,
                 "last_updated": now.isoformat(),
+                "as_of_date": end_date,
+                "time_travel": ip,
             },
-            cache_seconds=900,
+            cache_seconds=86400 if ip else 900,  # the past is immutable
         )
 
     except Exception as e:

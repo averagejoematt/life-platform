@@ -27,7 +27,7 @@ def _whoop_record(date):
 
 
 def test_vitals_frame_and_night_of(monkeypatch):
-    def fake_query_source(source, start, end):
+    def fake_query_source(source, start, end, include_pilot=False):
         if source == "whoop":
             return [_whoop_record("2026-06-17")]
         return []  # no withings/weight series
