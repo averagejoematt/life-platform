@@ -48,13 +48,45 @@ function safeNum(val, decimals = 0) {
   return Number(val).toFixed(decimals);
 }
 
+// ── v5 "Measured Life" palette (mirrors site/assets/css/tokens.css). The OG card
+//    renders server-side without the web fonts, so the type TRIAD is honoured by
+//    ROLE via generic families: serif = human/headline (Fraunces), mono = data &
+//    labels (IBM Plex Mono), sans = interface (Instrument Sans).
+const C = {
+  page: '#0E0C08', surface: '#16130E', raised: '#211C14',
+  ink: '#ECE3D2', muted: '#A99F8C', faint: '#857B68', ember: '#DD7A37',
+};
+const SERIF = 'Georgia, \'Times New Roman\', serif';
+const MONO = '\'IBM Plex Mono\', ui-monospace, monospace';
+
 function progressBar(pct, width = 200, height = 8) {
   const fill = Math.max(0, Math.min(100, pct || 0));
   const fillWidth = Math.round(width * fill / 100);
   return `
-    <rect x="0" y="0" width="${width}" height="${height}" rx="2" fill="#1a2330"/>
-    <rect x="0" y="0" width="${fillWidth}" height="${height}" rx="2" fill="#58a6ff"/>
+    <rect x="0" y="0" width="${width}" height="${height}" rx="2" fill="${C.raised}"/>
+    <rect x="0" y="0" width="${fillWidth}" height="${height}" rx="2" fill="${C.ember}"/>
   `;
+}
+
+// The platform's instrument mark — the same vocabulary as the coach sigils
+// (concentric ring + radial measuring-ticks + an orbital node). Earned glow:
+// ember, the "alive" accent. Ties the share card to the on-site identity.
+function instrumentMark(cx, cy, r, color = C.ember) {
+  let ticks = '';
+  for (let i = 0; i < 12; i++) {
+    const a = (Math.PI / 6) * i;
+    const x1 = cx + (r - 7) * Math.cos(a), y1 = cy + (r - 7) * Math.sin(a);
+    const x2 = cx + r * Math.cos(a), y2 = cy + r * Math.sin(a);
+    ticks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${color}" stroke-width="2" opacity="0.7"/>`;
+  }
+  const nx = cx + (r - 14) * Math.cos(-0.9), ny = cy + (r - 14) * Math.sin(-0.9);
+  return `<g>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="2"/>
+    <circle cx="${cx}" cy="${cy}" r="${r - 14}" fill="none" stroke="${color}" stroke-width="2" opacity="0.85"/>
+    ${ticks}
+    <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="4" fill="${color}"/>
+    <circle cx="${cx}" cy="${cy}" r="3" fill="${color}"/>
+  </g>`;
 }
 
 function buildSvg(stats) {
@@ -71,84 +103,64 @@ function buildSvg(stats) {
   const daysIn = safeNum(p.days_in, 0);
   const progressNum = parseFloat(j.progress_pct) || 0;
 
+  // Stat card — accent ember only on the truly-live signals (earned), faint otherwise.
+  const card = (x, label, value, unit) => `
+    <rect x="${x}" y="270" width="220" height="110" fill="${C.surface}" rx="6"/>
+    <rect x="${x}" y="270" width="220" height="3" fill="${C.ember}" rx="2"/>
+    <text x="${x + 20}" y="298" font-family="${MONO}" font-size="11" fill="${C.faint}" letter-spacing="2">${label}</text>
+    <text x="${x + 20}" y="348" font-family="${MONO}" font-size="46" fill="${C.ink}">${value}</text>
+    <text x="${x + 20}" y="372" font-family="${MONO}" font-size="11" fill="${C.faint}">${unit}</text>`;
+
   return `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
-  <!-- Background -->
-  <rect width="1200" height="630" fill="#0d1117"/>
+  <rect width="1200" height="630" fill="${C.page}"/>
 
-  <!-- Left accent bar -->
-  <rect x="0" y="0" width="4" height="630" fill="#58a6ff"/>
+  <!-- warm ember bloom behind the headline — earned depth, never gloss -->
+  <defs><radialGradient id="bloom" cx="22%" cy="20%" r="55%">
+    <stop offset="0%" stop-color="${C.ember}" stop-opacity="0.10"/>
+    <stop offset="100%" stop-color="${C.ember}" stop-opacity="0"/>
+  </radialGradient></defs>
+  <rect width="1200" height="630" fill="url(#bloom)"/>
 
-  <!-- Grid lines (subtle) -->
-  <line x1="0" y1="210" x2="1200" y2="210" stroke="#1a2330" stroke-width="1"/>
-  <line x1="0" y1="420" x2="1200" y2="420" stroke="#1a2330" stroke-width="1"/>
-  <line x1="400" y1="0" x2="400" y2="630" stroke="#1a2330" stroke-width="1"/>
-  <line x1="800" y1="0" x2="800" y2="630" stroke="#1a2330" stroke-width="1"/>
+  <!-- left ember accent bar (the one live accent) -->
+  <rect x="0" y="0" width="4" height="630" fill="${C.ember}"/>
 
-  <!-- Top bar -->
-  <rect x="0" y="0" width="1200" height="70" fill="#0a0e14"/>
-  <text x="40" y="44" font-family="monospace" font-size="13" fill="#484f58" letter-spacing="2">AVERAGEJOEMATT.COM</text>
-  <text x="1160" y="44" font-family="monospace" font-size="13" fill="#484f58" text-anchor="end" letter-spacing="2">// LIVE DATA</text>
-  <rect x="1120" y="28" width="8" height="8" rx="4" fill="#3fb950">
-    <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
-  </rect>
+  <!-- top bar -->
+  <rect x="0" y="0" width="1200" height="70" fill="${C.surface}"/>
+  <rect x="38" y="29" width="12" height="12" rx="2" fill="${C.ember}"/>
+  <text x="62" y="44" font-family="${MONO}" font-size="14" fill="${C.muted}" letter-spacing="1">averagejoematt</text>
+  <text x="1160" y="44" font-family="${MONO}" font-size="12" fill="${C.faint}" text-anchor="end" letter-spacing="2">THE MEASURED LIFE</text>
 
-  <!-- Main headline -->
-  <text x="40" y="140" font-family="Arial Black, sans-serif" font-size="72" font-weight="900" fill="#e6edf3" letter-spacing="-2">
-    302 → ${weight}
-  </text>
-  <text x="40" y="185" font-family="monospace" font-size="16" fill="#8b949e" letter-spacing="1">
-    LBS LOST: ${lost}  ·  ${progress}% TO GOAL  ·  DAY ${daysIn}
-  </text>
+  <!-- the platform instrument mark (top-right) -->
+  ${instrumentMark(1090, 165, 46)}
+  <text x="1090" y="240" font-family="${MONO}" font-size="11" fill="${C.faint}" text-anchor="middle" letter-spacing="2">N=1</text>
 
-  <!-- Progress bar -->
-  <g transform="translate(40, 205)">
-    ${progressBar(progressNum, 520, 10)}
-  </g>
-  <text x="40" y="238" font-family="monospace" font-size="11" fill="#58a6ff">0</text>
-  <text x="560" y="238" font-family="monospace" font-size="11" fill="#58a6ff" text-anchor="end">185 lbs</text>
+  <!-- headline (serif = the human voice) -->
+  <text x="40" y="150" font-family="${SERIF}" font-size="80" font-weight="600" fill="${C.ink}" letter-spacing="-1">302 &#8594; ${weight}</text>
+  <text x="40" y="192" font-family="${MONO}" font-size="16" fill="${C.muted}" letter-spacing="1">${lost} LBS LOST  ·  ${progress}% TO GOAL  ·  DAY ${daysIn}</text>
 
-  <!-- Stat cards -->
-  <!-- HRV -->
-  <rect x="40" y="270" width="220" height="110" fill="#0d1f2d" rx="4"/>
-  <rect x="40" y="270" width="220" height="3" fill="#58a6ff" rx="2"/>
-  <text x="60" y="298" font-family="monospace" font-size="10" fill="#484f58" letter-spacing="2">HRV</text>
-  <text x="60" y="348" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#58a6ff">${hrv}</text>
-  <text x="60" y="372" font-family="monospace" font-size="11" fill="#484f58">ms · 30d avg</text>
+  <!-- progress -->
+  <g transform="translate(40, 214)">${progressBar(progressNum, 700, 10)}</g>
+  <text x="40" y="248" font-family="${MONO}" font-size="11" fill="${C.faint}">0</text>
+  <text x="740" y="248" font-family="${MONO}" font-size="11" fill="${C.ember}" text-anchor="end">185 lbs</text>
 
-  <!-- Recovery -->
-  <rect x="280" y="270" width="220" height="110" fill="#0d1f2d" rx="4"/>
-  <rect x="280" y="270" width="220" height="3" fill="#3fb950" rx="2"/>
-  <text x="300" y="298" font-family="monospace" font-size="10" fill="#484f58" letter-spacing="2">RECOVERY</text>
-  <text x="300" y="348" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#3fb950">${recovery}</text>
-  <text x="300" y="372" font-family="monospace" font-size="11" fill="#484f58">% · today</text>
+  <!-- live vitals -->
+  ${card(40, 'HRV', hrv, 'ms · 30d avg')}
+  ${card(280, 'RECOVERY', recovery, '% · today')}
+  ${card(520, 'STREAK', streak, 'days · T0 habits')}
 
-  <!-- Streak -->
-  <rect x="520" y="270" width="220" height="110" fill="#0d1f2d" rx="4"/>
-  <rect x="520" y="270" width="220" height="3" fill="#f0883e" rx="2"/>
-  <text x="540" y="298" font-family="monospace" font-size="10" fill="#484f58" letter-spacing="2">STREAK</text>
-  <text x="540" y="348" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#f0883e">${streak}</text>
-  <text x="540" y="372" font-family="monospace" font-size="11" fill="#484f58">days · T0 habits</text>
+  <!-- right rail: what it is -->
+  <line x1="800" y1="270" x2="800" y2="540" stroke="${C.raised}" stroke-width="1"/>
+  <text x="840" y="300" font-family="${MONO}" font-size="11" fill="${C.faint}" letter-spacing="2">THE WAGER</text>
+  <text x="840" y="346" font-family="${SERIF}" font-size="30" font-weight="600" fill="${C.ink}">Numbers <tspan font-style="italic">and</tspan></text>
+  <text x="840" y="384" font-family="${SERIF}" font-size="30" font-weight="600" fill="${C.ink}">meaning, kept</text>
+  <text x="840" y="422" font-family="${SERIF}" font-size="30" font-weight="600" fill="${C.ember}">personal.</text>
+  <text x="840" y="474" font-family="${MONO}" font-size="13" fill="${C.muted}">A board of AI experts reads</text>
+  <text x="840" y="496" font-family="${MONO}" font-size="13" fill="${C.muted}">one real life. The anti-Blueprint.</text>
 
-  <!-- Right panel: Platform stats -->
-  <rect x="800" y="70" width="400" height="560" fill="#0a0e14"/>
-  <text x="860" y="130" font-family="monospace" font-size="11" fill="#484f58" letter-spacing="2">// THE PLATFORM</text>
-
-  <text x="860" y="200" font-family="Arial Black, sans-serif" font-size="52" font-weight="900" fill="#e6edf3">95</text>
-  <text x="860" y="228" font-family="monospace" font-size="12" fill="#8b949e">AI INTELLIGENCE TOOLS</text>
-
-  <text x="860" y="300" font-family="Arial Black, sans-serif" font-size="52" font-weight="900" fill="#e6edf3">19</text>
-  <text x="860" y="328" font-family="monospace" font-size="12" fill="#8b949e">LIVE DATA SOURCES</text>
-
-  <text x="860" y="400" font-family="Arial Black, sans-serif" font-size="52" font-weight="900" fill="#e6edf3">A</text>
-  <text x="860" y="428" font-family="monospace" font-size="12" fill="#8b949e">ARCHITECTURE GRADE (R16)</text>
-
-  <text x="860" y="500" font-family="Arial Black, sans-serif" font-size="52" font-weight="900" fill="#e6edf3">$13</text>
-  <text x="860" y="528" font-family="monospace" font-size="12" fill="#8b949e">/ MONTH ON AWS</text>
-
-  <!-- Bottom tagline -->
-  <rect x="0" y="560" width="800" height="70" fill="#0a0e14"/>
-  <text x="40" y="602" font-family="monospace" font-size="14" fill="#58a6ff" letter-spacing="1">Built by a non-engineer with Claude.</text>
-  <text x="40" y="622" font-family="monospace" font-size="12" fill="#484f58">Every failure included. Every number public.</text>
+  <!-- bottom tagline -->
+  <rect x="0" y="560" width="1200" height="70" fill="${C.surface}"/>
+  <text x="40" y="595" font-family="${SERIF}" font-size="17" font-style="italic" fill="${C.ink}">Built by a non-engineer, with Claude.</text>
+  <text x="40" y="617" font-family="${MONO}" font-size="12" fill="${C.faint}" letter-spacing="1">Every failure included · every number public</text>
 </svg>`;
 }
 

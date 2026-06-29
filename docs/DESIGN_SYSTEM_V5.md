@@ -150,3 +150,55 @@ shells); the hand-authored Home + Cockpit have them inline.
 ### Headroom (not yet done)
 Only `lineChart` is interactive — `barChart`/`dualLineChart`/rings/scatters are not yet. The identity
 swing was kept deliberately restrained.
+
+---
+
+## 8. The graphic-identity system (icons · sigils · imagery) — DURABLE STANDARD
+
+Added in the visual uplevel (PRs #260–#262). The point is **durability**: this is not a one-off
+re-skin. New content, pages, and coaches must keep the theme by **reusing these modules** — most of
+it is self-perpetuating by construction. Honours the same `earned glow / no gloss` rule: every mark
+encodes identity, never decoration. All of it is code-drawn SVG (no raster, no AI image gen).
+
+### 8.1 The line-icon set — `site/assets/icons/icons.svg` + `site/assets/js/icons.js`
+A stroke-based `<symbol>` sprite (`currentColor`, `viewBox 0 0 24 24`). Use it everywhere a domain,
+door, or section is labelled — **never reintroduce emoji** for these.
+- `icon(name, {size, cls, title})` → an `<svg>` that `<use>`s the sprite. Decorative by default.
+- `domainIcon(key, opts)` → resolves any domain name-space (cockpit pillar keys / `/data/` routes /
+  coach `short_id`) via `DOMAIN_ICON` to one icon.
+- **Adding a domain/icon:** add a `<symbol id="i-NAME">` to the sprite, then map the key(s) in
+  `DOMAIN_ICON`. Nothing else — every consumer (cockpit rows, `/data/` nav+title, kickers) picks it up.
+- **Door icons** are server-rendered inline `<use>` (no JS) — the nav markup is **duplicated** in
+  `v4_build_evidence.py:topbar()`, `v4_build_coaching.py`, `v4_build_dispatches.py`, and the
+  hand-authored `site/index.html` + `site/now/index.html`. Change all five together.
+- **Gotcha:** keep `.ico` OUT of any `.chart` figure (`.chart svg{width:100%}` would stretch it).
+
+### 8.2 Coach sigils — `site/assets/js/sigils.js`
+`sigil(coach)` returns a deterministic geometric "instrument" mark (concentric rings + radial
+measuring-ticks + orbital nodes), seeded by the coach's stable id (FNV-1a → mulberry32) — **same
+coach → byte-identical mark forever; a NEW coach automatically gets a unique one** with zero work.
+- **Rule:** anywhere a coach is rendered (badge, header, roster, popover, digest), use `sigil(c)`.
+  Keep initials only as an `.sr-only` fallback. Do not render `c.emoji` for coaches.
+- Colour rides the existing per-coach `--coach` channel — the **one sanctioned exception** to the
+  single-ember rule (persona identity only, never data encoding). Set `--coach` on a host element.
+- Classes: `.sigil` / `.sigil-lg` / `.coach-mark` / `.coach-head` in `tokens.css §13`.
+
+### 8.3 Editorial imagery — `lambdas/editorial_image.py` + the duotone treatment
+Atmospheric free-license (Pexels) cover art on the **narrative Story surfaces ONLY** (chronicle ·
+podcast · blog). **Never** on data/meal/vitals surfaces — those stay image-free to protect the
+truthfulness moat. The generators call it automatically for each new post (fail-soft, kill-switch
+`EDITORIAL_IMAGES` default OFF). Front-end renders `image_url` under `.editorial-img .img-duotone`
+(a warm ink↔ember wash so any photo reads as editorial texture, not glossy stock) + `.img-credit`
+attribution. New narrative surfaces should follow the same `{image_url, image_credit}` optional
+contract + the duotone classes.
+
+### 8.4 The instrument mark on share cards — `lambdas/og_image_lambda.mjs`
+The OG card is on the v5 palette and carries the **same sigil vocabulary** (`instrumentMark()` =
+ring + ticks + node, ember). Any new generated share/preview image should reuse the palette
+constants + that mark so off-site previews match the site.
+
+### 8.5 The one rule for future work
+Before adding a glyph, avatar, emoji, or decorative image: **reach for these modules first**
+(`icons.js`, `sigils.js`, `editorial_image.py`, the OG `instrumentMark`). If a new thing needs a
+mark, extend the system (a sprite symbol, a `DOMAIN_ICON` entry) rather than introducing a one-off.
+That is what keeps the identity coherent as the platform grows.
