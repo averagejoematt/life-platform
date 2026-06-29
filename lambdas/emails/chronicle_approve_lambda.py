@@ -262,11 +262,16 @@ def _invoke_email_sender() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _find_stale_drafts(hours: float) -> list[dict]:
-    """Chronicle DATE# records still in `draft` and older than `hours`."""
+def _find_stale_drafts(hours: float, max_days: float) -> list[dict]:
+    """Chronicle DATE# drafts inside the auto-publish WINDOW: older than the review
+    window (`hours`) but newer than `max_days`. The upper bound is the safety: a draft
+    abandoned for weeks (changes-requested, superseded, a pre-genesis leftover) must NOT
+    be resurrected — only a recently-unapproved one (the 'forgot to click' case)."""
     from boto3.dynamodb.conditions import Key
 
-    cutoff = datetime.now(timezone.utc).timestamp() - hours * 3600.0
+    now = datetime.now(timezone.utc).timestamp()
+    stale_before = now - hours * 3600.0  # must be older than this
+    too_old_before = now - max_days * 86400.0  # but newer than this
     out = []
     try:
         resp = table.query(KeyConditionExpression=Key("pk").eq(CHRONICLE_PK) & Key("sk").begins_with("DATE#"))
@@ -280,15 +285,15 @@ def _find_stale_drafts(hours: float) -> list[dict]:
         try:
             ts = datetime.fromisoformat(ga.replace("Z", "+00:00")).timestamp()
         except Exception:
-            ts = 0.0  # missing/unparseable timestamp → treat as stale (publish it)
-        if ts <= cutoff:
+            continue  # no/unparseable timestamp → skip (don't auto-publish a malformed record)
+        if too_old_before <= ts <= stale_before:
             out.append(it)
     return out
 
 
-def _sweep_stale_drafts(hours: float, dry_run: bool = False) -> list[dict]:
+def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = False) -> list[dict]:
     """Publish every stale draft via the approve path. Returns what was (would be) published."""
-    drafts = _find_stale_drafts(hours)
+    drafts = _find_stale_drafts(hours, max_days)
     published = []
     for item in drafts:
         date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
@@ -321,7 +326,8 @@ def lambda_handler(event, context):
     # SS-01 — scheduled sweep (EventBridge sends {"sweep": true} or source=aws.events).
     if isinstance(event, dict) and (event.get("sweep") or event.get("source") == "aws.events"):
         hours = float(os.environ.get("CHRONICLE_AUTOPUBLISH_HOURS", "48"))
-        published = _sweep_stale_drafts(hours, dry_run=bool(event.get("dry_run")))
+        max_days = float(os.environ.get("CHRONICLE_AUTOPUBLISH_MAX_DAYS", "10"))
+        published = _sweep_stale_drafts(hours, max_days, dry_run=bool(event.get("dry_run")))
         return {"statusCode": 200, "swept": published}
     try:
         return _handle(event)
