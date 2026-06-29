@@ -73,11 +73,11 @@ SHELL = """<!DOCTYPE html>
   <header class="story-top">
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
     <nav class="doors" aria-label="Doors">
-      <a href="/now/" title="Today's live instrument — your daily numbers, read back to you">the cockpit</a>
-      <a href="/data/" title="Every source the platform reads — trends now and over time">the data</a>
-      <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements">the coaching</a>
-      <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries">the protocols</a>
-      <a href="/story/" aria-current="page" title="The writing &amp; the why — chronicle, journal, timeline, about">the story</a>
+      <a href="/now/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+      <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
+      <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
+      <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
+      <a href="/story/" aria-current="page" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
       <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
     </nav>
   </header>

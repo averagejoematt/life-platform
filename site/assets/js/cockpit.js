@@ -15,6 +15,7 @@
 */
 
 import { sparkline } from "/assets/js/charts.js";
+import { domainIcon } from "/assets/js/icons.js";
 
 const API = "/api";
 
@@ -124,7 +125,7 @@ function pillarRow(key) {
   btn.dataset.pillar = key;
   btn.setAttribute("aria-expanded", "false");
   btn.innerHTML =
-    `<span class="lab">${PILLAR_LABEL[key] || key}</span>` +
+    `<span class="lab">${domainIcon(key, { cls: "dom-ico" })}${PILLAR_LABEL[key] || key}</span>` +
     `<span class="track"><i style="width:${Math.min(100, score)}%"></i></span>` +
     `<span class="val num">${score}</span>` +
     `<span class="tr">${MARK[dir]}</span>` +

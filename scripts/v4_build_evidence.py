@@ -572,9 +572,17 @@ DOORS = [
 ]
 
 
+def door_icon(key: str) -> str:
+    # Inline <use> of the shared sprite — server-rendered (no JS), inherits .ico-door colour.
+    return (
+        '<svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+        f'<use href="/assets/icons/icons.svg#i-door-{key}"></use></svg>'
+    )
+
+
 def topbar(active_key: str, brand_door: str) -> str:
     links = "".join(
-        f'<a href="{href}" title="{esc(title)}"{" aria-current=\"page\"" if key == active_key else ""}>{label}</a>'
+        f'<a href="{href}" title="{esc(title)}"{" aria-current=\"page\"" if key == active_key else ""}>{door_icon(key)}{label}</a>'
         for href, label, key, title in DOORS
     )
     return (

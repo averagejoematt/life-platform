@@ -14,6 +14,8 @@
 */
 
 import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero, autonomicQuadrant } from "/assets/js/charts.js";
+import { sigil } from "/assets/js/sigils.js";
+import { domainIcon } from "/assets/js/icons.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -1493,7 +1495,7 @@ async function renderBoard(d) {
     ? `<div class="rd-obs"><p class="board-kicker label">the integrator's weekly read · ${esc(wp.coach_name || "")}</p><p class="rd-primary">${esc(wp.text)}</p></div>`
     : `<div class="rd-obs"><p class="rd-primary">The board's weekly read posts after the next briefing.</p></div>`;
   const roster = coaches.length
-    ? `<div class="coach-grid">${coaches.map((c) => `<button class="coach coach-pick" data-coach="${esc(c.coach_id)}" data-name="${esc(c.name)}" data-title="${esc(c.title || "")}" style="--coach:${/^#|rgb/.test(c.color || "") ? c.color : "var(--ember)"}"><span class="coach-badge">${esc(c.initials || (c.name || "?").slice(0, 2))}</span><div><h3 class="coach-name">${esc(c.name)}</h3><p class="coach-title label">${esc(c.title || "")}</p></div></button>`).join("")}</div>`
+    ? `<div class="coach-grid">${coaches.map((c) => `<button class="coach coach-pick" data-coach="${esc(c.coach_id)}" data-name="${esc(c.name)}" data-title="${esc(c.title || "")}" style="--coach:${/^#|rgb/.test(c.color || "") ? c.color : "var(--ember)"}"><span class="coach-badge">${sigil(c, { title: "" })}<span class="sr-only">${esc(c.initials || (c.name || "?").slice(0, 2))}</span></span><div><h3 class="coach-name">${esc(c.name)}</h3><p class="coach-title label">${esc(c.title || "")}</p></div></button>`).join("")}</div>`
     : empty("The expert board is being assembled.");
   return chair + disagreements + sec("The experts — pick one to read their take", roster) +
     `<div class="coach-read" data-board-read></div>` +
@@ -2135,14 +2137,14 @@ function buildTabs() {
 }
 function buildSide() {
   const g = BYSLUG[current] ? BYSLUG[current].group : GROUPS[0];
-  $("[data-side]").innerHTML = REG.filter((t) => t.group === g).map((t) => `<button class="ev-tile ${t.slug === current ? "is-active" : ""}" data-slug="${esc(t.slug)}"><span class="ev-tile-t">${esc(t.title)}</span><span class="ev-tile-b">${esc(t.blurb)}</span></button>`).join("");
+  $("[data-side]").innerHTML = REG.filter((t) => t.group === g).map((t) => `<button class="ev-tile ${t.slug === current ? "is-active" : ""}" data-slug="${esc(t.slug)}"><span class="ev-tile-t">${domainIcon(t.slug, { cls: "dom-ico" })}${esc(t.title)}</span><span class="ev-tile-b">${esc(t.blurb)}</span></button>`).join("");
   document.querySelectorAll(".ev-tile").forEach((b) => b.addEventListener("click", () => select(b.dataset.slug)));
 }
 async function renderCenter() {
   const t = BYSLUG[current]; if (!t) return;
   const main = $("[data-main]");
   main.querySelector("[data-crumb]").innerHTML = `${esc(DOOR)} / ${esc(t.slug)}`;
-  main.querySelector("[data-title]").textContent = t.title;
+  { const _ti = main.querySelector("[data-title]"); _ti.innerHTML = domainIcon(t.slug, { cls: "dom-ico" }) + esc(t.title); }
   main.querySelector("[data-blurb]").textContent = t.blurb;
   const ro = main.querySelector("[data-readout]");
   const deeper = main.querySelector("[data-deeper]");
