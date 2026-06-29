@@ -1,3 +1,16 @@
+## Elena "previously on" recaps — backend serial phase 3 — 2026-06-29
+
+The third backend serial phase, shipped + deployed live + verified end-to-end (Matthew merged #275 + #276 and authorized "you run the deploys"). **1 feature PR: #276 (merged + deployed).** main == live, 0 open PRs.
+
+- **The device:** a serial-TV cold-open so a reader arriving months in catches up fast. **Elena Voss** (the embedded narrator who writes the weekly Chronicle — not the PI; that's Dr. Eli Marsh) produces a "previously on" recap grounded ONLY in **published** chronicle installments + the narrative arc — never raw vitals, never invented events.
+- **Low-fabrication by construction:** generate-at-draft, commit-at-publish — the recap is written to `RECAP#latest` only when a week actually publishes, so it can never run ahead of the history it summarizes. **5 guards** in `build_recap()`, the strongest a **deterministic date cross-check** (any beat whose date isn't a real published-installment date is dropped — never trust an LLM-emitted date), plus raw-vitals strip/reject, a fail-closed privacy gate, and thin-history blanking. All fail-soft (a recap error never aborts the chronicle).
+- **The loop:** `wednesday_chronicle_lambda.build_recap` (local `call_anthropic`, **not** the `ai_calls` layer → no layer rebuild) → `draft_recap_json` → `chronicle_approve._commit_recap` writes `RECAP#latest`+`RECAP#{date}` on both approve and the auto-publish sweep → `/api/recap` (`site_api_coach.handle_recap`, honest-null + stale-record withhold) → `dispatches.js` leads the `/story/timeline/` "story so far", falling back to the front-end stat aside when null.
+- **Bootstrap:** a `{"recap_only": true}` invoke builds/regenerates the recap from existing published history without forcing a new installment.
+- **Reset-safe:** `RECAP#` under `USER#…#SOURCE#chronicle` → already `EXPERIMENT_SCOPED` (zero taxonomy change, asserted).
+- **Deploy (lighter than phase 2, no layer dance):** `LifePlatformEmail` + site-api (`deploy_site_api.sh /api/recap`) + `sync_site_to_s3.sh`. **Verified live:** first recap bootstrapped (`as_of 2026-06-20`, 3 beats); `/api/recap` serves it; all beat dates are real published dates; the story faithfully summarizes the published prologue. New tests: +14 in `tests/test_chronicle_recap.py` (14/14 pass; 368 related tests green).
+
+⚠️ **Watch:** the raw-vitals guard is digit-based, so spelled-out numbers ("recovery score of *twelve*") pass through — grounded here, but the same gap the stance engine has. ⚠️ **Outstanding:** backend serial phase 4 (historical-window APIs); SS tail (SS-08/09/11). See `handovers/HANDOVER_LATEST.md`.
+
 ## Coaches-react-to-site-protocols — backend serial phase 2 — 2026-06-29
 
 The second backend serial phase, shipped + deployed live + verified end-to-end (Matthew merged both PRs and authorized "do all the deploys"). **2 PRs, both merged + deployed: #273 (the feature) + #274 (the `SHARED_LAYER_VERSION` 91→92 bump).** main == live, fleet uniform on layer **v92**, 0 open PRs.
