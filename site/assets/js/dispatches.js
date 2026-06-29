@@ -310,6 +310,12 @@ async function renderRead(s, id) {
     const cover = ent.image_url
       ? `<figure class="editorial-img editorial-cover"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`
       : "";
+    // Tie the episode back to the week it reviews — the missing podcast→chronicle backlink.
+    // (the podcast entry carries the week as its id, not a `week` field.)
+    const _wk = ent.week ?? ent.id;
+    const _pj = _wk != null ? await tryJSON("/journal/posts.json") : null;
+    const _wkPost = _pj && _pj.posts ? _pj.posts.find((p) => String(p.week) === String(_wk)) : null;
+    const chronLink = _wkPost ? `<p class="dx-xlink"><a href="/story/chronicle/#${esc(_wkPost.date)}">Read Week ${esc(_wk)}'s chronicle →</a></p>` : "";
     read.innerHTML =
       pendingHTML +
       cover +
@@ -318,6 +324,7 @@ async function renderRead(s, id) {
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
       `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
+      chronLink +
       ledgerHTML +
       (ent.transcript_url ? `<section class="dx-transcript" data-transcript hidden></section>` : "");
     // Transcript + in-page chapters (the host's questions). No audio timestamps

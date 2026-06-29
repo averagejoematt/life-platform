@@ -35,6 +35,9 @@ PUBLIC_PREFIX = "/assets/images/editorial"  # CloudFront strips the generated/ o
 # ("error code: 1010"). A real UA is required on BOTH the API call and the image fetch.
 _UA = "averagejoematt.com/1.0 (+https://averagejoematt.com)"
 
+# Per-surface seed offset so chronicle Week N and podcast Week N don't pick the same photo.
+_KIND_SEED_OFFSET = {"chronicle": 0, "podcast": 5, "blog": 9}
+
 # A curated pool of atmospheric, non-literal landscape moods. Deliberately NOT
 # health/fitness imagery — these read as editorial texture (a magazine feature
 # header), never as a claim about the day's data. Keep them calm + warm-leaning
@@ -119,8 +122,12 @@ def fetch_and_store(kind, slug, seed, *, s3_client=None, secrets_client=None, bu
         api_key = _api_key(secrets_client)
         if not api_key:
             return None
-        query = pick_query(seed)
-        dl_url, credit = _search(api_key, query, seed)
+        # Decorrelate by surface: chronicle Week N and podcast Week N share a numeric
+        # seed, which would otherwise pick the SAME photo. Offset the seed per kind so
+        # each surface gets its own image (still deterministic per (kind, seed)).
+        eff_seed = int(seed) + _KIND_SEED_OFFSET.get(kind, 0)
+        query = pick_query(eff_seed)
+        dl_url, credit = _search(api_key, query, eff_seed)
         if not dl_url:
             return None
         with urllib.request.urlopen(urllib.request.Request(dl_url, headers={"User-Agent": _UA}), timeout=20) as r:

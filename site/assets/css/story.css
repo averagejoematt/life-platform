@@ -355,6 +355,18 @@ body { overflow-x: hidden; }
 .dx-prev-t { font-family: var(--font-serif); color: var(--ink-muted); font-size: 1rem; }
 .dx-prevlink:hover .dx-prev-t { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 
+/* Coach "how this read evolved" trail — dated commentary, newest-first. */
+.ce-trail { list-style: none; margin: 0; padding-left: var(--sp-4); border-left: var(--border-hair); display: grid; gap: var(--sp-3); }
+.ce-item { position: relative; }
+.ce-item::before { content: ""; position: absolute; left: calc(-1 * var(--sp-4) - 4px); top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); }
+.ce-date { color: var(--ink-faint); display: block; }
+.ce-say { color: var(--ink-muted); margin: 1px 0 0; line-height: var(--lh-relaxed); }
+.ce-themes { color: var(--ink-faint); margin: 2px 0 0; }
+/* Cross-pillar link (podcast → the week's chronicle). */
+.dx-xlink { margin: var(--sp-3) 0; }
+.dx-xlink a { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.dx-xlink a:hover { border-color: var(--ember); }
+
 /* ── Narrow-screen topbar: stop the doors nav overflowing ~375px ──────────── */
 @media (max-width: 480px) {
   .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
