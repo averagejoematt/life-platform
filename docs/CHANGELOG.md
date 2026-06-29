@@ -1,3 +1,15 @@
+## Website visual uplevel + editorial imagery + serial reader + SS-01 — 2026-06-29
+
+A long, multi-thread session, all shipped + deployed live. **main `b35c8c68` (#260 + #261 merged).**
+
+- **Graphic identity (#260/#261):** a code-drawn SVG identity — a line-icon set (`icons.svg`/`icons.js`: 8 domain + 5 door), deterministic generative **coach sigils** (`sigils.js`), pillar+door identity across cockpit/data/nav, constellation earned-glow, an intensity pass, and the OG share-card reskinned to the v5 palette + the sigil `instrumentMark()`. Codified as a standard in `DESIGN_SYSTEM_V5.md §8`. *(The live OG generator is the `.mjs`, not the legacy Python.)*
+- **Editorial imagery (Pexels):** `lambdas/editorial_image.py` puts atmospheric, warm-duotone covers on chronicle/podcast/blog ONLY (never data/meal — truthfulness moat); fail-soft + kill-switch. Fixed the Cloudflare-403 (urllib User-Agent) and a chronicle/podcast image-dedup (per-kind seed offset). Pexels secret + `LifePlatformWeb`/`LifePlatformEmail` deploys + backfill; `EDITORIAL_IMAGES=on`.
+- **Serial "walk-backwards" reader (#265):** `/story/timeline/` as a serial spine (recap + month-grouped + "Read Week N →"), a "previously" rail in the chronicle reader, a coach "how this read has evolved" trail, and the podcast↔chronicle cross-link.
+- **SS-01 — the chronicle can't go dark (#265):** a daily bounded auto-publish sweep on `chronicle-approve` (publishes a draft unapproved past 48h, never resurrects one abandoned past 10d) via the same approve path. 5 unit tests; verified live.
+- **6-month "hands-off" foresight (#264):** the **SS-series** self-sustainability backlog (11 items) recorded in `docs/BACKLOG.md`.
+
+⚠️ **Outstanding:** close #262/#263 (superseded by #261), merge #264/#265; the rest of the SS-series + the backend serial phases (coach-opinion engine, coaches-review-site, Elena recaps, historical APIs). See `handovers/HANDOVER_LATEST.md`.
+
 ## Self-Management & Coherence Program (Phases 1–4) + content-bug fix + precision pass + asset guard — 2026-06-28/29
 
 The thesis: the platform proved it's ALIVE (freshness, auth, render all green) but not RIGHT — every silent-incoherence bug (predictions inconclusive for weeks, recovery 30-vs-86, a coach serving RHR 53 vs the canonical 64) passed every existing liveness check because the producer/consumer contracts were implicit. The program makes coherence a first-class, monitored property. **9 PRs #250–258 (this wrap) on top of Phases 1–3 (#245–248); all deployed; main green.**
