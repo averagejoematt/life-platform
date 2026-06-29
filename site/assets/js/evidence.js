@@ -2144,7 +2144,7 @@ async function renderCenter() {
   const t = BYSLUG[current]; if (!t) return;
   const main = $("[data-main]");
   main.querySelector("[data-crumb]").innerHTML = `${esc(DOOR)} / ${esc(t.slug)}`;
-  { const _ti = main.querySelector("[data-title]"); _ti.innerHTML = domainIcon(t.slug, { cls: "dom-ico" }) + esc(t.title); }
+  { const _ti = main.querySelector("[data-title]"); _ti.innerHTML = domainIcon(t.slug, { cls: "dom-ico dom-ico-lead" }) + esc(t.title); }
   main.querySelector("[data-blurb]").textContent = t.blurb;
   const ro = main.querySelector("[data-readout]");
   const deeper = main.querySelector("[data-deeper]");
