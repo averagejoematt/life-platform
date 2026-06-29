@@ -1,55 +1,77 @@
-# HANDOVER — Self-Sustainability (SS) A-tier: built, deployed, verified — 2026-06-29
+# HANDOVER — Coach-opinion engine: an evolving, evidence-derived stance per coach — 2026-06-29
 
-The highest-leverage slice of the 6-month "hands-off" foresight backlog. **Five SS items built, tested, and deployed live** (Matthew authorized all deploys), plus a real **squash-merge drift bug caught and reconciled** along the way.
+The first **backend serial phase** (of four). Each coach's public "read of Matthew" is now a
+first-class, **evidence-derived stance that evolves** — replacing the bodyweight-keyed ladder. Built,
+deployed live, verified end-to-end, plus a real pre-existing bug caught and fixed mid-deploy.
 
-**3 PRs:** **#266 (SS-03) MERGED** · **#267 (SS-02/04/05/06 + SS-01 reconcile) open + `CLEAN`/mergeable** · **#268 (docs reconcile + this wrap) open**.
+**2 PRs, both MERGED + DEPLOYED:** **#270** (the engine) · **#271** (the compression-truncation fix it
+surfaced). Matthew merged both and authorized the deploys.
 
 ---
 
-## 1. What shipped (all deployed live, verified)
+## 1. What shipped (all live, verified)
 
-| Item | What | Deploy | PR |
-|---|---|---|---|
-| **SS-03** | `budget-tier-hardstop` alarm (`BudgetTier≥3` → URGENT: all Bedrock off, daily brief data-only) | `LifePlatformMonitoring` ✅ | **#266 merged** |
-| **SS-06** | Write-time `PredictionGradableShare` metric (leading indicator of extraction drift) | `LifePlatformCompute` ✅ | #267 |
-| **SS-05** | `check_experiment_continuity` Sentinel invariant + the *runs-continuously* decision | `LifePlatformOperational` ✅ | #267 |
-| **SS-02** | Podcast soft-HOLD aging escape (auto-retry quality holds; safety stays human) | `LifePlatformEmail` ✅ | #267 |
-| **SS-04** | Dependabot safe-auto-merge (validate + self-gated automerge, dev-tooling only) | — (merge-activated) | #267 |
+The bodyweight-band ladder (`config/coaches/*_stance.json` + `coach_stance.py`) had a *sleep* coach
+"graduating" Matthew foundation→architecture because he lost weight — incoherent-but-green on the
+most-visited coach surface. Board decision (asked "what would the product board recommend") =
+**"replace, enriched":** the evidence-stance becomes the single public read AND carries a
+domain-appropriate stage; the ladder is demoted to a **silent fallback** (pre-data / engine lag), never
+a parallel read.
 
-**Verified-down discipline (it paid off twice):**
-- **SS-03:** 4 of 5 proposed monitors already existed (Garmin → `ingest-liveness-unhealthy`; podcast-HOLD → `panelcast-no-episode-7d`; budget≥2 → the existing `budget-tier-escalation` digest). Built only the genuine gap (tier-3 *urgent*). token-expiry-7d deferred (noisy); Dependabot-PR-age → SS-04.
-- **SS-06:** the C-3 fix already killed the `machine`/threshold=None spec — the residual gap was *visibility*, not the spec, so the deliverable is a metric, not a rewrite.
+**The loop (all deployed):**
+- **Stance engine** — `coach_history_summarizer.py` (weekly): after compression, `_generate_stance`
+  writes a grounded `STANCE#{date}` + `STANCE#latest` per coach. Grounded ONLY on the coach's own
+  validated artifacts (`LEARNING#`/`CONFIDENCE#` track record + `COMPRESSED` positions/corrections) —
+  speaks to patterns, never raw vitals. `_RAW_VITAL_RE` guard self-corrects ONCE then sets an internal
+  `grounding_flag`; a `how_my_read_changed` claim survives only with a real signal (a logged correction
+  or a stage shift), else blanked; first runs blank it. Fail-soft (`_run_stance`): a stance error never
+  aborts compression; skips on a compression `_fallback`.
+- **Generation** — `coach_narrative_orchestrator` reads `STANCE#latest` and injects `current_stance`
+  into the brief **deterministically** (not via the LLM) so it reaches the coach verbatim on every path;
+  `ai_calls.py` lets the stance lead framing over the static 185-lb goal block.
+- **Render** — `site_api_coach._stance_block` prefers `STANCE#latest` in a **normalized shape** both the
+  coach page and the My Team view consume; ladder mapped into the same keys as fallback (keeps canonical
+  `stage_id` for the team's all-same check). `handle_coach` adds `stance_history` for the trail.
+- **Front-end** — `coaching.js` + `dispatches.js`: the stance LEADS the coach page; "how this read has
+  evolved" prefers the dated `STANCE#` trail. New `.cs-evolve` ember-rule CSS.
 
-**Key design calls:**
-- **SS-02 safety:** holds carry `hold_class` (default `safety`, fail-closed). The sweep RE-GENERATES a *quality* hold through every gate (incl. the hard safety gate) and publishes only if a fresh attempt clears the bar — it never ships the flagged draft as-is. **Sensitivity/compassion holds are SAFETY (human-only)** — a deliberate override of the foresight note that lumped them as "soft".
-- **SS-05 decision:** the experiment **runs continuously**; a reset is a manual `restart_pipeline.py` act. The invariant flags only a counter that *disagrees with genesis* (the stale-pre-reset leak), not unbounded growth.
-- **SS-04 safety:** the repo's full CI/CD only runs on push-to-main and Dependabot PRs get a read-only token, so the workflow is **self-gated on a `workflow_run` success** (no `allow_auto_merge`/branch-protection dependency) and does **no PR-code execution under a write token**. Inert/safe until a dev-tooling PR appears.
+`STANCE#` is under `COACH#*` → already `EXPERIMENT_SCOPED` (wiped on reset, no taxonomy change). New
+tests: `tests/test_coach_stance_engine.py` (20).
 
-New tests: `test_budget_tier_alarms` · `test_prediction_gradability` (gradability metric) · `test_panelcast_hold_aging` · `test_coherence_invariants` (experiment-continuity) · the recovered `test_chronicle_autopublish`.
+**Verified live:** all 8 coaches serve `source=stance` via `/api/coach/<id>`, each a distinct
+evidence-derived stage (sleep: "energy-availability hypothesis"; nutrition: "decision gate / protocol
+transition"; …). 7/8 `grounding_flag=False`; labs_coach flagged on a derived "26%" — the guard working
+(internal signal only; the front-end doesn't render the flag, page reads fine).
 
-## 2. ⚠️ The squash-drift bug (caught by `cdk diff`)
+## 2. ⚠️ The pre-existing bug the bootstrap surfaced (#271)
 
-Deploying SS-02 surfaced that **SS-01 (the chronicle auto-publish, shipped + deployed live LAST session) was never on `main`** — #265's squash dropped the entire changeset (sweep lambda + the `ChronicleApproveSchedule` EventBridge rule + autopublish env + `dynamodb:Query` IAM). A naive `cdk deploy LifePlatformEmail` from a main-based branch would have **destroyed the live schedule and reverted the sweep lambda** — a silent regression of a working feature.
+Bootstrapping the engine, all 8 stances came back skipped — because **compression itself was falling
+back for every coach**. Root cause: as `THREAD#`/`PREDICTION#` accrued since genesis (sleep_coach: 52
+threads, 39 predictions), the compressed-history JSON outgrew the `max_tokens=1500` cap, **truncated
+before its closing ` ```json ` fence**, failed to parse, and fell back to a structural stub. This had
+been degrading the orchestrator's `COMPRESSED#latest` context for weeks (it plans on that) AND blocked
+the stance engine (which correctly won't ground on a fallback). Fix: compression 1500→4000, stance
+900→1400 (same failure mode + fix as the orchestrator's earlier 2000→6000 bump). Banked as a memory
+(`reference_llm_json_maxtokens_truncation`) — a 200 + a `_fallback` flag is the tell.
 
-**Caught only by reading the `cdk diff`:** `[-] AWS::Events::Rule ChronicleApproveSchedule … destroy`.
+## 3. Deploys done this session (Matthew authorized; each behind a `cdk diff` read)
+- `LifePlatformCompute` (twice — once for #270, once for the #271 fix). Both diffs: asset re-hashes
+  only, no destroys/IAM. No squash-drift (verified `git diff --stat origin/main..HEAD -- lambdas/ cdk/`
+  empty before each deploy).
+- Site-api via **`deploy/deploy_site_api.sh /api/coach_team`** (full `web/` package + route verify) —
+  **NOT** `cdk deploy LifePlatformWeb` (that stack only carries EmailSubscriber + OG; the site-api
+  lambda lives in Operational and ships via the script — codified gotcha).
+- Site sync (`sync_site_to_s3.sh`) — the clobber guard correctly blocked until `origin/main` was merged
+  in first.
+- Bootstrap: one-off `coach-history-summarizer` invoke → all 8 `STANCE#latest` populated live.
 
-**Reconciled:** recovered the live SS-01 source from `feat/serial-reader` (12 commits ahead of main; verified as a clean SS-01-only delta), folded it into #267 so the Email deploy **preserved SS-01 while adding SS-02**. Post-deploy verified live: `ChronicleApproveSchedule` + `CHRONICLE_AUTOPUBLISH_HOURS=48` intact, `PanelHoldSweep` rule live, sweep dry-run returns `swept:[]`.
-
-**Durable reflexes (memory `feedback_squash_merge_drops_unpushed_commits`, updated):**
-1. **`cdk diff` before EVERY deploy and READ it** — a `destroy`/`[-]` of a resource you didn't touch means main is behind live.
-2. **Never trust "main == live"** after a squash-heavy session; check the dangerous part: `git diff --stat origin/main..<live-branch> -- lambdas/ cdk/`.
-3. The full live state often lives on an unmerged branch — one squash PR captures only part of it.
-
-## 3. ⚠️ OUTSTANDING — next session
-
-### Merges (Matthew — his boundary)
-- **#267** — SS-02/04/05/06 + the SS-01 reconciliation. All its code is already deployed live; merging makes `main == live` for SS-01.
-- **#268** — this session's wrap docs + last session's docs that the #265 squash also dropped (CLAUDE/CHANGELOG/handover). Pure docs, additive, disjoint from #267.
-- After both: `main == live`, closing the recurring squash-drift. (The rest of `feat/serial-reader` — site/docs already live — can be retired once #268 lands its history.)
-
-### Backlog (each its own session)
-- **SS tail (B/C, lower priority):** SS-08 monthly "what changed" · SS-09 podcast format rotation · SS-11 editorial-image guard.
-- **Backend serial phases:** the coach-opinion engine (a stance that evolves beyond the weight-ladder) + the coaches-review-the-site loop (feed `challenges`/`habits`/`experiments` into `coach_narrative_orchestrator`); Elena-written "previously on" recaps; arbitrary historical-window APIs (`/api/character?date=` already time-travels — extend to data/waveform).
-
-## 4. Deploys done this session (Matthew authorized "you proceed")
-`LifePlatformCompute` (SS-06), `LifePlatformOperational` (SS-05), `LifePlatformEmail` (SS-02 + SS-01 preserved), `LifePlatformMonitoring` (SS-03, from the #266 branch). Every `cdk diff` confirmed non-destructive (or, for Email, made non-destructive via the SS-01 reconciliation) before deploying. SS-04 = no deploy.
+## 4. ⚠️ OUTSTANDING — next sessions
+- **Backend serial phases 2–4 (each its own session + deploys):** the **coaches-review-the-site loop**
+  (feed `challenges`/`habits`/`experiments` into the SAME `coach_narrative_orchestrator._gather_all_state`
+  hook the stance now reads); Elena-written "previously on" recaps; arbitrary historical-window APIs
+  (`/api/character?date=` already time-travels — extend to data/waveform).
+- **SS tail (B/C):** SS-08 monthly "what changed" · SS-09 podcast format rotation · SS-11 editorial-image
+  guard.
+- **Watch:** labs_coach `grounding_flag` (re-evaluate if it persists across weekly runs — don't chase
+  stochastic output, but a persistent flag means tighten the prompt). The summarizer caps OUTPUT# at 20
+  but NOT threads/predictions (52/39) — a longer-term input-bound follow-up.
