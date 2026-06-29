@@ -1,3 +1,16 @@
+## Coach-opinion engine — an evolving, evidence-derived stance per coach — 2026-06-29
+
+The first backend serial phase, shipped + deployed live + verified end-to-end (Matthew merged both PRs and authorized the deploys). **2 PRs, both merged + deployed: #270 (engine) + #271 (the compression bug it surfaced).**
+
+- **The problem:** each coach's public "read of Matthew" was resolved from a hand-authored **weight-band ladder** — a *sleep* coach "graduated" Matthew foundation→architecture because he lost weight, not because his sleep changed. Board decision (4 lenses) = **"replace, enriched":** an evidence-derived stance becomes the single public read (carrying a domain-appropriate stage); the ladder is demoted to a **silent fallback**, never a parallel read.
+- **Stance engine** (`coach_history_summarizer._generate_stance`, weekly): writes a grounded `STANCE#{date}` + `STANCE#latest` per coach, grounded ONLY in the coach's own validated artifacts (`LEARNING#`/`CONFIDENCE#` + `COMPRESSED` positions/corrections) — speaks to patterns, never raw vitals. A `_RAW_VITAL_RE` guard self-corrects once then sets an internal `grounding_flag`; an evolution claim survives only with a real signal (a logged correction or a stage shift); fail-soft.
+- **Generation:** the orchestrator injects `current_stance` into the brief **deterministically** so it reaches the coach verbatim on every path; `ai_calls.py` lets the stance lead framing over the static goal block.
+- **Render + front-end:** `_stance_block` prefers `STANCE#latest` in a normalized shape both the coach page and My Team consume (ladder mapped into the same keys as fallback); the stance now LEADS the coach page, and "how this read has evolved" reads the dated `STANCE#` trail.
+- **⚠️ Pre-existing bug #271 surfaced bootstrapping:** compression was falling back for all 8 coaches — as `THREAD#`/`PREDICTION#` accrued, the compressed JSON outgrew `max_tokens=1500`, truncated before its closing ```json fence, and fell back to a stub (degrading the orchestrator's context for weeks). Fix: compression 1500→4000, stance 900→1400 (same class as the orchestrator's earlier 2000→6000 bump).
+- **Verified live:** all 8 coaches serve `source=stance` with distinct evidence stages; 7/8 `grounding_flag=False`. Site-api shipped via `deploy/deploy_site_api.sh` (not `cdk deploy LifePlatformWeb`). New tests: `tests/test_coach_stance_engine.py` (20).
+
+⚠️ **Outstanding:** backend serial phases 2–4 (coaches-review-the-site loop, Elena recaps, historical-window APIs); SS tail (SS-08/09/11); watch labs_coach's `grounding_flag`. See `handovers/HANDOVER_LATEST.md`.
+
 ## Self-Sustainability (SS) A-tier — built, deployed live, verified — 2026-06-29
 
 The 6-month-hands-off foresight's highest-leverage backlog, shipped + deployed (Matthew authorized all deploys). 3 PRs — **#266 merged; #267 + #268 open + mergeable.**
