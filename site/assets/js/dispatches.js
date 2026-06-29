@@ -310,6 +310,12 @@ async function renderRead(s, id) {
     const cover = ent.image_url
       ? `<figure class="editorial-img editorial-cover"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`
       : "";
+    // Tie the episode back to the week it reviews — the missing podcast→chronicle backlink.
+    // (the podcast entry carries the week as its id, not a `week` field.)
+    const _wk = ent.week ?? ent.id;
+    const _pj = _wk != null ? await tryJSON("/journal/posts.json") : null;
+    const _wkPost = _pj && _pj.posts ? _pj.posts.find((p) => String(p.week) === String(_wk)) : null;
+    const chronLink = _wkPost ? `<p class="dx-xlink"><a href="/story/chronicle/#${esc(_wkPost.date)}">Read Week ${esc(_wk)}'s chronicle →</a></p>` : "";
     read.innerHTML =
       pendingHTML +
       cover +
@@ -318,6 +324,7 @@ async function renderRead(s, id) {
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
       `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
+      chronLink +
       ledgerHTML +
       (ent.transcript_url ? `<section class="dx-transcript" data-transcript hidden></section>` : "");
     // Transcript + in-page chapters (the host's questions). No audio timestamps
@@ -327,11 +334,47 @@ async function renderRead(s, id) {
   }
   if (s.kind === "timeline") {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2><p class="dx-loading shimmer">Loading the timeline…</p>`;
-    const d = await secFetch(s); const events = (d && d.events) || [];
+    // The serial spine: walk backwards through the arc, jump into the chronicle week each
+    // moment was written. Reads the existing journey-timeline + journey + the chronicle manifest.
+    const [d, jr, pj] = await Promise.all([secFetch(s), tryJSON("/api/journey"), tryJSON("/journal/posts.json")]);
+    const events = (d && d.events ? d.events.slice() : []);
+    const posts = (pj && pj.posts) || [];
+    events.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));  // newest-first → "walk back"
+    const GEN = "2026-06-14", day1 = Date.parse(GEN), now = Date.now();
+    const dayN = Math.max(1, Math.floor((now - day1) / 864e5) + 1);
+    const weekN = Math.max(1, Math.floor((now - day1) / 6048e5) + 1);
+    const lost = jr && jr.lost_lbs != null ? Math.round(jr.lost_lbs * 10) / 10 : null;
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const moLabel = (mo) => { const m = /^(\d{4})-(\d{2})/.exec(mo || ""); return m ? `${MON[+m[2] - 1]} ${m[1]}` : mo; };
+    // The chronicle installment that narrates a given date = the soonest week ending on/after it.
+    const postFor = (date) => { let best = null; for (const p of posts) { if (!p.date) continue; if (p.date >= date && (!best || p.date < best.date)) best = p; } return best || posts[0] || null; };
+    const TYPE = { weight: "wt", level_up: "lv", experiment: "ex", discovery: "dx", correlation: "co", milestone: "ms", life_event: "le" };
+    const recap = `<aside class="tl-recap"><p class="tl-recap-k label">the story so far</p>` +
+      `<p class="tl-recap-h">Day ${dayN} · Week ${weekN}${lost != null ? ` · <span class="tl-recap-em">${lost} lbs down</span>` : ""}</p>` +
+      `<p class="tl-recap-s">${events.length} key moment${events.length === 1 ? "" : "s"}, newest first.${events.length ? ` <a href="#tl-genesis">Jump to Day 1 ↓</a>` : ""}</p></aside>`;
+    let body;
+    if (events.length) {
+      let curMonth = "";
+      body = `<ol class="tl">`;
+      events.forEach((e, i) => {
+        const dt = String(e.date || "").slice(0, 10), mo = dt.slice(0, 7), last = i === events.length - 1;
+        if (mo !== curMonth) { curMonth = mo; body += `<li class="tl-month" aria-hidden="true"><span class="label">${esc(moLabel(mo))}</span></li>`; }
+        const p = postFor(dt);
+        const xlink = p ? `<a class="tl-x" href="/story/chronicle/#${esc(p.date)}">Read ${esc(p.label || ("Week " + p.week))} →</a>`
+          : (e.link ? `<a class="tl-x" href="${esc(e.link)}">see more →</a>` : "");
+        body += `<li class="tl-item tl-${esc(TYPE[e.type] || "ms")}"${last ? ' id="tl-genesis"' : ""}>` +
+          `<span class="tl-dot" aria-hidden="true"></span>` +
+          `<div class="tl-body"><span class="tl-date label">${esc(dt)}</span>` +
+          `<p class="tl-title">${esc(e.title || e.type || "")}</p>` +
+          (e.body ? `<p class="tl-note">${esc(e.body)}</p>` : "") + xlink + `</div></li>`;
+      });
+      body += `</ol>`;
+    } else {
+      body = `<p class="dx-prose">No milestones logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</p>`;
+    }
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2>` +
-      `<p class="dx-prose">Milestones, life events, and <strong>character level-ups</strong> — the rare days a pillar climbs a tier. <a href="/method/character/">What's a character level?</a></p>` +
-      (events.length ? `<ol class="dx-timeline">${events.map((e) => `<li class="dxt-item"><span class="dxt-date label">${esc(String(e.date || "").slice(0, 10))}</span><div><p class="dxt-title">${esc(e.title || e.type || "")}</p>${e.body ? `<p class="dxt-note">${esc(e.body)}</p>` : ""}</div></li>`).join("")}</ol>`
-        : `<p class="dx-prose">No milestones logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</p>`);
+      `<p class="dx-prose">Walk back through the arc — milestones, life events, and <strong>character level-ups</strong> — and jump into the chronicle week each moment was written. <a href="/method/character/">What's a character level?</a></p>` +
+      recap + body;
     return;
   }
   if (s.kind === "fieldnotes") {
@@ -367,9 +410,18 @@ async function renderRead(s, id) {
   const art = ent.image_url
     ? `<figure class="editorial-img"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`
     : "";
+  // "Previously" — the two prior installments, so a reader landing mid-series can step
+  // backwards through the arc (the serial scaffold). Chronicle only; needs ≥1 earlier entry.
+  const priors = s.key === "chronicle" && ent.date
+    ? all.filter((x) => x.date && x.date < ent.date).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 2)
+    : [];
+  const prevRail = priors.length
+    ? `<aside class="dx-prev"><p class="dx-prev-k label">previously</p><ul class="dx-prev-list">${priors.map((x) => `<li><button type="button" class="dx-prevlink" data-id="${esc(x.id)}"><span class="dx-prev-lbl label">${esc(x.label || ("week " + x.id))}</span><span class="dx-prev-t">${esc(x.title || "")}</span></button></li>`).join("")}</ul></aside>`
+    : "";
   read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
-    `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
+    prevRail + `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
+  read.querySelectorAll(".dx-prevlink").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   const rf = read.querySelector(".dx-readfull");
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
   const sf = read.querySelector(".dx-startfirst");
