@@ -275,3 +275,148 @@ def test_stance_block_falls_back_to_ladder(monkeypatch):
     assert sb["headline_read"]  # mapped from the rung's read_of_him
     assert sb["stage"]["label"]  # mapped from the rung's headline
     assert sb["rung"]  # ladder extras preserved for back-compat
+
+
+# ── site protocols: coaches react to the site (Phase 2, 2026-06-29) ───────────
+
+
+def _mock_protocol_reads(monkeypatch, challenges=None, experiments=None, raise_on=None):
+    """Route orch._query_begins_with by sk-prefix to canned challenge/experiment
+    lists, so domain-routing can be tested without DynamoDB."""
+
+    def _fake(pk, sk_prefix, scan_forward=True, limit=None):
+        if raise_on and raise_on in sk_prefix:
+            raise RuntimeError("boom")
+        if sk_prefix == "CHALLENGE#":
+            return list(challenges or [])
+        if sk_prefix == "EXP#":
+            return list(experiments or [])
+        return []
+
+    monkeypatch.setattr(orch, "_query_begins_with", _fake)
+
+
+def test_protocols_for_brief_trims_and_caps():
+    raw = {
+        "challenges": [{"name": f"C{i}", "domain": "sleep", "progress": None, "duration_days": 30} for i in range(7)],
+        "experiments": [],
+    }
+    t = orch._protocols_for_brief(raw)
+    assert len(t["challenges"]) == 5  # capped at 5
+    assert "progress" not in t["challenges"][0]  # null dropped
+    assert "experiments" not in t  # empty surface omitted
+    assert orch._protocols_for_brief(None) == {}
+    assert orch._protocols_for_brief({}) == {}
+
+
+def test_gather_filters_by_domain(monkeypatch):
+    _mock_protocol_reads(
+        monkeypatch,
+        challenges=[
+            {"name": "Wind-Down Hour", "domain": "sleep", "status": "active"},
+            {"name": "Protein Push", "domain": "nutrition", "status": "active"},
+        ],
+    )
+    sleep = orch._gather_site_protocols("sleep_coach")
+    names = [c["name"] for c in sleep["challenges"]]
+    assert names == ["Wind-Down Hour"]  # nutrition challenge excluded
+
+
+def test_gather_only_active(monkeypatch):
+    _mock_protocol_reads(
+        monkeypatch,
+        challenges=[
+            {"name": "Active One", "domain": "sleep", "status": "active"},
+            {"name": "Done", "domain": "sleep", "status": "completed"},
+            {"name": "Maybe", "domain": "sleep", "status": "candidate"},
+        ],
+    )
+    out = orch._gather_site_protocols("sleep_coach")
+    assert [c["name"] for c in out["challenges"]] == ["Active One"]
+
+
+def test_experiment_routing_by_tags(monkeypatch):
+    _mock_protocol_reads(
+        monkeypatch,
+        experiments=[
+            {"name": "Magnesium PM", "tags": ["sleep", "supplements"], "status": "active"},
+            {"name": "Zone 2 Base", "tags": ["movement"], "status": "active"},
+        ],
+    )
+    sleep = orch._gather_site_protocols("sleep_coach")
+    assert [e["name"] for e in sleep["experiments"]] == ["Magnesium PM"]
+
+
+def test_untagged_experiment_routes_to_explorer_only(monkeypatch):
+    _mock_protocol_reads(
+        monkeypatch,
+        experiments=[{"name": "Mystery Protocol", "tags": [], "status": "active"}],
+    )
+    # No domain coach should claim a tagless experiment...
+    assert orch._gather_site_protocols("sleep_coach") == {}
+    # ...but the cross-domain explorer catches it (never silently dropped).
+    exp = orch._gather_site_protocols("explorer_coach")
+    assert [e["name"] for e in exp["experiments"]] == ["Mystery Protocol"]
+
+
+def test_explorer_sees_all_domains(monkeypatch):
+    _mock_protocol_reads(
+        monkeypatch,
+        challenges=[
+            {"name": "Sleep One", "domain": "sleep", "status": "active"},
+            {"name": "Nutrition One", "domain": "nutrition", "status": "active"},
+            {"name": "Social One", "domain": "social", "status": "active"},
+        ],
+    )
+    out = orch._gather_site_protocols("explorer_coach")
+    assert len(out["challenges"]) == 3
+
+
+def test_gather_is_failsoft(monkeypatch):
+    # Even if a read raises (contract violation), the gather must return {} and
+    # never propagate — the daily orchestrator run can't be aborted by this.
+    def _fake(pk, sk_prefix, scan_forward=True, limit=None):
+        raise RuntimeError("ddb down")
+
+    monkeypatch.setattr(orch, "_query_begins_with", _fake)
+    assert orch._gather_site_protocols("sleep_coach") == {}
+
+
+def test_build_user_message_surfaces_protocols(monkeypatch):
+    monkeypatch.setattr(orch, "_track_record_block", lambda cid: "(none)")
+    state = _orch_state()
+    state["site_protocols"] = {"challenges": [{"name": "Wind-Down Hour", "domain": "sleep"}]}
+    blocks = orch._build_user_message(state, "sleep_coach", "2026-06-29")
+    suffix = blocks[-1]["text"]
+    assert "Active Site Protocols" in suffix
+    assert "Wind-Down Hour" in suffix
+
+
+def test_handler_injects_protocols_into_brief(monkeypatch):
+    state = _orch_state()
+    state["site_protocols"] = {"challenges": [{"name": "Wind-Down Hour", "domain": "sleep", "progress": None}]}
+    monkeypatch.setattr(orch, "_gather_all_state", lambda cid: state)
+    monkeypatch.setattr(orch, "_build_user_message", lambda *a, **k: [{"type": "text", "text": "x"}])
+    monkeypatch.setattr(orch, "_call_haiku", lambda **k: {"coach_id": "sleep_coach", "generation_brief": {"narrative_beat": "x"}})
+    monkeypatch.setattr(orch, "_cache_brief", lambda *a, **k: None)
+    import budget_guard
+
+    monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+
+    brief = orch.lambda_handler({"coach_id": "sleep_coach", "date": "2026-06-29"}, None)
+    sp = brief["generation_brief"]["site_protocols"]
+    assert sp["challenges"][0]["name"] == "Wind-Down Hour"
+    assert "progress" not in sp["challenges"][0]  # null trimmed
+
+
+def test_handler_omits_protocols_when_none(monkeypatch):
+    monkeypatch.setattr(orch, "_gather_all_state", lambda cid: _orch_state())  # no site_protocols key
+    monkeypatch.setattr(orch, "_build_user_message", lambda *a, **k: [{"type": "text", "text": "x"}])
+    monkeypatch.setattr(orch, "_call_haiku", lambda **k: {"coach_id": "sleep_coach", "generation_brief": {"narrative_beat": "x"}})
+    monkeypatch.setattr(orch, "_cache_brief", lambda *a, **k: None)
+    import budget_guard
+
+    monkeypatch.setattr(budget_guard, "allow", lambda feature: True)
+
+    brief = orch.lambda_handler({"coach_id": "sleep_coach", "date": "2026-06-29"}, None)
+    assert "site_protocols" not in brief["generation_brief"]
