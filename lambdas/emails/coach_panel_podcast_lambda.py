@@ -1141,9 +1141,34 @@ def _weekly_gate(turns: list, allowed_numbers, guest_id: str):
     return clean, sorted(set(hold))
 
 
-def _hold_and_alert(week, reasons: list, draft: dict) -> dict:
-    """Loud HOLD: stash the draft on a NON-public prefix + SNS alert. Never publishes."""
-    body = json.dumps({"week": week, "reasons": reasons, "draft": draft, "held_at": _today()}, indent=1)
+def _hold_and_alert(week, reasons: list, draft: dict, hold_class: str = "safety") -> dict:
+    """Loud HOLD: stash the draft on a NON-public prefix + SNS alert. Never publishes.
+
+    `hold_class` (SS-02) tags WHY it was held so the hold sweep knows what's safe to
+    auto-retry:
+      • "safety"  — a sensitivity/compassion or hard safety-gate hold. NEVER
+                    auto-released; stays for a human. This is the fail-closed default.
+      • "quality" — an editor/structural/read-aloud-QA hold (no safety concern). The
+                    sweep may RE-GENERATE the week (a fresh attempt through every gate)
+                    after a review window, so a soft flag can't strand the show forever.
+    Preserves `first_held_at` and bumps `retry_count` across re-holds so the sweep can
+    bound how many times it retries before giving up.
+    """
+    prior = _read_hold(week)
+    first_held = (prior or {}).get("first_held_at") or _today()
+    retry_count = int((prior or {}).get("retry_count", 0)) + (1 if prior else 0)
+    body = json.dumps(
+        {
+            "week": week,
+            "reasons": reasons,
+            "draft": draft,
+            "held_at": _today(),
+            "first_held_at": first_held,
+            "hold_class": hold_class if hold_class in ("safety", "quality") else "safety",
+            "retry_count": retry_count,
+        },
+        indent=1,
+    )
     try:
         s3.put_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json", Body=body.encode("utf-8"), ContentType="application/json")
     except Exception as e:
@@ -1164,8 +1189,117 @@ def _hold_and_alert(week, reasons: list, draft: dict) -> dict:
         "held_for_review",
         "This week's episode is in final review — it'll drop here as soon as it clears the quality bar.",
     )
-    logger.warning("[panel] wk%s HELD — %s", week, reasons)
-    return {"statusCode": 200, "body": json.dumps({"week": week, "held": True, "reasons": reasons})}
+    logger.warning("[panel] wk%s HELD (%s) — %s", week, hold_class, reasons)
+    return {"statusCode": 200, "body": json.dumps({"week": week, "held": True, "hold_class": hold_class, "reasons": reasons})}
+
+
+# ── SS-02: hold-aging escape ───────────────────────────────────────────────────
+# A soft (quality) HOLD used to strand an episode in panelcast-holds/ forever — the
+# weekly cron moves on to the next week and never revisits the held one, so the
+# archive keeps a permanent hole. The sweep below RE-GENERATES a quality-held week
+# (a fresh attempt through EVERY gate, safety included) after a review window, so the
+# show self-heals. HARD safety/sensitivity holds are NEVER auto-retried.
+HOLD_RETRY_HOURS = float(os.environ.get("PANELCAST_HOLD_RETRY_HOURS", "48"))  # give a human first crack
+HOLD_MAX_DAYS = float(os.environ.get("PANELCAST_HOLD_MAX_DAYS", "10"))  # past this, abandoned — leave it
+HOLD_MAX_RETRIES = int(os.environ.get("PANELCAST_HOLD_MAX_RETRIES", "3"))  # bound the regeneration spend
+
+
+def _read_hold(week) -> dict:
+    """The hold record for a week, or {} if none."""
+    try:
+        raw = s3.get_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json")["Body"].read()
+        d = json.loads(raw)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _delete_hold(week) -> None:
+    try:
+        s3.delete_object(Bucket=S3_BUCKET, Key=f"{HOLD_PREFIX}/wk{week}.json")
+    except Exception as e:
+        logger.warning("[panel] hold delete failed wk%s — %s", week, e)
+
+
+def _episode_published(week) -> bool:
+    """Authoritative published check: the week appears in the episodes index. (The
+    older _episode_exists head-checks a .mp3 key that the .wav publish path doesn't
+    write, so the index is the reliable signal for the sweep.)"""
+    try:
+        eps = json.loads(s3.get_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/episodes.json")["Body"].read()).get("episodes", [])
+        return any(e.get("week") == week for e in eps)
+    except Exception:
+        return False
+
+
+def _hold_age_days(hold: dict) -> float:
+    stamp = hold.get("first_held_at") or hold.get("held_at")
+    if not stamp:
+        return 0.0
+    try:
+        held = datetime.strptime(stamp[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - held).total_seconds() / 86400.0
+    except Exception:
+        return 0.0
+
+
+def _sweep_held_episodes(dry_run: bool = False) -> dict:
+    """SS-02: auto-retry a soft (quality) HOLD on the CURRENT week so the show doesn't
+    stall forever on a fixable flag. Walks the current week's hold and decides:
+
+      • hold_class == "safety"  → SKIP (sensitivity/safety stays human, fail-closed).
+      • already published        → clean up the stale hold, SKIP.
+      • age < HOLD_RETRY_HOURS   → SKIP (leave a window for a human to review first).
+      • age > HOLD_MAX_DAYS      → SKIP (abandoned; the moment passed — leave it).
+      • retry_count >= MAX       → SKIP (bounded regeneration spend; leave for a human).
+      • else → re-run the normal generation (force=False). It goes through EVERY gate
+               again (incl. the hard safety gate); it publishes ONLY if it now clears
+               the bar, otherwise it re-HOLDs (retry_count bumps). On publish, the hold
+               record is removed.
+
+    Only the current week is retried — once the week advances, an old held week is
+    stale (its 'this week' data has moved on) and is left to age out. dry_run reports
+    the decision without regenerating or writing anything."""
+    post = _select_week_post()
+    week = post.get("week")
+    hold = _read_hold(week)
+    if not hold:
+        return {"swept": [], "note": f"no hold for current week {week}"}
+
+    hold_class = hold.get("hold_class", "safety")
+    age = _hold_age_days(hold)
+    retries = int(hold.get("retry_count", 0))
+
+    def _skip(reason):
+        logger.info("[panel] hold sweep wk%s SKIP — %s", week, reason)
+        return {"swept": [], "week": week, "hold_class": hold_class, "skipped": reason}
+
+    if _episode_published(week):
+        if not dry_run:
+            _delete_hold(week)
+        return {"swept": [], "week": week, "cleaned_stale_hold": True}
+    if hold_class != "quality":
+        return _skip("safety/sensitivity hold — human review only")
+    if age < HOLD_RETRY_HOURS / 24.0:
+        return _skip(f"too fresh ({age:.1f}d < {HOLD_RETRY_HOURS/24.0:.1f}d review window)")
+    if age > HOLD_MAX_DAYS:
+        return _skip(f"abandoned ({age:.1f}d > {HOLD_MAX_DAYS}d)")
+    if retries >= HOLD_MAX_RETRIES:
+        return _skip(f"retry cap reached ({retries} >= {HOLD_MAX_RETRIES})")
+
+    if dry_run:
+        return {"swept": [week], "week": week, "would_retry": True, "hold_class": hold_class, "age_days": round(age, 1)}
+
+    logger.info("[panel] hold sweep wk%s — retrying generation (retry #%d)", week, retries + 1)
+    result = _run_weekly(force=False, dry_run=False)
+    published = False
+    try:
+        published = bool(json.loads(result.get("body", "{}")).get("published"))
+    except Exception:
+        pass
+    if published:
+        _delete_hold(week)
+    return {"swept": [week], "week": week, "retried": True, "published": published}
 
 
 def _emit_published_metric() -> None:
@@ -1280,6 +1414,27 @@ def _dry(week, decision, **extra) -> dict:
     return {"statusCode": 200, "body": json.dumps({"dry_run": True, "week": week, "would": decision, **extra})}
 
 
+def _select_week_post() -> dict:
+    """Pick the week the Panel should produce now (shared by the weekly run + the
+    SS-02 hold sweep so both target the SAME week).
+
+    Reset-proof selection (ADR-077): a reset restarts week-numbering at 1, but old
+    high-numbered chronicles linger in posts.json. Pick the most RECENT weekly post
+    in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
+    ISO dates compare lexically. If none exist yet (before the cycle's first
+    Wednesday chronicle), derive the current week from genesis (the chronicle is
+    optional flavor — 2026-06-21 decoupling)."""
+    posts = _published_posts()
+    weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
+    if weekly:
+        return max(weekly, key=lambda x: x["date"])
+    from datetime import date as _date
+
+    genesis = _date.fromisoformat(EXPERIMENT_START_DATE)
+    wk = max(1, ((_date.today() - genesis).days // 7) + 1)
+    return {"week": wk, "date": _date.today().isoformat(), "title": f"Week {wk}"}
+
+
 def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     """Produce the latest week's episode autonomously, publish-or-HOLD.
 
@@ -1288,24 +1443,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     what the live run would do. The pre-flight tool for every Friday / post-reset."""
     import gemini_tts
 
-    posts = _published_posts()
-    # Reset-proof selection (ADR-077): a reset restarts week-numbering at 1, but old
-    # high-numbered chronicles linger in posts.json. Pick the most RECENT weekly post
-    # in the CURRENT cycle (dated >= genesis), never the stale pre-reset max-week.
-    # ISO dates compare lexically. If none exist yet (before the cycle's first
-    # Wednesday chronicle), skip cleanly — the liveness alarm catches a truly silent show.
-    weekly = [p for p in posts if p.get("week") and p.get("week") > 0 and p.get("date") and p["date"] >= EXPERIMENT_START_DATE]
-    if weekly:
-        post = max(weekly, key=lambda x: x["date"])
-    else:
-        # Chronicle decoupled (2026-06-21): a published chronicle is no longer required
-        # to pick the week. Derive the current week from genesis so the Panel can review
-        # the week from the coaches' reads + data; the chronicle is optional flavor.
-        from datetime import date as _date
-
-        genesis = _date.fromisoformat(EXPERIMENT_START_DATE)
-        wk = max(1, ((_date.today() - genesis).days // 7) + 1)
-        post = {"week": wk, "date": _date.today().isoformat(), "title": f"Week {wk}"}
+    post = _select_week_post()
     week = post["week"]
     if not force and not dry_run and _episode_exists(week):
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
@@ -1334,7 +1472,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     if sens:
         if dry_run:
             return _dry(week, "HOLD", stage="sensitivity", reasons=sens, date=post.get("date"))
-        return _hold_and_alert(week, sens, {"note": "sensitivity routing pre-write"})
+        return _hold_and_alert(week, sens, {"note": "sensitivity routing pre-write"}, hold_class="safety")
 
     guest_id = (beats.get("guest") or {}).get("id") or persona_registry.OPERATIONAL_COACH_IDS[0]
     guest_name = (beats.get("guest") or {}).get("name", "Coach")
@@ -1352,13 +1490,15 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     if len(turns) < 6:
         if dry_run:
             return _dry(week, "HOLD", stage="writer", reasons=["too few turns"], turns=len(turns))
-        return _hold_and_alert(week, ["writer produced too few turns"], script)
+        return _hold_and_alert(week, ["writer produced too few turns"], script, hold_class="quality")
 
     review = _editor_review(turns, bible)
     if review.get("verdict") == "hold":
         if dry_run:
             return _dry(week, "HOLD", stage="editor", reasons=review.get("issues", []))
-        return _hold_and_alert(week, ["editor: " + "; ".join(review.get("issues", []))[:300]], {"turns": turns, "review": review})
+        return _hold_and_alert(
+            week, ["editor: " + "; ".join(review.get("issues", []))[:300]], {"turns": turns, "review": review}, hold_class="quality"
+        )
 
     for t in turns:
         t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
@@ -1381,15 +1521,15 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         else:
             if dry_run:
                 return _dry(week, "HOLD", stage="gate-drop", reasons=["gate dropped turns; re-roll did not produce a gap-free script"])
-            return _hold_and_alert(week, ["gate dropped turns (holey transcript); re-roll failed"], {"turns": turns})
+            return _hold_and_alert(week, ["gate dropped turns (holey transcript); re-roll failed"], {"turns": turns}, hold_class="quality")
     if hold:
         if dry_run:
             return _dry(week, "HOLD", stage="safety-gate", reasons=hold)
-        return _hold_and_alert(week, hold, {"turns": turns})
+        return _hold_and_alert(week, hold, {"turns": turns}, hold_class="safety")
     if len(clean) < 6:
         if dry_run:
             return _dry(week, "HOLD", stage="gate-thin", reasons=["too few clean turns after gate"], clean=len(clean))
-        return _hold_and_alert(week, ["too few clean turns after gate"], {"turns": turns})
+        return _hold_and_alert(week, ["too few clean turns after gate"], {"turns": turns}, hold_class="quality")
 
     # Weekly read-aloud QA (the Turing bar): guest introduced, no dangling thread, grounded,
     # humour, no AI tells. Self-correcting loop — feed the judge's exact failures back to the
@@ -1416,7 +1556,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         logger.info("[panel] wk%s: weekly QA HOLD after revisions — %s", week, qa_fails)
         if dry_run:
             return _dry(week, "HOLD", stage="weekly-qa", reasons=qa_fails)
-        return _hold_and_alert(week, ["weekly-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": clean})
+        return _hold_and_alert(week, ["weekly-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": clean}, hold_class="quality")
 
     if dry_run:
         preview = "\n".join(f"{('Elena' if t['speaker'] == ELENA else guest_name)}: {t['line']}" for t in clean[:6])
@@ -1562,6 +1702,17 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error("[panel] intro failed — %s", e)
             return {"statusCode": 500, "body": json.dumps({"intro": "failed", "error": str(e)[:200]})}
+
+    # SS-02 hold-aging sweep: a scheduled rule passes {"sweep_holds": true} to auto-
+    # retry a soft (quality) HOLD on the current week so the show can't stall forever on
+    # a fixable flag. Safety/sensitivity holds are never auto-retried. Routed BEFORE the
+    # weekly run, and distinct from the Friday cron (which carries no sweep_holds key).
+    if event.get("sweep_holds"):
+        try:
+            return {"statusCode": 200, "body": json.dumps(_sweep_held_episodes(dry_run=dry_run))}
+        except Exception as e:
+            logger.error("[panel] hold sweep failed — %s", e)
+            return {"statusCode": 500, "body": json.dumps({"sweep_holds": "failed", "error": str(e)[:200]})}
 
     # Weekly autonomous run (the board-reviewed pipeline). Latest week, publish-or-HOLD.
     try:

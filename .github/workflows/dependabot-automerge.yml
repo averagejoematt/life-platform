@@ -1,0 +1,65 @@
+name: Dependabot Auto-merge
+# SS-04 (self-sustainability): after "Dependabot Validate" passes, approve + squash-
+# merge the in-scope dev-tooling bump so the PR backlog can't pile up and block the
+# eventual `cdk deploy` during a hands-off stretch (the 6-month foresight risk).
+#
+# Safe-by-construction — no repo-settings / branch-protection dependency:
+#   • Fires ONLY on a *successful* "Dependabot Validate" run (workflow_run), so it can
+#     never merge on a red bump. The validate gate ran the enforced lint + offline tests.
+#   • Re-checks the scope here (actor + the dev-tooling branch prefix). It NEVER touches
+#     /cdk, github-actions, or runtime deps — those branches don't match the prefix.
+#   • Merge ≠ deploy: CI/CD's production approval gate is untouched. A merged bump lands
+#     on main; the next deploy is still a manual, gated action.
+#   • If the merge is blocked (e.g. a branch-protection review requirement the bot can't
+#     satisfy), it exits cleanly and leaves the PR for a human — it never force-merges.
+#
+# This decouples the merge from Dependabot's read-only PR token: workflow_run runs from
+# the default branch with the write-capable token declared below, and it does NOT check
+# out or execute the PR's code (it only approves + merges), so there is no
+# untrusted-code-with-privileged-token exposure.
+on:
+  workflow_run:
+    workflows: ["Dependabot Validate"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: >
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'dependabot[bot]' &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/pip/dev-tooling')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Approve + squash-merge the validated dev-tooling bump
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          PR_JSON=$(gh pr list --repo "$REPO" --head "$BRANCH" --state open --json number,author --jq '.[0] // empty')
+          if [ -z "$PR_JSON" ]; then
+            echo "No open PR for branch $BRANCH — nothing to merge."
+            exit 0
+          fi
+          NUM=$(echo "$PR_JSON" | jq -r '.number')
+          AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
+          # Defense in depth: the head_branch + workflow_run.actor are dependabot, but
+          # re-confirm the PR author is the bot before approving anything.
+          case "$AUTHOR" in
+            dependabot\[bot\]|app/dependabot) : ;;
+            *) echo "PR #$NUM author is '$AUTHOR', not dependabot — skipping."; exit 0 ;;
+          esac
+          echo "Approving + squash-merging dev-tooling PR #$NUM ($BRANCH)…"
+          gh pr review --repo "$REPO" --approve "$NUM" || echo "approve step non-fatal: $?"
+          if ! gh pr merge --repo "$REPO" --squash --delete-branch "$NUM"; then
+            echo "Auto-merge blocked for PR #$NUM (likely a branch-protection review gate the bot can't satisfy)."
+            echo "Leaving it open for a human merge — this is the safe fallback, not a failure."
+            exit 0
+          fi
+          echo "Merged PR #$NUM."

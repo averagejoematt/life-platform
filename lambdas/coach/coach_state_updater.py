@@ -253,6 +253,41 @@ def _emit_failure_metric():
         logger.warning("CloudWatch failure metric emit failed (non-fatal): %s", e)
 
 
+def _emit_prediction_gradability(gradable: int, qualitative: int) -> None:
+    """SS-06: emit the write-time gradability of this run's predictions.
+
+    The C-3 fix routes metric+direction claims to the gradable `directional`
+    evaluator; everything else falls to `qualitative` (ungradable — it expires
+    inconclusive and never fills the track record). The Coherence Sentinel watches
+    the *accumulated board* qualitative share daily, but it needs ≥8 CLOSED
+    predictions to judge — so a coach run that suddenly emits all-qualitative output
+    isn't visible until its windows elapse (weeks later). This metric is the leading
+    indicator: it catches a gradability regression the same day, at the source.
+    Emits counts + a 0-1 gradable share (only when predictions were written, so an
+    empty run doesn't drag the share to 0). Non-fatal.
+    """
+    total = gradable + qualitative
+    if total == 0:
+        return
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/Predictions",
+            MetricData=[
+                {"MetricName": "PredictionsGradable", "Value": float(gradable), "Unit": "Count"},
+                {"MetricName": "PredictionsQualitative", "Value": float(qualitative), "Unit": "Count"},
+                {"MetricName": "PredictionGradableShare", "Value": gradable / total, "Unit": "None"},
+            ],
+        )
+        logger.info(
+            "Prediction gradability this run: %d gradable / %d qualitative (%.0f%% gradable)",
+            gradable,
+            qualitative,
+            100.0 * gradable / total,
+        )
+    except Exception as e:
+        logger.warning("Prediction gradability metric emit failed (non-fatal): %s", e)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ANTHROPIC API CALL
 # ══════════════════════════════════════════════════════════════════════════════
@@ -879,6 +914,8 @@ def lambda_handler(event, context):
 
     # 6. Create formal PREDICTION# records (Phase 4B)
     predictions_made = extraction.get("predictions_made", [])
+    _gradable_n = 0  # SS-06: track directional (gradable) vs qualitative for the run metric
+    _qualitative_n = 0
     for pred in predictions_made:
         claim = pred.get("claim_natural", "")
         if not claim:
@@ -936,6 +973,12 @@ def lambda_handler(event, context):
                     subdomain = sd_key
                     break
 
+        eval_spec = _build_prediction_eval_spec(metric_hint, direction, window_days)
+        if eval_spec.get("type") == "directional":
+            _gradable_n += 1
+        else:
+            _qualitative_n += 1
+
         pred_record = {
             "pk": f"COACH#{coach_id}",
             "sk": f"PREDICTION#{pred_id}",
@@ -943,7 +986,7 @@ def lambda_handler(event, context):
             "coach_id": coach_id,
             "created_date": generation_date,
             "claim_natural": claim,
-            "evaluation": _build_prediction_eval_spec(metric_hint, direction, window_days),
+            "evaluation": eval_spec,
             "confidence": _parse_confidence(confidence_stated),
             "subdomain": subdomain,
             "confounders_noted": [],
@@ -961,6 +1004,10 @@ def lambda_handler(event, context):
         }
         _put_item(pred_record)
         logger.info("Created PREDICTION# %s for %s", pred_id, coach_id)
+
+    # SS-06: surface the write-time gradable share so an extraction regression is
+    # visible the same day, not weeks later when windows close (see the helper).
+    _emit_prediction_gradability(_gradable_n, _qualitative_n)
 
     # Return the trace (with Decimals converted for JSON serialization)
     return _decimal_to_float(trace)

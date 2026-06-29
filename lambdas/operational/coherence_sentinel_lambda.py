@@ -243,6 +243,38 @@ def _gather_counts():
     return pairs
 
 
+def _gather_experiment_continuity():
+    """SS-05: genesis date + today + the experiment week numbers actually surfaced to
+    readers. The experiment runs CONTINUOUSLY (a reset is a manual restart_pipeline.py
+    act), so this only flags a counter that DISAGREES with genesis — the ADR-077 stale-
+    pre-reset leak (a high week number resurfacing) or a misconfigured genesis. Fail-soft."""
+    genesis = None
+    try:
+        import constants
+
+        genesis = constants.EXPERIMENT_START_DATE
+    except Exception:  # noqa: BLE001
+        genesis = os.environ.get("EXPERIMENT_START_DATE")
+    surfaced = []
+    try:
+        arc = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#experiment_arc"}).get("Item")
+        if arc:
+            wc = _decimal(arc).get("week_count")
+            if wc:
+                surfaced.append({"name": "experiment_arc_week_count", "week": wc})
+    except Exception as e:  # noqa: BLE001
+        logger.warning("coherence: arc week_count read failed: %s", e)
+    # The latest published chronicle week (the serial's current installment).
+    try:
+        idx = _get_json("/api/journey_timeline") or {}
+        weeks = [e.get("week") for e in (idx.get("entries") or idx.get("posts") or []) if e.get("week")]
+        if weeks:
+            surfaced.append({"name": "latest_chronicle_week", "week": max(int(w) for w in weeks)})
+    except Exception as e:  # noqa: BLE001
+        logger.warning("coherence: chronicle week read failed: %s", e)
+    return genesis, _today(), surfaced
+
+
 # ── Semantic pass (budget-gated Claude) ──────────────────────────────────────
 def _semantic_pass(facts, narratives):
     """A Haiku read on whether the served narratives cohere with the facts —
@@ -333,6 +365,10 @@ def run_checks():
         findings.append(f)
 
     findings.append(ci.check_count_agreement(_gather_counts()))
+
+    genesis, today, surfaced_weeks = _gather_experiment_continuity()
+    if genesis:
+        findings.append(ci.check_experiment_continuity(genesis, today, surfaced_weeks))
 
     semantic = _semantic_pass(facts, narratives)
     return findings, semantic
