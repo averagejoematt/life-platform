@@ -63,7 +63,7 @@ export function sigil(coach, { title, cls = "" } = {}) {
 
   const outerR = 40;
   const innerR = 27;
-  const SW = `stroke-width="1.4" vector-effect="non-scaling-stroke"`;
+  const SW = `stroke-width="1.7" vector-effect="non-scaling-stroke"`;
 
   let body = `<circle class="sigil-ring" cx="${C}" cy="${C}" r="${outerR}" fill="none" stroke="currentColor" ${SW}/>`;
   if (rings === 2) {
@@ -85,7 +85,7 @@ export function sigil(coach, { title, cls = "" } = {}) {
     const [nx, ny] = pt(C, C, nodeR, a);
     const [sx, sy] = pt(C, C, hasCore ? 6 : 0, a);
     body += `<line class="sigil-tick" x1="${sx}" y1="${sy}" x2="${nx}" y2="${ny}" stroke="currentColor" ${SW}/>`;
-    body += `<circle class="sigil-node" cx="${nx}" cy="${ny}" r="3.4"/>`;
+    body += `<circle class="sigil-node" cx="${nx}" cy="${ny}" r="3.9"/>`;
   }
 
   if (hasCore) body += `<circle class="sigil-node" cx="${C}" cy="${C}" r="2.6"/>`;
