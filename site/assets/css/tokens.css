@@ -1052,3 +1052,47 @@ a.vg-lit:hover { background: var(--ember-wash); }
   .loop > .loop-arrow:nth-child(6) { animation-delay: 0.7s; }
   @keyframes mo-flow { 0%, 100% { opacity: 0.4; } 45% { opacity: 1; transform: translateX(2px); } }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   13. ICONOGRAPHY — the line-icon set (icons.js + /assets/icons/icons.svg) and the
+   generative coach sigils (sigils.js). Stroke-based, currentColor, no fills/gloss —
+   an instrument set, never decoration. Icons inherit their host element's `color`.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* The icon primitive. Sizes to surrounding text (1em); explicitly NOT width:100%,
+   so an icon dropped inside a .chart figure won't stretch to the chart's width. */
+.ico {
+  inline-size: 1em;
+  block-size: 1em;
+  flex: none;
+  vertical-align: -0.125em;
+  color: inherit;            /* stroke=currentColor in the sprite resolves to this */
+}
+/* Domain/kicker icons sit at label weight; ember only when their row is "current". */
+.kicker-ico { color: var(--ink-faint); margin-inline-end: 0.45em; }
+.ico-door   { color: var(--ink-faint); margin-inline-end: 0.4em; }
+.doors a:hover .ico-door { color: var(--ink-muted); }
+.doors a[aria-current="page"] .ico-door { color: var(--ember); }
+/* A pillar/domain mark beside a serif or label heading. */
+.dom-ico { color: var(--ink-faint); margin-inline-end: 0.4em; vertical-align: -0.14em; }
+
+/* ── Coach sigils — a deterministic geometric mark per persona (sigils.js).
+   Colour comes from the existing per-coach --coach channel (the sanctioned
+   persona-identity exception to one-ember); falls back to ember. */
+.sigil { display: block; inline-size: 100%; block-size: 100%; color: var(--coach, var(--ember)); overflow: visible; }
+.sigil [stroke] { stroke: currentColor; }
+.sigil-node { fill: currentColor; stroke: none; }
+.sigil-ring { opacity: 0.9; }
+.sigil-tick { opacity: 0.7; }
+/* Inside the existing 34px coach badge, the sigil replaces the initials glyph. */
+.coach-badge .sigil { inline-size: 24px; block-size: 24px; }
+/* A larger sigil for coach detail headers / the team roster. */
+.sigil-lg { inline-size: 48px; block-size: 48px; flex: none; color: var(--coach, var(--ember)); }
+/* An inline persona mark for kickers / headlines (sits at ~text height). */
+.coach-mark { display: inline-block; inline-size: 1.15em; block-size: 1.15em; vertical-align: -0.22em;
+  margin-inline-end: 0.4em; color: var(--coach, var(--ember)); }
+/* A coach detail header: the large sigil beside the kicker + serif name. */
+.coach-head { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.coach-head .dx-kicker { margin: 0; }
+.coach-head .dx-title { margin: 0.1em 0 0; }
+

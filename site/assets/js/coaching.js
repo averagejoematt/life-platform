@@ -19,6 +19,7 @@
   Reuses dx- and coach- styles from story.css; one type system (coaches speak serif).
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
+import { sigil } from "/assets/js/sigils.js";
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -162,8 +163,8 @@ async function renderReadToday(read) {
   if (coaches.length) {
     h += `<section class="read-digest"><p class="dx-kicker label">each coach's read · click to go deeper</p><ul class="rd-list">`;
     for (const c of coaches) {
-      h += `<li class="rd-card" data-coach="${esc(c.coach_id + "_coach")}"><button type="button" class="rd-btn">` +
-        `<span class="rd-top"><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
+      h += `<li class="rd-card" data-coach="${esc(c.coach_id + "_coach")}" style="--coach:${esc(c.color || "")}"><button type="button" class="rd-btn">` +
+        `<span class="rd-top"><span class="coach-mark">${sigil(c, { title: "" })}</span><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
         `<span class="rd-say">${esc(c.position_summary)}</span></button></li>`;
     }
     h += `</ul></section>`;
@@ -253,7 +254,7 @@ async function renderByCoach(read, id) {
     wantsTraining ? tryJSON("/api/training_overview") : Promise.resolve(null),
   ]);
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">${esc(coach.emoji || "")} ${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2>`;
+  let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}"><span class="sigil-lg">${sigil(coach, { title: "" })}</span><div><p class="dx-kicker label">${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2></div></div>`;
 
   // 1) THE READ — lead with the coach's actual verdict on the domain.
   if (analysis && (analysis.analysis || analysis.key_recommendation)) {
@@ -348,7 +349,7 @@ async function renderTeamCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the profile…</span></p>`;
   const d = await tryJSON(`/api/coach/${encodeURIComponent(id)}`);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load this profile just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">${esc(d.emoji || "")} ${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2>`;
+  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}"><span class="sigil-lg">${sigil(d, { title: "" })}</span><div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
   const v = d.voice || {};
