@@ -2695,3 +2695,25 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Deploy.** Infra is CDK (`LifePlatformOperational`); enabling CloudFront standard logging on dist `E3S424OXQZ8NBE` → the bucket (prefix `cf/`) is a one-time manual step. Runbook: docs/SITE_UPLEVEL_PLAYBOOK.md. Tests: tests/test_traffic_digest.py (incl. an assertion that no raw IP survives parsing). Both shipped 2026-06-27 (#217).
 
 ---
+
+## ADR-096: Coherence as a monitored property — the Self-Management & Coherence Program
+
+**Status:** ✅ Active — 2026-06-29 (Phases 1–4 + precision pass shipped, #245–258)
+
+**Context.** Every liveness signal the platform had (freshness, auth-health, error alarms, render/visual QA) proved a system was ALIVE but said nothing about whether it was RIGHT. A run of silent-incoherence bugs all passed those checks: coach predictions 100%-inconclusive for weeks, recovery rendered 30 on one surface and 86 on another, the experiment arc counting 7 weeks against the 3 the UI showed, `handle_predictions` returning all-zeros, and coaches serving a resting-HR of 53 when the canonical value was 64. The common shape: an *implicit* producer/consumer contract drifted, and nothing was watching the contract — only its liveness.
+
+**Decision.** Make coherence a first-class, monitored property, in four phases.
+1. **Detect** — a read-only `coherence-sentinel` Lambda (daily 10:45 AM PT) runs pure invariants (`lambdas/coherence_invariants.py`), each unit-tested by replaying a real past outage: prediction-health, computed-coherence, canonical-facts cross-surface agreement, endpoint non-degenerate shape, cross-surface count-agreement. It emits `LifePlatform/Coherence` → the `coherence-overall` digest alarm and persists a findings artifact to `s3://matthew-life-platform/coherence-log/`.
+2. **Contracts** — kill the drift at the source: `measurable_metrics.py` (the extractor allowlist DERIVED from `METRIC_SOURCES`, so they can't diverge) and `canonical_facts.py` (one facts schema + units, with a producer-contract test asserting `daily_metrics_compute` writes every field). Coaches are grounded on, and the Sentinel checks against, the *same* extraction.
+3. **Deploy hygiene** — a clobber guard in `sync_site_to_s3.sh` and `deploy/session_postflight.py` (layer uniformity, config drift, and — added after this program found the failure mode live — asset completeness).
+4. **Self-healing eyes on content** — the remediation agent ingests the Sentinel's artifact as a triage signal; the taxonomy routes every coherence finding to a human-PR or needs-human bucket and **never** to auto-merge (a test enforces that no content path is on the auto-merge allowlist).
+
+**Key sub-decision — the deterministic invariants drive the alarm; the LLM semantic pass is advisory.** The Sentinel also runs a budget-gated Haiku "does the narrative cohere with the facts" pass. It earned its keep (it caught the RHR-53 hallucination), but it proved too unreliable to *gate* a daily-emailing CloudWatch alarm: even with a tightened prompt it lists items it concludes are fine in its `issues` array and returns `coherent:false` on borderline variance. A permanently-red alarm is ignored — which would defeat the program. So `coherence-overall` fires on the deterministic invariant verdict only (which, after the precision pass, covers the egregious numeric contradictions with grounding-aware tolerance — the original RHR-53 is caught deterministically now); the semantic read stays in the digest + a `semantic_incoherent` advisory flag for a human/agent to weigh.
+
+**Precision over recall (for the alarm).** The deterministic `facts_agreement` check flags a metric only when a wrong value is cited AND the canonical value is cited nowhere in the narrative — so a grounded trend ("recovery dipped from 86 to 30") doesn't false-fire. The coach-side analyzer's self-correction (`_hard_canonical_contradictions` → regenerate-once) uses the same grounded-anywhere logic, so detection and grounding agree.
+
+**Alternatives rejected.** *Let the semantic pass drive the alarm* (#252's original wiring) — too noisy; superseded by #257. *Backfill the 296 legacy dead predictions* — keyword-inference on old prose mis-directs ~⅓; let them expire. *Widen the auto-merge allowlist to let the agent fix content* — content correctness is exactly what must stay human-reviewed; the whole safety model is that the agent (read-only role) only opens PRs and a deterministic gate merges a narrow non-content allowlist. *Fix coach fabrication to zero* — it's a stochastic LLM frontier; the program bounds it (egregious cases self-correct + trip a precise alarm; soft cases are advisory) rather than claiming elimination.
+
+**Deploy.** All shared modules (`coherence_invariants`, `measurable_metrics`, `canonical_facts`) are bundled with the `lambdas/` asset, NOT the layer (no layer dance). CDK: `LifePlatformOperational` (the Sentinel + IAM) and `LifePlatformMonitoring` (the alarm). See `handovers/HANDOVER_LATEST.md`, the `reference_cdk_asset_staging_glitch` operator note, and `docs/REMEDIATION_TAXONOMY.md`. Shipped across #245–258 (2026-06-28/29).
+
+---

@@ -1,9 +1,28 @@
 # Life Platform — Open Backlog
 
-**Last updated:** 2026-06-23 (redesign marathon — Physical/Vitals/Mind pages + Doors IA + RQA-04/05 + WQA-06 all shipped; follow-ups added: PHY-01..06, VIT-01..06, DOORS-01, MIND-01..05 (Mind capture DEFERRED pending invitation-UX sign-off). Prior: Nutrition/Training/Sleep/Habits shipped, EVR-01..06; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
+**Last updated:** 2026-06-29 (Self-Management & Coherence Program Phases 1–4 + the content-bug fix + precision pass + asset-completeness guard ALL SHIPPED — see the section directly below. Prior: 2026-06-23 redesign marathon — Physical/Vitals/Mind pages + Doors IA + RQA-04/05 + WQA-06 all shipped; follow-ups added: PHY-01..06, VIT-01..06, DOORS-01, MIND-01..05 (Mind capture DEFERRED pending invitation-UX sign-off). Earlier: Nutrition/Training/Sleep/Habits shipped, EVR-01..06; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
+
+### Recently shipped (2026-06-28/29 — Self-Management & Coherence Program + content-bug fix + precision pass)
+
+The platform proved it was ALIVE but not RIGHT — silent-incoherence bugs (predictions inconclusive-for-weeks, recovery 30-vs-86, a coach serving RHR 53 vs the canonical 64) all passed every existing liveness check. The program closes that gap. **All four phases + follow-ups deployed; main green; 0 open PRs.**
+
+- ✅ **Phase 1 — Coherence Sentinel** (#245): `life-platform-coherence-sentinel` (daily 10:45 AM PT, read-only) runs 5 pure invariants in `lambdas/coherence_invariants.py` (each unit-tested by replaying a past outage) → `LifePlatform/Coherence` metrics → the `coherence-overall` digest alarm + a budget-gated Haiku semantic pass.
+- ✅ **Phase 2 — shared contracts** (#246/#247): `measurable_metrics.py` (the extractor allowlist DERIVED from `METRIC_SOURCES`, un-driftable) + `canonical_facts.py` (one facts schema + units; a producer-contract test asserts `daily_metrics_compute` writes every field).
+- ✅ **Phase 3 — deploy hygiene** (#248): clobber guard in `sync_site_to_s3.sh` + `deploy/session_postflight.py` (layer uniformity + config drift).
+- ✅ **Phase 4 — self-healing eyes on content** (#250/#251/#252): the Sentinel persists findings to `s3://…/coherence-log/` + grounds on `canonical_facts`; the remediation agent reads them; `REMEDIATION_TAXONOMY.md` routes every coherence finding to **Bucket B/C only, never auto-merge** (a test enforces no content path on the allowlist).
+- ✅ **Content-bug self-correction** (#254): the Sentinel caught coaches serving a hallucinated RHR (53 vs 64). `ai_expert_analyzer` now self-corrects — `_hard_canonical_contradictions` (RHR/recovery/HRV) regenerates the narrative once on a hard canonical contradiction + a no-invent-trends prompt rule.
+- ✅ **Precision pass + honest alarm** (#255/#256/#257): `facts_agreement` no longer false-fires on historical/trend mentions; the email-subscriber config drift is resolved; **`coherence-overall` now fires on the DETERMINISTIC invariants only** — the Haiku semantic read is advisory (too noisy to gate a daily alarm). Sentinel reports OVERALL OK.
+- ✅ **Postflight asset-completeness guard** (#258): catches the reproducible CDK glitch that ships a Lambda zip missing root `lambdas/*.py` (the silent Sentinel break). `session_postflight.check_asset_completeness()` downloads each bundled-asset canary's zip and asserts its imported root modules are present.
+
+**Open follow-ups (small):** coach physiological fabrication is a quality frontier (now bounded — egregious cases self-correct + trip a precise alarm; soft Haiku noise is advisory — pushing further is its own session); the `ai_calls.py` nutrition guardrail rides the next layer rebuild; optionally wire `session_postflight` into CI.
+
+### Recently shipped (2026-06-28 — coaching commentary-first + Phase-C backends + nutrition 24h-lag, #237–248)
+
+- ✅ **Coaching recut commentary-first** (#237–243): `/coaching/` = The Read · By Coach · Scorecard · Team · lab-notes · Reader Q&A; **C-1** cross-week experiment arc (`/api/experiment_synthesis`), **C-2** cardio-vs-lifts + per-muscle balance, **C-3** gradable predictions + a Scorecard (routed metric+direction claims to the directional/EWMA evaluator; `handle_predictions` reads real `PREDICTION#`).
+- ✅ **Nutrition 24h-lag framing** (#244): MacroFactor is a manual end-of-day upload → always ~24h behind by design; every surface (cockpit/coaching/data + 7 MCP tools) now treats the latest COMPLETE day as live, never "not logged today".
 
 ### Recently shipped (2026-05-29 marathon — moved out of backlog)
 
