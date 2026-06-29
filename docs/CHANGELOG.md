@@ -1,3 +1,14 @@
+## Self-Sustainability (SS) A-tier — built, deployed live, verified — 2026-06-29
+
+The 6-month-hands-off foresight's highest-leverage backlog, shipped + deployed (Matthew authorized all deploys). 3 PRs — **#266 merged; #267 + #268 open + mergeable.**
+
+- **SS-03 — budget hard-stop alarm** (#266, `LifePlatformMonitoring`): `budget-tier-hardstop` (`BudgetTier≥3` → **urgent** — all Bedrock off, the daily brief goes data-only). *Verified-down:* Garmin-staleness (`ingest-liveness-unhealthy`), podcast-HOLD (`panelcast-no-episode-7d`), and budget≥2 (`budget-tier-escalation` digest) already existed — only the tier-3 urgent escalation was the real gap.
+- **SS-06 — gradable-predictions write-time metric** (#267, `LifePlatformCompute`): `coach_state_updater` emits `LifePlatform/Predictions::PredictionGradableShare` per run — a leading indicator of extraction drift ahead of the Sentinel's ≥8-closed check.
+- **SS-05 — experiment continuity** (#267, `LifePlatformOperational`): decision = *runs continuously*; a Sentinel `check_experiment_continuity` invariant ALARMs only when a surfaced week disagrees with genesis (the ADR-077 stale-pre-reset leak).
+- **SS-02 — podcast HOLD-aging escape** (#267, `LifePlatformEmail`): holds tagged `hold_class` (safety|quality); a Mon+Wed sweep re-generates a *quality* hold through every gate (never ships the flagged draft). **Safety/sensitivity holds never auto-release.**
+- **SS-04 — Dependabot safe-auto-merge** (#267, merge-activated): a read-only `dependabot-validate` PR gate + a self-gated `dependabot-automerge` (on validate success) for the dev-tooling group only. No repo-settings change required.
+- **Squash-drift caught + reconciled:** SS-01 (last session) was deployed-but-not-on-main; the Email deploy would have regressed it — caught by `cdk diff`. SS-01 source recovered into #267; this doc reconciliation (#268) lands the matching history. Reflex: `cdk diff` before every deploy.
+
 ## Website visual uplevel + editorial imagery + serial reader + SS-01 — 2026-06-29
 
 A long, multi-thread session, all shipped + deployed live. **main `b35c8c68` (#260 + #261 merged).**
