@@ -32,6 +32,7 @@ v1.0.0 — 2026-04-06 (Coach Intelligence)
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -717,6 +718,282 @@ def _write_compressed_state(coach_id, compressed):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# STANCE ENGINE — the coach-opinion: an evolving, evidence-derived read of Matthew
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# A stance is the coach's CURRENT read of Matthew in this coach's domain — what it
+# is focused on now, what it has set aside, and how that read has CHANGED as
+# evidence accrued. It is grounded ONLY in the coach's own already-validated
+# artifacts (the compressed history's positions/corrections, the scored track
+# record, the prior stance) — never in raw physiological values — so it sidesteps
+# the daily-narrative fabrication frontier by construction. It REPLACES the
+# hand-authored weight-band ladder as the public "read of him" (the ladder stays a
+# silent fallback in site_api_coach._stance_block).
+
+# Patterns the stance must NEVER fabricate — it speaks to *thinking*, not
+# measurements. A hit drives a single strict regeneration; a residual hit sets a
+# grounding flag the render/Sentinel can see.
+_RAW_VITAL_RE = re.compile(
+    r"\b\d{2,3}\s?(?:bpm|ms|mg/?dl|lbs?|kg|kcal|cal)\b"
+    r"|\b(?:rhr|hrv|recovery|resting heart rate|resting hr|deep|rem)\b[^.\n]{0,14}?\b\d"
+    r"|\b\d{1,3}(?:\.\d+)?\s?%",
+    re.IGNORECASE,
+)
+
+# Language that asserts the read has evolved — only allowed when a real signal of
+# change exists (a logged correction or a stage shift vs the prior stance).
+_CHANGE_RE = re.compile(
+    r"\b(?:chang|shift|revis|reconsider|no longer|used to|previously|earlier I|"
+    r"moved (?:on |from )|updated my|come around|changed my mind|where I once)",
+    re.IGNORECASE,
+)
+
+STANCE_SYSTEM_PROMPT = (
+    "You maintain the evolving STANCE of one AI health coach toward the person they coach "
+    "(Matthew). A stance is the coach's current *read* of him IN THIS COACH'S DOMAIN — what the "
+    "coach is focused on now, what it has set aside for now, where it thinks he is in this "
+    "domain's progression, and HOW that read has changed as evidence accrued.\n\n"
+    "## Ground truth (your stance must FOLLOW from these — provided in the user message):\n"
+    "- The coach's compressed history: positions taken, key concerns, corrections made, "
+    "relationship notes, recent themes.\n"
+    "- The coach's scored track record: predictions confirmed/refuted, an overall hit-rate, "
+    "per-subdomain confidence.\n"
+    "- The coach's PREVIOUS stance (may be absent on the first run).\n\n"
+    "## ABSOLUTE RULES:\n"
+    "- Speak to the coach's THINKING — positions, focus, what changed and why. This is an "
+    "OPINION, not a data readout.\n"
+    "- NEVER invent or cite raw physiological numbers — no HRV in ms, no RHR/recovery/sleep "
+    "values, no weights, no calorie counts, no percentages. Name the PATTERN or the PREDICTION, "
+    "never a number.\n"
+    "- 'how_my_read_changed' must describe a REAL change grounded in 'corrections_made' or a "
+    "genuine shift versus the previous stance. If nothing genuinely changed — or there is no "
+    "previous stance — return an empty string.\n"
+    "- 'stage' is a domain-appropriate sense of where he is in THIS domain's progression, derived "
+    "from your read — NOT from his bodyweight.\n"
+    "- Write in the FIRST PERSON ('I'). Address him as 'you'. You ARE this coach.\n\n"
+    "## Output — return ONLY valid JSON, no markdown, no preamble:\n"
+    "{\n"
+    '  "headline_read": "one tight paragraph: my current read of you, in my domain",\n'
+    '  "focused_on_now": ["what I care most about right now (evidence-derived)"],\n'
+    '  "set_aside_for_now": ["what I am deliberately not chasing yet"],\n'
+    '  "stage": {"label": "short domain-appropriate stage name", "rationale": "why this stage, from my read"},\n'
+    '  "how_my_read_changed": "the genuine evolution vs my prior stance, or \\"\\" if nothing changed",\n'
+    '  "confidence_note": "how sure I am, grounded in my track record",\n'
+    '  "evidence_basis": ["the positions/predictions/threads this read rests on"]\n'
+    "}\n"
+)
+
+_STANCE_FIELDS = {
+    "headline_read": "",
+    "focused_on_now": [],
+    "set_aside_for_now": [],
+    "stage": {},
+    "how_my_read_changed": "",
+    "confidence_note": "",
+    "evidence_basis": [],
+}
+
+
+def _contains_raw_vitals(text):
+    """True if the text cites a raw physiological number the stance must not invent."""
+    return bool(_RAW_VITAL_RE.search(text or ""))
+
+
+def _vital_hits(stance):
+    """Count raw-vital citations across the prose fields of a stance dict."""
+    if not isinstance(stance, dict):
+        return 0
+    prose = " ".join(
+        [
+            str(stance.get("headline_read", "")),
+            str(stance.get("how_my_read_changed", "")),
+            str(stance.get("confidence_note", "")),
+            " ".join(str(x) for x in stance.get("focused_on_now", []) or []),
+            " ".join(str(x) for x in stance.get("set_aside_for_now", []) or []),
+        ]
+    )
+    return len(_RAW_VITAL_RE.findall(prose))
+
+
+def _claims_change(text):
+    """True if the prose asserts the read has evolved (needs a real change signal)."""
+    return bool(_CHANGE_RE.search(text or ""))
+
+
+def _gather_learning(coach_id, limit=40):
+    """Most-recent resolved LEARNING# verdicts (the coach's scored track record)."""
+    return _query_begins_with(f"COACH#{coach_id}", "LEARNING#", scan_forward=False, limit=limit)
+
+
+def _summarize_track_record(learning, confidence_records):
+    """Reduce LEARNING#/CONFIDENCE# into the grounding block the stance reasons from.
+
+    Mirrors the hit/miss accounting site_api_coach._track_record surfaces publicly,
+    so the stance's self-assessment agrees with the coach page's headline stat.
+    """
+    _hit = {"confirmed", "correct", "hit", "true"}
+    _miss = {"refuted", "incorrect", "miss", "false"}
+    confirmed = refuted = 0
+    recent = []
+    for rec in learning or []:
+        verdict = (rec.get("verdict") or rec.get("outcome") or rec.get("result") or "").lower()
+        if verdict in _hit:
+            confirmed += 1
+        elif verdict in _miss:
+            refuted += 1
+        if len(recent) < 8:
+            recent.append(
+                {
+                    "date": rec.get("sk", "").replace("LEARNING#", "").split("#")[0],
+                    "verdict": verdict or "pending",
+                    "claim": (rec.get("claim_natural") or rec.get("claim") or "")[:160],
+                }
+            )
+    decided = confirmed + refuted
+    confidence = {}
+    for conf in confidence_records or []:
+        sub = conf.get("subdomain", conf.get("sk", "").replace("CONFIDENCE#", ""))
+        confidence[sub] = round(conf.get("mean_confidence", 0.5), 3)
+    return {
+        "confirmed": confirmed,
+        "refuted": refuted,
+        "decided": decided,
+        "hit_rate_pct": round(100 * confirmed / decided) if decided else None,
+        "recent": recent,
+        "confidence": confidence,
+    }
+
+
+def _build_stance_message(coach_id, compressed, track, prior_stance):
+    """Assemble the grounding the stance LLM call reasons from."""
+    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    grounding = {
+        "coach": meta["display_name"],
+        "domain": meta["domain"],
+        "compressed_history": {
+            "summary": compressed.get("summary", ""),
+            "positions_taken": compressed.get("positions_taken", []),
+            "key_concerns": compressed.get("key_concerns", []),
+            "corrections_made": compressed.get("corrections_made", []),
+            "relationship_notes": compressed.get("relationship_notes", ""),
+            "recent_themes": compressed.get("recent_themes", []),
+        },
+        "track_record": track,
+        "previous_stance": (
+            {
+                "headline_read": prior_stance.get("headline_read", ""),
+                "stage": prior_stance.get("stage", {}),
+                "focused_on_now": prior_stance.get("focused_on_now", []),
+                "as_of": prior_stance.get("as_of"),
+            }
+            if prior_stance
+            else None
+        ),
+    }
+    return (
+        f"## Coach: {meta['display_name']} ({meta['domain']})\n\n"
+        "Form your CURRENT stance toward Matthew from this grounding. If there is no previous "
+        'stance, "how_my_read_changed" MUST be an empty string.\n\n'
+        f"{json.dumps(grounding, indent=2, default=str)}"
+    )
+
+
+def _sanitize_stance(stance, compressed, prior_stance):
+    """Blank an ungrounded evolution claim. First run => no change is possible.
+
+    A change claim is grounded only when the coach logged a correction or its stage
+    actually shifted versus the prior stance — otherwise it's narrative invention.
+    """
+    if prior_stance is None:
+        stance["how_my_read_changed"] = ""
+        return stance
+    changed = stance.get("how_my_read_changed") or ""
+    if changed and _claims_change(changed):
+        stage_now = (stance.get("stage") or {}).get("label")
+        stage_prior = (prior_stance.get("stage") or {}).get("label")
+        grounded = bool(compressed.get("corrections_made")) or (stage_now and stage_now != stage_prior)
+        if not grounded:
+            logger.info("[stance] dropping ungrounded change claim for %s", stance.get("coach_id"))
+            stance["how_my_read_changed"] = ""
+    return stance
+
+
+def _generate_stance(coach_id, compressed, track, prior_stance):
+    """Generate one coach's evolving stance via a grounded Haiku call.
+
+    Self-corrects ONCE if raw vitals leak (mirrors ai_expert_analyzer). Returns the
+    stance dict, or None on a hard failure (caller treats a missing stance as
+    fail-soft — the public render keeps the ladder fallback).
+    """
+    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    now_iso = datetime.now(timezone.utc).isoformat()
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    user_message = _build_stance_message(coach_id, compressed, track, prior_stance)
+    result = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=user_message, max_tokens=900, temperature=0.3)
+    if not isinstance(result, dict):
+        logger.warning("[stance] LLM returned non-dict for %s — skipping stance this run", coach_id)
+        return None
+
+    # Self-correct once if the read leaked raw numbers.
+    if _vital_hits(result) > 0:
+        strict = user_message + (
+            "\n\nSTRICT CORRECTION: your previous attempt cited raw numeric values (HRV/RHR/"
+            "weights/percentages). Rewrite with ZERO numbers — describe patterns and positions only."
+        )
+        retry = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=strict, max_tokens=900, temperature=0.2)
+        if isinstance(retry, dict) and _vital_hits(retry) < _vital_hits(result):
+            result = retry
+
+    for field, default in _STANCE_FIELDS.items():
+        result.setdefault(field, default() if callable(default) else default)
+    result["coach_id"] = coach_id
+    result["display_name"] = meta["display_name"]
+    result["domain"] = meta["domain"]
+    result["as_of"] = today
+    result["generated_at"] = now_iso
+
+    _sanitize_stance(result, compressed, prior_stance)
+    result["grounding_flag"] = _vital_hits(result) > 0
+    if result["grounding_flag"]:
+        logger.warning("[stance] %s retains raw-vital citations after correction — flagged", coach_id)
+    return result
+
+
+def _write_stance(coach_id, stance):
+    """Persist STANCE#{date} (immutable history) + STANCE#latest (the live pointer)."""
+    date = stance.get("as_of")
+    ok_hist = _put_item({"pk": f"COACH#{coach_id}", "sk": f"STANCE#{date}", **stance})
+    ok_latest = _put_item({"pk": f"COACH#{coach_id}", "sk": "STANCE#latest", **stance})
+    if ok_hist and ok_latest:
+        logger.info("Wrote STANCE#%s + STANCE#latest for %s", date, coach_id)
+    return ok_hist and ok_latest
+
+
+def _run_stance(coach_id, compressed, state):
+    """Gather track record + prior stance, generate, and persist. Returns a result
+    dict for the handler summary. Fail-soft — never raises into the compression loop."""
+    if compressed.get("_fallback"):
+        return {"written": False, "reason": "compression_fallback"}
+    try:
+        track = _summarize_track_record(_gather_learning(coach_id), state.get("confidence_records", []))
+        prior_stance = _get_item(f"COACH#{coach_id}", "STANCE#latest")
+        stance = _generate_stance(coach_id, compressed, track, prior_stance)
+        if not stance:
+            return {"written": False, "reason": "generation_failed"}
+        written = _write_stance(coach_id, stance)
+        return {
+            "written": written,
+            "stage": (stance.get("stage") or {}).get("label"),
+            "evolved": bool(stance.get("how_my_read_changed")),
+            "grounding_flag": stance.get("grounding_flag", False),
+        }
+    except Exception as e:
+        logger.error("[stance] generation failed for %s (non-fatal): %s", coach_id, e)
+        return {"written": False, "error": str(e)}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -773,6 +1050,10 @@ def lambda_handler(event, context):
                     "active_predictions": len(compressed.get("active_predictions", [])),
                     "is_fallback": compressed.get("_fallback", False),
                 }
+
+                # Stance engine (coach-opinion) — evolving evidence-derived read of
+                # Matthew. Fail-soft: a stance error never aborts the compression run.
+                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state)
 
             except Exception as e:
                 logger.error("Failed to compress %s: %s", coach_id, e, exc_info=True)
