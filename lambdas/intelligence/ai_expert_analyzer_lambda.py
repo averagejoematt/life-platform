@@ -168,9 +168,19 @@ def _hard_canonical_contradictions(text, facts):
     import re as _re
 
     low = (text or "").lower()
+
+    def _mentions(val):
+        # Canonical number appears anywhere (int or 1-dp) → coach is grounded, even in
+        # a trend ("RHR climbed from 64 to 66" cites 64). Mirrors the Sentinel's check
+        # so the analyzer and the detector agree on what counts as a contradiction.
+        forms = {str(int(round(val)))}
+        if abs(val - round(val)) > 0.05:
+            forms.add(f"{val:.1f}")
+        return any(_re.search(r"(?<![\d.])" + _re.escape(v) + r"(?![\d])", low) for v in forms)
+
     out = []
     rhr = facts.get("rhr_bpm")
-    if rhr is not None:
+    if rhr is not None and not _mentions(rhr):
         # "RHR", "resting HR", "resting heart rate" + a 2-3 digit number nearby.
         m = _re.search(r"\b(?:rhr|resting\s+(?:heart\s+rate|hr))\b[^.\d]{0,18}(\d{2,3})", low)
         if m:
@@ -186,7 +196,7 @@ def _hard_canonical_contradictions(text, facts):
                     }
                 )
     rec = facts.get("recovery_pct")
-    if rec is not None:
+    if rec is not None and not _mentions(rec):
         # % optional ("recovery at 86" / "recovery of 30%" / "86% recovery"), but reject a
         # trailing time/weight word ("recovery over 4 weeks") — the Sentinel's _NO_TIME lesson.
         m = _re.search(
@@ -205,7 +215,7 @@ def _hard_canonical_contradictions(text, facts):
                     }
                 )
     hrv = facts.get("hrv_ms")
-    if hrv is not None:
+    if hrv is not None and not _mentions(hrv):
         m = _re.search(r"hrv[^.\d]{0,20}(\d{1,3}(?:\.\d+)?)", low)
         if m:
             claimed = float(m.group(1))
@@ -850,12 +860,12 @@ def _build_shared_system_prompt():
 Write a 2-3 paragraph analysis (200-300 words).
 
 STRUCTURE:
-- Paragraph 1: Open with ONE specific, concrete observation. Lead with the number that caught your attention.
+- Paragraph 1: Open with ONE specific, concrete observation. Lead with a number ONLY if it is one of your data points or an AUTHORITATIVE FACT — otherwise lead with the pattern.
 - Paragraph 2: Interpret the pattern. Connect to another domain if relevant.
 - Paragraph 3: One specific, actionable suggestion for the coming week.
 
 VOICE:
-- First person as yourself. Reference specific numbers naturally.
+- First person as yourself. Cite specific numbers ONLY when they are in your data or the AUTHORITATIVE FACTS — never invent a figure, trend, range, or multi-day value to sound precise. A described pattern with no number beats a fabricated number.
 - Do NOT use bullet points, headers, or formatting. Flowing prose only.
 - Vary sentence length.
 

@@ -185,6 +185,16 @@ def _cited_for_metric(low_text: str, patterns):
     return out
 
 
+def _mentions_value(low_text: str, true_val: float) -> bool:
+    """Does the canonical number appear anywhere in the text (int or 1-dp form)?
+    Used to recognise a grounded trend — "recovery dropped from 86 to 30" cites the
+    canonical 30 even though the tight metric window only captured the historical 86."""
+    forms = {str(int(round(true_val)))}
+    if abs(true_val - round(true_val)) > 0.05:
+        forms.add(f"{true_val:.1f}")
+    return any(re.search(r"(?<![\d.])" + re.escape(v) + r"(?![\d])", low_text) for v in forms)
+
+
 def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
     """`narratives`: list of served text blobs. `facts`: the canonical dict
     ({recovery_pct, hrv_ms, rhr_bpm, latest_weight}). Flags a cited number that
@@ -209,12 +219,18 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
             true_val = float(true_val)
             band = abs(true_val) * tol
             lo, hi = _PLAUSIBILITY.get(key, (0.0, 1e9))
-            for cited in _cited_for_metric(low, patterns):
-                if not (lo * true_val <= cited <= hi * true_val):
-                    continue  # outside the metric's plausible range — not a claim about it
-                if cited > 0 and abs(cited - true_val) > band:
-                    offenders.append(f"{label}: cited {cited:g} for '{key}' but canonical is {true_val:g}")
-                    break
+            # Only the in-plausible-range citations count as claims about this metric.
+            in_range = [c for c in _cited_for_metric(low, patterns) if lo * true_val <= c <= hi * true_val and c > 0]
+            if not in_range:
+                continue
+            # If the narrative cites the canonical value ANYWHERE (even inside a trend
+            # — "recovery climbed from 86 to 30"), the coach is grounded on it: a
+            # historical/trend reference to an off-value is not a contradiction. Only
+            # flag when NO cited value (and no bare mention) lands on the canonical.
+            if any(abs(c - true_val) <= band for c in in_range) or _mentions_value(low, true_val):
+                continue
+            off = min(in_range, key=lambda c: abs(c - true_val))
+            offenders.append(f"{label}: cited {off:g} for '{key}' but canonical is {true_val:g} (no grounded value cited)")
     f.value = float(len(offenders))
     if offenders:
         f.status = ALARM if len(offenders) >= 2 else WARN

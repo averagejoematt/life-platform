@@ -116,6 +116,20 @@ class TestFactsAgreement:
         f = ci.check_facts_agreement(narratives, self.FACTS)
         assert f.status in (ci.WARN, ci.ALARM)
 
+    # ── Trend/historical references must NOT false-fire (2026-06-28 precision pass) ──
+    def test_trend_citing_the_canonical_is_not_a_contradiction(self):
+        # "dipped from 86 to 30" — the tight window captures the historical 86, but
+        # the canonical 30 appears in the trend, so the coach is grounded → no flag.
+        narratives = ["Recovery dipped from 86 to 30 — still rebuilding this week."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert f.status == ci.OK
+
+    def test_stale_only_value_with_no_grounding_still_fires(self):
+        # Cites 86 as the current value and never mentions the canonical 30 → real.
+        narratives = ["Recovery sits at 86 right now — push hard today."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert f.status in (ci.WARN, ci.ALARM)
+
 
 class TestEndpointShape:
     def test_all_zero_predictions_fires(self):
