@@ -1453,6 +1453,22 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         script.get("pull_quote"),
         review.get("pull_quote"),
     )
+    # Editorial cover art (Part II — atmospheric, free-license; fail-soft, kill-switch
+    # default OFF). Reuse this week's prior image if present; else fetch once. Never blocks.
+    _cover = {}
+    try:
+        import editorial_image
+
+        if editorial_image.enabled():
+            _prev = next((e for e in existing if e.get("week") == week and e.get("image_url")), None)
+            _cover = (
+                {"image_url": _prev["image_url"], "image_credit": _prev.get("image_credit", "")}
+                if _prev
+                else (editorial_image.fetch_and_store("podcast", f"wk{week}", week, s3_client=s3) or {})
+            )
+    except Exception:
+        _cover = {}
+
     ep = {
         "week": week,
         # EP{n} · short hook — episode number == week (intro is EP0). No long sentence titles.
@@ -1465,6 +1481,8 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         "guest_id": guest_id,  # throughline: front-end links the byline → /story/coaches/<guest_id>
         "guest_name": label_of[guest_id],
         "excerpt": (script.get("pull_quote") or post.get("excerpt") or "")[:240],
+        "image_url": _cover.get("image_url", ""),
+        "image_credit": _cover.get("image_credit", ""),
     }
     existing = [e for e in existing if e.get("week") != week] + [ep]
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)

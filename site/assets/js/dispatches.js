@@ -89,7 +89,7 @@ const ABOUT = `
 function entriesFor(s, data) {
   if (!data) return [];
   if (s.kind === "coaches") return [{ id: "team", title: "🧭 My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" })));
-  if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, guest_id: e.guest_id, guest_name: e.guest_name, excerpt: e.excerpt }));
+  if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, guest_id: e.guest_id, guest_name: e.guest_name, excerpt: e.excerpt, image_url: e.image_url || "", image_credit: e.image_credit || "" }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "posts") {
     const ps = data.posts || data.entries || (Array.isArray(data) ? data : []);
@@ -108,7 +108,7 @@ function entriesFor(s, data) {
     };
     // id = date (unique) for selection/routing; week kept separately for podcast lookup.
     // The raw `week` repeated (two "Week 1"), so using it as the id collided two posts.
-    return ps.map((p) => ({ id: p.date || String(p.week), week: p.week, label: labelOf(p), title: p.title || labelOf(p), date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url }));
+    return ps.map((p) => ({ id: p.date || String(p.week), week: p.week, label: labelOf(p), title: p.title || labelOf(p), date: p.date, excerpt: p.excerpt, meta: p.stats_line, word_count: p.word_count, url: p.url, image_url: p.image_url || "", image_credit: p.image_credit || "" }));
   }
   return [];
 }
@@ -307,8 +307,12 @@ async function renderRead(s, id) {
         (lg.disclosure ? `<p class="correlative">${esc(lg.disclosure)}</p>` : "") +
         `</section>`;
     }
+    const cover = ent.image_url
+      ? `<figure class="editorial-img editorial-cover"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`
+      : "";
     read.innerHTML =
       pendingHTML +
+      cover +
       `<p class="dx-kicker label">the podcast · weekly review · two AI voices</p>` +
       `<h2 class="dx-title">${esc(ent.title)}</h2>` +
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
@@ -360,7 +364,10 @@ async function renderRead(s, id) {
   const listen = episode
     ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round((episode.bytes || 0) / 1024 / 1024 / 0.12))} min)</span></div>`
     : "";
-  read.innerHTML = `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+  const art = ent.image_url
+    ? `<figure class="editorial-img"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`
+    : "";
+  read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   const rf = read.querySelector(".dx-readfull");

@@ -777,6 +777,20 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # Editorial cover art (Part II) — Lambda-written to generated/assets/images/editorial/*.
+                    # Must precede any generic /assets/* (site origin) behaviour so these route to generated.
+                    # 30-day TTL: an image never changes once chosen for a post.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/assets/images/editorial/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=2592000,
+                        max_ttl=2592000,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     # /api/* — site-api Lambda (all methods, query strings forwarded).
                     # POST endpoints (nudge, vote, follow, submit_finding) need POST.
                     # GET endpoints (experiment_detail) need query_string=True.
