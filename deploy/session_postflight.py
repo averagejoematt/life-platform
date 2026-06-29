@@ -58,6 +58,43 @@ def check_layer_uniformity():
     return latest, behind
 
 
+# Bundled-asset canaries: a function that imports a root-level lambdas/*.py module,
+# and the module(s) its zip MUST therefore contain. A cdk deploy once shipped an
+# asset MISSING every root module (the silent coherence-sentinel break, 2026-06-28:
+# ImportModuleError, but the invoke still returned 200 + it ran "green" off a stale
+# artifact). Spread across stacks (Operational + Compute) since each deploys its own
+# copy of the shared asset at its own time. See reference_cdk_asset_staging_glitch.
+_ASSET_CANARIES = {
+    "life-platform-coherence-sentinel": ["coherence_invariants.py", "canonical_facts.py"],
+    "ai-expert-analyzer": ["canonical_facts.py"],
+}
+
+
+def check_asset_completeness():
+    """Returns [(function, [missing root modules]), ...]. Downloads each canary's
+    deployed zip and asserts the root module(s) it imports are present — catching a
+    staging glitch that bundles only subdir modules. Fail-soft per function (a
+    transient describe/download error skips that canary, never crashes postflight)."""
+    import io
+    import urllib.request
+    import zipfile
+
+    cl = _lambda()
+    problems = []
+    for fn, required in _ASSET_CANARIES.items():
+        try:
+            loc = cl.get_function(FunctionName=fn)["Code"]["Location"]
+            with urllib.request.urlopen(loc, timeout=30) as r:
+                data = r.read()
+            names = set(zipfile.ZipFile(io.BytesIO(data)).namelist())
+            missing = [m for m in required if m not in names]
+            if missing:
+                problems.append((fn, missing))
+        except Exception as e:  # noqa: BLE001 — transient AWS/network, not a real gap
+            print(f"  ⚠️  asset check skipped for {fn}: {e}")
+    return problems
+
+
 def check_config_drift():
     """Returns the list of drifted lambdas (from check_lambda_config_drift)."""
     sys.path.insert(0, os.path.join(_ROOT, "deploy"))
@@ -89,6 +126,18 @@ def main() -> int:
             print(f"  🟢 layer uniformity: all consumers on v{latest}")
     except Exception as e:  # noqa: BLE001
         print(f"  ⚠️  layer check skipped: {e}")
+
+    try:
+        incomplete = check_asset_completeness()
+        if incomplete:
+            problems += 1
+            print(f"  🔴 asset completeness: {len(incomplete)} lambda(s) shipped a zip missing imported root module(s):")
+            for fn, missing in incomplete:
+                print(f"       {fn} is MISSING {missing} — `rm -rf cdk/cdk.out` and redeploy its stack")
+        else:
+            print("  🟢 asset completeness: canary zips contain their imported root modules")
+    except Exception as e:  # noqa: BLE001
+        print(f"  ⚠️  asset-completeness check skipped: {e}")
 
     try:
         drift = check_config_drift()
