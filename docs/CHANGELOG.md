@@ -1,3 +1,17 @@
+## Coaches-react-to-site-protocols — backend serial phase 2 — 2026-06-29
+
+The second backend serial phase, shipped + deployed live + verified end-to-end (Matthew merged both PRs and authorized "do all the deploys"). **2 PRs, both merged + deployed: #273 (the feature) + #274 (the `SHARED_LAYER_VERSION` 91→92 bump).** main == live, fleet uniform on layer **v92**, 0 open PRs.
+
+- **The loop:** coaches now react to the challenges/experiments Matthew has committed to on the site, instead of treating those protocol surfaces as separate from the coaching. Built on the **same `_gather_all_state` seam** phase 1 (the stance engine) laid — one new gather step.
+- **`_gather_site_protocols(coach_id)`** (`coach_narrative_orchestrator`): reads active **challenges** (clean `domain` field) + **experiments** (routed by `tags`), filtered per-coach via a deterministic `COACH_DOMAINS` map (explorer = all; an experiment whose tags match no domain → explorer only, never mis-attributed). Reads go through `_query_begins_with` → **ADR-058 phase-filtered**, so the coach sees exactly the active set the site/MCP surface. Fail-soft; `_protocols_for_brief` caps ≤5/surface and drops nulls; **injected into the brief deterministically on every path** — the same seam `current_stance` uses.
+- **`ai_calls.py`:** one ACTIVE PROTOCOLS steering line — acknowledge commitments by name, **never invent** progress/streak/adherence numbers (ground in real data or say it's not visible yet).
+- **Scope held tight:** challenges + experiments only — **habits deferred** (ongoing behavior whose adherence already reaches coaches; re-surfacing risks number-fabrication); no persisted protocol-read record (phase 3/4).
+- **Folded-in stance polish:** the labs_coach persistent `grounding_flag` — the stance no-numbers rule now explicitly covers **targets and gaps-to-target** ("short of the protein target", not "26% short of 190g"); takes effect on the next weekly summarizer run.
+- **Deploy = the full layer dance** (`ai_calls.py` is a layer module): `build_layer.sh` → publish **v92** via `LifePlatformCore` → bump `SHARED_LAYER_VERSION` → redeploy **all 5 consumer stacks** for fleet uniformity (the v89 lesson). Every `cdk diff` read first — layer re-point + benign asset re-hash, zero destroys/IAM.
+- **Verified live:** fleet **71/71 functions on v92**; live smoke invoke of `coach-narrative-orchestrator` → `200`, runs clean against the real partitions, correctly omits `site_protocols` when nothing is active (surfaces when Matthew activates a challenge), stance intact. New tests: +10 in `tests/test_coach_stance_engine.py` (30/30 pass; 198 coach tests green).
+
+⚠️ **Outstanding:** backend serial phases 3–4 (Elena "previously on" recaps; historical-window APIs); SS tail (SS-08/09/11); watch labs_coach's `grounding_flag` across weekly runs. See `handovers/HANDOVER_LATEST.md`.
+
 ## Coach-opinion engine — an evolving, evidence-derived stance per coach — 2026-06-29
 
 The first backend serial phase, shipped + deployed live + verified end-to-end (Matthew merged both PRs and authorized the deploys). **2 PRs, both merged + deployed: #270 (engine) + #271 (the compression bug it surfaced).**
