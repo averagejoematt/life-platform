@@ -31,6 +31,9 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 PEXELS_SECRET_ID = "life-platform/pexels"  # noqa: S105 — a Secrets Manager id, not a credential. {"api_key": "..."}
 EDITORIAL_PREFIX = "generated/assets/images/editorial"
 PUBLIC_PREFIX = "/assets/images/editorial"  # CloudFront strips the generated/ origin path
+# Pexels sits behind Cloudflare, which 403s the default Python-urllib User-Agent
+# ("error code: 1010"). A real UA is required on BOTH the API call and the image fetch.
+_UA = "averagejoematt.com/1.0 (+https://averagejoematt.com)"
 
 # A curated pool of atmospheric, non-literal landscape moods. Deliberately NOT
 # health/fitness imagery — these read as editorial texture (a magazine feature
@@ -80,7 +83,7 @@ def _search(api_key, query, seed):
     url = "https://api.pexels.com/v1/search?" + urllib.parse.urlencode(
         {"query": query, "orientation": "landscape", "size": "large", "per_page": "15"}
     )
-    req = urllib.request.Request(url, headers={"Authorization": api_key})
+    req = urllib.request.Request(url, headers={"Authorization": api_key, "User-Agent": _UA})
     with urllib.request.urlopen(req, timeout=12) as resp:
         payload = json.loads(resp.read().decode("utf-8"))
     photos = payload.get("photos") or []
@@ -120,7 +123,7 @@ def fetch_and_store(kind, slug, seed, *, s3_client=None, secrets_client=None, bu
         dl_url, credit = _search(api_key, query, seed)
         if not dl_url:
             return None
-        with urllib.request.urlopen(dl_url, timeout=20) as r:
+        with urllib.request.urlopen(urllib.request.Request(dl_url, headers={"User-Agent": _UA}), timeout=20) as r:
             img_bytes = r.read()
         if not img_bytes or len(img_bytes) < 1024:
             return None
