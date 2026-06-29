@@ -72,6 +72,17 @@ def test_weight_loss_delta_is_not_treated_as_rhr_or_weight():
     assert az._hard_canonical_contradictions(txt, FACTS) == []
 
 
+def test_grounded_trend_does_not_self_correct():
+    # "RHR climbed from 64 to 66" cites the canonical 64 → grounded trend, not a
+    # contradiction (don't waste a regeneration; mirror the Sentinel's logic).
+    assert az._hard_canonical_contradictions("Your RHR climbed from 64 to 66 over the week.", FACTS) == []
+
+
+def test_recovery_trend_citing_canonical_does_not_fire():
+    # canonical recovery 30; "fell from 55 to 30" cites 30 → grounded.
+    assert az._hard_canonical_contradictions("Recovery fell from 55 to 30 this week.", FACTS) == []
+
+
 def test_missing_facts_are_safe():
     assert az._hard_canonical_contradictions("RHR dropped to 53.", {}) == []
     assert az._hard_canonical_contradictions("", FACTS) == []
