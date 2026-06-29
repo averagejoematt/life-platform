@@ -338,6 +338,17 @@ async function renderByCoach(read, id) {
   if (tr.hit_rate_pct != null || (tr.recent || []).length) {
     h += `<p class="bc-track label">track record: ${tr.hit_rate_pct != null ? esc(tr.hit_rate_pct) + "% hit-rate " + esc(tr.n_note || "") : "accruing"}</p>`;
   }
+  // 3.5) THE EVOLVING READ — this coach's recent dated commentary, so a reader can trace
+  //      how their take on Matthew has moved over the journey (the serial/evolution surface).
+  const ro = (coach.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
+  if (ro.length) {
+    h += disclose(`how this read has evolved · ${ro.length} recent`,
+      `<ol class="ce-trail">${ro.slice(0, 8).map((o) =>
+        `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
+        (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
+        ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") +
+        `</li>`).join("")}</ol>`);
+  }
   // 4) The bio is one disclosure click down — not the lead.
   h += disclose("who this coach is · their voice", coachCharacterHTML(coach.character) + (coach.stance && coach.stance.rung ? coachStanceHTML(coach.stance.rung) : ""));
   read.innerHTML = h;

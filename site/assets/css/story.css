@@ -319,6 +319,54 @@ body { overflow-x: hidden; }
 .dxt-title { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.2; }
 .dxt-note { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); margin-top: 2px; }
 
+/* ── The serial journey timeline (the "walk backwards" spine) ──────────────── */
+.tl-recap { margin: var(--sp-5) 0 var(--sp-4); padding: var(--sp-3) var(--sp-4); border: var(--border-hair);
+  border-radius: var(--radius); background: color-mix(in oklch, var(--ember) 5%, var(--surface)); }
+.tl-recap-k { color: var(--ink-faint); margin: 0; }
+.tl-recap-h { font-family: var(--font-mono); font-size: 1.05rem; color: var(--ink); margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.tl-recap-em { color: var(--ember); }
+.tl-recap-s { color: var(--ink-muted); font-size: var(--fs-small); margin: var(--sp-1) 0 0; }
+.tl-recap-s a, .tl-x { color: var(--ember); }
+.tl { list-style: none; margin: var(--sp-4) 0 0; padding-left: var(--sp-5); border-left: var(--border-hair); display: grid; gap: 0; }
+.tl-month { margin: var(--sp-4) 0 var(--sp-1); }
+.tl-month:first-child { margin-top: 0; }
+.tl-month .label { color: var(--ink-faint); }
+.tl-item { position: relative; padding: var(--sp-3) 0; border-top: var(--border-hair); }
+.tl-month + .tl-item { border-top: 0; }
+.tl-dot { position: absolute; left: calc(-1 * var(--sp-5) - 4px); top: calc(var(--sp-3) + 7px); width: 8px; height: 8px;
+  border-radius: 50%; background: var(--ink-faint); box-shadow: 0 0 0 3px var(--page); transition: transform var(--dur-fast) var(--ease-out); }
+.tl-date { color: var(--ink-faint); display: block; }
+.tl-title { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.25; margin: 1px 0 0; }
+.tl-note { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); margin-top: 2px; }
+.tl-x { display: inline-block; margin-top: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: 0.03em; text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.tl-x:hover { border-color: var(--ember); }
+/* event-type dot colours — ember for the "up"/milestone moments, muted for the rest */
+.tl-lv .tl-dot, .tl-ms .tl-dot, .tl-wt .tl-dot { background: var(--ember); }
+.tl-item:hover .tl-dot { transform: scale(1.18); }
+
+/* "Previously" rail in the chronicle reader — step back through the serial. */
+.dx-prev { margin: var(--sp-3) 0 var(--sp-4); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); }
+.dx-prev-k { color: var(--ink-faint); margin: 0 0 var(--sp-1); }
+.dx-prev-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.dx-prevlink { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); background: transparent;
+  border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
+.dx-prev-lbl { color: var(--ember); flex: none; }
+.dx-prev-t { font-family: var(--font-serif); color: var(--ink-muted); font-size: 1rem; }
+.dx-prevlink:hover .dx-prev-t { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Coach "how this read evolved" trail — dated commentary, newest-first. */
+.ce-trail { list-style: none; margin: 0; padding-left: var(--sp-4); border-left: var(--border-hair); display: grid; gap: var(--sp-3); }
+.ce-item { position: relative; }
+.ce-item::before { content: ""; position: absolute; left: calc(-1 * var(--sp-4) - 4px); top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); }
+.ce-date { color: var(--ink-faint); display: block; }
+.ce-say { color: var(--ink-muted); margin: 1px 0 0; line-height: var(--lh-relaxed); }
+.ce-themes { color: var(--ink-faint); margin: 2px 0 0; }
+/* Cross-pillar link (podcast → the week's chronicle). */
+.dx-xlink { margin: var(--sp-3) 0; }
+.dx-xlink a { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.dx-xlink a:hover { border-color: var(--ember); }
+
 /* ── Narrow-screen topbar: stop the doors nav overflowing ~375px ──────────── */
 @media (max-width: 480px) {
   .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
