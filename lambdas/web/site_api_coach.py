@@ -687,6 +687,43 @@ def handle_experiment_synthesis():
     )
 
 
+def handle_recap():
+    """GET /api/recap — Elena's "previously on" cold-open (backend serial phase 3).
+
+    Reads the chronicle recap (`RECAP#latest`), written when a chronicle week is
+    published. Honest-null before the first recap exists; the timeline view then falls
+    back to its front-end-derived "story so far". Withholds a stale record (one that
+    survived a genesis re-anchor) the same way handle_ai_analysis does.
+    """
+    item = table.get_item(Key={"pk": f"{USER_PREFIX}chronicle", "sk": "RECAP#latest"}).get("Item")
+    if not item:
+        return _ok({"recap": None}, cache_seconds=300)
+    item = _decimal_to_float(item)
+    rec_days = item.get("experiment_day")
+    if rec_days is not None:
+        try:
+            if int(rec_days) > _current_day_n():
+                logger.info("[recap] record claims day %s but current is %s — withholding stale recap", rec_days, _current_day_n())
+                return _ok({"recap": None}, cache_seconds=300)
+        except (TypeError, ValueError):
+            pass
+    return _ok(
+        {
+            "recap": {
+                "story_so_far": item.get("story_so_far"),
+                "recent_beats": item.get("recent_beats", []),
+                "where_we_are_now": item.get("where_we_are_now"),
+                "threads_to_watch": item.get("threads_to_watch", []),
+                "as_of": item.get("as_of"),
+                "as_of_week": item.get("as_of_week"),
+                "author": item.get("author", "Elena Voss"),
+                "generated_at": item.get("generated_at"),
+            }
+        },
+        cache_seconds=300,
+    )
+
+
 def handle_ai_analysis(event):
     """GET /api/ai_analysis"""
     qs = event.get("queryStringParameters") or {}
