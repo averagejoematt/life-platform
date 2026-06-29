@@ -341,7 +341,7 @@ async function renderRead(s, id) {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2><p class="dx-loading shimmer">Loading the timeline…</p>`;
     // The serial spine: walk backwards through the arc, jump into the chronicle week each
     // moment was written. Reads the existing journey-timeline + journey + the chronicle manifest.
-    const [d, jr, pj] = await Promise.all([secFetch(s), tryJSON("/api/journey"), tryJSON("/journal/posts.json")]);
+    const [d, jr, pj, rc] = await Promise.all([secFetch(s), tryJSON("/api/journey"), tryJSON("/journal/posts.json"), tryJSON("/api/recap")]);
     const events = (d && d.events ? d.events.slice() : []);
     const posts = (pj && pj.posts) || [];
     events.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));  // newest-first → "walk back"
@@ -354,9 +354,29 @@ async function renderRead(s, id) {
     // The chronicle installment that narrates a given date = the soonest week ending on/after it.
     const postFor = (date) => { let best = null; for (const p of posts) { if (!p.date) continue; if (p.date >= date && (!best || p.date < best.date)) best = p; } return best || posts[0] || null; };
     const TYPE = { weight: "wt", level_up: "lv", experiment: "ex", discovery: "dx", correlation: "co", milestone: "ms", life_event: "le" };
-    const recap = `<aside class="tl-recap"><p class="tl-recap-k label">the story so far</p>` +
-      `<p class="tl-recap-h">Day ${dayN} · Week ${weekN}${lost != null ? ` · <span class="tl-recap-em">${lost} lbs down</span>` : ""}</p>` +
-      `<p class="tl-recap-s">${events.length} key moment${events.length === 1 ? "" : "s"}, newest first.${events.length ? ` <a href="#tl-genesis">Jump to Day 1 ↓</a>` : ""}</p></aside>`;
+    // Stat line (always shown): Day/Week/lbs + the jump link.
+    const statLine = `<p class="tl-recap-h">Day ${dayN} · Week ${weekN}${lost != null ? ` · <span class="tl-recap-em">${lost} lbs down</span>` : ""}</p>` +
+      `<p class="tl-recap-s">${events.length} key moment${events.length === 1 ? "" : "s"}, newest first.${events.length ? ` <a href="#tl-genesis">Jump to Day 1 ↓</a>` : ""}</p>`;
+    // Phase 3: prefer Elena's "previously on" cold-open when /api/recap has one; else
+    // fall back to the front-end-derived stat aside (no regression pre-recap).
+    const er = rc && rc.recap;
+    let recap;
+    if (er && er.story_so_far) {
+      const beats = (er.recent_beats || []).slice(0, 4).map((b) => {
+        const lbl = b.week != null ? `Week ${b.week}` : (b.date || "");
+        const lk = b.date ? `<a href="/story/chronicle/#${esc(b.date)}">${esc(lbl)}</a>` : `<span>${esc(lbl)}</span>`;
+        return `<li class="tl-recap-beat"><span class="tl-recap-beat-k label">${lk}</span> ${esc(b.beat || "")}</li>`;
+      }).join("");
+      recap = `<aside class="tl-recap tl-recap-elena">` +
+        `<p class="tl-recap-k label">previously on · the measured life</p>` +
+        `<p class="tl-recap-story">${esc(er.story_so_far)}</p>` +
+        (beats ? `<ul class="tl-recap-beats">${beats}</ul>` : "") +
+        (er.where_we_are_now ? `<p class="tl-recap-now">${esc(er.where_we_are_now)}</p>` : "") +
+        statLine +
+        `<p class="tl-recap-by label">— Elena Voss</p></aside>`;
+    } else {
+      recap = `<aside class="tl-recap"><p class="tl-recap-k label">the story so far</p>` + statLine + `</aside>`;
+    }
     let body;
     if (events.length) {
       let curMonth = "";

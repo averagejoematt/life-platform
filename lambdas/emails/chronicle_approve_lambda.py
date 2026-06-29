@@ -207,7 +207,7 @@ def _mark_published(date_str: str) -> None:
             UpdateExpression=(
                 "SET #s = :published, approved_at = :now "
                 "REMOVE approval_token, draft_blog_post_html, draft_blog_index_html, "
-                "draft_journal_post_html, draft_journal_posts_json, draft_email_html"
+                "draft_journal_post_html, draft_journal_posts_json, draft_email_html, draft_recap_json"
             ),
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={
@@ -218,6 +218,33 @@ def _mark_published(date_str: str) -> None:
         logger.info("DDB: installment %s marked as published", date_str)
     except Exception as exc:
         logger.error("DDB update failed: %s", exc)
+
+
+def _commit_recap(item: dict) -> None:
+    """Phase 3: commit the week's pre-built 'previously on' recap to RECAP#latest +
+    RECAP#{date} when the week is actually published. The recap is grounded in
+    published history, so it only goes live alongside the week it summarizes.
+    Fail-soft — a recap commit failure never blocks publishing the installment."""
+    raw = item.get("draft_recap_json")
+    if not raw:
+        return
+    try:
+        recap = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(recap, dict) or not recap.get("story_so_far"):
+            return
+        date_str = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")
+        base = dict(recap)
+        base["pk"] = CHRONICLE_PK
+        base["source"] = "chronicle_recap"
+        base["status"] = "published"
+        base["generated_at"] = datetime.now(timezone.utc).isoformat()
+        for sk in (f"RECAP#{date_str}", "RECAP#latest"):
+            row = dict(base)
+            row["sk"] = sk
+            table.put_item(Item=row)
+        logger.info("[recap] committed RECAP#latest + RECAP#%s on publish", date_str)
+    except Exception as exc:
+        logger.warning("[recap] _commit_recap failed (non-fatal): %s", exc)
 
 
 def _mark_changes_requested(date_str: str) -> None:
@@ -304,6 +331,7 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
         try:
             paths = _publish_to_s3(item)
             _invalidate_cloudfront(paths)
+            _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
             _mark_published(date_str)
             published.append({"date": date_str, "week": wk})
             logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
@@ -415,6 +443,7 @@ def _handle(event: dict) -> dict:
 
         invalidation_paths = _publish_to_s3(item)
         _invalidate_cloudfront(invalidation_paths)
+        _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
         _mark_published(date_str)
         _invoke_email_sender()
 
