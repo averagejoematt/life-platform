@@ -73,6 +73,25 @@ ALL_COACH_IDS = [
     "explorer_coach",
 ]
 
+# Owner — challenges/experiments are keyed USER#{USER_ID}#SOURCE#... (mcp/config.py).
+USER_ID = os.environ.get("USER_ID", "matthew")
+
+# Phase 2 (2026-06-29) — the coaches-review-the-site loop: which site-protocol
+# pillars each coach reacts to. Keys are the challenge `domain` / experiment `tags`
+# vocab (sleep/movement/nutrition/supplements/mental/social/discipline/metabolic/
+# general). Deterministic config routing — NOT inference — so a sleep coach never
+# sees a nutrition challenge. explorer_coach is the cross-domain coach → None = all.
+COACH_DOMAINS = {
+    "sleep_coach": {"sleep"},
+    "training_coach": {"movement"},
+    "nutrition_coach": {"nutrition", "metabolic"},
+    "mind_coach": {"mental", "mind", "social", "discipline"},
+    "physical_coach": {"movement", "general"},
+    "glucose_coach": {"metabolic", "nutrition"},
+    "labs_coach": {"supplements", "metabolic"},
+    "explorer_coach": None,
+}
+
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "coach-narrative-orchestrator")
@@ -418,6 +437,11 @@ def _gather_all_state(coach_id):
     if not current_stance:
         logger.info("No stance yet for %s — first cycles", coach_id)
 
+    # 11. Active site protocols — the challenges/experiments Matthew has actually
+    # committed to in this coach's domain, so the coach reacts to them by name
+    # (Phase 2). Read-only, domain-routed, fail-soft; {} when nothing is active.
+    site_protocols = _gather_site_protocols(coach_id)
+
     return {
         "target_compressed": target_compressed,
         "other_compressed": other_compressed,
@@ -429,7 +453,70 @@ def _gather_all_state(coach_id):
         "open_threads": open_threads,
         "active_predictions": active_predictions,
         "current_stance": current_stance,
+        "site_protocols": site_protocols,
     }
+
+
+def _gather_site_protocols(coach_id):
+    """Active challenges + experiments in this coach's domain — the site 'protocols'
+    Matthew has committed to, so the coach can react to real commitments by name.
+
+    Read-only and fail-soft (matches the gather contract — `_query_begins_with`
+    returns [] on error). Routing is deterministic config (COACH_DOMAINS): a coach
+    sees only its pillars; explorer_coach (domains=None) sees all. Experiments whose
+    tags match no domain fall through to explorer only — never mis-attributed, never
+    silently dropped to nowhere. Returns {} when nothing is active."""
+    domains = COACH_DOMAINS.get(coach_id)  # None ⇒ all (explorer)
+
+    def _in_domain(item_domains):
+        if domains is None:
+            return True
+        return bool(domains & {d.lower() for d in item_domains if d})
+
+    # Reads go through _query_begins_with → ADR-058 phase-filtered, so the coach
+    # sees exactly the active set the site/MCP surface (same _apply_phase_filter).
+    # The whole body is wrapped fail-soft: this gather must never abort the daily
+    # orchestrator run for any coach.
+    try:
+        challenges = []
+        for c in _query_begins_with(f"USER#{USER_ID}#SOURCE#challenges", "CHALLENGE#", limit=100):
+            if c.get("status") != "active":
+                continue
+            if not _in_domain([c.get("domain", "")]):
+                continue
+            challenges.append(
+                {
+                    "name": c.get("name"),
+                    "domain": c.get("domain"),
+                    "duration_days": c.get("duration_days"),
+                    "progress": c.get("progress"),  # writer-computed; trimmed if null
+                }
+            )
+
+        experiments = []
+        for e in _query_begins_with(f"USER#{USER_ID}#SOURCE#experiments", "EXP#", limit=100):
+            if e.get("status") != "active":
+                continue
+            if not _in_domain(e.get("tags") or []):
+                continue
+            experiments.append(
+                {
+                    "name": e.get("name"),
+                    "hypothesis": e.get("hypothesis"),
+                    "tags": e.get("tags") or [],
+                    "start_date": e.get("start_date"),
+                }
+            )
+    except Exception as exc:  # pragma: no cover — defensive; reads already fail-soft
+        logger.warning("site-protocols gather failed for %s: %s", coach_id, exc)
+        return {}
+
+    out = {}
+    if challenges:
+        out["challenges"] = challenges
+    if experiments:
+        out["experiments"] = experiments
+    return out
 
 
 def _stance_for_brief(stance):
@@ -445,6 +532,22 @@ def _stance_for_brief(stance):
         "how_my_read_changed": stance.get("how_my_read_changed", ""),
         "as_of": stance.get("as_of"),
     }
+
+
+def _protocols_for_brief(protocols):
+    """Trim active-protocol context for the brief: cap each surface at 5 items
+    (D-03 input-creep bound, newest-first as queried) and drop null/empty fields
+    so the coach reacts to real commitments without prompt bloat. Returns {} when
+    nothing is active (the key is then omitted from the brief entirely)."""
+    if not isinstance(protocols, dict):
+        return {}
+    out = {}
+    for surface in ("challenges", "experiments"):
+        items = protocols.get(surface) or []
+        trimmed = [{k: v for k, v in it.items() if v not in (None, "", [], {})} for it in items[:5]]
+        if trimmed:
+            out[surface] = trimmed
+    return out
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -582,6 +685,19 @@ def _build_user_message(state, coach_id, today):
     else:
         parts.append("No stance yet — first cycles. Establish the read.")
     parts.append("")
+
+    # Active site protocols (Phase 2, 2026-06-29): the challenges/experiments Matthew
+    # has committed to in this coach's domain. Surfaced here so PLANNING accounts for
+    # them; injected into the brief deterministically downstream (like the stance).
+    protocols = _protocols_for_brief(state.get("site_protocols"))
+    if protocols:
+        parts.append("## Active Site Protocols (Matthew's current commitments in your domain)")
+        parts.append(json.dumps(protocols, indent=2, default=str))
+        parts.append(
+            "Plan the coach to acknowledge the relevant ones by name and give an honest read — "
+            "grounded in the data already in this context, never invented progress."
+        )
+        parts.append("")
 
     parts.append("## Instructions")
     parts.append(
@@ -761,6 +877,13 @@ def lambda_handler(event, context):
     stance = state.get("current_stance")
     if stance and isinstance(brief.get("generation_brief"), dict):
         brief["generation_brief"]["current_stance"] = _stance_for_brief(stance)
+
+    # Inject active site protocols DETERMINISTICALLY (same seam as the stance) so the
+    # coach reacts to Matthew's real challenge/experiment commitments on every path,
+    # including fallback/default. Omitted when nothing is active (Phase 2).
+    protocols = _protocols_for_brief(state.get("site_protocols"))
+    if protocols and isinstance(brief.get("generation_brief"), dict):
+        brief["generation_brief"]["site_protocols"] = protocols
 
     # Cache the brief for fallback use
     _cache_brief(coach_id, brief, today)
