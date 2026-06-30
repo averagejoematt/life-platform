@@ -42,7 +42,7 @@ const NODES = {
 // Each pillar in the hero links into its deeper Data page (the story → sub-pages).
 const NODE_LINK = {
   sleep: "/data/sleep/", movement: "/data/training/", nutrition: "/data/nutrition/",
-  metabolic: "/data/glucose/", mind: "/data/mind/", relationships: "/data/mind/",
+  metabolic: "/data/glucose/", mind: "/mind/", relationships: "/data/mind/",
   consistency: "/data/habits/",
 };
 // How the pillars pull on each other (the synthesis, drawn).
