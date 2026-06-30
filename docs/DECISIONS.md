@@ -29,7 +29,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-002 | Lambda Function URL over API Gateway for MCP | ✅ Active | 2026-02-23 |
 | ADR-003 | MCP over REST API for Claude integration | ✅ Active | 2026-02-24 |
 | ADR-004 | Source-of-truth domain ownership model | ✅ Active | 2026-02-25 |
-| ADR-005 | No GSI on DynamoDB table | ✅ Active | 2026-02-25 |
+| ADR-005 | No GSI on DynamoDB table | ⚠️ Amended by ADR-097 | 2026-02-25 |
 | ADR-006 | DynamoDB on-demand billing over provisioned | ✅ Active | 2026-02-25 |
 | ADR-007 | Lambda memory 1024 MB over provisioned concurrency | ✅ Active | 2026-02-26 |
 | ADR-008 | No VPC — public Lambda endpoints with auth | ✅ Active | 2026-02-27 |
@@ -82,6 +82,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-055 | Coach prediction loop closure: 4-step chain | ✅ Active | 2026-05-17 |
 | ADR-056 | SIMP-2 ingestion framework: 8 sources migrated, 6 pattern-exempt | ✅ Active | 2026-05-17 |
 | ADR-057 | V2 audit items formally closed with rationale | ✅ Active | 2026-05-17 |
+| ADR-097 | Two GSIs for the reading domain (amends ADR-005) | ✅ Active | 2026-06-29 |
 
 ---
 
@@ -2715,5 +2716,31 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 **Alternatives rejected.** *Let the semantic pass drive the alarm* (#252's original wiring) — too noisy; superseded by #257. *Backfill the 296 legacy dead predictions* — keyword-inference on old prose mis-directs ~⅓; let them expire. *Widen the auto-merge allowlist to let the agent fix content* — content correctness is exactly what must stay human-reviewed; the whole safety model is that the agent (read-only role) only opens PRs and a deterministic gate merges a narrow non-content allowlist. *Fix coach fabrication to zero* — it's a stochastic LLM frontier; the program bounds it (egregious cases self-correct + trip a precise alarm; soft cases are advisory) rather than claiming elimination.
 
 **Deploy.** All shared modules (`coherence_invariants`, `measurable_metrics`, `canonical_facts`) are bundled with the `lambdas/` asset, NOT the layer (no layer dance). CDK: `LifePlatformOperational` (the Sentinel + IAM) and `LifePlatformMonitoring` (the alarm). See `handovers/HANDOVER_LATEST.md`, the `reference_cdk_asset_staging_glitch` operator note, and `docs/REMEDIATION_TAXONOMY.md`. Shipped across #245–258 (2026-06-28/29).
+
+---
+
+## ADR-097: Two GSIs for the reading domain — the first GSIs on `life-platform` (amends ADR-005)
+
+**Status:** ✅ Active — 2026-06-29 (Mind pillar Phase A)
+
+**Context.** The new reading/Mind domain (`docs/SPEC_READING_MIND_2026-06-29.md`) has access patterns that the single composite key cannot serve without a table scan: "everything I'm currently reading / queued" (by status, not by a known pk), "reading-session history over a date range" (across all books), and the daily "recall prompts that are due now" sweep (a time-ordered slice of a sparse subset). ADR-005 ("No GSI") was decided for a workload where every query was `pk = USER#…#SOURCE#X AND sk BETWEEN d1 AND d2` — true then, not true for reading.
+
+**Decision.** Add exactly two Global Secondary Indexes to `life-platform`, additively. This **amends ADR-005** (which stands for every other domain — GSIs remain the documented exception, added only with an ADR):
+- **GSI1 — recall due (SPARSE).** `GSI1PK="RECALL_DUE"`, `GSI1SK=<nextDue iso>`. Only `RECALL#` prompts with an active `nextDue` carry the GSI1 attributes, so the index holds just the un-answered prompts; the daily EventBridge sweep is `query GSI1 where GSI1SK <= now` — never a scan. Answering/retiring a prompt removes the attributes, dropping it from the index.
+- **GSI2 — reading state/time.** `GSI2PK="READING_STATUS#<status>"` (on `READING#/STATE` rows) or `"READING_SESSION"` (on `SESSION#` rows); `GSI2SK=<iso>`. Serves current-reading, the queue, and history-by-date.
+
+Both project `ALL` (reading items are small and the read paths want the full record). Sparseness is intrinsic — only items that carry the index pk attribute participate — so GSI1 stays tiny regardless of library size.
+
+**Mechanism — CLI, not CDK (important).** The `life-platform` table is deliberately **not** CDK-managed (`core_stack.py` holds a read-only `from_table_name` lookup; the table is a stateful resource). GSIs therefore cannot be added through a CDK construct. They are created with `aws dynamodb update-table` via `deploy/deploy_reading_gsis.sh` (idempotent; one GSI per `UpdateTable`, each an online backfill that leaves the table readable/writable throughout). This is consistent with the platform norm that deploy steps are scripts the operator runs. No `core_stack.py` change is needed or possible for the GSIs.
+
+**IAM.** No role change: the existing table grants already include `…/index/*` (`role_policies.py`), so consumers can query the new GSIs as soon as they exist. The Phase A cover-pipeline Lambda's policy mirrors that pattern.
+
+**Cost.** Two on-demand GSIs with ALL projection on a single-user, ~tens-of-MB table is a few cents/month plus write amplification on reading writes only (a handful per day). Negligible against the $75 ceiling.
+
+**Taxonomy.** All reading records are `CROSS_PHASE` (`phase_taxonomy.py`): a person's library and reading history is durable identity data that must survive an experiment reset — never tagged, never wiped, never phase-filtered (a test asserts the new families classify).
+
+**Alternatives rejected.** *Keep ADR-005 absolute and scan* — the recall sweep and status/queue views would scan the whole table daily as the library grows; the sparse GSI1 is exactly the pattern DynamoDB sparse indexes exist for. *Model reading under `USER#…#SOURCE#reading` with date sks* — loses the by-status and global-by-date access without a GSI anyway, and fights the spec's entity design. *Add the GSIs via a new CDK-managed table* — the table is shared, live, and stateful; re-homing it is far riskier than an additive online index add.
+
+**Deploy.** `deploy/deploy_reading_gsis.sh` (GSIs) then `deploy/deploy_reading_data.sh` (`cdk diff` → `cdk deploy LifePlatformOperational` for the cover-pipeline Lambda). No layer rebuild (reading modules bundle with the `lambdas/` asset). See `handovers/HANDOVER_LATEST.md`.
 
 ---

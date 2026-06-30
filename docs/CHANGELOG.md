@@ -1,3 +1,61 @@
+## The Mind Pillar (Reading) — go-live: discoverability, cover-on-add, Bedrock grant, first seed — 2026-06-29
+
+Post-Phase-E follow-ups surfaced by real use; all **deployed live**.
+- **cover-on-add** — `manage_reading add_book` now fire-and-forget invokes `reading-cover-pipeline` (scoped `lambda:InvokeFunction` on the MCP role); a new book gets a cover automatically. Fail-soft.
+- **discoverability** — the home seven-pillar constellation's **Mind node now leads to `/mind/`** (was the old `/data/mind/`); the page had no normal-flow entry before. Mood/journal stays reachable via `/data/` + the `/mind/` foot.
+- **⚠️ Bedrock grant (real gap)** — the reading LLM features (enrichment, onboarding taste synthesis, recall gist scoring, idea extraction) run **in the MCP lambda** but the MCP role lacked `bedrock:InvokeModel` — so they all silently **fail-soft to empty** (un-tagged books, no taste hypothesis). Found via live onboarding (`AccessDeniedException`). Added the standard budget-guarded grant (ADR-062); enrichment + synthesis now work (books come back genre-tagged).
+- **First real seed** — Matthew's onboarding interview synthesized to a low-confidence taste profile; library seeded with Dark Matter (reading) + 5 queued spanning sci-fi/history/biography/memoir/fantasy/philosophy. `/mind/` is now populated.
+
+## The Mind Pillar (Reading) — Phase E the signature (the Constellation) — 2026-06-29
+
+Phase E: the gated signature. **Built + tested.** Per Mara's restraint rule it ships **dormant behind a beautiful honest-empty state** — a single lit point, "the constellation begins with the first idea you keep" — and fills only on real kept ideas (never fabricated).
+
+- **The Constellation** (`lambdas/reading/reading_constellation.py`): a fail-soft LLM distills the DURABLE ideas he KEPT from a finished book's own takeaway/notes — **grounded only in his words, never invented** — into idea nodes + same-book edges. An idea-index (`READING#IDEA_INDEX`) makes the graph enumerable (DynamoDB can't `begins_with` a pk). The graph refuses to render below 4 nodes (brief §2: never a sparse sad graph). Ember = recent, muted ink = settled, never red.
+- **MCP** `manage_reading map_ideas` (10th action): distil + persist ideas/edges from a debriefed book. `get_constellation` now enumerates the real graph when ready.
+- **Public** `/api/constellation` (honest single-point empty state; public projection only) + the `/mind/` Constellation section: the lit-point seed empty state (reduced-motion respected) → a quiet code-drawn SVG graph once earned.
+- **Gated backlog (per the spec, NOT built — earned on real data):** journal-resonance embeddings (the recommender already accepts the `journal_resonance` signal), the mind-body bridge (reading×sleep/HRV/mood via the existing correlation framework — `READING_SESSION#` already logs `moodSnapshot`), voice debrief, and the mnemonic medium. The Third-Wall debrief *render* (Lena hoped ↔ how it hit) is a frontend follow-up.
+- **Tests:** `test_reading_constellation` (7). Full suite green except the 2 pre-existing pexels failures. Deploy: `cdk deploy LifePlatformMcp` + `deploy/deploy_site_api.sh /api/constellation` + `deploy/sync_site_to_s3.sh`.
+
+## The Mind Pillar (Reading) — Phase D the loop (recall + debrief + retention) — 2026-06-29
+
+Phase D: the two-clock loop. **Built + tested.** The debrief (immediate reaction → public takeaway) and the probes (spaced retention) are kept architecturally separate.
+
+- **Spaced-retrieval core** (`lambdas/reading/reading_recall.py`, spec §7): expanding intervals `[3,7,16,35,90,180]` days, autoregulated (a strong gist ratchets the interval up, a weak one down — never to zero); a fail-soft LLM **gist scorer** (rewards reconstruct-the-argument / changed-prior, never verbatim); and the **n-gated PRIVATE `retentionScore`** (recency-weighted, no score until ≥3 scored probes — Henning's refuse-to-render).
+- **The debrief starts the retention clock** (MCP `manage_reading debrief`): writes the public takeaway AND creates the first spaced probe (due in 3 days) — the two clocks never merged. `answer_recall` now scores the gist, advances the interval, and updates the private retentionScore on the READING#/STATE row (never public).
+- **EventBridge sweep** (`reading-recall-sweep`, daily 16:00 UTC, DST-safe): queries the sparse GSI1 for due probes, writes an **owner-private** nudge snapshot (`READING#NUDGE`, never served publicly), emits `LifePlatform/Reading::RecallsDue`.
+- **Tests:** `test_reading_recall` (7) + `test_reading_recall_sweep` (2) + 3 MCP-flow tests. Full suite green except the 2 pre-existing pexels failures. Deploy: `cdk deploy LifePlatformOperational` (the sweep lambda + rule + IAM).
+
+## The Mind Pillar (Reading) — Phase C the /mind/ page + cockpit thread — 2026-06-29
+
+Phase C: the public reading surface. **Built + tested.** A new `/mind/` page, public site-api endpoints (the first live surface for the `reading_visibility` chokepoint), a reading icon, and a cockpit reading line.
+
+- **Public site-api** (`lambdas/web/site_api_reading.py`): `/api/reading_shelf` (currently-reading · queue · finished · the dignified "set down" shelf) + `/api/reading_overview` (roundedness wheel · input-streak · cockpit line). **Every record passes through `reading_visibility.project_public`** — retention/recall/mood/calibration internals are unreachable on the public surface BY CONSTRUCTION (a test populates private fields + asserts they never appear). Read-only.
+- **The `/mind/` page** (`site/mind/index.html` + `site/assets/js/mind.js` + `site/assets/css/mind.css`): warm spines (cover if cached, else a designed text spine), the roundedness wheel, the habit line — **honest empty states everywhere** (day one is an invitation, not a failure). **No red on this surface** (a stalled/set-down book is muted ink). A reading icon added to `icons.svg`/`icons.js`.
+- **Cockpit thread** (`/now/`): a `data-reading` tile + `renderReading()` — current book, read-today tick, input streak. Recall prompts/retention stay **owner-private** (MCP only) — never fetched on the public cockpit.
+- **IAM:** the site-api role's DynamoDB read grant gains `/index/*` (the reading GSIs); deploy_site_api.sh + the CDK asset stage `lambdas/reading/`. Registered in visual_qa + the site-review bindings map.
+- **Tests:** `test_site_api_reading` (5, incl. the privacy proof). Full suite green except the 2 pre-existing pexels failures. Deploy: `cdk deploy LifePlatformOperational` (IAM + code) → `deploy/sync_site_to_s3.sh`.
+
+## The Mind Pillar (Reading) — Phase B engine + MCP tools — 2026-06-29
+
+Phase B: the recommender + onboarding + the MCP tool surface, over the Phase A data layer. **Built + tested; MCP deploy run (no layer dance).** 8 new MCP tools (count 136→144).
+
+- **Rules-based recommender v1** (`lambdas/reading/reading_recommender.py`, spec §4): the transparent objective function (capacity / difficulty-ratchet / breadth / momentum / journal-resonance / phase, minus whiplash / repeat / anti-Goggins penalties), weights shifting by curriculum phase. Every pick **decomposes to a reason string**; confidence is `f(n_finished,n_abandoned)` and below the n-gate it's **propose-and-dispose** (one pick). Never invents data.
+- **Onboarding interview** (`reading_onboarding.py`, calibration §8): the taste-archaeology question bank + a fail-soft LLM synthesis → a low-confidence `tasteHypothesis`, **deliberately refusing to infer taste from the fitness goal** (anti-Goggins).
+- **8 MCP tools** (`mcp/tools_reading.py`, spec §9): 7 reads (`get_reading_shelf` / `_recommendation` / `_profile` / `_history` / `get_due_recalls` / `get_reading_track_record` / `get_constellation`) + `manage_reading` — a **draft→dry_run→commit** write fat-tool (add_book / update_status / log_session / add_note / answer_recall / debrief / log_outcome / update_profile / onboard); previews by default, writes only on explicit `dry_run=false`. Honest empty states (constellation, recommendation, track record).
+- **No layer dance** — the MCP bundle stages `lambdas/reading/` as a package (`mcp_stack.py`), so the reading code keeps its single source of truth and only the MCP stack redeploys (no fleet redeploy). No IAM change (the MCP role already has table + index/* CRUD).
+- **Tests:** `test_reading_recommender` (10) + `test_reading_onboarding` (6) + `test_tools_reading` (14); `test_mcp_registry` ceiling bumped 141→150. Full suite green except the 2 pre-existing pexels failures. Deploy: `deploy/deploy_reading_mcp.sh`.
+
+## The Mind Pillar (Reading) — Phase A data layer — 2026-06-29
+
+The first phase of the reading/Mind pillar (`docs/SPEC_READING_MIND_2026-06-29.md`): the data layer only — no UI, no MCP tools (those are Phases B–E). **Built + tested; deploy scripts staged for the operator to run.** New SOT domain `reading` on the shared `life-platform` table.
+
+- **Entities + access patterns** (`lambdas/reading/reading_store.py` + `reading_keys.py`): every reading entity per spec §1 (`BOOK#`, `READING#/STATE|SESSION|NOTE|RECALL`, `READING#REC`, `READING#PROFILE`, `READING#IDEA#`) with the seven access patterns from spec §2 (current/queue, history-by-date, notes, due-recalls, roundedness wheel, track record, Constellation node). Reading is `CROSS_PHASE` in `phase_taxonomy.py` (durable identity data — survives experiment resets; a coverage test asserts the new families classify).
+- **Two GSIs — the first on `life-platform`** (`ADR-097`, amends ADR-005): **GSI1** sparse recall-due (only active prompts project → the daily sweep never scans), **GSI2** reading state/time (current-reading, queue, history). Added via `aws dynamodb update-table` (the table is not CDK-managed), additive/online-backfill.
+- **Public/private chokepoint** (`reading_visibility.py`): an allowlist projection — the only sanctioned way to make a stored reading record public. Fail-closed (pk/sk, GSI attrs, and every private field — `retentionScore`, all `RECALL#`, session mood/location, recommendation `inputsSnapshot`, calibration internals — are dropped). A test populates every private field + an injected secret and proves none survive (spec §10 enforced server-side, not in the UI).
+- **Cover pipeline** (`reading-cover-pipeline` Lambda): Open Library → Google Books → **designed placeholder** (Pillow, house palette). Always downloads + caches to `generated/covers/<bookId>.jpg` (ADR-046 prefix) — never hot-links. Fail-soft (a book always gets a cover).
+- **LLM enrichment on add** (`reading_enrich.py`): Haiku tags `domainTags`/`themes`/`era`/difficulty subscores via the Bedrock chokepoint; fail-soft (a tagging failure still adds the book un-tagged).
+- **Tests:** `test_reading_keys` / `test_reading_visibility` / `test_reading_store` / `test_reading_enrich` / `test_cover_pipeline` + reading families in `test_phase_taxonomy` (all green; full suite green except 2 pre-existing pexels secret-list failures unrelated to this change). **Deploy scripts** `deploy/deploy_reading_gsis.sh` + `deploy/deploy_reading_data.sh` (cdk diff first; operator runs). See `handovers/HANDOVER_LATEST.md`.
+
 ## The SS self-sustainability tail (SS-08/09/11) — 2026-06-30
 
 The last documented backlog after the backend serial arc — counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **Shipped + deployed live + verified.** 3 items, 2 PRs: SS-09 + SS-11 → #280; SS-08 → #281 — all merged + deployed.

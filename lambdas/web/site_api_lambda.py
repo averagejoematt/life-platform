@@ -150,6 +150,13 @@ from web.site_api_observatory import (
     handle_workouts,
 )
 
+# P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
+from web.site_api_reading import (
+    handle_constellation,
+    handle_reading_overview,
+    handle_reading_shelf,
+)
+
 # P1.1 Phase B step 4 (2026-05-26): social cluster extracted to sibling module.
 from web.site_api_social import (
     _handle_board_question,
@@ -171,8 +178,6 @@ from web.site_api_social import (
     handle_predict_week_tally,
     handle_subscriber_count,
 )
-
-# P1.1 Phase B step 5 (2026-05-26): vitals cluster extracted.
 from web.site_api_vitals import (
     handle_achievements,
     handle_character,
@@ -325,6 +330,9 @@ def handle_vacation_fund() -> dict:
 
 ROUTES = {
     "/api/vitals": handle_vitals,
+    "/api/reading_shelf": handle_reading_shelf,  # Mind pillar (ADR-097) — public shelf
+    "/api/reading_overview": handle_reading_overview,  # Mind pillar — wheel + stats + cockpit line
+    "/api/constellation": handle_constellation,  # Mind pillar (Phase E) — the idea-graph signature
     "/api/journey": handle_journey,
     "/api/vacation_fund": handle_vacation_fund,
     "/api/character": handle_character,

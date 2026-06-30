@@ -66,6 +66,13 @@ class McpStack(Stack):
         os.makedirs(_stage)
         shutil.copy2("../mcp_server.py", _stage)
         shutil.copytree("../mcp", os.path.join(_stage, "mcp"), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        # ADR-097 (Phase B): the reading/Mind tools (mcp/tools_reading.py) import the
+        # reading data layer package. Stage lambdas/reading/ as a top-level package in
+        # the MCP bundle so `from reading import reading_store` resolves at runtime
+        # (numeric/retry_utils that reading depends on come from the shared layer). This
+        # keeps the package's single source of truth in lambdas/reading/ — no copy/paste
+        # into mcp/, and no shared-layer bump (so no fleet redeploy).
+        shutil.copytree("../lambdas/reading", os.path.join(_stage, "reading"), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         mcp_code = _lambda.Code.from_asset(_stage)
 
         # ADR-066 (2026-05-31): MCP gets the shared layer so manage_hevy_routine

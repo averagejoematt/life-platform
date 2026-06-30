@@ -152,6 +152,12 @@ _PK_RULES: list = [
     (lambda pk, sk: pk == "ENSEMBLE#disagreements", EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#influence_graph", SYSTEM_STATE),  # static config
     (lambda pk, sk: pk == "NARRATIVE#arc", EXPERIMENT_SCOPED),
+    # Reading / Mind pillar (ADR-097). Durable identity data — a person's library and
+    # reading history must survive an experiment reset, so it is CROSS_PHASE (never
+    # tagged, never wiped, never phase-filtered). Covers BOOK#<id> and every READING#
+    # pk: READING#<id>, READING#REC, READING#PROFILE, READING#IDEA#<id>.
+    (lambda pk, sk: pk.startswith("BOOK#"), CROSS_PHASE),
+    (lambda pk, sk: pk.startswith("READING#"), CROSS_PHASE),
     # Bare USER#matthew pk — coach conversation memory leaks live here (ADR-077 finding 1).
     (lambda pk, sk: pk == "USER#matthew" and sk.startswith("SOURCE#coach_thread"), EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "USER#matthew" and sk.startswith("SOURCE#intelligence_quality"), SYSTEM_STATE),

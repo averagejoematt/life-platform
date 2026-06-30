@@ -417,6 +417,33 @@ async function renderCircadian() {
   sec.hidden = false;
 }
 
+// Reading line (Mind pillar, ADR-097): current book + read-today tick + streak.
+// Recall prompts/retention are owner-private — never fetched on the public cockpit.
+async function renderReading() {
+  const sec = $("[data-reading]");
+  if (!sec) return;
+  let d = null;
+  try { d = await getJSON(`${API}/reading_overview`); } catch (e) { d = null; }
+  const line = d && d.cockpit_line;
+  const current = line && line.current;
+  const streak = line && line.input_streak_days != null ? line.input_streak_days : 0;
+  if (!current && !streak) { sec.hidden = true; return; }  // nothing to show yet
+  const tick = bind("reading-tick");
+  if (tick) tick.textContent = line && line.read_today ? " · read today ✓" : "";
+  const now = bind("reading-now");
+  if (now) {
+    const b = (current && current.book) || {};
+    const title = isBad(b.title) ? "" : b.title;
+    const author = isBad(b.author) ? "" : b.author;
+    now.innerHTML = title
+      ? `<span class="rl-title">${escapeHTML(title)}</span>${author ? `<span class="rl-author"> · ${escapeHTML(author)}</span>` : ""}`
+      : `<span class="rl-title">the shelf →</span>`;
+  }
+  const st = bind("reading-streak");
+  if (st) st.textContent = streak ? `${streak} day${streak === 1 ? "" : "s"} in a row` : "";
+  sec.hidden = false;
+}
+
 /* ── Journey scope: level-up timeline + achievements (gamified layer) ──────── */
 const DAILY_SEL = [".dialogue", "[data-readiness]", ".cap-today", ".domains", ".band", "[data-circadian]"];
 function showJourney(on) {
@@ -665,6 +692,7 @@ async function load(dateStr) {
     renderVerdict(pri);
     renderBoardline(pri);
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
+    renderReading();    // fire-and-forget; hides itself if no book in hand
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
 
     if (character.as_of_date) bind("asof").textContent = `as of ${character.as_of_date}`;

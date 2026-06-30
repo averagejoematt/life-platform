@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" data-door="mind">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The Mind — averagejoematt</title>
+  <meta name="description" content="Becoming a reader, measured by what he kept — not what he consumed. The shelf, the roundedness, the habit.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta property="og:title" content="The Mind — becoming a reader">
+  <meta property="og:description" content="The body pillar measures what he can do; the mind pillar measures who he's becoming.">
+  <meta property="og:type" content="website">
+
+  <!-- The type triad (Design System §3), self-hosted -->
+  <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/v4/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/cockpit.css">
+  <link rel="stylesheet" href="/assets/css/mind.css">
+
+  <!-- No-flash theme: honour saved choice before first paint. -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("ajm-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    })();
+  </script>
+  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
+</head>
+<body>
+  <a class="skip" href="#mind">Skip to the shelf</a>
+
+  <header class="cockpit-top">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">averagejoematt</span>
+      <span class="brand-door label">mind</span>
+    </a>
+    <div class="top-controls">
+      <nav class="doors" aria-label="Doors">
+        <a href="/now/" title="Today's live instrument"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+        <a href="/data/" title="Every source the platform reads"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
+        <a href="/coaching/" title="The AI team &amp; their arguments"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
+        <a href="/protocols/" title="The levers"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
+        <a href="/story/" title="The writing &amp; the why"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
+        <button class="theme-toggle" type="button" aria-label="Toggle light and dark">
+          <span class="theme-dot" aria-hidden="true"></span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="mind" class="mind" data-state="loading">
+    <header class="page-hero">
+      <p class="ph-kicker label"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-reading"></use></svg> the mind</p>
+      <h1 class="ph-title">Becoming a reader</h1>
+      <p class="ph-promise">Measured by what he <em>kept</em>, not what he consumed. The body pillar measures what he can do; this one measures who he's becoming.</p>
+    </header>
+
+    <!-- The shelf — currently reading, finished, queued, set down. -->
+    <section class="shelf-wrap" aria-label="The shelf">
+      <div class="shelf-block" data-block="reading">
+        <p class="cap label">reading now</p>
+        <div class="shelf" data-rows="reading"></div>
+        <p class="shelf-empty" data-empty="reading" hidden>Nothing open right now — the next book is the whole point.</p>
+      </div>
+
+      <div class="shelf-block" data-block="finished">
+        <p class="cap label">finished <span class="shelf-count num" data-bind="count-finished"></span></p>
+        <div class="shelf" data-rows="finished"></div>
+        <p class="shelf-empty" data-empty="finished" hidden>The shelf is empty — the first finished book is the one that makes him a reader.</p>
+      </div>
+
+      <div class="shelf-block" data-block="queue">
+        <p class="cap label">up next</p>
+        <div class="shelf" data-rows="queue"></div>
+        <p class="shelf-empty" data-empty="queue" hidden>No queue yet. Lena builds a curriculum, not a pile.</p>
+      </div>
+
+      <!-- Abandoning is first-class and dignified — a "set down" shelf, never a failure bin. -->
+      <div class="shelf-block shelf-setdown" data-block="set_down" hidden>
+        <p class="cap label">set down <span class="shelf-note label">— honestly, both finishing and setting down are fine</span></p>
+        <div class="shelf" data-rows="set_down"></div>
+      </div>
+    </section>
+
+    <!-- The roundedness wheel — domain breadth. Honest until there's enough to mean anything. -->
+    <section class="round-wrap" aria-label="Roundedness">
+      <p class="cap label">roundedness — the texture of what he reads</p>
+      <div class="wheel" data-bind="wheel"></div>
+      <p class="round-empty" data-empty="wheel" hidden>The wheel fills as the shelf grows — breadth is earned, not declared.</p>
+    </section>
+
+    <!-- The habit — input streak (reading is pleasure + becoming, never a streak to grind). -->
+    <section class="habit-wrap" aria-label="The reading habit">
+      <p class="cap label">the habit</p>
+      <ul class="habit-rows" data-bind="habit"></ul>
+    </section>
+
+    <!-- The Constellation (the signature). Earned, not launched — it begins as a single
+         lit point and fills as ideas are kept; never a sparse sad graph. -->
+    <section class="const-wrap" aria-label="The constellation of ideas">
+      <p class="cap label">the constellation — ideas kept, and how they connect</p>
+      <figure class="constellation-fig" data-bind="constellation">
+        <div class="const-seed">
+          <span class="const-point" aria-hidden="true"></span>
+          <p class="const-empty">the constellation begins with the first idea you keep</p>
+        </div>
+      </figure>
+    </section>
+
+    <p class="mind-foot label">
+      <a href="/">home →</a>
+      <a href="/data/mind/">mood &amp; journal →</a>
+      <a href="/story/">the story →</a>
+      <span class="asof" data-bind="asof"></span>
+    </p>
+    <p class="mind-error" data-bind="error" hidden></p>
+  </main>
+
+  <footer class="site-foot">
+    <p class="sf-base label"><span>averagejoematt · the mind</span><a href="/">← home</a></p>
+  </footer>
+
+  <script src="/assets/js/motion.js" defer></script>
+  <script type="module" src="/assets/js/mind.js"></script>
+</body>
+</html>

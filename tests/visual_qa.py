@@ -205,6 +205,22 @@ PAGES.extend(
     ]
 )
 
+# The Mind pillar (reading, ADR-097) — /mind/ over /api/reading_shelf + /api/reading_overview.
+# Checks stay lenient: day-one the shelf is intentionally an honest empty state (an
+# invitation, not a failure), so we assert the page CHROME renders, not that books exist.
+PAGES.append(
+    {
+        "path": "/mind/",
+        "name": "Mind (reading shelf)",
+        "wait_for": ".page-hero",
+        "checks": [
+            {"selector": ".ph-title", "not_empty": True, "desc": "Mind hero title rendered"},
+            {"selector": ".shelf-block", "min_count": 1, "desc": "shelf blocks present"},
+            {"selector": ".round-wrap", "min_count": 1, "desc": "roundedness section present"},
+        ],
+    }
+)
+
 # Text that should never be visible (stuck/placeholder states).
 _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
 

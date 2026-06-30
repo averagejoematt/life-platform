@@ -36,6 +36,7 @@ Visible at `averagejoematt.com` to anyone:
 - State of mind / mood entries
 - Activity GPS traces, workout details
 - Sick day records, supplement logs
+- Reading retention/recall (ADR-097): `retentionScore`, all `RECALL#` spaced-retrieval prompts + performance, the cognitive-reserve/longevity framing, reading×biometric correlations, session `moodSnapshot`/`location`, and reading-calibration internals. **Private by default, owner's toggle, owner's eyes** — a bad retention week is never reachable from a public surface (spec §10, enforced server-side in `reading_visibility.project_public`). NB: the *public* reading projection (current/finished shelf, public takeaways, input streak) is Tier 1.
 
 ### Tier 3 — Never exposed (system internal)
 - OAuth refresh tokens, API keys, secrets
@@ -51,7 +52,8 @@ Per typical health-data definitions, the following fields are **PII** regardless
 - Email addresses (subscribers, recipients)
 - Any biometric data tied to identity
 - Journal entries (contain personal narrative)
-- Location data (Strava GPS traces, weather queries by city)
+- Reading notes/reflections (contain personal narrative) + spaced-retrieval responses
+- Location data (Strava GPS traces, weather queries by city, reading-session location)
 - Body composition images / DEXA scans
 
 **No PII is in Tier 0.** Public site exposes aggregates only; never raw values tied to identity at granular timestamp resolution.
@@ -72,6 +74,7 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | CGM readings | `USER#matthew#SOURCE#apple_health` | **Forever** | Pattern detection across years |
 | Habit scores | `USER#matthew#SOURCE#habit_scores` | **Forever** | Streak + correlation analysis |
 | Coach threads | `COACH#{coach_id}` | **Forever** | Coaching memory |
+| Reading library (ADR-097) | `BOOK#{bookId}`, `READING#{bookId\|REC\|PROFILE\|IDEA#…}` | **Forever** | Durable identity data (CROSS_PHASE); private fields gated server-side |
 | Sick days | `USER#matthew#SOURCE#sick_days` | **Forever** | Analysis context |
 | Rate limit counters | `RATE#{endpoint}#{ip_hash}` | **2 hours (DDB TTL)** | Auto-expire via `ttl` attribute (P1.7) |
 | Auth failure markers | `USER#matthew#SOURCE#{src}` `sk=AUTH_FAILURE` | **24 hours (DDB TTL)** | Circuit breaker; auto-expire (P3.6) |

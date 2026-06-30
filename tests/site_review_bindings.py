@@ -300,6 +300,19 @@ PAGE_BINDINGS.append(
         "endpoints": [],
     }
 )
+PAGE_BINDINGS.append(
+    {
+        "path": "/mind/",
+        "name": "Mind · the reading shelf (ADR-097)",
+        "door": "mind",
+        "narrative_order": 82,
+        "story_intent": "becoming a reader, measured by what he kept — the shelf, the roundedness, the habit",
+        "endpoints": [
+            {"url": "/api/reading_shelf", "role": "primary", "metrics": []},
+            {"url": "/api/reading_overview", "role": "primary", "metrics": []},
+        ],
+    }
+)
 
 _build_evidence_bindings()
 

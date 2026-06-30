@@ -51,7 +51,6 @@ var R = {
 "/ledger/": "/data/ledger/",
 "/live/": "/data/vitals/",
 "/methodology/": "/method/methodology/",
-"/mind/": "/data/mind/",
 "/mission/": "/story/about/",
 "/nutrition/": "/data/nutrition/",
 "/observatory/": "/now/",
