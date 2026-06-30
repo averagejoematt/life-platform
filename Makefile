@@ -28,7 +28,7 @@ format:  ## Apply ruff (lint+import-sort) then black. Config in pyproject.toml.
 	$(PYTHON) -m ruff check --fix lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 	$(PYTHON) -m black lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
-format-check:  ## Verify formatting (no changes) — will gate CI once the baseline lands
+format-check:  ## Verify formatting (no changes) — this is the enforced CI gate (black --check + ruff check)
 	$(PYTHON) -m ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 	$(PYTHON) -m black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 

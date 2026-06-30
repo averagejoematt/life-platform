@@ -1,14 +1,12 @@
 # Formatting & linting config — A-grade "enforced style" tooling.
 #
 # Tools: ruff (lint + import-sort) + black (format). Line length 140 to match
-# .flake8. ruff supersedes flake8 incrementally; flake8's E9/F-class stays the
-# hard CI floor until the baseline lands.
-#
-# SEQUENCING: the repo-wide *baseline reformat* is intentionally deferred until
-# the in-flight PRs merge — reformatting ~130 files now would conflict with
-# every file those PRs touch. Until then this config is staged + advisory:
-#   make format        # apply (the one-time baseline)
-#   make format-check  # verify (wired to CI as a gate with the baseline PR)
+# .flake8. flake8's E9/F-class is the hard CI floor; ruff + black are also
+# ENFORCED — CI's "Lint + Syntax Check" job runs `black --check` and `ruff check`
+# and FAILS the build on any violation (black pinned 25.9.0, ruff 0.14.0). Run
+# `make format` before committing; flake8 alone is not enough.
+#   make format        # apply ruff --fix + black
+#   make format-check  # verify (this is the CI gate)
 
 [tool.black]
 line-length = 140

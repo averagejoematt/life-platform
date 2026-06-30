@@ -17,12 +17,14 @@ Tiers (projected month-end total, $75 all-in ceiling):
   2 Restrict $65-73   → + pause public website AI (/api/ask, /api/board_ask)
   3 Hard stop ≥ $73   → + pause ALL Bedrock; daily brief goes data-only
 
-Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
-Auto-resets to 0 at month rollover (estimate is month-to-date).
+Runs 3x/day (every 8h). Sets SSM /life-platform/budget-tier (default 0). Alerts on
+change. Auto-resets to 0 at month rollover (estimate is month-to-date). The 8h
+cadence means up to ~8h of detection lag; the actual-month-to-date cap in
+bedrock_client.invoke() is the same-invocation backstop.
 
 IAM: ce:GetCostAndUsage, cloudwatch:GetMetricData, cloudwatch:PutMetricData,
      ssm:GetParameter, ssm:PutParameter, sns:Publish.
-Schedule: hourly (EventBridge).
+Schedule: every 8h (EventBridge; see operational_stack.py).
 """
 
 import calendar

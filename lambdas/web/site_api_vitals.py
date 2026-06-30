@@ -78,10 +78,14 @@ def handle_vitals(date: str | None = None) -> dict:
     latest = sorted([w for w in whoop_7d if w.get("recovery_score") is not None], key=lambda x: x.get("sk", ""), reverse=True)
     latest = latest[0] if latest else {}
 
-    # 30d averages + trends
-    hrv_vals = sorted([float(w["hrv"]) for w in whoop_30d if w.get("hrv")], key=lambda _: 0)
-    rhr_vals = sorted([float(w["resting_heart_rate"]) for w in whoop_30d if w.get("resting_heart_rate")], key=lambda _: 0)
-    [float(w["recovery_score"]) for w in whoop_30d if w.get("recovery_score")]
+    # 30d averages + trends. Order by date (oldest→newest) explicitly so the
+    # half-vs-half trend is chronological by construction, not dependent on query
+    # return order (the prior constant-key sort was a no-op that only worked because
+    # the query happened to return ascending sk). See AUDIT BUG-04. rhr_trend below
+    # passes reversed values — that's the deliberate "lower is better" inversion.
+    whoop_30d_sorted = sorted(whoop_30d, key=lambda w: w.get("sk", ""))
+    hrv_vals = [float(w["hrv"]) for w in whoop_30d_sorted if w.get("hrv")]
+    rhr_vals = [float(w["resting_heart_rate"]) for w in whoop_30d_sorted if w.get("resting_heart_rate")]
 
     def trend(vals):
         if len(vals) < 6:
