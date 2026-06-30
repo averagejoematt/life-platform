@@ -37,6 +37,7 @@ from zoneinfo import ZoneInfo
 _PT = ZoneInfo("America/Los_Angeles")
 
 import boto3
+from pacific_time import pacific_today
 
 try:
     from platform_logger import get_logger
@@ -489,7 +490,9 @@ def _lambda_handler_impl(event, context):
     t0 = time.time()
     logger.info("Circadian Compliance Score v1.0.0 starting...")
 
-    today_str = event.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Pacific day, not UTC: this lambda runs on a 7 PM PT cron (02:00 UTC), where a
+    # UTC "today" is tomorrow in PT — an empty future day. See AUDIT BUG-01.
+    today_str = event.get("date") or pacific_today()
 
     result = compute_circadian_score(today_str)
     store_circadian_score(result)
