@@ -138,9 +138,10 @@
           </div>
         </section>
 
-        <!-- Consistency: a cross-cutting discipline band, not a sixth peer tile -->
-        <div class="band" data-pillar="consistency" tabindex="0" role="button"
-             aria-label="Consistency — open detail">
+        <!-- Consistency: a cross-cutting discipline band, not a sixth peer tile.
+             Display-only (no detail drill-in) — no role/tabindex, so assistive tech
+             doesn't announce a button that goes nowhere. See AUDIT FE-01. -->
+        <div class="band" data-pillar="consistency">
           <span class="label">Consistency</span>
           <span class="meter"><i data-bind="consistency-fill" style="width:0%"></i></span>
           <span class="band-val num" data-bind="consistency-val">··</span>
