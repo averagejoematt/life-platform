@@ -123,3 +123,33 @@ def test_dry_run_default_is_preview():
     out = tr.tool_manage_reading({"action": "add_note", "bookId": bid, "text": "a thought"})
     assert out["status"] == "preview"  # default dry_run, nothing written
     assert rs.notes(bid) == []
+
+
+# ── Phase D: the loop (debrief starts the probe clock; answer_recall scores) ──
+def test_debrief_starts_the_retention_clock():
+    bid = _add("Finished", status="finished")
+    out = tr.tool_manage_reading({"action": "debrief", "bookId": bid, "takeaway": "The one idea that stuck.", "dry_run": False})
+    assert out["status"] == "committed" and out["first_probe_due"]
+    # a synthesis note (the public takeaway) AND a recall probe were created
+    assert any(n["type"] == "synthesis" for n in rs.notes(bid))
+    due = rs.due_recalls(now="2099-01-01")  # far future → the new probe is "due"
+    assert any(r["bookId"] == bid for r in due)
+
+
+def test_answer_recall_scores_and_advances(monkeypatch):
+    bid = _add("Finished", status="finished")
+    rs.put_recall(bid, prompt_id="p1", prompt="what stuck?", interval_index=1, next_due="2026-06-01T00:00:00")
+    # stub the gist scorer so the test stays offline
+    monkeypatch.setattr(tr.reading_recall, "score_gist", lambda p, a, caller=None: {"gist": 0.85, "note": "solid", "scored": True})
+    out = tr.tool_manage_reading(
+        {"action": "answer_recall", "bookId": bid, "prompt_id": "p1", "answer": "I can reconstruct the core argument.", "dry_run": False}
+    )
+    assert out["status"] == "committed" and out["interval_index"] == 2  # advanced on strong gist
+    assert out["probes"] == 1 and out["retention_score"] is None  # 1 probe → n-gated
+
+
+def test_answer_recall_requires_answer():
+    bid = _add("Finished", status="finished")
+    rs.put_recall(bid, prompt_id="p1", prompt="q", next_due="2026-06-01T00:00:00")
+    out = tr.tool_manage_reading({"action": "answer_recall", "bookId": bid, "prompt_id": "p1", "dry_run": False})
+    assert out.get("error_code") == "MISSING_ARG"

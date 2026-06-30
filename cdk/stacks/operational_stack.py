@@ -808,6 +808,28 @@ class OperationalStack(Stack):
             digest=True,
         )
 
+        # ── 12c. Reading Recall Sweep (ADR-097, Mind pillar Phase D) — daily 16:00 UTC
+        # (8 AM PT). Queries the sparse GSI1 for due spaced-retrieval prompts, writes
+        # the owner-PRIVATE nudge snapshot, emits LifePlatform/Reading::RecallsDue.
+        # Fixed-UTC schedule (DST-safe). No AI (gist scoring runs in the MCP answer path).
+        create_platform_lambda(
+            self,
+            "ReadingRecallSweep",
+            function_name="reading-recall-sweep",
+            source_file="lambdas/reading/reading_recall_sweep_lambda.py",
+            handler="reading.reading_recall_sweep_lambda.lambda_handler",
+            schedule="cron(0 16 * * ? *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            custom_policies=rp.operational_reading_recall_sweep(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+        )
+
         # ── 13. Pipeline Health Check — daily at 13:00 UTC (6 AM PT)
         # SNS_ARN env added 2026-05-25: Lambda hardcodes life-platform-alerts as
         # fallback (the immediate-email topic). Set explicitly to digest so

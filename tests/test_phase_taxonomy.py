@@ -123,6 +123,7 @@ LIVE_FAMILIES = [
     ("READING#PROFILE", "CURRENT"),
     ("READING#IDEA#idea1", "META"),
     ("READING#IDEA#idea1", "EDGE#idea2"),
+    ("READING#NUDGE", "RECALL_QUEUE#current"),  # Phase D recall sweep snapshot
 ]
 
 

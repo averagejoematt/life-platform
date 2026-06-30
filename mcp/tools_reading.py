@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from reading import reading_enrich, reading_keys as rk, reading_onboarding, reading_recommender, reading_store
+from reading import reading_enrich, reading_keys as rk, reading_onboarding, reading_recall, reading_recommender, reading_store
 
 from mcp.config import logger, table
 from mcp.utils import mcp_error
@@ -264,34 +264,76 @@ def _action_add_note(args, dry_run):
 
 
 def _action_answer_recall(args, dry_run):
+    """Answer a due probe (Phase D): score the gist, advance the interval, recompute
+    the n-gated PRIVATE retentionScore. The two-clock model — this is the retention
+    clock, not the immediate debrief."""
     bid, prompt_id = args.get("bookId"), args.get("prompt_id")
-    if not bid or not prompt_id:
-        return mcp_error("answer_recall requires bookId + prompt_id", error_code="MISSING_ARG")
+    answer = args.get("answer")
+    if not bid or not prompt_id or not answer:
+        return mcp_error("answer_recall requires bookId + prompt_id + answer", error_code="MISSING_ARG")
     if dry_run:
-        return _preview("answer_recall", {"bookId": bid, "prompt_id": prompt_id, "next_due": args.get("next_due")})
-    # advance the prompt: record the answer, set the next interval (or retire → drops from GSI1)
-    item = reading_store.put_recall(
+        return _preview("answer_recall", {"bookId": bid, "prompt_id": prompt_id, "answer": answer})
+    recall = reading_store._get(rk.recall_key(bid, prompt_id))  # noqa: SLF001 — intra-domain read
+    if not recall:
+        return mcp_error(f"no recall prompt '{prompt_id}' for book", error_code="NO_DATA")
+    result = reading_recall.record_answer(recall, answer)
+    reading_store.put_recall(
         bid,
         prompt_id=prompt_id,
-        prompt=args.get("prompt", ""),
-        interval_index=int(args.get("interval_index", 1)),
-        next_due=args.get("next_due"),
-        performance_history=args.get("performance_history"),
+        prompt=recall.get("prompt", ""),
+        interval_index=result["intervalIndex"],
+        next_due=result["nextDue"],
+        performance_history=result["performanceHistory"],
     )
-    return {"status": "committed", "action": "answer_recall", "recall": item}
+    # retentionScore + lastProbeAt are PRIVATE — live on the READING#/STATE row.
+    state = reading_store.get_reading_state(bid) or {"status": "finished"}
+    reading_store.put_reading_state(
+        bid,
+        state.get("status", "finished"),
+        fields={
+            "retentionScore": result["retentionScore"],
+            "lastProbeAt": result["lastProbeAt"],
+            **{k: v for k, v in state.items() if k not in ("status", "statusChangedAt", "bookId")},
+        },
+    )
+    return {
+        "status": "committed",
+        "action": "answer_recall",
+        "next_due": result["nextDue"],
+        "interval_index": result["intervalIndex"],
+        "retention_score": result["retentionScore"],  # None until the n-gate passes
+        "probes": len(result["performanceHistory"]),
+    }
 
 
 def _action_debrief(args, dry_run):
-    """Record the post-book debrief note(s). (The Third Wall render is Phase D; this
-    persists the takeaway as a note.)"""
+    """The post-book debrief (Phase D): the immediate reaction → the public takeaway,
+    AND it STARTS the retention clock (creates the first spaced probe). The two clocks
+    are never merged — this is reaction; the probe weeks later is retention."""
     bid, takeaway = args.get("bookId"), args.get("takeaway")
     if not bid or not takeaway:
         return mcp_error("debrief requires bookId + takeaway", error_code="MISSING_ARG")
-    note_id = "debrief-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    note_id = "debrief-" + now
+    probe_id = "probe-" + now
+    book = reading_store.get_book(bid) or {}
+    prompt = f"A few weeks back you read {book.get('title', 'this book')} — what's stayed with you? Reconstruct the heart of it."
     if dry_run:
-        return _preview("debrief", {"bookId": bid, "noteId": note_id, "public": bool(args.get("public", True))})
+        return _preview(
+            "debrief",
+            {"bookId": bid, "noteId": note_id, "first_probe": probe_id, "probe_prompt": prompt, "public": bool(args.get("public", True))},
+        )
     item = reading_store.add_note(bid, note_id=note_id, type="synthesis", text=takeaway, public=bool(args.get("public", True)))
-    return {"status": "committed", "action": "debrief", "note": item, "note2": "Prediction reconciliation lands in Phase D."}
+    # start the retention clock — the first probe, due in INTERVALS[0] days (sparse GSI1)
+    fp = reading_recall.first_probe()
+    reading_store.put_recall(bid, prompt_id=probe_id, prompt=prompt, interval_index=0, next_due=fp["nextDue"])
+    return {
+        "status": "committed",
+        "action": "debrief",
+        "note": item,
+        "first_probe_due": fp["nextDue"],
+        "note2": "Retention clock started — the first memory check is weeks out, kept separate from this reaction.",
+    }
 
 
 def _action_log_outcome(args, dry_run):

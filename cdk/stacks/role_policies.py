@@ -1471,6 +1471,29 @@ def operational_reading_cover_pipeline() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_reading_recall_sweep() -> list[iam.PolicyStatement]:
+    """Reading recall sweep (ADR-097, Phase D): queries the sparse GSI1 for due
+    recall prompts, writes the owner-private nudge snapshot, emits a CloudWatch
+    count. No Bedrock (gist scoring runs in the MCP answer path)."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+    ]
+
+
 def operational_key_rotator() -> list[iam.PolicyStatement]:
     """Key rotator: rotates MCP API key in Secrets Manager."""
     return [

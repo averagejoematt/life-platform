@@ -3644,7 +3644,11 @@ TOOLS = {
                     "public": {"type": "boolean", "description": "[add_note/debrief] Whether the note may be shown publicly."},
                     "takeaway": {"type": "string", "description": "[debrief] The one public takeaway."},
                     "prompt_id": {"type": "string", "description": "[answer_recall] Recall prompt id."},
-                    "next_due": {"type": "string", "description": "[answer_recall] Next-due ISO (omit to retire the prompt)."},
+                    "answer": {
+                        "type": "string",
+                        "description": "[answer_recall] The reader's recall answer (gist-scored; advances the interval).",
+                    },
+                    "next_due": {"type": "string", "description": "[answer_recall] (reserved) explicit next-due ISO override."},
                     "ts": {"type": "string", "description": "[log_outcome] Recommendation timestamp id."},
                     "resolved_outcome": {"type": "string", "description": "[log_outcome] right|surprised|unexpected|miss."},
                     "answers": {

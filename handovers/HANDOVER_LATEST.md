@@ -1,3 +1,19 @@
+# HANDOVER — The Mind Pillar (Reading): Phases A + B + C + D — 2026-06-29
+
+> **Phase D (the loop) — BUILT + tested; deploy = `cdk deploy LifePlatformOperational`.** The two-clock
+> retention model: `reading_recall.py` (expanding intervals, autoregulated; fail-soft LLM gist scorer;
+> n-gated PRIVATE retentionScore — none until ≥3 probes). MCP `debrief` writes the public takeaway AND
+> starts the first spaced probe (the clocks never merge); `answer_recall` scores gist → advances interval
+> → updates private retentionScore on READING#/STATE (never public). New `reading-recall-sweep` lambda
+> (daily 16:00 UTC, DST-safe) queries the sparse GSI1, writes an owner-private `READING#NUDGE` snapshot,
+> emits `LifePlatform/Reading::RecallsDue`. Tests: `test_reading_recall` (7) + `_sweep` (2) + 3 MCP-flow.
+> ⚠️ The MCP wiring (debrief/answer_recall) ships on the **next MCP deploy** (`cdk deploy LifePlatformMcp`)
+> — Phase D's `cdk deploy LifePlatformOperational` only adds the sweep lambda. **Only Phase E remains**
+> (the gated signature: Constellation + journal-resonance + mind-body bridge — build dormant/honest-empty
+> per Mara's rule). The Third-Wall debrief *render* (Lena hoped ↔ how it hit) is a frontend follow-up.
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): Phases A + B + C — 2026-06-29
 
 > **Phase C (the /mind/ page + cockpit thread) — BUILT + tested; deploy pending (IAM + site sync).**

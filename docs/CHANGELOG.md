@@ -1,3 +1,12 @@
+## The Mind Pillar (Reading) — Phase D the loop (recall + debrief + retention) — 2026-06-29
+
+Phase D: the two-clock loop. **Built + tested.** The debrief (immediate reaction → public takeaway) and the probes (spaced retention) are kept architecturally separate.
+
+- **Spaced-retrieval core** (`lambdas/reading/reading_recall.py`, spec §7): expanding intervals `[3,7,16,35,90,180]` days, autoregulated (a strong gist ratchets the interval up, a weak one down — never to zero); a fail-soft LLM **gist scorer** (rewards reconstruct-the-argument / changed-prior, never verbatim); and the **n-gated PRIVATE `retentionScore`** (recency-weighted, no score until ≥3 scored probes — Henning's refuse-to-render).
+- **The debrief starts the retention clock** (MCP `manage_reading debrief`): writes the public takeaway AND creates the first spaced probe (due in 3 days) — the two clocks never merged. `answer_recall` now scores the gist, advances the interval, and updates the private retentionScore on the READING#/STATE row (never public).
+- **EventBridge sweep** (`reading-recall-sweep`, daily 16:00 UTC, DST-safe): queries the sparse GSI1 for due probes, writes an **owner-private** nudge snapshot (`READING#NUDGE`, never served publicly), emits `LifePlatform/Reading::RecallsDue`.
+- **Tests:** `test_reading_recall` (7) + `test_reading_recall_sweep` (2) + 3 MCP-flow tests. Full suite green except the 2 pre-existing pexels failures. Deploy: `cdk deploy LifePlatformOperational` (the sweep lambda + rule + IAM).
+
 ## The Mind Pillar (Reading) — Phase C the /mind/ page + cockpit thread — 2026-06-29
 
 Phase C: the public reading surface. **Built + tested.** A new `/mind/` page, public site-api endpoints (the first live surface for the `reading_visibility` chokepoint), a reading icon, and a cockpit reading line.
