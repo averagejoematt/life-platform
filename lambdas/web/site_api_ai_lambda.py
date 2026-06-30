@@ -261,7 +261,7 @@ def _load_content_filter():
         # to the minimal set for its lifetime.
         return {
             "blocked_vices": ["No porn", "No marijuana"],
-            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"],
         }
 
 
