@@ -791,6 +791,22 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # Book cover art (ADR-097, Mind pillar) — reading-cover-pipeline writes to
+                    # generated/covers/<bookId>.jpg; the /mind/ front-end strips the `generated/`
+                    # prefix and requests /covers/<bookId>.jpg. Without this behaviour the request
+                    # falls through to the site origin → 404 (the broken-image bug). 30-day TTL:
+                    # a cover is immutable once cached for a book.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/covers/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=2592000,
+                        max_ttl=2592000,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     # /api/* — site-api Lambda (all methods, query strings forwarded).
                     # POST endpoints (nudge, vote, follow, submit_finding) need POST.
                     # GET endpoints (experiment_detail) need query_string=True.

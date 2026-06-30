@@ -132,6 +132,16 @@ from mcp.tools_protocols import (
     tool_retire_protocol,
     tool_update_protocol,
 )
+from mcp.tools_reading import (
+    tool_get_constellation,
+    tool_get_due_recalls,
+    tool_get_reading_history,
+    tool_get_reading_profile,
+    tool_get_reading_recommendation,
+    tool_get_reading_shelf,
+    tool_get_reading_track_record,
+    tool_manage_reading,
+)
 from mcp.tools_sick_days import tool_manage_sick_days
 from mcp.tools_sleep import tool_get_sleep_analysis, tool_get_sleep_environment_analysis
 from mcp.tools_social import (
@@ -3499,6 +3509,153 @@ TOOLS = {
                     "volume_7d": {"type": "object", "description": "Optional map of muscle->sets completed in last 7d."},
                     "z2_minutes_7d": {"type": "number"},
                     "days_since_last_workout": {"type": "integer"},
+                },
+                "required": ["action"],
+            },
+        },
+    },
+    "get_reading_shelf": {
+        "fn": tool_get_reading_shelf,
+        "schema": {
+            "name": "get_reading_shelf",
+            "description": (
+                "The reading shelf (Mind pillar): currently-reading, the queue, finished books, and the "
+                "'set down' (abandoned) shelf. Use for: 'what am I reading', 'my bookshelf', 'reading list'."
+            ),
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    "get_reading_recommendation": {
+        "fn": tool_get_reading_recommendation,
+        "schema": {
+            "name": "get_reading_recommendation",
+            "description": (
+                "A curated next-read pick from the queue, each with a DECOMPOSED reason string + confidence "
+                "label. Below the data n-gate it is propose-and-dispose (one pick, stated as a hypothesis). "
+                "Use for: 'what should I read next', 'recommend a book'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "description": "Max picks to surface (default 3; capped to 1 at low n)."}},
+                "required": [],
+            },
+        },
+    },
+    "get_reading_profile": {
+        "fn": tool_get_reading_profile,
+        "schema": {
+            "name": "get_reading_profile",
+            "description": "The reading calibration profile: taste hypothesis, curriculum phase, difficulty ratchet, roundedness wheel, trust mode.",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    "get_reading_history": {
+        "fn": tool_get_reading_history,
+        "schema": {
+            "name": "get_reading_history",
+            "description": "Reading-session history over a date range + the current input streak (consecutive days read). Defaults to the trailing 90 days.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "start_date": {"type": "string", "description": "Start YYYY-MM-DD (default 90 days ago)."},
+                    "end_date": {"type": "string", "description": "End YYYY-MM-DD (default today)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "get_due_recalls": {
+        "fn": tool_get_due_recalls,
+        "schema": {
+            "name": "get_due_recalls",
+            "description": "Spaced-retrieval recall prompts that are due now (private). The sparse-index sweep that powers the cockpit's recall nudge.",
+            "inputSchema": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    "get_reading_track_record": {
+        "fn": tool_get_reading_track_record,
+        "schema": {
+            "name": "get_reading_track_record",
+            "description": "Lena's reading-recommendation track record + auditable hit rate (low-confidence until enough recommendations resolve).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "description": "Max records (default 50)."}},
+                "required": [],
+            },
+        },
+    },
+    "get_constellation": {
+        "fn": tool_get_constellation,
+        "schema": {
+            "name": "get_constellation",
+            "description": (
+                "The Constellation idea-graph (Mind pillar signature). Honest empty state below the node threshold; "
+                "pass idea_id to fetch one node + its edges. Whole-graph enumeration ships in Phase E."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"idea_id": {"type": "string", "description": "Optional — fetch a single idea node + its edges."}},
+                "required": [],
+            },
+        },
+    },
+    "manage_reading": {
+        "fn": tool_manage_reading,
+        "schema": {
+            "name": "manage_reading",
+            "description": (
+                "Write fat-tool for the reading library (draft -> dry_run -> commit). Every mutating action PREVIEWS by "
+                "default (dry_run=true) and writes only on an explicit dry_run=false. Actions: add_book, update_status "
+                "(abandon requires abandon_reason), log_session, add_note, answer_recall, debrief, log_outcome, "
+                "update_profile, onboard (taste-archaeology interview)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "add_book",
+                            "update_status",
+                            "log_session",
+                            "add_note",
+                            "answer_recall",
+                            "debrief",
+                            "log_outcome",
+                            "update_profile",
+                            "onboard",
+                            "map_ideas",
+                        ],
+                        "description": "Which write to perform.",
+                    },
+                    "dry_run": {"type": "boolean", "description": "Preview without writing (default true). Set false to commit."},
+                    "bookId": {"type": "string", "description": "Target book id (most actions)."},
+                    "title": {"type": "string", "description": "[add_book] Book title."},
+                    "author": {"type": "string", "description": "[add_book] Author."},
+                    "isbn13": {"type": "string", "description": "[add_book] ISBN-13 (improves cover + id)."},
+                    "olid": {"type": "string", "description": "[add_book] Open Library id."},
+                    "pageCount": {"type": "integer", "description": "[add_book] Page count."},
+                    "status": {"type": "string", "description": "[add_book/update_status] want|reading|finished|abandoned."},
+                    "abandon_reason": {"type": "string", "description": "[update_status=abandoned] wrong-time|wrong-book|stalled|other."},
+                    "minutes": {"type": "number", "description": "[log_session] Minutes read."},
+                    "pages": {"type": "integer", "description": "[log_session] Pages read."},
+                    "date": {"type": "string", "description": "[log_session] Date YYYY-MM-DD."},
+                    "type": {"type": "string", "description": "[add_note] highlight|reflection|synthesis."},
+                    "text": {"type": "string", "description": "[add_note] Note text."},
+                    "public": {"type": "boolean", "description": "[add_note/debrief] Whether the note may be shown publicly."},
+                    "takeaway": {"type": "string", "description": "[debrief] The one public takeaway."},
+                    "prompt_id": {"type": "string", "description": "[answer_recall] Recall prompt id."},
+                    "answer": {
+                        "type": "string",
+                        "description": "[answer_recall] The reader's recall answer (gist-scored; advances the interval).",
+                    },
+                    "next_due": {"type": "string", "description": "[answer_recall] (reserved) explicit next-due ISO override."},
+                    "ts": {"type": "string", "description": "[log_outcome] Recommendation timestamp id."},
+                    "resolved_outcome": {"type": "string", "description": "[log_outcome] right|surprised|unexpected|miss."},
+                    "answers": {
+                        "type": "object",
+                        "description": "[onboard] {question: answer} from the taste interview (omit to get the questions).",
+                    },
                 },
                 "required": ["action"],
             },

@@ -1447,6 +1447,53 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_reading_cover_pipeline() -> list[iam.PolicyStatement]:
+    """Reading cover pipeline (ADR-097): reads/updates BOOK# items + writes the
+    cached cover JPEG under generated/covers/. No Bedrock (enrichment runs in the
+    MCP add_book path, Phase B). The /index/* resource is included for forward
+    compatibility with the new reading GSIs (ADR-097)."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3WriteCovers",
+            actions=["s3:PutObject"],
+            resources=_s3("generated/covers/*"),
+        ),
+    ]
+
+
+def operational_reading_recall_sweep() -> list[iam.PolicyStatement]:
+    """Reading recall sweep (ADR-097, Phase D): queries the sparse GSI1 for due
+    recall prompts, writes the owner-private nudge snapshot, emits a CloudWatch
+    count. No Bedrock (gist scoring runs in the MCP answer path)."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+    ]
+
+
 def operational_key_rotator() -> list[iam.PolicyStatement]:
     """Key rotator: rotates MCP API key in Secrets Manager."""
     return [
@@ -1667,7 +1714,9 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="DynamoDBRead",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
-            resources=[TABLE_ARN],
+            # ADR-097: /index/* added for the reading GSIs (GSI1/GSI2) — the public
+            # /api/reading_shelf + /api/reading_overview endpoints query GSI2.
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
         ),
         iam.PolicyStatement(
             sid="DynamoDBWrite",
@@ -1825,6 +1874,8 @@ def compute_circadian_compliance() -> list[iam.PolicyStatement]:
 # MCP STACK — 1 Lambda
 # ═════════════════════════════════════════════════════════════════════════
 
+_COVER_PIPELINE_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:function:reading-cover-pipeline"
+
 
 def mcp_server() -> list[iam.PolicyStatement]:
     """MCP server: DDB read/write (cache), S3 read (config + CGM only), secrets, no full-bucket access.
@@ -1911,6 +1962,19 @@ def mcp_server() -> list[iam.PolicyStatement]:
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
         ),
+        iam.PolicyStatement(
+            # ADR-097: manage_reading add_book fire-and-forget invokes the reading
+            # cover pipeline so a new book gets a cover. Scoped to that one function.
+            sid="ReadingCoverInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[_COVER_PIPELINE_ARN],
+        ),
+        # ADR-097: the reading LLM features run IN the MCP lambda — book enrichment,
+        # the onboarding taste synthesis, recall gist scoring, and Constellation idea
+        # extraction all go through bedrock_client (budget-guarded). Without this they
+        # fail-soft to empty (un-tagged books, no taste hypothesis). Same scoped grant
+        # every AI-calling role gets (ADR-062).
+        _bedrock_statement(),
     ]
 
 

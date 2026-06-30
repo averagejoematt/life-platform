@@ -11,6 +11,7 @@ const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replac
 // Known icon ids — a typo'd name renders nothing rather than a broken ref.
 const KNOWN = new Set([
   "sleep", "training", "nutrition", "vitals", "glucose", "mind", "habits", "people",
+  "reading",
   "door-cockpit", "door-data", "door-coaching", "door-protocols", "door-story",
 ]);
 
@@ -47,7 +48,7 @@ export const DOMAIN_ICON = {
   // glucose / metabolic
   glucose: "glucose", metabolic: "glucose", cgm: "glucose",
   // mind
-  mind: "mind", mood: "mind",
+  mind: "mind", mood: "mind", reading: "reading", books: "reading",
   // habits / consistency
   habits: "habits", consistency: "habits",
   // relationships / social

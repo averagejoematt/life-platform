@@ -340,6 +340,15 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .circadian[data-cat="poor"] .circ-meter i { background: color-mix(in oklch, var(--ember) 55%, var(--ink-faint)); }
 .circadian[data-cat="poor"] .circ-cat { color: var(--ink-muted); }
 
+/* Reading line (Mind pillar, ADR-097) — current book + read-today + streak. No red. */
+.reading-line { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.rl-tick { color: var(--ember); }
+.rl-now { display: block; margin-top: var(--sp-2); text-decoration: none; }
+.rl-now .rl-title { font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); }
+.rl-now:hover .rl-title { color: var(--ember); }
+.rl-now .rl-author { font-family: var(--font-mono); font-size: 0.7em; color: var(--ink-faint); }
+.rl-streak { margin-top: var(--sp-1); color: var(--ink-faint); }
+
 /* Foot + states */
 .cockpit-foot { margin-top: var(--sp-5); display: flex; gap: var(--sp-5); flex-wrap: wrap; align-items: baseline; }
 .cockpit-foot a { color: var(--ink-faint); text-decoration: none; }

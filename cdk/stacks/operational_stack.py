@@ -18,6 +18,7 @@ Lambdas (11):
   insight-email-parser              (SES inbound trigger only)
   site-stats-refresh                4x/day (15:00, 19:00, 23:00, 03:00 UTC) — no AI calls
   og-image-generator                cron(30 19 * * ? *)     — 11:30 AM PT daily (HP-13)
+  reading-cover-pipeline            (on-demand only)        — Mind pillar covers (ADR-097)
 """
 
 import aws_cdk as cdk
@@ -775,6 +776,52 @@ class OperationalStack(Stack):
             memory_mb=512,
             additional_layers=[pillow_layer],
             custom_policies=rp.operational_og_image_generator(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+        )
+
+        # ── 12b. Reading Cover Pipeline (ADR-097, Mind pillar Phase A) — on-demand only.
+        # Invoked with a book dict; fetches a cover (Open Library → Google Books →
+        # designed placeholder), caches it to generated/covers/<bookId>.jpg, and
+        # updates BOOK#.coverS3Key. No schedule (the add_book path / MCP triggers it in
+        # Phase B). Pillow via the standalone pillow-layer (same as OG); imports no
+        # shared-layer modules. Never hot-links — always stores bytes (spec §8).
+        create_platform_lambda(
+            self,
+            "ReadingCoverPipeline",
+            function_name="reading-cover-pipeline",
+            source_file="lambdas/reading/cover_pipeline_lambda.py",
+            handler="reading.cover_pipeline_lambda.lambda_handler",
+            timeout_seconds=60,
+            memory_mb=512,
+            additional_layers=[pillow_layer],
+            custom_policies=rp.operational_reading_cover_pipeline(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+        )
+
+        # ── 12c. Reading Recall Sweep (ADR-097, Mind pillar Phase D) — daily 16:00 UTC
+        # (8 AM PT). Queries the sparse GSI1 for due spaced-retrieval prompts, writes
+        # the owner-PRIVATE nudge snapshot, emits LifePlatform/Reading::RecallsDue.
+        # Fixed-UTC schedule (DST-safe). No AI (gist scoring runs in the MCP answer path).
+        create_platform_lambda(
+            self,
+            "ReadingRecallSweep",
+            function_name="reading-recall-sweep",
+            source_file="lambdas/reading/reading_recall_sweep_lambda.py",
+            handler="reading.reading_recall_sweep_lambda.lambda_handler",
+            schedule="cron(0 16 * * ? *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            custom_policies=rp.operational_reading_recall_sweep(),
             table=local_table,
             bucket=local_bucket,
             dlq=None,
