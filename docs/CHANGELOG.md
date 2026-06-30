@@ -1,3 +1,13 @@
+## The Mind Pillar (Reading) — Phase E the signature (the Constellation) — 2026-06-29
+
+Phase E: the gated signature. **Built + tested.** Per Mara's restraint rule it ships **dormant behind a beautiful honest-empty state** — a single lit point, "the constellation begins with the first idea you keep" — and fills only on real kept ideas (never fabricated).
+
+- **The Constellation** (`lambdas/reading/reading_constellation.py`): a fail-soft LLM distills the DURABLE ideas he KEPT from a finished book's own takeaway/notes — **grounded only in his words, never invented** — into idea nodes + same-book edges. An idea-index (`READING#IDEA_INDEX`) makes the graph enumerable (DynamoDB can't `begins_with` a pk). The graph refuses to render below 4 nodes (brief §2: never a sparse sad graph). Ember = recent, muted ink = settled, never red.
+- **MCP** `manage_reading map_ideas` (10th action): distil + persist ideas/edges from a debriefed book. `get_constellation` now enumerates the real graph when ready.
+- **Public** `/api/constellation` (honest single-point empty state; public projection only) + the `/mind/` Constellation section: the lit-point seed empty state (reduced-motion respected) → a quiet code-drawn SVG graph once earned.
+- **Gated backlog (per the spec, NOT built — earned on real data):** journal-resonance embeddings (the recommender already accepts the `journal_resonance` signal), the mind-body bridge (reading×sleep/HRV/mood via the existing correlation framework — `READING_SESSION#` already logs `moodSnapshot`), voice debrief, and the mnemonic medium. The Third-Wall debrief *render* (Lena hoped ↔ how it hit) is a frontend follow-up.
+- **Tests:** `test_reading_constellation` (7). Full suite green except the 2 pre-existing pexels failures. Deploy: `cdk deploy LifePlatformMcp` + `deploy/deploy_site_api.sh /api/constellation` + `deploy/sync_site_to_s3.sh`.
+
 ## The Mind Pillar (Reading) — Phase D the loop (recall + debrief + retention) — 2026-06-29
 
 Phase D: the two-clock loop. **Built + tested.** The debrief (immediate reaction → public takeaway) and the probes (spaced retention) are kept architecturally separate.

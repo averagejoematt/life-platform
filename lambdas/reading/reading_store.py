@@ -237,11 +237,48 @@ def update_cover_key(book_id: str, cover_s3_key: str | None, cover_source: str, 
     return put_book(book)
 
 
-def put_idea(idea: dict) -> dict:
+# A small index of idea ids — DynamoDB can't `begins_with` a partition key, so the
+# Constellation enumerates via this single index record (spec §2.7 deferred-enum).
+_IDEA_INDEX_PK = "READING#IDEA_INDEX"
+_IDEA_INDEX_SK = "CURRENT"
+
+
+def put_idea(idea: dict, *, source_book_id: str | None = None) -> dict:
     item = dict(idea)
     item.update(rk.idea_key(item["ideaId"]))
+    if source_book_id:
+        srcs = set(item.get("sourceBookIds") or [])
+        srcs.add(source_book_id)
+        item["sourceBookIds"] = sorted(srcs)
     _put(item)
+    _index_idea(item["ideaId"])
     return item
+
+
+def _index_idea(idea_id: str) -> None:
+    rec = _get({"pk": _IDEA_INDEX_PK, "sk": _IDEA_INDEX_SK}) or {}
+    ids = set(rec.get("ideaIds") or [])
+    if idea_id in ids:
+        return
+    ids.add(idea_id)
+    table.put_item(Item={"pk": _IDEA_INDEX_PK, "sk": _IDEA_INDEX_SK, "ideaIds": sorted(ids)})
+
+
+def idea_ids() -> list:
+    rec = _get({"pk": _IDEA_INDEX_PK, "sk": _IDEA_INDEX_SK}) or {}
+    return list(rec.get("ideaIds") or [])
+
+
+def all_ideas() -> dict:
+    """The whole Constellation: nodes + edges (enumerated via the idea index)."""
+    nodes, edges = [], []
+    for iid in idea_ids():
+        node = idea(iid)
+        if node:
+            nodes.append(node)
+            for e in idea_edges(iid):
+                edges.append({"from": iid, "to": e.get("otherIdeaId"), "weight": e.get("weight"), "rationale": e.get("rationale")})
+    return {"nodes": nodes, "edges": edges, "node_count": len(nodes)}
 
 
 def put_edge(idea_id: str, other_idea_id: str, *, weight: float, rationale: str = "") -> dict:

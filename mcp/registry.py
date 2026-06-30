@@ -3624,6 +3624,7 @@ TOOLS = {
                             "log_outcome",
                             "update_profile",
                             "onboard",
+                            "map_ideas",
                         ],
                         "description": "Which write to perform.",
                     },

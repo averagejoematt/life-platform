@@ -1,3 +1,25 @@
+# HANDOVER — The Mind Pillar (Reading): Phases A–E COMPLETE — 2026-06-29
+
+> **🎉 ALL FIVE PHASES BUILT.** A (data layer) · B (recommender + 8 MCP tools) · C (the /mind/ page +
+> public endpoints) · D (the recall/debrief/retention loop) — all **deployed live + verified**. E (the
+> gated signature) — **built; ships dormant** behind a beautiful honest-empty state (Mara's rule).
+>
+> **Phase E (the Constellation):** `reading_constellation.py` distils the durable ideas he KEPT from a
+> debriefed book (grounded, fail-soft, never invented) → idea nodes + same-book edges; an idea-index
+> (`READING#IDEA_INDEX`) makes the graph enumerable. MCP `manage_reading map_ideas` (action #10);
+> `get_constellation` enumerates when ready (≥4 nodes). Public `/api/constellation` (honest-empty;
+> public projection) + the `/mind/` lit-point seed → code-drawn SVG graph once earned. Test:
+> `test_reading_constellation` (7). **Deploy E:** `cdk deploy LifePlatformMcp` + `deploy/deploy_site_api.sh
+> /api/constellation` + `deploy/sync_site_to_s3.sh`.
+>
+> **Gated backlog (per spec, intentionally NOT built — earned on real data):** journal-resonance
+> embeddings (the recommender already takes a `journal_resonance` signal), the mind-body bridge
+> (reading×sleep/HRV/mood — `READING_SESSION#` already logs `moodSnapshot`; use the existing correlation
+> framework), voice debrief, mnemonic medium, and the Third-Wall debrief *render*. Persona reconciliation
+> (Lena/Priya/etc. vs `docs/BOARDS.md`) is still owed before coaches surface on the coaching page.
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): Phases A + B + C + D — 2026-06-29
 
 > **Phase D (the loop) — BUILT + tested; deploy = `cdk deploy LifePlatformOperational`.** The two-clock

@@ -135,6 +135,26 @@
 .hb-row .label { color: var(--ink-faint); }
 .hb-empty { font-family: var(--font-serif); font-style: italic; color: var(--ink-muted); }
 
+/* ── The Constellation (the signature) ────────────────────────────────────── */
+.const-wrap { margin-bottom: clamp(2rem, 5vw, 3.5rem); }
+.const-wrap .cap { margin: 0 0 1rem; }
+.constellation-fig { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+/* honest single-lit-point empty state — beautiful on day one (Mara's gate) */
+.const-seed { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: clamp(2rem, 6vw, 3.5rem) 0; }
+.const-point {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--ember);
+  box-shadow: 0 0 16px 2px color-mix(in srgb, var(--ember) 55%, transparent);
+}
+.mo .const-point { animation: const-pulse 3.2s ease-in-out infinite; }
+@keyframes const-pulse { 0%, 100% { opacity: 0.65; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .const-point { animation: none; } }
+.const-empty { font-family: var(--font-serif); font-style: italic; color: var(--ink-muted); text-align: center; }
+.constellation-fig svg { width: min(360px, 90vw); height: auto; }
+.cst-edge { stroke: color-mix(in srgb, var(--ink-faint) 45%, transparent); stroke-width: 1; }
+.cst-node circle { fill: var(--ink-muted); }
+.cst-node.cst-recent circle { fill: var(--ember); }
+.constellation-fig figcaption { color: var(--ink-faint); }
+
 /* ── Foot ─────────────────────────────────────────────────────────────────── */
 .mind-foot { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; color: var(--ink-faint); border-top: 1px solid color-mix(in srgb, var(--ink-faint) 22%, transparent); padding-top: 1.25rem; }
 .mind-foot a { color: var(--ink-muted); }

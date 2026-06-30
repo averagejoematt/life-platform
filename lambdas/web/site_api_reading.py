@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from reading import reading_store, reading_visibility as rv
+from reading import reading_constellation, reading_store, reading_visibility as rv
 
 from web.site_api_common import _ok
 
@@ -66,6 +66,27 @@ def handle_reading_shelf():
             "as_of": _today(),
         },
         cache_seconds=300,
+    )
+
+
+def handle_constellation():
+    """The public Constellation (brief §2): ideas kept become nodes, connections
+    edges. Honest single-point empty state below the node threshold — never a
+    sparse sad graph. Public projection (label/sourceBooks/recency); no private data."""
+    graph = reading_store.all_ideas()
+    if not reading_constellation.is_ready(graph["node_count"]):
+        return _ok(
+            {
+                "ready": False,
+                "node_count": graph["node_count"],
+                "min_nodes": reading_constellation.MIN_NODES,
+                "note": "the constellation begins with the first idea you keep",
+            },
+            cache_seconds=300,
+        )
+    nodes = [rv.project_public(rv.IDEA, n) for n in graph["nodes"]]
+    return _ok(
+        {"ready": True, "nodes": [n for n in nodes if n], "edges": graph["edges"], "node_count": graph["node_count"]}, cache_seconds=300
     )
 
 

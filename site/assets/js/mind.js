@@ -134,6 +134,46 @@ function renderHabit(stats) {
     `<li class="hb-empty label">The habit starts with one session — no streaks to break yet, just the first page.</li>`;
 }
 
+/* The Constellation. Honest single-point empty state until enough ideas are kept;
+   then a quiet code-drawn graph (ember = recent, muted ink = settled). Never red. */
+async function renderConstellation() {
+  const fig = bind("constellation");
+  if (!fig) return;
+  let d = null;
+  try {
+    d = await getJSON(`${API}/constellation`);
+  } catch (e) {
+    d = null;
+  }
+  if (!d || !d.ready || !Array.isArray(d.nodes) || d.nodes.length < 4) {
+    return; // keep the beautiful seed empty-state already in the HTML
+  }
+  const nodes = d.nodes.slice(0, 40);
+  const edges = Array.isArray(d.edges) ? d.edges : [];
+  const W = 360, H = 360, cx = W / 2, cy = H / 2, r = 140;
+  const pos = {};
+  nodes.forEach((n, i) => {
+    const a = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
+    pos[n.ideaId] = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  });
+  const edgeSvg = edges
+    .filter((e) => pos[e.from] && pos[e.to])
+    .map((e) => `<line class="cst-edge" x1="${pos[e.from].x.toFixed(1)}" y1="${pos[e.from].y.toFixed(1)}" x2="${pos[e.to].x.toFixed(1)}" y2="${pos[e.to].y.toFixed(1)}"/>`)
+    .join("");
+  const nodeSvg = nodes
+    .map((n) => {
+      const p = pos[n.ideaId];
+      const recent = Number(n.recency || 0) > 0.6 ? " cst-recent" : "";
+      return `<g class="cst-node${recent}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5"/>` +
+        `<title>${escapeHTML(n.label || "")}</title></g>`;
+    })
+    .join("");
+  fig.innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="A graph of ${nodes.length} ideas kept and their connections">` +
+    `<g class="cst-edges">${edgeSvg}</g><g class="cst-nodes">${nodeSvg}</g></svg>` +
+    `<figcaption class="label">${nodes.length} ideas kept · ${edges.length} connections</figcaption>`;
+}
+
 async function renderOverview() {
   let d = null;
   try {
@@ -150,7 +190,7 @@ async function renderOverview() {
 async function load() {
   const main = $("#mind");
   try {
-    await Promise.all([renderShelf(), renderOverview()]);
+    await Promise.all([renderShelf(), renderOverview(), renderConstellation()]);
     if (main) main.dataset.state = "ready";
   } catch (e) {
     if (main) main.dataset.state = "ready";

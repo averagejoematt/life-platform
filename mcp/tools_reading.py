@@ -16,7 +16,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
-from reading import reading_enrich, reading_keys as rk, reading_onboarding, reading_recall, reading_recommender, reading_store
+from reading import (
+    reading_constellation,
+    reading_enrich,
+    reading_keys as rk,
+    reading_onboarding,
+    reading_recall,
+    reading_recommender,
+    reading_store,
+)
 
 from mcp.config import logger, table
 from mcp.utils import mcp_error
@@ -166,18 +174,24 @@ def tool_get_reading_track_record(args):
 
 def tool_get_constellation(args):
     """The Constellation idea-graph. Honest empty state below the node threshold
-    (brief §2: never a sparse sad graph). Whole-graph enumeration is Phase E."""
+    (brief §2: never a sparse sad graph) — the graph fills as ideas are kept
+    (manage_reading map_ideas on a debriefed book)."""
     idea_id = args.get("idea_id")
     if idea_id:
         node = reading_store.idea(idea_id)
         if not node:
             return mcp_error(f"no idea node '{idea_id}'", error_code="NO_DATA")
         return {"idea": node, "edges": reading_store.idea_edges(idea_id)}
-    return {
-        "ready": False,
-        "min_nodes": _CONSTELLATION_MIN_NODES,
-        "note": "The constellation begins with the first idea you keep. (Full graph view ships in Phase E.)",
-    }
+    graph = reading_store.all_ideas()
+    ready = reading_constellation.is_ready(graph["node_count"])
+    if not ready:
+        return {
+            "ready": False,
+            "node_count": graph["node_count"],
+            "min_nodes": _CONSTELLATION_MIN_NODES,
+            "note": "The constellation begins with the first idea you keep.",
+        }
+    return {"ready": True, "nodes": graph["nodes"], "edges": graph["edges"], "node_count": graph["node_count"]}
 
 
 # ── WRITE FAT-TOOL (draft → dry_run → commit) ─────────────────────────────────
@@ -191,6 +205,7 @@ _WRITE_ACTIONS = {
     "log_outcome",
     "update_profile",
     "onboard",
+    "map_ideas",
 }
 
 
@@ -336,6 +351,46 @@ def _action_debrief(args, dry_run):
     }
 
 
+def _action_map_ideas(args, dry_run):
+    """Constellation FILL (Phase E, gated): distill the durable ideas he KEPT from a
+    finished book's own takeaway/notes (grounded, never invented) into idea nodes +
+    same-book edges. The graph stays honestly empty until enough ideas accrue."""
+    bid = args.get("bookId")
+    if not bid:
+        return mcp_error("map_ideas requires bookId", error_code="MISSING_ARG")
+    book = reading_store.get_book(bid) or {}
+    notes = reading_store.notes(bid)
+    source = "\n\n".join(n.get("text", "") for n in notes if n.get("type") in ("synthesis", "reflection") and n.get("text"))
+    if not source.strip():
+        return mcp_error("no takeaway/reflection notes to distill — debrief the book first", error_code="NO_DATA")
+    ideas = reading_constellation.extract_ideas(book.get("title", "this book"), source)
+    if not ideas:
+        return {
+            "status": "committed",
+            "action": "map_ideas",
+            "ideas": [],
+            "note": "No durable idea distilled (kept honest — nothing invented).",
+        }
+    if dry_run:
+        return _preview("map_ideas", {"bookId": bid, "ideas": ideas})
+    for idea in ideas:
+        reading_store.put_idea(idea, source_book_id=bid)
+    # same-book co-occurrence edges (the simplest honest link; richer linking is gated)
+    for i in range(len(ideas)):
+        for j in range(i + 1, len(ideas)):
+            reading_store.put_edge(
+                ideas[i]["ideaId"], ideas[j]["ideaId"], weight=0.5, rationale=f"both kept from {book.get('title', 'the same book')}"
+            )
+    count = reading_store.all_ideas()["node_count"]
+    return {
+        "status": "committed",
+        "action": "map_ideas",
+        "ideas": ideas,
+        "constellation_nodes": count,
+        "ready": reading_constellation.is_ready(count),
+    }
+
+
 def _action_log_outcome(args, dry_run):
     """Resolve a RECOMMENDATION#'s outcome (feeds Lena's track record)."""
     ts, outcome = args.get("ts"), (args.get("resolved_outcome") or "").lower()
@@ -394,6 +449,7 @@ _DISPATCH = {
     "log_outcome": _action_log_outcome,
     "update_profile": _action_update_profile,
     "onboard": _action_onboard,
+    "map_ideas": _action_map_ideas,
 }
 
 
