@@ -13,6 +13,8 @@ reason string + confidence; below the n-gate it is propose-and-dispose (one pick
 
 from __future__ import annotations
 
+import json
+import os
 from datetime import datetime, timezone
 
 from boto3.dynamodb.conditions import Key
@@ -220,6 +222,29 @@ def _preview(action: str, plan: dict) -> dict:
     }
 
 
+_COVER_FN = os.environ.get("COVER_PIPELINE_FN", "reading-cover-pipeline")
+_lambda_client = None
+
+
+def _trigger_cover(book_id, meta):
+    """Fire-and-forget invoke of the cover pipeline so a freshly-added book gets a
+    cover (Open Library → Google Books → designed placeholder). Fail-soft: a
+    cover-invoke failure never breaks add_book — the cover can be fetched later."""
+    global _lambda_client
+    try:
+        import boto3
+
+        if _lambda_client is None:
+            _lambda_client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-west-2"))
+        payload = {k: meta.get(k) for k in ("isbn13", "olid", "title", "author")}
+        payload["bookId"] = book_id
+        _lambda_client.invoke(FunctionName=_COVER_FN, InvocationType="Event", Payload=json.dumps(payload).encode("utf-8"))
+        return True
+    except Exception as e:  # noqa: BLE001 — cover is best-effort, never blocks the add
+        logger.info("[reading] cover trigger failed (%s) — fetch it later", type(e).__name__)
+        return False
+
+
 def _action_add_book(args, dry_run):
     meta = {k: args.get(k) for k in ("title", "author", "isbn13", "olid", "pageCount", "format") if args.get(k) is not None}
     if not meta.get("title"):
@@ -231,7 +256,13 @@ def _action_add_book(args, dry_run):
         enrich = reading_enrich.enrich_book(meta) if args.get("preview_enrich") else {"note": "enrichment runs on commit"}
         return _preview("add_book", {"bookId": bid, "book": meta, "initial_status": args.get("status", "want"), "enrichment": enrich})
     bid = reading_store.add_book(meta, initial_status=args.get("status", "want"))
-    return {"status": "committed", "action": "add_book", "bookId": bid, "note": "Cover fetch is a separate step (reading-cover-pipeline)."}
+    cover_triggered = _trigger_cover(bid, meta)
+    return {
+        "status": "committed",
+        "action": "add_book",
+        "bookId": bid,
+        "cover_fetch": "triggered" if cover_triggered else "deferred (invoke reading-cover-pipeline to fetch)",
+    }
 
 
 def _action_update_status(args, dry_run):

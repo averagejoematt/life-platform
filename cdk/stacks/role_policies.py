@@ -1874,6 +1874,8 @@ def compute_circadian_compliance() -> list[iam.PolicyStatement]:
 # MCP STACK — 1 Lambda
 # ═════════════════════════════════════════════════════════════════════════
 
+_COVER_PIPELINE_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:function:reading-cover-pipeline"
+
 
 def mcp_server() -> list[iam.PolicyStatement]:
     """MCP server: DDB read/write (cache), S3 read (config + CGM only), secrets, no full-bucket access.
@@ -1959,6 +1961,13 @@ def mcp_server() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            # ADR-097: manage_reading add_book fire-and-forget invokes the reading
+            # cover pipeline so a new book gets a cover. Scoped to that one function.
+            sid="ReadingCoverInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[_COVER_PIPELINE_ARN],
         ),
     ]
 

@@ -95,6 +95,22 @@ def test_add_book_requires_title():
     assert out.get("error_code") == "MISSING_ARG"
 
 
+def test_add_book_triggers_cover_fetch(monkeypatch):
+    calls = []
+    monkeypatch.setattr(tr, "_trigger_cover", lambda bid, meta: calls.append((bid, meta)) or True)
+    out = tr.tool_manage_reading(
+        {"action": "add_book", "title": "Project Hail Mary", "author": "Weir", "isbn13": "9780593135204", "dry_run": False}
+    )
+    assert out["status"] == "committed" and out["cover_fetch"] == "triggered"
+    assert len(calls) == 1 and calls[0][0] == out["bookId"] and calls[0][1]["isbn13"] == "9780593135204"
+
+
+def test_add_book_cover_failure_is_soft(monkeypatch):
+    monkeypatch.setattr(tr, "_trigger_cover", lambda bid, meta: False)  # cover invoke failed
+    out = tr.tool_manage_reading({"action": "add_book", "title": "T", "author": "A", "dry_run": False})
+    assert out["status"] == "committed" and "deferred" in out["cover_fetch"]  # book still added
+
+
 def test_update_status_abandon_requires_reason():
     bid = _add("Stalled")
     out = tr.tool_manage_reading({"action": "update_status", "bookId": bid, "status": "abandoned", "dry_run": False})
