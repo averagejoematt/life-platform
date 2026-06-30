@@ -163,6 +163,15 @@
           <p class="circ-weak label" data-bind="circ-weak" hidden></p>
         </section>
 
+        <!-- Reading line (Mind pillar, ADR-097): current book, the read-today tick,
+             input streak. Present-tense; hidden until there's a book in hand. The
+             recall nudge stays owner-private (MCP), never on the public cockpit. -->
+        <section class="reading-line" data-reading hidden aria-label="Today's reading">
+          <p class="cap label">reading<span class="rl-tick label" data-bind="reading-tick"></span></p>
+          <a class="rl-now" data-bind="reading-now" href="/mind/"></a>
+          <p class="rl-streak label" data-bind="reading-streak"></p>
+        </section>
+
         <!-- Predict the week (PG-ENG-1): a reader bets which way a leading signal
              moves — not the outcome (weight), the levers. Present-tense, hidden when
              there's no active weekly challenge with predict_metrics. -->

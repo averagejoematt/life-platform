@@ -1691,7 +1691,9 @@ def site_api() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="DynamoDBRead",
             actions=["dynamodb:GetItem", "dynamodb:Query"],
-            resources=[TABLE_ARN],
+            # ADR-097: /index/* added for the reading GSIs (GSI1/GSI2) — the public
+            # /api/reading_shelf + /api/reading_overview endpoints query GSI2.
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
         ),
         iam.PolicyStatement(
             sid="DynamoDBWrite",

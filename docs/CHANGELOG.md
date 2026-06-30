@@ -1,3 +1,13 @@
+## The Mind Pillar (Reading) — Phase C the /mind/ page + cockpit thread — 2026-06-29
+
+Phase C: the public reading surface. **Built + tested.** A new `/mind/` page, public site-api endpoints (the first live surface for the `reading_visibility` chokepoint), a reading icon, and a cockpit reading line.
+
+- **Public site-api** (`lambdas/web/site_api_reading.py`): `/api/reading_shelf` (currently-reading · queue · finished · the dignified "set down" shelf) + `/api/reading_overview` (roundedness wheel · input-streak · cockpit line). **Every record passes through `reading_visibility.project_public`** — retention/recall/mood/calibration internals are unreachable on the public surface BY CONSTRUCTION (a test populates private fields + asserts they never appear). Read-only.
+- **The `/mind/` page** (`site/mind/index.html` + `site/assets/js/mind.js` + `site/assets/css/mind.css`): warm spines (cover if cached, else a designed text spine), the roundedness wheel, the habit line — **honest empty states everywhere** (day one is an invitation, not a failure). **No red on this surface** (a stalled/set-down book is muted ink). A reading icon added to `icons.svg`/`icons.js`.
+- **Cockpit thread** (`/now/`): a `data-reading` tile + `renderReading()` — current book, read-today tick, input streak. Recall prompts/retention stay **owner-private** (MCP only) — never fetched on the public cockpit.
+- **IAM:** the site-api role's DynamoDB read grant gains `/index/*` (the reading GSIs); deploy_site_api.sh + the CDK asset stage `lambdas/reading/`. Registered in visual_qa + the site-review bindings map.
+- **Tests:** `test_site_api_reading` (5, incl. the privacy proof). Full suite green except the 2 pre-existing pexels failures. Deploy: `cdk deploy LifePlatformOperational` (IAM + code) → `deploy/sync_site_to_s3.sh`.
+
 ## The Mind Pillar (Reading) — Phase B engine + MCP tools — 2026-06-29
 
 Phase B: the recommender + onboarding + the MCP tool surface, over the Phase A data layer. **Built + tested; MCP deploy run (no layer dance).** 8 new MCP tools (count 136→144).

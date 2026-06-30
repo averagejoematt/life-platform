@@ -19,7 +19,12 @@ echo "→ Packaging full web/ from $ROOT/lambdas/web/ …"
 rm -rf /tmp/siteapi /tmp/siteapi.zip
 mkdir -p /tmp/siteapi/web
 cp "$ROOT"/lambdas/web/*.py /tmp/siteapi/web/
-( cd /tmp/siteapi && zip -rq /tmp/siteapi.zip web/ -x '*__pycache__*' '*.pyc' )
+# ADR-097 (Phase C): site_api_reading imports the reading data-layer package.
+# Stage lambdas/reading/ as a top-level package so `from reading import …`
+# resolves at runtime (numeric/retry_utils come from the shared layer).
+cp -r "$ROOT"/lambdas/reading /tmp/siteapi/reading
+rm -rf /tmp/siteapi/reading/__pycache__
+( cd /tmp/siteapi && zip -rq /tmp/siteapi.zip web/ reading/ -x '*__pycache__*' '*.pyc' )
 
 echo "→ Deploying $FN …"
 aws lambda update-function-code --function-name "$FN" \

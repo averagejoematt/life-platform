@@ -1,3 +1,21 @@
+# HANDOVER — The Mind Pillar (Reading): Phases A + B + C — 2026-06-29
+
+> **Phase C (the /mind/ page + cockpit thread) — BUILT + tested; deploy pending (IAM + site sync).**
+> Public site-api `lambdas/web/site_api_reading.py` → `/api/reading_shelf` + `/api/reading_overview`,
+> both routed through `reading_visibility.project_public` (the public/private chokepoint's first LIVE
+> surface — a test proves private fields never appear). New `/mind/` page (`site/mind/index.html` +
+> `mind.js` + `mind.css`): warm spines, roundedness wheel, habit line, honest empty states, **no red**.
+> Reading icon added (`icons.svg`/`icons.js`). Cockpit `/now/` gains a `data-reading` tile +
+> `renderReading()` (current book · read-today · streak; recall stays owner-private). Registered in
+> `visual_qa.py` PAGES + `site_review_bindings.py`. **⚠️ Deploy needs `cdk deploy LifePlatformOperational`**
+> (the site-api role gains DynamoDB `/index/*` for the reading GSIs — an IAM change the site-api script
+> can't do; the CDK asset also bundles `web/` + `reading/`) **then `deploy/sync_site_to_s3.sh`** for the
+> page. The home Mind pillar already exists with the right edges (left untouched). Next: Phase D (the
+> loop — recall EventBridge sweep + debrief + retention) and the gated Phase E (Constellation + resonance
+> + mind-body). Test: `test_site_api_reading` (5). Suite green except the 2 pre-existing pexels failures.
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): Phases A + B — 2026-06-29
 
 > **Phase B (engine + MCP) — SHIPPED + DEPLOYED LIVE + verified.** The rules-based recommender
