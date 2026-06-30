@@ -17,10 +17,11 @@ v1.0.0 — 2026-03-15 (R54)
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 
 import boto3
+from pacific_time import pacific_today
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -184,7 +185,10 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict]) -> st
 
 def lambda_handler(event, context):
     try:
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Pacific day, not UTC: this lambda runs on an 8 PM PT cron (03:00 UTC), where
+        # a UTC "today" is tomorrow in PT — so every manual source reads "not logged".
+        # See AUDIT BUG-02.
+        today = pacific_today()
         logger.info(f"[nudge] Checking data completeness for {today}")
 
         checks = [

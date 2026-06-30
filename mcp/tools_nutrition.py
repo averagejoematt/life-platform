@@ -33,6 +33,7 @@ from mcp.core import (
     get_sot,
     mem_cache_get,
     mem_cache_set,
+    pacific_today,
     parallel_query_sources,
     query_source,
     resolve_field,
@@ -60,7 +61,9 @@ def _nutrition_through_date():
     a user failure. Anchor to yesterday (the latest complete day), matching
     tool_get_food_log. Callers may still pass an explicit end_date.
     """
-    return (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    # Pacific day: "yesterday" must be relative to the PT calendar, else a caller in
+    # the UTC-evening window gets today's (still-empty) PT day. See AUDIT BUG-03.
+    return (datetime.strptime(pacific_today(), "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
 # ── MacroFactor reference data ──
@@ -650,7 +653,7 @@ def tool_get_food_log(args):
     Return individual food entries logged on a specific date.
     Useful for 'what did I eat yesterday?', 'show me my food diary'.
     """
-    date_str = args.get("date", (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"))
+    date_str = args.get("date", (datetime.strptime(pacific_today(), "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"))
 
     pk = USER_PREFIX + "macrofactor"
 

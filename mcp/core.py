@@ -210,6 +210,20 @@ def date_diff_days(start, end):
         return 0
 
 
+def pacific_today():
+    """Today's date (YYYY-MM-DD) in Pacific time — the calendar day the data is keyed by.
+
+    Data is keyed by the Pacific day a behavior occurred; deriving "today" from a raw
+    UTC ``now`` selects tomorrow's (empty) PT day for any caller in the UTC-evening
+    window. MCP single source of truth; mirrors ``lambdas/pacific_time.pacific_today``
+    (the MCP bundle resolves shared modules from the layer, not lambdas/). See
+    ``docs/reviews/PLATFORM_AUDIT_2026-06-30.md`` BUG-03.
+    """
+    from zoneinfo import ZoneInfo
+
+    return datetime.now(ZoneInfo("America/Los_Angeles")).strftime("%Y-%m-%d")
+
+
 def resolve_field(source, field):
     aliases = FIELD_ALIASES.get(source, {})
     return aliases.get(field, field)
