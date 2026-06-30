@@ -1,3 +1,14 @@
+## The SS self-sustainability tail (SS-08/09/11) — 2026-06-30
+
+The last documented backlog after the backend serial arc — counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **Built + tested + PR'd; deploys pending merge.** 3 items, 2 PRs: SS-09 + SS-11 → #280; SS-08 → #281.
+
+- **SS-11 — editorial-image guardrail** (`editorial_image.py`): a fail-closed quality/denylist gate before an auto-picked Pexels cover ships. `_acceptable(photo)` requires a usable landscape AND an atmospheric description (rejects people/face/text/brand via a word-boundary denylist); `_search` ships the first candidate that clears the gate, or NO image if none qualify. Bundled (not the layer) → no layer dance.
+- **SS-09 — podcast format rotation** (`coach_panel_podcast_lambda.py`): a deterministic per-week entry-point lens (`_episode_angle(week)`, 6 angles) injected into the writer prompt so the show doesn't feel formulaic by ep 26 — the bet/Split/scoreboard identity stays, only the lens rotates.
+- **SS-08 — monthly "what changed"** (`weekly_correlation_compute_lambda.py` + `site_api_data.py` + `cockpit.js`): the `/now` "Month" scope button was a placeholder; SS-08 fills it so a flat day still shows monthly motion. Fill-in-the-blank — piggybacks the series + FDR correlations already computed weekly (zero new DDB queries, no new lambda, no layer dance). `compute_month_deltas` (trailing-30d vs prior-30d, n≥10 real days each half, never zero-filled) + `diff_newly_unlocked` (a first-seen ledger so a correlation is announced once, never re-announced) + `honest_null` → a calm "steady month" state (never fake motion). New `/api/what_changed`, `renderMonth()`, `what_changed` = EXPERIMENT_SCOPED.
+- **Low-fabrication across all three** — only real FDR verdicts + real deltas + fail-closed image gating. Tests: `tests/test_ss_tail.py` (11) + `tests/test_what_changed.py` (11); all related green.
+
+✅ **The full backlog is cleared:** backend serial arc (phases 1–4) + SS tail (SS-08/09/11). Only genuinely-deferred items remain (SS-10 coach-grounding "its own session", PRE-13). See `handovers/HANDOVER_LATEST.md`.
+
 ## Historical-window APIs — backend serial phase 4 (arc complete) — 2026-06-29
 
 The **last** backend serial phase — the backend serial arc is now COMPLETE (all four phases live). Shipped + deployed live + verified (Matthew merged #278 and authorized the deploys). **1 feature PR: #278.** main == live, 0 open PRs.
