@@ -71,7 +71,7 @@ def test_happy_path_stores_to_editorial_prefix(ei):
     secrets = mock.Mock()
     secrets.get_secret_value.return_value = {"SecretString": json.dumps({"api_key": "K"})}
     s3 = mock.Mock()
-    search_json = json.dumps({"photos": [{"src": {"landscape": "https://images.pexels.com/x.jpg"}, "photographer": "Jane Doe"}]}).encode()
+    search_json = json.dumps({"photos": [{"width": 1600, "height": 900, "alt": "quiet landscape at dawn", "src": {"landscape": "https://images.pexels.com/x.jpg"}, "photographer": "Jane Doe"}]}).encode()
     image_bytes = b"\xff\xd8\xff" + b"x" * 5000  # > 1024, looks like a jpeg
 
     def fake_urlopen(req, timeout=0):
@@ -95,7 +95,7 @@ def test_tiny_image_rejected(ei):
     secrets = mock.Mock()
     secrets.get_secret_value.return_value = {"SecretString": json.dumps({"api_key": "K"})}
     s3 = mock.Mock()
-    search_json = json.dumps({"photos": [{"src": {"landscape": "https://images.pexels.com/x.jpg"}, "photographer": "Jo"}]}).encode()
+    search_json = json.dumps({"photos": [{"width": 1600, "height": 900, "alt": "quiet landscape at dawn", "src": {"landscape": "https://images.pexels.com/x.jpg"}, "photographer": "Jo"}]}).encode()
 
     def fake_urlopen(req, timeout=0):
         url = req.full_url if hasattr(req, "full_url") else req
@@ -111,7 +111,7 @@ def test_slug_is_sanitised(ei):
     secrets = mock.Mock()
     secrets.get_secret_value.return_value = {"SecretString": json.dumps({"api_key": "K"})}
     s3 = mock.Mock()
-    search_json = json.dumps({"photos": [{"src": {"landscape": "https://images.pexels.com/x.jpg"}, "photographer": "Jo"}]}).encode()
+    search_json = json.dumps({"photos": [{"width": 1600, "height": 900, "alt": "quiet landscape at dawn", "src": {"landscape": "https://images.pexels.com/x.jpg"}, "photographer": "Jo"}]}).encode()
     img = b"\xff\xd8\xff" + b"y" * 4000
 
     def fake_urlopen(req, timeout=0):
