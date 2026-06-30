@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs — ADR-005)
-**Last updated:** 2026-06-29 (v8.6.0 — 136 MCP tools, 20 data sources, 83 Lambdas, 12 cached tools)
+**Last updated:** 2026-06-30 (v8.6.0 — 136 MCP tools, 20 data sources, 84 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -89,6 +89,11 @@ Where multiple sources measure the same thing:
 |--------|-----------|---------|
 | Health source data | `USER#matthew#SOURCE#<source>` | `USER#matthew#SOURCE#whoop` |
 | User profile | `USER#matthew` | `USER#matthew` |
+| Reading — book catalog (ADR-097) | `BOOK#<bookId>` | `BOOK#9b1f…` |
+| Reading — relationship / notes / recall | `READING#<bookId>` | `READING#9b1f…` |
+| Reading — recommendation track record | `READING#REC` | `READING#REC` |
+| Reading — calibration profile | `READING#PROFILE` | `READING#PROFILE` |
+| Reading — Constellation idea (Phase E) | `READING#IDEA#<ideaId>` | `READING#IDEA#entropy` |
 
 ### Sort Key Patterns
 
@@ -1541,6 +1546,31 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 **Pairs computed:** hrv↔recovery, sleep_duration↔recovery, sleep_score↔recovery, hrv↔sleep_score, rhr↔recovery, tsb↔recovery, strain↔hrv, training_load↔hrv, training_mins↔recovery, protein↔recovery, calories↔hrv, carbs↔hrv, steps↔recovery, steps↔hrv, steps↔sleep, habit_pct↔day_grade, habit_pct↔recovery, tier0_streak↔day_grade, calories↔day_grade, readiness↔day_grade.
 
 **Durability:** Retained indefinitely. One record per ISO week.
+
+---
+
+## Reading / Mind Partition (ADR-097, 2026-06-29)
+
+The reading (Mind pillar) domain — a new source-of-truth domain on the shared table, using **top-level pks** (`BOOK#`, `READING#`), NOT the `USER#…#SOURCE#` convention. Written by the reading data layer (`lambdas/reading/`); the cover-pipeline Lambda (`reading-cover-pipeline`) caches covers. All reading records are taxonomy class **`CROSS_PHASE`** (durable identity data — never wiped or phase-filtered on an experiment reset). Two GSIs serve the access patterns (ADR-097).
+
+**Public/private (spec §10, enforced server-side via `reading_visibility.project_public`):** PRIVATE fields — `retentionScore`, `lastProbeAt`, all `RECALL#` records, session `moodSnapshot`/`location`, recommendation `inputsSnapshot`, and profile calibration internals (`tasteHypothesis`/`ratchetPosition`/`seasonBias`/`trustLadderMode`) — are never serveable from a public endpoint.
+
+| pk | sk | Entity | Notes |
+|----|----|--------|-------|
+| `BOOK#<bookId>` | `META` | catalog (shared facts) | `title, author, isbn13, olid, pageCount, format, domainTags[], themes[], era, difficulty{length,density,prose,structure,composite}, coverS3Key, coverSource, source, enrichedAt`. `bookId` = 16-char hash of ISBN-13/OLID, else slug(title+author). |
+| `READING#<bookId>` | `STATE` | his relationship (state machine) | `status` (want\|reading\|finished\|abandoned), `startedAt/finishedAt/abandonedAt`, `abandonReason` (required on abandon), `currentPage, rating, curriculumPhaseAtStart`; **PRIVATE:** `retentionScore`, `lastProbeAt`. Carries **GSI2** (`READING_STATUS#<status>` / `<iso>`). |
+| `READING#<bookId>` | `SESSION#<iso-ts>` | input event | `date, minutes, pages`; **PRIVATE:** `location, moodSnapshot`. Carries **GSI2** (`READING_SESSION` / `<date>`). |
+| `READING#<bookId>` | `NOTE#<noteId>` | highlight\|reflection\|synthesis | `type, text, createdAt, public` (bool — only `public:true` is ever projected). |
+| `READING#<bookId>` | `RECALL#<promptId>` | spaced retrieval (**PRIVATE, whole entity**) | `prompt, intervalIndex, nextDue, performanceHistory[]`. Carries **GSI1** (`RECALL_DUE` / `<nextDue>`) **only while due** (sparse). |
+| `READING#REC` | `REC#<iso-ts>` | recommendation audit / track record | `bookId, reasonString, confidence, prediction{…}, status, resolvedOutcome, resolvedAt`; **PRIVATE:** `inputsSnapshot`. |
+| `READING#PROFILE` | `CURRENT` | calibration state (one item) | `wheelDistribution` (public); **PRIVATE:** `tasteHypothesis, ratchetPosition, seasonBias, trustLadderMode`. |
+| `READING#IDEA#<ideaId>` | `META` / `EDGE#<otherId>` | Constellation node / edge (Phase E) | nodes `{label, sourceBookIds[], recency}`; edges `{weight, rationale}`. |
+
+**GSIs (ADR-097, additive):**
+- **GSI1** (sparse recall-due): `GSI1PK="RECALL_DUE"`, `GSI1SK=<nextDue iso>`. Only active `RECALL#` prompts project. Sweep: `query GSI1 where GSI1SK <= now`.
+- **GSI2** (state/time): `GSI2PK="READING_STATUS#<status>"` | `"READING_SESSION"`, `GSI2SK=<iso>`. Serves current-reading, queue, and history-by-date.
+
+**Durability:** `CROSS_PHASE` — a person's library and reading history persist across experiment resets. Forever retention.
 
 ---
 

@@ -113,6 +113,16 @@ LIVE_FAMILIES = [
     ("USER#system", "CANARY#last_state"),
     ("USER#system", "INGESTION_STATE#hevy"),
     ("VOTES#challenges", "CH#no-doordash-30"),
+    # Reading / Mind pillar (ADR-097) — CROSS_PHASE, durable identity data
+    ("BOOK#0123456789abcdef", "META"),
+    ("READING#0123456789abcdef", "STATE"),
+    ("READING#0123456789abcdef", "SESSION#2026-06-29T20:00:00+00:00"),
+    ("READING#0123456789abcdef", "NOTE#n1"),
+    ("READING#0123456789abcdef", "RECALL#p1"),
+    ("READING#REC", "REC#2026-06-29T20:00:00+00:00"),
+    ("READING#PROFILE", "CURRENT"),
+    ("READING#IDEA#idea1", "META"),
+    ("READING#IDEA#idea1", "EDGE#idea2"),
 ]
 
 
@@ -204,6 +214,11 @@ def test_pk_rules():
     assert pt.classify("ENSEMBLE#influence_graph", "CONFIG#v1") == pt.SYSTEM_STATE
     assert pt.classify("PULSE", "DATE#2026-04-04") == pt.SYSTEM_STATE
     assert pt.classify("USER#system", "CANARY#last_state") == pt.SYSTEM_STATE
+    # reading / Mind pillar (ADR-097) = cross_phase (durable, never wiped)
+    assert pt.classify("BOOK#abc", "META") == pt.CROSS_PHASE
+    assert pt.classify("READING#abc", "STATE") == pt.CROSS_PHASE
+    assert pt.classify("READING#REC", "REC#2026-06-29T20:00:00+00:00") == pt.CROSS_PHASE
+    assert pt.classify("READING#IDEA#x", "EDGE#y") == pt.CROSS_PHASE
 
 
 def test_helper_predicates():

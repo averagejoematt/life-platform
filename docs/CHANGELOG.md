@@ -1,3 +1,14 @@
+## The Mind Pillar (Reading) — Phase A data layer — 2026-06-29
+
+The first phase of the reading/Mind pillar (`docs/SPEC_READING_MIND_2026-06-29.md`): the data layer only — no UI, no MCP tools (those are Phases B–E). **Built + tested; deploy scripts staged for the operator to run.** New SOT domain `reading` on the shared `life-platform` table.
+
+- **Entities + access patterns** (`lambdas/reading/reading_store.py` + `reading_keys.py`): every reading entity per spec §1 (`BOOK#`, `READING#/STATE|SESSION|NOTE|RECALL`, `READING#REC`, `READING#PROFILE`, `READING#IDEA#`) with the seven access patterns from spec §2 (current/queue, history-by-date, notes, due-recalls, roundedness wheel, track record, Constellation node). Reading is `CROSS_PHASE` in `phase_taxonomy.py` (durable identity data — survives experiment resets; a coverage test asserts the new families classify).
+- **Two GSIs — the first on `life-platform`** (`ADR-097`, amends ADR-005): **GSI1** sparse recall-due (only active prompts project → the daily sweep never scans), **GSI2** reading state/time (current-reading, queue, history). Added via `aws dynamodb update-table` (the table is not CDK-managed), additive/online-backfill.
+- **Public/private chokepoint** (`reading_visibility.py`): an allowlist projection — the only sanctioned way to make a stored reading record public. Fail-closed (pk/sk, GSI attrs, and every private field — `retentionScore`, all `RECALL#`, session mood/location, recommendation `inputsSnapshot`, calibration internals — are dropped). A test populates every private field + an injected secret and proves none survive (spec §10 enforced server-side, not in the UI).
+- **Cover pipeline** (`reading-cover-pipeline` Lambda): Open Library → Google Books → **designed placeholder** (Pillow, house palette). Always downloads + caches to `generated/covers/<bookId>.jpg` (ADR-046 prefix) — never hot-links. Fail-soft (a book always gets a cover).
+- **LLM enrichment on add** (`reading_enrich.py`): Haiku tags `domainTags`/`themes`/`era`/difficulty subscores via the Bedrock chokepoint; fail-soft (a tagging failure still adds the book un-tagged).
+- **Tests:** `test_reading_keys` / `test_reading_visibility` / `test_reading_store` / `test_reading_enrich` / `test_cover_pipeline` + reading families in `test_phase_taxonomy` (all green; full suite green except 2 pre-existing pexels secret-list failures unrelated to this change). **Deploy scripts** `deploy/deploy_reading_gsis.sh` + `deploy/deploy_reading_data.sh` (cdk diff first; operator runs). See `handovers/HANDOVER_LATEST.md`.
+
 ## The SS self-sustainability tail (SS-08/09/11) — 2026-06-30
 
 The last documented backlog after the backend serial arc — counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **Shipped + deployed live + verified.** 3 items, 2 PRs: SS-09 + SS-11 → #280; SS-08 → #281 — all merged + deployed.

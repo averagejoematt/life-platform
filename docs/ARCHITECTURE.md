@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-06-30 (v8.6.0 — 136 tools, 42-module MCP package, 20 data sources, 83 Lambdas, 9 secrets, 52 alarms, 8 CDK stacks deployed).
+Last updated: 2026-06-30 (v8.6.0 — 136 tools, 42-module MCP package, 20 data sources, 84 Lambdas, 9 secrets, 52 alarms, 8 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared layer **v76**. **78 ADRs** (ADR-001 → ADR-078; newest: ADR-076 visual + AI-vision QA harness, ADR-077 phase taxonomy, ADR-078 commercial wedge). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -170,6 +170,16 @@ coaching / generation logic
 - **Subtract-only autoregulation** until N≥30 readiness validation passes (PREREQS §C). Add-load SSM (`/life-platform/hevy/autoreg_add_load_enabled`) defaults `false`.
 - **Conflict guard:** GET-before-PUT compares `updated_at`; refuses to clobber in-app edits.
 - **Hevy API surprises:** no DELETE (archive = rename + folder-move), no webhooks (Phase 2 adherence polls `/v1/workouts/events`), no documented rate limits (client-side ≤1 req/s throttle).
+
+### Reading / Mind Pillar data layer (ADR-097, Phase A)
+
+A new source-of-truth domain (`reading`) on the shared table, using top-level pks (`BOOK#`, `READING#`) rather than the `USER#…#SOURCE#` convention. Data layer in `lambdas/reading/` (`reading_store`, `reading_keys`, `reading_visibility`, `reading_enrich`, `cover_placeholder` — bundled with the `lambdas/` asset, not the shared layer). Two **additive GSIs** (the first on `life-platform`, amending ADR-005): **GSI1** sparse recall-due, **GSI2** reading state/time. Public/private split enforced server-side via the `reading_visibility.project_public` allowlist. All reading records are `CROSS_PHASE` (survive experiment resets).
+
+| Function | Lambda | Trigger |
+|---|---|---|
+| Cover pipeline | `reading-cover-pipeline` | on-demand (Open Library → Google Books → designed placeholder; caches to `generated/covers/`, never hot-links) |
+
+Later phases (B–E): MCP tools + rules-based recommender, the `/mind/` page, the read→debrief→recall loop, and the Constellation (`docs/specs/CLAUDE_CODE_PROMPT_READING_MIND_v1.md`).
 
 ### File-triggered ingestion (S3 → Lambda)
 

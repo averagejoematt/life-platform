@@ -286,6 +286,9 @@
     "lambdas/operational/remediation_dispatcher_lambda.py": {
       "function": "life-platform-remediation-dispatcher"
     },
+    "lambdas/reading/cover_pipeline_lambda.py": {
+      "function": "reading-cover-pipeline"
+    },
     "lambdas/web/email_subscriber_lambda.py": {
       "function": "email-subscriber",
       "region": "us-east-1"

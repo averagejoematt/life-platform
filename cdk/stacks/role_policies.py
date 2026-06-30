@@ -1447,6 +1447,30 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
     ]
 
 
+def operational_reading_cover_pipeline() -> list[iam.PolicyStatement]:
+    """Reading cover pipeline (ADR-097): reads/updates BOOK# items + writes the
+    cached cover JPEG under generated/covers/. No Bedrock (enrichment runs in the
+    MCP add_book path, Phase B). The /index/* resource is included for forward
+    compatibility with the new reading GSIs (ADR-097)."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3WriteCovers",
+            actions=["s3:PutObject"],
+            resources=_s3("generated/covers/*"),
+        ),
+    ]
+
+
 def operational_key_rotator() -> list[iam.PolicyStatement]:
     """Key rotator: rotates MCP API key in Secrets Manager."""
     return [
