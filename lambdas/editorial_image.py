@@ -21,6 +21,7 @@ Bundled with the lambdas/ asset (NOT the layer) — no layer rebuild needed.
 import json
 import logging
 import os
+import re
 import urllib.parse
 import urllib.request
 
@@ -81,6 +82,35 @@ def _api_key(secrets_client):
         return None
 
 
+# SS-11 (2026-06-30): a quality/denylist guardrail before an auto-picked cover
+# ships — the counterweight to "fully automatic". A candidate is rejected (and the
+# next tried, else NO image ships) if it's too small / not landscape, or its
+# description reads as a person/face/text/brand shot rather than atmospheric texture.
+# Word-boundary matching so "woman" doesn't trip on the "man" substring, etc.
+_IMAGE_DENY_RE = re.compile(
+    r"\b(?:person|people|man|woman|men|women|boy|girl|kid|child|children|baby|"
+    r"face|portrait|selfie|crowd|model|nude|naked|lingerie|bikini|"
+    r"text|sign|signage|logo|brand|poster|billboard|banner|advert\w*|"
+    r"weapon|gun|rifle|knife|blood|gore)\b",
+    re.IGNORECASE,
+)
+
+
+def _acceptable(photo):
+    """SS-11 guardrail: a candidate cover must be a usable landscape AND read as
+    atmospheric texture (no people/faces/text/branding). Fail-CLOSED — an unsure or
+    malformed candidate is rejected (the next is tried, else no image ships)."""
+    try:
+        w, h = int(photo.get("width") or 0), int(photo.get("height") or 0)
+        if w < 1200 or h < 600 or w <= h:  # too small, or not landscape
+            return False
+        if _IMAGE_DENY_RE.search(photo.get("alt") or ""):
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def _search(api_key, query, seed):
     """Query Pexels, return (download_url, credit) or (None, None). Fail-soft."""
     url = "https://api.pexels.com/v1/search?" + urllib.parse.urlencode(
@@ -92,7 +122,14 @@ def _search(api_key, query, seed):
     photos = payload.get("photos") or []
     if not photos:
         return None, None
-    photo = photos[int(seed) % len(photos)]
+    # SS-11: pick the first candidate that clears the guardrail, scanning from the
+    # seed offset (still deterministic per seed); ship NO image if none qualify.
+    n = len(photos)
+    start = int(seed) % n
+    photo = next((photos[(start + i) % n] for i in range(n) if _acceptable(photos[(start + i) % n])), None)
+    if not photo:
+        logger.info("[editorial_image] no candidate cleared the SS-11 guardrail for %r — shipping no image", query)
+        return None, None
     src = photo.get("src") or {}
     dl = src.get("landscape") or src.get("large") or src.get("large2x") or src.get("original")
     name = photo.get("photographer") or "Pexels"
