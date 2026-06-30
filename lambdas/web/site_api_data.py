@@ -327,6 +327,32 @@ def handle_ledger() -> dict:
     )
 
 
+def handle_what_changed() -> dict:
+    """GET /api/what_changed — SS-08 monthly "what changed": real trailing-30d vs
+    prior-30d deltas + correlations newly FDR-significant in the last 30 days, so a
+    flat day still shows monthly motion. Written weekly by weekly-correlation-compute.
+    Shaped-empty 200 before the first run; honest_null on a genuinely steady month."""
+    item = table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item")
+    if not item:
+        return _ok(
+            {"deltas": [], "newly_unlocked": [], "honest_null": True, "window_start": None, "window_end": None, "week": None},
+            cache_seconds=900,
+        )
+    item = _decimal_to_float(item)
+    return _ok(
+        {
+            "deltas": item.get("deltas", []),
+            "newly_unlocked": item.get("newly_unlocked", []),
+            "honest_null": bool(item.get("honest_null", False)),
+            "window_start": item.get("window_start"),
+            "window_end": item.get("window_end"),
+            "week": item.get("week"),
+            "computed_at": item.get("computed_at"),
+        },
+        cache_seconds=900,
+    )
+
+
 def handle_discoveries() -> dict:
     """
     GET /api/discoveries

@@ -876,6 +876,167 @@ def store_zone2_efficiency(week_key, efficiency, end_date, computed_at):
 
 
 # ==============================================================================
+# SS-08: MONTHLY "WHAT CHANGED" — cumulative deltas + newly-unlocked correlations
+# ==============================================================================
+#
+# So a flat DAY still shows MOTION over the MONTH. Two real, low-fabrication halves:
+#   • deltas       — real trailing-30d vs prior-30d averages (n>=10 real days each
+#                    half, never zero-filled/interpolated) for the headline metrics.
+#   • newly_unlocked — correlations that FIRST crossed FDR significance within the
+#                    trailing 30 days, via a first-seen ledger so a pair is announced
+#                    ONCE and a flickering pair is never re-announced.
+# honest_null when both are empty → the front-end shows a calm "steady month", not
+# fake motion. Both halves piggyback the series + correlations already computed here.
+
+# (series key, display label, unit, higher_is_better) — the metrics worth surfacing.
+_MONTH_DELTA_METRICS = [
+    ("recovery_score", "Recovery", "%", True),
+    ("hrv", "HRV", "ms", True),
+    ("sleep_duration", "Sleep", "h", True),
+    ("resting_hr", "Resting HR", "bpm", False),
+    ("steps", "Steps", "/day", True),
+    ("protein_g", "Protein", "g", True),
+    ("day_grade", "Day grade", "", True),
+    ("readiness", "Readiness", "", True),
+]
+
+
+def _deep_dec(obj):
+    """Recursively cast floats→Decimal through lists/dicts for a DynamoDB write."""
+    if isinstance(obj, bool):
+        return obj
+    if isinstance(obj, float):
+        return _to_dec(obj) or Decimal("0")
+    if isinstance(obj, int):
+        return Decimal(str(obj))
+    if isinstance(obj, list):
+        return [_deep_dec(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: _deep_dec(v) for k, v in obj.items()}
+    return obj
+
+
+def compute_month_deltas(series, end_date, *, metrics=None, min_days=10):
+    """Real trailing-30d vs prior-30d averages for the headline metrics. A metric is
+    emitted ONLY when BOTH halves have >= min_days real (non-None) values — never
+    zero-filled or interpolated — and the averages genuinely differ. Returns a list
+    of delta dicts (empty on a flat/sparse window)."""
+    metrics = metrics or _MONTH_DELTA_METRICS
+    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    cur_lo, prior_hi, prior_lo = (end - timedelta(days=29)), (end - timedelta(days=30)), (end - timedelta(days=59))
+
+    def _half(lo, hi, key):
+        vals = []
+        for d, m in series.items():
+            try:
+                dd = datetime.strptime(d, "%Y-%m-%d").date()
+            except Exception:
+                continue
+            if lo <= dd <= hi and m.get(key) is not None:
+                vals.append(float(m[key]))
+        return vals
+
+    out = []
+    for key, label, unit, higher_better in metrics:
+        cur, prior = _half(cur_lo, end, key), _half(prior_lo, prior_hi, key)
+        if len(cur) < min_days or len(prior) < min_days:
+            continue
+        a, b = sum(cur) / len(cur), sum(prior) / len(prior)
+        delta = round(a - b, 2)
+        if delta == 0:
+            continue  # genuinely flat metric — no motion to surface
+        out.append(
+            {
+                "metric": key,
+                "label": label,
+                "unit": unit,
+                "this_month_avg": round(a, 2),
+                "prior_month_avg": round(b, 2),
+                "delta": delta,
+                "pct": round((a - b) / b * 100, 1) if b else None,
+                "direction": "improved" if ((delta > 0) == higher_better) else "declined",
+                "n_this": len(cur),
+                "n_prior": len(prior),
+            }
+        )
+    return out
+
+
+def diff_newly_unlocked(correlations, first_sig, end_date, *, window_days=30):
+    """Update the first-seen ledger and return the correlations that FIRST crossed FDR
+    significance within the trailing window. A pair is stamped on its first significant
+    run and NEVER re-stamped — so a pair that drops out then re-crosses keeps its
+    original date and is not re-announced. Returns (newly_unlocked_list, updated_first_sig)."""
+    first_sig = dict(first_sig or {})
+    end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    cutoff = end - timedelta(days=window_days)
+    fresh = []
+    for label, data in (correlations or {}).items():
+        if not data.get("fdr_significant"):
+            continue
+        if label not in first_sig:
+            first_sig[label] = end_date  # first time significant → stamp now
+        try:
+            seen = datetime.strptime(str(first_sig[label]), "%Y-%m-%d").date()
+        except Exception:
+            seen = end
+        if seen >= cutoff:
+            fresh.append(
+                {
+                    "label": label,
+                    "metric_a": data.get("metric_a"),
+                    "metric_b": data.get("metric_b"),
+                    "r": data.get("pearson_r"),
+                    "n": data.get("n_days"),
+                    "direction": data.get("direction"),
+                    "interpretation": data.get("interpretation"),
+                    "first_seen": first_sig[label],
+                }
+            )
+    return fresh, first_sig
+
+
+def store_what_changed(week_key, deltas, newly_unlocked, first_sig, end_date, computed_at):
+    """Write the SS-08 SNAPSHOT#current (the served record) + STATE#first_seen (the
+    ledger) under SOURCE#what_changed. honest_null when nothing moved."""
+    window_start = (datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=29)).strftime("%Y-%m-%d")
+    snap = {
+        "pk": USER_PREFIX + "what_changed",
+        "sk": "SNAPSHOT#current",
+        "week": week_key,
+        "window_start": window_start,
+        "window_end": end_date,
+        "deltas": _deep_dec(deltas),
+        "newly_unlocked": _deep_dec(newly_unlocked),
+        "honest_null": (not deltas and not newly_unlocked),
+        "computed_at": computed_at,
+    }
+    try:
+        from compute_metadata import tag_record
+
+        snap = tag_record(snap, source_id="what_changed")
+    except ImportError:
+        pass
+    table.put_item(Item=snap)
+    # The first-seen ledger is a plain {label: date} string map — no Decimal needed.
+    table.put_item(
+        Item={
+            "pk": USER_PREFIX + "what_changed",
+            "sk": "STATE#first_seen",
+            "first_sig": first_sig,
+            "updated_at": computed_at,
+        }
+    )
+    logger.info(
+        "SS-08: stored what_changed for week %s (%d deltas, %d newly-unlocked, honest_null=%s)",
+        week_key,
+        len(deltas),
+        len(newly_unlocked),
+        snap["honest_null"],
+    )
+
+
+# ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
 
@@ -962,6 +1123,18 @@ def lambda_handler(event, context):
         store_zone2_efficiency(week_key, zone2_eff, end_date, computed_at)
     except Exception as e:
         logger.warning("BS-TR2 failed (non-fatal): %s", e)
+
+    # SS-08: Monthly "what changed" — cumulative deltas + newly-unlocked correlations (non-fatal).
+    # Piggybacks the series + correlations already in hand; reads/writes the first-seen ledger.
+    try:
+        logger.info("SS-08: Computing monthly 'what changed'...")
+        _wc = table.get_item(Key={"pk": USER_PREFIX + "what_changed", "sk": "STATE#first_seen"}).get("Item") or {}
+        _first_sig = dict(_wc.get("first_sig") or {})
+        _deltas = compute_month_deltas(series, end_date)
+        _unlocked, _first_sig = diff_newly_unlocked(correlations, _first_sig, end_date)
+        store_what_changed(week_key, _deltas, _unlocked, _first_sig, end_date, computed_at)
+    except Exception as e:
+        logger.warning("SS-08 failed (non-fatal): %s", e)
 
     elapsed = time.time() - t0
     significant = {k: v for k, v in correlations.items() if v.get("pearson_r") is not None and abs(v["pearson_r"]) >= 0.3}
