@@ -62,3 +62,24 @@ def test_stale_draft_detection():
     assert pg.is_stale_draft(None)
     assert not pg.is_stale_draft(pg.GUARD_VERSION)
     assert not pg.is_stale_draft("2099-01-01")
+
+
+def test_edible_blocked():
+    # AUDIT PRIV-01: "edible"/"edibles" (a cannabis form) must trip the chronicle gate.
+    assert not pg.is_clean("the edible from last weekend")
+    assert not pg.is_clean("skipped edibles this week")
+    assert ("vice", "edible") in pg.find_violations("one edible on Friday")
+
+
+def test_vice_keywords_superset_of_content_filter():
+    """Drift guard (AUDIT PRIV-01, theme #3): the deterministic chronicle gate must
+    never be NARROWER than the configured public filter — every blocked_vice_keyword
+    in config/content_filter.json must be covered by privacy_guard.VICE_KEYWORDS."""
+    import json
+
+    cf_path = os.path.join(os.path.dirname(__file__), "..", "seeds", "content_filter.json")
+    with open(cf_path, encoding="utf-8") as f:
+        configured = {k.lower() for k in json.load(f)["blocked_vice_keywords"]}
+    gate = {k.lower() for k in pg.VICE_KEYWORDS}
+    missing = configured - gate
+    assert not missing, f"privacy_guard.VICE_KEYWORDS missing configured vice terms: {sorted(missing)}"

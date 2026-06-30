@@ -24,14 +24,20 @@ import re
 # Bump when the banned sets below change; publish paths refuse drafts stamped older.
 GUARD_VERSION = "2026-06-28"
 
-# Vices/substances — never public. Mirrors site_api_ai_lambda `blocked_vice_keywords`
-# (kept in sync) plus nicotine. Alcohol is deliberately NOT a hard block — it appears
-# in too much legitimate nutrition context; the prompt handles it.
+# Vices/substances — never public. Must be a SUPERSET of config/content_filter.json
+# `blocked_vice_keywords` (enforced by test_privacy_guard); this deterministic gate
+# is the chronicle's only hard guarantee, so it can never be narrower than the
+# configured public filter. Plus nicotine (not in content_filter). Alcohol is
+# deliberately NOT a hard block — it appears in too much legitimate nutrition
+# context; the prompt handles it. "edible"/"edibles" added per AUDIT PRIV-01 (an
+# explicitly-moderated cannabis form the gate previously missed).
 VICE_KEYWORDS = (
     "marijuana",
     "cannabis",
     "weed",
     "thc",
+    "edible",
+    "edibles",
     "pornography",
     "porn",
     "nicotine",
