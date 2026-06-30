@@ -272,7 +272,7 @@ def _load_content_filter():
         logger.warning(f"[content_filter] Failed to load from S3: {e}")
         _content_filter_cache = {
             "blocked_vices": ["No porn", "No marijuana"],
-            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc"],
+            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"],
         }
         # BUG-05: emit EMF metric when fallback is active. We use sys.stdout.write
         # rather than print() so this file passes test_no_print_in_new_lambdas —
