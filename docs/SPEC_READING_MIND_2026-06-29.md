@@ -33,7 +33,7 @@ IDs: `bookId` = stable hash of ISBN-13 or OLID; fall back to slug(title+author).
 **RECALL#`<bookId>`#`<promptId>`** — spaced retrieval (**private**) · `PK=READING#<bookId>`, `SK=RECALL#<promptId>`
 - `prompt, intervalIndex, nextDue (iso)`, `performanceHistory[] ({askedAt, gistScore, note})`
 
-**RECOMMENDATION#`<ts>`** — audit trail / Lena's track record · `PK=READING#REC`, `SK=REC#<iso-ts>`
+**RECOMMENDATION#`<ts>`** — audit trail / Cora's track record · `PK=READING#REC`, `SK=REC#<iso-ts>`
 - `bookId, reasonString, inputsSnapshot, confidence`
 - `prediction { finishWindowDays, expectedRating, gapFilled, hopedEffect }`
 - `status` (surfaced|accepted|rejected|deferred), `resolvedOutcome` (right|surprised|unexpected|miss), `resolvedAt`
@@ -54,7 +54,7 @@ IDs: `bookId` = stable hash of ISBN-13 or OLID; fall back to slug(title+author).
 3. All notes for a book → `PK=READING#<bookId>`, `SK begins_with NOTE#`.
 4. Due recall prompts (the EventBridge sweep) → **sparse GSI1** on `nextDue`.
 5. Roundedness wheel (domain distribution) → finished `READING#` joined to `BOOK#.domainTags`; cache on `READING_PROFILE.wheelDistribution`.
-6. Lena's track record → `PK=READING#REC`, `SK begins_with REC#`, filter resolvedOutcome.
+6. Cora's track record → `PK=READING#REC`, `SK begins_with REC#`, filter resolvedOutcome.
 7. Constellation graph → `PK begins_with READING#IDEA#`.
 
 ---
@@ -87,7 +87,7 @@ fit =  w_cap     * capacity_fit(book, recovery, deficit, travel, taskload)
 - **Weights shift by phase.** Phase 1: `w_cap` + completion-probability dominate; breadth/diff low. Later: breadth/depth rise. Weight sets live on config, versioned.
 - **Reason string** = top-N contributing terms in plain language. If `fit` can't decompose, the book isn't surfaced (anti-black-box, hard).
 - **Confidence** = f(n_finished, n_abandoned). Below threshold → low-confidence label + **propose-and-dispose only**.
-- **Trust ladder** gates autonomy on Lena's audited hit rate (`RECOMMENDATION` outcomes): `propose → shortlist → surprise-me`. Surprise-me unlocks only past a real hit rate. Mode on `READING_PROFILE`.
+- **Trust ladder** gates autonomy on Cora's audited hit rate (`RECOMMENDATION` outcomes): `propose → shortlist → surprise-me`. Surprise-me unlocks only past a real hit rate. Mode on `READING_PROFILE`.
 - Rules-based v1 (transparent, no ML). ML deferred until n≥30 labeled outcomes — and layered *over* the explainable base, never replacing the reason string.
 
 ---
@@ -105,7 +105,7 @@ fit =  w_cap     * capacity_fit(book, recovery, deficit, travel, taskload)
 
 - Join `READING_SESSION#` to sleep/HRV/mood/glucose via the existing `get_cross_source_correlation` machinery; N=1 reading experiments via the existing experiment framework.
 - **Correlation honesty (existing thresholds):** direction-only under 2 weeks overlap; Pearson + chip at 2+ weeks. Inverse-aware ember applies.
-- Output lives in protocols (experiments/discoveries) and the **private** data view. Never a reason reading must "perform" (Priya's leash).
+- Output lives in protocols (experiments/discoveries) and the **private** data view. Never a reason reading must "perform" — reading stays pleasure, not a KPI (Cora's mandate, READING_CALIBRATION §9).
 
 ---
 

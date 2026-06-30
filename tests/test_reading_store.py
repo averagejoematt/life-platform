@@ -94,7 +94,7 @@ def test_wheel_distribution_joins_domain_tags():
     assert wheel == {"fiction": 2, "classics": 1}
 
 
-# ── §2.6 Lena's track record (begins_with REC#) ───────────────────────────────
+# ── §2.6 Cora's track record (begins_with REC#) ───────────────────────────────
 def test_track_record():
     rs.put_recommendation({"bookId": "b1", "reasonString": "r", "confidence": "low"}, now="2026-06-10T00:00:00")
     rs.put_recommendation({"bookId": "b2", "reasonString": "r", "confidence": "med"}, now="2026-06-12T00:00:00")

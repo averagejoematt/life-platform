@@ -3,6 +3,7 @@
 Repo path: `docs/briefs/BRIEF_2026-06-29_reading_mind.md`
 Status: DRAFT for review · 2026-06-29 · harmonize with `DESIGN_SYSTEM_V5.md` / `V4_DESIGN_CONSTITUTION` (this brief feeds them; it does not reinvent the system)
 Scope: design direction only. Data model, schema, build order are in the spec + Claude Code prompt.
+> **Persona note (reconciled 2026-06-30):** the archetype names in this brief (Lena / Priya / Nadia / Crowe / Theo / Mara) are **superseded**. The reading coach is **Dr. Cora Vance** (`cora_vance`); counter-voices are the real roster (Coach Maya Rodriguez, Dr. Amara Patel, Mara Chen). See `docs/coaching/READING_CALIBRATION.md` §9 and `docs/BOARDS.md`. This dated brief is kept as the original build record.
 
 ---
 

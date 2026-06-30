@@ -16,7 +16,7 @@
 
 Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `paul_conti`, `andrew_huberman`, `rhonda_patrick`) holding **fictional replacement personas** for backward-compatibility with existing prompts. The displayed name on every public surface is the fictional persona — never the real public figure. The legacy keys are mirrored by canonical keys (`victor_reyes`, `nathan_reeves`, `integrator`, `amara_patel`) used by observatory pages.
 
-### Active personas (20 distinct in the live config; representative set below)
+### Active personas (22 distinct in the live config; representative set below)
 
 | Display name | Title | Type | Config key(s) | Domains |
 |--------------|-------|------|---------------|---------|
@@ -33,12 +33,15 @@ Note on identity: the JSON config keeps **legacy keys** (e.g. `peter_attia`, `pa
 | Dr. Henning Brandt | Biostatistician — N=1 Research | fictional | `henning_brandt` | Statistical rigor, confidence intervals, false-positive risk |
 | Elena Voss | Embedded Journalist — "The Measured Life" | narrator | `elena_voss` | Weekly chronicle author |
 | Margaret Calloway | Senior Editor — Longform | fictional | `margaret_calloway` | Edits Elena's work, narrative structure, prose craft |
+| Dr. Cora Vance | Reading Coach — The Mind Pillar | fictional (non-operational) | `cora_vance` | Periodized reading curriculum, difficulty calibration, two-clock retention, taste archaeology |
 | The Chair | Board Chair — Verdict & Priority | meta_role | `the_chair` | Cross-domain synthesis, one priority, verdict |
 
 **Source of truth**: this table is derived from the live S3 config. To re-verify:
 ```bash
 aws s3 cp s3://matthew-life-platform/config/board_of_directors.json - | python3 -c "import sys, json; d=json.load(sys.stdin); [print(f\"{k} → {v.get('name','?')} ({v.get('type','?')})\") for k,v in d['members'].items()]"
 ```
+
+**Reading Coach (non-operational, 2026-06-30)**: "Dr. Cora Vance — Reading Coach — The Mind Pillar" (key `cora_vance`) is the literary analogue of Dr. Sarah Chen, periodizing reading the way Sarah periodizes training. She is a **defined but non-operational** persona — registered in `personas.json`/`board_of_directors.json` and features-gated to nothing, so she generates no email/chronicle content yet (like Elena Voss and Dr. Eli Marsh sit inert) — pending the reading-coaching surface (ADR-097, the Mind pillar). Her mandate & standing disagreements (vs Coach Maya Rodriguez on the on-ramp; vs Dr. Amara Patel on what reading is *for*; Mara Chen's restraint gate) live in `docs/coaching/READING_CALIBRATION.md` §9. She supersedes the placeholder "Lena Marsh / Priya / Nadia / Crowe / Theo" archetypes from the reading spec.
 
 **Backlog addition**: Sports Medicine / Movement Quality specialist — injury prevention, biomechanics of training at higher body weight, joint health screening.
 
