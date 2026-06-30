@@ -1969,6 +1969,12 @@ def mcp_server() -> list[iam.PolicyStatement]:
             actions=["lambda:InvokeFunction"],
             resources=[_COVER_PIPELINE_ARN],
         ),
+        # ADR-097: the reading LLM features run IN the MCP lambda — book enrichment,
+        # the onboarding taste synthesis, recall gist scoring, and Constellation idea
+        # extraction all go through bedrock_client (budget-guarded). Without this they
+        # fail-soft to empty (un-tagged books, no taste hypothesis). Same scoped grant
+        # every AI-calling role gets (ADR-062).
+        _bedrock_statement(),
     ]
 
 
