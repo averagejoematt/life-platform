@@ -680,6 +680,28 @@ _INTRO_RUBRIC = (
 # The weekly read-aloud bar: a real listener should believe this is a human-made podcast and
 # recommend it. Encodes Matt's acceptance test (2026-06-21) — Turing-pass transcript, guest
 # introduced, no dangling thread, grounded, with humour and human interest.
+# SS-09 (2026-06-30): a format/entry-point rotation lever so the weekly show doesn't
+# feel formulaic by episode 26. The bet/Split/scoreboard scaffold stays (it's the
+# show's identity) — only the LENS the episode leads with rotates, deterministically by
+# week number. Injected into the writer prompt so consecutive episodes feel distinct.
+_EPISODE_ANGLES = [
+    "Open COLD on the single most surprising number in this week's material, then unspool why it matters — no throat-clearing.",
+    "Lead with THE SPLIT: start from where the guest coach most disagrees with the others, and let the friction drive the episode.",
+    "Open by scoring last week's bet out loud — did it hold? — and let that verdict set this week's agenda.",
+    "Lead with the week's hardest moment or biggest effort (process, never outcome) and what it actually revealed.",
+    "Build the episode around a question a curious listener would genuinely ask this week, and answer it honestly end-to-end.",
+    "Lead with what CHANGED versus the established pattern — the inflection, however small — and whether it's signal or noise.",
+]
+
+
+def _episode_angle(week):
+    """The rotating entry-point lens for this week's episode (deterministic by week)."""
+    try:
+        return _EPISODE_ANGLES[int(week) % len(_EPISODE_ANGLES)]
+    except Exception:
+        return _EPISODE_ANGLES[0]
+
+
 _WEEKLY_RUBRIC = (
     "Two speakers: ELENA VOSS (host, embedded journalist) and the GUEST COACH (an AI coach, named in the script). "
     "MATT is the third-person SUBJECT of the experiment — he is NOT in the room and does NOT speak. Elena and the "
@@ -1041,7 +1063,11 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         f"GUEST CONTINUITY: last week's guest was {beats.get('prev_guest') or '(none — first weekly with a coach guest; the only prior episode was the intro)'}. "
         f"THIS week's guest is {guest.get('name')}. If that's a change, introduce {guest.get('name')} properly for the audience "
         f"(who they are + what they work on, drawn from their read/themes above) before getting into it.\n\n"
-        f"RECENT TOPICS (avoid repeating): {beats.get('recent_topics')}\n\nWrite the JSON now."
+        f"RECENT TOPICS (avoid repeating): {beats.get('recent_topics')}\n\n"
+        # SS-09: rotate the entry-point lens so the show doesn't feel formulaic by ep 26.
+        # Keep the bet/Split/scoreboard format — change only what the episode LEADS with.
+        f"THIS WEEK'S ANGLE (keep the format, but lead with THIS lens so the show stays fresh): {_episode_angle(beats.get('week'))}\n\n"
+        "Write the JSON now."
     )
     body = {"model": WRITER_MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=WRITER_MODEL)
