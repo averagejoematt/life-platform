@@ -3576,7 +3576,7 @@ TOOLS = {
         "fn": tool_get_reading_track_record,
         "schema": {
             "name": "get_reading_track_record",
-            "description": "Lena's reading-recommendation track record + auditable hit rate (low-confidence until enough recommendations resolve).",
+            "description": "Cora's reading-recommendation track record + auditable hit rate (low-confidence until enough recommendations resolve).",
             "inputSchema": {
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Max records (default 50)."}},

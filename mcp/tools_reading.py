@@ -162,7 +162,7 @@ def tool_get_due_recalls(args):
 
 
 def tool_get_reading_track_record(args):
-    """Lena's recommendation track record (auditable hit rate)."""
+    """Cora's recommendation track record (auditable hit rate)."""
     recs = reading_store.track_record(limit=int(args.get("limit", 50)))
     resolved = [r for r in recs if r.get("resolvedOutcome")]
     hits = [r for r in resolved if r.get("resolvedOutcome") in ("right", "surprised")]
@@ -423,7 +423,7 @@ def _action_map_ideas(args, dry_run):
 
 
 def _action_log_outcome(args, dry_run):
-    """Resolve a RECOMMENDATION#'s outcome (feeds Lena's track record)."""
+    """Resolve a RECOMMENDATION#'s outcome (feeds Cora's track record)."""
     ts, outcome = args.get("ts"), (args.get("resolved_outcome") or "").lower()
     if not ts or outcome not in ("right", "surprised", "unexpected", "miss"):
         return mcp_error("log_outcome requires ts + resolved_outcome in right|surprised|unexpected|miss", error_code="MISSING_ARG")

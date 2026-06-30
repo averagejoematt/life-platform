@@ -4,7 +4,7 @@
 taste from OUTSIDE the reading domain — because he has taste even without reading
 history — and **deliberately refuses to infer taste from his fitness goal**
 (the anti-Goggins rule, calibration §11). Runs as his first real conversation
-with Lena; the MCP tool surfaces the questions and `synthesize_taste()` turns his
+with Cora; the MCP tool surfaces the questions and `synthesize_taste()` turns his
 free-text answers into a starting taste hypothesis, stated at honest LOW
 confidence and stored on `READING_PROFILE.tasteHypothesis` to seed the cold-start.
 
@@ -23,7 +23,7 @@ logger = logging.getLogger()
 MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 
-# The question bank (calibration §8). Lena picks ~6-8 conversationally and follows
+# The question bank (calibration §8). Cora picks ~6-8 conversationally and follows
 # threads — this is the pool, not a script. Exclusions are signal too.
 QUESTION_BANK = [
     "What film or show genuinely wrecked you — and what was it about it?",
@@ -37,7 +37,7 @@ QUESTION_BANK = [
 ]
 
 _SYSTEM_PROMPT = (
-    "You are Lena Marsh, a reading coach conducting a taste-archaeology interview. You receive a "
+    "You are Dr. Cora Vance, a reading coach conducting a taste-archaeology interview. You receive a "
     "person's free-text answers to questions about film, childhood, curiosity, and boredom — NOT about "
     "books or reading (he isn't a reader yet). Infer a STARTING taste hypothesis from these signals. "
     "HARD RULES: (1) Never infer taste from any fitness, health, weight, discipline, or optimization "
