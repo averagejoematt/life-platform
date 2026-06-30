@@ -1,3 +1,11 @@
+## The Mind Pillar (Reading) — go-live: discoverability, cover-on-add, Bedrock grant, first seed — 2026-06-29
+
+Post-Phase-E follow-ups surfaced by real use; all **deployed live**.
+- **cover-on-add** — `manage_reading add_book` now fire-and-forget invokes `reading-cover-pipeline` (scoped `lambda:InvokeFunction` on the MCP role); a new book gets a cover automatically. Fail-soft.
+- **discoverability** — the home seven-pillar constellation's **Mind node now leads to `/mind/`** (was the old `/data/mind/`); the page had no normal-flow entry before. Mood/journal stays reachable via `/data/` + the `/mind/` foot.
+- **⚠️ Bedrock grant (real gap)** — the reading LLM features (enrichment, onboarding taste synthesis, recall gist scoring, idea extraction) run **in the MCP lambda** but the MCP role lacked `bedrock:InvokeModel` — so they all silently **fail-soft to empty** (un-tagged books, no taste hypothesis). Found via live onboarding (`AccessDeniedException`). Added the standard budget-guarded grant (ADR-062); enrichment + synthesis now work (books come back genre-tagged).
+- **First real seed** — Matthew's onboarding interview synthesized to a low-confidence taste profile; library seeded with Dark Matter (reading) + 5 queued spanning sci-fi/history/biography/memoir/fantasy/philosophy. `/mind/` is now populated.
+
 ## The Mind Pillar (Reading) — Phase E the signature (the Constellation) — 2026-06-29
 
 Phase E: the gated signature. **Built + tested.** Per Mara's restraint rule it ships **dormant behind a beautiful honest-empty state** — a single lit point, "the constellation begins with the first idea you keep" — and fills only on real kept ideas (never fabricated).

@@ -1,3 +1,42 @@
+# HANDOVER — The Mind Pillar (Reading): A–E COMPLETE, LIVE + SEEDED — 2026-06-29
+
+> **🎉 THE WHOLE MIND PILLAR IS LIVE, AND IN USE.** All five phases built + deployed + verified on
+> production, the discoverability + LLM-permission gaps that real use surfaced are fixed, and the library
+> is seeded with Matthew's actual onboarding + first 6 books. `averagejoematt.com/mind/` is populated.
+>
+> **What's live now:** `/mind/` (home → Mind pillar → `/mind/`), `/now/` reading line, `/api/reading_shelf
+> · _overview · constellation`, 9 MCP `manage_reading`/`get_reading_*` tools, 2 lambdas
+> (`reading-cover-pipeline`, `reading-recall-sweep`), 2 GSIs. Reading = `CROSS_PHASE` (survives resets).
+>
+> **Branch `feat/reading-phase-a-data-layer` (~10 commits) is pushed and deployed; it needs Matthew's
+> MERGE** to reconcile `main` (I can't self-merge). Everything is already live in prod.
+>
+> **⚠️ Real-use fixes folded in after the A–E build (each deployed):**
+> 1. **MCP role was missing `bedrock:InvokeModel`** — every reading LLM feature (enrichment / onboarding
+>    synthesis / recall gist / idea extraction) runs IN the MCP lambda and was silently failing-soft to
+>    empty (un-tagged books, blank taste hypothesis). Found live via `AccessDeniedException` on the first
+>    onboarding. Added the budget-guarded grant (ADR-062). **Verify any new MCP AI feature has Bedrock.**
+> 2. **cover-on-add** — `add_book` now invokes `reading-cover-pipeline` (scoped `lambda:InvokeFunction`).
+> 3. **`/mind/` had no normal-flow entry** — pointed the home Mind pillar at it (`story.js`).
+>
+> **The first live loop, end-to-end (proven):** onboarding interview → low-confidence taste profile
+> (sci-fi/fiction/history; "narrative momentum", "second chances") → 6 books added with auto-fetched
+> covers + real genre tags (Dark Matter reading; Wager/Born a Crime/PHM/Ocean/Midnight Library queued,
+> spanning fiction + non-fiction). The wheel fills as books are FINISHED; the Constellation as ideas are
+> kept (`map_ideas` on a debriefed book).
+>
+> **⚠️ S3 note:** the `generated/` prefix is delete-protected (ADR-046), so test cover JPEGs can't be
+> removed via CLI — harmless orphans unless the same bookId is re-added (which re-references them).
+>
+> **Outstanding (next sessions):** (a) **persona reconciliation** — Lena/Priya/Crowe/Nadia/Theo/Mara are
+> archetypes; recast vs `docs/BOARDS.md` BEFORE they surface on the coaching page. (b) The **gated Phase-E
+> backlog** (earned on real reading data): journal-resonance embeddings (recommender already takes the
+> signal), mind-body bridge (`READING_SESSION#` logs `moodSnapshot`), voice debrief, mnemonic medium, the
+> Third-Wall debrief render. (c) The **2 pre-existing pexels** secret-test failures (red on `main` before
+> this work; unrelated). (d) Merge the branch.
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): Phases A–E COMPLETE — 2026-06-29
 
 > **🎉 ALL FIVE PHASES BUILT.** A (data layer) · B (recommender + 8 MCP tools) · C (the /mind/ page +
