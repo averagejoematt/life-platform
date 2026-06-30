@@ -1544,6 +1544,30 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 
 ---
 
+## What-Changed Partition (SS-08, 2026-06-30)
+
+**pk:** `USER#matthew#SOURCE#what_changed`
+**sk:** `SNAPSHOT#current` (the served record) · `STATE#first_seen` (the first-seen ledger)
+
+Monthly "what changed" — real trailing-30d-vs-prior-30d deltas + correlations newly FDR-significant in the last 30 days, so a flat day still shows monthly motion. Written (non-fatal) by `weekly-correlation-compute` each run, piggybacking the series + correlations it already computes (no new queries/lambda). Served read-only at `/api/what_changed`; rendered in the `/now` cockpit "Month" scope. `EXPERIMENT_SCOPED` (wiped + cycle-stamped on reset, ADR-077).
+
+**`SNAPSHOT#current` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `week` | string | ISO week key |
+| `window_start` / `window_end` | string | Trailing-30d window (YYYY-MM-DD) |
+| `deltas` | list | Per-metric 30d-vs-prior averages — emitted only when both halves have ≥10 real days (never zero-filled); each: `{metric,label,unit,this_month_avg,prior_month_avg,delta,pct,direction,n_this,n_prior}` |
+| `newly_unlocked` | list | Correlations first FDR-significant in the last 30 days; each: `{label,metric_a,metric_b,r,n,direction,interpretation,first_seen}` |
+| `honest_null` | bool | True when nothing moved (deltas + newly_unlocked both empty) → a calm "steady month" |
+| `computed_at` | string | ISO timestamp |
+
+**`STATE#first_seen` fields:** `first_sig` (map of `correlation_label → ISO date first FDR-significant`; a pair is stamped once and never re-stamped, so a flickering pair is never re-announced) · `updated_at`.
+
+**Durability:** A single current snapshot + the cumulative ledger (overwritten each run). EXPERIMENT_SCOPED.
+
+---
+
 ## ~~Composite Scores Partition~~ (Removed v3.7.28 — ADR-025)
 
 **Status: REMOVED.** This partition (`USER#matthew#SOURCE#composite_scores`) was consolidated into `computed_metrics` in v3.7.28 (CLEANUP-1 per ADR-025). No new data is written here. All fields previously in this partition now live in the `computed_metrics` partition. Existing historical records remain in DynamoDB but are not read by any Lambda or MCP tool.

@@ -1,6 +1,6 @@
 ## The SS self-sustainability tail (SS-08/09/11) — 2026-06-30
 
-The last documented backlog after the backend serial arc — counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **Built + tested + PR'd; deploys pending merge.** 3 items, 2 PRs: SS-09 + SS-11 → #280; SS-08 → #281.
+The last documented backlog after the backend serial arc — counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **Shipped + deployed live + verified.** 3 items, 2 PRs: SS-09 + SS-11 → #280; SS-08 → #281 — all merged + deployed.
 
 - **SS-11 — editorial-image guardrail** (`editorial_image.py`): a fail-closed quality/denylist gate before an auto-picked Pexels cover ships. `_acceptable(photo)` requires a usable landscape AND an atmospheric description (rejects people/face/text/brand via a word-boundary denylist); `_search` ships the first candidate that clears the gate, or NO image if none qualify. Bundled (not the layer) → no layer dance.
 - **SS-09 — podcast format rotation** (`coach_panel_podcast_lambda.py`): a deterministic per-week entry-point lens (`_episode_angle(week)`, 6 angles) injected into the writer prompt so the show doesn't feel formulaic by ep 26 — the bet/Split/scoreboard identity stays, only the lens rotates.
