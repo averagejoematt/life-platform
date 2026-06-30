@@ -1,3 +1,22 @@
+# HANDOVER — The Mind Pillar (Reading): Phases A + B — 2026-06-29
+
+> **Phase B (engine + MCP) — SHIPPED + DEPLOYED LIVE + verified.** The rules-based recommender
+> (`reading_recommender.py`, spec §4 — decomposed reason strings, confidence n-gate → propose-and-
+> dispose, anti-Goggins penalty, phase-shifting weights), the taste-archaeology onboarding
+> (`reading_onboarding.py`, calibration §8), and **8 MCP tools** (`mcp/tools_reading.py`: 7 reads +
+> `manage_reading` draft→dry_run→commit write fat-tool). Tool count 136→144 (`EXPECTED_MAX_TOOLS`
+> 141→150). **No layer dance** — `mcp_stack.py` stages `lambdas/reading/` into the MCP bundle (the
+> shared layer already provides `numeric`/`retry_utils` that reading needs), so only `LifePlatformMcp`
+> redeployed; no fleet redeploy, no IAM change. **Deployed + verified live:** `cdk deploy
+> LifePlatformMcp` clean (code-asset re-hash only); a direct MCP invoke of `get_reading_shelf`
+> returned `200` with an empty shelf — proving the runtime `from reading import …` resolves AND a
+> real GSI2 query ran against the now-ACTIVE index. Tests: `test_reading_recommender` (10) +
+> `test_reading_onboarding` (6) + `test_tools_reading` (14). Deploy script: `deploy/deploy_reading_mcp.sh`.
+> **Phase A GSIs are both ACTIVE in prod; the cover lambda is live.** Next: Phase C (the `/mind/` page +
+> cockpit thread). Reconcile the panel personas vs `docs/BOARDS.md` before coaches surface (Phase C/D).
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): Phase A data layer — 2026-06-29
 
 Phase A of the reading/Mind pillar — **the data layer only** (no UI, no MCP tools; those are Phases

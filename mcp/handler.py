@@ -350,6 +350,8 @@ _RATE_LIMITED_TOOLS = {
     # Read actions (list/get/dry_run) also count toward the window; trade-off
     # accepted to keep one tool surface rather than splitting.
     "manage_hevy_routine",
+    # ADR-097 (Phase B): reading library write fat-tool (add_book/log_session/etc.).
+    "manage_reading",
 }
 
 

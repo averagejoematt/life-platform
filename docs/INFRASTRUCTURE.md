@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-06-30 (v8.6.0 — 84 Lambdas, 9 active secrets, 136 MCP tools, ~52 alarms)
+> Last updated: 2026-06-30 (v8.6.0 — 84 Lambdas, 9 active secrets, 144 MCP tools, ~52 alarms)
 
 ---
 

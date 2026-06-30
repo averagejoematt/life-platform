@@ -1,3 +1,13 @@
+## The Mind Pillar (Reading) — Phase B engine + MCP tools — 2026-06-29
+
+Phase B: the recommender + onboarding + the MCP tool surface, over the Phase A data layer. **Built + tested; MCP deploy run (no layer dance).** 8 new MCP tools (count 136→144).
+
+- **Rules-based recommender v1** (`lambdas/reading/reading_recommender.py`, spec §4): the transparent objective function (capacity / difficulty-ratchet / breadth / momentum / journal-resonance / phase, minus whiplash / repeat / anti-Goggins penalties), weights shifting by curriculum phase. Every pick **decomposes to a reason string**; confidence is `f(n_finished,n_abandoned)` and below the n-gate it's **propose-and-dispose** (one pick). Never invents data.
+- **Onboarding interview** (`reading_onboarding.py`, calibration §8): the taste-archaeology question bank + a fail-soft LLM synthesis → a low-confidence `tasteHypothesis`, **deliberately refusing to infer taste from the fitness goal** (anti-Goggins).
+- **8 MCP tools** (`mcp/tools_reading.py`, spec §9): 7 reads (`get_reading_shelf` / `_recommendation` / `_profile` / `_history` / `get_due_recalls` / `get_reading_track_record` / `get_constellation`) + `manage_reading` — a **draft→dry_run→commit** write fat-tool (add_book / update_status / log_session / add_note / answer_recall / debrief / log_outcome / update_profile / onboard); previews by default, writes only on explicit `dry_run=false`. Honest empty states (constellation, recommendation, track record).
+- **No layer dance** — the MCP bundle stages `lambdas/reading/` as a package (`mcp_stack.py`), so the reading code keeps its single source of truth and only the MCP stack redeploys (no fleet redeploy). No IAM change (the MCP role already has table + index/* CRUD).
+- **Tests:** `test_reading_recommender` (10) + `test_reading_onboarding` (6) + `test_tools_reading` (14); `test_mcp_registry` ceiling bumped 141→150. Full suite green except the 2 pre-existing pexels failures. Deploy: `deploy/deploy_reading_mcp.sh`.
+
 ## The Mind Pillar (Reading) — Phase A data layer — 2026-06-29
 
 The first phase of the reading/Mind pillar (`docs/SPEC_READING_MIND_2026-06-29.md`): the data layer only — no UI, no MCP tools (those are Phases B–E). **Built + tested; deploy scripts staged for the operator to run.** New SOT domain `reading` on the shared `life-platform` table.
