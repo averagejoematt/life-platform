@@ -11,7 +11,7 @@ The query helpers ARE the access patterns in spec §2:
   3. all notes for a book            → notes(book_id)             (main, begins_with)
   4. due recall prompts (sweep)      → due_recalls(now)           (GSI1, sparse)
   5. roundedness wheel               → wheel_distribution()       (GSI2 finished + BOOK# join)
-  6. Lena's track record             → track_record()            (main, begins_with)
+  6. Cora's track record             → track_record()            (main, begins_with)
   7. Constellation graph             → idea(id) / idea_edges(id)  (main; enum = Phase E)
 """
 
@@ -207,7 +207,7 @@ def put_recall(
 
 
 def put_recommendation(rec: dict, *, now: str | None = None) -> dict:
-    """Append a RECOMMENDATION# audit record (Lena's track record). `inputsSnapshot`
+    """Append a RECOMMENDATION# audit record (Cora's track record). `inputsSnapshot`
     is PRIVATE (snapshots his state)."""
     now = now or _now_iso()
     item = dict(rec)
@@ -369,7 +369,7 @@ def wheel_distribution() -> dict:
 
 
 def track_record(limit: int | None = None) -> list:
-    """§2.6 — Lena's recommendation track record via the main table (begins_with REC#)."""
+    """§2.6 — Cora's recommendation track record via the main table (begins_with REC#)."""
     items = _query(
         KeyConditionExpression=Key("pk").eq(rk.REC_PK) & Key("sk").begins_with(rk.SK_REC_PREFIX),
         ScanIndexForward=False,
