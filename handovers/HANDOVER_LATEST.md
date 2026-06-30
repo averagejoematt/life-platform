@@ -1,3 +1,58 @@
+# HANDOVER — The Mind Pillar (Reading): cover-route fix + persona reconciliation (Dr. Cora Vance) — 2026-06-30
+
+> **🎉 THE READING PILLAR IS NOW COHERENT END-TO-END AND `main == live`.** Two things shipped this
+> session, both merged + deployed + verified; **0 open PRs, zero drift.** The reading pillar A–E work that
+> was deployed-but-not-on-main last session is now reconciled (PR #286 merged), the broken book covers are
+> fixed, and the placeholder reading-coach archetype is recast to a real named persona.
+>
+> **1. Broken book covers (real bug — FIXED + DEPLOYED + visually verified).** Matthew saw broken-image
+> icons in his queue. Root cause: the `reading-cover-pipeline` writes real JPEGs to
+> `generated/covers/<bookId>.jpg` and the `/mind/` front-end requests `/covers/<bookId>.jpg`, but **no
+> CloudFront behavior routed `/covers/*` to `S3GeneratedOrigin`** — every cover fell through to the site
+> origin and 404'd. Phase C shipped the page + pipeline but missed the one edge route. Fix: a `/covers/*`
+> cache behavior in `cdk/stacks/web_stack.py` (mirrors `/assets/images/editorial/*`, 30-day TTL); the S3
+> objects already existed. `cdk diff` clean (one behavior, no IAM/destroy) → `cdk deploy LifePlatformWeb`
+> + invalidate `/covers/*`. **All 6 covers now serve `200 image/jpeg`**, confirmed by curl AND a Playwright
+> `/mind/` screenshot (shelf renders Dark Matter + 5 queued covers crisp). **Durable lesson:** any new
+> generated-content URL path needs its own CloudFront behavior (the ADR-046 prefix-stripping pattern) — a
+> file in `generated/` is invisible at the edge until a behavior routes its viewer path. (PR #286.)
+>
+> **2. Persona reconciliation → Dr. Cora Vance (DONE + DEPLOYED).** The reading coach is now **Dr. Cora
+> Vance** (`cora_vance`), recast from the placeholder "Lena Marsh". Registered in `config/personas.json` +
+> `config/board_of_directors.json` as `type: board`, **`operational: false`**, **`active: false`**,
+> **features-gated to nothing** → a defined-but-dormant persona that generates zero email/chronicle content
+> until the reading-coaching surface ships (exactly how Elena Voss / Dr. Eli Marsh sit inert). All 13
+> `tests/test_persona_registry.py` invariants stay green — incl. the gate that a non-operational persona
+> gets **no `config/coaches/*.json` voice file** (that set matches operational coaches only). Counter-voices
+> recast to the **real roster** (`READING_CALIBRATION.md` §9): Coach Maya Rodriguez (on-ramp), Dr. Amara
+> Patel (longevity-vs-pleasure), Mara Chen (restraint gate). Orphan archetypes **Priya/Nadia/Crowe/Theo
+> dropped** (only ever in the NOTE); Priya's pleasure-stance folded into Cora's own mandate.
+>
+> **⚠️ The rename touched LIVE code, not just docs** (my first `git grep` check missed it — a repo-wide
+> plain `grep` caught it): the onboarding LLM **system prompt** ("You are Dr. Cora Vance",
+> `reading_onboarding.py`), the `/mind/` empty-state string, the MCP **tool description** (`registry.py`),
+> and track-record docstrings. Renamed + deployed: `cdk deploy LifePlatformMcp` (clean code re-hash — no
+> IAM/layer; onboarding prompt + tool desc are bundled there) + `sync_site_to_s3.sh`. **NB — DO NOT TOUCH
+> the separate, pre-existing Product-Board "Lena/Priya" personas** (in `docs/reviews/*`, product-board
+> specs, `daily_insight`/`chronicle` lambdas, `challenges_catalog.json`): they're a different cast, and
+> renaming the reading coach to Cora actually *disambiguates* from them. Dated build briefs
+> (`BRIEF_2026-06-29…`, `CLAUDE_CODE_PROMPT_READING_MIND…`) keep their original names behind a
+> reconciliation pointer (historical record). (PR #287.)
+>
+> **Process notes:** PR #286 was squash-merged mid-session → the post-squash drift guard (clobber guard in
+> `sync_site_to_s3.sh`) correctly **blocked** the site sync because origin/main had a `site/` commit the
+> branch lacked; reconciled by branching fresh off `main` and cherry-picking just the persona delta into
+> #287 (the documented net-delta pattern). Also **deleted the stale `feat/site-polish-reading-layer`
+> branch** — it had forked from main long ago (a merge would have reverted ~9,600 lines of coherence/SS/
+> serial work) and its 2 commits were already shipped via PR #232; verified superseded, then removed.
+>
+> **Outstanding:** only the **gated Phase-E backlog** (journal-resonance embeddings, mind-body bridge,
+> voice debrief, mnemonic medium, Third-Wall debrief render) — deliberately earned on real reading data
+> (Matthew has 6 books, no finishes yet), so it waits. The reading pillar is otherwise complete: real
+> covers, a real named coach, `main == live`. Prior session below.
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): A–E COMPLETE, LIVE + SEEDED — 2026-06-29
 
 > **🎉 THE WHOLE MIND PILLAR IS LIVE, AND IN USE.** All five phases built + deployed + verified on
