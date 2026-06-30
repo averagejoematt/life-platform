@@ -1,3 +1,15 @@
+## Historical-window APIs — backend serial phase 4 (arc complete) — 2026-06-29
+
+The **last** backend serial phase — the backend serial arc is now COMPLETE (all four phases live). Shipped + deployed live + verified (Matthew merged #278 and authorized the deploys). **1 feature PR: #278.** main == live, 0 open PRs.
+
+- **The device:** let a reader arriving months in see the platform **AS OF a past date**, extending the `?date=` time-travel pattern `handle_character` already used to the data/waveform surfaces.
+- **Two endpoints get `?date=`** (both already `DATE#`-keyed → zero new compute): `/api/observatory_week?domain=X&date=Y` (the 6-domain waveform) and `/api/vitals?date=Y` (the cockpit, with a new `site_api_common._latest_item_asof` for the latest weigh-in on-or-before the anchor).
+- **As-of semantics mirror `handle_character` exactly:** most-recent-on-or-before, future clamps to today, pre-genesis honest-null 200 (never 503), `include_pilot=bool(date)` so prior-cycle history shows only when time-travelling, `time_travel` flag, immutable-past day cache. Read-only — stored records served verbatim, never interpolated.
+- **Front-end (`cockpit.js`):** the date-scrubber time-travel mode no longer **hides** the vitals band (it did because no historical vitals endpoint existed) — it shows the **real readings from that date** via `/api/vitals?date=`, plus a chronicle cross-link. (The `evidence.js` silhouette scrubber is *weight*-keyed, not date-keyed, so it's correctly not wired.)
+- **Deploy (site-api only, no layer dance, no CDK):** `deploy_site_api.sh` + `sync_site_to_s3.sh`. **Verified live:** historical-vs-current divergence proves real past records (weight 305 on 06-20 vs 301 now; recovery 60 vs 84); future clamps; pre-genesis 200. New tests: +10 in `tests/test_historical_window.py` (270 site-api tests green).
+
+🎉 **The serial vision is complete:** phase 1 (coach stances) + phase 2 (coaches react to protocols) + phase 3 (Elena recaps) + phase 4 (historical windows). ⚠️ **Outstanding:** only the SS tail (SS-08/09/11). See `handovers/HANDOVER_LATEST.md`.
+
 ## Elena "previously on" recaps — backend serial phase 3 — 2026-06-29
 
 The third backend serial phase, shipped + deployed live + verified end-to-end (Matthew merged #275 + #276 and authorized "you run the deploys"). **1 feature PR: #276 (merged + deployed).** main == live, 0 open PRs.
