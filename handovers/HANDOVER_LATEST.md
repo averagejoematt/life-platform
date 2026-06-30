@@ -1,12 +1,12 @@
 # HANDOVER — The SS self-sustainability tail (SS-08/09/11) — 2026-06-30
 
 The last documented backlog after the backend serial arc: three self-sustainability items —
-counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **Built, tested,
-PR'd; deploys pending Matthew's merge.** With these the full backlog (serial phases 1–4 + SS tail) is
-cleared; only genuinely-deferred items remain.
+counterweights to "fully automatic" content + a flat-day-still-shows-motion view. **SHIPPED + DEPLOYED
+LIVE + verified.** With these the full backlog (serial phases 1–4 + SS tail) is cleared and live; only
+genuinely-deferred items remain.
 
-**3 items, 2 PRs:** SS-09 + SS-11 → **#280**; SS-08 → **#281**. (Plus #279 — the phase-4 wrap docs —
-which this wrap stacks on.) ⚠️ I cannot self-merge (harness guardrail) — all await Matthew's merge.
+**3 items, 2 PRs, all MERGED + DEPLOYED:** SS-09 + SS-11 → **#280**; SS-08 → **#281** (Matthew merged all
+PRs — incl. the #279/#282 wrap docs — and authorized "work through them" for the deploys). 0 open PRs.
 
 ---
 
@@ -45,22 +45,28 @@ new lambda/schedule, no layer dance**):
 **Tests:** `tests/test_ss_tail.py` (11) + `tests/test_what_changed.py` (11); both + all related suites
 green; ruff + black clean; cockpit.js valid.
 
-## 2. Deploys — PENDING Matthew's merge (then I run them; `cdk diff` first)
+## 2. Deploys — DONE + LIVE-VERIFIED (each behind a `cdk diff`; Matthew authorized "work through them")
 
 - **SS-09 + SS-11 (#280) → `LifePlatformEmail`** — both files bundle there; diff = benign shared-bundle
   re-hash, no layer/IAM. Fail-soft/fail-closed, so no live behavior breaks if a cover or episode is
-  skipped.
+  skipped. Passive — take effect on the next weekly panelcast / next chronicle-with-cover.
 - **SS-08 (#281):** **`LifePlatformCompute`** (`weekly_correlation_compute_lambda.py` + `phase_taxonomy.py`
   — asset re-hash only, no IAM: table-wide PutItem already granted, no layer) + **site-api** via
-  `deploy/deploy_site_api.sh /api/what_changed` + **front-end** via `sync_site_to_s3.sh`. **Bootstrap:**
-  `aws lambda invoke --function-name life-platform-weekly-correlation-compute --payload '{"force":true}'`
-  to populate `SNAPSHOT#current` immediately (it runs Sundays otherwise).
+  `deploy/deploy_site_api.sh /api/what_changed` (verified 200) + **front-end** via `sync_site_to_s3.sh`.
+  **Bootstrapped:** `aws lambda invoke --function-name weekly-correlation-compute --payload
+  '{"force":true}'` (NB: the real fn name is `weekly-correlation-compute`, NOT `life-platform-…`) →
+  `SNAPSHOT#current` populated.
+- **Verified live:** `/api/what_changed` serves `honest_null=False, deltas=[], newly_unlocked=1`.
+  `deltas=[]` is correct + honest (genesis 2026-06-14 → the prior-30d half is empty, so NO fabricated
+  month-over-month motion). The 1 unlock (`habit_pct↔day_grade`, ledger-stamped `2026-06-30`) proves the
+  FDR rigor: the run logged "3 significant (|r|≥0.3)" but SS-08 surfaces only the **1 BH-FDR-significant**
+  pair, not the loose-|r| heuristic. `main == live`, nothing left behind.
 
-## 3. ✅ The full backlog is cleared
+## 3. ✅ The full backlog is cleared + DEPLOYED
 
 - Backend serial arc: phase 1 (coach stances) · 2 (coaches react to protocols) · 3 (Elena recaps) ·
   4 (historical windows) — all shipped + deployed live.
-- SS tail: SS-08 · SS-09 · SS-11 — built + PR'd (this wrap).
+- SS tail: SS-08 · SS-09 · SS-11 — shipped + deployed live. **0 open PRs.**
 
 ## 4. ⚠️ OUTSTANDING — only genuinely-deferred items
 
@@ -68,6 +74,6 @@ green; ruff + black clean; cockpit.js valid.
   detect-and-email → block-and-regen at generation time; the known hard item + the `ai_calls.py`
   nutrition guardrail (rides the next layer rebuild).
 - **PRE-13** — genome/lab publication granularity (deferred).
-- **Watch:** the phase-3 spelled-number recap gap; labs_coach `grounding_flag` across weekly runs.
-- **PR housekeeping:** #279 (phase-4 wrap), #280 (SS-09/11), #281 (SS-08) await Matthew's merge; I
-  cannot self-merge. This wrap (`docs/ss-tail-wrap`) stacks on #279.
+- **Watch:** the phase-3 spelled-number recap gap; labs_coach `grounding_flag` across weekly runs; the
+  SS-08 month view stays delta-light until ~30 days post-genesis fill the prior-30d half (then real
+  month-over-month deltas surface — expected, not a bug).
