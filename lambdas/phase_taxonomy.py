@@ -96,6 +96,7 @@ SOURCE_CLASS: dict[str, str] = {
     "circadian": EXPERIMENT_SCOPED,
     "anomalies": EXPERIMENT_SCOPED,
     "weekly_correlations": EXPERIMENT_SCOPED,
+    "what_changed": EXPERIMENT_SCOPED,  # SS-08 monthly delta + first-seen ledger; resets with cycle
     "centenarian_progress": EXPERIMENT_SCOPED,
     "nutrition_review": EXPERIMENT_SCOPED,
     "chronicle": EXPERIMENT_SCOPED,  # the Wednesday narrative (curated carry-forward at restart)

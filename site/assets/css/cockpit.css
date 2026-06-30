@@ -435,6 +435,28 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   .wk-note { display: none; }
 }
 
+/* Month scope — SS-08 "what changed": 30d deltas + newly-unlocked correlations */
+.monthview { margin-top: var(--sp-5); }
+.mo-rows { list-style: none; margin: 0; padding: 0; }
+.mo-row { display: grid; grid-template-columns: 110px auto auto 1fr; align-items: center;
+          gap: var(--sp-3); padding: var(--sp-2) 0; border-bottom: 1px solid var(--rule); }
+.mo-val { font-size: var(--fs-body); }
+.mo-val small { color: var(--ink-muted); font-size: var(--fs-label); }
+.mo-delta { font-family: var(--font-mono); font-size: var(--fs-small); }
+.mo-row.is-up .mo-delta { color: var(--ember); }
+.mo-row.is-down .mo-delta { color: var(--ink-faint); }
+.mo-note { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint);
+           text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mo-unlocks { margin-top: var(--sp-4); display: grid; gap: var(--sp-2); }
+.mo-unlock { font-size: var(--fs-small); line-height: 1.5; color: var(--ink); padding-left: var(--sp-3);
+             border-left: 2px solid var(--ember); }
+.mo-unlock-k { color: var(--ember); margin-right: var(--sp-1); }
+.mo-unlock-r { font-family: var(--font-mono); color: var(--ink-faint); }
+@media (max-width: 480px) {
+  .mo-row { grid-template-columns: 92px auto auto; }
+  .mo-note { display: none; }
+}
+
 /* Time scrubber — any past morning's sheet (2026-06-13) */
 .scrub-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .scrub { background: transparent; border: var(--border-hair); border-radius: var(--radius-xs);
