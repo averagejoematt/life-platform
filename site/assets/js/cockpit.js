@@ -484,12 +484,47 @@ async function renderWeek() {
     : "The week view fills in as the record deepens.";
 }
 
-// Month: honest "not yet" — the record is days old; a month view would just
-// re-run the week (false affordance). Unlocks as the record deepens.
-function showScopeSoon(scope) {
+// Month scope (SS-08): "what changed" — real trailing-30d-vs-prior deltas + correlations
+// newly FDR-significant in the last 30 days, so a flat day still shows monthly motion.
+// honest_null → a calm "steady month" state, never fake motion.
+async function renderMonth() {
   hideDaily();
-  const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Scope";
-  bind("verdict").innerHTML = `The ${scope} view fills in as the record deepens — for now, the 42-day arc lives in <a href="/">the Story</a> and longer trends in <a href="/data/">the Data</a>.`;
+  const mv = document.querySelector("[data-monthview]"); if (mv) mv.hidden = false;
+  const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Month";
+  bind("verdict").textContent = "Reading the month…";
+
+  const wc = await getJSON(`${API}/what_changed`).catch(() => null);
+  const deltas = (wc && wc.deltas) || [];
+  const unlocks = (wc && wc.newly_unlocked) || [];
+
+  const drows = deltas.map((d) => {
+    const up = d.direction === "improved";
+    const arrow = d.delta > 0 ? "▲" : "▼";
+    const pct = typeof d.pct === "number" ? ` (${d.pct > 0 ? "+" : ""}${escapeHTML(String(d.pct))}%)` : "";
+    return `<li class="mo-row ${up ? "is-up" : "is-down"}"><span class="label">${escapeHTML(d.label)}</span>` +
+      `<span class="mo-val num">${escapeHTML(String(d.this_month_avg))}<small> ${escapeHTML(d.unit || "")}</small></span>` +
+      `<span class="mo-delta">${arrow} ${escapeHTML(String(Math.abs(d.delta)))}${pct}</span>` +
+      `<span class="mo-note">vs ${escapeHTML(String(d.prior_month_avg))} prior 30d</span></li>`;
+  });
+  bind("month-deltas").innerHTML = drows.join("");
+
+  const urows = unlocks.map((u) => {
+    const r = typeof u.r === "number" ? ` <span class="mo-unlock-r">r=${escapeHTML(u.r.toFixed(2))}</span>` : "";
+    const txt = u.interpretation || `${u.metric_a || ""} ↔ ${u.metric_b || ""}`;
+    return `<div class="mo-unlock"><span class="mo-unlock-k label">newly unlocked</span> ${escapeHTML(txt)}${r}</div>`;
+  });
+  bind("month-unlocks").innerHTML = urows.join("");
+
+  if (wc && wc.honest_null) {
+    bind("verdict").textContent = "A steady month — no metric crossed its monthly threshold and no new correlation reached significance. Calm is data too.";
+  } else if (drows.length || urows.length) {
+    const bits = [];
+    if (drows.length) bits.push(`${drows.length} metric${drows.length === 1 ? "" : "s"} moved`);
+    if (urows.length) bits.push(`${urows.length} new correlation${urows.length === 1 ? "" : "s"} unlocked`);
+    bind("verdict").textContent = `Past 30 days vs the 30 before — ${bits.join(", ")}.`;
+  } else {
+    bind("verdict").textContent = "The month view fills in as the record deepens.";
+  }
 }
 
 /* ── scope + theme controls ──────────────────────────────────────────────── */
@@ -505,9 +540,10 @@ function wireScope() {
       state.scope = b.dataset.scope;
       bind("scopeLabel").textContent = b.textContent.toLowerCase();
       const wv = document.querySelector("[data-weekview]"); if (wv) wv.hidden = true;
+      const mv = document.querySelector("[data-monthview]"); if (mv) mv.hidden = true;
       if (state.scope === "journey") renderJourney();
       else if (state.scope === "week") renderWeek();
-      else if (state.scope === "month") showScopeSoon(state.scope);
+      else if (state.scope === "month") renderMonth();
       else {
         // Today: restore what hideDaily() inline-hid (children of .dialogue —
         // restoring the parent alone leaves them display:none), then reload.

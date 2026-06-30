@@ -178,6 +178,13 @@
           <ul class="wk-rows" data-bind="weekrows"></ul>
         </section>
 
+        <!-- Month scope: SS-08 "what changed" — real 30d-vs-prior deltas + newly-unlocked correlations -->
+        <section class="monthview" data-monthview hidden aria-label="What changed this month">
+          <p class="cap label">what changed this month</p>
+          <ul class="mo-rows" data-bind="month-deltas"></ul>
+          <div class="mo-unlocks" data-bind="month-unlocks"></div>
+        </section>
+
         <!-- Journey scope: the level-up timeline + achievements (empty-but-ready) -->
         <section class="journey" data-journey hidden aria-label="The journey so far">
           <div class="jr-block">
