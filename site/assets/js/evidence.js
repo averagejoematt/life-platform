@@ -2008,6 +2008,49 @@ function renderBenchmarks(d) {
 const _readingCover = (b) =>
   b && b.coverS3Key ? "/" + String(b.coverS3Key).replace(/^generated\//, "") : b && b.bookId ? `/covers/${esc(b.bookId)}.jpg` : null;
 
+// The reader's own words — intention (why this book / what sparked it / the goal),
+// reflections, and the finished-book takeaway. The loudest type on the page (design
+// brief); only PUBLIC notes ever reach here (the server drops the rest). Empty → "".
+function readingNotes(notes) {
+  const list = Array.isArray(notes) ? notes : [];
+  if (!list.length) return "";
+  const LABELS = { intention: "Why this book", synthesis: "The takeaway", reflection: "Reflections", highlight: "Highlights" };
+  const ORDER = ["intention", "synthesis", "reflection", "highlight"];
+  const byType = {};
+  list.forEach((n) => {
+    (byType[n.type] = byType[n.type] || []).push(n);
+  });
+  return ORDER.filter((t) => byType[t] && byType[t].length)
+    .map((t) => {
+      const body = byType[t].map((n) => `<p class="rdg-note-text">${esc(n.text)}</p>`).join("");
+      return `<div class="rdg-notes"><p class="rdg-note-label label">${esc(LABELS[t] || t)}</p>${body}</div>`;
+    })
+    .join("");
+}
+
+// Finished books, each with cover + the reader's takeaway/reflections (the point of the
+// whole pillar: what was kept, not what was consumed).
+function readingFinishedBlock(items) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return sec("Finished", empty("No finishes yet this cycle — the shelf fills a book at a time."));
+  const rows = list
+    .map((it) => {
+      const b = it.book || {};
+      const cover = _readingCover(b);
+      return (
+        `<article class="rdg-fin">` +
+        `<div class="rdg-fin-head">` +
+        (cover ? `<img class="rdg-fin-cover" src="${esc(cover)}" alt="" loading="lazy">` : "") +
+        `<div><p class="rdg-fin-title">${esc(b.title || "Untitled")}</p>${b.author ? `<p class="rd-meta label">${esc(b.author)}</p>` : ""}</div>` +
+        `</div>` +
+        (readingNotes(it.notes) || `<p class="rd-meta label">Kept on the shelf — a debrief adds the takeaway here.</p>`) +
+        `</article>`
+      );
+    })
+    .join("");
+  return sec("Finished — and what stuck", `<div class="rdg-fin-list">${rows}</div>`);
+}
+
 function readingSpine(item) {
   const b = (item && item.book) || {};
   const s = (item && item.state) || {};
@@ -2045,7 +2088,8 @@ function readingNow(cur) {
       (b.author ? `<p class="rd-meta label rdg-now-author">${esc(b.author)}</p>` : "") +
       (tags ? `<p class="rd-meta label">${tags}</p>` : "") +
       (themes ? `<p class="rd-meta label">themes — ${themes}</p>` : "") +
-      `</div></div>`
+      `</div></div>` +
+      readingNotes(cur && cur.notes)
   );
 }
 
@@ -2122,7 +2166,7 @@ async function renderReading(d) {
   const body =
     readingNow(cur) +
     readingShelfBlock("Up next", shelf && shelf.queue, "Nothing queued yet — the next book is the whole point.") +
-    readingShelfBlock("Finished", shelf && shelf.finished, "No finishes yet this cycle — the shelf fills a book at a time.") +
+    readingFinishedBlock(shelf && shelf.finished) +
     readingShelfBlock("Set down", shelf && shelf.set_down, "") +
     readingWheel(d.wheel) +
     readingConstellation(cst);

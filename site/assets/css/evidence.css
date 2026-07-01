@@ -471,3 +471,13 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 @media (max-width: 640px) {
   .wh-row { grid-template-columns: 5rem 1fr 1.75rem; }
 }
+
+/* The reader's own words — intention (why), reflections, takeaways. Loudest type. */
+.rdg-notes { margin-top: 0.9rem; }
+.rdg-note-label { color: var(--ember); margin: 0 0 0.25rem; }
+.rdg-note-text { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.5; color: var(--ink); margin: 0 0 0.5rem; white-space: pre-line; }
+.rdg-fin-list { display: flex; flex-direction: column; gap: 1.5rem; }
+.rdg-fin { border-left: 2px solid color-mix(in srgb, var(--ink-faint) 30%, transparent); padding-left: 1rem; }
+.rdg-fin-head { display: flex; gap: 0.9rem; align-items: center; margin-bottom: 0.5rem; }
+.rdg-fin-cover { width: 48px; height: auto; border-radius: 3px; flex: 0 0 auto; box-shadow: 0 2px 8px -3px rgba(0, 0, 0, 0.5); }
+.rdg-fin-title { font-family: var(--font-serif); font-size: 1.15rem; color: var(--ink); margin: 0; }
