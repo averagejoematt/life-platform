@@ -86,6 +86,36 @@ class MonitoringStack(Stack):
             a.add_alarm_action(cw_actions.SnsAction(digest if to_digest else topic))
             return a
 
+        # REL-01 (AUDIT 2026-06-30): a silent-failure DETECTOR that stops being
+        # invoked emits no metric, so its "≥1 problem" alarm (treat_missing=NB) sits OK
+        # forever — the watchdog itself goes dark (the 44-day-Garmin class, one level up).
+        # Give each daily detector a HEARTBEAT: BREACHING when its own gauge is ABSENT
+        # for `days` consecutive days. Mirrors panelcast-no-episode-7d exactly —
+        # SampleCount<1 over N full days = "the producer did not run". Requiring N
+        # consecutive days avoids a false fire from the in-progress UTC period (the
+        # reason the problem alarms can't simply flip to BREACHING at evaluation=1).
+        def _heartbeat_alarm(alarm_id, alarm_name, namespace, metric_name, dims=None, days=2):
+            metric = cloudwatch.Metric(
+                namespace=namespace,
+                metric_name=metric_name,
+                dimensions_map=dims or {},
+                period=Duration.seconds(86400),
+                statistic="SampleCount",
+            )
+            a = cloudwatch.Alarm(
+                self,
+                alarm_id,
+                alarm_name=alarm_name,
+                metric=metric,
+                evaluation_periods=days,
+                datapoints_to_alarm=days,
+                threshold=1,
+                comparison_operator=LT,
+                treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+            )
+            a.add_alarm_action(cw_actions.SnsAction(digest))
+            return a
+
         # ══════════════════════════════════════════════════════════════
         # SLO alarms
         # ══════════════════════════════════════════════════════════════
@@ -193,6 +223,37 @@ class MonitoringStack(Stack):
             1,
             GTE,
             to_digest=True,
+        )
+
+        # REL-01: heartbeats for the four silent-failure detectors above. Each fires if
+        # the detector's own daily metric is ABSENT for 2 straight days — i.e. the
+        # producer (pipeline-health / strava-reconcile / freshness-checker / coherence-
+        # sentinel) stopped running. The "≥1 problem" alarms above are NB and blind to
+        # this; these close the "who watches the watchdog" gap. Digest, not urgent.
+        _heartbeat_alarm(
+            "IngestLivenessHeartbeat",
+            "ingest-liveness-heartbeat",
+            "LifePlatform/IngestLiveness",
+            "UnhealthySourceCount",
+        )
+        _heartbeat_alarm(
+            "IngestReconciliationStravaHeartbeat",
+            "ingest-reconciliation-strava-heartbeat",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            dims={"Source": "strava"},
+        )
+        _heartbeat_alarm(
+            "FreshnessInteriorGapHeartbeat",
+            "freshness-interior-gap-heartbeat",
+            "LifePlatform/Freshness",
+            "InteriorGapCount",
+        )
+        _heartbeat_alarm(
+            "CoherenceHeartbeat",
+            "coherence-heartbeat",
+            "LifePlatform/Coherence",
+            "OverallAlarm",
         )
 
         # ══════════════════════════════════════════════════════════════
