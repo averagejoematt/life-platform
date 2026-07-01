@@ -770,6 +770,81 @@ ELENA QUOTE: [One sentence in Elena Voss's voice — third person, literary jour
 Write only the analysis — no preamble, no "Here is my analysis:", just paragraphs followed by the tagged lines."""
 
 
+def _load_engagement_signal():
+    """Read the presence / quiet-stretch state (engagement_state STATE#current),
+    written by adaptive_mode via engagement_core. Fail-soft → {}."""
+    try:
+        resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"})
+        return resp.get("Item") or {}
+    except Exception as e:  # pragma: no cover — defensive
+        logger.warning("engagement signal read failed: %s", e)
+        return {}
+
+
+def _presence_block():
+    """A steering block for when Matthew's OWN logging has gone quiet (or he just
+    returned). Empty string when he's present. This is what stops the observatory
+    coaches + integrator from claiming perfect adherence / an unbroken streak /
+    'zero missed targets' over a window that actually contains a logging gap — the
+    exact incoherence the presence feature exists to kill. The REASON for the gap
+    is never included (the coach names the silence and invites the story)."""
+    sig = _load_engagement_signal()
+    if not sig:
+        return ""
+    cls = sig.get("presence_class")
+    returned = bool(sig.get("returned"))
+    if cls not in ("light", "quiet", "dark") and not returned:
+        return ""  # present → nothing to say
+
+    def _num(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    lines = []
+    if returned:
+        rn = _num(sig.get("resumed_after_days"))
+        lines.append(f"Matthew has JUST RETURNED to logging after ~{rn if rn is not None else 'a few'} days quiet.")
+        wd = sig.get("weight_delta_over_gap")
+        if wd is not None:
+            try:
+                lines.append(f"Weight change over the gap: {float(wd):+g} lb (data, not a verdict).")
+            except (TypeError, ValueError):
+                pass
+        lines.append("Acknowledge the return SUPPORTIVELY — never punitive; the goal is to help him restart.")
+    else:
+        gap = _num(sig.get("gap_days"))
+        last = sig.get("last_food_log_date")
+        gap_txt = f"~{gap} days" if gap is not None else "several days"
+        lines.append(
+            f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log"
+            + (f" (last logged {last})" if last else "")
+            + "."
+        )
+        quiet = sig.get("channels_quiet") or []
+        if quiet:
+            lines.append(f"Channels gone silent: {', '.join(str(q) for q in quiet)}.")
+        if sig.get("passive_still_flowing"):
+            lines.append(
+                "His WEARABLES are still reporting — the passive data (sleep/recovery/RHR) keeps flowing even though he stopped logging, so you can see the consequences but not the cause."
+            )
+        if sig.get("planned_pause"):
+            lines.append(
+                f"This looks like a PLANNED pause ({sig.get('planned_pause_reason') or 'sick/travel'}) — frame it as a break, not falling off."
+            )
+
+    guard = (
+        "CRITICAL: because of this gap, DO NOT claim perfect adherence, an unbroken streak, "
+        "'zero missed targets', or summarize the period as flawless — any window that includes "
+        "these days is INCOMPLETE, and celebrating it would be dishonest. Acknowledge the silence "
+        "honestly in your own voice, ground the day-count in the number above, do NOT invent WHY he "
+        "went quiet (you cannot see it — name the gap and invite the story), and cite only the "
+        "authoritative wearable values you were given for any consequences."
+    )
+    return "PRESENCE / QUIET STRETCH (Matthew's own logging):\n" + "\n".join(f"- {ln}" for ln in lines) + "\n" + guard
+
+
 def _build_shared_system_prompt():
     """Build the cacheable system prompt shared across all 8 expert calls.
 
@@ -853,6 +928,15 @@ def _build_shared_system_prompt():
             )
     except Exception as _fe:
         logger.warning("Authoritative facts injection failed: %s", _fe)
+
+    # Presence / quiet-stretch — if Matthew's own logging has gone quiet, every expert
+    # must notice it rather than narrate a flawless week over an incomplete window.
+    try:
+        _pb = _presence_block()
+        if _pb:
+            parts.append(_pb)
+    except Exception as _pe:  # pragma: no cover — defensive
+        logger.warning("Presence block injection failed: %s", _pe)
 
     # Format instructions (identical for all experts)
     parts.append(
@@ -1225,10 +1309,16 @@ def generate_synthesis(all_coach_outputs):
         else ""
     )
 
+    # Presence / quiet-stretch: the Chair's cross-pillar synthesis is the cockpit's
+    # headline verdict, so it MUST notice a real logging gap — otherwise it crowns a
+    # flawless week over days Matthew logged nothing (the exact incoherence caught).
+    _pb = _presence_block()
+    presence_block = ("\n" + _pb + "\n") if _pb else ""
+
     prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
 
 Matthew's goals: {goals_json}
-{facts_block}
+{facts_block}{presence_block}
 Coach assessments:
 {coach_sections}
 
