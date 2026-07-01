@@ -1,3 +1,47 @@
+# HANDOVER — Platform deep-dive audit + Tier-0/Tier-1 remediation — 2026-07-01
+
+> **A full consulting-grade audit (80-agent workflow, token-only, $0 AWS/Bedrock) → 9 PRs, 5 stacks deployed + live-verified.
+> Platform verdict: fundamentally healthy (0 P0, 0 P1). One Tier-1 item (DEVOPS-02 / OIDC) deliberately deferred.**
+
+## ⚠️ IMMEDIATE STATE (read first)
+- **`main` == #294.** **#295 (pexels registry) + #296 (REL-01 heartbeats) are OPEN.**
+- **`main` is RED until #295 merges** — the audit's CI-integrity work unmasked two pre-existing red-mains (see cascade below). After #295, the full suite is green (verified locally: 2427 passed, black/ruff/mypy clean).
+- **#296 (REL-01) is DEPLOYED but not on main** → a `cdk deploy LifePlatformMonitoring` from main would DROP the 4 new alarms (reverse-drift). **MERGE ORDER: #295 first, then #296.**
+- Deploys done this session: **Compute, Email, MCP, Operational ×2 (COST-01 + SEC-01), Monitoring**, `deploy_site_api.sh`, `sync_site_to_s3.sh`. Each behind a `cdk diff` read (bundle re-hashes / +4 alarms / one IAM condition — zero destroys).
+
+## THE AUDIT
+`docs/reviews/PLATFORM_AUDIT_2026-06-30.md` (25KB). An 80-agent `Workflow`: 10 expert lenses (security · architecture · cost · reliability · correctness · code-quality · privacy · devops · product · frontend), each finding **adversarially verified** by a skeptic that reads the actual code (→ 23 confirmed, 45 refuted — the ~50% false-positive filter). **0 P0, 0 P1, 4 P2, 19 P3.** 7 systemic themes (worth more than any single finding): UTC-vs-Pacific date selection · silent-failure detectors that can themselves go silent · multiple-source-of-truth drift · doc-drift-behind-a-fresh-façade · IAM-known-but-not-applied · CI gate-coverage/masking · built-but-stranded surfaces.
+
+## TIER 0 — deployed + live-verified (#289/#290/#291, MERGED)
+- **BUG-01/02/03** (#289): `circadian-compliance` (7 PM PT) + `evening-nudge` (8 PM PT) + nutrition-MCP derived "today" from **UTC** while data is keyed by the **Pacific** day → their evening crons (02:00–03:00 UTC = *tomorrow* PT) scored an empty future day (published to `/now`) / cried "not logged". Fix: canonical `lambdas/pacific_time.pacific_today()` (bundled into Compute+Email → **no layer dance**) + MCP-single-source mirror `mcp.core.pacific_today`. **Live-proof:** at the real bug window (UTC 07-01 / PT 06-30) circadian wrote `DATE#2026-06-30`. Same class as the #133 DST fix, day-selection sibling.
+- **FE-01** (#290): dead `role="button"` on the cockpit consistency band → removed (verified gone on live `/now`).
+- **BUG-04** (#290): `/api/vitals` 30d trend on a `key=lambda _:0` no-op sort (correct only by DDB return-order luck) → explicit sort, **output unchanged**, + shuffled-input ordering-contract test.
+- **COST-01/CQ-04** (#290): "hourly"→"every 8h" docstring; "advisory"→"ENFORCED" gate comments.
+- **PRIV-01** (#291): the chronicle's only deterministic vice gate (`privacy_guard.VICE_KEYWORDS`) missed **"edible/edibles"** (already in `content_filter.json`) → added + a **superset drift-guard** test (the gate can never again be a subset of the configured filter). `privacy_guard` is a layer module but bundled into every asset → shipped via the Email bundle, **no layer dance**.
+
+## TIER 1
+- **DEVOPS-01 + CQ-01** (#292, MERGED): CI push-`paths` excluded `cdk/`, `ci/`, `config/`, workflows, tooling → those changes ran **NO pipeline** (IAM/alarm/layer-version un-gated) AND the auto-merge ALLOWLIST's premised on-main re-run never fired for its own files. Added the paths + fixed the automerge comment + unified `requirements-dev.txt` black/ruff/playwright to the CI pins + `tests/test_ci_pin_consistency.py`.
+- **SEC-01** (#293, MERGED + DEPLOYED): public `site_api` role had **unconditioned PutItem/UpdateItem on the whole table** → scoped (`LeadingKeys`) to the 6 real interactive partitions (`VOTES#*`/`EXPERIMENT_FOLLOWS`/`CHALLENGE_FOLLOWS`/`RATE#*`/`…experiment_suggestions`/`…challenges`), enumerated exhaustively from `site_api_social.py` + `rate_limiter.py` (findings write to S3, not DDB) + a write-call-site canary test. **Verified via `aws iam simulate-principal-policy`** (zero data pollution): real partitions `allowed`, `…SOURCE#whoop`/`labs` now `implicitDeny`.
+- **REL-01** (#296, OPEN + DEPLOYED): the 4 silent-failure detectors each had only a "≥1 problem" alarm with `treat_missing=NB` — blind to their OWN producer dying. Added a `_heartbeat_alarm` companion per detector = **BREACHING when the daily gauge is absent 2 consecutive days** (`SampleCount<1`, `evaluation=datapoints=2`; mirrors `panelcast-no-episode-7d`; 2 days dodges the in-progress-UTC-period false fire that's why the problem alarms can't just flip to BREACHING at eval=1). +4 digest alarms (52→56); problem alarms untouched. **All 4 live + `breaching`** (INSUFFICIENT_DATA until they accrue 2 days).
+- **⚠️ DEVOPS-02 — DEFERRED (deliberate).** Tighten the OIDC trust subject `repo:org/repo:*` → `ref:refs/heads/main` / `environment:production`, and split the read-only-diff (plan/QA) role from the write (deploy) role. **Why held:** `deploy/setup_github_oidc.sh` rewrites the LIVE IAM trust policy that gates **all** CI/CD — a wrong condition locks GitHub Actions out of AWS entirely (no deploys, no CI rollback), and validating it means watching a real CI run assume the tightened role. Not a tail-of-session change. P3, `matthew-admin`-bounded today. **Plan:** dedicated session → edit the script's trust `StringLike`, apply, then push a trivial commit and confirm the CI/CD run still assumes the role before trusting it; keep the old policy handy for instant revert.
+
+## THE CI-MASKING CASCADE (a real finding, not just process)
+Merging the audit's CI-integrity work triggered fresh pipeline runs that exposed **two pre-existing red-mains** that had been masked for days (CI's Lint job runs gates sequentially — a red `black` skips everything downstream):
+- **#294** (MERGED): `tests/test_editorial_image.py` unformatted since #280 (SS-11) → black red since then.
+- **#295** (OPEN): once black was green, Unit Tests ran → `test_iam_secrets_consistency` + `test_secret_references` failed because **`life-platform/pexels`** (created 2026-06-29 for editorial imagery, referenced in IAM) was never in their `KNOWN_SECRETS`. Registered it (secret verified to exist in AWS) + bumped `test_s4` EXPECTED_COUNT 20→21.
+- Ran the **full suite + all lint gates locally, creds-blanked** → after #295 there are no more layers; main goes green on merge. Lesson reinforced: after greening one gate, run the whole suite locally to surface the next masked layer at once.
+
+## DEPLOY-FROM-BRANCH TRAP (new memory)
+`cdk deploy` / `deploy/*.sh` package the **working tree**, not `origin/main`. I first ran Compute/Email while the worktree sat on the `priv01` feature branch → shipped only that PR's code, **missing** the pacific-date fixes. **The tell: `cdk diff LifePlatformMcp` showed 0 differences when I expected the nutrition change.** Recovered by `git checkout origin/main` + `grep`-verifying every fix present + redeploying. → memory `reference_deploy_from_main_not_worktree_branch`.
+
+## OUTSTANDING
+1. **Merge #295 (first) then #296** → main green + `main == live`.
+2. **DEVOPS-02** (OIDC) — its own careful session (plan above).
+3. **Doc-truth batch** (CQ-02 ARCHITECTURE.md layer/ADR/module + CQ-03 CLAUDE.md counts + PRIV-03 DATA_GOVERNANCE + the stale Secrets Manager table) — the deferred doc-drift-behind-a-fresh-façade theme, as one focused pass.
+4. From the pre-audit backlog: SS-10 coach-grounding, PRE-13 data-publication decision, the gated reading Phase-E.
+
+---
+
 # HANDOVER — The Mind Pillar (Reading): cover-route fix + persona reconciliation (Dr. Cora Vance) — 2026-06-30
 
 > **🎉 THE READING PILLAR IS NOW COHERENT END-TO-END AND `main == live`.** Two things shipped this
