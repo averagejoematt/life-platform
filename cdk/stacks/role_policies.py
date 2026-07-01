@@ -1719,9 +1719,27 @@ def site_api() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN, f"{TABLE_ARN}/index/*"],
         ),
         iam.PolicyStatement(
+            # SEC-01 (AUDIT 2026-06-30): the public site-api write was unconditioned on
+            # the WHOLE table. Scope it to the exact interactive partitions the code
+            # writes (votes, follows, challenge check-ins, experiment suggestions, and
+            # the shared rate limiter), mirroring site_api_ai's RATE#* LeadingKeys.
+            # tests/test_site_api_write_scope.py greps the site-api code and FAILS if a
+            # new write partition appears that isn't covered here — keep them in lockstep.
             sid="DynamoDBWrite",
             actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
             resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": [
+                        "VOTES#*",  # experiment/challenge/predict votes + their per-IP rate limits
+                        "EXPERIMENT_FOLLOWS",  # experiment follows
+                        "CHALLENGE_FOLLOWS",  # challenge follows
+                        "RATE#*",  # shared rate_limiter.py (per-endpoint per-IP counters)
+                        "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
+                        "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
+                    ],
+                },
+            },
         ),
         iam.PolicyStatement(
             sid="KMS",
