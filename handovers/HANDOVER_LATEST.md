@@ -1,12 +1,13 @@
 # HANDOVER — Presence / "the quiet stretch": give a human logging-gap a voice — 2026-07-01
 
 > **When Matthew falls off routine (stops logging food/workouts/habits), the platform now NOTICES — the coaches raise it in their own voice, and the site says so honestly — instead of staying silent.**
-> BUILT + tests green on branch `feat/presence-quiet-stretch` (PR opening). **NOT yet deployed — deploy is gated on Matthew.**
+> **SHIPPED + DEPLOYED LIVE + verified. PR #301 merged, `main == live`, layer v93, fleet uniform (70/70). Matthew authorized the deploys in-session.**
 
-## ⚠️ STATE
-- Branch **`feat/presence-quiet-stretch`** off `origin/main` (`ef53d47f`), 1 feature commit `f3f926c8`. PR to open.
-- **Full suite 2480 passed**; black/ruff green. The **5 failures are pre-existing live-AWS** (`test_coaches_api` needs S3 config → `InvalidBucketName`; `test_i16` needs real DynamoDB) — **confirmed failing identically on clean origin/main via `git stash`**, not caused by this work.
-- **Nothing deployed.** The first `engagement_state STATE#current` record doesn't exist until `adaptive_mode` runs post-deploy, so `/api/presence` returns the honest `present`/`available:false` default and every surface stays hidden until then (safe to ship dark).
+## ⚠️ STATE — DEPLOYED
+- **PR #301 merged** (`main` @ `e69f2153`). Layer **v93** published, `SHARED_LAYER_VERSION=93` on main (no reverse-squash-drift — confirmed main constant == live layer). All 70 fleet functions on v93.
+- **Deployed:** `LifePlatformCore` (layer v93) → Compute + Email + MCP + Ingestion + Operational (all consumers, fleet uniform) → `deploy_site_api.sh` (`/api/presence`) → `sync_site_to_s3.sh` (cockpit + Story, CloudFront invalidated).
+- **LIVE-PROOF (the real scenario, unforced):** bootstrap `adaptive-mode` invoke wrote Matthew's actual state — `engagement_state STATE#current` = **`dark`, gap_days 5** (last food log 2026-06-24), `passive_still_flowing:true`, `returned:false`. `/api/presence` serves it (`in_lull:true`). A live `coach-narrative-orchestrator` invoke (nutrition_coach) confirmed the brief is injected with the real `engagement_signal` (`gap_days:5`, `channels_quiet:["food","journal"]`). The cockpit line + Story beat render it; coaches voice it on the next scheduled daily run.
+- **Full suite 2480 passed** (5 pre-existing live-AWS failures confirmed on clean origin/main via stash); black/ruff green.
 
 ## WHAT & WHY (owner's trigger)
 Matthew went to a friend's 50th Friday, came back Saturday, and — "as always when routine gets disrupted" — stopped logging food, stopped working out, stopped syncing habits, started DoorDashing + eating badly. **With minimal inputs, nothing on the site or in the coaches noticed.** He wanted it to feel like a real experiment where AI coaches act like real coaches: notice the lack of signal, flag "it's day X with no feeds," raise concern about falling off — and when he starts logging again, observe what changed (probably weight regain). Explicitly **NOT a big red PAUSED sign**.
