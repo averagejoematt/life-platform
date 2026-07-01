@@ -29,12 +29,19 @@ def _today() -> str:
 
 
 def _public_shelf_item(state: dict) -> dict:
-    """A public shelf entry = public BOOK facts + public READING state."""
-    book = reading_store.get_book(state.get("bookId", "")) or {}
-    return {
-        "book": rv.project_public(rv.BOOK, book) or {"bookId": state.get("bookId")},
+    """A public shelf entry = public BOOK facts + public READING state + the reader's
+    own PUBLIC notes (intention/why · reflections · finished-book takeaways). Notes pass
+    through project_public_list, which drops any note whose `public` flag is falsy — so a
+    private highlight never leaks. The front-end renders these as the loudest type."""
+    book_id = state.get("bookId", "")
+    book = reading_store.get_book(book_id) or {}
+    item = {
+        "book": rv.project_public(rv.BOOK, book) or {"bookId": book_id},
         "state": rv.project_public(rv.READING_STATE, state) or {},
     }
+    if book_id:
+        item["notes"] = rv.project_public_list(rv.READING_NOTE, reading_store.notes(book_id))
+    return item
 
 
 def _input_streak(sessions: list) -> int:
