@@ -1998,8 +1998,54 @@ function renderBenchmarks(d) {
   return figs([fig(trends.length, "benchmarks")]) + sec("Where the numbers stand", `<table class="rd-tbl"><thead><tr><th>metric</th><th>current</th><th>target</th><th>age-band</th></tr></thead><tbody>${rows}</tbody></table>`) + note("Targets are age-band and centenarian-decathlon references — direction, not destiny.");
 }
 
+// Reading — a compact readout for the Data door's Mind & accountability group that
+// links out to the full /mind/ library (shelf, queue, idea constellation). Reuses
+// /api/reading_overview (the same endpoint that powers /mind/). See AUDIT PROD-01 —
+// this makes the reading pillar discoverable from persistent nav.
+function renderReading(d) {
+  const cur = (d.cockpit_line || {}).current || {};
+  const b = cur.book || {};
+  const st = d.stats || {};
+  const wheel = d.wheel || {};
+  const cover = b.bookId ? `/covers/${esc(b.bookId)}.jpg` : null;
+  const tags = (b.domainTags || []).map(esc).join(" · ");
+  const head = figs([
+    fig(st.finished_count ?? 0, "finished"),
+    st.input_streak_days ? fig(st.input_streak_days, "day streak") : null,
+    wheel.domains ? fig(wheel.domains, "domains") : null,
+    st.sessions_90d != null ? fig(st.sessions_90d, "sessions · 90d") : null,
+  ]);
+  const now = b.title
+    ? sec(
+        "Currently reading",
+        `<div style="display:flex;gap:14px;align-items:center">` +
+          (cover
+            ? `<img src="${cover}" alt="" loading="lazy" style="width:56px;height:auto;border-radius:4px;flex:0 0 auto;box-shadow:0 1px 6px rgba(0,0,0,.18)">`
+            : "") +
+          `<div><p class="rd-name" style="font-size:1.05rem;margin:0">${esc(b.title)}</p>` +
+          (b.author ? `<p class="rd-meta label" style="margin:.2rem 0 0">${esc(b.author)}${tags ? " · " + tags : ""}</p>` : "") +
+          `</div></div>`
+      )
+    : "";
+  const wsec =
+    wheel.total > 0
+      ? sec(
+          "Roundedness",
+          `<p class="rd-meta label">${wheel.domains} domain${wheel.domains === 1 ? "" : "s"} across ${wheel.total} finished book${
+            wheel.total === 1 ? "" : "s"
+          } — the full wheel + idea constellation live in the library.</p>`
+        )
+      : sec(
+          "Roundedness — earned on finishes",
+          `<p class="rd-archive">The roundedness wheel fills as books are <em>finished</em>, not shelved — an honest empty state until the first finish.</p>`
+        );
+  const cta = `<p class="rd-meta label" style="margin-top:1rem"><a href="/mind/"><strong>Open the full library →</strong></a> — the shelf, the queue, and the idea constellation.</p>`;
+  if (!b.title && (st.finished_count || 0) === 0) return empty("The reading library is just getting started.") + cta;
+  return head + now + wsec + cta + note("The Mind pillar — measuring what's kept, not what's consumed.");
+}
+
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
 const WIRE = {
   ask: () => {
     const f = document.querySelector("[data-ask]");
