@@ -154,6 +154,15 @@
              retrospective. What today's light / meal / screen / sleep-timing
              behaviours set tonight's sleep up to be. Present-tense only (hidden
              in time-travel), like the boardline. -->
+        <!-- Presence / quiet stretch (2026-06-30): an honest note when Matthew's own
+             logging has gone quiet — or when he's just returned. Self-hides when he's
+             present. Calm by design — no banner, no red; the platform simply notices. -->
+        <section class="presence" data-presence hidden aria-label="Logging presence">
+          <p class="cap label">the log</p>
+          <p class="presence-line" data-bind="presence-line"></p>
+          <p class="presence-sub label" data-bind="presence-sub" hidden></p>
+        </section>
+
         <section class="circadian" data-circadian hidden aria-label="Tonight's sleep forecast">
           <p class="cap label">tonight's forecast<span class="circ-cat" data-bind="circ-cat"></span></p>
           <div class="circ-gauge">

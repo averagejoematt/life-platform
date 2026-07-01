@@ -340,6 +340,20 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .circadian[data-cat="poor"] .circ-meter i { background: color-mix(in oklch, var(--ember) 55%, var(--ink-faint)); }
 .circadian[data-cat="poor"] .circ-cat { color: var(--ink-muted); }
 
+/* Presence / quiet stretch (2026-06-30) — an honest note when the owner's own
+   logging goes quiet, or when he's back. Calm, not alarmist: the accent only warms
+   as the gap lengthens (dark), and a return reads neutral-warm. Never red. */
+.presence { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.presence-line {
+  margin-top: var(--sp-2); font-family: var(--font-serif); font-style: italic;
+  font-size: var(--fs-quote); line-height: 1.4; color: var(--ink-muted); max-width: var(--measure);
+}
+.presence-sub { margin-top: var(--sp-2); color: var(--ink-faint); }
+.presence[data-cls="quiet"] .presence-line,
+.presence[data-cls="dark"] .presence-line { color: var(--ink); }
+.presence[data-cls="dark"] { border-top-color: color-mix(in oklch, var(--ember) 30%, var(--rule)); }
+.presence[data-cls="returned"] .presence-line { color: var(--ink); }
+
 /* Reading line (Mind pillar, ADR-097) — current book + read-today + streak. No red. */
 .reading-line { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
 .rl-tick { color: var(--ember); }
