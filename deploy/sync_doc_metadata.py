@@ -173,7 +173,7 @@ PLATFORM_FACTS = {
     "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
-    "alarm_count": 52,  # +1 SS-03 (2026-06-29): budget-tier-hardstop (≥3 urgent; ≥2 digest already existed)
+    "alarm_count": 56,  # +4 REL-01 (2026-06-30): silent-failure detector heartbeats (ingest-liveness/strava-reconcile/interior-gap/coherence). Prior 52 (+1 SS-03 budget-tier-hardstop).
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 8,
     "iam_roles": 43,
