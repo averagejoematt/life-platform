@@ -8,13 +8,17 @@ pytest-cov==7.1.0
 
 # Visual QA — Playwright browser automation (tests/visual_qa.py).
 # After install: `playwright install --with-deps chromium`
-playwright==1.61.0
+# CQ-01 (AUDIT 2026-06-30): pinned to MATCH the CI gate (ci-cd.yml) — CI is the
+# source of truth for the enforced gate versions; a mismatch let local formatting
+# diverge from what the build enforces. Bump both together, never one alone.
+playwright==1.58.0
 
 # Linting & formatting (config in pyproject.toml). ruff owns lint + import-sort;
 # black owns formatting. (standalone isort removed — it fought ruff's sorter.)
+# black + ruff versions MUST equal ci-cd.yml's pins (CQ-01) — the ENFORCED gate.
 flake8==7.3.0
-ruff==0.15.20
-black==26.5.1
+ruff==0.14.0
+black==25.9.0
 
 # Type checking (advisory — see tests/test_mypy_clean_modules.py + mypy.ini)
 mypy==2.1.0

@@ -34,6 +34,17 @@ on:
       - 'mcp/**'
       - 'mcp_server.py'
       - 'tests/**'          # test-only changes must re-validate the suite (else CI red lingers)
+      # DEVOPS-01 (AUDIT 2026-06-30): infra/config/tooling were EXCLUDED, so IAM, alarm,
+      # and layer-version changes reached main with NO pipeline — and the auto-merge
+      # ALLOWLIST (role_policies.py, monitoring_stack.py, ci/lambda_map.json) relies on
+      # an on-main re-run that therefore never happened. These paths close that hole.
+      - 'cdk/**'                 # IAM / alarms / layer version → must hit Lint + Plan
+      - 'ci/**'                  # lambda_map.json / deploy-manifest drift
+      - 'config/**'              # config that feeds Lambdas (content_filter, personas, goals)
+      - '.github/workflows/**'   # workflow edits must re-validate
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - '.flake8'
   workflow_dispatch:
     inputs:
       deploy_all:
