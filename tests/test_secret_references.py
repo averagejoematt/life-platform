@@ -68,6 +68,7 @@ KNOWN_SECRETS = {
     "life-platform/hevy",  # ADR-060 / SPEC_HEVY (2026-05-25)
     "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): remediation dispatcher PAT
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): dedicated HMAC signing key for subscriber tokens
+    "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (editorial_image.py)
     # life-platform/google-calendar removed — retired ADR-030 (v3.7.46)
 }
 

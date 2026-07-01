@@ -79,6 +79,7 @@ KNOWN_SECRETS = [
     "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): fine-grained PAT for remediation-dispatcher Lambda → GitHub repository_dispatch. Rotates ~2026-08-27.
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens, dedicated (was sha256(anthropic-api-key)).
     "life-platform/google-tts",  # 2026-06-14: Google Cloud Chirp 3: HD API key for the podcasts (chronicle-podcast + coach-panel-podcast). Created as a prerequisite.
+    "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (wednesday-chronicle + coach-panel-podcast). Created with the editorial-image feature.
     "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
@@ -212,8 +213,10 @@ def test_s4_known_secrets_count_matches_architecture():
     # 2026-05-30 (#106): added life-platform/subscriber-token-secret for dedicated subscriber-token HMAC.
     # 2026-05-31 (ADR-066): added life-platform/hevy-write for the Hevy routine write-loop (separate from read).
     # 2026-06-14: added life-platform/google-tts (Chirp 3: HD voices for the podcasts).
-    # Total = 19 actual secrets + 1 wildcard = 20.
-    EXPECTED_COUNT = 20
+    # 2026-06-29: added life-platform/pexels (editorial cover imagery) — registered in
+    #   KNOWN_SECRETS here as part of the audit CI-unmasking (it was in IAM, not the registry).
+    # Total = 20 actual secrets + 1 wildcard = 21.
+    EXPECTED_COUNT = 21
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "
