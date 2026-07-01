@@ -1,3 +1,41 @@
+# HANDOVER — Reading/Mind pillar: consolidated into the Data door + made content-rich — 2026-07-01
+
+> **The reading pillar is now ONE coherent, content-rich experience inside the Data door, and `main == live` (0 open PRs).**
+> Consolidated from two mismatched surfaces into `/data/reading`; every book shows its "why" (the coach's recommendation
+> reason). Follows the audit session (below) — all of its PRs (#295/#296/#297/#298/#299) are merged; main is green.
+
+## ⚠️ STATE
+- **`main` == #299** (`20e8b15f`), **0 open PRs**, `main == live`. The audit PRs are all in.
+- Reading lives entirely at **`/data/reading`** (Data door). The standalone **`/mind/` is retired** — it's a `noindex` redirect stub → `/data/reading` (bookmarks don't 404).
+
+## WHAT & WHY
+Matthew's feedback on the audit's PROD-01 fix (#298 had added `/data/reading` as a *thin* tile): it was too thin ("just the book I'm reading, not in the spirit of the data page") and clicking "open the full library" jumped to the standalone `/mind/` page, which "made the rest of the site look odd." **Root cause (2 Explore agents):** reading rendered **twice in two chromes** — thin `/data/reading` (evidence.css) + rich `/mind/` (cockpit.css+mind.css, no active-door highlight, truncated footer). **Owner call:** "I just want it to look like the same website" + "full depth" → consolidate into one Data-door surface, retire `/mind/`.
+
+## BUILT (PR #299 — 3 phases, all live + verified)
+- **P1 — consolidate + rich render:** `renderReading()` in `site/assets/js/evidence.js` is now the full async readout (reading-now, shelf, roundedness wheel, idea constellation), ported from `mind.js`, restyled `.rdg-*`/`wh-*`/`cst-` in `evidence.css`. **Retired `/mind/`:** repointed the 2 inbound links (`story.js:45` home constellation node; `/now/` cockpit reading line) to `/data/reading`; `site/mind/index.html` → `noindex` redirect stub; sitemap regenerated.
+- **P2 — serve the reflections:** `lambdas/web/site_api_reading.py::_public_shelf_item` joins each book's **public** notes via `reading_visibility.project_public_list` (fail-closed — only `public:true` notes serve). Deployed via `deploy_site_api.sh`.
+- **P3 — render the "why" + reflections + takeaways:** `readingNotes()` renders them as the loudest type — **"Why this book"** (intention) / "The takeaway" (synthesis) / "Reflections". The queue was generalized from bare spines to `readingBookList` so the why shows per book.
+
+## ⚠️ THE KEY INSIGHT (drives the design)
+Owner: *"I don't know what my intention is, I'm going off your recommendation."* → **the "why" belongs to the coach/recommender, NOT the reader** (the brief's anti-black-box reason-string rule). Forcing the reader to write an intention was backwards. So I **wrote 6 coach-authored recommendation reasons** (Dark Matter + the 5 queued books) as public `intention` notes via `reading_store.add_note` — the exact fn the MCP uses — with a **stable `noteId="coach-why"`** so they're idempotent + **editable in place** (rewrite the same sk to change framing; delete-item to remove). **No new field/tool/allowlist needed:** `intention` is just a public note type, `project_public` gates purely on the `public` flag (type-agnostic), and the capture path (`manage_reading add_note`) already existed.
+
+## GOTCHAS
+- **Local render QA hangs:** the `http.server` + Playwright harness times out on `goto` because the **service worker** stalls headless local loads. Verify reading-page renders against **live prod + a Playwright route-mock** instead (inject a sample note into `/api/reading_overview` to prove the populated render without fabricating owner content).
+- **`/api/reading_*` is CDN-cached 300s** — after writing a note, `curl` with a `?cb=<ts>` buster (or `aws cloudfront create-invalidation --paths /api/reading_shelf /api/reading_overview`) to see it immediately.
+- Reading write-tools (`manage_reading`) were **not exposed in this session's MCP** — wrote notes directly via `reading_store.add_note` (same schema/fn). `mind.js`/`mind.css` are now orphaned but harmless (left in place).
+
+## OUTSTANDING (reading)
+1. **Auto-recommender-reason path** (the clear next want): wire `reading_recommender`'s reason string to persist as a `RECOMMENDATION#` on `add_book` so every future book auto-gets a "why" — no manual note. Reconcile the `reason` vs allowlisted `reasonString` field-name mismatch; serve it on the shelf item.
+2. Proper **`/mind/` CloudFront 301** (vs the current `noindex` stub) — add to `redirects.map` + republish the `v4-redirects` function (careful — it gates all viewer routing).
+3. Rename the Data door's **"Mind & inner life"** tile → **"Mood & journal"** to fully de-collide with the reading pillar.
+4. The 6 coach-why reasons are the owner's to edit — he may reframe any (e.g. picked Dark Matter for the idea, not the momentum).
+
+## OUTSTANDING (from the audit session, still open)
+- **DEVOPS-02** (OIDC trust tighten — dangerous, needs a dedicated session; plan in the audit handover below).
+- **Doc-truth batch** — CQ-02 (ARCHITECTURE.md layer/ADR/module) + CQ-03 (CLAUDE.md counts) + PRIV-03 (DATA_GOVERNANCE + the stale Secrets Manager table).
+
+---
+
 # HANDOVER — Platform deep-dive audit + Tier-0/Tier-1 remediation — 2026-07-01
 
 > **A full consulting-grade audit (80-agent workflow, token-only, $0 AWS/Bedrock) → 9 PRs, 5 stacks deployed + live-verified.
