@@ -341,7 +341,7 @@ async function renderRead(s, id) {
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2><p class="dx-loading shimmer">Loading the timeline…</p>`;
     // The serial spine: walk backwards through the arc, jump into the chronicle week each
     // moment was written. Reads the existing journey-timeline + journey + the chronicle manifest.
-    const [d, jr, pj, rc] = await Promise.all([secFetch(s), tryJSON("/api/journey"), tryJSON("/journal/posts.json"), tryJSON("/api/recap")]);
+    const [d, jr, pj, rc, pres] = await Promise.all([secFetch(s), tryJSON("/api/journey"), tryJSON("/journal/posts.json"), tryJSON("/api/recap"), tryJSON("/api/presence")]);
     const events = (d && d.events ? d.events.slice() : []);
     const posts = (pj && pj.posts) || [];
     events.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));  // newest-first → "walk back"
@@ -377,6 +377,35 @@ async function renderRead(s, id) {
     } else {
       recap = `<aside class="tl-recap"><p class="tl-recap-k label">the story so far</p>` + statLine + `</aside>`;
     }
+    // The quiet stretch (2026-06-30): when the owner's own logging has gone quiet —
+    // or he's just returned — the serial spine says so, honestly. Fed by the
+    // fail-closed /api/presence. No red; the arc simply acknowledges the lull.
+    let quiet = "";
+    if (pres && (pres.in_lull || pres.returned)) {
+      const WD = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      let since = "";
+      if (pres.last_log_date) { const dt = new Date(pres.last_log_date + "T12:00:00"); since = WD[dt.getDay()] || ""; }
+      let head, line;
+      if (pres.returned) {
+        head = "the return";
+        const n = pres.resumed_after_days;
+        line = `Back after ${n ? n + (n === 1 ? " day" : " days") : "a stretch"} away.`;
+        const wd = pres.weight_delta_over_gap_lbs;
+        if (wd != null && wd > 0) line += ` The scale came back up about ${Math.abs(wd)} lb over the gap — noted, not judged.`;
+        else if (pres.passive_still_flowing) line += " The wearables kept the thread while the logs were dark.";
+      } else {
+        head = "the quiet stretch";
+        const n = pres.gap_days;
+        if (pres.planned_pause) {
+          line = `The logs have been quiet${since ? ` since ${since}` : ""} — a planned break.`;
+        } else {
+          line = `The logs have gone quiet${since ? ` since ${since}` : ""} — ${n != null ? n : "several"} ${n === 1 ? "day" : "days"} without an entry.`;
+          if (pres.passive_still_flowing) line += " The wearables kept recording; the coaches are watching for the return.";
+        }
+      }
+      quiet = `<aside class="tl-quiet" data-cls="${esc(pres.returned ? "returned" : (pres.presence_class || ""))}">` +
+        `<p class="tl-quiet-k label">${head}</p><p class="tl-quiet-line">${esc(line)}</p></aside>`;
+    }
     let body;
     if (events.length) {
       let curMonth = "";
@@ -399,7 +428,7 @@ async function renderRead(s, id) {
     }
     read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2>` +
       `<p class="dx-prose">Walk back through the arc — milestones, life events, and <strong>character level-ups</strong> — and jump into the chronicle week each moment was written. <a href="/method/character/">What's a character level?</a></p>` +
-      recap + body;
+      recap + quiet + body;
     return;
   }
   if (s.kind === "fieldnotes") {

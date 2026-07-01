@@ -93,6 +93,7 @@ SOURCE_CLASS: dict[str, str] = {
     "computed_metrics": EXPERIMENT_SCOPED,
     "computed_insights": EXPERIMENT_SCOPED,
     "adaptive_mode": EXPERIMENT_SCOPED,
+    "engagement_state": EXPERIMENT_SCOPED,  # presence / quiet-stretch state; resets with the cycle
     "circadian": EXPERIMENT_SCOPED,
     "anomalies": EXPERIMENT_SCOPED,
     "weekly_correlations": EXPERIMENT_SCOPED,

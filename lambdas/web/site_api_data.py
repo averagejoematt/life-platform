@@ -234,6 +234,50 @@ def handle_source_freshness() -> dict:
     return _ok({"sources": sources, "summary": summary}, cache_seconds=300)
 
 
+# Presence classes the public surface treats as "in a lull" (worth showing a line).
+_PRESENCE_LOUD = {"light", "quiet", "dark"}
+
+
+def handle_presence() -> dict:
+    """GET /api/presence — the honest "quiet stretch" state for the cockpit line +
+    Story beat: is Matthew actively logging, or has he gone quiet?
+
+    FAIL-CLOSED public projection: this builds the response field-by-field from an
+    explicit allowlist and NEVER spreads the stored record — so no private
+    per-channel detail, no passive_read internals, no retention/mood ever leak.
+    Day-counts are already publicly disclosed via /api/source_freshness, so this is
+    consistent with existing disclosure. Honest 'present' default before the first
+    compute (front-end simply hides). Always a shaped 200."""
+    try:
+        resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
+        rec = resp.get("Item") or {}
+    except Exception as e:
+        logger.warning("handle_presence read failed: %s", e)
+        rec = {}
+
+    rec = _decimal_to_float(rec)
+    presence_class = rec.get("presence_class") or "present"
+    returned = bool(rec.get("returned"))
+    in_lull = presence_class in _PRESENCE_LOUD
+
+    out = {
+        "available": bool(rec),
+        "presence_class": presence_class,
+        "in_lull": in_lull,
+        "gap_days": rec.get("gap_days"),
+        "last_log_date": rec.get("last_food_log_date"),
+        "channels_quiet_count": rec.get("channels_quiet_count") or len(rec.get("channels_quiet") or []),
+        "passive_still_flowing": rec.get("passive_still_flowing"),
+        "planned_pause": bool(rec.get("planned_pause")),
+        "planned_pause_reason": rec.get("planned_pause_reason") or "",
+        "returned": returned,
+        "resumed_after_days": rec.get("resumed_after_days") if returned else None,
+        "weight_delta_over_gap_lbs": rec.get("weight_delta_over_gap") if returned else None,
+        "as_of": rec.get("date"),
+    }
+    return _ok(out, cache_seconds=300)
+
+
 def handle_ledger() -> dict:
     """
     GET /api/ledger

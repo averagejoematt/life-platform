@@ -417,6 +417,49 @@ async function renderCircadian() {
   sec.hidden = false;
 }
 
+// The weekday name for an ISO date ("2026-06-26" → "Friday"), for "since Friday".
+function _weekdaySince(iso) {
+  if (!iso) return "";
+  try {
+    const dt = new Date(iso + "T12:00:00");
+    return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dt.getDay()] || "";
+  } catch (e) { return ""; }
+}
+
+// Presence / quiet-stretch (2026-06-30): an honest line when the OWNER's own
+// logging has gone quiet — or when he's just returned after a lull. No streaks,
+// no shame, no red; the platform simply notices, the way a coach would. Reads the
+// fail-closed /api/presence (no private per-channel detail). Self-hides when present.
+async function renderPresence() {
+  const sec = $("[data-presence]");
+  if (!sec) return;
+  let d = null;
+  try { d = await getJSON(`${API}/presence`); } catch (e) { d = null; }
+  if (!d || (!d.in_lull && !d.returned)) { sec.hidden = true; return; }
+  let line = "", sub = "";
+  if (d.returned) {
+    const n = d.resumed_after_days;
+    line = n ? `Back after ${n} ${n === 1 ? "day" : "days"} away.` : "Back at it.";
+    const wd = d.weight_delta_over_gap_lbs;
+    if (wd != null && wd > 0) sub = `The scale came back up about ${Math.abs(wd)} lb over the gap — data, not a verdict.`;
+    else if (d.passive_still_flowing) sub = "The wearables kept the thread while the logs were dark.";
+  } else {
+    const n = d.gap_days;
+    const since = _weekdaySince(d.last_log_date);
+    if (d.planned_pause) {
+      line = `Quiet on the logs${since ? ` since ${since}` : ""} — looks like a planned break.`;
+    } else {
+      line = `Off the grid${since ? ` since ${since}` : ""} — ${n != null ? n : "several"} ${n === 1 ? "day" : "days"} without a log.`;
+      if (d.passive_still_flowing) sub = "The wearables are still reporting — the story picks back up when the logging does.";
+    }
+  }
+  bind("presence-line").textContent = line;
+  const subEl = bind("presence-sub");
+  if (sub) { subEl.textContent = sub; subEl.hidden = false; } else { subEl.hidden = true; }
+  sec.dataset.cls = d.returned ? "returned" : (d.presence_class || "");
+  sec.hidden = false;
+}
+
 // Reading line (Mind pillar, ADR-097): current book + read-today tick + streak.
 // Recall prompts/retention are owner-private — never fetched on the public cockpit.
 async function renderReading() {
@@ -691,6 +734,7 @@ async function load(dateStr) {
     const pri = priority.status === "fulfilled" ? priority.value : null;
     renderVerdict(pri);
     renderBoardline(pri);
+    renderPresence();   // fire-and-forget; hides itself unless he's gone quiet / just returned
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
     renderReading();    // fire-and-forget; hides itself if no book in hand
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
