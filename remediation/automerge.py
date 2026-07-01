@@ -15,7 +15,11 @@ A PR is merged only if ALL hold:
   4. diff is bounded (<= MAX_LINES, no new non-test files)
   5. lint + the offline unit-test subset pass on the PR branch (GITHUB_TOKEN PRs do
      NOT trigger ci-cd.yml, so we run the checks here BEFORE merging; CI re-runs them
-     on main after merge, and the production deploy still requires manual approval)
+     on main after merge, and the production deploy still requires manual approval).
+     NB: the on-main re-run only covers files in ci-cd.yml's push `paths` filter —
+     the ALLOWLIST files (cdk/**, ci/**, lambdas/**, tests/**) are all in that filter
+     as of DEVOPS-01 (AUDIT 2026-06-30). Do not add an ALLOWLIST path that isn't also
+     a CI push-path, or its post-merge validation silently disappears.
   6. under the per-day merge cap
 
 Merged PRs that touch cdk/ are flagged "needs cdk deploy" — CI hot-deploys Lambda
