@@ -1998,50 +1998,191 @@ function renderBenchmarks(d) {
   return figs([fig(trends.length, "benchmarks")]) + sec("Where the numbers stand", `<table class="rd-tbl"><thead><tr><th>metric</th><th>current</th><th>target</th><th>age-band</th></tr></thead><tbody>${rows}</tbody></table>`) + note("Targets are age-band and centenarian-decathlon references — direction, not destiny.");
 }
 
-// Reading — a compact readout for the Data door's Mind & accountability group that
-// links out to the full /mind/ library (shelf, queue, idea constellation). Reuses
-// /api/reading_overview (the same endpoint that powers /mind/). See AUDIT PROD-01 —
-// this makes the reading pillar discoverable from persistent nav.
-function renderReading(d) {
-  const cur = (d.cockpit_line || {}).current || {};
-  const b = cur.book || {};
-  const st = d.stats || {};
-  const wheel = d.wheel || {};
-  const cover = b.bookId ? `/covers/${esc(b.bookId)}.jpg` : null;
+// Reading — the full Mind-pillar readout, rendered INSIDE the Data door so it shares
+// the site chrome (there is no separate /mind/ page — it 301s here). Pulls the shelf
+// (/api/reading_shelf), the roundedness wheel + habit (/api/reading_overview), and the
+// idea constellation (/api/constellation). Honest empty states everywhere; no red on
+// this surface (a set-down book is muted ink, never an alert); the reader's own words
+// are the loudest type. Private fields never arrive — the server projects them out.
+// See AUDIT PROD-01. (Reflections + why/intention + per-book detail layer in next.)
+const _readingCover = (b) =>
+  b && b.coverS3Key ? "/" + String(b.coverS3Key).replace(/^generated\//, "") : b && b.bookId ? `/covers/${esc(b.bookId)}.jpg` : null;
+
+// The reader's own words — intention (why this book / what sparked it / the goal),
+// reflections, and the finished-book takeaway. The loudest type on the page (design
+// brief); only PUBLIC notes ever reach here (the server drops the rest). Empty → "".
+function readingNotes(notes) {
+  const list = Array.isArray(notes) ? notes : [];
+  if (!list.length) return "";
+  const LABELS = { intention: "Why this book", synthesis: "The takeaway", reflection: "Reflections", highlight: "Highlights" };
+  const ORDER = ["intention", "synthesis", "reflection", "highlight"];
+  const byType = {};
+  list.forEach((n) => {
+    (byType[n.type] = byType[n.type] || []).push(n);
+  });
+  return ORDER.filter((t) => byType[t] && byType[t].length)
+    .map((t) => {
+      const body = byType[t].map((n) => `<p class="rdg-note-text">${esc(n.text)}</p>`).join("");
+      return `<div class="rdg-notes"><p class="rdg-note-label label">${esc(LABELS[t] || t)}</p>${body}</div>`;
+    })
+    .join("");
+}
+
+// A book list where each row carries cover + facts + the reader/coach's own words
+// (why this book · reflections · the finished takeaway). Used for the queue (so the
+// recommendation reason shows per book — the point of the pillar: the why, not just the
+// spine) and for finished. `fallbackNote` shows when a book has no public note yet.
+function readingBookList(title, items, opts) {
+  opts = opts || {};
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return opts.emptyMsg ? sec(title, empty(opts.emptyMsg)) : "";
+  const rows = list
+    .map((it) => {
+      const b = it.book || {};
+      const cover = _readingCover(b);
+      const tags = (b.domainTags || []).map(esc).join(" · ");
+      const notes = readingNotes(it.notes);
+      return (
+        `<article class="rdg-fin">` +
+        `<div class="rdg-fin-head">` +
+        (cover ? `<img class="rdg-fin-cover" src="${esc(cover)}" alt="" loading="lazy">` : "") +
+        `<div><p class="rdg-fin-title">${esc(b.title || "Untitled")}</p>` +
+        (b.author ? `<p class="rd-meta label">${esc(b.author)}${tags ? " · " + tags : ""}</p>` : "") +
+        `</div></div>` +
+        (notes || (opts.fallbackNote ? `<p class="rd-meta label">${esc(opts.fallbackNote)}</p>` : "")) +
+        `</article>`
+      );
+    })
+    .join("");
+  return sec(title, `<div class="rdg-fin-list">${rows}</div>`);
+}
+
+function readingSpine(item) {
+  const b = (item && item.book) || {};
+  const s = (item && item.state) || {};
+  const title = b.title || "Untitled";
+  const author = b.author || "";
+  const cover = _readingCover(b);
+  const rating = s.rating != null ? `<span class="rdg-rating num">${esc(s.rating)}★</span>` : "";
+  const inner = cover
+    ? `<img class="rdg-cover" src="${esc(cover)}" alt="" loading="lazy">`
+    : `<span class="rdg-spine-t">${esc(title)}</span>${author ? `<span class="rdg-spine-a">${esc(author)}</span>` : ""}`;
+  return (
+    `<figure class="rdg-spine rdg-${esc(s.status || "")}" title="${esc(title)}${author ? " — " + esc(author) : ""}">` +
+    `<span class="rdg-face">${inner}</span>` +
+    `<figcaption class="rdg-cap label">${esc(title)}${rating}</figcaption></figure>`
+  );
+}
+
+function readingShelfBlock(title, items, emptyMsg) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return emptyMsg ? sec(title, empty(emptyMsg)) : "";
+  return sec(title, `<div class="rdg-shelf">${list.map(readingSpine).join("")}</div>`);
+}
+
+function readingNow(cur) {
+  const b = (cur && cur.book) || null;
+  if (!b) return sec("Reading now", empty("Nothing on the nightstand right now — the next book is the whole point."));
+  const cover = _readingCover(b);
   const tags = (b.domainTags || []).map(esc).join(" · ");
+  const themes = (b.themes || []).slice(0, 4).map(esc).join(" · ");
+  return sec(
+    "Reading now",
+    `<div class="rdg-now">` +
+      (cover ? `<img class="rdg-now-cover" src="${esc(cover)}" alt="" loading="lazy">` : "") +
+      `<div class="rdg-now-meta"><p class="rdg-now-title">${esc(b.title || "Untitled")}</p>` +
+      (b.author ? `<p class="rd-meta label rdg-now-author">${esc(b.author)}</p>` : "") +
+      (tags ? `<p class="rd-meta label">${tags}</p>` : "") +
+      (themes ? `<p class="rd-meta label">themes — ${themes}</p>` : "") +
+      `</div></div>` +
+      readingNotes(cur && cur.notes)
+  );
+}
+
+function readingWheel(wheel) {
+  const dist = (wheel && wheel.distribution) || {};
+  const entries = Object.entries(dist).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((s, [, n]) => s + n, 0);
+  if (total < 1)
+    return sec(
+      "Roundedness — earned on finishes",
+      empty("The wheel fills as books are finished, not shelved — a domain lights up when its first book is kept. Honest and empty until then.")
+    );
+  const max = Math.max(...entries.map(([, n]) => n));
+  const bars = entries
+    .map(
+      ([tag, n]) =>
+        `<div class="wh-row"><span class="wh-label label">${esc(tag)}</span><span class="wh-bar"><i style="width:${Math.round(
+          (n / max) * 100
+        )}%"></i></span><span class="wh-n num">${esc(n)}</span></div>`
+    )
+    .join("");
+  return sec("Roundedness — what's been kept", bars);
+}
+
+function readingConstellation(cst) {
+  if (!cst || !cst.ready || !Array.isArray(cst.nodes) || cst.nodes.length < 4) {
+    const seedNote = (cst && cst.note) || "the constellation begins with the first idea you keep";
+    return sec(
+      "The idea constellation",
+      `<div class="rdg-seed"><span class="rdg-seed-dot" aria-hidden="true"></span><p class="rd-archive">${esc(seedNote)}</p></div>`
+    );
+  }
+  const nodes = cst.nodes.slice(0, 40);
+  const edges = Array.isArray(cst.edges) ? cst.edges : [];
+  const W = 360,
+    H = 360,
+    cx = W / 2,
+    cy = H / 2,
+    r = 140,
+    pos = {};
+  nodes.forEach((n, i) => {
+    const a = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
+    pos[n.ideaId] = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  });
+  const edgeSvg = edges
+    .filter((e) => pos[e.from] && pos[e.to])
+    .map((e) => `<line class="cst-edge" x1="${pos[e.from].x.toFixed(1)}" y1="${pos[e.from].y.toFixed(1)}" x2="${pos[e.to].x.toFixed(1)}" y2="${pos[e.to].y.toFixed(1)}"/>`)
+    .join("");
+  const nodeSvg = nodes
+    .map((n) => {
+      const p = pos[n.ideaId];
+      const recent = Number(n.recency || 0) > 0.6 ? " cst-recent" : "";
+      return `<g class="cst-node${recent}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5"/><title>${esc(n.label || "")}</title></g>`;
+    })
+    .join("");
+  return sec(
+    "The idea constellation",
+    `<figure class="rdg-cst"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="A graph of ${nodes.length} ideas kept and their connections"><g class="cst-edges">${edgeSvg}</g><g class="cst-nodes">${nodeSvg}</g></svg><figcaption class="label">${nodes.length} ideas kept · ${edges.length} connections</figcaption></figure>`
+  );
+}
+
+async function renderReading(d) {
+  d = d || {};
+  const [shelf, cst] = await Promise.all([tryJSON("/api/reading_shelf"), tryJSON("/api/constellation")]);
+  const st = d.stats || {};
+  const counts = (shelf && shelf.counts) || {};
+  const cur = (d.cockpit_line || {}).current || (shelf && (shelf.reading || [])[0]) || null;
   const head = figs([
-    fig(st.finished_count ?? 0, "finished"),
+    fig(st.finished_count ?? counts.finished ?? 0, "finished"),
+    counts.queue != null ? fig(counts.queue, "in the queue") : null,
     st.input_streak_days ? fig(st.input_streak_days, "day streak") : null,
-    wheel.domains ? fig(wheel.domains, "domains") : null,
     st.sessions_90d != null ? fig(st.sessions_90d, "sessions · 90d") : null,
   ]);
-  const now = b.title
-    ? sec(
-        "Currently reading",
-        `<div style="display:flex;gap:14px;align-items:center">` +
-          (cover
-            ? `<img src="${cover}" alt="" loading="lazy" style="width:56px;height:auto;border-radius:4px;flex:0 0 auto;box-shadow:0 1px 6px rgba(0,0,0,.18)">`
-            : "") +
-          `<div><p class="rd-name" style="font-size:1.05rem;margin:0">${esc(b.title)}</p>` +
-          (b.author ? `<p class="rd-meta label" style="margin:.2rem 0 0">${esc(b.author)}${tags ? " · " + tags : ""}</p>` : "") +
-          `</div></div>`
-      )
-    : "";
-  const wsec =
-    wheel.total > 0
-      ? sec(
-          "Roundedness",
-          `<p class="rd-meta label">${wheel.domains} domain${wheel.domains === 1 ? "" : "s"} across ${wheel.total} finished book${
-            wheel.total === 1 ? "" : "s"
-          } — the full wheel + idea constellation live in the library.</p>`
-        )
-      : sec(
-          "Roundedness — earned on finishes",
-          `<p class="rd-archive">The roundedness wheel fills as books are <em>finished</em>, not shelved — an honest empty state until the first finish.</p>`
-        );
-  const cta = `<p class="rd-meta label" style="margin-top:1rem"><a href="/mind/"><strong>Open the full library →</strong></a> — the shelf, the queue, and the idea constellation.</p>`;
-  if (!b.title && (st.finished_count || 0) === 0) return empty("The reading library is just getting started.") + cta;
-  return head + now + wsec + cta + note("The Mind pillar — measuring what's kept, not what's consumed.");
+  const body =
+    readingNow(cur) +
+    readingBookList("Up next", shelf && shelf.queue, {
+      emptyMsg: "Nothing queued yet — the next book is the whole point.",
+      fallbackNote: "",
+    }) +
+    readingBookList("Finished — and what stuck", shelf && shelf.finished, {
+      emptyMsg: "No finishes yet this cycle — the shelf fills a book at a time.",
+      fallbackNote: "Kept on the shelf — a debrief adds the takeaway here.",
+    }) +
+    readingShelfBlock("Set down", shelf && shelf.set_down, "") +
+    readingWheel(d.wheel) +
+    readingConstellation(cst);
+  return head + body + note("The Mind pillar — measuring what's kept, not what's consumed. Private fields (retention, mood) never reach this page.");
 }
 
 const RENDERERS = {
