@@ -109,6 +109,16 @@ REGISTRY = [
         "/legacy/mind/",
     ),
     (
+        "reading",
+        "Reading",
+        "Books finished, what's on the shelf, and the ideas kept — the Mind pillar.",
+        "Mind & accountability",
+        "data",
+        "/api/reading_overview",
+        None,
+        None,
+    ),
+    (
         "habits",
         "Habits",
         "The daily adherence layer the Consistency pillar is built on.",
