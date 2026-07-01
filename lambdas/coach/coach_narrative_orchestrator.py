@@ -442,6 +442,12 @@ def _gather_all_state(coach_id):
     # (Phase 2). Read-only, domain-routed, fail-soft; {} when nothing is active.
     site_protocols = _gather_site_protocols(coach_id)
 
+    # 12. Presence / quiet-stretch state — whether Matthew is actively logging or
+    # has fallen off routine (engagement_core, written by adaptive_mode). Shared by
+    # all coaches (not per-coach) — it's about the human, not the domain. Absent /
+    # 'present' ⇒ the coach says nothing about it. Fail-soft, like stance.
+    engagement_signal = _get_item(f"USER#{USER_ID}#SOURCE#engagement_state", "STATE#current")
+
     return {
         "target_compressed": target_compressed,
         "other_compressed": other_compressed,
@@ -454,6 +460,7 @@ def _gather_all_state(coach_id):
         "active_predictions": active_predictions,
         "current_stance": current_stance,
         "site_protocols": site_protocols,
+        "engagement_signal": engagement_signal,
     }
 
 
@@ -548,6 +555,46 @@ def _protocols_for_brief(protocols):
         if trimmed:
             out[surface] = trimmed
     return out
+
+
+# Presence classes that warrant the coach saying something. 'present' is silence.
+_ENGAGEMENT_LOUD = {"light", "quiet", "dark"}
+
+
+def _engagement_for_brief(signal):
+    """Trim the engagement_state STATE#current record to the fields a coach needs
+    to VOICE the gap — and nothing that would let it fabricate the CAUSE. Returns
+    None when Matthew is present (or a returned-flag is the only news), so the key
+    is omitted from the brief entirely and the coach stays quiet on it.
+
+    Carries only: presence class, the real gap day-count, which channels went
+    quiet, whether the wearables are still flowing, the planned-pause flag, and —
+    on a return — how many days he was gone plus any real weight regain and the
+    real passive read. The REASON for the gap is never here (the coach must invite
+    the story, not invent it)."""
+    if not isinstance(signal, dict):
+        return None
+    presence = signal.get("presence_class")
+    returned = bool(signal.get("returned"))
+    if presence not in _ENGAGEMENT_LOUD and not returned:
+        return None  # present + no return → nothing to say
+    out = {
+        "presence_class": presence,
+        "gap_days": signal.get("gap_days"),
+        "last_food_log_date": signal.get("last_food_log_date"),
+        "channels_quiet": signal.get("channels_quiet") or [],
+        "passive_still_flowing": signal.get("passive_still_flowing"),
+        "planned_pause": bool(signal.get("planned_pause")),
+        "planned_pause_reason": signal.get("planned_pause_reason") or "",
+        "returned": returned,
+    }
+    if returned:
+        out["resumed_after_days"] = signal.get("resumed_after_days")
+        if signal.get("weight_delta_over_gap") is not None:
+            out["weight_delta_over_gap_lbs"] = signal.get("weight_delta_over_gap")
+    if signal.get("passive_read"):
+        out["passive_read"] = signal.get("passive_read")
+    return {k: v for k, v in out.items() if v not in (None, "", [])}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -696,6 +743,20 @@ def _build_user_message(state, coach_id, today):
         parts.append(
             "Plan the coach to acknowledge the relevant ones by name and give an honest read — "
             "grounded in the data already in this context, never invented progress."
+        )
+        parts.append("")
+
+    # Presence / quiet-stretch signal: surface here so PLANNING makes the lull (or
+    # the return) the beat when it matters; injected into the brief deterministically
+    # downstream (like the stance/protocols).
+    engagement = _engagement_for_brief(state.get("engagement_signal"))
+    if engagement:
+        parts.append("## Presence signal (Matthew's own logging)")
+        parts.append(json.dumps(engagement, indent=2, default=str))
+        parts.append(
+            "If this shows a real gap (or a return), make NOTICING it the narrative beat — in "
+            "this coach's own voice. Ground the day-count in the real numbers; never invent the "
+            "reason for the silence — name it, note what the wearables caught, and invite the story."
         )
         parts.append("")
 
@@ -884,6 +945,14 @@ def lambda_handler(event, context):
     protocols = _protocols_for_brief(state.get("site_protocols"))
     if protocols and isinstance(brief.get("generation_brief"), dict):
         brief["generation_brief"]["site_protocols"] = protocols
+
+    # Inject the presence / quiet-stretch signal DETERMINISTICALLY (same seam) so a
+    # real logging gap reaches the coach on every path — it can then notice the
+    # silence in its own voice (and note the return). Omitted when Matthew is
+    # present (nothing to say). The REASON for the gap is never in the payload.
+    engagement = _engagement_for_brief(state.get("engagement_signal"))
+    if engagement and isinstance(brief.get("generation_brief"), dict):
+        brief["generation_brief"]["engagement_signal"] = engagement
 
     # Cache the brief for fallback use
     _cache_brief(coach_id, brief, today)

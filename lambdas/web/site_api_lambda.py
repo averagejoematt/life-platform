@@ -107,6 +107,7 @@ from web.site_api_data import (
     handle_observatory_week,
     handle_phenoage,
     handle_platform_stats,
+    handle_presence,
     handle_protocols,
     handle_sleep_correlations,
     handle_sleep_detail,
@@ -430,6 +431,8 @@ ROUTES = {
     "/api/platform_stats": handle_platform_stats,
     # Live pipeline status: per-source freshness (fresh/stale/paused)
     "/api/source_freshness": handle_source_freshness,
+    # Presence / quiet-stretch: is Matthew actively logging or has he gone quiet
+    "/api/presence": handle_presence,
     # Discoveries page: active hypotheses + inner life + AI findings
     "/api/discoveries": handle_discoveries,
     # Experiment suggestion (POST)

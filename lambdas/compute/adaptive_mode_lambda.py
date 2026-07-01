@@ -35,6 +35,7 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ALGO_VERSION = "1.0"
+ENGAGEMENT_ALGO_VERSION = "1.0"
 
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -280,6 +281,157 @@ def compute_adaptive_mode(date_str):
     }
 
 
+# ── Presence / quiet-stretch (engagement_state) ───────────────────────────────
+# A separate instrument from the engagement_score above: that one deliberately
+# NEUTRALISES missing data (returns 50 so it never penalises a gap); this one
+# MEASURES the gap so the coaches and the site can voice it. Same lambda, same
+# schedule, its own record — engagement_score keeps its philosophy untouched.
+
+
+def _engagement_reference_today():
+    """The real 'now' Pacific day — engagement is measured from now, not from the
+    yesterday that adaptive_mode scores. Falls back to UTC if pacific_time absent."""
+    try:
+        from pacific_time import pacific_today
+
+        return pacific_today()
+    except Exception:
+        return datetime.now(timezone.utc).date().isoformat()
+
+
+def _log_dates(source, today, window_days=35):
+    """Trailing-window list of days `source` logged (high-water-mark widened).
+    Deduped 'YYYY-MM-DD', newest first. BETWEEN spans suffixed SKs (hevy
+    DATE#..#WORKOUT#, notion DATE#..#journal#)."""
+    from datetime import timedelta as _td
+
+    pk = f"USER#{USER_ID}#SOURCE#{source}"
+    base = datetime.strptime(today, "%Y-%m-%d").date()
+    lo = (base - _td(days=window_days)).isoformat()
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+            ExpressionAttributeValues={":pk": pk, ":lo": f"DATE#{lo}", ":hi": f"DATE#{today}~"},
+            ProjectionExpression="sk",
+        )
+    except Exception as e:
+        logger.warning("engagement _log_dates(%s) query failed: %s", source, e)
+        return []
+    out = set()
+    for it in resp.get("Items", []):
+        d = it.get("sk", "").replace("DATE#", "")[:10]
+        try:
+            datetime.strptime(d, "%Y-%m-%d")
+            out.add(d)
+        except ValueError:
+            continue
+    return sorted(out, reverse=True)
+
+
+def _latest_date(source, today):
+    """Newest DATE# day for a source (high-water-mark), or None."""
+    dates = _log_dates(source, today, window_days=14)
+    return dates[0] if dates else None
+
+
+def _weight_series(today, window_days=60):
+    """[(date, weight_lbs)] from Withings over the window, for the return delta."""
+    from datetime import timedelta as _td
+
+    pk = f"USER#{USER_ID}#SOURCE#withings"
+    base = datetime.strptime(today, "%Y-%m-%d").date()
+    lo = (base - _td(days=window_days)).isoformat()
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
+            ExpressionAttributeValues={":pk": pk, ":lo": f"DATE#{lo}", ":hi": f"DATE#{today}~"},
+            ProjectionExpression="sk, weight_lbs",
+        )
+    except Exception as e:
+        logger.warning("engagement _weight_series query failed: %s", e)
+        return []
+    series = []
+    for it in resp.get("Items", []):
+        w = it.get("weight_lbs")
+        d = it.get("sk", "").replace("DATE#", "")[:10]
+        if w is not None:
+            try:
+                series.append((d, float(w)))
+            except (ValueError, TypeError):
+                continue
+    return series
+
+
+def store_engagement_state(today, signal):
+    """Write the presence record: DATE#{today} (history) + STATE#current (cheap
+    read for the orchestrator + site-api, like STANCE#latest)."""
+    from compute_metadata import tag_record
+    from numeric import floats_to_decimal
+
+    base = {
+        "pk": f"USER#{USER_ID}#SOURCE#engagement_state",
+        "date": today,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "algo_version": ENGAGEMENT_ALGO_VERSION,
+        **signal,
+    }
+    base = floats_to_decimal(base)
+    for sk in (f"DATE#{today}", "STATE#current"):
+        item = dict(base, sk=sk)
+        try:
+            item = tag_record(item, source_id="engagement_state")
+        except ImportError:
+            pass
+        table.put_item(Item=item)
+    logger.info(
+        "Stored engagement_state for %s: %s (gap=%s, returned=%s)",
+        today,
+        signal.get("presence_class"),
+        signal.get("gap_days"),
+        signal.get("returned"),
+    )
+
+
+def compute_and_store_engagement():
+    """Compute + persist the presence / quiet-stretch state. Fail-soft — never
+    aborts the adaptive_mode run."""
+    from engagement_core import MANUAL_CHANNELS, WEARABLES, compute_presence
+
+    today = _engagement_reference_today()
+    channel_dates = {src: _log_dates(src, today) for src in MANUAL_CHANNELS}
+    wearable_latest = {src: _latest_date(src, today) for src in WEARABLES}
+    weight_series = _weight_series(today)
+
+    sick_days = set()
+    try:
+        from sick_day_checker import get_sick_days_range
+
+        base = datetime.strptime(today, "%Y-%m-%d").date()
+        recs = get_sick_days_range(table, USER_ID, (base - timedelta(days=35)).isoformat(), today) or []
+        sick_days = {r.get("date") for r in recs if r.get("date")}
+    except Exception as e:
+        logger.info("engagement sick-day lookup skipped: %s", e)
+
+    travel_days = _travel_days(today)
+
+    signal = compute_presence(
+        today,
+        channel_dates,
+        wearable_latest=wearable_latest,
+        weight_series=weight_series,
+        sick_days=sick_days,
+        travel_days=travel_days,
+    )
+    store_engagement_state(today, signal)
+    return signal
+
+
+def _travel_days(today, window_days=35):
+    """Set of 'YYYY-MM-DD' with a travel log in the window (best-effort)."""
+    dates = set(_log_dates("travel", today, window_days=window_days))
+    return dates
+
+
 # ── Lambda handler ────────────────────────────────────────────────────────────
 
 
@@ -323,6 +475,13 @@ def lambda_handler(event, context):
             except Exception as e:
                 logger.error(f"Failed to compute adaptive mode for {date_str}: {e}", exc_info=True)
                 results.append({"date": date_str, "error": str(e)})
+
+        # Presence / quiet-stretch state — separate instrument, fail-soft so a
+        # gap-compute error never aborts the adaptive_mode write above.
+        try:
+            compute_and_store_engagement()
+        except Exception as e:
+            logger.error("compute_and_store_engagement failed (non-fatal): %s", e, exc_info=True)
 
         if len(results) == 1:
             return results[0]
