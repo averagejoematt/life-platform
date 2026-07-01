@@ -2028,27 +2028,33 @@ function readingNotes(notes) {
     .join("");
 }
 
-// Finished books, each with cover + the reader's takeaway/reflections (the point of the
-// whole pillar: what was kept, not what was consumed).
-function readingFinishedBlock(items) {
+// A book list where each row carries cover + facts + the reader/coach's own words
+// (why this book · reflections · the finished takeaway). Used for the queue (so the
+// recommendation reason shows per book — the point of the pillar: the why, not just the
+// spine) and for finished. `fallbackNote` shows when a book has no public note yet.
+function readingBookList(title, items, opts) {
+  opts = opts || {};
   const list = Array.isArray(items) ? items : [];
-  if (!list.length) return sec("Finished", empty("No finishes yet this cycle — the shelf fills a book at a time."));
+  if (!list.length) return opts.emptyMsg ? sec(title, empty(opts.emptyMsg)) : "";
   const rows = list
     .map((it) => {
       const b = it.book || {};
       const cover = _readingCover(b);
+      const tags = (b.domainTags || []).map(esc).join(" · ");
+      const notes = readingNotes(it.notes);
       return (
         `<article class="rdg-fin">` +
         `<div class="rdg-fin-head">` +
         (cover ? `<img class="rdg-fin-cover" src="${esc(cover)}" alt="" loading="lazy">` : "") +
-        `<div><p class="rdg-fin-title">${esc(b.title || "Untitled")}</p>${b.author ? `<p class="rd-meta label">${esc(b.author)}</p>` : ""}</div>` +
-        `</div>` +
-        (readingNotes(it.notes) || `<p class="rd-meta label">Kept on the shelf — a debrief adds the takeaway here.</p>`) +
+        `<div><p class="rdg-fin-title">${esc(b.title || "Untitled")}</p>` +
+        (b.author ? `<p class="rd-meta label">${esc(b.author)}${tags ? " · " + tags : ""}</p>` : "") +
+        `</div></div>` +
+        (notes || (opts.fallbackNote ? `<p class="rd-meta label">${esc(opts.fallbackNote)}</p>` : "")) +
         `</article>`
       );
     })
     .join("");
-  return sec("Finished — and what stuck", `<div class="rdg-fin-list">${rows}</div>`);
+  return sec(title, `<div class="rdg-fin-list">${rows}</div>`);
 }
 
 function readingSpine(item) {
@@ -2165,8 +2171,14 @@ async function renderReading(d) {
   ]);
   const body =
     readingNow(cur) +
-    readingShelfBlock("Up next", shelf && shelf.queue, "Nothing queued yet — the next book is the whole point.") +
-    readingFinishedBlock(shelf && shelf.finished) +
+    readingBookList("Up next", shelf && shelf.queue, {
+      emptyMsg: "Nothing queued yet — the next book is the whole point.",
+      fallbackNote: "",
+    }) +
+    readingBookList("Finished — and what stuck", shelf && shelf.finished, {
+      emptyMsg: "No finishes yet this cycle — the shelf fills a book at a time.",
+      fallbackNote: "Kept on the shelf — a debrief adds the takeaway here.",
+    }) +
     readingShelfBlock("Set down", shelf && shelf.set_down, "") +
     readingWheel(d.wheel) +
     readingConstellation(cst);
