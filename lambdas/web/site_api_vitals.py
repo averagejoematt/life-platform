@@ -254,6 +254,10 @@ def handle_journey() -> dict:
                 "projected_goal_date": projected_goal_date,
                 "days_to_goal": days_to_goal,
                 "started_date": EXPERIMENT_START,
+                # The date behind current_weight_lbs/lost_lbs — the front-end pairs the
+                # (possibly days-stale) weight with a live day counter, so it needs the
+                # as-of anchor to stay honest during a weigh-in gap.
+                "last_weighin_date": weight_series[-1][0],
                 "day_n": _day_n,
                 "week_n": (max(_day_n - 1, 0) // 7) + 1,
                 # Height (profile, authoritative) so the page can show a de-emphasized BMI

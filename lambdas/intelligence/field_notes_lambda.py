@@ -135,13 +135,22 @@ def gather_week_data(start_date, end_date):
             "avg_protein_g": round(sum(protein) / len(protein), 1) if protein else None,
         }
 
-    # Training (Strava)
-    activities = _query_source("strava", start_date, end_date)
-    if activities:
-        total_min = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) / 60 for a in activities)
+    # Training (Strava) — items are DAY rollups (activity_count, total_moving_time_seconds,
+    # activities[]), not individual activities. Reading per-activity fields off the day
+    # record produced "N sessions / 0 minutes", which the AI then publicly flagged as a
+    # data-entry bug in the 2026-W26 note.
+    day_records = _query_source("strava", start_date, end_date)
+    if day_records:
+
+        def _day_minutes(rec):
+            total = rec.get("total_moving_time_seconds")
+            if total is None:
+                total = sum(float(a.get("moving_time_seconds") or a.get("elapsed_time_seconds") or 0) for a in rec.get("activities") or [])
+            return float(total or 0) / 60
+
         data["training"] = {
-            "sessions": len(activities),
-            "total_minutes": round(total_min),
+            "sessions": sum(int(rec.get("activity_count") or len(rec.get("activities") or []) or 1) for rec in day_records),
+            "total_minutes": round(sum(_day_minutes(rec) for rec in day_records)),
         }
 
     # Weight (Withings)

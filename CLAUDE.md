@@ -10,6 +10,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
   - `docs/SITE_MAP_AND_INTENT.md` — **what each page is for** and why it matters to the platform (one scannable registry)
   - `docs/DESIGN_SYSTEM_V5.md` — the **standards**: type triad, tokens, `.prose`, the page kit, the motion/interaction layer, the "earned glow / no gloss" rule
   - `docs/SITE_UPLEVEL_PLAYBOOK.md` — **how to change it well**: render-sweep→fix→verify loop + the hard-won gotchas (stored-artifact regen, CloudFront viewer-path, CDK-bundled lambdas)
+  - `/uplevel` (`.claude/commands/uplevel.md`) — the **session driver**: fresh-eyes survey → rank against the north star → ship the flagship slice end-to-end (use `/uplevel <lane or idea>` to direct it)
 - `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
