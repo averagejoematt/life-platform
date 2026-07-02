@@ -136,14 +136,18 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # SEASON-1 ZOMBIE RETIRED (2026-07-02, flagged by #310): the weekly Wed 15:40 UTC
+        # cron kept re-indexing the stale /podcast/episodes.json from season 1's dead
+        # posts.json (and _episode_exists keys mp3s by bare wk{N}, colliding across
+        # cycles). The lambda STAYS for manual/one-off invokes (back-catalogue re-render,
+        # feed repair) — only the schedule is removed. The live weekly show is
+        # coach-panel-podcast ("The Panel"), below.
         create_platform_lambda(
             self,
             "ChroniclePodcast",
             function_name="chronicle-podcast",
             handler="emails.chronicle_podcast_lambda.lambda_handler",
             source_file="lambdas/emails/chronicle_podcast_lambda.py",
-            # Wed 15:40 UTC — after the chronicle publishes (15:00) and emails (15:10)
-            schedule="cron(40 15 ? * WED *)",
             # 900s: a force re-render voices the whole back-catalogue (5+ episodes,
             # multi-chunk Google TTS each) in one pass — 300s timed out mid-catalogue.
             timeout_seconds=900,
