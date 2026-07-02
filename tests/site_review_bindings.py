@@ -139,6 +139,9 @@ PAGE_BINDINGS = [
             {"url": "/api/achievements", "role": "secondary", "metrics": []},
             {"url": "/api/coach_analysis?domain=sleep", "role": "lazy", "metrics": []},  # disclosure
             {"url": "/api/observatory_week?domain=sleep", "role": "lazy", "metrics": []},  # week scope
+            # Since-your-last-visit strip (2026-07-02): fetched only for a returning
+            # visitor with a >=12h localStorage gap — conditional, so "lazy".
+            {"url": "/api/changes-since", "role": "lazy", "metrics": []},
         ],
     },
     {
