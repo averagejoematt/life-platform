@@ -115,12 +115,14 @@
       <p class="beat-kicker label" data-bind="wave-window">the shape of it</p>
       <h2 class="beat-h">The climb isn't a straight line. Here's every day, including the ones that dipped.</h2>
       <figure class="waveform">
-        <div class="wave" data-bind="wave" role="img" aria-label="Daily whole-life score, every day since the experiment began"></div>
+        <!-- role=group (not img): each scored bar is a focusable link into that day's cockpit. -->
+        <div class="wave" data-bind="wave" role="group" aria-label="Daily whole-life score, every day since the experiment began — each day opens its cockpit sheet"></div>
         <figcaption class="wave-legend label">
           <span class="lg lg-up">strong</span>
           <span class="lg lg-mid">holding</span>
           <span class="lg lg-down">down — shown, not hidden</span>
           <span class="lg lg-none">no data</span>
+          <span class="lg lg-tap">tap any day → its cockpit</span>
         </figcaption>
       </figure>
       <p class="beat-deeper"><a href="/now/" class="cta">See today in the cockpit →</a></p>
