@@ -279,6 +279,78 @@ Requirements:
 - Tone should match the data: don't be affirming when the data is concerning"""
 
 
+def _call_notes_model(prompt, api_key):
+    """One model call → parsed field-notes JSON (shared by first pass + regen)."""
+    req_body = json.dumps(
+        {
+            "model": AI_MODEL,
+            "max_tokens": 2000,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    )
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=req_body.encode(),
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+    )
+    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+    from retry_utils import call_anthropic_raw
+
+    result = call_anthropic_raw(req, timeout=60)
+    text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text").strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+    return json.loads(text)
+
+
+_NOTE_FIELDS = ("ai_present", "ai_cautionary", "ai_affirming")
+
+
+def _grounding_contradictions(analysis):
+    """SS-10 — deterministic canonical-facts contradiction count for a generated note.
+
+    Uses the shared TIGHT guard (grounding_guard.hard_canonical_contradictions — the
+    analyzer's proven detector, grounded-anywhere semantics so a legit trend citing
+    the true value never fires). Deliberately NOT the layer's check_facts_agreement:
+    that one is precision-tuned for the daily alarm (20-25% tolerances) and the live
+    RHR-53-vs-64 incident — a 17% miss — passes it by design. Facts come from
+    canonical_facts.build_canonical_facts, the same schema the coaches are grounded
+    on. Fail-soft (0, "") when the record/helpers are unavailable: grounding never
+    blocks the note outright, only triggers the one corrective rewrite below.
+    """
+    try:
+        try:
+            from intelligence.grounding_guard import hard_canonical_contradictions
+        except ImportError:  # pragma: no cover — flat sys.path (tests)
+            from grounding_guard import hard_canonical_contradictions
+
+        from canonical_facts import build_canonical_facts
+
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#computed_metrics"),
+            ScanIndexForward=False,
+            Limit=1,
+        )
+        items = resp.get("Items", [])
+        if not items:
+            return 0, ""
+        facts = {k: v for k, v in build_canonical_facts(items[0]).items() if k != "as_of"}
+        hits = []
+        for f in _NOTE_FIELDS:
+            hits.extend(hard_canonical_contradictions(analysis.get(f) or "", facts))
+        return len(hits), "; ".join(h["detail"] for h in hits[:3])
+    except Exception as e:  # noqa: BLE001 — check is best-effort by design
+        logger.info(f"[grounding] check unavailable ({type(e).__name__}) — note served unchecked")
+        return 0, ""
+
+
 def generate_field_notes(iso_week):
     start, end = week_bounds(iso_week)
     logger.info(f"Generating field notes for {iso_week} ({start} to {end})")
@@ -294,40 +366,33 @@ def generate_field_notes(iso_week):
     prompt = build_prompt(iso_week, data, prior_notes)
 
     api_key = _get_api_key()
-    req_body = json.dumps(
-        {
-            "model": AI_MODEL,
-            "max_tokens": 2000,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    )
+    analysis = _call_notes_model(prompt, api_key)
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=req_body.encode(),
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-        },
-    )
+    # SS-10 block-and-regen: the field note is the public Third Wall — a canonical-
+    # facts contradiction (wrong RHR/recovery/HRV/weight) must not ship as written.
+    # One strict regeneration with the contradictions named; keep the rewrite only
+    # if it strictly improves (the analyzer's proven keep-if-improved pattern —
+    # never regress to a worse draft, never loop chasing stochastic output).
+    n_bad, detail = _grounding_contradictions(analysis)
+    if n_bad:
+        logger.info(f"[grounding] {n_bad} contradiction(s) in {iso_week}: {detail} — one corrective rewrite")
+        fix_prompt = (
+            prompt
+            + "\n\nCORRECTION REQUIRED — your previous draft contradicted the week's authoritative "
+            + f"record: {detail}. Rewrite the full JSON response. Never state a recovery/HRV/RHR/weight "
+            + "number that is not in the data above; when unsure, describe the pattern without a number."
+        )
+        try:
+            retry = _call_notes_model(fix_prompt, api_key)
+            n_retry, _ = _grounding_contradictions(retry)
+            if n_retry < n_bad:
+                logger.info(f"[grounding] rewrite kept ({n_bad} → {n_retry})")
+                analysis = retry
+            else:
+                logger.warning(f"[grounding] rewrite not better ({n_bad} → {n_retry}) — keeping the original")
+        except Exception as e:  # noqa: BLE001 — regen is best-effort
+            logger.warning(f"[grounding] rewrite failed ({type(e).__name__}) — keeping the original")
 
-    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    from retry_utils import call_anthropic_raw
-
-    result = call_anthropic_raw(req, timeout=60)
-
-    text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
-
-    # Parse JSON response
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[-1]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-
-    analysis = json.loads(text)
     now = datetime.now(timezone.utc).isoformat()
 
     item = {
