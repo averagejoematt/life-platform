@@ -163,6 +163,16 @@
           <p class="presence-sub label" data-bind="presence-sub" hidden></p>
         </section>
 
+        <!-- Since your last visit (2026-07-02): a returning visitor is greeted with what
+             moved while they were away — keyed to THEIR OWN visit gap via localStorage
+             (no accounts, privacy-clean). Self-hides on first visit, same-day reloads,
+             fetch failure, and in time-travel. /api/changes-since existed since v3;
+             only /legacy ever called it. -->
+        <section class="lastvisit" data-lastvisit hidden aria-label="Since your last visit">
+          <p class="cap label">since your last visit<span class="lv-gap" data-bind="lv-gap"></span></p>
+          <ul class="lv-rows" data-bind="lv-rows"></ul>
+        </section>
+
         <section class="circadian" data-circadian hidden aria-label="Tonight's sleep forecast">
           <p class="cap label">tonight's forecast<span class="circ-cat" data-bind="circ-cat"></span></p>
           <div class="circ-gauge">

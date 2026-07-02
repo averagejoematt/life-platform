@@ -460,6 +460,58 @@ async function renderPresence() {
   sec.hidden = false;
 }
 
+// Since your last visit — the returning-visitor strip. Keyed to the visitor's own
+// gap via localStorage (the legacy key, so v3-era returners keep their continuity;
+// no accounts, privacy-clean). Self-hides on: first visit, gaps under 12h (same-day
+// reloads aren't a "return"), corrupted/ancient timestamps, fetch failure, empty
+// deltas. The stamp only advances after a successful read, so a failed fetch
+// doesn't eat the gap. /api/changes-since wants EPOCH SECONDS.
+const _LV_KEY = "amj_last_visit";
+function _lvSpark(values) {
+  const v = (values || []).map(Number).filter(Number.isFinite);
+  if (v.length < 2) return "";
+  const min = Math.min(...v), max = Math.max(...v), span = max - min || 1;
+  const pts = v.map((x, i) => `${(i / (v.length - 1)) * 72},${16 - ((x - min) / span) * 12 + 2}`).join(" ");
+  return `<svg class="lv-spark" viewBox="0 0 72 20" width="72" height="20" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+}
+async function renderSinceLastVisit() {
+  const sec = $("[data-lastvisit]");
+  if (!sec) return;
+  const now = Date.now();
+  const raw = localStorage.getItem(_LV_KEY);
+  const ts = raw ? parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(ts) || ts <= 0 || ts > now || now - ts > 365 * 86400000) {
+    localStorage.setItem(_LV_KEY, String(now));  // first visit / corrupted / ancient → stamp + stay silent
+    return;
+  }
+  const gapH = (now - ts) / 3600000;
+  if (gapH < 12) { localStorage.setItem(_LV_KEY, String(now)); return; }
+  let d = null;
+  try { d = await getJSON(`${API}/changes-since?ts=${Math.floor(ts / 1000)}`); } catch (e) { return; }
+  const deltas = (d && d.deltas) || {};
+  const METRICS = [
+    { key: "weight", label: "weight", unit: " lb" },
+    { key: "hrv", label: "HRV", unit: " ms" },
+    { key: "sleep", label: "sleep", unit: " h" },
+    { key: "character", label: "character", unit: " pts" },
+  ];
+  const rows = METRICS.filter((m) => deltas[m.key] && deltas[m.key].from != null && deltas[m.key].to != null).map((m) => {
+    const x = deltas[m.key];
+    const chg = Number(x.change);
+    const chgTxt = Number.isFinite(chg) ? `${chg > 0 ? "+" : ""}${Math.round(chg * 10) / 10}${m.unit}` : "";
+    return `<li class="lv-row"><span class="label">${escapeHTML(m.label)}</span>` +
+      `<span class="lv-delta num">${escapeHTML(String(x.from))} → ${escapeHTML(String(x.to))}</span>` +
+      `<span class="lv-chg num">${escapeHTML(chgTxt)}${x.trend ? ` <span class="label">${escapeHTML(String(x.trend))}</span>` : ""}</span>` +
+      `${_lvSpark(x.sparkline)}</li>`;
+  });
+  if (!rows.length) { localStorage.setItem(_LV_KEY, String(now)); return; }  // nothing moved → silent
+  const days = Math.max(1, Math.round(gapH / 24));
+  bind("lv-gap").textContent = ` · ${days === 1 ? "a day" : days + " days"} away`;
+  bind("lv-rows").innerHTML = rows.join("");
+  sec.hidden = false;
+  localStorage.setItem(_LV_KEY, String(now));
+}
+
 // Reading line (Mind pillar, ADR-097): current book + read-today tick + streak.
 // Recall prompts/retention are owner-private — never fetched on the public cockpit.
 async function renderReading() {
@@ -735,6 +787,7 @@ async function load(dateStr) {
     renderVerdict(pri);
     renderBoardline(pri);
     renderPresence();   // fire-and-forget; hides itself unless he's gone quiet / just returned
+    renderSinceLastVisit(); // fire-and-forget; only speaks to a genuine returning visitor
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
     renderReading();    // fire-and-forget; hides itself if no book in hand
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction

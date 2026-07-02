@@ -354,6 +354,17 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .presence[data-cls="dark"] { border-top-color: color-mix(in oklch, var(--ember) 30%, var(--rule)); }
 .presence[data-cls="returned"] .presence-line { color: var(--ink); }
 
+/* Since your last visit — the returning-visitor strip. Machine voice, no drama:
+   metric rows with from→to, the signed change, and a hairline sparkline. */
+.lastvisit { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.lv-gap { color: var(--ink-faint); }
+.lv-rows { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.lv-row { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.lv-row > .label { min-width: 5.5em; }
+.lv-delta { color: var(--ink); font-variant-numeric: tabular-nums; }
+.lv-chg { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.lv-spark { color: var(--ink-faint); align-self: center; }
+
 /* Reading line (Mind pillar, ADR-097) — current book + read-today + streak. No red. */
 .reading-line { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
 .rl-tick { color: var(--ember); }
