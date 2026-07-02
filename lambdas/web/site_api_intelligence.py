@@ -1418,9 +1418,10 @@ _HYPOTHESES_PK = f"{USER_PREFIX}hypotheses"
 def handle_hypotheses() -> dict:
     """
     GET /api/hypotheses
-    Returns active hypotheses with status + confidence + domain.
+    Returns active hypotheses with status + confidence + domain, plus the
+    verdict trail (last_checked / last_evidence) once the engine grades one.
     Filters out `public: false` so private records never leak.
-    Cache: 3600s (hypothesis engine runs daily; data shifts slowly).
+    Cache: 3600s (the hypothesis engine runs WEEKLY, Sundays; data shifts slowly).
     """
     try:
         resp = table.query(
@@ -1453,6 +1454,11 @@ def handle_hypotheses() -> dict:
                 "created_at": it.get("created_at"),
                 "check_count": it.get("check_count", 0),
                 "evidence": it.get("evidence", {}),
+                # The weekly check's verdict trail — the citing evidence sentence the
+                # engine wrote when it last graded this bet (AI-4 requires confirming/
+                # refuted verdicts to cite numbers). Null until the first check lands.
+                "last_checked": it.get("last_checked"),
+                "last_evidence": it.get("last_evidence"),
             }
         )
 
