@@ -146,6 +146,10 @@ body { overflow-x: hidden; }
 .wave { position: relative; display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
 .wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out), filter 0.14s var(--ease-out), transform 0.14s var(--ease-out); transform-origin: bottom; cursor: crosshair; }
 .wave .bar:hover { filter: brightness(1.28); transform: scaleY(1.05); }
+/* Scored bars are anchors into that day's cockpit (/now/?date=) — same box as the
+   spans, pointer instead of crosshair, keyboard-visible focus. */
+.wave a.bar { text-decoration: none; cursor: pointer; }
+.wave a.bar:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 /* cursor-following readout for the interactive waveform */
 .wave-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; pointer-events: none;
   background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-xs); padding: 2px 8px; color: var(--ink); box-shadow: var(--shadow-soft); z-index: 2; }
@@ -159,6 +163,7 @@ body { overflow-x: hidden; }
 .lg::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
 .lg-up::before { background: var(--ember); } .lg-mid::before { background: var(--ink-muted); }
 .lg-down::before { background: var(--ink-faint); } .lg-none::before { background: var(--rule); }
+.lg-tap { color: var(--ink-faint); } .lg-tap::before { content: none; }
 
 /* The Third Wall (two-voice, editorial scale) */
 .beat-wall .wall { margin-top: var(--sp-5); border-left: 2px solid var(--ember-line); padding-left: var(--sp-5); }
