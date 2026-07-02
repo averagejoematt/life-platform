@@ -96,15 +96,19 @@ CORS_HEADERS = {
 
 
 # ── Platform stats — single source of truth for all site pages ──
-# Verified 2026-05-29 against live AWS state. Lambdas counted across both
-# regions; alarms us-west-2; secrets under the life-platform/ namespace.
+# The discoverable fields (mcp_tools, lambdas, alarms, data_sources, adrs,
+# test_count) are REWRITTEN by `python3 deploy/sync_doc_metadata.py --apply` and
+# pinned by tests/test_platform_stats_truth.py — don't hand-edit them. lambdas =
+# CDK-defined count; test_count = `def test_` functions in tests/. Judgment /
+# live-AWS fields (monthly_cost, review_grade, active_secrets, site_pages…) stay
+# hand-maintained.
 PLATFORM_STATS = {
-    "data_sources": 26,
-    "mcp_tools": 138,
-    "lambdas": 87,  # us-west-2: 82 + us-east-1: 5
+    "data_sources": 20,
+    "mcp_tools": 144,
+    "lambdas": 85,
     "cdk_stacks": 8,
-    "alarms": 94,
-    "adrs": 65,
+    "alarms": 56,
+    "adrs": 85,
     "monthly_cost": "~$60",  # real steady-state (~$29 AI + CloudWatch/Secrets/CE); the old
     # "$19" was stale and read as less than AI-alone MTD ($24) on the inference page — a visible
     # contradiction. ~$60 total keeps AI < total and matches the actual run-rate (still « $75 cap).
@@ -112,7 +116,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 15,
     "site_pages": 77,
-    "test_count": 303,
+    "test_count": 1295,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

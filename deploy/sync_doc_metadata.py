@@ -123,6 +123,78 @@ def _auto_discover_version() -> str | None:
         return None
 
 
+def _count_adrs() -> int | None:
+    """Count `## ADR-` headings in docs/DECISIONS.md."""
+    decisions = DOCS / "DECISIONS.md"
+    if not decisions.exists():
+        return None
+    try:
+        return len(re.findall(r"^## ADR-", decisions.read_text(encoding="utf-8"), re.MULTILINE)) or None
+    except Exception:
+        return None
+
+
+def _count_test_functions() -> int | None:
+    """Count `def test_` functions across tests/*.py.
+
+    The repo-derivable, deterministic public test count (pytest --collect-only
+    inflates it with parametrized cases and needs the suite importable).
+    """
+    tests_dir = ROOT / "tests"
+    if not tests_dir.exists():
+        return None
+    try:
+        total = 0
+        for f in tests_dir.glob("*.py"):
+            total += len(re.findall(r"^\s*def test_", f.read_text(encoding="utf-8"), re.MULTILINE))
+        return total or None
+    except Exception:
+        return None
+
+
+# The credibility numbers served at /api/platform_stats (rendered on the /method/
+# pages — the surface a skeptic cross-checks against the public repo). Hand-editing
+# rotted: 2026-07-01 the dict claimed 303 tests vs ~1,290 actual, 138 tools vs 144,
+# 65 ADRs vs 85. These fields are rewritten from the discoverers above; judgment /
+# live-AWS fields (monthly_cost, review_grade, active_secrets, site_pages…) are
+# never touched. tests/test_platform_stats_truth.py reds CI if the literal drifts.
+_PLATFORM_STATS_PATH = ROOT / "lambdas" / "web" / "site_api_common.py"
+
+
+def _platform_stats_values(facts: dict) -> dict:
+    return {
+        "mcp_tools": facts.get("tool_count"),
+        "lambdas": facts.get("lambda_count"),
+        "alarms": facts.get("alarm_count"),
+        "data_sources": facts.get("data_sources"),
+        "adrs": _count_adrs(),
+        "test_count": _count_test_functions(),
+    }
+
+
+def _sync_platform_stats(facts: dict, dry_run: bool) -> list[str]:
+    """Rewrite the discoverable fields of PLATFORM_STATS in site_api_common.py."""
+    if not _PLATFORM_STATS_PATH.exists():
+        return [f"  SKIP (not found): {_PLATFORM_STATS_PATH}"]
+    src = _PLATFORM_STATS_PATH.read_text(encoding="utf-8")
+    changes = []
+    for field, value in _platform_stats_values(facts).items():
+        if value is None:
+            continue
+        pattern = rf'("{field}": )\d+'
+        m = re.search(pattern, src)
+        if not m:
+            changes.append(f"  ! PLATFORM_STATS field {field!r} not found (literal int expected)")
+            continue
+        old = int(m.group(0).split(":")[1])
+        if old != int(value):
+            src = re.sub(pattern, rf"\g<1>{int(value)}", src, count=1)
+            changes.append(f"  ~ PLATFORM_STATS {field}: {old} → {value}")
+    if changes and not dry_run:
+        _PLATFORM_STATS_PATH.write_text(src, encoding="utf-8")
+    return changes
+
+
 def _apply_auto_discovered(facts: dict) -> dict:
     """Override PLATFORM_FACTS values with auto-discovered counts where available.
 
@@ -370,9 +442,17 @@ def main():
     )
     print(f"{'='*60}\n")
 
+    # Served credibility numbers (/api/platform_stats) sync from the same facts.
+    stats_changes = _sync_platform_stats(PLATFORM_FACTS, dry_run)
+    if stats_changes:
+        print("[lambdas/web/site_api_common.py]")
+        for c in stats_changes:
+            print(c)
+        print()
+
     # Get unique docs to process
     docs_to_process = sorted(set(doc for doc, _, _ in RULES))
-    total_changes = 0
+    total_changes = len([c for c in stats_changes if c.startswith("  ~")])
 
     for rel_path in docs_to_process:
         changes = process_doc(rel_path, dry_run)

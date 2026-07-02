@@ -537,33 +537,36 @@ function trainingSRPE(workouts) {
 }
 async function renderTraining(d) { const t = d.training || {}; const [str, wk, wo, ph] = await Promise.all([tryJSON("/api/strength_benchmarks"), tryJSON("/api/weekly_physical_summary"), tryJSON("/api/workouts"), tryJSON("/api/pulse_history")]); const ramp = trainingVolumeRamp((wo && wo.workouts) || []); const rhrHero = trainingRHRHero((ph && ph.pulse_history) || []); const head = figs([fig(t.workouts_30d ?? "—", "workouts · 30d"), fig(t.weekly_avg ?? "—", "weekly avg"), t.z2_pct != null && fig(t.z2_pct + "%", "zone-2 target"), t.strength_sessions_30d != null && fig(t.strength_sessions_30d, "strength · 30d"), d.walking && d.walking.avg_daily_steps != null && fig(fmt(d.walking.avg_daily_steps), "avg daily steps")]); const _cardioHR = (d.cardio_sessions || []).filter((c) => c.avg_hr != null && c.minutes); const hrSec = _cardioHR.length ? sec("HR of the engine — is the easy work staying easy?", barChart(_cardioHR.slice(0, 12).map((c) => ({ label: String(c.sport || "—").slice(0, 8), value: Math.round(Number(c.avg_hr)) })), { valueKey: "value", labelKey: "label", label: "Avg HR per cardio session (bpm)" }) + `<p class="rd-meta label">Easy aerobic work should sit low (≈ under 129 bpm, ~70% of max) — proof the base stays base. Lifting HR isn't shown: Whoop returns 0 HR-zone minutes for lifts, so that's an honest gap an HR strap would fill — never a 0 bar.</p>`) : ""; const z2v = t.z2_weekly_avg_min, z2t = t.z2_target_min || 150; const z2Sec = z2v != null ? sec("The engine — Zone-2 base", targetSpine(z2v, z2t, { valueLabel: "Z2/wk", targetLabel: "150 target", unit: " min", label: "Zone-2 minutes per week" }) + `<p class="rd-meta label">Counts steady aerobic work across sources — Strava, Whoop zones, AND Hevy bike/elliptical. The easy work that builds the engine.</p>`) : ""; const lifts = (str && str.benchmarks) || []; const strSec = lifts.length ? sec("The Lift Index — load trend, not max-testing", liftIndex(lifts) + `<p class="rd-meta label">Estimated from working sets (Epley) — a direction, not a 1RM goal. Foundation block: building the engine, not chasing PRs.</p>`) : ""; const days = (wk && wk.days) || []; const wkSec = days.length ? sec("This week — daily movement", `<table class="rd-tbl"><thead><tr><th>day</th><th>steps</th><th>active min</th></tr></thead><tbody>${days.map((x) => `<tr><td class="rd-name">${esc(x.day_of_week || x.date)}</td><td class="num">${fmt(x.steps)}</td><td class="num">${fmt(x.total_active_minutes)}</td></tr>`).join("")}</tbody></table>`) : ""; const rpeSec = trainingRPE((wo && wo.workouts) || []); const srpeSec = trainingSRPE((wo && wo.workouts) || []); const hrStrapSec = sec("Lifting HR zones — coming online", `<div class="nut-coming"><p class="rd-archive">Whoop returns 0 HR-zone minutes for lifting, so the cardiovascular cost of the lifts is a gap. A chest HR strap worn during sessions would fill it — turning "how hard did the lift tax the engine" from blank into data. <span class="confidence conf-low">needs HR strap</span></p></div>`); const ruckSec = sec("Rucking load & incline — coming online", `<div class="nut-coming"><p class="rd-archive">Walking is the primary engine, but it's logged flat — no pack weight or grade. Capturing rucking load / incline would make the walk progressible (same minutes, more stimulus) instead of a fixed floor. <span class="confidence conf-low">needs capture</span></p></div>`); const acwrSec = sec("Load gauge (ACWR) — coming online", `<div class="nut-coming"><p class="rd-archive">The acute:chronic workload ratio — this week's load against the rolling 4-week baseline — is the standard read on whether the ramp is sustainable or tipping into the danger zone. It needs ~3–4 weeks of history before it means anything; computing it at week one would be noise dressed as a verdict. The inputs (session sRPE, volume) are already accruing. <span class="confidence conf-low">unlocks ~4 weeks</span></p></div>`); const _strainDays = ((ph && ph.pulse_history) || []).map((h) => ({ date: h.date, value: Number(h.strain) })).filter((x) => Number.isFinite(x.value) && x.value > 0); const strainSec = _strainDays.length ? sec("Absorbing the work — daily strain", barChart(_strainDays.map((x) => ({ label: fmtShort(x.date).split(" ")[1] || "", value: Math.round(x.value * 10) / 10 })), { valueKey: "value", labelKey: "label", label: "Whoop day strain (0–21)" }) + `<p class="rd-meta label">Day-by-day cardiovascular load, not a single average headline. The strain-vs-recovery overlay fills in (P2.1).</p>`) : ""; const _phRec = ((ph && ph.pulse_history) || []).map((h) => ({ date: h.date, rec: Number(h.recovery_pct), str: Number(h.strain) })); const _recS = _phRec.filter((x) => Number.isFinite(x.rec)).map((x) => ({ date: x.date, value: x.rec })); const _strS = _phRec.filter((x) => Number.isFinite(x.str)).map((x) => ({ date: x.date, value: Math.round(x.str * 100 / 21) })); const overlaySec = (_recS.length >= 4 && _strS.length >= 4) ? sec("Strain vs recovery", dualLineChart(_recS, _strS, { aLabel: "recovery %", bLabel: "strain ·scaled", label: "does the load cost next-day recovery?", showGap: false }) + `<p class="rd-meta label">Recovery % (ember) against day strain scaled to 100 (muted dashed). Observation only — n=1, no coefficient drawn (needs ≥2 weeks).</p>`) : ""; const _mv = d.muscle_volume || []; const mvSec = _mv.length ? sec("Per-muscle volume vs landmarks", landmarkBars(_mv, { label: "MEV = minimum effective · MAV = optimal range · MRV = max recoverable." }) + `<p class="rd-meta label">Weekly working sets per muscle against the volume landmarks (Israetel). Ember = in the optimal MEV–MAV band; muted = under or over. Week-one sets/week are extrapolated from a short window.</p>`) : ""; const bodyMapSec = _mv.length ? muscleBodyMap(_mv) : ""; const _tbp = d.training_blueprint; const blueprintSec = (_tbp && _tbp.public) ? sec("Present vs the proven blueprint", `<p class="rd-meta label">Present training vs the proven loss-period blueprint${_tbp.confidence ? ` · ${esc(_tbp.confidence)} confidence` : ""}. <span class="confidence conf-low">private — blueprint</span></p>`) : ""; const _ppl = { Push: 0, Pull: 0, Legs: 0 }; for (const w of (wo && wo.workouts) || []) { const ti = String(w.title || "").toLowerCase(); const cat = ti.includes("push") ? "Push" : ti.includes("pull") ? "Pull" : (ti.includes("leg") || ti.includes("squat")) ? "Legs" : null; if (!cat) continue; let vol = w.total_volume_kg; if (vol == null) { vol = 0; for (const e of w.exercises || []) for (const s of e.sets || []) vol += (Number(s.reps) || 0) * (Number(s.weight_kg) || 0); } _ppl[cat] += Number(vol) || 0; } const _pplRows = Object.entries(_ppl).filter(([, v]) => v > 0).map(([k, v]) => ({ label: k, value: Math.round(v) })); const pplSec = _pplRows.length ? sec("Push / Pull / Legs balance", barChart(_pplRows, { valueKey: "value", labelKey: "label", label: "Working-set volume by split (kg)" }) + `<p class="rd-meta label">Is one pattern carrying the others? Working-set volume tagged from Hevy session titles.</p>`) : ""; const _mod = (d.daily_modality_minutes_30d || []).map((m) => ({ date: m.date, lift: m.strength_min || 0, cardio: (m.walking_min || 0) + (m.cycling_min || 0) + (m.hiking_min || 0) + (m.soccer_min || 0) + (m.other_min || 0), mob: (m.stretching_min || 0) + (m.breathwork_min || 0) })); const modSec = _mod.some((m) => m.lift + m.cardio + m.mob > 0) ? sec("Training time — where the minutes go", stackedDayColumns(_mod, [{ key: "lift", label: "lift", tone: "lift" }, { key: "cardio", label: "walk/cardio", tone: "cardio" }, { key: "mob", label: "mobility", tone: "mob" }], { label: "minutes by modality · per day" }) + `<p class="rd-meta label">Is the engine work happening, or getting crowded out? Mobility gets its own lane here instead of hiding in the cardio list.</p>`) : ""; const _stepsTrend = (d.walking && d.walking.daily_steps_trend) || []; const wlk = d.walking || {}; const walkSec = _stepsTrend.length ? sec("Walking — the primary engine", figs([wlk.avg_daily_steps != null && fig(fmt(wlk.avg_daily_steps), "avg daily steps"), wlk.total_miles_30d != null && fig(fmt(wlk.total_miles_30d) + " mi", "walked · 30d"), wlk.avg_pace_min_per_mi != null && fig(fmt(wlk.avg_pace_min_per_mi) + "/mi", "avg pace")]) + heatStrip(_stepsTrend, { valueKey: "steps", label: "Daily steps", unit: " steps" })) : ""; const _MOBRE = /stretch|yoga|mobility|foam|recovery|\brest\b/i; const cardio = (d.cardio_sessions || []).filter((w) => w.modality !== "mobility" && !_MOBRE.test(String(w.sport || ""))); const _km = (mi) => (mi != null ? (mi * 1.60934).toFixed(1) : null); const sessSec = cardio.length ? sec("Recent cardio", `<table class="rd-tbl"><thead><tr><th>date</th><th>activity</th><th>distance</th><th>min</th><th>avg HR</th></tr></thead><tbody>${cardio.slice(0, 20).map((w) => `<tr><td class="rd-name">${esc(String(w.date || "").slice(0, 10))}</td><td>${esc(ttl(w.sport || "—"))}</td><td class="num rd-range">${w.distance_mi != null ? `${fmt(w.distance_mi, 1)} mi · ${_km(w.distance_mi)} km` : "—"}</td><td class="num">${fmt(w.minutes)}</td><td class="num">${fmt(w.avg_hr)}</td></tr>`).join("")}</tbody></table>`) : ""; const log = (wo && wo.workouts) || []; const logSec = log.length ? sec("Strength log — per-exercise sets", log.slice(0, 12).map((w) => `<details class="wlog"><summary class="wlog-sum"><span class="wlog-t">${esc(w.title || w.date)}</span><span class="wlog-m label">${[w.date, w.exercise_count != null && Math.round(w.exercise_count) + " exercises", w.total_volume_kg != null && dualWeight(w.total_volume_kg, "kg")].filter(Boolean).map(esc).join("  ·  ")}</span></summary>${(w.exercises || []).map((e) => `<div class="wlog-ex"><p class="wlog-ex-n">${esc(e.name)}</p><table class="rd-tbl"><tbody>${(e.sets || []).map((s, i) => `<tr><td class="rd-name">${esc(s.type && s.type.toLowerCase() !== "normal" ? s.type : "set")} ${i + 1}</td><td class="num">${s.reps != null ? fmt(s.reps) + " reps" : "—"}</td><td class="num rd-range">${s.weight_kg != null ? dualWeight(s.weight_kg, "kg") : (s.distance_m != null ? fmt(s.distance_m) + " m" : "—")}</td></tr>`).join("")}</tbody></table></div>`).join("")}</details>`).join("")) : ""; if (!ramp && !rhrHero && !head.includes("fig-v") && !strSec && !wkSec && !sessSec && !logSec) return empty("No training logged yet — workouts, Zone-2, and strength benchmarks appear here as sessions accrue."); return ramp + rhrHero + head + z2Sec + hrSec + walkSec + strSec + pplSec + mvSec + bodyMapSec + blueprintSec + modSec + strainSec + overlaySec + rpeSec + srpeSec + acwrSec + hrStrapSec + ruckSec + logSec + sessSec + wkSec + note("Correlative — training load vs the body's response. Per-exercise sets from Hevy; per-session strain & zones from Whoop."); }
 // The §0 verdict (P0.1): mono states the figures, serif judges the trade. Computed
-// only from protein_hit_pct + avg_deficit — no fabricated mechanism, just the honest read.
+// only from the protein pct + avg_deficit — no fabricated mechanism, just the honest
+// read. Every "floor" word here grades the FLOOR pct (170), not the 190 stretch target.
 function nutritionVerdict(n) {
   const hasDef = n.avg_deficit != null && Number.isFinite(Number(n.avg_deficit));
-  const hasHit = n.protein_hit_pct != null && Number.isFinite(Number(n.protein_hit_pct));
+  const hasFloor = n.protein_floor_hit_pct != null && Number.isFinite(Number(n.protein_floor_hit_pct));
+  const hasHit = hasFloor || (n.protein_hit_pct != null && Number.isFinite(Number(n.protein_hit_pct)));
   if (!hasDef && !hasHit) return null;
-  const d = Number(n.avg_deficit), h = Number(n.protein_hit_pct);
+  const d = Number(n.avg_deficit), h = Number(hasFloor ? n.protein_floor_hit_pct : n.protein_hit_pct);
   const machine = [
     n.avg_calories != null ? `${fmt(n.avg_calories)} in` : null,
     n.tdee != null ? `${fmt(n.tdee)} maintenance` : null,
     hasDef ? `${d >= 0 ? "−" : "+"}${fmt(Math.abs(Math.round(d)))} kcal/day` : null,
-    hasHit ? `protein hit ${fmt(h)}%` : null,
+    hasHit ? `protein ${hasFloor ? "floor" : "target"} ${fmt(h)}%` : null,
   ].filter(Boolean).join(" · ");
   const realDeficit = hasDef && d >= 250;
+  const line = hasFloor ? "floor" : "target"; // which line h actually grades
   let human;
   if (!hasDef) {
-    human = h === 0 ? "Protein's under target every logged day — the floor isn't being cleared yet."
-      : `Protein clears the floor about ${fmt(h)}% of days. An expenditure read is needed before the deficit half of the story lands.`;
+    human = h === 0 ? `Protein's under the ${line} every logged day — it isn't being cleared yet.`
+      : `Protein clears the ${line} about ${fmt(h)}% of days. An expenditure read is needed before the deficit half of the story lands.`;
   } else if (!realDeficit) {
     human = "No real deficit on the logged days — this reads closer to maintenance than a cut right now.";
   } else if (!hasHit || h === 0) {
-    human = "The deficit's real. The protein's missing every logged day — that's the trade you're making.";
+    human = `The deficit's real. The protein's under the ${line} every logged day — that's the trade you're making.`;
   } else if (h < 50) {
-    human = "The deficit's real, but the protein lands under target most days — some of the cut is coming out of muscle, not just fat.";
+    human = `The deficit's real, but the protein clears the ${line} on under half the days — some of the cut is coming out of muscle, not just fat.`;
   } else if (h < 100) {
-    human = "The deficit's real and the protein mostly holds — the days it slips are the ones to watch.";
+    human = `The deficit's real and the protein mostly holds the ${line} — the days it slips are the ones to watch.`;
   } else {
-    human = "The deficit's real and the protein clears the floor every day — the cut's coming off the right places.";
+    human = `The deficit's real and the protein clears the ${line} every day — the cut's coming off the right places.`;
   }
   return { machine, human };
 }
@@ -580,24 +583,29 @@ function nutritionHero(n) {
   if (!spine && !voice) return "";
   return `<section class="rd-sec nut-hero">${spine}${voice}</section>`;
 }
-// §2 lead (P0.2) — promote protein_hit_pct to THE weighted signal. Ember-as-warning
-// when the floor isn't cleared (giant figure + ▼ + "under floor" — never an ember "win"
-// block, honouring HARD RULE 3). avg protein demotes into the subline.
+// §2 lead (P0.2) — promote the protein signal to THE weighted headline. Graded against
+// the FLOOR (the same 170 g the coaches grade against — one story on both doors), with
+// the 190 g target shown as the stretch line. Ember-as-warning when the floor isn't
+// cleared (never an ember "win" block, honouring HARD RULE 3). Falls back to the old
+// target-graded read if the payload predates the floor fields.
 function nutritionProteinLead(n) {
-  if (n.protein_hit_pct == null) return "";
-  const h = Number(n.protein_hit_pct);
-  const low = h < 100; // target is a daily floor — anything under 100% missed days
-  const days = n.days_logged, hitDays = n.protein_hit_days;
+  const hasFloor = n.protein_floor_hit_pct != null && n.protein_floor_g != null;
+  if (!hasFloor && n.protein_hit_pct == null) return "";
+  const h = Number(hasFloor ? n.protein_floor_hit_pct : n.protein_hit_pct);
+  const low = h < 100; // the floor is daily — anything under 100% is missed days
+  const days = n.days_logged;
+  const hitDays = hasFloor ? n.protein_floor_hit_days : n.protein_hit_days;
   const sub = [
     n.avg_protein_g != null ? `${fmt(n.avg_protein_g)} g avg` : null,
-    n.protein_target_g != null ? `${fmt(n.protein_target_g)} g target` : null,
+    hasFloor ? `floor ${fmt(n.protein_floor_g)} g` : null,
+    n.protein_target_g != null ? `target ${fmt(n.protein_target_g)} g` : null,
     (days != null && hitDays != null)
-      ? (hitDays === 0 ? `missed every logged day · 0/${fmt(days)}` : `cleared ${fmt(hitDays)}/${fmt(days)} days`)
+      ? (hitDays === 0 ? `${hasFloor ? "floor" : "target"} missed every logged day · 0/${fmt(days)}` : `cleared ${fmt(hitDays)}/${fmt(days)} days`)
       : null,
   ].filter(Boolean).join(" · ");
   return `<section class="rd-sec nut-lead ${low ? "lead-warn" : "lead-ok"}">` +
     `<div class="lead-fig"><span class="lead-v mono">${fmt(h)}%</span>` +
-    `<span class="lead-k label">protein target hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
+    `<span class="lead-k label">protein ${hasFloor ? "floor" : "target"} hit${low ? " — under floor" : " — floor cleared"}</span></div>` +
     `<p class="lead-sub mono">${esc(sub)}</p></section>`;
 }
 // §1 loss-rate readout (P0.9) — target rate → required deficit → actual deficit → gap,
@@ -610,13 +618,16 @@ function nutritionLossRate(lr) {
     lr.required_deficit_kcal != null ? `needs −${fmt(lr.required_deficit_kcal)} kcal/day` : null,
     lr.actual_deficit_kcal != null ? `running ${lr.actual_deficit_kcal >= 0 ? "−" : "+"}${fmt(Math.abs(lr.actual_deficit_kcal))}` : "running — (needs an expenditure read)",
     lr.gap_kcal != null ? `gap ${lr.gap_kcal >= 0 ? "+" : "−"}${fmt(Math.abs(lr.gap_kcal))}` : null,
-    lr.protein_hit_pct != null ? `protein ${fmt(lr.protein_hit_pct)}%` : null,
+    (lr.protein_floor_hit_pct ?? lr.protein_hit_pct) != null ? `protein floor ${fmt(lr.protein_floor_hit_pct ?? lr.protein_hit_pct)}%` : null,
   ].filter(Boolean).join(" → ");
   const flag = lr.deficit_label ? `<span class="nut-flag nut-flag-${esc(lr.deficit_label)}">${esc(lr.deficit_label)} cut</span>` : "";
+  // "The floor" here means the real floor (170) the coaches grade against, not the
+  // 190 stretch target — the pct must match the word.
+  const fp = lr.protein_floor_hit_pct ?? lr.protein_hit_pct;
   let floorClause;
-  if (lr.protein_hit_pct === 0) floorClause = ", and that floor's being missed every logged day";
-  else if (lr.protein_hit_pct != null && lr.protein_hit_pct < 100) floorClause = ", and right now that floor's missed most days";
-  else if (lr.protein_hit_pct != null && lr.protein_hit_pct >= 100) floorClause = ", and right now that floor's holding";
+  if (fp === 0) floorClause = ", and that floor's being missed every logged day";
+  else if (fp != null && fp < 100) floorClause = ", and right now that floor's missed most days";
+  else if (fp != null && fp >= 100) floorClause = ", and right now that floor's holding";
   else floorClause = "";
   const serif = `Three pounds a week is an aggressive rate. The bench is split on it — defensible early at this size if it's monitored, but only while the protein floor holds${floorClause}. That's why the rate and the protein sit on the same line here.`;
   return `<div class="two-voice nut-lossrate"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(chain)} ${flag}</p><p class="tv-human">${esc(serif)}</p></div>`;
@@ -625,15 +636,20 @@ function nutritionLossRate(lr) {
 // SIGNATURE 2 human voice). Data-derived, correlative, no causal claim.
 function nutritionProteinAnnotation(n) {
   const avg = n.avg_protein_g, tgt = n.protein_target_g, hit = n.protein_hit_pct;
+  const floor = n.protein_floor_g, floorHit = n.protein_floor_hit_pct;
   if (avg == null || tgt == null) return "";
   const gap = Math.round(Number(tgt) - Number(avg));
+  // Floor (170) and target (190) are distinct lines — "the floor" must never name
+  // the 190 stretch target (the cross-door contradiction a skeptic caught).
   let txt;
-  if (hit === 0) {
-    txt = `The ember line stays the whole way under the dotted ${fmt(tgt)} g goal — every logged day landed below the floor, about ${fmt(gap)} g short on average. On a cut, that's the line that decides how much muscle the deficit costs.`;
+  if (floor != null && floorHit === 0) {
+    txt = `The ember line stays under the dotted ${fmt(tgt)} g target the whole way — and under the ${fmt(floor)} g floor too, every logged day, about ${fmt(gap)} g short of target on average. On a cut, the floor is the line that decides how much muscle the deficit costs.`;
+  } else if (hit === 0) {
+    txt = `The ember line stays the whole way under the dotted ${fmt(tgt)} g target${floor != null ? ` — though it clears the ${fmt(floor)} g floor on some days` : ""}, about ${fmt(gap)} g short on average.`;
   } else if (gap > 0) {
-    txt = `The line sits mostly under the dotted ${fmt(tgt)} g goal — about ${fmt(gap)} g short on average. The days it crosses the line are the ones holding muscle.`;
+    txt = `The line sits mostly under the dotted ${fmt(tgt)} g target — about ${fmt(gap)} g short on average. The days it crosses the line are the ones holding muscle.`;
   } else {
-    txt = `The line rides at or above the dotted ${fmt(tgt)} g goal most days — the protein floor is holding through the cut.`;
+    txt = `The line rides at or above the dotted ${fmt(tgt)} g target most days — the protein floor is holding through the cut.`;
   }
   return `<p class="tv-human nut-anno">${esc(txt)}</p>`;
 }
@@ -646,7 +662,9 @@ function nutritionProteinFloor(lm, target) {
     bits.push(`The ${fmt(target)} g target is ${fmt(lm.target_g_per_kg_lean)} g per kg of ${fmt(lm.lean_mass_lb)} lb lean mass.`);
   }
   if (lm.floor_protein_g != null) {
-    bits.push(`The muscle-retention floor on a cut is ~${fmt(lm.floor_g_per_kg_lean)} g/kg lean — about ${fmt(lm.floor_protein_g)} g a day (Helms et al.).`);
+    // A lean-mass-derived CROSS-CHECK on the profile floor, not a third goal —
+    // labeled as an estimate so it can't read as yet another "floor" number.
+    bits.push(`A lean-mass cross-check: ~${fmt(lm.floor_g_per_kg_lean)} g/kg lean puts the retention floor near ${fmt(lm.floor_protein_g)} g a day (Helms et al.).`);
   }
   return bits.length ? `<p class="rd-meta label">${esc(bits.join(" "))}</p>` : "";
 }
@@ -1967,10 +1985,16 @@ function renderCorrelations(d) {
   const pairs = obj.pairs || [];
   if (!pairs.length) return empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
   const sig = pairs.filter((p) => p.fdr_significant).length;
+  // Pairs with fewer than 5 overlapping days can't claim anything — collapse them
+  // into one honest line instead of tabling a wall of r=0.00 / n=2 rows.
+  const tabled = pairs.filter((p) => (p.n ?? 0) >= 5);
+  const belowFloor = pairs.length - tabled.length;
   const head = figs([fig(obj.count ?? pairs.length, "pairs"), sig ? fig(sig, "FDR-significant") : "", obj.week && fig(obj.week, "week")]);
-  const rows = pairs.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${fmt(p.p, 3)}</td><td class="num">${fmt(p.n)}</td><td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
-  const tbl = sec("Correlation matrix — strongest first", `<table class="rd-tbl"><thead><tr><th>pair</th><th>r</th><th>p</th><th>n</th><th>significance</th></tr></thead><tbody>${rows}</tbody></table>`);
-  return head + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal.");
+  const pTxt = (p) => (p.p === 0 ? "&lt;0.001" : p.p == null ? "—" : fmt(p.p, 3));
+  const rows = tabled.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${pTxt(p)}</td><td class="num">${fmt(p.n)}</td><td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
+  const floorNote = belowFloor ? `<p class="rd-desc">${belowFloor} more pair${belowFloor === 1 ? "" : "s"} had fewer than 5 overlapping days this week — below the floor for claiming a pattern, so they aren't tabled.</p>` : "";
+  const tbl = sec("Correlation matrix — strongest first", `<table class="rd-tbl"><thead><tr><th>pair</th><th>r</th><th>p</th><th>n</th><th>significance</th></tr></thead><tbody>${rows}</tbody></table>${floorNote}`);
+  return head + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
 }
 // Predictions — the coaches' forward calls, scored against measured outcomes.
 function renderPredictions(d) {

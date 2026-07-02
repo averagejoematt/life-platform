@@ -26,6 +26,7 @@ from web.site_api_common import (
     _decimal_to_float,
     _error,
     _experiment_date,
+    _get_profile,
     _is_blocked_vice,
     _ok,
     _query_source,
@@ -193,6 +194,9 @@ def handle_nutrition_overview() -> dict:
                     "protein_target_g": 190,
                     "protein_hit_pct": 0,
                     "protein_hit_days": 0,
+                    "protein_floor_g": 170,
+                    "protein_floor_hit_pct": 0,
+                    "protein_floor_hit_days": 0,
                     "days_logged": 0,
                     "tdee": None,
                     "avg_deficit": None,
@@ -239,9 +243,18 @@ def handle_nutrition_overview() -> dict:
     fat_vals = [_mf(i, "fat_g", "total_fat_g") for i in items if _mf(i, "fat_g", "total_fat_g") is not None]
     fiber_vals = [_mf(i, "fiber_g", "total_fiber_g") for i in items if _mf(i, "fiber_g", "total_fiber_g") is not None]
 
-    protein_target = 190  # Matthew's protein target in grams — matches profile.protein_target_g
+    # One protein story on every door: target (stretch) and floor (graded) are the
+    # SAME profile values daily_metrics_compute writes into canonical_facts
+    # (protein_g_target/protein_g_floor). This page used to hardcode 190 and call it
+    # the "floor" while the coaches graded against the real 170 floor — a reader
+    # crossing doors saw two truths.
+    _prof = _get_profile()
+    protein_target = float(_prof.get("protein_target_g", 190))
+    protein_floor = float(_prof.get("protein_floor_g", 170))
     protein_hit_days = sum(1 for v in pro_vals if v >= protein_target)
     protein_hit_pct = round(protein_hit_days / len(pro_vals) * 100) if pro_vals else 0
+    floor_hit_days = sum(1 for v in pro_vals if v >= protein_floor)
+    floor_hit_pct = round(floor_hit_days / len(pro_vals) * 100) if pro_vals else 0
 
     # Latest day
     latest = items[-1] if items else {}
@@ -416,6 +429,10 @@ def handle_nutrition_overview() -> dict:
         "deficit_pct": deficit_pct,
         "deficit_label": deficit_label,
         "protein_hit_pct": protein_hit_pct,
+        # The floor (170) is what "the protein floor holds" language grades against —
+        # the target (190) is the stretch line, not the floor.
+        "protein_floor_hit_pct": floor_hit_pct,
+        "protein_floor_g": protein_floor,
     }
 
     # ── Meal rhythm (P1.1): per-meal timing + protein, from food_log entries (each entry
@@ -612,6 +629,9 @@ def handle_nutrition_overview() -> dict:
                 "protein_target_g": protein_target,
                 "protein_hit_pct": protein_hit_pct,
                 "protein_hit_days": protein_hit_days,
+                "protein_floor_g": protein_floor,
+                "protein_floor_hit_pct": floor_hit_pct,
+                "protein_floor_hit_days": floor_hit_days,
                 "days_logged": len(items),
                 "tdee": round(tdee) if tdee else None,
                 "avg_deficit": deficit,

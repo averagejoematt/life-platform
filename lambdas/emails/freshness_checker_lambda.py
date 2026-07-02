@@ -55,6 +55,10 @@ SOURCES = {
     "habitify": "Habitify habits",
     "food_delivery": "Food delivery behavioral signal",
     "measurements": "Tape measure check-ins",
+    # 2026-07-02: hevy was never listed — the public pipeline board mirrors this dict,
+    # so /data/training rendered Hevy sets while the pipeline page omitted the source.
+    # Behavioral (manual lift logging): a rest week reads as a lapse, not an outage.
+    "hevy": "Hevy strength sets",
     # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
 }
 
@@ -77,6 +81,8 @@ SOURCE_STALE_HOURS = {
     # macrofactor is a manual-ish S3 CSV upload (not every day) — lenient threshold
     # avoids false-stale; the dedicated format-drift check is the real guard.
     "macrofactor": 96,  # 4 days
+    # hevy is manual lift logging — a rest week must not read as an outage.
+    "hevy": 7 * 24,
 }
 
 # ── DI-1.6: Apple Health activity-integrity guard ──────────────────────────
@@ -196,7 +202,7 @@ def check_apple_health_activity(table, now, sick_suppress):
 # (whoop/withings/eightsleep) and API/webhook (todoist/apple_health/habitify)
 # sources stay infra. Zero new metrics/alarms: this only redefines what the
 # existing StaleSourceCount counts.
-BEHAVIORAL_SOURCES = {"measurements", "food_delivery"}
+BEHAVIORAL_SOURCES = {"measurements", "food_delivery", "hevy"}
 
 # DI-2b: interior-gap detection. The staleness check above only sees the latest
 # date per source (the high-water mark), so a hole *behind* it is invisible — a
