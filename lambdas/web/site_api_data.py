@@ -126,13 +126,32 @@ _FRESHNESS_SOURCES = {
     "withings": {"label": "Withings", "desc": "Weight & body composition", "category": "Wearables"},
     "eightsleep": {"label": "Eight Sleep", "desc": "Sleep stages, HR, HRV", "category": "Wearables"},
     "apple_health": {"label": "Apple Health", "desc": "Steps & active energy", "category": "Wearables"},
+    # 483ecb11 removed strava/macrofactor from the paused list but never re-added them
+    # here — so the board showed a 9-source pipeline while /data/training rendered
+    # Strava walks + Hevy sets and /data/nutrition rendered MacroFactor days.
+    "strava": {"label": "Strava", "desc": "Activities & walks", "category": "Wearables"},
+    "hevy": {"label": "Hevy", "desc": "Strength sets — logged when he lifts", "category": "Manual logs", "behavioral": True},
     "habitify": {"label": "Habitify", "desc": "Daily habit completions", "category": "Inputs"},
     "todoist": {"label": "Todoist", "desc": "Tasks completed", "category": "Inputs"},
+    "macrofactor": {
+        "label": "MacroFactor",
+        "desc": "Nutrition log — manual end-of-day upload, ~24h behind by design",
+        "category": "Manual logs",
+        "behavioral": True,
+    },
     "measurements": {"label": "Tape measure", "desc": "Body measurements", "category": "Manual logs", "behavioral": True},
     "food_delivery": {"label": "Food delivery", "desc": "Delivery behavioral signal", "category": "Manual logs", "behavioral": True},
 }
 # Per-source stale thresholds in hours (default 48). Mirrors SOURCE_STALE_HOURS.
-_FRESHNESS_STALE_HOURS = {"withings": 7 * 24, "todoist": 48, "measurements": 60 * 24, "food_delivery": 90 * 24}
+# (food_delivery was 90d here vs the checker's 14d — the mirror had drifted.)
+_FRESHNESS_STALE_HOURS = {
+    "withings": 7 * 24,
+    "todoist": 48,
+    "measurements": 60 * 24,
+    "food_delivery": 14 * 24,
+    "macrofactor": 96,
+    "hevy": 7 * 24,
+}
 _FRESHNESS_DEFAULT_STALE_HOURS = 48
 # Intentionally paused — reported as status "paused", never counted stale (ADR-074 etc.).
 # Only Garmin is genuinely paused. Strava came back (DI-2 walk-ingestion fix, 2026-06-21)
@@ -1179,6 +1198,38 @@ def handle_habits() -> dict:
     )
 
 
+def _corr_p_value(p: dict):
+    """Serve the stored p-value faithfully, or None when absent.
+
+    The compute lambda rounds p to 4 decimals, so a highly-significant pair
+    stores p=0.0 — and the old `float(... or 1)` coerced that 0.0 to 1.0,
+    rendering the flagship FDR-significant pair as "p 1.000". Zero is a
+    value, not a missing value.
+    """
+    raw = p.get("p_value", p.get("p"))
+    if raw is None:
+        return None
+    return round(float(raw), 4)
+
+
+def _corr_strength(r_val: float, stored: str) -> str:
+    """Deterministic strength label from |r| (Cohen-style bands).
+
+    The stored `interpretation` has disagreed with the number it sits next
+    to (r=0.843 labeled "weak"); the served label must match the served r.
+    Falls back to the stored label only for degenerate r=0 rows so
+    "insufficient_data" survives.
+    """
+    a = abs(r_val)
+    if a >= 0.7:
+        return "strong"
+    if a >= 0.4:
+        return "moderate"
+    if a > 0:
+        return "weak"
+    return stored or "weak"
+
+
 def handle_correlations(event: dict = None) -> dict:
     """
     GET /api/correlations
@@ -1280,9 +1331,9 @@ def handle_correlations(event: dict = None) -> dict:
                 "field_b": metric_b,
                 "label_b": meta_b.get("label", p.get("label_b", metric_b)),
                 "r": round(r_val, 3),
-                "p": round(float(p.get("p_value", p.get("p", 1)) or 1), 4),
+                "p": _corr_p_value(p),
                 "n": int(p.get("n_days", p.get("n", 0)) or 0),
-                "strength": p.get("interpretation", p.get("strength", "weak")),
+                "strength": _corr_strength(r_val, p.get("interpretation", p.get("strength", ""))),
                 "fdr_significant": p.get("fdr_significant", False),
                 "correlation_type": p.get("correlation_type", "cross_sectional"),
                 "lag_days": int(p.get("lag_days", 0) or 0),
@@ -1302,8 +1353,9 @@ def handle_correlations(event: dict = None) -> dict:
 
     # HP-06: Featured mode — return flat array of top significant correlations
     if featured:
-        # Filter to significant only (p < 0.05 or FDR-significant)
-        significant = [p for p in public_pairs if p.get("fdr_significant") or p.get("p", 1) < 0.05]
+        # Filter to significant only (p < 0.05 or FDR-significant).
+        # p may be None (absent) — and p=0.0 is maximally significant, not missing.
+        significant = [p for p in public_pairs if p.get("fdr_significant") or (p.get("p") is not None and p["p"] < 0.05)]
         # Fall back to strongest by |r| if no significant ones found
         if not significant:
             significant = public_pairs

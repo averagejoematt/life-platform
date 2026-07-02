@@ -135,18 +135,45 @@ function renderNumbers(journey) {
     const hp = bind("hero-proof");
     if (hp) {
       const dir = lost > 0.05 ? `down ${Math.round(Math.abs(lost) * 10) / 10} lb` : lost < -0.05 ? `up ${Math.round(Math.abs(lost) * 10) / 10} lb` : "even";
-      hp.textContent = `${dir} in ${dayN} days — the shape of it, every day, just below.`;
+      // Honest as-of: the day counter ticks live while the weight only moves at weigh-ins —
+      // during a quiet stretch the pairing reads false without the anchor date.
+      let asof = "";
+      if (journey.last_weighin_date) {
+        const lw = new Date(`${journey.last_weighin_date}T12:00:00`);
+        if ((Date.now() - lw.getTime()) / 86400000 > 1.5) asof = ` (last weigh-in ${lw.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+      }
+      hp.textContent = `${dir} in ${dayN} days${asof} — the shape of it, every day, just below.`;
       hp.hidden = false;
     }
   }
   if (journey.projected_goal_date) {
     bind("projected").textContent = `At the current rate, goal lands around ${journey.projected_goal_date}. Correlative projection — not a promise.`;
   } else if (journey.rate_provisional) {
-    // Lean into the truth instead of projecting off early water-weight: it's week one.
-    bind("projected").textContent = "Too early to project — this is week one, and an early cut's rate is mostly water weight that will slow. No fake finish line; watch it happen in real time.";
+    // Lean into the truth instead of projecting off a thin weigh-in record — but derive
+    // the copy from the actual week, not a hardcoded "week one" (it fired in week 3).
+    const wk = Number(journey.week_n) || genesisCount().weekN || 1;
+    const span = Number(journey.weighin_span_days) || 0;
+    bind("projected").textContent = wk <= 1
+      ? "Too early to project — this is week one, and an early cut's rate is mostly water weight that will slow. No fake finish line; watch it happen in real time."
+      : `No projection yet — the weigh-in record spans only ${span || "a few"} days, too short to draw an honest line. No fake finish line; watch it happen in real time.`;
   } else if (journey.weekly_rate_lbs != null) {
     bind("projected").textContent = "No reliable projection yet — too few weigh-ins to draw a line.";
   }
+}
+
+/* ── the quiet stretch (presence) ────────────────────────────────────────── */
+// Home is where family lands first — when the manual logs go quiet, say so in one
+// calm line (the shipped /api/presence contract; same tone as the Story timeline's
+// quiet-stretch beat). No banner, no red, and never a cause — the cause isn't in
+// the data. Hides itself entirely when logging is current or the pause is planned.
+function renderQuiet(p) {
+  const el = bind("hero-quiet");
+  if (!el || !p || !p.in_lull || p.planned_pause) return;
+  const days = Math.round(Number(p.gap_days) || 0);
+  const since = days >= 2 ? `${days} days since the last entry` : "the latest entry is a beat behind";
+  const passive = p.passive_still_flowing === false ? "" : " — the wearables kept recording, so the record stays honest";
+  el.textContent = `The manual logs have gone quiet (${since})${passive}.`;
+  el.hidden = false;
 }
 
 /* ── the waveform (honest down-beats) ────────────────────────────────────── */
@@ -339,12 +366,13 @@ async function load() {
   wireTheme();
   renderWall();
 
-  const [stats, journey, wave, character, weight] = await Promise.allSettled([
+  const [stats, journey, wave, character, weight, presence] = await Promise.allSettled([
     getJSON("/public_stats.json"),
     getJSON("/api/journey"),
     getJSON("/api/journey_waveform"),
     getJSON("/api/character"),
     getJSON("/api/weight_progress"),
+    getJSON("/api/presence"),
   ]);
 
   const statsV = stats.status === "fulfilled" ? stats.value : null;
@@ -363,6 +391,7 @@ async function load() {
 
   const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
   renderNumbers(journeyV);
+  renderQuiet(presence.status === "fulfilled" ? presence.value : null);
 
   const wp = weight.status === "fulfilled" ? (weight.value.weight_progress || weight.value) : [];
   const wc = bind("weightchart");
