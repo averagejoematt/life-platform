@@ -67,3 +67,28 @@ def test_training_falls_back_to_activities_list(monkeypatch):
 def test_training_omitted_when_no_records(monkeypatch):
     data = _gather_with([], monkeypatch)
     assert "training" not in data
+
+
+# The whoop partition also stores DATE#<day>#WORKOUT#<uuid> sub-records — counting
+# them as nights produced "20 nights of sleep in one week", which the regenerated
+# W26 note then flagged as a tracking error in its own data (2026-07-02).
+_WHOOP_RECORDS = [
+    {"sk": "DATE#2026-06-22", "sleep_duration_hours": 7.5, "hrv": 44.0},
+    {"sk": "DATE#2026-06-22#WORKOUT#53900157-2526-4bcb-be21-80a07f56adea", "strain": 12.1},
+    {"sk": "DATE#2026-06-23", "sleep_duration_hours": 7.9, "hrv": 44.2},
+    {"sk": "DATE#2026-06-23#WORKOUT#230994b0-a21e-4071-8f0f-00a18b8c4dee", "strain": 9.4},
+    {"sk": "DATE#2026-06-23#WORKOUT#28a877e8-676d-4a17-b64b-8c90a97686c0", "strain": 6.2},
+]
+
+
+def test_sleep_nights_count_day_records_only(monkeypatch):
+    monkeypatch.setattr(fnl, "_query_source", lambda src, s, e: _WHOOP_RECORDS if src == "whoop" else [])
+    data = fnl.gather_week_data("2026-06-22", "2026-06-28")
+    assert data["sleep"]["nights"] == 2  # never 5 — workout sub-records aren't nights
+    assert data["sleep"]["avg_hours"] == 7.7
+
+
+def test_day_record_filter_shape():
+    assert fnl._DAY_SK_RE.match("DATE#2026-06-22")
+    assert not fnl._DAY_SK_RE.match("DATE#2026-06-22#WORKOUT#abc")
+    assert not fnl._DAY_SK_RE.match("YEAR#2026")

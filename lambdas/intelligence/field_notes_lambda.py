@@ -17,6 +17,7 @@ v1.0.0 — 2026-03-31
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -97,6 +98,17 @@ def _query_source(source, start_date, end_date):
     return _decimal_to_float(resp.get("Items", []))
 
 
+_DAY_SK_RE = re.compile(r"^DATE#\d{4}-\d{2}-\d{2}$")
+
+
+def _query_day_records(source, start_date, end_date):
+    """Day-level records only. Some partitions carry sub-records under the same
+    date prefix (whoop stores DATE#<day>#WORKOUT#<uuid> per workout), and counting
+    them as days produced "20 nights of sleep in one week" — which the AI then
+    publicly flagged as a tracking error in its own note (2026-W26)."""
+    return [i for i in _query_source(source, start_date, end_date) if _DAY_SK_RE.match(str(i.get("sk", "")))]
+
+
 def _latest_item(source):
     pk = f"{USER_PREFIX}{source}"
     resp = table.query(
@@ -113,7 +125,7 @@ def gather_week_data(start_date, end_date):
     data = {}
 
     # Sleep (Whoop)
-    sleep_items = _query_source("whoop", start_date, end_date)
+    sleep_items = _query_day_records("whoop", start_date, end_date)
     if sleep_items:
         hrs = [i.get("sleep_duration_hours", 0) for i in sleep_items if i.get("sleep_duration_hours")]
         hrvs = [i.get("hrv", 0) for i in sleep_items if i.get("hrv")]
@@ -125,7 +137,7 @@ def gather_week_data(start_date, end_date):
         }
 
     # Nutrition (MacroFactor)
-    nutrition = _query_source("macrofactor", start_date, end_date)
+    nutrition = _query_day_records("macrofactor", start_date, end_date)
     if nutrition:
         cals = [float(i["total_calories_kcal"]) for i in nutrition if i.get("total_calories_kcal")]
         protein = [float(i["total_protein_g"]) for i in nutrition if i.get("total_protein_g")]
@@ -139,7 +151,7 @@ def gather_week_data(start_date, end_date):
     # activities[]), not individual activities. Reading per-activity fields off the day
     # record produced "N sessions / 0 minutes", which the AI then publicly flagged as a
     # data-entry bug in the 2026-W26 note.
-    day_records = _query_source("strava", start_date, end_date)
+    day_records = _query_day_records("strava", start_date, end_date)
     if day_records:
 
         def _day_minutes(rec):
@@ -154,7 +166,7 @@ def gather_week_data(start_date, end_date):
         }
 
     # Weight (Withings)
-    weights = _query_source("withings", start_date, end_date)
+    weights = _query_day_records("withings", start_date, end_date)
     if weights:
         wt = [float(w.get("weight_lbs", 0)) for w in weights if w.get("weight_lbs")]
         if wt:
@@ -166,7 +178,7 @@ def gather_week_data(start_date, end_date):
             }
 
     # Habits (habit_scores)
-    habits = _query_source("habit_scores", start_date, end_date)
+    habits = _query_day_records("habit_scores", start_date, end_date)
     if habits:
         completion_rates = [float(h.get("completion_rate", 0)) for h in habits if h.get("completion_rate") is not None]
         data["habits"] = {
@@ -193,7 +205,7 @@ def gather_week_data(start_date, end_date):
         }
 
     # Mood (State of Mind)
-    mood_items = _query_source("state_of_mind", start_date, end_date)
+    mood_items = _query_day_records("state_of_mind", start_date, end_date)
     if mood_items:
         valences = [float(m.get("valence", 0)) for m in mood_items if m.get("valence") is not None]
         data["mood"] = {
