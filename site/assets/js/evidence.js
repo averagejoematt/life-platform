@@ -1195,7 +1195,35 @@ function renderLedger(d) {
   const reluctantSec = reluctant.length ? sec("Where forfeits go (the ones that sting)", `<div class="cause-grid">${reluctant.map((c) => causeCard(c, "joke_note")).join("")}</div>`) : "";
   return head + earnedSec + reluctantSec + note("Money moved by the accountability rules — skin in the game. Causes shown whether or not money has moved yet.");
 }
-function renderDiscoveries(d) {
+// One machine-bet card: domains + status badge in the header, the falsifiable
+// statement as the body, the verdict trail once graded, the founding evidence
+// collapsed behind a details toggle (it's long — 4-5 cited sentences).
+// Status → badge: confirmed earns ember (a live confirmed signal); refuted stays
+// muted ink (down is never red); pending/confirming are plain machine labels.
+function hypCard(h) {
+  const status = String(h.status || "pending");
+  const badgeCls = status === "confirmed" ? "rd-badge rd-badge-live" : "rd-badge";
+  const domains = (h.domains || []).map(esc).join(" ↔ ") || "cross-domain";
+  const checks = Math.round(Number(h.check_count) || 0);
+  const formed = h.created_at ? String(h.created_at).slice(0, 10) : null;
+  const checked = h.last_checked ? String(h.last_checked).slice(0, 10) : null;
+  const decided = status === "confirmed" || status === "refuted";
+  const meta = [
+    h.confidence && `confidence ${h.confidence}`,
+    checks === 0 ? "not yet checked" : `${checks} check${checks === 1 ? "" : "s"}`,
+    formed && `formed ${formed}`,
+    checked && `last checked ${checked}`,
+  ].filter(Boolean).join("  ·  ");
+  const verdict = h.last_evidence
+    ? `<p class="rd-why hyp-verdict"><span class="label">${decided ? "the verdict" : "latest check"} — </span>${esc(h.last_evidence)}</p>`
+    : "";
+  const founding = h.evidence && typeof h.evidence === "string"
+    ? `<details class="hyp-ev"><summary class="label">the data behind it</summary><p class="rd-why">${esc(h.evidence)}</p></details>`
+    : "";
+  return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${domains}</h3><span class="${badgeCls}">${esc(status)}</span></header>` +
+    `<p class="rd-why">${esc(h.hypothesis || "")}</p>${verdict}${founding}<p class="rd-meta label">${esc(meta)}</p></article>`;
+}
+async function renderDiscoveries(d) {
   // Real discoveries first: ai_findings = FDR-significant correlations computed from
   // Matt's own data (the API computed these but the page never rendered them — it showed
   // only library hypothesis templates, which read as placeholder). Hypotheses now last,
@@ -1209,12 +1237,28 @@ function renderDiscoveries(d) {
     ? sec("Correlations found in the data", `<div class="rd-cards">${findings.map((f) => card(f.title, f.body, f.n ? `n=${f.n}` : "")).join("")}</div>`)
     : "";
   const is = inner.length ? sec("Inner-life findings", `<div class="rd-cards">${inner.map((f) => card(f.title, f.body, f.confidence)).join("")}</div>`) : "";
-  const hs = hyp.length
-    ? sec("Hypotheses under test", `<div class="rd-cards">${hyp.map((h) => card(h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`)
-    : "";
+  // What the machine suspects — the hypothesis engine's REAL live bets
+  // (/api/hypotheses: formed from the data, re-checked every Sunday, graded
+  // confirmed/refuted or expired). The static library templates remain the
+  // fallback for the empty windows (30-day hard expiry / post-reset).
+  const live = await tryJSON("/api/hypotheses");
+  const all = (live && live.hypotheses) || [];
+  const bets = all.filter((h) => h.status !== "archived");
+  const expired = all.length - bets.length;
+  const unchecked = bets.length > 0 && bets.every((h) => !Math.round(Number(h.check_count) || 0));
+  let hs;
+  if (bets.length) {
+    const intro = `<p class="rd-meta label">Falsifiable bets the engine formed from the data — re-checked every Sunday. A bet gets confirmed, refuted, or expires undecided; all three are shown.${unchecked ? " None checked yet — the first weekly check is upcoming." : ""}</p>`;
+    const expiredNote = expired ? `<p class="rd-meta label">${expired} earlier bet${expired === 1 ? "" : "s"} expired before the data could decide ${expired === 1 ? "it" : "them"} — shown as the honest cost of betting in public.</p>` : "";
+    hs = sec("What the machine suspects", intro + `<div class="rd-cards">${bets.map(hypCard).join("")}</div>` + expiredNote);
+  } else {
+    hs = hyp.length
+      ? sec("Hypotheses under test", `<div class="rd-cards">${hyp.map((h) => card(h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`)
+      : "";
+  }
   if (!fs && !is && !hs)
     return empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
-  return fs + is + hs + note("Correlative leads, not conclusions — FDR-corrected, but n is small this early in the cycle.");
+  return fs + is + hs + note("Correlative leads, not conclusions — N=1, FDR-corrected where computed, and n is small this early in the cycle.");
 }
 function renderGenome(d) { const g = d.genome || d; const rs = g.risk_summary || {}; const cats = g.categories || {}; const head = figs([g.total_snps != null && fig(fmt(g.total_snps), "SNPs analysed"), rs.unfavorable != null && fig(rs.unfavorable, "unfavorable"), rs.favorable != null && fig(rs.favorable, "favorable")]); const cs = Object.keys(cats).length ? sec("Risk by category", kvtable(cats)) : ""; if (!head.includes("fig-v") && !cs) return empty("Genome not yet published."); return head + cs + note("Genotype is predisposition, not destiny — context for the biomarkers."); }
 async function renderChallenges(d) {
@@ -1978,23 +2022,30 @@ function renderPipeline(d) {
     `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made.</p>`;
 }
 
-// Intelligence — the weekly correlation matrix (Pearson r + BH-FDR), strongest first.
-function renderCorrelations(d) {
+// Intelligence — the weekly correlation matrix (Pearson r + BH-FDR), strongest first,
+// headed by the engine's live tallies (/api/intelligence_summary: open bets + pairs).
+async function renderCorrelations(d) {
+  const summary = await tryJSON("/api/intelligence_summary");
+  const hypCount = summary && summary.hypotheses && summary.hypotheses.count;
+  // The loop continues: the machine's bets live on the Protocols door.
+  const betsLine = hypCount
+    ? `<p class="rd-meta label">The engine also holds ${fmt(hypCount)} open bet${hypCount === 1 ? "" : "s"} on this data — graded weekly under <a href="/protocols/discoveries/">What the machine suspects</a>.</p>`
+    : "";
   const c = d && d.correlations;
   const obj = (c && !Array.isArray(c)) ? c : {};
   const pairs = obj.pairs || [];
-  if (!pairs.length) return empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
+  if (!pairs.length) return betsLine + empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
   const sig = pairs.filter((p) => p.fdr_significant).length;
   // Pairs with fewer than 5 overlapping days can't claim anything — collapse them
   // into one honest line instead of tabling a wall of r=0.00 / n=2 rows.
   const tabled = pairs.filter((p) => (p.n ?? 0) >= 5);
   const belowFloor = pairs.length - tabled.length;
-  const head = figs([fig(obj.count ?? pairs.length, "pairs"), sig ? fig(sig, "FDR-significant") : "", obj.week && fig(obj.week, "week")]);
+  const head = figs([fig(obj.count ?? pairs.length, "pairs"), sig ? fig(sig, "FDR-significant") : "", hypCount ? fig(hypCount, "open bets") : "", obj.week && fig(obj.week, "week")]);
   const pTxt = (p) => (p.p === 0 ? "&lt;0.001" : p.p == null ? "—" : fmt(p.p, 3));
   const rows = tabled.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${pTxt(p)}</td><td class="num">${fmt(p.n)}</td><td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
   const floorNote = belowFloor ? `<p class="rd-desc">${belowFloor} more pair${belowFloor === 1 ? "" : "s"} had fewer than 5 overlapping days this week — below the floor for claiming a pattern, so they aren't tabled.</p>` : "";
   const tbl = sec("Correlation matrix — strongest first", `<table class="rd-tbl"><thead><tr><th>pair</th><th>r</th><th>p</th><th>n</th><th>significance</th></tr></thead><tbody>${rows}</tbody></table>${floorNote}`);
-  return head + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
+  return head + betsLine + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
 }
 // Predictions — the coaches' forward calls, scored against measured outcomes.
 function renderPredictions(d) {

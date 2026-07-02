@@ -172,6 +172,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   color: var(--ink-faint); border: var(--border-hair); border-radius: var(--radius-xs); padding: 1px 7px; white-space: nowrap; }
 .rd-badge-live { color: var(--ember); border-color: var(--ember-line); }
 .rd-why { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); }
+/* Machine-bet cards (What the machine suspects) — founding evidence collapses behind
+   a details toggle; the verdict line sits on a neutral hairline (never red). */
+.hyp-ev { margin-top: var(--sp-2); }
+.hyp-ev summary { cursor: pointer; }
+.hyp-verdict { border-left: 2px solid var(--rule); padding-left: var(--sp-2); }
 .rd-line { margin-top: var(--sp-2); font-size: var(--fs-small); color: var(--ink-muted); }
 .rd-line .label { display: inline; margin-right: var(--sp-2); }
 .rd-line.rd-up .label { color: var(--ember); } .rd-line.rd-down .label { color: var(--ink-muted); }
