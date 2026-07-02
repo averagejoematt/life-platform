@@ -125,14 +125,48 @@ def tool_get_reading_shelf(args):
 
 def tool_get_reading_recommendation(args):
     """A curated next-read pick with a decomposed reason string + confidence.
-    Below the n-gate it is propose-and-dispose (one pick, stated as a hypothesis)."""
+    Below the n-gate it is propose-and-dispose (one pick, stated as a hypothesis).
+    Each surfaced pick is persisted as an OPEN RECOMMENDATION# — that's what
+    log_outcome later resolves (the track record was write-less before this) and
+    what auto-becomes the public "why this book" note when the book is started."""
     candidates = _candidates_from_queue()
     state = _build_recommender_state()
     top_n = int(args.get("limit", 3))
     result = reading_recommender.rank(candidates, state, top_n=top_n)
     if not candidates:
         result["note"] = "Nothing in the queue yet — add a book (manage_reading add_book) to get a pick."
+    _persist_recommendations(result)
     return result
+
+
+def _persist_recommendations(result):
+    """Persist each surfaced pick as an open RECOMMENDATION# audit record.
+
+    Dedup: a bookId with an OPEN rec already on file is skipped, so re-running the
+    tool doesn't spam Cora's track record. The recommender's `reason` is stored as
+    `reasonString` — the name the public visibility allowlist sanctions. Fail-soft:
+    a persistence hiccup never breaks the recommendation read itself.
+    """
+    try:
+        picks = result.get("recommendations") or []
+        if not picks:
+            return
+        open_ids = {r.get("bookId") for r in reading_store.track_record(limit=50) if r.get("status") == "open"}
+        for p in picks:
+            bid = p.get("bookId")
+            if not bid or bid in open_ids:
+                continue
+            reading_store.put_recommendation(
+                {
+                    "bookId": bid,
+                    "title": p.get("title"),
+                    "reasonString": p.get("reason"),
+                    "confidence": result.get("confidence"),
+                    "status": "open",
+                }
+            )
+    except Exception as e:
+        logger.info("[reading] recommendation persistence failed (%s) — read still served", type(e).__name__)
 
 
 def tool_get_reading_profile(args):
@@ -274,7 +308,31 @@ def _action_update_status(args, dry_run):
     if dry_run:
         return _preview("update_status", {"bookId": bid, "status": status, "abandon_reason": args.get("abandon_reason")})
     item = reading_store.update_reading_status(bid, status, abandon_reason=args.get("abandon_reason"))
+    if status == "reading":
+        _auto_coach_why(bid)
     return {"status": "committed", "action": "update_status", "state": item}
+
+
+def _auto_coach_why(book_id):
+    """When a recommended book is picked up, Cora's decomposed reason becomes the
+    public "why this book" note (noteId=coach-why, type=intention) — the anti-
+    black-box rule: the why is the COACH's recommendation reason, not an invented
+    reader intention. A hand-authored coach-why always wins (never overwritten);
+    a book that was never recommended simply gets no auto-why. Fail-soft: never
+    blocks the status update."""
+    try:
+        if any(n.get("noteId") == "coach-why" for n in reading_store.notes(book_id)):
+            return
+        rec = next(
+            (r for r in reading_store.track_record(limit=50) if r.get("bookId") == book_id and r.get("reasonString")),
+            None,
+        )
+        if not rec:
+            return
+        reading_store.add_note(book_id, note_id="coach-why", type="intention", text=rec["reasonString"], public=True)
+        logger.info("[reading] auto coach-why note written for %s", book_id)
+    except Exception as e:
+        logger.info("[reading] auto coach-why skipped (%s)", type(e).__name__)
 
 
 def _action_log_session(args, dry_run):
