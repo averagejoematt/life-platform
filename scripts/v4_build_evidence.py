@@ -100,7 +100,9 @@ REGISTRY = [
     # ── Mind & accountability ──────────────────────────────────────────────
     (
         "mind",
-        "Mind & inner life",
+        # "Mood & journal", not "Mind & inner life" — Reading owns the Mind-pillar name
+        # now (the tile below), so this one says exactly what it holds.
+        "Mood & journal",
         "Mood, journal, temptations resisted, and meditation.",
         "Mind & accountability",
         "data",
