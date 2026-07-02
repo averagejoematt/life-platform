@@ -17,27 +17,51 @@
 (function () {
   var root = document.documentElement;
 
-  // ── Interactive line charts (ALWAYS on — interaction, not motion, so it runs even
-  //    under prefers-reduced-motion). lineChart embeds data-cpts (normalized coords +
-  //    label per point); we draw a focus dot + tooltip that track the cursor. ──
+  // ── Interactive charts (ALWAYS on — interaction, not motion, so it runs even
+  //    under prefers-reduced-motion). Any chart that embeds data-cpts (normalized
+  //    coords + label per point) gets a focus dot + tooltip. Hit-testing is
+  //    NEAREST-BY-X, not index-ratio: date-positioned charts (weight trend,
+  //    autonomic hero) have irregular x spacing, so round(ratio·(n−1)) picks the
+  //    wrong point there; nearest keeps uniform charts pixel-identical. Pointer
+  //    events cover mouse + pen + touch: touch-action pan-y keeps the page
+  //    scrolling vertically while a horizontal drag scrubs the chart, and a tap
+  //    inspects (lingers briefly — touch has no hover-out). ──
   function wireChart(svg) {
     if (svg.__ix) return; svg.__ix = 1;
     var cpts; try { cpts = JSON.parse(svg.getAttribute("data-cpts")); } catch (e) { return; }
     if (!cpts || !cpts.length) return;
     var fig = svg.closest(".chart"); if (!fig) return;
     if (getComputedStyle(fig).position === "static") fig.style.position = "relative";
+    svg.style.touchAction = "pan-y";
     var dot = document.createElement("span"); dot.className = "chart-focus"; dot.hidden = true;
     var tip = document.createElement("span"); tip.className = "chart-tip label"; tip.hidden = true;
     fig.appendChild(dot); fig.appendChild(tip);
-    svg.addEventListener("mousemove", function (e) {
+    var hideT = null;
+    function show(clientX) {
       var r = svg.getBoundingClientRect(), fr = fig.getBoundingClientRect();
-      var ratio = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-      var pt = cpts[Math.round(ratio * (cpts.length - 1))]; if (!pt) return;
+      if (!r.width) return;
+      var ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      var pt = cpts[0], best = Infinity;
+      for (var i = 0; i < cpts.length; i++) {
+        var d = Math.abs(cpts[i].x - ratio);
+        if (d < best) { best = d; pt = cpts[i]; }
+      }
       var px = (r.left - fr.left) + pt.x * r.width, py = (r.top - fr.top) + pt.y * r.height;
       dot.style.left = px + "px"; dot.style.top = py + "px"; dot.hidden = false;
       tip.textContent = pt.l; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.hidden = false;
+    }
+    function hide() { clearTimeout(hideT); dot.hidden = true; tip.hidden = true; }
+    svg.addEventListener("pointermove", function (e) { clearTimeout(hideT); show(e.clientX); });
+    svg.addEventListener("pointerdown", function (e) { clearTimeout(hideT); show(e.clientX); });
+    svg.addEventListener("pointerup", function (e) {
+      // tap-to-inspect: linger long enough to read, then tidy up.
+      if (e.pointerType !== "mouse") { clearTimeout(hideT); hideT = setTimeout(hide, 2600); }
     });
-    svg.addEventListener("mouseleave", function () { dot.hidden = true; tip.hidden = true; });
+    svg.addEventListener("pointerleave", function (e) {
+      // touch fires leave right after up — that would kill the tap linger.
+      if (e.pointerType === "mouse") hide();
+    });
+    svg.addEventListener("pointercancel", hide); // the scroll took over the gesture
   }
   function wireCharts(scope) {
     if (!scope.querySelectorAll) return;

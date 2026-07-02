@@ -118,8 +118,12 @@ export function weightTrendChart(readings, { goal = null, genesis = null, valueK
   // P0.2 — a horizontal scrub marker the silhouette drives in lockstep. Hidden until the
   // silhouette scrubber moves it; data-* expose the y-scale so the link math stays in JS.
   const markerY = y(lastRaw.v).toFixed(1);
+  // Interactive hover/tap: cpts from the RAW weigh-ins (the dots — what a reader
+  // asks "what was that day?" about). x is date-positioned, so motion.js's
+  // nearest-by-x hit-testing is what makes this land on the right weigh-in.
+  const cpts = pts.map((p) => ({ x: +(x(p.d) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: `${_shortDate(p.d)} · ${_r(p.v)} lb` }));
   return `<figure class="chart wt-chart" data-wt-min="${min.toFixed(2)}" data-wt-max="${max.toFixed(2)}" data-wt-h="${H}" data-wt-p="${P}">` +
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     gMark +
     `<path class="wt-trend" d="${trendLine}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `${dots}` +
@@ -197,7 +201,15 @@ export function dualLineChart(seriesA, seriesB, { aLabel = "A", bLabel = "B", un
   const _r = (n) => Math.round(n * 10) / 10;
   const aLast = A[A.length - 1].v, bLast = B[B.length - 1].v, gap = _r(aLast - bLast);
   const summary = `${aLabel} ${_r(aLast)}${unit} vs ${bLabel} ${_r(bLast)}${unit}, gap ${gap}${unit}.`;
-  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+  // Interactive hover/tap: cpts track series A (the ember primary); when B has a
+  // point on the same date, the tooltip carries both so the gap is readable.
+  const xA = xf(A);
+  const bByD = new Map(B.filter((p) => p.d).map((p) => [p.d, p.v]));
+  const cpts = A.map((p, i) => ({
+    x: +(xA(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4),
+    l: (p.d ? _shortDate(p.d) + " · " : "") + `${aLabel} ${_r(p.v)}${unit}` + (p.d && bByD.has(p.d) ? ` · ${bLabel} ${_r(bByD.get(p.d))}${unit}` : ""),
+  }));
+  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<path class="chart-down" d="${path(B)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<path class="chart-line" d="${path(A)}" vector-effect="non-scaling-stroke"/></svg>` +
     `<figcaption class="chart-cap label sbar-legend"><span class="sbar-key"><i class="sbar-dot sbar-ember"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>${escAttr(bLabel)}</span>${showGap ? ` · gap ${escAttr(String(gap))}${escAttr(unit)}` : ""}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
@@ -243,7 +255,15 @@ export function autonomicHero(hist, { height = 190, label = "" } = {}) {
   const rhrDir = rhr[rhr.length - 1].v <= rhr[0].v ? "down" : "up";
   const hrvDir = hrv[hrv.length - 1].v >= hrv[0].v ? "up" : "down";
   const summary = `Autonomic hero: resting HR ${rhrDir} (${_r(rhr[0].v)}→${_r(rhr[rhr.length - 1].v)} bpm), HRV ${hrvDir} (${_r(hrv[0].v)}→${_r(hrv[hrv.length - 1].v)} ms). Both toward recovery read ember-positive.`;
-  return `<figure class="chart ah-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+  // Interactive hover/tap: cpts on the HRV line (ember primary) with the REAL
+  // values — the plot is normalized, so the tooltip is where the truth lives.
+  // Same-night RHR joins the label when present. Date-positioned x → nearest-by-x.
+  const rhrByD = new Map(rhr.map((p) => [p.d, p.v]));
+  const cpts = hrvN.map((p, i) => ({
+    x: +(x(p.d) / W).toFixed(4), y: +(y(p.n) / H).toFixed(4),
+    l: `${_shortDate(p.d)} · HRV ${_r(hrv[i].v)} ms` + (rhrByD.has(p.d) ? ` · RHR ${_r(rhrByD.get(p.d))} bpm` : ""),
+  }));
+  return `<figure class="chart ah-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<path class="ah-hrv" d="${path(hrvN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<path class="ah-rhr" d="${path(rhrN)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(hrvN[hrvN.length - 1].d).toFixed(1)}" cy="${y(hrvN[hrvN.length - 1].n).toFixed(1)}" r="3.2"/>` +
