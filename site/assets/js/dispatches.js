@@ -31,16 +31,28 @@ const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-let _podcastEpisodes = null;  // week → {url, bytes}; loaded once, fails silent
-async function podcastEpisode(week) {
+let _podcastEpisodes = null;  // current-cycle feed; loaded once, fails silent
+async function podcastEpisode(ent) {
+  // The chronicle's "listen" join used to read the SEASON-1 feed (/podcast/
+  // episodes.json — pre-reset episodes, weeks 5..-4, Feb–May dates) keyed by
+  // bare week number. Week numbers repeat across experiment resets, so the
+  // moment the current chronicle reached Week 5 it would have inherited a May
+  // episode about a previous cycle. Now: the current-cycle feed (/panelcast/,
+  // the same one the Podcast tab reads) + a date-window guard on the join.
   if (_podcastEpisodes === null) {
     try {
-      const d = await getJSON("/podcast/episodes.json");
-      _podcastEpisodes = {};
-      for (const e of d.episodes || []) _podcastEpisodes[String(e.week)] = e;
-    } catch (e) { _podcastEpisodes = {}; }
+      const d = await getJSON("/panelcast/episodes.json");
+      _podcastEpisodes = d.episodes || [];
+    } catch (e) { _podcastEpisodes = []; }
   }
-  return _podcastEpisodes[String(week)];
+  if (!ent) return undefined;
+  const w = ent.week ?? ent.id;
+  return _podcastEpisodes.find((e) => {
+    if (String(e.week) !== String(w)) return false;
+    if (!ent.date || !e.date) return true; // nothing to compare — trust the week
+    const gap = Math.abs(Date.parse(e.date) - Date.parse(ent.date)) / 86400000;
+    return Number.isFinite(gap) ? gap <= 14 : true; // same-cycle window
+  });
 }
 
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
@@ -457,7 +469,7 @@ async function renderRead(s, id) {
   const readmore = ent.url
     ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
     : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
-  const episode = s.key === "chronicle" ? await podcastEpisode(ent.week ?? ent.id) : null;
+  const episode = s.key === "chronicle" ? await podcastEpisode(ent) : null;
   const listen = episode
     ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round((episode.bytes || 0) / 1024 / 1024 / 0.12))} min)</span></div>`
     : "";
