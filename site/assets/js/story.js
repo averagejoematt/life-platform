@@ -200,14 +200,25 @@ function renderWave(days) {
   const lo = scores.length ? Math.min(...scores) : 0;
   const span = Math.max(1, (scores.length ? Math.max(...scores) : 1) - lo);
   const meaningfulSpread = scores.length >= 4 && (Math.max(...scores) - lo) >= 8;
+  // Each scored day deep-links into its own cockpit sheet (/now/?date= — the
+  // time-travel view that already exists one URL away). The signature honesty
+  // artifact stops being inert: tap a dip, read that morning. No-data days stay
+  // plain spans — there's no sheet to open.
   wrap.replaceChildren(...days.map((d) => {
     const pos = d.score ? (d.score - lo) / span : null;
-    const bar = document.createElement("span");
+    const linkable = !!d.date && d.score != null;
+    const bar = document.createElement(linkable ? "a" : "span");
     bar.className = `bar ${d.score == null ? "none" : meaningfulSpread ? tierOfRel(pos) : "up"}`;
     const h = d.score ? 14 + (pos || 0) * 86 : 6;
     bar.style.height = `${h}%`;
     bar.title = `${d.date || ""}: ${d.score ?? "no data"}`; // a11y / no-JS fallback
-    bar.dataset.tip = `${d.date || ""} · ${d.score == null ? "no data" : "score " + d.score}`;
+    bar.dataset.tip = `${d.date || ""} · ${d.score == null ? "no data" : "score " + d.score + " — tap to open that day"}`;
+    if (linkable) {
+      bar.href = `/now/?date=${encodeURIComponent(d.date)}`;
+      bar.setAttribute("aria-label", `${d.date} · score ${d.score} — open that day's cockpit`);
+    } else {
+      bar.setAttribute("aria-hidden", "true");
+    }
     return bar;
   }));
   // Styled, cursor-following tooltip — the waveform becomes a thing you explore.
