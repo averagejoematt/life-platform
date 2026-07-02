@@ -41,7 +41,21 @@ _DAY_RECORDS = [
 ]
 
 
+class _NoAwsTable:
+    """gather_week_data queries the journal (and _latest_item the character sheet)
+    DIRECTLY on `table`, not via _query_source — unstubbed, these tests silently
+    queried PROD DynamoDB when local creds existed and died in CI on the invalid
+    token (the live-coupled-test trap). Hermetic now: every direct read is empty."""
+
+    def query(self, **_kw):
+        return {"Items": []}
+
+    def get_item(self, **_kw):
+        return {}
+
+
 def _gather_with(records, monkeypatch):
+    monkeypatch.setattr(fnl, "table", _NoAwsTable())
     monkeypatch.setattr(fnl, "_query_source", lambda src, s, e: records if src == "strava" else [])
     return fnl.gather_week_data("2026-06-22", "2026-06-28")
 
@@ -82,6 +96,7 @@ _WHOOP_RECORDS = [
 
 
 def test_sleep_nights_count_day_records_only(monkeypatch):
+    monkeypatch.setattr(fnl, "table", _NoAwsTable())
     monkeypatch.setattr(fnl, "_query_source", lambda src, s, e: _WHOOP_RECORDS if src == "whoop" else [])
     data = fnl.gather_week_data("2026-06-22", "2026-06-28")
     assert data["sleep"]["nights"] == 2  # never 5 — workout sub-records aren't nights
