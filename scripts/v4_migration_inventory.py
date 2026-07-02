@@ -174,6 +174,12 @@ def main() -> int:
     for old in ("/story/lab-notes/", "/dispatches/lab-notes/"):
         redirects.append((old, "/coaching/lab-notes/"))
 
+    # 2026-07-02: post-v4 page moves that the legacy scan can't discover — these are
+    # NEW-era URLs retired later, so a regeneration would silently drop them if they
+    # only lived in redirects.map. Every manual 301 belongs here. /mind/ was the
+    # standalone reading page, consolidated into the Data door (AUDIT PROD-01).
+    redirects.append(("/mind/", "/data/reading/"))
+
     print(f"\nv4 migration inventory - {len(pages)} preserved page(s) under {LEGACY_DIR}/\n")
     for d in DEST_ORDER:
         print(f"  {d:8} {len(buckets[d]):4}")
