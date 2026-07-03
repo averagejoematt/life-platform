@@ -368,7 +368,18 @@ body { overflow-x: hidden; }
 .tl-x:hover { border-color: var(--ember); }
 /* event-type dot colours — ember for the "up"/milestone moments, muted for the rest */
 .tl-lv .tl-dot, .tl-ms .tl-dot, .tl-wt .tl-dot { background: var(--ember); }
+/* visual P2 — node glyphs read by TYPE (same size, ink/ember only — no confetti):
+   level-up = ember ring + core (the instrument motif) · milestone = filled ember ·
+   life event = open square · discovery/correlation = rotated open diamond ·
+   weight = filled ember dot (as before) · experiment = open circle. */
+.tl-lv .tl-dot { background: transparent; border: 1.5px solid var(--ember); }
+.tl-lv .tl-dot::before { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--ember); }
+.tl-le .tl-dot { border-radius: 2px; background: transparent; border: 1.5px solid var(--ink-faint); }
+.tl-dx .tl-dot, .tl-co .tl-dot { border-radius: 2px; background: transparent; border: 1.5px solid var(--ember); transform: rotate(45deg); }
+.tl-dx .tl-item:hover .tl-dot, .tl-co .tl-item:hover .tl-dot { transform: rotate(45deg) scale(1.18); }
+.tl-ex .tl-dot { background: transparent; border: 1.5px solid var(--ink-faint); }
 .tl-item:hover .tl-dot { transform: scale(1.18); }
+.tl-dx:hover .tl-dot, .tl-co:hover .tl-dot { transform: rotate(45deg) scale(1.18); }
 
 /* "Previously" rail in the chronicle reader — step back through the serial. */
 .dx-prev { margin: var(--sp-3) 0 var(--sp-4); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); }
@@ -559,6 +570,14 @@ body { overflow-x: hidden; }
 .askboard-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 .askboard-out { margin: 0; min-height: 1.2em; color: var(--ink-muted); }
 @media (max-width: 440px) { .askboard-email { flex-basis: 100%; } .askboard-btn { width: 100%; } }
+
+/* ── The marginal instrument mark (visual P2) — the OG card's brand device, on
+   exactly THREE surfaces (home loop beat · timeline header · the QA close). Faint
+   by rule; the sigil draw-in animates it via the shared classes. ── */
+.imark-rail { float: right; width: 44px; height: 44px; color: var(--ink-faint); opacity: 0.35; margin: 0 0 var(--sp-2) var(--sp-4); }
+.imark-rail .imark { width: 100%; height: 100%; display: block; }
+/* Story tab medium-marks (i-chronicle / i-podcast) — sit at label height. */
+.dx-tab .tab-ico { width: 0.95em; height: 0.95em; vertical-align: -0.12em; margin-right: 0.45em; }
 
 /* ── Returnability (uplevel P5) — the since-strip + NEW badges. Quiet by design:
    a single mono line, ember only on the section key; hides entirely when silent. ── */
