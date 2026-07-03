@@ -225,6 +225,24 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # AI Quality Canary (#385): a DETERMINISTIC quality check over the public
+        # AI endpoints ALARMed — an empty/stub answer, a fourth-wall vendor leak,
+        # a fabricated (ungrounded) number, a blocked term served, or the
+        # invalid-persona 400 regressed to a 500. The only alarm that watches the
+        # AI a reader actually touches. The advisory Haiku judge never trips it.
+        # Digest, not urgent.
+        _alarm(
+            "AiCanaryOverall",
+            "ai-canary-overall",
+            "LifePlatform/AICanary",
+            "OverallAlarm",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # REL-01: heartbeats for the four silent-failure detectors above. Each fires if
         # the detector's own daily metric is ABSENT for 2 straight days — i.e. the
         # producer (pipeline-health / strava-reconcile / freshness-checker / coherence-
@@ -254,6 +272,15 @@ class MonitoringStack(Stack):
             "coherence-heartbeat",
             "LifePlatform/Coherence",
             "OverallAlarm",
+        )
+        # The canary runs WEEKLY (Mon), so tolerate a 9-day gap — fires only if it
+        # misses more than one scheduled run (the producer actually stopped).
+        _heartbeat_alarm(
+            "AiCanaryHeartbeat",
+            "ai-canary-heartbeat",
+            "LifePlatform/AICanary",
+            "OverallAlarm",
+            days=9,
         )
 
         # ══════════════════════════════════════════════════════════════

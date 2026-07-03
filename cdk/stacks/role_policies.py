@@ -1608,6 +1608,41 @@ def operational_coherence_sentinel() -> list[iam.PolicyStatement]:
     )
 
 
+def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
+    """AI Quality Canary (#385): read-only DDB (the canonical facts to ground the
+    digit check) + INVOKE the site-api-ai Lambda directly (never through
+    CloudFront, so no reader rate-limit quota is spent) + emit LifePlatform/
+    AICanary metrics + a budget-gated Haiku advisory judge + persist findings to
+    a scoped audit prefix. No platform writes (ai-canary-log/ is an out-of-band
+    audit trail, not site/data)."""
+    return _operational_base(
+        ddb_actions=["dynamodb:GetItem", "dynamodb:Query"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="InvokeSiteApiAi",
+                actions=["lambda:InvokeFunction"],
+                resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:life-platform-site-api-ai"],
+            ),
+            iam.PolicyStatement(
+                sid="CanaryMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],  # PutMetricData only accepts "*"
+            ),
+            iam.PolicyStatement(
+                sid="CanaryAuditLog",
+                actions=["s3:PutObject"],
+                resources=_s3("ai-canary-log/*"),
+            ),
+            _bedrock_statement(),
+            iam.PolicyStatement(
+                sid="BudgetTierRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+            ),
+        ],
+    )
+
+
 def operational_og_image_generator() -> list[iam.PolicyStatement]:
     """OG image generator: reads public_stats.json, writes PNG images to S3, invalidates CloudFront."""
     return [
