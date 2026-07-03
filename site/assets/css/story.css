@@ -560,6 +560,30 @@ body { overflow-x: hidden; }
 .askboard-out { margin: 0; min-height: 1.2em; color: var(--ink-muted); }
 @media (max-width: 440px) { .askboard-email { flex-basis: 100%; } .askboard-btn { width: 100%; } }
 
+/* ── Convene the board (uplevel P2) — the live panel deliberation. Cards appear
+   thinking the moment you ask; answers reveal in sequence. The stagger is gated on
+   html.mo so reduced-motion (and no-JS-motion) shows every answer at once —
+   interaction, not animation. Wrong/unavailable is muted ink, never red. ── */
+.cv-all { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-muted); cursor: pointer; }
+.cv-all input { accent-color: var(--ember); }
+.cv-panel { display: grid; gap: var(--sp-3); margin-top: var(--sp-5); }
+.cv-q { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); max-width: var(--measure); }
+.cv-q .label { display: block; color: var(--ink-faint); margin-bottom: 2px; }
+.cv-card { border: var(--border-hair); border-left: 3px solid var(--ember-line); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
+.cv-head { display: flex; align-items: center; gap: var(--sp-3); }
+.cv-head .coach-mark svg { width: 30px; height: 30px; display: block; }
+.cv-who { display: grid; gap: 1px; }
+.cv-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
+.cv-title { color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
+.cv-text { margin-top: var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); max-width: var(--measure); }
+.cv-text.cv-unavailable { color: var(--ink-faint); font-style: italic; }
+.cv-note { margin-top: var(--sp-4); color: var(--ink-muted); font-family: var(--font-serif); font-style: italic;
+  font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure); border-left: 2px solid var(--rule); padding-left: var(--sp-4); }
+@media (prefers-reduced-motion: no-preference) {
+  html.mo .cv-text.is-answered { opacity: 0; animation: cvIn 0.6s var(--ease-out) forwards; animation-delay: var(--cv-delay, 0s); }
+  @keyframes cvIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+
 /* ── Commentary-first coaching (2026-06-28 re-cut). The Read = the board's read on
    you now; By Coach = the read on top of the domain data. Reuses dx-/coach-/tt- tokens. */
 .read-priority { margin: var(--sp-4) 0; padding: var(--sp-4) var(--sp-5); border-left: 3px solid var(--ember);

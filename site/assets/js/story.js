@@ -13,6 +13,7 @@
 
 import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
+import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -431,3 +432,11 @@ async function load() {
 }
 
 load();
+
+// uplevel P2 — the home "Ask the data" beat is a REAL inline ask (it was a styled
+// teaser that linked away). Same shared widget as the Data door; three chips tuned
+// for a first-time visitor. Fail-quiet: no mount point → nothing breaks.
+mountAsk(document.querySelector("[data-home-ask]"), {
+  chips: ["Is my sleep actually improving?", "What moves the glucose most?", "Is the weight loss on track?"],
+  note: "AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour); may pause under the budget guard.",
+});
