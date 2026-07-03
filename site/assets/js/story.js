@@ -15,6 +15,7 @@ import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
 import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — returnability, reader-keyed
+import { instrumentMark } from "/assets/js/sigils.js"; // visual P2 — the marginal instrument mark
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -463,3 +464,8 @@ mountAsk(document.querySelector("[data-home-ask]"), {
   chips: ["Is my sleep actually improving?", "What moves the glucose most?", "Is the weight loss on track?"],
   note: "AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour); may pause under the budget guard.",
 });
+
+// visual P2 — the faint marginal instrument mark on the loop beat (one of exactly
+// three on the whole site; the OG card's own device, so on- and off-site share
+// one vocabulary). aria-hidden, decorative-but-branded, draw-in via tokens §13.
+document.querySelectorAll("[data-imark]").forEach((el) => { el.innerHTML = instrumentMark(); });

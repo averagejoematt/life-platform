@@ -19,7 +19,7 @@
   Reuses dx- and coach- styles from story.css; one type system (coaches speak serif).
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
-import { sigil } from "/assets/js/sigils.js";
+import { sigil, instrumentMark } from "/assets/js/sigils.js";
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -461,7 +461,8 @@ function renderAskBoard(read) {
     `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>` +
     `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +
     `<p class="dx-disclosure label">Rate-limited (5/hour) and budget-guarded. Prefer a considered, human-reviewed answer? ` +
-    `<button type="button" class="dx-readfull" data-cv-queue>Send it to the weekly Reader Q&amp;A →</button></p>`;
+    `<button type="button" class="dx-readfull" data-cv-queue>Send it to the weekly Reader Q&amp;A →</button></p>` +
+    `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>`;
   const form = read.querySelector(".askboard-form");
   const out = read.querySelector(".askboard-out");
   const panel = read.querySelector("[data-cv-panel]");
