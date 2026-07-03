@@ -79,7 +79,46 @@ function kvtable(o, f) {
 }
 
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */
-function renderSupplements(d) { const g = d.groups || {}; const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]); const secs = Object.values(g).map((grp) => { const cards = (grp.items || []).map((s) => { const [c, l] = evClass(s.ev); const pct = Math.max(4, Math.min(100, s.evPct ?? 0)); const paused = !!s.paused; const pausedNote = paused && (s.pausedReason || "Paused — not currently taken"); return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div><p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || ((s.sources || []).find((x) => x && x.url) || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (s.sources.find((x) => x && x.url) || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`; }).join(""); return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`; }).join(""); return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew."); }
+function renderSupplements(d) {
+  const g = d.groups || {};
+  const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]);
+  const secs = Object.values(g).map((grp) => {
+    const cards = (grp.items || []).map((s) => {
+      const [c, l] = evClass(s.ev);
+      const pct = Math.max(4, Math.min(100, s.evPct ?? 0));
+      const paused = !!s.paused;
+      const pausedNote = paused && (s.pausedReason || "Paused — not currently taken");
+      // P2.3 — the honesty layer: what the stack CLAIMS (evidence meter) vs what's
+      // actually swallowed (adherence_pct, merged server-side from the real log —
+      // served since Sprint 9, never drawn until now).
+      const adherence = s.adherence_pct != null
+        ? `<div class="supp-ev supp-adh"><span class="supp-evlabel">taken</span><span class="supp-meter"><i class="supp-adh-i" style="width:${Math.max(2, Math.min(100, Number(s.adherence_pct))).toFixed(0)}%"></i></span><span class="supp-evpct num">${fmt(s.adherence_pct)}% of days</span></div>`
+        : "";
+      // P2.3 — the disclosure: the science bullets, the SPLIT sources (the dissent
+      // listed first — a stack that only cites support isn't showing its work),
+      // rationale/synergy/watching, genome flags.
+      const srcs = (s.sources || []).filter((x) => x && x.url);
+      const against = srcs.filter((x) => /challeng|against|counter|skeptic/i.test(String(x.stance || "")));
+      const forSrcs = srcs.filter((x) => !against.includes(x));
+      const srcList = (list, cls, lbl) => list.length
+        ? `<p class="supp-srchead label ${cls}">${lbl}</p><ul class="supp-srcs">${list.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title || x.url)}</a></li>`).join("")}</ul>`
+        : "";
+      const lines = [["rationale", s.rationale], ["synergy", s.synergy], ["watching", s.watching]]
+        .filter(([, v]) => v && !isBad(v))
+        .map(([k, v]) => `<p class="rd-line"><span class="label">${k}</span> ${esc(v)}</p>`).join("");
+      const sci = (s.science || []).length ? `<ul class="supp-sci">${s.science.slice(0, 6).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : "";
+      const hasMore = sci || lines || srcs.length > 1 || against.length;
+      const more = hasMore
+        ? `<details class="supp-more"><summary class="label">the work — science, sources${against.length ? " (incl. the dissent)" : ""}, rationale</summary>${sci}${lines}${srcList(against, "supp-src-against", "challenges it")}${srcList(forSrcs, "supp-src-for", "supports it")}</details>`
+        : "";
+      const snps = (d.genome_snps || []).filter((x) => x && x.supp && String(x.supp).toLowerCase() === String(s.name || "").toLowerCase());
+      const snpChips = snps.length ? snps.map((x) => `<p class="supp-snp label" title="${esc(x.note || "")}">genome · ${esc(x.id || "")}${x.note ? ` — ${esc(String(x.note).split("—")[0].trim())}` : ""}</p>`).join("") : "";
+      return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div>${adherence}${more}${snpChips}<p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || (srcs[0] || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (srcs[0] || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`;
+    }).join("");
+    return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`;
+  }).join("");
+  return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
+}
 function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }
 // ── /data/physical/ — two tiers: the weight cockpit (daily) + the composition arc
 // (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.
@@ -1272,8 +1311,43 @@ async function renderChallenges(d) {
   const avail = list.filter((c) => c.origin === "catalog" && c.status === "available");
   const backlog = list.filter((c) => c.origin === "catalog" && c.status === "backlog");
   const head = figs([fig(sm.active ?? live.length, "active"), fig(avail.length + backlog.length, "in the backlog")]);
-  const liveCard = (c) => { const done = !!c.completed_at || c.status === "completed"; const active = !done && (c.status === "active" || !!c.activated_at); return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header><p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p></article>`; };
-  const catCard = (c) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}<p class="rd-meta label">${[c.category, c.difficulty, c.duration_days && c.duration_days + "d"].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+  // P2.2 — the live card draws its served-but-never-drawn record: the check-in
+  // streak grid (one cell per day of the run: checked-in = ember, checked-but-
+  // missed = faint, ahead = outline) + the progress figs. Real cells only —
+  // the grid renders exactly what was logged, gaps stay gaps.
+  const checkinGrid = (c) => {
+    const dur = Number((c.progress || {}).duration_days || c.duration_days) || 0;
+    const checks = c.daily_checkins;
+    if (!dur || !checks || typeof checks !== "object") return "";
+    const entries = Array.isArray(checks) ? checks : Object.entries(checks).map(([date, v]) => ({ date, completed: v === true || (v && v.completed) }));
+    const byDate = new Map(entries.map((e) => [String(e.date).slice(0, 10), !!(e.completed ?? e.done ?? e.success ?? true)]));
+    const start = c.activated_at || c.start_date;
+    if (!start) return "";
+    const t0 = Date.parse(String(start).slice(0, 10) + "T12:00:00");
+    if (!Number.isFinite(t0)) return "";
+    const cells = Array.from({ length: Math.min(dur, 60) }, (_, i) => {
+      const dd = new Date(t0 + i * 86400000).toISOString().slice(0, 10);
+      const v = byDate.get(dd);
+      const cls = v === true ? "is-done" : v === false ? "is-miss" : "";
+      return `<i class="cg-cell ${cls}" title="${esc(dd)}${v === true ? " · done" : v === false ? " · missed" : ""}"></i>`;
+    }).join("");
+    return `<div class="cg" role="img" aria-label="Daily check-ins, ${dur} days">${cells}</div>`;
+  };
+  const liveCard = (c) => {
+    const done = !!c.completed_at || c.status === "completed";
+    const active = !done && (c.status === "active" || !!c.activated_at);
+    const pr = c.progress || {};
+    const progFigs = active && pr.duration_days
+      ? `<p class="rd-meta label">${[pr.checkin_days != null && `${pr.checkin_days}/${pr.duration_days} days checked in`, pr.completion_pct != null && `${fmt(pr.completion_pct)}% complete`, pr.success_rate != null && `${fmt(pr.success_rate)}% success`].filter(Boolean).join("  ·  ")}</p>`
+      : "";
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p></article>`;
+  };
+  // P2.2 — catalog cards carry their evidence: the summary, the tier chip, and
+  // the recommending board persona. The served `icon` field is emoji — never drawn (§8).
+  const catCard = (c) => {
+    const [tc, tl] = c.evidence_tier ? evClass(c.evidence_tier) : [null, null];
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${c.category ? `<span class="ch-ric">${domainIcon(c.category)}</span>` : ""}${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}${c.evidence_summary && !isBad(c.evidence_summary) ? `<p class="rd-line">${esc(c.evidence_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${[c.category, c.difficulty, c.duration_days && c.duration_days + "d", c.board_recommender && "recommended by " + c.board_recommender].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+  };
   const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet this cycle."));
   // "Available now" vs "Backlog" was a distinction without a difference — both are
   // catalog ideas not yet taken on. One backlog.
@@ -1282,24 +1356,51 @@ async function renderChallenges(d) {
   return banner + head + liveSec + backSec + note("An N=1 instrument — reader participation is deferred.");
 }
 function renderProtocols(d) { const ps = (d.protocols || []).slice().sort((a, b) => (/(active|running|on)/i.test(a.status || "") ? 0 : 1) - (/(active|running|on)/i.test(b.status || "") ? 0 : 1)); if (!ps.length) return empty("No active protocols yet."); return figs([fig(ps.length, "active protocols")]) + `<div class="rd-cards">${ps.map((p) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(p.name)}</h3>${p.status ? `<span class="rd-badge">${esc(p.status)}</span>` : ""}</header>${p.why ? `<p class="rd-why">${esc(p.why)}</p>` : ""}${p.mechanism ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(p.mechanism)}</p>` : ""}<p class="rd-meta label">${[p.domain, p.tier && "tier " + esc(p.tier)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`).join("")}</div>` + note("Matthew's deliberate interventions, read-only. Not medical advice."); }
-function renderExperiments(d) {
+async function renderExperiments(d) {
   const xs = d.experiments || [];
   if (!xs.length) return empty("No experiments yet — the library is loading.");
+  // P2.1 — the arc header: what the whole experiment PROGRAM has learned so far
+  // (the same synthesis the coaching page reads; it was never surfaced here).
+  const syn = await tryJSON("/api/experiment_synthesis");
+  const arcBand = syn && syn.throughline && !isBad(syn.throughline)
+    ? `<div class="rd-obs"><p class="dx-kicker label">what the program has learned${syn.week_count ? ` · week ${esc(String(syn.week_count))}` : ""}</p><p class="rd-primary">${esc(syn.throughline)}</p>${syn.arc && !isBad(syn.arc) ? `<p class="rd-why">${esc(String(syn.arc).slice(0, 420))}${String(syn.arc).length > 420 ? "…" : ""}</p>` : ""}</div>`
+    : "";
   const running = xs.filter((x) => x.origin !== "library");
   const lib = xs.filter((x) => x.origin === "library");
   const avail = lib.filter((x) => x.status === "available");
   const backlog = lib.filter((x) => x.status === "backlog");
   const head = figs([fig(running.length, "running"), avail.length ? fig(avail.length, "ready to run") : "", fig(backlog.length, "in backlog")]);
-  const runCard = (x) => { const done = /complete|done|ended|closed/i.test(x.status || ""); const verdict = x.hypothesis_confirmed === true ? "confirmed" : x.hypothesis_confirmed === false ? "not confirmed" : (x.outcome || x.status || "running"); return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${x.result_summary && !isBad(x.result_summary) ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`; };
+  // P2.1 — running cards carry their served-but-never-drawn instrumentation:
+  // the progress bar, the primary metric, the mechanism, compliance; completed
+  // runs become "receipt" cards — baseline→result drawn (the effect size), the
+  // key finding as the headline, the reflection as the second (human) voice.
+  const runCard = (x) => {
+    const done = /complete|done|ended|closed/i.test(x.status || "");
+    const verdict = x.hypothesis_confirmed === true ? "confirmed" : x.hypothesis_confirmed === false ? "not confirmed" : (x.outcome || x.status || "running");
+    const prog = !done && x.planned_duration_days && x.days_in != null
+      ? `<div class="pr-row"><span class="pr-bar"><i style="width:${Math.max(2, Math.min(100, Number(x.progress_pct) || (Number(x.days_in) / Number(x.planned_duration_days)) * 100)).toFixed(0)}%"></i></span><span class="label">day ${esc(String(x.days_in))} of ${esc(String(x.planned_duration_days))}</span></div>`
+      : "";
+    const compliance = x.compliance_pct != null
+      ? `<div class="pr-row"><span class="pr-bar pr-bar--ink"><i style="width:${Math.max(2, Math.min(100, Number(x.compliance_pct))).toFixed(0)}%"></i></span><span class="label">compliance ${fmt(x.compliance_pct)}%</span></div>`
+      : "";
+    const receipt = done && Number.isFinite(Number(x.baseline_value)) && Number.isFinite(Number(x.result_value))
+      ? dumbbell([{ label: x.primary_metric || "primary metric", a: Number(x.baseline_value), b: Number(x.result_value) }], { aLabel: "baseline", bLabel: "result", unit: "" })
+      : "";
+    const finding = done && x.key_finding && !isBad(x.key_finding) ? `<p class="rd-line"><strong>${esc(x.key_finding)}</strong></p>` : "";
+    const reflect = done && x.reflection && !isBad(x.reflection) ? `<p class="rd-reflect">“${esc(x.reflection)}”</p>` : "";
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+  };
   const libCard = (x) => {
-    const meta = [x.pillar, x.difficulty, x.evidence_tier && "tier " + x.evidence_tier, x.evidence_citation && "src: " + x.evidence_citation].filter(Boolean).map(esc).join("  ·  ");
+    // P2.1 — evidence_tier gets the evClass chip treatment (strong/moderate/emerging).
+    const [tc, tl] = x.evidence_tier ? evClass(x.evidence_tier) : [null, null];
+    const meta = [x.pillar, x.difficulty, x.evidence_citation && "src: " + x.evidence_citation].filter(Boolean).map(esc).join("  ·  ");
     const link = x.source_url ? ` · <a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">evidence ↗</a>` : "";
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${meta}${link}</p></article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${meta}${link}</p></article>`;
   };
   const runSec = sec("Running now", running.length ? `<div class="rd-cards">${running.map(runCard).join("")}</div>` : empty("Nothing running yet this cycle — the experiment just started."));
   const pipeline = [...avail, ...backlog];
   const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.slice(0, 60).map(libCard).join("")}</div>`) : "";
-  return head + runSec + pipeSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
+  return arcBand + head + runSec + pipeSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
 }
 // §0 keystone hero (P0.1) — THE honesty fix. The old panel showed a bare Pearson (r=0.88,
 // n=7) as if proven. Rebuild: lead with the group + direction + STRENGTH word; n is the
