@@ -596,7 +596,7 @@ body { overflow-x: hidden; }
 .cv-q .label { display: block; color: var(--ink-faint); margin-bottom: 2px; }
 .cv-card { border: var(--border-hair); border-left: 3px solid var(--ember-line); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
 .cv-head { display: flex; align-items: center; gap: var(--sp-3); }
-.cv-head .coach-mark svg { width: 30px; height: 30px; display: block; }
+.cv-head .sigil-md svg, .cv-head .coach-mark svg { width: 40px; height: 40px; display: block; }
 .cv-who { display: grid; gap: 1px; }
 .cv-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
 .cv-title { color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
@@ -618,11 +618,17 @@ body { overflow-x: hidden; }
 .rd-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
 .rd-card { list-style: none; }
 .rd-btn { width: 100%; text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair);
-  border-left: 3px solid transparent; border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); display: grid; gap: 4px; }
-.rd-btn:hover { border-left-color: var(--ember); }
+  border-left: 3px solid transparent; border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4);
+  display: flex; gap: var(--sp-3); align-items: flex-start; }
+.rd-btn .sigil-md { margin-top: 2px; }
+.rd-body { display: grid; gap: 4px; min-width: 0; }
+/* The coach's signature hairline — their sanctioned color as a quiet left rule,
+   so each card carries its author's mark (visual uplevel P1). */
+.rd-card .rd-btn { border-left-color: color-mix(in srgb, var(--coach, transparent) 45%, transparent); }
+.rd-btn:hover { border-left-color: var(--coach, var(--ember)); }
 .rd-top { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; }
 .rd-dom { color: var(--ember); }
-.rd-name { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); }
+.rd-name { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ink-muted)); }
 .rd-say { font-family: var(--font-sans); color: var(--ink); line-height: 1.5; }
 .read-week { margin-top: var(--sp-5); }
 .rw-list { margin: var(--sp-2) 0 0; }

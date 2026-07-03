@@ -13,6 +13,9 @@ const KNOWN = new Set([
   "sleep", "training", "nutrition", "vitals", "glucose", "mind", "habits", "people",
   "reading",
   "door-cockpit", "door-data", "door-coaching", "door-protocols", "door-story",
+  // interface + narrative marks (visual uplevel): the ask glyph, the milestone
+  // flag, transport marks, and the two narrative-medium marks.
+  "ask", "milestone", "play", "pause", "podcast", "chronicle",
 ]);
 
 /*

@@ -1094,9 +1094,30 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .sigil-ring { opacity: 0.95; }
 .sigil-tick { opacity: 0.8; }
 /* Inside the existing 34px coach badge, the sigil fills more of it for presence. */
-.coach-badge .sigil { inline-size: 27px; block-size: 27px; }
+.coach-badge .sigil { inline-size: 36px; block-size: 36px; }
 /* A larger sigil for coach detail headers / the team roster. */
 .sigil-lg { inline-size: 58px; block-size: 58px; flex: none; color: var(--coach, var(--ember)); }
+/* Mid-size sigil for list/card surfaces (visual uplevel P1) — at 16-27px the
+   distinguishing geometry vanished and every coach read as an interchangeable
+   colored dot; 40px is where the rings/ticks become a face. */
+.sigil-md { inline-size: 40px; block-size: 40px; flex: none; color: var(--coach, var(--ember)); }
+/* The coach's NAME carries their sanctioned identity color (§8.2 — persona
+   identity only, never data encoding), pairing name ↔ sigil into a character. */
+.rd-name, .th-name, .cv-name, .coach-name { color: var(--coach, var(--ink)); }
+/* Sigil draw-in — self-contained (pathLength="1" in sigils.js): every sigil
+   draws itself the moment it enters the DOM; rings sweep, ticks follow. Inside
+   the reduced-motion wrapper below, so motion-averse readers see it complete.
+   Fail-open: if the animation never runs, strokes are simply... drawn. */
+@media (prefers-reduced-motion: no-preference) {
+  .sigil-ring { stroke-dasharray: 1; stroke-dashoffset: 1; animation: sigilDraw 0.9s var(--ease-out) forwards; }
+  .sigil-tick { stroke-dasharray: 1; stroke-dashoffset: 1; animation: sigilDraw 0.5s var(--ease-out) 0.35s forwards; }
+  @keyframes sigilDraw { to { stroke-dashoffset: 0; } }
+  /* The SELECTED coach is present: their sigil's orbital nodes breathe — the
+     constellation's own 6s grammar, nothing else moves. */
+  .coach-pick.is-active .sigil-node, .coach-head .sigil-lg .sigil-node {
+    animation: mo-breathe 6s var(--ease-inout) infinite;
+  }
+}
 /* An inline persona mark for kickers / headlines (sits at ~text height). */
 .coach-mark { display: inline-block; inline-size: 1.15em; block-size: 1.15em; vertical-align: -0.22em;
   margin-inline-end: 0.4em; color: var(--coach, var(--ember)); }
