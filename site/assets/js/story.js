@@ -14,6 +14,7 @@
 import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
+import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — returnability, reader-keyed
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -436,6 +437,28 @@ load();
 // uplevel P2 — the home "Ask the data" beat is a REAL inline ask (it was a styled
 // teaser that linked away). Same shared widget as the Data door; three chips tuned
 // for a first-time visitor. Fail-quiet: no mount point → nothing breaks.
+// uplevel P5 — the returnability strip: the since-ribbon (reader-keyed, cockpit owns
+// the stamp) + anything the correlation engine newly unlocked this month (announced
+// once, correlative framing). The wrap unhides only if a child has something to say.
+(async function homePulse() {
+  const wrap = document.querySelector("[data-home-since-wrap]");
+  if (!wrap) return;
+  const rib = wrap.querySelector("[data-home-since]");
+  await mountSinceRibbon(rib);
+  try {
+    const r = await fetch("/api/what_changed", { headers: { accept: "application/json" } });
+    const d = r.ok ? await r.json() : null;
+    const nu = ((d && d.newly_unlocked) || [])[0];
+    const el = wrap.querySelector("[data-home-unlocked]");
+    if (nu && el) {
+      const pretty = String(nu.label || "").replace(/_vs_/g, " ↔ ").replace(/_/g, " ");
+      el.textContent = `newly unlocked this month: ${pretty} (r=${nu.r}, n=${Math.round(nu.n)}, ${nu.direction}${nu.interpretation ? " · " + nu.interpretation : ""}) — correlation, not cause; announced once.`;
+      el.hidden = false;
+    }
+  } catch (e) { /* honest silence */ }
+  if ((rib && !rib.hidden) || !wrap.querySelector("[data-home-unlocked]").hidden) wrap.hidden = false;
+})();
+
 mountAsk(document.querySelector("[data-home-ask]"), {
   chips: ["Is my sleep actually improving?", "What moves the glucose most?", "Is the weight loss on track?"],
   note: "AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour); may pause under the budget guard.",
