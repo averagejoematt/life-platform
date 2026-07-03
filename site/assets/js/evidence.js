@@ -111,7 +111,10 @@ function renderSupplements(d) {
       const more = hasMore
         ? `<details class="supp-more"><summary class="label">the work — science, sources${against.length ? " (incl. the dissent)" : ""}, rationale</summary>${sci}${lines}${srcList(against, "supp-src-against", "challenges it")}${srcList(forSrcs, "supp-src-for", "supports it")}</details>`
         : "";
-      const snps = (d.genome_snps || []).filter((x) => x && x.supp && String(x.supp).toLowerCase() === String(s.name || "").toLowerCase());
+      // Containment, not equality: the registry names are richer than the SNP's
+      // supplement key ("Vitamin D3 + K2" vs "Vitamin D3") — verified 1:1 on the
+      // live registry; a non-match simply means no chip (fail-soft).
+      const snps = (d.genome_snps || []).filter((x) => x && x.supp && String(s.name || "").toLowerCase().includes(String(x.supp).toLowerCase()));
       const snpChips = snps.length ? snps.map((x) => `<p class="supp-snp label" title="${esc(x.note || "")}">genome · ${esc(x.id || "")}${x.note ? ` — ${esc(String(x.note).split("—")[0].trim())}` : ""}</p>`).join("") : "";
       return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div>${adherence}${more}${snpChips}<p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || (srcs[0] || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (srcs[0] || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`;
     }).join("");
