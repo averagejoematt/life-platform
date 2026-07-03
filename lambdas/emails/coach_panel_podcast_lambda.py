@@ -1656,13 +1656,19 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     recent = ([beats["title"]] + beats.get("recent_topics", []))[:5]
     # Bet ledger (the Panel scoreboard): resolve the prior open bet with THIS week's
     # reported outcome, then record the new open bet. Capped, reset-safe in DDB.
+    # Idempotent per-week (2026-07-02): a RE-published episode used to (a) "resolve"
+    # its own week's open bet with last week's outcome and (b) append a paraphrased
+    # duplicate — the live wk1 double-bet. The resolve loop now only touches a bet
+    # from an EARLIER week (the one the episode actually reports on), and the append
+    # supersedes this week's own open bet. Resolved bets are history — never touched.
     ledger = list(state.get("bet_ledger", []))
     outcome = ((script.get("last_bet_result") or {}).get("outcome") or "open").lower()
     for entry in reversed(ledger):
-        if entry.get("outcome") == "open":
+        if entry.get("outcome") == "open" and entry.get("week") != week:
             entry["outcome"] = outcome if outcome in ("won", "lost", "open", "none") else "open"
             break
     if script.get("open_bet"):
+        ledger = [e for e in ledger if not (e.get("week") == week and e.get("outcome") == "open")]
         ledger.append({"week": week, "bet": script["open_bet"], "outcome": "open", "date": beats["date"]})
     _state_write(
         {
