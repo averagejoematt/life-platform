@@ -361,6 +361,7 @@ jobs:
       has_deploys: ${{ steps.plan.outputs.has_deploys }}
       layer_changed: ${{ steps.plan.outputs.layer_changed }}
       mcp_changed: ${{ steps.plan.outputs.mcp_changed }}
+      site_changed: ${{ steps.plan.outputs.site_changed }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -616,6 +617,21 @@ jobs:
           fi
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
 
+          # Public-site change detection (#393). The CHANGED set above is scoped to
+          # lambdas/mcp only, so site/ edits are invisible to the Lambda plan — detect
+          # them independently. A push touching site/ (or a manual deploy-all) triggers
+          # the gated CI site deploy so the product ships through the same pipeline as
+          # the backend, and the post-deploy visual/AI-QA gate fires on site-only pushes.
+          SITE_CHANGED="false"
+          if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
+            SITE_CHANGED="true"
+            echo "⚡ Public site queued (manual deploy-all)"
+          elif git diff --name-only HEAD~1 HEAD -- site/ 2>/dev/null | grep -q .; then
+            SITE_CHANGED="true"
+            echo "⚡ Public site changed"
+          fi
+          echo "site_changed=$SITE_CHANGED" >> "$GITHUB_OUTPUT"
+
           DEPLOYS="[]"
 
           for file in $CHANGED; do
@@ -645,7 +661,7 @@ jobs:
           echo "$DEPLOYS" | jq -r '.[] | "  → \(.function) (\(.source))"'
 
           HAS_DEPLOYS="false"
-          if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ]; then
+          if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ] || [ "$SITE_CHANGED" = "true" ]; then
             HAS_DEPLOYS="true"
           fi
 
@@ -822,6 +838,29 @@ jobs:
             echo "::error::$FAILED Lambda(s) failed to deploy"
             exit 1
           fi
+
+      # ── Public site deploy (#393) ──────────────────────────────────────────
+      # Ships the product through the SAME gated pipeline as the backend, ending
+      # hand-deploys from a local checkout. Runs only when site/ changed (or a
+      # manual deploy-all). Reuses this job's `environment: production` approval,
+      # so one click gates backend + site together. deploy_site.sh is the exact
+      # canonical human path (validate → sync_site_to_s3.sh → content-hash +
+      # build-stamp + PII guard + CloudFront invalidation). Because CI deploys the
+      # merged main tree, the "stale local checkout overwrites live" class is
+      # structurally impossible on this path. The post-deploy visual/AI-QA +
+      # accuracy gates (needs: deploy) fire next — including on site-only pushes.
+      - name: Set up Python (site build tooling)
+        if: needs.plan.outputs.site_changed == 'true'
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Deploy public site
+        if: needs.plan.outputs.site_changed == 'true'
+        run: |
+          echo "═══ Deploying public site through CI ═══"
+          bash deploy/deploy_site.sh
+          echo "✅ Public site deployed via CI"
 
   # ════════════════════════════════════════════════════════════════
   # Job 5: Smoke test

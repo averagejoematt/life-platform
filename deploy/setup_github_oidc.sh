@@ -144,6 +144,14 @@ PERMISSION_POLICY=$(cat <<EOF
       ]
     },
     {
+      "Sid": "CloudFrontSiteInvalidate",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateInvalidation"
+      ],
+      "Resource": "arn:aws:cloudfront::${ACCOUNT}:distribution/E3S424OXQZ8NBE"
+    },
+    {
       "Sid": "DynamoDB",
       "Effect": "Allow",
       "Action": [
