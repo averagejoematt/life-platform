@@ -97,13 +97,26 @@ function isBad(v) {
 }
 
 function renderVerdict(priority) {
+  // uplevel P3 — the verdict was an 11-line static wall of mono text. Same words,
+  // staged: attributed to the coach who wrote it (name + title from the payload,
+  // never invented) and split on sentence boundaries into ≤3 beats that reveal in
+  // sequence (CSS gated on html.mo — reduced-motion reads it all at once).
   const v = bind("verdict");
   const text = priority && priority.weekly_priority;
-  if (!isBad(text)) {
-    v.innerHTML = `<span class="mark">&rsaquo;</span> ${escapeHTML(text)}`;
-  } else {
+  if (isBad(text)) {
     v.innerHTML = `<span class="mark">&rsaquo;</span> The board's weekly read isn't in yet — it posts after the next briefing.`;
+    return;
   }
+  const sentences = String(text).match(/[^.!?]+[.!?]+(?:\s|$)/g) || [String(text)];
+  const beats = [];
+  const per = Math.ceil(sentences.length / Math.min(3, sentences.length));
+  for (let i = 0; i < sentences.length; i += per) beats.push(sentences.slice(i, i + per).join("").trim());
+  const who = priority.coach_name
+    ? `<p class="vd-who label">${escapeHTML(priority.coach_name)}${priority.coach_title ? ` · ${escapeHTML(priority.coach_title)}` : ""}</p>`
+    : "";
+  v.innerHTML = who + beats.map((b, i) =>
+    `<span class="vd-beat" style="--vd-delay:${(i * 0.45).toFixed(2)}s">${i === 0 ? `<span class="mark">&rsaquo;</span> ` : ""}${escapeHTML(b)}</span>`
+  ).join(" ");
 }
 
 /* ── render: the two domains + consistency band ──────────────────────────── */
