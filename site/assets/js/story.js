@@ -344,8 +344,15 @@ async function dxTeaser() {
     const data = await dxFetch("chronicle");
     const latest = dxEntries("chronicle", data)[0];
     if (latest) {
+      // Freshness stated plainly: "latest" from a weekly serial can honestly be
+      // days old — say how many, so a stale beat never masquerades as today's.
+      let ago = "";
+      if (latest.date) {
+        const days = Math.max(0, Math.round((Date.now() - Date.parse(latest.date)) / 86400000));
+        ago = days >= 2 ? ` · ${days} days ago` : days === 1 ? " · yesterday" : " · today";
+      }
       read.innerHTML =
-        `<p class="dx-kicker label">latest from the chronicle · Elena Voss${latest.date ? ` · ${esc(latest.date)}` : ""}</p>` +
+        `<p class="dx-kicker label">latest from the chronicle · Elena Voss${latest.date ? ` · ${esc(latest.date)}${ago}` : ""}</p>` +
         `<h3 class="dx-title">${esc(latest.title || latest.label || "")}</h3>` +
         (latest.excerpt ? `<p class="dx-prose">${esc(String(latest.excerpt).slice(0, 240))}…</p>` : "") +
         `<p class="dx-foot label">The chronicle, journal &amp; podcast read in full in <a href="/story/">Story</a>; the AI lab notes live in <a href="/coaching/">Coaching</a>. This is just the latest beat.</p>`;

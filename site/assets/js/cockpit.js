@@ -174,12 +174,19 @@ function renderReadinessScore(readiness) {
   bind("readiness-score").textContent = Math.round(readiness.score);
   const bandEl = $("[data-bind=readiness-band]");
   bandEl.textContent = word; bandEl.className = "rd-score-band label " + cls;
-  comp.innerHTML = (readiness.components || []).map((c) => {
+  // A 0-score is a REAL computed input (a quiet day scores 0 — e.g. no logged
+  // habits, near-zero movement), so it's never hidden or excused as "no data".
+  // But twin dead bars read sad-empty: de-emphasize the zero rows and say once,
+  // honestly, what a zero means.
+  const comps = readiness.components || [];
+  comp.innerHTML = comps.map((c) => {
     const pct = Math.max(0, Math.min(100, Number(c.score) || 0));
-    return `<li class="rd-comp-row"><span class="label">${escapeHTML(c.label)}</span>` +
+    return `<li class="rd-comp-row${pct === 0 ? " rd-comp-zero" : ""}"><span class="label">${escapeHTML(c.label)}</span>` +
       `<span class="rd-comp-track"><span class="rd-comp-fill" style="width:${pct}%"></span></span>` +
       `<span class="rd-comp-v num">${Math.round(pct)}</span></li>`;
-  }).join("");
+  }).join("") + (comps.some((c) => !Number(c.score))
+    ? `<li class="rd-comp-note label">a quiet day scores 0 — counted, not hidden.</li>`
+    : "");
   wrap.hidden = false;
 }
 function renderReadiness(vitals) {

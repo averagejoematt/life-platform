@@ -83,9 +83,11 @@
   }
   clearTimeout(window.__moFail); // we're alive — cancel the fail-open timer
 
+  // .rd-card removed (2026-07-02): the coach-read/protocol cards paint immediately —
+  // opacity-gating them read as dead air on the Coaching landing tab (see tokens.css).
   var SEL = ".hero, .page-hero, .ev-head, .dx-head, .beat, .loop, .rd-sec, .two-voice, .coach-daily, " +
     ".coach-progress, .coach-report, .coach-stance, .team-lead, .team-focus, .team-tension, .team-huddle, " +
-    ".supp, .rd-card, .cap-card, .vr-row, .figs, .ml-ladder";
+    ".supp, .cap-card, .vr-row, .figs, .ml-ladder";
 
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
