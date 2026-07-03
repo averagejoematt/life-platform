@@ -18,6 +18,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - **The forward-work backlog is GitHub Issues (ADR-099)** — epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones; seed sessions from `gh issue list --label type:story --milestone Now --state open`; a shipping PR carries `Fixes #N`. `docs/BACKLOG.md` is a frozen archive.
+- **`docs/CONVENTIONS.md` — the canonical home for the load-bearing deploy/CI reflexes** (shared-layer sequence, deploy-from-main, squash-drift checks, CI gate ordering, the asset-staging trap) + the drift-discovery commands. When one of those rules is stated below, it's a one-line pointer here, not a restatement — update the reflex in CONVENTIONS.md.
 - `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-103), why things are the way they are; **ADR-103 = the complexity-posture ledger** (load-bearing / portfolio / retire-candidate per subsystem — consult it before adding or removing machinery)
 - `docs/PHASE_TAXONOMY.md` — experiment-restart data semantics (ADR-077): the 4-class registry for what resets vs. what's kept
 - `docs/REMEDIATION_TAXONOMY.md` — classifier rubric for the self-healing agent (auto-fix-safe / fix-via-pr / needs-human / stale)
@@ -89,7 +90,7 @@ python3 mcp_bridge.py
 
 **EventBridge crons use fixed UTC** — no DST drift. All schedules in `cdk/stacks/` must be UTC-fixed.
 
-**Lambda Layer** — shared modules (`ai_calls.py` + its split modules `ai_context.py`/`ai_summaries.py` (god-module split 2026-06-08; `ai_calls` re-exports both for backward compat), `retry_utils.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (version mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION` — trust THAT constant + the live query below, not any number written here). Note: `email_framework.py` was deleted in V2 (replaced inline). Changes here require a layer rebuild (`bash deploy/build_layer.sh`) before deploying dependent functions. Source of truth: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --query 'LayerVersions[0].Version'`.
+**Lambda Layer** — shared modules (`ai_calls.py` + its split modules `ai_context.py`/`ai_summaries.py` (god-module split 2026-06-08; `ai_calls` re-exports both for backward compat), `retry_utils.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, `character_engine.py`, `intelligence_common.py`, `auth_breaker.py`, `compute_metadata.py`, `http_retry.py`, `numeric.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, + others) are deployed as a layer (version in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Note: `email_framework.py` was deleted in V2 (replaced inline). **The rebuild → publish → deploy-consumers sequence and the live version-discovery command live in `docs/CONVENTIONS.md` §1** — a layer change needs that exact order or the deploy fails.
 
 **Prompt caching (COST-OPT-2)** — `ai_calls.py` and `retry_utils.py` auto-wrap system messages as Anthropic cached content blocks (90% discount). Model tiering: structured tasks use Haiku, narrative content uses Sonnet. All model assignments configurable via `AI_MODEL` env var. See ADR-049.
 
@@ -97,7 +98,7 @@ python3 mcp_bridge.py
 
 **Flake8 config** — max 140 chars, ignores E501, W503, E402, E741. See `.flake8`.
 
-**Format gate (ENFORCED)** — CI's "Lint + Syntax Check" job runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/` and **fails the build** if anything isn't black-formatted (line-length 140, `pyproject.toml`). **Run `black` before committing** — flake8 alone is not enough; an unformatted file reds main and emails a CI failure per push. CI pins `black==25.9.0` (note: `requirements-dev.txt` currently pins 26.5.1 — a mismatch that can let local formatting diverge from the gate; match 25.9.0 when in doubt). `ruff==0.14.0` also runs.
+**Format gate (ENFORCED)** — CI's "Lint + Syntax Check" job runs `black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/` and **fails the build** if anything isn't black-formatted (line-length 140, `pyproject.toml`). **Run `black` before committing** — flake8 alone is not enough; an unformatted file reds main and emails a CI failure per push. `ruff` also runs. **The gates run sequentially (a red one masks the rest) and the pinned tool versions can drift from `requirements-dev.txt`** — read the pins from CI and see the full gate ordering + the FAKE-creds parity run in `docs/CONVENTIONS.md` §4.
 
 ## MCP Tool Modules
 
