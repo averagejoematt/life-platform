@@ -90,38 +90,14 @@ BUILD_DIR=$(mktemp -d)
 trap 'rm -rf "$BUILD_DIR"' EXIT
 cp -r "$SITE_DIR"/* "$BUILD_DIR/"
 
-# Collect all CSS/JS files to hash
-SED_EXPR=""
-FILE_COUNT=0
-
-for f in "$BUILD_DIR"/assets/css/*.css "$BUILD_DIR"/assets/js/*.js; do
-  [[ -f "$f" ]] || continue
-  HASH=$(md5 -q "$f" | cut -c1-8)
-  BASE=$(basename "$f")
-  NAME="${BASE%.*}"
-  EXT="${BASE##*.}"
-  HASHED="${NAME}.${HASH}.${EXT}"
-
-  # Create hashed copy alongside the original
-  cp "$f" "$(dirname "$f")/${HASHED}"
-
-  # Build sed expression for this file
-  SED_EXPR="${SED_EXPR}s|${BASE}|${HASHED}|g;"
-
-  echo "  ${BASE} → ${HASHED}"
-  FILE_COUNT=$((FILE_COUNT + 1))
-done
-
-echo "  Hashed ${FILE_COUNT} files."
-
-# Update all HTML references to use hashed filenames
-if [[ -n "$SED_EXPR" ]]; then
-  echo "→ Updating HTML references (excluding /legacy — its assets stay unhashed)..."
-  # v4: legacy/ is served verbatim with UNHASHED assets at /legacy/assets/*. Never
-  # rewrite its references to the hashed v4 names, or legacy CSS/JS 404s.
-  find "$BUILD_DIR" -name "*.html" -not -path "*/legacy/*" -exec sed -i '' "$SED_EXPR" {} +
-  echo "  Done."
-fi
+# Content-hash CSS/JS across the FULL module graph (leaves first) and rewrite every
+# reference — HTML <link>/<script> AND intra-module `import ... from "/assets/js/*"`.
+# Rewriting only HTML (the old behavior) left module imports on unhashed, mutable,
+# 24h-cached URLs, so a fresh entry module could pair with a stale cached dependency
+# and throw at load — rendering only the static shell (the "frozen page" bug,
+# 2026-07-03). Full-graph hashing makes every asset URL immutable → no version skew.
+# /legacy assets stay unhashed (served verbatim); the helper skips legacy/.
+python3 "$(dirname "$0")/hash_site_assets.py" "$BUILD_DIR"
 
 # ── Build stamp (apples-to-apples QA) ─────────────────────────────────────────
 # Stamp every deploy with the git short-SHA + UTC time so we always know which build
