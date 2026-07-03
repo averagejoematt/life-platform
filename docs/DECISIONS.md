@@ -2791,3 +2791,18 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 **Alternatives considered.** Keeping BACKLOG.md with stricter discipline (rejected: discipline is what failed — the fix must be structural, and `Fixes #N` closes issues mechanically); GitHub Projects v2 board (deferred: milestones + labels are CLI-scriptable and sufficient; a board view can be layered on later without migration).
 
 **Outcome.** 12 epics + 74 stories + 1 parked-register issue filed 2026-07-03 from the review (83 verified findings + 41 verified-open ledger items, duplicates merged), every body privacy-passed before creation.
+
+## ADR-101: Distribution before monetization — no paid-product work until an audience trigger
+
+**Date:** 2026-07-03 · **Status:** Accepted · **Extends:** ADR-078 (the three-wedge strategy)
+
+**Context.** The 2026-07 review measured the audience honestly: **~1 confirmed subscriber** (the other 425 records were the canary's synthetic signups). Every paid form of the build-in-public wedge — a template repo, a guide, a paid tier — requires an audience that does not exist yet, and building the paid shell first is the highest-fidelity avoidance pattern the personal board already warned about (SUMMIT 2026-06-07, the Viktor/Reeves dissent). Meanwhile the review found the distribution plumbing itself broken at every stage (RSS on a dead feed, chronicle invisible to search, the day-2 email failing since launch). The honest first-dollar path runs entirely through distribution and the transformation itself.
+
+**Decision.**
+1. **No paid-product work — pricing, checkout, paid tiers, paid artifacts, sponsorship outreach — until a concrete trigger fires:** EITHER **100 confirmed (human) subscribers** OR the **wedge-A gate** (~30 lb visible progress + a ~6-month sustained list) per ADR-078, whichever comes first. "Confirmed subscribers" means the post-cleanup real-human count (#355), not raw records.
+2. **The interim routing rule:** any monetization-flavored proposal — from a session, an agent, a review, or enthusiasm — is either (a) converted into its distribution equivalent (make the thing findable/followable/shareable) or (b) declined with a pointer to this ADR. It is never parked as "later monetization" — that re-opens the debate this record closes.
+3. **What continues freely:** wedge-B *content* (writing, the method pages, the public repo story, the agents showcase) — the capped, documents-what-exists work ADR-078 already sanctions — and all audience-accrual mechanics (subscribe, RSS, share kits, SEO).
+
+**Revisit trigger.** The trigger firing (either arm) re-opens monetization as a deliberate session with this ADR and ADR-078 on the table — not as a side effect of a feature branch.
+
+**Consequences.** The backlog's parked register points here as the single written rationale for every parked monetization item; future sessions route around the question instead of re-litigating it; the growth epics (#338, #339) become the only sanctioned path toward the first dollar.
