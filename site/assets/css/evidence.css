@@ -557,3 +557,49 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .ch-rung { grid-template-columns: 28px minmax(0, 1fr) auto; }
   .ch-rung-fl { grid-column: 2 / -1; }
 }
+
+/* The mechanics layer (P1.2) — what it takes, the XP economy, effects, feeds. */
+.ch-xpbar { position: relative; height: 12px; background: var(--surface-sunken, var(--surface)); border: var(--border-hair); border-radius: 6px; overflow: hidden; max-width: 34rem; }
+.ch-xpbar i { position: absolute; inset: 0 auto 0 0; background: var(--ember); border-radius: 6px; }
+.ch-xpbar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: 0.7; }
+.ch-gates { display: grid; gap: var(--sp-2); margin: var(--sp-4) 0 var(--sp-2); }
+.ch-gate { display: flex; align-items: center; gap: var(--sp-3); }
+.ch-gate > .label { width: 6.5rem; color: var(--ink-muted); }
+.ch-ticks { display: inline-flex; align-items: center; gap: 3px; }
+.ch-ticks i { width: 7px; height: 14px; border-radius: 2px; display: inline-block; }
+.ch-ticks i.up { background: var(--ember); }
+.ch-ticks i.dn { background: var(--ink-faint); opacity: 0.55; }
+.ch-ticks b { margin-left: var(--sp-2); color: var(--ink-faint); font-weight: 400; }
+.ch-bands { display: grid; gap: var(--sp-2); max-width: 34rem; }
+.ch-band { display: grid; grid-template-columns: 5.5rem 6.5rem minmax(0, 1fr); gap: var(--sp-3); align-items: center; padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-xs); }
+.ch-band.has-p { border-color: var(--ember-line); }
+.ch-band-r { color: var(--ink-muted); }
+.ch-band-p { display: inline-flex; gap: var(--sp-2); }
+.ch-band-p .ico { width: 16px; height: 16px; display: block; }
+.ch-fxgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--sp-3); }
+.ch-fx { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); display: grid; gap: var(--sp-1); opacity: 0.75; }
+.ch-fx.is-active { opacity: 1; border-color: var(--ember-line); background: var(--ember-wash); }
+.ch-fx.is-inert { opacity: 0.55; }
+.ch-fx-name { font-family: var(--font-sans); color: var(--ink); }
+.ch-fx-cond { color: var(--ink-faint); }
+.ch-fx.is-active .ch-fx-cond { color: var(--ember); }
+.ch-fx-targets { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.ch-fx-t { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink-muted); }
+.ch-fx-t .ico { width: 14px; height: 14px; display: block; }
+.ch-feeds { display: grid; gap: var(--sp-2); }
+.ch-feed { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3); }
+.ch-feed summary { cursor: pointer; display: flex; align-items: center; gap: var(--sp-2); font-family: var(--font-sans); color: var(--ink); }
+.ch-feed summary .label { color: var(--ink-faint); }
+.ch-feed summary .ico { width: 16px; height: 16px; display: block; }
+.ch-feed-body { display: grid; gap: var(--sp-2); padding: var(--sp-3) 0 var(--sp-1); }
+.ch-comp { display: grid; grid-template-columns: 11rem minmax(60px, 1fr) 3rem; gap: var(--sp-2) var(--sp-3); align-items: center; }
+.ch-comp-n { font-size: var(--fs-small); color: var(--ink-muted); }
+.ch-comp-bar { position: relative; height: 6px; background: var(--surface-sunken, var(--surface)); border: var(--border-hair); border-radius: 3px; overflow: hidden; }
+.ch-comp-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; }
+.ch-comp-w { font-size: var(--fs-small); color: var(--ink); text-align: right; }
+.ch-comp-t { grid-column: 1 / -1; color: var(--ink-faint); }
+@media (max-width: 819px) {
+  .ch-band { grid-template-columns: 4.5rem 5.5rem minmax(0, 1fr); }
+  .ch-comp { grid-template-columns: minmax(0, 1fr) 3rem; }
+  .ch-comp-bar { grid-column: 1 / -1; }
+}

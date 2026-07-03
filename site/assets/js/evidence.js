@@ -2285,9 +2285,13 @@ async function renderCharacter(d) {
   const ch = (d && d.character) || {};
   const pillars = ((d && d.pillars) || []).slice().sort((a, b) => CH_ORDER.indexOf(a.name) - CH_ORDER.indexOf(b.name));
   if (!pillars.length) return empty("The character sheet computes nightly — it fills in as the first days of data land.");
-  const [stats, wave, j] = await Promise.all([
+  const [stats, wave, j, cfgRaw] = await Promise.all([
     tryJSON("/data/character_stats.json"), tryJSON("/api/journey_waveform"), tryJSON("/api/journey"),
+    tryJSON("/api/character_config"),
   ]);
+  // The mechanics contract (P1.2) — fail-soft: without it the mechanics panels
+  // simply don't render and the sheet stands on P1.1 alone.
+  const cfg = cfgRaw && cfgRaw.available ? cfgRaw : null;
   const sc = (stats && stats.character) || {};
   const tier = String(ch.tier || "Foundation");
   const level = Math.round(Number(ch.level) || 1);
@@ -2361,6 +2365,99 @@ async function renderCharacter(d) {
   }).join("") + `</div>` +
     (sc.next_tier ? `<p class="rd-archive">Next tier: <strong>${esc(sc.next_tier)}</strong> at level ${esc(String(sc.next_tier_level || ""))} — crossing a tier line takes a longer sustained streak than a normal level-up.</p>` : "")) : "";
 
+  /* 6-9 · The mechanics layer (P1.2) — the gamification made legible, every
+     number interpolated from the live engine config so it can never lie. */
+  let mechanics = "";
+  if (cfg) {
+    const lv = cfg.leveling || {};
+    const scores = Object.fromEntries(pillars.map((p) => [p.name, Number(p.raw_score) || 0]));
+    const weights = Object.fromEntries(Object.entries(cfg.pillars || {}).map(([n, p]) => [n, Number(p.weight) || 0]));
+    const wTotal = Object.values(weights).reduce((a, b) => a + b, 0) || 1;
+
+    /* 6 · What it takes — the next level. */
+    const perLvl = Number(lv.xp_per_level) || 100;
+    const bufThr = Number(lv.xp_buffer_threshold) || 20;
+    const xpNow = Math.max(0, Number(ch.xp_total) || 0) % perLvl;
+    const gates = (lv.tier_streak_overrides || {})[tier] || { up: lv.level_up_streak_days, down: lv.level_down_streak_days };
+    const tick = (n, cls) => `<span class="ch-ticks">${Array.from({ length: Math.max(0, Math.min(Number(n) || 0, 21)) }, () => `<i class="${cls}"></i>`).join("")}<b class="label">${esc(String(n))} days</b></span>`;
+    const bottlenecks = pillars.slice().sort((a, b) => (a.raw_score || 0) - (b.raw_score || 0)).slice(0, 2);
+    const nextlvl = sec("What it takes — the next level", `
+      <div class="ch-xpbar" role="img" aria-label="XP buffer: ${fmt(xpNow)} of ${perLvl}, shield at ${bufThr}">
+        <i style="width:${Math.min(100, (xpNow / perLvl) * 100).toFixed(1)}%"></i>
+        <b style="left:${(bufThr / perLvl) * 100}%"></b>
+      </div>
+      <p class="rd-why">XP banked: <strong class="num">${fmt(xpNow)}</strong> of ${perLvl}. The mark at ${bufThr} is <strong>the shield</strong> — a pillar can't level DOWN while its buffer holds above it. Strong days earn XP, every day decays ${fmt(lv.daily_xp_decay)} — coasting bleeds the shield.</p>
+      <div class="ch-gates">
+        <div class="ch-gate"><span class="label">level up</span>${tick(gates.up, "up")}</div>
+        <div class="ch-gate"><span class="label">level down</span>${tick(gates.down, "dn")}</div>
+      </div>
+      <p class="rd-why">In ${esc(tier)}, a level-up takes <strong>${esc(String(gates.up))} sustained days</strong> above the line — but a level-down takes ${esc(String(gates.down))}. The asymmetry is deliberate: an "up" is earned, a "down" needs real decline, and a single day can never swing either.</p>
+      ${bottlenecks.length ? `<p class="rd-prose">The bottlenecks right now: ${bottlenecks.map((p) => `<strong>${esc(ttl(p.name))}</strong> (${fmt(p.raw_score)}/100 — a level here moves the character +${((weights[p.name] || 1 / 7) / wTotal).toFixed(2)} weighted)`).join(" and ")}. The fastest route to the next character level runs through the weakest pillar, not the strongest.</p>` : ""}`);
+
+    /* 7 · The XP economy — the bands ladder, today's pillars placed on it. */
+    const bands = (cfg.xp_bands || []).slice().sort((a, b) => (b.min_raw_score || 0) - (a.min_raw_score || 0));
+    const bandRows = bands.map((b, i) => {
+      const lo = Number(b.min_raw_score) || 0;
+      const hi = i === 0 ? 100 : Number(bands[i - 1].min_raw_score);
+      const here = pillars.filter((p) => (p.raw_score || 0) >= lo && (p.raw_score || 0) < (i === 0 ? 101 : hi));
+      return `<div class="ch-band${here.length ? " has-p" : ""}">
+        <span class="ch-band-r label">${lo}–${i === 0 ? 100 : hi - 1}</span>
+        <span class="ch-band-xp num ${Number(b.xp) > 0 ? "ch-dup" : Number(b.xp) < 0 ? "ch-ddn" : "ch-d0"}">${Number(b.xp) > 0 ? "+" : ""}${esc(String(b.xp))} xp/day</span>
+        <span class="ch-band-p">${here.map((p) => `<span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))" title="${esc(ttl(p.name))} · ${fmt(p.raw_score)}">${domainIcon(p.name)}</span>`).join("")}</span>
+      </div>`;
+    }).join("");
+    const economy = sec("The XP economy", `<div class="ch-bands">${bandRows}</div>
+      <p class="rd-why">Each pillar's nightly score lands in a band and earns (or loses) that XP — today's pillars are placed where they scored. Against it runs the decay: <strong>−${fmt(lv.daily_xp_decay)} XP every day</strong>, no exceptions. The game is simple and honest: you can't bank a good week and coast.</p>`);
+
+    /* 8 · Cross-pillar effects — evaluated live against today's raw scores. */
+    const evalCond = (cond) => {
+      const parts = String(cond || "").split(/\s+AND\s+/i);
+      let active = true;
+      for (const part of parts) {
+        const m = /^\s*(\w+)\s*(<=|>=|<|>|==?)\s*([\d.]+)\s*$/.exec(part);
+        if (!m) return null;
+        const num = Number(m[3]);
+        const vals = m[1] === "all_pillars" ? Object.values(scores) : (m[1] in scores ? [scores[m[1]]] : null);
+        if (!vals) return null;
+        const ok = vals.every((v) => (m[2] === "<" ? v < num : m[2] === ">" ? v > num : m[2] === "<=" ? v <= num : m[2] === ">=" ? v >= num : v === num));
+        if (!ok) active = false;
+      }
+      return active;
+    };
+    const fxChips = (cfg.cross_pillar_effects || []).map((e) => {
+      const active = evalCond(e.condition);
+      const targets = Object.entries(e.targets || {}).map(([t, v]) => {
+        const pct = Math.round(Math.abs(Number((v || {}).value) || 0) * 100);
+        const sign = (Number((v || {}).value) || 0) >= 0 ? "+" : "−";
+        return `<span class="ch-fx-t"><span class="ch-ric" style="color:var(--pillar-${esc(t)},var(--ember))">${t === "_all" ? "" : domainIcon(t)}</span>${t === "_all" ? "all pillars" : ""} ${sign}${pct}%</span>`;
+      }).join("");
+      return `<div class="ch-fx${active === true ? " is-active" : ""}${active === null ? " is-inert" : ""}">
+        <span class="ch-fx-name">${esc(e.name || "")}</span>
+        <span class="ch-fx-cond label">${active === true ? "active — " : active === false ? "activates when " : ""}${esc(String(e.condition || "").replace(/_/g, " "))}</span>
+        <span class="ch-fx-targets">${targets}</span>
+      </div>`;
+    }).join("");
+    const effects = fxChips ? sec("Cross-pillar effects", `<div class="ch-fxgrid">${fxChips}</div>
+      <p class="rd-why">The pillars aren't independent — the engine models the physiology: poor sleep drags training and mind; strong nutrition and movement compound into metabolic health; everything above the line at once earns an alignment bonus. Active effects are evaluated from today's real scores.</p>`) : "";
+
+    /* 9 · What feeds each pillar — component weights + targets, disclosure per pillar. */
+    const feeds = Object.keys(cfg.pillars || {}).length ? sec("What feeds each pillar", `<div class="ch-feeds">` +
+      pillars.map((p) => {
+        const pc = (cfg.pillars || {})[p.name] || {};
+        const comps = Object.entries(pc.components || {});
+        if (!comps.length) return "";
+        const compRows = comps.map(([cn, cv]) => {
+          const w = Math.round((Number(cv.weight) || 0) * 100);
+          const targets = Object.entries(cv).filter(([k, v]) => k !== "weight" && typeof v !== "object").map(([k, v]) => `${ttl(k)} ${fmt(v)}`).join(" · ");
+          return `<div class="ch-comp"><span class="ch-comp-n">${esc(ttl(cn))}</span><span class="ch-comp-bar"><i style="width:${w}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i></span><span class="ch-comp-w num">${w}%</span>${targets ? `<span class="ch-comp-t label">${esc(targets)}</span>` : ""}</div>`;
+        }).join("");
+        return `<details class="ch-feed"><summary><span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>${esc(ttl(p.name))} <span class="label">· ${Math.round(((weights[p.name] || 0) / wTotal) * 100)}% of the character</span></summary><div class="ch-feed-body">${compRows}</div></details>`;
+      }).join("") + `</div>
+      <p class="rd-why">Every pillar is a weighted blend of measurable components with explicit targets — nothing subjective, nothing self-reported where a sensor exists. The weights are live from the engine's own config: change the config, and this page changes with it.</p>`) : "";
+
+    mechanics = nextlvl + economy + effects + feeds;
+  }
+
   /* 4 · The record — level events, the weekly heatmap, the daily waveform. */
   const tl = (stats && stats.timeline) || [];
   const tlHtml = tl.length
@@ -2399,8 +2496,14 @@ async function renderCharacter(d) {
     <p class="rd-archive" data-lvlsub-status hidden></p>
   </section>`;
 
-  return hero + statblock + ladder + record + sub +
-    `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>` +
+  /* 10 · The math — prose interpolated from the live config so it can never lie. */
+  const lvv = (cfg && cfg.leveling) || null;
+  const math = lvv
+    ? sec("The math", `<p class="rd-prose">Each pillar scores 0–100 nightly from weighted components (above). An exponential moving average (λ = ${fmt(lvv.ema_lambda)} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate before a level moves, and crossing a tier boundary demands a longer streak still. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. The character level is the weighted average of the seven pillar levels, floored — so it understates, never flatters.</p>
+      <p class="rd-archive">The plain-language version lives on <a href="/method/character/">the character explainer</a>; the engine itself runs nightly in the platform's compute layer, and every number in this section is read live from its config.</p>`)
+    : `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
+
+  return hero + statblock + ladder + mechanics + record + sub + math +
     note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
 }
 

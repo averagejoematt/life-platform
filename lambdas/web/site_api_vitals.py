@@ -22,6 +22,7 @@ Endpoints:
 
 import hashlib  # used by handle_achievements stable-event-key hash
 import json
+import os
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
@@ -34,6 +35,7 @@ from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
     EXPERIMENT_START,
     PT,
+    S3_REGION,
     USER_ID,
     USER_PREFIX,
     _clamp_today,
@@ -418,6 +420,79 @@ def handle_weight_progress() -> dict:
     )
 
     return _ok({"weight_progress": readings}, cache_seconds=3600)
+
+
+# /api/character_config — the public "how the engine works" contract (character
+# sheet P1.2). A WHITELISTED subset of config/{user}/character_sheet.json (the
+# MCP-editable engine config), served live so the sheet's mechanics panels can
+# never drift from what the engine actually runs. Never spread the config.
+# Excluded BY DESIGN:
+#   * pillar `owner`   — the config names a real public figure; the public site
+#     fictionalizes real names (fail-closed until owners migrate to registered
+#     personas)
+#   * `baseline`       — /api/journey serves the public weight numbers
+#   * `avatar`, `protocols`, `_meta` internals — private/prescriptive
+_CHAR_CONFIG_LEVELING_KEYS = (
+    "ema_lambda",
+    "ema_window_days",
+    "level_up_streak_days",
+    "level_down_streak_days",
+    "tier_up_streak_days",
+    "tier_down_streak_days",
+    "level_step_threshold",
+    "xp_per_level",
+    "daily_xp_decay",
+    "xp_buffer_threshold",
+    "tier_streak_overrides",
+)
+
+
+def handle_character_config() -> dict:
+    """
+    GET /api/character_config
+    Returns: pillar weights + component weights/targets, leveling mechanics
+    (streak gates incl. per-tier overrides, XP economy), xp_bands, tier bands,
+    and cross-pillar effects (emoji stripped — §8, renderers draw icons).
+    Cache: 3600s — the config changes rarely (MCP edits take effect next compute).
+    """
+    import boto3 as _boto3
+
+    bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
+    try:
+        s3 = _boto3.client("s3", region_name=S3_REGION)
+        raw = s3.get_object(Bucket=bucket, Key=f"config/{USER_ID}/character_sheet.json")["Body"].read()
+        cfg = json.loads(raw)
+    except Exception as e:
+        logger.warning("character_config: config load failed: %s", e)
+        return _ok({"config": None, "available": False}, cache_seconds=300)
+
+    def _scalars(o: dict) -> dict:
+        return {k: v for k, v in (o or {}).items() if isinstance(v, (int, float, str, bool))}
+
+    pillars_out = {}
+    for name, p in (cfg.get("pillars") or {}).items():
+        pillars_out[name] = {
+            "weight": p.get("weight"),
+            "ema_lambda": p.get("ema_lambda"),
+            "components": {cn: _scalars(cv) for cn, cv in (p.get("components") or {}).items()},
+        }
+    leveling = {k: v for k, v in (cfg.get("leveling") or {}).items() if k in _CHAR_CONFIG_LEVELING_KEYS}
+    tiers = [{"name": t.get("name"), "min_level": t.get("min_level"), "max_level": t.get("max_level")} for t in cfg.get("tiers") or []]
+    effects = [
+        {"name": e.get("name"), "condition": e.get("condition"), "targets": e.get("targets")} for e in cfg.get("cross_pillar_effects") or []
+    ]
+    return _ok(
+        {
+            "available": True,
+            "pillars": pillars_out,
+            "leveling": leveling,
+            "xp_bands": cfg.get("xp_bands") or [],
+            "tiers": tiers,
+            "cross_pillar_effects": effects,
+            "updated_at": (cfg.get("_meta") or {}).get("last_updated"),
+        },
+        cache_seconds=3600,
+    )
 
 
 def handle_character_stats() -> dict:
