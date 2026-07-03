@@ -38,6 +38,8 @@ from datetime import datetime, timezone
 
 import boto3
 
+import drift_report
+
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 MODE_PARAM = "/life-platform/remediation-mode"
 BUDGET_PARAM = "/life-platform/budget-tier"
@@ -250,6 +252,9 @@ def update_report_and_email(decisions, mode):
                 lambda d: f"PR #{d['pr']} {d['title']} — {d['reason']}")
         + block("👤 Needs you", nh, lambda i: f"<b>{i.get('issue','')}</b>: {i.get('action','')}")
         + block("· Stale / ignored", stale, lambda i: str(i.get('summary', i)))
+        # Weekly drift sentinel status — always rendered so a clean week is explicitly
+        # clean (never silent about infra drift). AC4 of #394.
+        + drift_report.status_html(drift_report.read_latest(_s3, LOG_BUCKET))
     )
     try:
         _ses.send_email(FromEmailAddress=SENDER, Destination={"ToAddresses": [RECIPIENT]},
