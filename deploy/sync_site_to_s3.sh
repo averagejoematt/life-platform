@@ -17,6 +17,16 @@
 
 set -euo pipefail
 
+# Portable in-place sed. This script runs both locally (macOS / BSD sed, needs the
+# empty '' suffix arg) AND in CI (GitHub Actions ubuntu / GNU sed, which rejects it).
+# GNU sed answers --version; BSD sed errors. Use an array so the flag words expand
+# correctly under set -u. (Added with the CI-gated site deploy — #393.)
+if sed --version >/dev/null 2>&1; then
+  SED_INPLACE=(-i)       # GNU
+else
+  SED_INPLACE=(-i '')    # BSD/macOS
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CLOBBER GUARD (Coherence Program Phase 3). sync_site_to_s3.sh pushes the WHOLE
 # site/ tree, so syncing from a branch that's MISSING site/ commits which are
@@ -110,8 +120,8 @@ BUILD_SHA=$(git -C "$(dirname "$0")/.." rev-parse --short HEAD 2>/dev/null || ec
 BUILD_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "→ Build stamp: $BUILD_SHA · $BUILD_AT"
 printf '{"build":"%s","deployed":"%s"}\n' "$BUILD_SHA" "$BUILD_AT" > "$BUILD_DIR/version.json"
-find "$BUILD_DIR" -name "*.html" -not -path "*/legacy/*" -exec sed -i '' "s#</head>#<meta name=\"build\" content=\"$BUILD_SHA $BUILD_AT\"></head>#" {} +
-sed -i '' -E "s/const VERSION = \"[^\"]*\";/const VERSION = \"$BUILD_SHA\";/" "$BUILD_DIR/sw.js"
+find "$BUILD_DIR" -name "*.html" -not -path "*/legacy/*" -exec sed "${SED_INPLACE[@]}" "s#</head>#<meta name=\"build\" content=\"$BUILD_SHA $BUILD_AT\"></head>#" {} +
+sed "${SED_INPLACE[@]}" -E "s/const VERSION = \"[^\"]*\";/const VERSION = \"$BUILD_SHA\";/" "$BUILD_DIR/sw.js"
 
 echo ""
 echo "=== Syncing to s3://$BUCKET/$S3_PREFIX/ ==="

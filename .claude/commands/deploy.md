@@ -7,8 +7,16 @@ Deploy a Lambda function, the site, or the shared layer.
 Parse `$ARGUMENTS` to determine what to deploy. Support these modes:
 
 ### Mode 1: `site`
-Run: `bash deploy/deploy_site.sh`
-This syncs the site/ directory to S3 with content-hashed assets and invalidates CloudFront.
+**Primary path (since #393): merge to `main` — CI deploys the site.** A push to `main`
+touching `site/` runs the gated CI pipeline (`.github/workflows/ci-cd.yml`): lint → test →
+plan → **manual `production` approval** → site deploy (`deploy_site.sh`) → visual/AI-QA +
+accuracy gates. CI deploys the merged `main` tree only, so a stale local checkout can never
+clobber live, and the reader-facing QA gate fires on every site change. Prefer this.
+
+**Local fallback (documented, not the default):** `bash deploy/deploy_site.sh` — run this
+only for an out-of-band hotfix or when CI is unavailable. It syncs `site/` to S3 with
+content-hashed assets and invalidates CloudFront; the clobber guard blocks a sync from a
+checkout behind `origin/main` (override `ALLOW_STALE_SITE=1` for an intentional rollback).
 
 ### Mode 2: `layer`
 Run: `bash deploy/build_layer.sh`
