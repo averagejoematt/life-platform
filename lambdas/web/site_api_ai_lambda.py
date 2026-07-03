@@ -485,75 +485,111 @@ SAFETY (WR-40):
 - If asked about these topics, respond only with: I don't have data on that specific topic."""
 
 
-# ── Board of Directors persona definitions ─────────────────
-
-PERSONA_PROMPTS = {
-    "vasquez": {
-        "name": "Dr. Elena Vasquez",
-        "title": "Metabolic Medicine & Longevity",
-        "system": (
-            "You are Dr. Elena Vasquez, MD, a metabolic medicine physician specializing in longevity. "
-            "Focus on: VO2max, Zone 2 training, strength, metabolic health, and the major drivers of chronic disease. "
-            "Evidence-based and nuanced. Distinguish strong evidence from speculation. "
-            "Your perspective is informed by current peer-reviewed research. Do not reference specific researchers by name. "
-            "Use first person. 3-5 sentences. Note N=1 for any comparative claim. "
-            "Never give medical advice — reference a physician only if clinically urgent."
-        ),
+# ── The board = the REAL coach roster (#373: one cast, one grounding path) ──
+# The retired separate "board of directors" cast answered ungrounded and echoed
+# real-expert-adjacent wire IDs. board_ask now convenes the SAME eight coaches
+# the coaching pages display (config/coaches/*.json display names), each
+# grounded on the canonical facts block + their own STANCE#latest.
+COACH_ROSTER = {
+    "sleep_coach": {"name": "Dr. Lisa Park", "title": "Sleep & Recovery", "lens": "sleep architecture, recovery, HRV, circadian rhythm"},
+    "training_coach": {
+        "name": "Dr. Sarah Chen",
+        "title": "Training & Movement",
+        "lens": "strength, cardio load, progressive overload, movement quality",
     },
-    "okafor": {
-        "name": "Dr. James Okafor",
-        "title": "Performance Neuroscience",
-        "system": (
-            "You are Dr. James Okafor PhD, a performance neuroscientist. "
-            "Focus on: sleep architecture, light exposure, stress resilience, neuroplasticity, and dopamine. "
-            "Explain the mechanism first, then the protocol. "
-            "Your perspective is informed by current peer-reviewed research. Do not reference specific researchers by name. "
-            "Use phrases like 'the data are clear' and 'the mechanism here is'. "
-            "3-5 sentences. Actionable and specific."
-        ),
-    },
-    "patel": {
-        "name": "Dr. Amara Patel",
-        "title": "Cellular Biology & Nutrition",
-        "system": (
-            "You are Dr. Amara Patel PhD, a cellular-biology and nutrition scientist. "
-            "Focus on: micronutrients, cellular resilience, omega-3s, heat/cold exposure, inflammation. "
-            "Cite mechanisms. Use 'the research shows' and 'at the cellular level'. "
-            "Thorough, not reductive. 3-5 sentences."
-        ),
-    },
-    "norton": {
+    "nutrition_coach": {
         "name": "Dr. Marcus Webb",
         "title": "Evidence-Based Nutrition",
-        "system": (
-            "You are Dr. Marcus Webb, a nutrition scientist and evidence-based coach. "
-            "Focus on: protein synthesis, body composition, muscle retention in deficit. "
-            "No-nonsense, skeptical of broscience. "
-            "Use 'the evidence actually shows' and 'people get this wrong because'. "
-            "Emphasize protein quality, leucine threshold, and adherence. 3-5 sentences."
-        ),
+        "lens": "energy balance, protein, adherence, a sustainable deficit",
     },
-    "cole": {
-        "name": "Dr. Naomi Cole",
-        "title": "Habit Architecture",
-        "system": (
-            "You are Dr. Naomi Cole, a behavioral scientist specializing in habit architecture. "
-            "Focus on: identity-based change, cue-routine-reward loops, habit stacking, systems over goals. "
-            "Make abstract ideas concrete with specific examples. "
-            "3-5 sentences. Actionable and memorable. Do not quote or paraphrase any real author or book."
-        ),
+    "mind_coach": {"name": "Dr. Nathan Reeves", "title": "Mind & Behaviour", "lens": "habits, stress, motivation, behavioural patterns"},
+    "physical_coach": {
+        "name": "Dr. Victor Reyes",
+        "title": "Physical & Metabolic Health",
+        "lens": "body composition, weight trajectory, metabolic adaptation",
     },
-    "driggs": {
-        "name": "Marcus Driggs",
-        "title": "Mental Toughness",
-        "system": (
-            "You are Marcus Driggs, a mental-toughness and grit coach. "
-            "You believe most people quit well before their real limit and that the mind sets the ceiling. "
-            "Brutally honest, intense, no coddling. Do NOT use any real public figure's trademark catchphrases. "
-            "3-5 sentences. High energy."
-        ),
+    "glucose_coach": {
+        "name": "Dr. Amara Patel",
+        "title": "Glucose & Metabolic Response",
+        "lens": "glucose response, meal timing, metabolic flexibility",
+    },
+    "labs_coach": {"name": "Dr. James Okafor", "title": "Labs & Biomarkers", "lens": "bloodwork, biomarkers, long-run risk factors"},
+    "explorer_coach": {
+        "name": "Dr. Henning Brandt",
+        "title": "Cross-Domain Patterns",
+        "lens": "correlations across domains, N=1 methodology, statistical honesty",
     },
 }
+# Tolerant transition for cached OLD persona ids (the retired cast) — mapped to
+# the nearest real coach, deduped downstream. Unknown ids (not old, not real) 400.
+LEGACY_PERSONA_MAP = {
+    "vasquez": "physical_coach",
+    "okafor": "labs_coach",
+    "patel": "glucose_coach",
+    "norton": "nutrition_coach",
+    "cole": "mind_coach",
+    "driggs": "mind_coach",
+    "clear": "mind_coach",
+}
+
+
+def _coach_system(pid: str) -> str:
+    """The persona system block — identity + the absolute grounding rules.
+    Stable per coach so the ephemeral prompt cache keeps its 90% discount;
+    the volatile facts ride in the user message instead."""
+    c = COACH_ROSTER[pid]
+    return (
+        f"You are {c['name']}, the {c['title']} coach — an AI coach persona on averagejoematt.com, "
+        f"one of the eight-coach board that reads Matthew's real health data daily. Your lens: {c['lens']}. "
+        "You are answering a READER's question about Matthew's public N=1 experiment, from your discipline only. "
+        "GROUNDING (absolute): cite ONLY numbers present in the CURRENT DATA block provided with the question — "
+        "never invent, estimate, or recall figures from anywhere else. If the data you would need is not in the "
+        "block, say so plainly instead of guessing. Every observation is correlative and N=1 — no causal claims, "
+        "and never medical advice for the reader. Stay in character: you may acknowledge being an AI persona if "
+        "asked directly, without abandoning your coaching voice. "
+        "First person, 3-5 sentences, plain language, at most a couple of concrete numbers."
+    )
+
+
+def _board_facts_block() -> str:
+    """The shared CURRENT DATA block — the same sanitized aggregates /api/ask
+    grounds on, formatted once per request and injected into every persona turn."""
+    ctx = _ask_fetch_context()
+    lines = []
+    if ctx.get("weight_lbs") is not None:
+        lines.append(f"weight: {ctx['weight_lbs']:.1f} lb")
+    if ctx.get("recovery_pct") is not None:
+        lines.append(f"recovery: {ctx['recovery_pct']:.0f}%")
+    if ctx.get("hrv_ms") is not None:
+        lines.append(f"HRV: {ctx['hrv_ms']:.1f} ms")
+    if ctx.get("rhr_bpm") is not None:
+        lines.append(f"resting HR: {ctx['rhr_bpm']:.0f} bpm")
+    if ctx.get("sleep_hours") is not None:
+        lines.append(f"last sleep: {ctx['sleep_hours']:.1f} h")
+    if ctx.get("character_level") is not None:
+        lines.append(f"character level: {ctx['character_level']:.0f} ({ctx.get('character_tier', 'Foundation')})")
+    for pname, pd in (ctx.get("pillars") or {}).items():
+        lines.append(f"pillar {pname}: {pd.get('raw_score', 0):.0f}/100")
+    if ctx.get("habit_completion_pct") is not None:
+        lines.append(f"habit completion: {ctx['habit_completion_pct']:.0f}%")
+    return "; ".join(lines) if lines else "no current data available"
+
+
+def _coach_stance_bits(pid: str) -> str:
+    """The coach's own current read (STANCE#latest, written weekly by the
+    coach-opinion engine) — one headline + stage label. Empty pre-data."""
+    try:
+        item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "STANCE#latest"}).get("Item") or {}
+        item = _decimal_to_float(item)
+        bits = []
+        if item.get("headline_read"):
+            bits.append(str(item["headline_read"])[:300])
+        stage = item.get("stage") or {}
+        if isinstance(stage, dict) and stage.get("label"):
+            bits.append(f"(stage: {stage['label']})")
+        return " ".join(bits)
+    except Exception:
+        return ""
 
 
 # ── Lambda Handler ─────────────────────────────────────────
@@ -757,10 +793,23 @@ def _handle_board_ask(event: dict) -> dict:
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
 
-    requested = body.get("personas") or list(PERSONA_PROMPTS.keys())
-    personas = [p for p in requested if p in PERSONA_PROMPTS][:6]
-    if not personas:
-        personas = ["vasquez", "okafor", "clear"]
+    # #373: convene the REAL roster. Legacy cached ids map to their nearest
+    # coach; a genuinely unknown id is a 400 BEFORE any paid model call.
+    requested = body.get("personas") or ["training_coach", "nutrition_coach", "sleep_coach"]
+    if not isinstance(requested, list) or len(requested) > 12:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "personas must be a list of coach ids"})}
+    personas = []
+    for pid in requested:
+        pid = LEGACY_PERSONA_MAP.get(str(pid), str(pid))
+        if pid not in COACH_ROSTER:
+            return {
+                "statusCode": 400,
+                "headers": CORS_HEADERS,
+                "body": json.dumps({"error": f"Unknown persona id. Valid: {', '.join(COACH_ROSTER)}"}),
+            }
+        if pid not in personas:
+            personas.append(pid)
+    personas = personas[:8]
 
     api_key = _get_anthropic_key()
     if not api_key:
@@ -770,10 +819,19 @@ def _handle_board_ask(event: dict) -> dict:
     # repeat questions to the same persona within 5 min hit the prompt cache
     # (90% discount on the system block). Each persona stays a distinct cache
     # entry — they don't share preamble (voice/focus differ too much).
+    # One facts fetch per request; per-coach stance rides in the user turn so
+    # the persona system block stays byte-stable for the prompt cache.
+    facts = _board_facts_block()
     responses = {}
     for pid in personas:
-        p = PERSONA_PROMPTS[pid]
+        p = COACH_ROSTER[pid]
         try:
+            stance = _coach_stance_bits(pid)
+            user_msg = (
+                f"CURRENT DATA (authoritative — cite only these numbers): {facts}\n"
+                + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
+                + f"READER QUESTION: {question}"
+            )
             req_body = json.dumps(
                 {
                     "model": AI_MODEL_HAIKU,
@@ -781,11 +839,11 @@ def _handle_board_ask(event: dict) -> dict:
                     "system": [
                         {
                             "type": "text",
-                            "text": p["system"],
+                            "text": _coach_system(pid),
                             "cache_control": {"type": "ephemeral"},
                         }
                     ],
-                    "messages": [{"role": "user", "content": question}],
+                    "messages": [{"role": "user", "content": user_msg}],
                 }
             )
             # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
