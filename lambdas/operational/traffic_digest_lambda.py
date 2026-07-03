@@ -201,19 +201,60 @@ def build_html(agg, start_date, end_date):
 
 
 def _load_logs(s3, start_dt):
-    """List + read CF log objects modified within the window. Returns concatenated text."""
+    """List + read CF log objects modified within the window.
+
+    Returns (texts, object_count) — object_count is the number of log files
+    found in the window so the caller can distinguish "no objects" (logging is
+    broken/disabled) from "objects found but 0 human views" (genuine quiet week).
+    """
     texts = []
+    object_count = 0
     paginator = s3.get_paginator("list_objects_v2")
     for page in paginator.paginate(Bucket=LOG_BUCKET, Prefix=LOG_PREFIX):
         for obj in page.get("Contents", []):
             if obj["LastModified"] < start_dt:
                 continue
+            object_count += 1
             body = s3.get_object(Bucket=LOG_BUCKET, Key=obj["Key"])["Body"].read()
             try:
                 texts.append(gzip.GzipFile(fileobj=io.BytesIO(body)).read().decode("utf-8", "ignore"))
             except Exception as e:
                 logger.warning("skip unreadable log %s: %s", obj["Key"], e)
-    return texts
+    return texts, object_count
+
+
+def _emit_no_logs_alert(s3, cw, start_dt, now):
+    """Send a loud email + CloudWatch metric when the log source is empty."""
+    cw.put_metric_data(
+        Namespace="LifePlatform/Traffic",
+        MetricData=[{"MetricName": "LogSourceEmpty", "Value": 1, "Unit": "Count"}],
+    )
+    subject = "⚠️ Traffic digest: NO log objects this week — CF logging may be off"
+    body_html = f"""<html><body>
+<h2>Traffic digest: log source empty</h2>
+<p>The weekly traffic digest found <strong>zero CloudFront log objects</strong>
+in <code>s3://{LOG_BUCKET}/{LOG_PREFIX}</code> for the window
+<strong>{start_dt.strftime("%b %d")} – {now.strftime("%b %d")}</strong>.</p>
+<p>This likely means CloudFront access logging is disabled on the main distribution
+(it may have been reset by a CDK deploy). Check:
+<code>aws cloudfront get-distribution-config --id E3S424OXQZ8NBE --query DistributionConfig.Logging</code></p>
+<p>If logging is off, re-enable it via CDK (it is now declared in web_stack.py)
+and run <code>cdk deploy LifePlatformWeb</code>.</p>
+</body></html>"""
+    try:
+        boto3.client("sesv2", region_name=REGION).send_email(
+            FromEmailAddress=EMAIL_SENDER,
+            Destination={"ToAddresses": [EMAIL_RECIPIENT]},
+            Content={
+                "Simple": {
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {"Html": {"Data": body_html, "Charset": "UTF-8"}},
+                }
+            },
+        )
+        logger.warning("traffic digest: no log objects found — alert email sent")
+    except Exception as exc:
+        logger.error("traffic digest: no log objects + failed to send alert: %s", exc)
 
 
 def lambda_handler(event, context):
@@ -224,18 +265,30 @@ def lambda_handler(event, context):
         now = datetime.now(timezone.utc)
         start_dt = now - timedelta(days=DAYS)
         s3 = boto3.client("s3", region_name=REGION)
+        cw = boto3.client("cloudwatch", region_name=REGION)
+
+        texts, object_count = _load_logs(s3, start_dt)
+
+        if object_count == 0:
+            # No log objects at all — logging is likely disabled, not just a quiet week.
+            _emit_no_logs_alert(s3, cw, start_dt, now)
+            return {"statusCode": 200, "body": "no log objects — alert sent"}
 
         records = []
-        for text in _load_logs(s3, start_dt):
+        for text in texts:
             records.extend(parse_cf_log(text))
         agg = aggregate(records)
         logger.info(
-            "traffic digest: %s views, %s unique, %s returning", agg["page_views"], agg["unique_visitors"], agg["returning_visitors"]
+            "traffic digest: %s views, %s unique, %s returning (from %s log files)",
+            agg["page_views"],
+            agg["unique_visitors"],
+            agg["returning_visitors"],
+            object_count,
         )
 
         if agg["page_views"] == 0:
-            logger.info("no page views in window — skipping email")
-            return {"statusCode": 200, "body": "no traffic"}
+            logger.info("no human page views in window (logs present, genuinely quiet) — skipping email")
+            return {"statusCode": 200, "body": "quiet week — no email"}
 
         html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"))
         boto3.client("sesv2", region_name=REGION).send_email(

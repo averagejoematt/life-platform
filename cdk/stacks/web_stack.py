@@ -466,6 +466,14 @@ class WebStack(Stack):
                 aliases=["averagejoematt.com", "www.averagejoematt.com"],
                 price_class="PriceClass_100",
                 default_root_object="index.html",
+                # Access logging → matthew-life-platform-cf-logs/cf/ (ADR-099 #349).
+                # Declared in CDK so any future redeploy preserves it.  The log bucket
+                # was created by LifePlatformOperational and is retained independently.
+                logging=cloudfront.CfnDistribution.LoggingProperty(
+                    bucket="matthew-life-platform-cf-logs.s3.amazonaws.com",
+                    prefix="cf/",
+                    include_cookies=False,
+                ),
                 # web_acl_id intentionally omitted — WAF removed (2026-06); see note above.
                 viewer_certificate=cloudfront.CfnDistribution.ViewerCertificateProperty(
                     acm_certificate_arn=CERT_ARN_AMJ,
