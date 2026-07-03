@@ -1544,10 +1544,9 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     _art_html = ""
     if cur_image.get("image_url"):
         _art_html = (
-            '<figure class="post-header__art" style="margin:0 0 22px;border-radius:10px;overflow:hidden;position:relative;aspect-ratio:21/9;background:#16130E">'
-            f'<img src="{cur_image["image_url"]}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;filter:saturate(.62) contrast(1.03)">'
-            f'<figcaption style="position:absolute;right:8px;bottom:6px;font:11px/1.4 ui-monospace,monospace;color:#e7dccb;'
-            f'background:rgba(0,0,0,.5);padding:2px 7px;border-radius:4px">{cur_image.get("image_credit", "")}</figcaption>'
+            '<figure class="post-header__art">'
+            f'<img src="{cur_image["image_url"]}" alt="" loading="lazy">'
+            f'<figcaption>{cur_image.get("image_credit", "")}</figcaption>'
             "</figure>"
         )
 
@@ -1555,18 +1554,39 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     word_count = len(body_html.split())
     read_min = max(4, round(word_count / 250))
 
-    # Convert blog body_html (built for email) to prose-ready Signal HTML
-    # Remap email-style <p> to prose <p> — classes already handled by Signal serif
+    # Convert blog body_html (built for email) to prose-ready Signal HTML.
+    # v5 template (#384): the live story-top five-door header + site-foot, editorial
+    # cover as og:image, rel=canonical to the un-redirected /journal/posts/ URL, and an
+    # end-of-read subscribe CTA. Chrome ported from scripts/v4_build_dispatches.py SHELL;
+    # reading styles are chronicle-local and token-based (tokens.css .prose is the base).
+    og_image = cur_image.get("image_url") or "https://averagejoematt.com/assets/images/og-home.png"
+    canonical_url = f"https://averagejoematt.com/journal/posts/week-{cur_seq:02d}/"
     post_html = f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{title} — The Measured Life</title>
   <meta name="description" content="{title} — {cur_label} of The Measured Life by Elena Voss">
+  <link rel="canonical" href="{canonical_url}">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="{canonical_url}">
   <meta property="og:title" content="{title} — The Measured Life">
   <meta property="og:description" content="{stats_line}">
-  <meta property="og:type" content="article">
-  <title>{title} — The Measured Life</title>
+  <meta property="og:image" content="{og_image}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title} — The Measured Life">
+  <meta name="twitter:description" content="{stats_line}">
+  <meta name="twitter:image" content="{og_image}">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Measured Life">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <script type="application/ld+json">
   {{
     "@context": "https://schema.org",
@@ -1575,104 +1595,128 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     "description": "{cur_label} of The Measured Life by Elena Voss",
     "datePublished": "{datetime.now(timezone.utc).date().isoformat()}",
     "author": {{"@type": "Person", "name": "Elena Voss"}},
+    "image": "{og_image}",
     "publisher": {{
       "@type": "Organization",
       "name": "The Measured Life",
       "url": "https://averagejoematt.com",
-      "logo": {{
-        "@type": "ImageObject",
-        "url": "https://averagejoematt.com/assets/icons/apple-touch-icon.png"
-      }}
+      "logo": {{"@type": "ImageObject", "url": "https://averagejoematt.com/apple-touch-icon.png"}}
     }},
-    "mainEntityOfPage": {{
-      "@type": "WebPage",
-      "@id": "https://averagejoematt.com/chronicle/posts/week-{cur_seq:02d}/"
-    }},
+    "mainEntityOfPage": {{"@type": "WebPage", "@id": "{canonical_url}"}},
     "articleSection": "Health Transformation",
-    "isPartOf": {{
-      "@type": "Blog",
-      "name": "The Measured Life",
-      "url": "https://averagejoematt.com/chronicle/"
-    }}
+    "isPartOf": {{"@type": "Blog", "name": "The Measured Life", "url": "https://averagejoematt.com/story/chronicle/"}}
   }}
   </script>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
-  <link rel="stylesheet" href="/assets/css/base.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <script>(function(){{try{{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}}catch(e){{}}}})();</script>
   <style>
-    :root {{
-      --accent: var(--c-amber-500);
-      --accent-dim: var(--c-amber-300);
-      --accent-bg: var(--c-amber-100);
-      --accent-bg-subtle: var(--c-amber-050);
-      --border: rgba(200,132,58,0.15);
-    }}
-    .reading-progress {{ position:fixed;top:var(--nav-height);left:0;right:0;height:2px;background:var(--border-subtle);z-index:var(--z-overlay); }}
-    .reading-progress__fill {{ height:100%;background:var(--accent);width:0%;transition:width 0.1s linear; }}
-    .post-header {{ padding:calc(var(--nav-height) + var(--space-16)) var(--page-padding) var(--space-10);border-bottom:1px solid var(--border);max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto; }}
-    .post-header__series {{ font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--accent-dim);margin-bottom:var(--space-3); }}
-    .post-header__title {{ font-family:var(--font-serif);font-size:clamp(28px,4vw,46px);color:var(--text);line-height:1.15;font-weight:400;font-style:italic;margin-bottom:var(--space-5); }}
-    .post-header__meta {{ display:flex;align-items:center;gap:var(--space-5);font-size:var(--text-xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted); }}
-    .post-header__stats {{ font-size:var(--text-xs);color:var(--text-faint);letter-spacing:var(--ls-tag);margin-top:var(--space-3); }}
-    .post-body {{ max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-10) var(--page-padding) var(--space-20); }}
-    .prose {{ font-family:var(--font-serif); }}
-    .prose p {{ font-size:18px;line-height:1.85;color:var(--text);margin-bottom:var(--space-6); }}
-    .prose p:first-child::first-letter {{ font-size:64px;line-height:0.8;float:left;margin-right:var(--space-3);margin-top:8px;color:var(--accent);font-family:var(--font-serif); }}
-    .prose blockquote {{ border-left:2px solid var(--accent);padding:var(--space-4) var(--space-6);background:var(--accent-bg-subtle);margin:var(--space-8) 0;font-style:italic;font-size:17px;color:var(--text);line-height:1.7; }}
-    .prose hr {{ border:none;border-top:1px solid var(--border);margin:var(--space-10) 0; }}
-    .prose .signature {{ text-align:center;font-size:14px;color:var(--text-muted);font-style:italic; }}
-    .prose strong {{ color:var(--text);font-weight:700; }}
-    .post-nav {{ max-width:calc(var(--prose-width) + var(--page-padding) * 2);margin:0 auto;padding:var(--space-6) var(--page-padding) var(--space-16);border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:var(--space-6); }}
-    .post-nav a {{ font-family:var(--font-serif);font-size:17px;color:var(--text);text-decoration:none;transition:color var(--dur-fast); }}
-    .post-nav a:hover {{ color:var(--accent); }}
-    .post-nav span {{ display:block;font-family:var(--font-mono);font-size:var(--text-2xs);letter-spacing:var(--ls-tag);text-transform:uppercase;color:var(--text-muted);margin-bottom:var(--space-1); }}
+    .reading-progress {{ position:fixed;top:0;left:0;right:0;height:2px;background:transparent;z-index:var(--z-overlay); }}
+    .reading-progress__fill {{ height:100%;background:var(--ember);width:0%;transition:width 0.1s linear; }}
+    .post-wrap {{ max-width:var(--container-read);margin:0 auto;padding-inline:var(--gutter); }}
+    .post-header {{ padding:var(--sp-8) 0 var(--sp-6);border-bottom:var(--border-hair); }}
+    .post-header__art {{ margin:0 0 var(--sp-5);border-radius:var(--radius);overflow:hidden;position:relative;aspect-ratio:21/9;background:#16130E; }}
+    .post-header__art img {{ width:100%;height:100%;object-fit:cover;filter:saturate(.62) contrast(1.03); }}
+    .post-header__art figcaption {{ position:absolute;right:8px;bottom:6px;font:11px/1.4 var(--font-mono);color:#e7dccb;background:rgba(0,0,0,.5);padding:2px 7px;border-radius:var(--radius-xs); }}
+    .post-header__series {{ font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ember);margin-bottom:var(--sp-3); }}
+    .post-header__title {{ font-family:var(--font-serif);font-size:var(--fs-h1);color:var(--ink);line-height:var(--lh-snug);font-weight:var(--weight-reg);font-style:italic;margin-bottom:var(--sp-4); }}
+    .post-header__meta {{ display:flex;align-items:center;gap:var(--sp-3);font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-muted); }}
+    .post-header__stats {{ font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);letter-spacing:var(--tracking-label);margin-top:var(--sp-2); }}
+    .post-body {{ padding:var(--sp-7) 0 var(--sp-8); }}
+    .post-body .prose {{ font-family:var(--font-serif);max-width:none; }}
+    .post-body .prose p {{ max-width:none;line-height:var(--lh-relaxed); }}
+    .post-body .prose > p:first-of-type::first-letter {{ font-size:64px;line-height:0.8;float:left;margin-right:var(--sp-2);margin-top:6px;color:var(--ember);font-family:var(--font-serif); }}
+    .post-body .prose blockquote {{ border-left:2px solid var(--ember);padding:var(--sp-3) var(--sp-5);background:var(--ember-wash);margin:var(--sp-6) 0;font-style:italic;color:var(--ink); }}
+    .post-body .prose hr {{ border:none;border-top:var(--border-hair);margin:var(--sp-7) 0; }}
+    .post-body .prose .signature {{ text-align:center;font-size:var(--fs-small);color:var(--ink-muted);font-style:italic; }}
+    .post-body .prose strong {{ color:var(--ink);font-weight:var(--weight-med); }}
+    .post-cta {{ margin:var(--sp-6) 0 var(--sp-7);padding:var(--sp-6);border:var(--border-hair);border-radius:var(--radius);background:var(--ember-wash);text-align:center; }}
+    .post-cta h2 {{ font-family:var(--font-serif);font-style:italic;font-weight:var(--weight-reg);font-size:var(--fs-h3);color:var(--ink);margin:0 0 var(--sp-2); }}
+    .post-cta p {{ color:var(--ink-muted);font-size:var(--fs-small);margin:0 auto var(--sp-4);max-width:44ch; }}
+    .post-cta a.cta-btn {{ display:inline-block;font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--page);background:var(--ember);padding:10px 20px;border-radius:var(--radius-sm);text-decoration:none; }}
+    .post-cta a.cta-btn:hover {{ filter:brightness(1.08); }}
+    .post-nav {{ padding:var(--sp-5) 0 var(--sp-8);border-top:var(--border-hair);display:flex;justify-content:space-between;gap:var(--sp-5); }}
+    .post-nav a {{ font-family:var(--font-serif);font-size:var(--fs-body);color:var(--ink);text-decoration:none;transition:color var(--dur-fast); }}
+    .post-nav a:hover {{ color:var(--ember); }}
+    .post-nav span {{ display:block;font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-faint);margin-bottom:var(--sp-1); }}
   </style>
 </head>
-<body>
+<body class="dx-page">
+<a class="skip" href="#post">Skip to the story</a>
 <div class="reading-progress"><div class="reading-progress__fill" id="rp"></div></div>
-<nav class="nav">
-  <a href="/" class="nav__brand">AMJ</a>
-  <div class="nav__links">
-    <a href="/#experiment" class="nav__link">The experiment</a>
-    <a href="/platform/" class="nav__link">The platform</a>
-    <a href="/journal/" class="nav__link active">Journal</a>
-    <a href="/character/" class="nav__link">Character</a>
+<header class="story-top">
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
+  <nav class="doors" aria-label="Doors">
+    <a href="/now/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+    <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
+    <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
+    <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
+    <a href="/story/" aria-current="page" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
+    <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+  </nav>
+</header>
+<main id="post">
+<div class="post-wrap">
+  <div class="post-header">
+    {_art_html}
+    <div class="post-header__series">The Measured Life &middot; {cur_label} &middot; By Elena Voss</div>
+    <h1 class="post-header__title">&ldquo;{title}&rdquo;</h1>
+    <div class="post-header__meta">
+      <span>{date_display}</span>
+      <span>&middot;</span>
+      <span>{read_min} min read</span>
+    </div>
+    <div class="post-header__stats">{stats_line}</div>
   </div>
-  <div class="nav__status"><div class="pulse" style="background:var(--accent)"></div><span>The Measured Life</span></div>
-</nav>
-<div class="post-header">
-  {_art_html}
-  <div class="post-header__series">The Measured Life &middot; {cur_label} &middot; By Elena Voss</div>
-  <h1 class="post-header__title">&ldquo;{title}&rdquo;</h1>
-  <div class="post-header__meta">
-    <span>{date_display}</span>
-    <span>&middot;</span>
-    <span>{read_min} min read</span>
-  </div>
-  <div class="post-header__stats">{stats_line}</div>
+  <article class="post-body">
+    <div class="prose">
+      {body_html}
+    </div>
+  </article>
+  <aside class="post-cta">
+    <h2>Follow the experiment</h2>
+    <p>A new installment every week — the data, the coaches, and what actually moved. No spam, unsubscribe anytime.</p>
+    <a class="cta-btn" href="/subscribe/">Follow by email</a>
+  </aside>
+  <nav class="post-nav">
+    <a href="/story/chronicle/"><span>&larr; All installments</span>The Measured Life archive</a>
+    <a href="/now/"><span>Today</span>The live cockpit &rarr;</a>
+  </nav>
 </div>
-<article class="post-body">
-  <div class="prose">
-    {body_html}
-  </div>
-</article>
-<div class="post-nav">
-  <a href="/journal/"><span>&larr; All installments</span>The Measured Life archive</a>
-  <a href="/"><span>The experiment</span>averagejoematt.com &rarr;</a>
-</div>
-<footer class="footer">
-  <div class="footer__brand" style="color:var(--accent)">AMJ</div>
-  <div class="footer__links">
-    <a href="/" class="footer__link">Home</a>
-    <a href="/character/" class="footer__link">Character</a>
-  </div>
-  <div class="footer__copy">// words when there's something worth saying</div>
+</main>
+<footer class="site-foot">
+  <nav class="site-foot-cols" aria-label="Site map">
+    <div class="sf-col"><p class="sf-h label">The Story</p>
+      <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
+    <div class="sf-col"><p class="sf-h label">The Coaching</p>
+      <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
+    <div class="sf-col"><p class="sf-h label">The Data</p>
+      <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
+    <div class="sf-col"><p class="sf-h label">The Protocols</p>
+      <a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>
+    <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
+      <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>
+  </nav>
+  <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
 </footer>
 <script>
-  const rp = document.getElementById('rp');
-  window.addEventListener('scroll', () => {{
-    const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
-    rp.style.width = Math.min(pct, 100) + '%';
-  }});
+  (function(){{
+    var b=document.querySelector('.theme-toggle');
+    if(b){{b.addEventListener('click',function(){{
+      var r=document.documentElement;
+      var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+      var next=cur==='light'?'dark':'light';
+      r.dataset.theme=next;
+      try{{localStorage.setItem('ajm-theme',next);}}catch(e){{}}
+    }});}}
+    var rp=document.getElementById('rp');
+    window.addEventListener('scroll',function(){{
+      if(!rp)return;
+      var pct=window.scrollY/(document.body.scrollHeight-window.innerHeight)*100;
+      rp.style.width=Math.min(pct,100)+'%';
+    }});
+  }})();
 </script>
 </body>
 </html>"""
