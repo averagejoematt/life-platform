@@ -205,18 +205,20 @@ PAGES.extend(
     ]
 )
 
-# The Mind pillar (reading, ADR-097) — /mind/ over /api/reading_shelf + /api/reading_overview.
-# Checks stay lenient: day-one the shelf is intentionally an honest empty state (an
-# invitation, not a failure), so we assert the page CHROME renders, not that books exist.
+# The Mind pillar (reading, ADR-097) — consolidated into the Data door (#298/#299);
+# /mind/ now 301s to /data/reading/ at the edge (#313). Follow the redirect and
+# assert the READING readout renders in the archive chrome (the old standalone
+# .ph-title/.shelf-block/.round-wrap selectors died with the standalone page —
+# they red-flagged the first full run after the consolidation). Checks stay
+# lenient: an honest empty shelf is an invitation, not a failure.
 PAGES.append(
     {
         "path": "/mind/",
-        "name": "Mind (reading shelf)",
-        "wait_for": ".page-hero",
+        "name": "Mind → /data/reading (redirect + readout)",
+        "wait_for": ".ev-app",
         "checks": [
-            {"selector": ".ph-title", "not_empty": True, "desc": "Mind hero title rendered"},
-            {"selector": ".shelf-block", "min_count": 1, "desc": "shelf blocks present"},
-            {"selector": ".round-wrap", "min_count": 1, "desc": "roundedness section present"},
+            {"selector": ".ev-tile", "min_count": 3, "desc": "archive tiles render after the redirect"},
+            {"selector": ".readout, .ev-main", "min_count": 1, "desc": "the reading readout mounts"},
         ],
     }
 )
