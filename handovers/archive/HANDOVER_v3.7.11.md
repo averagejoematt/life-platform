@@ -36,7 +36,7 @@ Run: `python3 -m pytest tests/test_lambda_handlers.py -v`
 |--------|---------|
 | Freshness checker bug fix | `bash deploy/deploy_lambda.sh freshness-checker lambdas/freshness_checker_lambda.py` |
 | S3 lifecycle rule | `bash deploy/apply_s3_lifecycle.sh` |
-| Partner SES verification | `aws sesv2 create-email-identity --email-identity [partner-address-redacted] --region us-west-2` |
+| Partner SES verification | `aws sesv2 create-email-identity --email-identity (partner address — SSM /life-platform/partner-email) --region us-west-2` |
 | SNS subscription confirmation | Check `awsdev@mattsusername.com` inbox |
 
 ---

@@ -79,5 +79,5 @@ Will self-heal on next `cdk deploy McpStack`.
 - Platform: v3.7.6, 42 Lambdas, 19 data sources, 8 CDK stacks
 - `life-platform/api-keys` secret: DELETED (2026-03-13)
 - Billing alarm: `life-platform-ai-cost-soft-alarm` in us-east-1
-- Partner email: `[partner-address-redacted]`, sender `awsdev@mattsusername.com`
+- Partner email: `(partner address — SSM /life-platform/partner-email)`, sender `awsdev@mattsusername.com`
 - Post-deploy rule: run `bash deploy/post_cdk_reconcile_smoke.sh` after every `cdk deploy`

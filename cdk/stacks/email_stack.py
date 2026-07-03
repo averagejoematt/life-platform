@@ -248,9 +248,13 @@ class EmailStack(Stack):
         # EXTERNAL_EMAILS_ENABLED kill switch — flip to "true" to resume sending to
         # non-Matthew recipients (Partner, confirmed subscribers). Used by
         # partner-weekly-email, chronicle-email-sender, weekly-signal.
+        # The recipient address is PII and lives OUT of the repo: SSM parameter
+        # /life-platform/partner-email (created via CLI; on the managed-where
+        # ledger). The lambda reads it at runtime with a cached client and falls
+        # back to Matthew's own address if the parameter is absent.
         _partner_env = {
             **_email_env,
-            "PARTNER_EMAIL": "[partner-address-redacted]",
+            "PARTNER_EMAIL_PARAM": "/life-platform/partner-email",
             "EMAIL_SENDER": "awsdev@mattsusername.com",
             "EXTERNAL_EMAILS_ENABLED": "false",
         }

@@ -3,8 +3,9 @@ Partner Weekly Email — v1.1.0
 Fires Sunday 9:30 AM PT (17:30 UTC) via EventBridge.
 
 Design philosophy: narrative-first, not a data dashboard.
-Partner is Matthew's partner, not his doctor. She doesn't need Whoop scores.
-She needs to understand how he's doing emotionally and how to show up for him.
+The recipient is Matthew's partner, not his doctor. She doesn't need Whoop
+scores. She needs to understand how he's doing emotionally and how to show up
+for him.
 
 Structure:
   - Hero: Elena's one-line narrative lede
@@ -48,8 +49,22 @@ _REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 SENDER = os.environ["EMAIL_SENDER"]
-RECIPIENT = os.environ.get("PARTNER_EMAIL", "awsdev@mattsusername.com")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
+# The recipient is PII — resolved at runtime from SSM (kept out of the repo),
+# cached warm; falls back to Matthew's own address if the parameter is absent.
+_RECIPIENT_PARAM = os.environ.get("PARTNER_EMAIL_PARAM", "/life-platform/partner-email")
+_recipient_cache = {"v": None}
+
+
+def _recipient():
+    if not _recipient_cache["v"]:
+        try:
+            ssm = boto3.client("ssm", region_name=_REGION)
+            _recipient_cache["v"] = ssm.get_parameter(Name=_RECIPIENT_PARAM)["Parameter"]["Value"].strip()
+        except Exception:
+            _recipient_cache["v"] = os.environ.get("PARTNER_EMAIL", "awsdev@mattsusername.com")
+    return _recipient_cache["v"]
+
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -837,7 +852,7 @@ def lambda_handler(event, context):
 
     ses.send_email(
         FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
+        Destination={"ToAddresses": [_recipient()]},
         Content={
             "Simple": {
                 "Subject": {"Data": subject, "Charset": "UTF-8"},
@@ -847,5 +862,5 @@ def lambda_handler(event, context):
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
         EmailTags=[{"Name": "message_type", "Value": "partner_weekly"}],
     )
-    print("[INFO] Sent to " + RECIPIENT + ": " + subject)
+    print("[INFO] Sent to the partner address: " + subject)
     return {"statusCode": 200, "body": "Partner email v1.1.0 sent: " + subject}

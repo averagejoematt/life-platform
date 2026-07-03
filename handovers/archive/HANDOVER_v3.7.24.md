@@ -70,7 +70,7 @@ Conducted Architecture Review #11 — a first-principles deep dive on architectu
 
 All clean. Notable findings:
 - `dropbox-poll`, `todoist-data-ingestion`: `SECRET_NAME = life-platform/ingestion-keys` ✅ (correct active secret)
-- `partner-weekly-email`: `PARTNER_EMAIL = [partner-address-redacted]` ✅ (real address confirmed)
+- `partner-weekly-email`: `PARTNER_EMAIL = (partner address — SSM /life-platform/partner-email)` ✅ (real address confirmed)
 - No Lambda has `SECRET_NAME = life-platform/api-keys` (the deleted secret) ✅
 - All Lambdas have standard `TABLE_NAME = life-platform`, `S3_BUCKET = matthew-life-platform` ✅
 

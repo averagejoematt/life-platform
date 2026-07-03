@@ -19,14 +19,14 @@ bash deploy/apply_s3_lifecycle.sh
 ```
 
 ### Partner Weekly Email — Already Correct ✅
-`email_stack.py` already had `[partner-address-redacted]` as `PARTNER_EMAIL`.
+`email_stack.py` already had `(partner address — SSM /life-platform/partner-email)` as `PARTNER_EMAIL`.
 No CDK change needed.
 
 **SES status:** Account is in **Sandbox mode**. his partner's address must be verified
 before she'll receive emails. Matthew needs to run:
 ```bash
 aws sesv2 create-email-identity \
-  --email-identity [partner-address-redacted] \
+  --email-identity (partner address — SSM /life-platform/partner-email) \
   --region us-west-2
 ```
 She'll receive a verification link — clicks once, permanent.
@@ -75,7 +75,7 @@ Alarms are silent until confirmed. Has been pending since v3.7.3.
 |--------|---------|
 | S3 lifecycle rule | `bash deploy/apply_s3_lifecycle.sh` |
 | Freshness checker bug fix | `bash deploy/deploy_lambda.sh freshness-checker lambdas/freshness_checker_lambda.py` |
-| Partner SES verification | `aws sesv2 create-email-identity --email-identity [partner-address-redacted] --region us-west-2` |
+| Partner SES verification | `aws sesv2 create-email-identity --email-identity (partner address — SSM /life-platform/partner-email) --region us-west-2` |
 
 ---
 

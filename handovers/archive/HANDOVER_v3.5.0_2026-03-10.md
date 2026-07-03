@@ -21,7 +21,7 @@ Fixed 9 Lambdas with hardcoded `"life-platform/api-keys"` default → all update
 
 Fixed CDK `cdk/stacks/email_stack.py`:
 - Added `_email_env = {"ANTHROPIC_SECRET": "life-platform/ai-keys"}` applied to all 7 email Lambdas
-- Added `_partner_env = {**_email_env, "PARTNER_EMAIL": "[partner-address-redacted]"}` (placeholder)
+- Added `_partner_env = {**_email_env, "PARTNER_EMAIL": "(partner address — SSM /life-platform/partner-email)"}` (placeholder)
 - **⚠️ Confirm his partner's real email, then `cdk deploy LifePlatformEmail`**
 
 #### ✅ Item 6 — SEC-1 cleanup (already done in v3.4.0)
