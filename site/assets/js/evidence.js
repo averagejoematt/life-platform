@@ -2288,7 +2288,21 @@ const WIRE = {
     if (start) load(start);
   },
   results: () => wireDataFigure(),
-  physical: () => wireDataFigure(moveTrendMarker),  // P0.2 — silhouette scrubs the trend marker in lockstep
+  physical: () => {
+    // P0.2 — silhouette scrubs the trend marker in lockstep; P4 adds the inverse:
+    // hovering the weight chart drives the silhouette to that day's weigh-in.
+    // Fire-and-forget both ways — a failure in the link never breaks either.
+    const dfRender = wireDataFigure(moveTrendMarker);
+    if (dfRender) {
+      document.addEventListener("chart:point", (e) => {
+        try {
+          if (!e.target.closest || !e.target.closest(".wt-chart")) return;
+          const w = Number(e.detail && e.detail.v);
+          if (Number.isFinite(w)) dfRender(w);
+        } catch (err) { /* decorative link */ }
+      });
+    }
+  },
 };
 
 // P0.2 — silhouette scrubber wiring, reusable. `onWeight(w)` fires on every render so a
@@ -2337,6 +2351,7 @@ function wireDataFigure(onWeight) {
     });
   }
   render(NOW);   // open on the honest current state
+  return render; // uplevel P4 — lets the chart's hover cross-highlight drive the figure
 }
 
 // P0.2 — move the trend-chart's horizontal scrub marker to weight `w` (lockstep with the
