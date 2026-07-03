@@ -273,14 +273,18 @@ class MonitoringStack(Stack):
             "LifePlatform/Coherence",
             "OverallAlarm",
         )
-        # The canary runs WEEKLY (Mon), so tolerate a 9-day gap — fires only if it
-        # misses more than one scheduled run (the producer actually stopped).
+        # The canary runs WEEKLY (Mon). CloudWatch caps an hourly+ alarm's window at
+        # 7 days (EvaluationPeriods × Period ≤ 604800), so a >7-day heartbeat is
+        # impossible as a single alarm — days=9 was rejected at CREATE. days=7 is the
+        # max AND exactly right: the trailing-7-day window always contains one
+        # scheduled run, so it fires the first time a weekly run is missed (a full 7
+        # days with no datapoint) and never on a healthy cadence.
         _heartbeat_alarm(
             "AiCanaryHeartbeat",
             "ai-canary-heartbeat",
             "LifePlatform/AICanary",
             "OverallAlarm",
-            days=9,
+            days=7,
         )
 
         # ══════════════════════════════════════════════════════════════
