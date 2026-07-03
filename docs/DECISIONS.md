@@ -63,7 +63,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-036 | 3-layer status monitoring architecture | ✅ Active | 2026-03-29 |
 | ADR-037 | Site API read-only constraint | ✅ Active | 2026-02-27 |
 | ADR-038 | In-memory rate limiting over DynamoDB counters — backstopped by WAF | ✅ Active | 2026-03-20 |
-| ADR-039 | CSS/JS cache: content-hash filenames with 1-year immutable TTL | ✅ Active | 2026-03-29 |
+| ADR-039 | CSS/JS cache: content-hash filenames with 1-year immutable TTL | ⚠️ Extended by ADR-098 | 2026-03-29 |
 | ADR-040 | Board of Directors: fictional advisors over real public figures | ✅ Active | 2026-03-26 |
 | ADR-041 | Food delivery data: Delivery Index abstraction for privacy | ✅ Active | 2026-03-28 |
 | ADR-042 | OG image generation: Lambda + Pillow over external services | ✅ Active | 2026-03-28 |
@@ -83,6 +83,7 @@ When a significant decision is made — a design pattern chosen, an approach rej
 | ADR-056 | SIMP-2 ingestion framework: 8 sources migrated, 6 pattern-exempt | ✅ Active | 2026-05-17 |
 | ADR-057 | V2 audit items formally closed with rationale | ✅ Active | 2026-05-17 |
 | ADR-097 | Two GSIs for the reading domain (amends ADR-005) | ✅ Active | 2026-06-29 |
+| ADR-098 | Content-hash the full JS module graph, not just HTML refs (extends ADR-039) | ✅ Active | 2026-07-03 |
 
 ---
 
@@ -2742,5 +2743,32 @@ Both project `ALL` (reading items are small and the read paths want the full rec
 **Alternatives rejected.** *Keep ADR-005 absolute and scan* — the recall sweep and status/queue views would scan the whole table daily as the library grows; the sparse GSI1 is exactly the pattern DynamoDB sparse indexes exist for. *Model reading under `USER#…#SOURCE#reading` with date sks* — loses the by-status and global-by-date access without a GSI anyway, and fights the spec's entity design. *Add the GSIs via a new CDK-managed table* — the table is shared, live, and stateful; re-homing it is far riskier than an additive online index add.
 
 **Deploy.** `deploy/deploy_reading_gsis.sh` (GSIs) then `deploy/deploy_reading_data.sh` (`cdk diff` → `cdk deploy LifePlatformOperational` for the cover-pipeline Lambda). No layer rebuild (reading modules bundle with the `lambdas/` asset). See `handovers/HANDOVER_LATEST.md`.
+
+---
+
+## ADR-098: Content-hash the full JS module graph, not just HTML references (extends ADR-039)
+
+**Status:** Active
+**Date:** 2026-07-03
+
+**Context.** ADR-039 established content-hashed CSS/JS filenames served `max-age=31536000, immutable`, with `sync_site_to_s3.sh` computing an 8-char hash per file and rewriting references. But it rewrote references **only in `*.html`**. The v5 site is ES modules that import each other by absolute URL (`import ... from "/assets/js/charts.js"`), and those **intra-module import statements were never rewritten** — they kept pointing at the unhashed filename, which was *also* uploaded (`max-age=86400`, mutable, same name forever) as ADR-039's "fallback for dynamic loads."
+
+The result: the entry module (e.g. `evidence.js`) was hashed and immutable, but the dependencies it imported (`charts.js`, `sigils.js`, `icons.js`, `ask.js`) resolved to mutable, 24h-cached URLs. When a deploy changed an entry module **and** a dependency together (as #260's graphic-identity change did), a returning browser could pair a **fresh hashed entry module with a stale cached dependency**. An ES module graph fails atomically — one bad/mismatched import throws at load time and the whole module never executes — so the page rendered only its static HTML shell with all JS-populated content blank ("the frozen page"). A hard reload bypassed the HTTP cache and fixed it; the stale copy survived a browser restart, so it reproduced reliably. See INCIDENT_LOG 2026-07-03 (P3).
+
+**Decision.** Hash the **entire CSS/JS module graph** and rewrite **every** reference — HTML `<link>`/`<script>`, intra-module `import` statements, and CSS `@import`/`url()`. New helper `deploy/hash_site_assets.py` (replacing the inline bash hashing in `sync_site_to_s3.sh`):
+- Builds the module dependency graph from the original file contents (the `/assets/(js|css)/name.ext` reference regex).
+- Hashes **leaves-first** via a topological sort (raises on an import cycle): a dependency's hash is finalized before any dependent is hashed, so a dependent's rewritten content — and therefore its own hash — already reflects the hashed dependency URL. This is textbook cache-correct hashing.
+- Writes `name.<hash>.ext` alongside each file (immutable upload) and rewrites the original in place too (kept as the short-cache fallback), so both copies are internally consistent.
+- Skips `legacy/` (served verbatim with unhashed assets, per ADR-071).
+
+Every asset URL is now content-hashed and immutable, so an entry module pins the exact hashed bytes of every transitive dependency. **Version skew across the module graph is structurally impossible** — the failure mode ADR-039 left open is closed.
+
+**Why the graph approach over a hardcoded dependency list.** The helper discovers the graph from the source each deploy, so a newly-added import (e.g. current `evidence.js` imports an `ask.js` module that didn't exist when the bug was diagnosed) is hashed automatically with no script change. A hardcoded list would silently miss it and reintroduce the skew.
+
+**Alternatives considered.**
+- **Network-first / short-TTL on the mutable-named assets** (the minimal fix): shrinks the skew window from 24h to ~5 min but doesn't eliminate it, and keeps the SW's cache-first-on-"immutable" assumption technically false. Rejected in favor of the structural fix.
+- **A bundler (esbuild/Vite)** that emits one hashed bundle per entry: eliminates the graph but adds a Node build dependency and toolchain — against the platform's no-build-framework norm (ADR-071). Overkill for ~10 modules.
+
+**Outcome.** Deployed 2026-07-03 and live-verified: `/data/` and `/coaching/` serve a fully-hashed, self-consistent, immutable module graph (the shared `sigils` hash is byte-identical across pages), 0 dangling references, 0 unhashed HTML references, `version.json` build == `sw.js` VERSION. The service worker (`site/sw.js`) needs no change — its cache-first-on-immutable strategy is now genuinely correct for these URLs. The unhashed-original upload remains for true runtime `document.createElement('script')` loads (ADR-039's `countdown.js` case) but is otherwise dead weight, a candidate for later cleanup.
 
 ---
