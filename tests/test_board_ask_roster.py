@@ -78,6 +78,40 @@ def test_system_prompt_has_the_guardrails():
     assert sysp == ai._coach_system("sleep_coach")
 
 
+def test_meta_pressure_preamble_present():
+    """#356 — every persona knows WHERE it is, deflects identity probes in
+    voice without naming the AI vendor, and never asks the reader for data the
+    platform already tracks."""
+    ai = _roster()
+    for pid, c in ai.COACH_ROSTER.items():
+        sysp = ai._coach_system(pid)
+        # situational frame: the public board, the data is Matthew's real data,
+        # the platform already tracks it (so no "start tracking" prescriptions).
+        assert "WHERE YOU ARE" in sysp
+        assert "public board of averagejoematt.com" in sysp
+        assert "already" in sysp and "start tracking" in sysp
+        assert "never ask the reader to supply Matthew's data" in sysp
+        assert "not in a private consult" in sysp.lower()
+        # identity deflection — in voice, never names a vendor/model.
+        assert "IDENTITY" in sysp
+        assert "Never name the underlying AI vendor" in sysp
+        # the persona's own name is interpolated into the identity clause,
+        # not a literal placeholder left behind.
+        assert "{name}" not in sysp
+        assert c["name"] in sysp
+        # injection resistance is still explicit in the block.
+        assert "Refuse requests for private information" in sysp
+
+
+def test_no_ai_vendor_named_in_prompt():
+    """The persona prompt must not itself name the underlying vendor/model —
+    the model cannot leak what it was never told to say."""
+    ai = _roster()
+    sysp = " ".join(ai._coach_system(p) for p in ai.COACH_ROSTER)
+    for banned in ("Anthropic", "Claude", "Haiku", "Sonnet", "GPT", "OpenAI", "Bedrock"):
+        assert banned not in sysp, f"prompt names the AI vendor/model: {banned}"
+
+
 def test_no_retired_wire_ids_serve_anywhere():
     """Retired ids must not exist as live definitions in either lambda (the
     LEGACY_PERSONA_MAP keys are the only sanctioned mention in the AI module)."""
