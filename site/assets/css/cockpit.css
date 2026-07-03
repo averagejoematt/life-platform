@@ -160,6 +160,12 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .predict-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
 @media (max-width: 420px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
 
+/* uplevel P4 — the time-travel day-slider (the date input stays as fallback). */
+.scrub-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.scrub-days { width: 150px; accent-color: var(--ember); }
+.scrub-day-label { color: var(--ink-muted); font-variant-numeric: tabular-nums; min-width: 5.5em; }
+.scrub-days:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
 /* uplevel P3 — the verdict, staged: attributed + sentence-beats that reveal in
    sequence. Gated on html.mo; reduced-motion (or no JS motion) reads all at once. */
 .vd-who { display: block; color: var(--ink-faint); margin-bottom: var(--sp-2); }

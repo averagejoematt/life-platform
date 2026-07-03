@@ -748,7 +748,11 @@ def main() -> int:
         slugs = [r[0] for r in REGISTRY if r[3] in pillar["groups"]]
         if not slugs:
             continue
-        first = slugs[0]
+        # uplevel P4: the Data door lands on its RICHEST readout (the weight cockpit —
+        # silhouette + rungs + cone), not registry-first "Vitals" whose sparse "fills
+        # in" placeholders made the worst first impression on the page. Other pillars
+        # keep registry order. Hash deep-links still win in evidence.js.
+        first = "physical" if (pillar["dir"] == "data" and "physical" in slugs) else slugs[0]
         (out / "index.html").write_text(
             shell(first, pillar["base"], f"The {pillar['title']} — averagejoematt", pillar["lede"], pillar),
             encoding="utf-8",

@@ -229,7 +229,13 @@
     </article>
 
     <p class="cockpit-foot label">
-      <label class="scrub-wrap">time travel <input type="date" class="scrub" data-scrub aria-label="View the cockpit as of a past date"></label>
+      <label class="scrub-wrap">time travel
+        <!-- uplevel P4: the day-slider is the primary scrubber (drag through the
+             experiment); the date input stays as the accessible/precise fallback. -->
+        <input type="range" class="scrub-days" data-scrub-days min="0" max="1" step="1" value="1" hidden aria-label="Scrub the cockpit through the days of the experiment">
+        <span class="scrub-day-label label" data-scrub-label hidden></span>
+        <input type="date" class="scrub" data-scrub aria-label="View the cockpit as of a past date">
+      </label>
       <a href="/">home →</a>
       <a href="/story/">the story →</a>
       <a href="/data/">the data →</a>
