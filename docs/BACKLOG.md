@@ -1,5 +1,13 @@
 # Life Platform — Open Backlog
 
+> **⚠️ FROZEN — historical archive (ADR-099, 2026-07-03).** The single source of truth for
+> forward work is now the **GitHub issue backlog**: epics (`type:epic`) + ranked stories
+> (`type:story`) on Now/Next/Later milestones — see
+> https://github.com/averagejoematt/life-platform/issues and
+> `docs/reviews/BACKLOG_MANIFEST_2026-07.json`. Do not add items here. Every open item below
+> was reconciled on 2026-07-03 (41 open → migrated as issues · 29 already shipped · 26 gated ·
+> 11 won't-do → the parked register). The shipped-history sections retain archival value.
+
 **Last updated:** 2026-06-29 (Self-Management & Coherence Program Phases 1–4 + the content-bug fix + precision pass + asset-completeness guard ALL SHIPPED — see the section directly below. Prior: 2026-06-23 redesign marathon — Physical/Vitals/Mind pages + Doors IA + RQA-04/05 + WQA-06 all shipped; follow-ups added: PHY-01..06, VIT-01..06, DOORS-01, MIND-01..05 (Mind capture DEFERRED pending invitation-UX sign-off). Earlier: Nutrition/Training/Sleep/Habits shipped, EVR-01..06; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
 **Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 

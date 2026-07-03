@@ -2772,3 +2772,22 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 **Outcome.** Deployed 2026-07-03 and live-verified: `/data/` and `/coaching/` serve a fully-hashed, self-consistent, immutable module graph (the shared `sigils` hash is byte-identical across pages), 0 dangling references, 0 unhashed HTML references, `version.json` build == `sw.js` VERSION. The service worker (`site/sw.js`) needs no change — its cache-first-on-immutable strategy is now genuinely correct for these URLs. The unhashed-original upload remains for true runtime `document.createElement('script')` loads (ADR-039's `countdown.js` case) but is otherwise dead weight, a candidate for later cleanup.
 
 ---
+
+## ADR-099: GitHub Issues become the single source of truth for forward work (supersedes BACKLOG.md's role)
+
+**Date:** 2026-07-03 · **Status:** Accepted
+
+**Context.** `docs/BACKLOG.md` declared itself "single source of truth for everything not done," but the 2026-07 platform + product review's reconciliation found it ~27% wrong: 29 of 107 claimed-open items had already shipped, one "blocked" item (B-01) had been resolved for two weeks, and several time-gates had silently elapsed. A hand-maintained ledger drifts because closing an item is a separate manual act from shipping it. The review produced 83 verified findings + 41 verified-open ledger items that needed one unified, ranked home.
+
+**Decision.** Forward work lives as **public GitHub issues** on `averagejoematt/life-platform` (the build-in-public wedge makes the backlog itself content):
+- **Epics** (`type:epic`, `[EPIC]` title): outcome hypothesis, a leading measure, loop pillar, wedge alignment, definition of done, and a task-list of story issues.
+- **Stories** (`type:story`): a user story, 3–5 verifiable acceptance criteria, evidence links, and an auditable score line.
+- **Ranking:** hard gates first (the 185 test · the build cap · privacy absolutes · the honesty moat — a failure is parked in the review report, never filed). Then `Score = (Impact × Confidence) / Effort`, Impact = 0.35·returnability + 0.25·credibility-moat + 0.20·monetization-readiness + 0.20·durability (each 1–5); Confidence 0.5/0.75/1.0; Effort S=1 M=2 L=4. Score terciles map to the **Now / Next / Later** milestones. PM overrides are allowed and must be recorded in the issue (e.g. a live reader-facing defect outranks the effort denominator).
+- **Idempotency + audit:** `docs/reviews/BACKLOG_MANIFEST_2026-07.json` records item-id → issue number → score.
+- **Exclusions:** gated/won't-do/owner-capture items are NOT filed — they live in the review report's parked register, referenced by one `parked-register` issue.
+
+**Maintenance convention (the anti-drift mechanism):** (1) a PR that ships a story carries `Fixes #N` so shipping closes the ledger entry atomically; (2) `/uplevel` Phase 0 seeds from `gh issue list --milestone Now`, never from a static doc list; (3) a monthly ~10-minute triage sweep closes-or-demotes stale issues; (4) new work enters as an issue or not at all. `docs/BACKLOG.md` is frozen as a historical archive with a banner.
+
+**Alternatives considered.** Keeping BACKLOG.md with stricter discipline (rejected: discipline is what failed — the fix must be structural, and `Fixes #N` closes issues mechanically); GitHub Projects v2 board (deferred: milestones + labels are CLI-scriptable and sufficient; a board view can be layered on later without migration).
+
+**Outcome.** 12 epics + 74 stories + 1 parked-register issue filed 2026-07-03 from the review (83 verified findings + 41 verified-open ledger items, duplicates merged), every body privacy-passed before creation.
