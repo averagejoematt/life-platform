@@ -9,6 +9,7 @@
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
+import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { sigil } from "/assets/js/sigils.js";
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
@@ -568,7 +569,7 @@ async function selectSection(key, preId, push = true) {
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
   const entries = entriesFor(s, await secFetch(s));
   if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = ""; return; }
-  listEl.innerHTML = entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
+  listEl.innerHTML = entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
   selectEntry(s, initId, true);
@@ -591,3 +592,17 @@ function wireTheme() {
 wireTheme();
 build();
 stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)
+
+// uplevel P5 — the same reader-keyed since-ribbon on the Story page (reads the
+// cockpit's stamp, never writes it). Injected under the header; self-hides.
+(function storySince() {
+  try {
+    const head = document.querySelector(".dx-head");
+    if (!head) return;
+    const rib = document.createElement("div");
+    rib.className = "home-since dx-since";
+    rib.hidden = true;
+    head.insertAdjacentElement("afterend", rib);
+    mountSinceRibbon(rib);
+  } catch (e) { /* enhancement only */ }
+})();
