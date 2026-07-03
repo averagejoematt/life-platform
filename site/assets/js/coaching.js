@@ -516,7 +516,9 @@ function renderAskBoard(read) {
             el.classList.add("cv-unavailable");
             el.textContent = `${BOARD_PERSONAS[pid].name} couldn't join this one.`;
           } else {
-            el.textContent = text;
+            // Personas emit light markdown bold — escape first, then render **…**
+            // as <strong> so emphasis reads as emphasis, not raw asterisks.
+            el.innerHTML = esc(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
           }
           el.classList.add("is-answered");
         });
@@ -679,6 +681,37 @@ function build() {
   const start = (window.__COACHING_START__ && BYKEY[window.__COACHING_START__]) ? window.__COACHING_START__ : "read";
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);
+  wireMachineryRibbon(tabsEl);
+}
+
+// ── The machinery ribbon (uplevel P3) — the elite AI machinery (live tensions +
+// the falsifiable track record) was one tab too deep; the landing view showed
+// none of it. One quiet line above the tabs, from data already computed:
+// a live disagreement when one exists, and the scorecard tally always (honest
+// about "none decided yet" — the count itself is the credibility signal).
+// Fail-quiet: no data → no ribbon.
+async function wireMachineryRibbon(tabsEl) {
+  try {
+    const [team, preds] = await Promise.all([tryJSON("/api/coach_team"), tryJSON("/api/predictions")]);
+    const bits = [];
+    const tension = ((team && team.tensions) || []).find((t) => t && (t.topic || t.summary));
+    if (tension) {
+      bits.push(`<button type="button" class="cm-bit cm-tension" data-sec="read"><span class="cm-k label">the board disagrees</span> ${esc(tension.topic || tension.summary)} →</button>`);
+    }
+    const o = (preds && preds.overall) || {};
+    if (o.total) {
+      const tally = o.decided
+        ? `${o.decided} decided · ${o.accuracy_pct != null ? o.accuracy_pct + "% held up" : ""}`
+        : "none decided yet — graded daily as windows close";
+      bits.push(`<button type="button" class="cm-bit" data-sec="scorecard"><span class="cm-k label">the record</span> ${esc(String(o.total))} falsifiable calls · ${esc(tally)} →</button>`);
+    }
+    if (!bits.length) return;
+    const rib = document.createElement("div");
+    rib.className = "cm-ribbon";
+    rib.innerHTML = bits.join("");
+    tabsEl.insertAdjacentElement("beforebegin", rib);
+    rib.querySelectorAll("[data-sec]").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
+  } catch (e) { /* ribbon is an enhancement — never block the page */ }
 }
 window.addEventListener("popstate", (e) => { const sec = (e.state && e.state.sec) || (location.pathname.match(/\/coaching\/([^/]+)\//) || [])[1] || "read"; selectSection(sec, e.state && e.state.id, false); });
 

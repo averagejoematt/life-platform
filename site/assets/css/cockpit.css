@@ -160,6 +160,14 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .predict-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
 @media (max-width: 420px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
 
+/* uplevel P3 — the verdict, staged: attributed + sentence-beats that reveal in
+   sequence. Gated on html.mo; reduced-motion (or no JS motion) reads all at once. */
+.vd-who { display: block; color: var(--ink-faint); margin-bottom: var(--sp-2); }
+@media (prefers-reduced-motion: no-preference) {
+  html.mo .vd-beat { opacity: 0; animation: vdIn 0.55s var(--ease-out) forwards; animation-delay: var(--vd-delay, 0s); }
+  @keyframes vdIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+
 /* Signature 1 — the measuring-rule spine */
 .spine {
   width: var(--spine-width); flex-shrink: 0; position: relative;
