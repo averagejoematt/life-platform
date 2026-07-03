@@ -855,12 +855,39 @@ function wireScrub() {
   inp.min = "2026-04-01";  // cycle 1 genesis — the first morning with a sheet
   const fromUrl = new URLSearchParams(location.search).get("date");
   if (fromUrl) inp.value = fromUrl;
-  inp.addEventListener("change", () => {
-    const d = inp.value;
+  const go = (d) => {
     const url = d && d < today ? `/now/?date=${d}` : "/now/";
     try { history.replaceState({}, "", url); } catch (e) {}
     if (d && d < today) load(d);
     else { inp.value = ""; load(); }
+  };
+  inp.addEventListener("change", () => go(inp.value));
+
+  // uplevel P4: the raw date input was the least-elite element on the flagship
+  // instrument. A day-slider over the experiment's real span (min = cycle-1
+  // genesis) makes time-travel a drag, not a form fill. Debounced so scrubbing
+  // doesn't hammer the API; the date input stays as the precise/accessible path.
+  const slider = document.querySelector("[data-scrub-days]");
+  const lab = document.querySelector("[data-scrub-label]");
+  if (!slider || !lab) return;
+  const t0 = Date.parse("2026-04-01T12:00:00");
+  const days = Math.max(1, Math.round((Date.parse(`${today}T12:00:00`) - t0) / 86400000));
+  slider.max = String(days);
+  const dOf = (i) => new Date(t0 + i * 86400000).toISOString().slice(0, 10);
+  const sync = () => {
+    const cur = fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : today;
+    const idx = Math.max(0, Math.min(days, Math.round((Date.parse(`${cur}T12:00:00`) - t0) / 86400000)));
+    slider.value = String(idx);
+    lab.textContent = cur === today ? "today" : cur;
+  };
+  sync();
+  slider.hidden = false; lab.hidden = false;
+  let deb = null;
+  slider.addEventListener("input", () => {
+    const d = dOf(Number(slider.value));
+    lab.textContent = d === today ? "today" : d;
+    clearTimeout(deb);
+    deb = setTimeout(() => { inp.value = d === today ? "" : d; go(d === today ? "" : d); }, 350);
   });
 }
 

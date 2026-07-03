@@ -121,7 +121,7 @@ export function weightTrendChart(readings, { goal = null, genesis = null, valueK
   // Interactive hover/tap: cpts from the RAW weigh-ins (the dots — what a reader
   // asks "what was that day?" about). x is date-positioned, so motion.js's
   // nearest-by-x hit-testing is what makes this land on the right weigh-in.
-  const cpts = pts.map((p) => ({ x: +(x(p.d) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: `${_shortDate(p.d)} · ${_r(p.v)} lb` }));
+  const cpts = pts.map((p) => ({ x: +(x(p.d) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), v: p.v, l: `${_shortDate(p.d)} · ${_r(p.v)} lb` }));
   return `<figure class="chart wt-chart" data-wt-min="${min.toFixed(2)}" data-wt-max="${max.toFixed(2)}" data-wt-h="${H}" data-wt-p="${P}">` +
     `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     gMark +
@@ -173,7 +173,14 @@ export function projectionCone(current, goal, ratePerWeek, { provisional = false
   const _d = (ms) => { const d = new Date(ms); return `${_MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
   const betFast = _d(dateAt(rFast, g)), betMid = _d(dateAt(rMid, g)), betSlow = _d(dateAt(rSlow, g));
   const summary = `Projection cone from ${Math.round(cur)} lb toward ${g} lb: at the current rate ~${betFast}, realistically ${betMid}–${betSlow} as the loss slows.`;
-  return `<figure class="chart pc-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}">` +
+  // Interactive scrub (uplevel P4): cpts along the MID path — hover/tap any point of
+  // the projection to read "when ≈ what weight". Honest labels: these are projected
+  // dates on the middle path, so each carries a ~ prefix. motion.js wires it free.
+  const cpts = mid.filter((_, i) => i % 2 === 0).map(([t, w]) => ({
+    x: +(x(t) / W).toFixed(4), y: +(y(w) / H).toFixed(4), v: +w.toFixed(1),
+    l: `~${_d(t0 + t * 86400000)} · ${Math.round(w)} lb (mid path)`,
+  }));
+  return `<figure class="chart pc-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<path class="pc-cone" d="${cone}"/>${marks}${goalLine}` +
     `<path class="pc-mid" d="${toPath(mid)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(0).toFixed(1)}" cy="${y(cur).toFixed(1)}" r="3.5"/></svg>` +
@@ -574,6 +581,6 @@ export function barChart(items, { valueKey = "value", labelKey = "label", height
   const rows = (items || []).map((it) => ({ l: it[labelKey], v: Number(it[valueKey]) })).filter((r) => Number.isFinite(r.v));
   if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">No data yet.</figcaption></figure>`;
   const max = Math.max(1, ...rows.map((r) => r.v));
-  const bars = rows.map((r) => `<div class="cbar"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
+  const bars = rows.map((r) => `<div class="cbar" title="${escAttr(r.l)}: ${escAttr(Math.round(r.v * 10) / 10)}"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
   return `<figure class="chart"><div class="cbars" style="--cbar-h:${height}px">${bars}</div>${label ? `<figcaption class="chart-cap label">${escAttr(label)}</figcaption>` : ""}</figure>`;
 }

@@ -49,6 +49,10 @@
       var px = (r.left - fr.left) + pt.x * r.width, py = (r.top - fr.top) + pt.y * r.height;
       dot.style.left = px + "px"; dot.style.top = py + "px"; dot.hidden = false;
       tip.textContent = pt.l; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.hidden = false;
+      // Cross-highlight hook (uplevel P4): fire-and-forget — a consumer (e.g. the
+      // weight silhouette) can follow the focused point; a listener error must
+      // never break the chart itself.
+      try { svg.dispatchEvent(new CustomEvent("chart:point", { bubbles: true, detail: { label: pt.l, v: pt.v } })); } catch (e) {}
     }
     function hide() { clearTimeout(hideT); dot.hidden = true; tip.hidden = true; }
     svg.addEventListener("pointermove", function (e) { clearTimeout(hideT); show(e.clientX); });
