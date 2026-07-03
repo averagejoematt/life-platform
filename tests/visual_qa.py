@@ -136,6 +136,25 @@ PAGES = [
         "wait_for": "[data-readout]",
         "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "protocols readout rendered"}],
     },
+    # S2 protocols uplevel (2026-07): the three upleveled topic pages get their own defs.
+    {
+        "path": "/protocols/experiments/",
+        "name": "Protocols · experiments",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "experiments readout rendered"}],
+    },
+    {
+        "path": "/protocols/challenges/",
+        "name": "Protocols · challenges",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "challenges readout rendered"}],
+    },
+    {
+        "path": "/protocols/supplements/",
+        "name": "Protocols · supplements",
+        "wait_for": "[data-readout]",
+        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "supplements readout rendered"}],
+    },
     {
         "path": "/method/character/",
         "name": "Method · character explainer",

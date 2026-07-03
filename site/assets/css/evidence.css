@@ -627,3 +627,34 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .ch-bgrid { grid-template-columns: repeat(2, 1fr); }
   .ch-tt [data-ch-scrub-label] { min-width: 7rem; }
 }
+
+/* ── Protocols uplevel (S2, 2026-07) — experiments / challenges / supplements. */
+/* Progress + compliance rows on running experiment cards. */
+.pr-row { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-2); }
+.pr-bar { position: relative; flex: 1; max-width: 16rem; height: 7px; background: var(--surface-sunken, var(--surface)); border: var(--border-hair); border-radius: 4px; overflow: hidden; }
+.pr-bar i { position: absolute; inset: 0 auto 0 0; background: var(--ember); border-radius: 4px; }
+.pr-bar--ink i { background: var(--ink-faint); }
+.pr-row .label { color: var(--ink-faint); }
+/* The completed-run reflection — the second (human) voice. */
+.rd-reflect { margin-top: var(--sp-2); font-family: var(--font-serif); font-style: italic; font-size: var(--fs-body); color: var(--ink-muted); line-height: 1.5; }
+/* The challenge check-in grid — one cell per day of the run. */
+.cg { display: flex; flex-wrap: wrap; gap: 3px; margin-top: var(--sp-2); }
+.cg-cell { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--rule); display: inline-block; }
+.cg-cell.is-done { background: var(--ember); border-color: var(--ember); }
+.cg-cell.is-miss { background: var(--ink-faint); opacity: 0.5; border-color: transparent; }
+/* Challenge catalog: category icon beside the name. */
+.rd-cardname .ch-ric { display: inline-block; width: 16px; height: 16px; vertical-align: -2px; margin-right: 6px; color: var(--ink-faint); }
+.rd-cardname .ch-ric .ico { width: 16px; height: 16px; display: block; }
+/* Supplements: the adherence meter + the disclosure. */
+.supp-adh .supp-evlabel { color: var(--ink-muted); }
+.supp-adh-i { background: var(--ink-muted); }
+.supp-more { margin-top: var(--sp-3); border-top: var(--border-hair); padding-top: var(--sp-2); }
+.supp-more summary { cursor: pointer; color: var(--ink-faint); }
+.supp-more summary:hover { color: var(--ember); }
+.supp-sci { margin: var(--sp-2) 0 0; padding-left: 1.1em; font-size: var(--fs-small); color: var(--ink-muted); display: grid; gap: var(--sp-1); }
+.supp-srchead { display: block; margin-top: var(--sp-3); color: var(--ink-faint); }
+.supp-srchead.supp-src-against { color: var(--ink-muted); }
+.supp-srcs { margin: var(--sp-1) 0 0; padding-left: 1.1em; font-size: var(--fs-small); display: grid; gap: 3px; }
+.supp-srcs a { color: var(--ink-muted); }
+.supp-srcs a:hover { color: var(--ember); }
+.supp-snp { margin-top: var(--sp-2); color: var(--ink-faint); }
