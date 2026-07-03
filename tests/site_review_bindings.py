@@ -303,6 +303,40 @@ PAGE_BINDINGS.append(
         "endpoints": [],
     }
 )
+# S2 protocols uplevel (2026-07): the three upleveled topic pages joined visual_qa.PAGES.
+PAGE_BINDINGS.append(
+    {
+        "path": "/protocols/experiments/",
+        "name": "Protocols · experiments",
+        "door": "protocols",
+        "narrative_order": 83,
+        "story_intent": "the N=1 instrument — the program arc, running progress, effect-size receipts",
+        "endpoints": [
+            {"url": "/api/experiments", "role": "primary", "metrics": []},
+            {"url": "/api/experiment_synthesis", "role": "secondary", "metrics": []},
+        ],
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/protocols/challenges/",
+        "name": "Protocols · challenges",
+        "door": "protocols",
+        "narrative_order": 84,
+        "story_intent": "time-boxed challenges — the check-in grid, evidence, XP earned",
+        "endpoints": [{"url": "/api/challenges", "role": "primary", "metrics": []}],
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/protocols/supplements/",
+        "name": "Protocols · supplements",
+        "door": "protocols",
+        "narrative_order": 85,
+        "story_intent": "what's taken vs what's swallowed — evidence, adherence, the dissent",
+        "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/mind/",
