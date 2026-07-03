@@ -167,3 +167,46 @@ export function tierEmblem(tier, level, { cls = "" } = {}) {
     : `role="img" aria-label="${escAttr(`Level ${lvl} · ${tier || "Foundation"} tier emblem`)}"`;
   return `<svg class="sigil emblem${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 110 120" ${a11y}>${body}</svg>`;
 }
+
+// ── The badge mark — a deterministic geometric mark per achievement (character
+// sheet P1.3). Same machinery as the coach sigils (FNV-1a → mulberry32): same
+// badge id → byte-identical mark, forever, and any FUTURE badge gets a mark for
+// free — self-perpetuating, no asset to draw (§8.2/§8.5). Instrument vocabulary
+// only: ring or hexagon frame, radial ticks, an inner polygon, a node. Earned
+// state is the host's concern (CSS mutes the unearned wall).
+export function badgeMark(id, { earned = false, cls = "" } = {}) {
+  const rng = mulberry32(fnv1a(String(id || "badge")));
+  const C = 50;
+  const S = `fill="none" stroke="currentColor" pathLength="1" vector-effect="non-scaling-stroke"`;
+  // frame: circle | hexagon | square-diamond — hash-picked
+  const frame = Math.floor(rng() * 3);
+  let out = "";
+  if (frame === 0) {
+    out += `<circle class="sigil-ring" cx="${C}" cy="${C}" r="40" ${S} stroke-width="1.7"/>`;
+  } else if (frame === 1) {
+    const hex = Array.from({ length: 6 }, (_, i) => pt(C, C, 40, i * 60 - 90).join(",")).join(" ");
+    out += `<polygon class="sigil-ring" points="${hex}" ${S} stroke-width="1.7"/>`;
+  } else {
+    const dia = [0, 90, 180, 270].map((d) => pt(C, C, 42, d - 45).join(",")).join(" ");
+    out += `<polygon class="sigil-ring" points="${dia}" ${S} stroke-width="1.7"/>`;
+  }
+  // radial ticks — count + phase from the hash
+  const n = 4 + Math.floor(rng() * 5);
+  const phase = rng() * 360;
+  for (let i = 0; i < n; i++) {
+    const a = phase + (i * 360) / n;
+    const [x1, y1] = pt(C, C, 30, a);
+    const [x2, y2] = pt(C, C, 36, a);
+    out += `<line class="sigil-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" pathLength="1" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+  }
+  // inner motif: a small polygon (3-6 sides) rotated by the hash
+  const sides = 3 + Math.floor(rng() * 4);
+  const rot = rng() * 360;
+  const poly = Array.from({ length: sides }, (_, i) => pt(C, C, 16, rot + (i * 360) / sides).join(",")).join(" ");
+  out += `<polygon class="sigil-tick" points="${poly}" ${S} stroke-width="1.4"/>`;
+  // the node — filled when earned, the mark's "lit" state
+  out += earned
+    ? `<circle class="sigil-node" cx="${C}" cy="${C}" r="4.5" fill="currentColor"/>`
+    : `<circle class="sigil-ring" cx="${C}" cy="${C}" r="4.5" ${S} stroke-width="1.4"/>`;
+  return `<svg class="sigil badge-mark${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 100 100" aria-hidden="true" focusable="false">${out}</svg>`;
+}
