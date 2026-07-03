@@ -403,19 +403,13 @@ def check_subscribe_flow(canary_ts: str) -> tuple[bool, str, float]:
         if status_attr != "pending_confirmation":
             return False, f"subscribe record status='{status_attr}' (expected pending_confirmation)", latency
 
-        # Cleanup: tombstone the canary record (IAM blocks DeleteItem)
+        # Cleanup: delete the canary record — the role has DeleteItem.
+        # (The comment "IAM blocks DeleteItem" was wrong; the role has it since day 1.
+        # The previous update_item approach was failing because UpdateItem is NOT granted.)
         try:
-            ddb_client.update_item(
+            ddb_client.delete_item(
                 TableName=TABLE_NAME,
                 Key={"pk": {"S": "USER#matthew#SOURCE#subscribers"}, "sk": {"S": sk}},
-                UpdateExpression="SET #s = :v, tombstone = :tomb, tombstoned_at = :ts, tombstoned_reason = :r",
-                ExpressionAttributeNames={"#s": "status"},
-                ExpressionAttributeValues={
-                    ":v": {"S": "canary"},
-                    ":tomb": {"BOOL": True},
-                    ":ts": {"S": canary_ts},
-                    ":r": {"S": "canary_subscribe_check"},
-                },
             )
         except Exception:
             pass  # cleanup failure is non-fatal for the canary itself
