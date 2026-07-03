@@ -260,6 +260,9 @@
     "lambdas/operational/coherence_sentinel_lambda.py": {
       "function": "life-platform-coherence-sentinel"
     },
+    "lambdas/operational/ai_quality_canary_lambda.py": {
+      "function": "life-platform-ai-quality-canary"
+    },
     "lambdas/operational/delete_user_data_lambda.py": {
       "function": "life-platform-delete-user-data"
     },
