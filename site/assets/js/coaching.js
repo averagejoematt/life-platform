@@ -166,7 +166,7 @@ async function renderReadToday(read) {
   }
   if (team) h += tensionsHTML(team);
   // The stacked all-coach digest — each coach's LIVE read (position_summary), domain-labeled, deep-linking into By Coach.
-  const coaches = (d.coaches || []).filter((c) => c.position_summary);
+  const coaches = (d.coaches || []).filter((c) => String(c.position_summary || "").trim());
   if (coaches.length) {
     h += `<section class="read-digest"><p class="dx-kicker label">each coach's read · click to go deeper</p><ul class="rd-list">`;
     for (const c of coaches) {
@@ -175,10 +175,17 @@ async function renderReadToday(read) {
         `<span class="rd-say">${esc(c.position_summary)}</span></button></li>`;
     }
     h += `</ul></section>`;
+  } else {
+    // Honest empty — never a promising heading over dead air. The reads regenerate
+    // with the daily sync; a transient gap is stated, not hidden.
+    h += `<section class="read-digest"><p class="dx-kicker label">each coach's read</p>` +
+      `<p class="dx-prose">The per-coach reads refresh with the next daily sync — the full roster and stances live under <button type="button" class="dx-readfull" data-goto="by-coach">By Coach →</button></p></section>`;
   }
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   read.innerHTML = h;
   read.querySelectorAll(".rd-card").forEach((li) => li.querySelector(".rd-btn").addEventListener("click", () => selectSection("by-coach", li.dataset.coach)));
+  const goBtn = read.querySelector("[data-goto]");
+  if (goBtn) goBtn.addEventListener("click", () => selectSection(goBtn.dataset.goto));
   enhanceCoachNames(read);
 }
 async function renderReadWeek(read) {

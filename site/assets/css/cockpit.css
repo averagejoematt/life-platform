@@ -312,6 +312,12 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .rd-comp-track { height: 6px; background: var(--surface-2, color-mix(in oklch, var(--ink) 10%, transparent)); border-radius: 3px; overflow: hidden; }
 .rd-comp-fill { display: block; height: 100%; background: var(--ember); }
 .rd-comp-v { font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink-muted); text-align: right; }
+/* A computed zero is real input, shown honestly — but de-emphasized (hairline
+   track, faint value) so twin dead bars don't read as broken. One shared caption
+   states what a zero means. */
+.rd-comp-zero .rd-comp-track { height: 2px; opacity: 0.6; }
+.rd-comp-zero .rd-comp-v { color: var(--ink-faint); }
+.rd-comp-note { margin-top: 2px; color: var(--ink-faint); opacity: 0.85; }
 
 /* "today — where you stand" band header, above the pillar domains. */
 .cap-today { margin-top: var(--sp-5); margin-bottom: 0; }

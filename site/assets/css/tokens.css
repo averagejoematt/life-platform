@@ -1027,10 +1027,15 @@ a.vg-lit:hover { background: var(--ember-wash); }
    content shows — motion fails OPEN, never hides content.
    ════════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: no-preference) {
+  /* NB: .rd-card was removed from this reveal set (2026-07-02). Those are the
+     per-coach read cards on Coaching's landing tab (+ protocol cards), injected on
+     every tab render — opacity-gating them left the flagship AI digest reading as
+     DEAD AIR in any non-scrolling context (the heading isn't gated; the cards were).
+     Content over entrance: they paint immediately. */
   html.mo .hero, html.mo .page-hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat,
   html.mo .loop, html.mo .rd-sec, html.mo .two-voice, html.mo .coach-daily, html.mo .coach-progress,
   html.mo .coach-report, html.mo .coach-stance, html.mo .team-lead, html.mo .team-focus,
-  html.mo .team-tension, html.mo .team-huddle, html.mo .supp, html.mo .rd-card, html.mo .cap-card,
+  html.mo .team-tension, html.mo .team-huddle, html.mo .supp, html.mo .cap-card,
   html.mo .vr-row, html.mo .figs, html.mo .ml-ladder {
     opacity: 0; transform: translateY(16px);
     transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);

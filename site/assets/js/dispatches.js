@@ -317,10 +317,20 @@ async function renderRead(s, id) {
     const lg = await tryJSON("/api/panel_ledger");
     let ledgerHTML = "";
     if (lg && (lg.ledger || []).length) {
+      // One bet per week by design — a historical re-publish once appended a
+      // paraphrased duplicate (the wk1 double). Keep the NEWEST entry per week;
+      // the stored ledger is fixed too, this is the render-side belt-and-braces.
+      const _seen = new Set();
+      const ledger = [...lg.ledger].reverse().filter((b) => {
+        const k = String(b.week);
+        if (_seen.has(k)) return false;
+        _seen.add(k);
+        return true;
+      }).reverse();
       const r = lg.record || {};
       ledgerHTML =
         `<section class="panel-ledger"><p class="dx-kicker label">the bets · ${r.won || 0} won · ${r.lost || 0} lost${r.open ? ` · ${r.open} open` : ""}</p>` +
-        `<ul class="pl-list">${lg.ledger.slice(0, 12).map((b) => `<li class="pl-${esc(b.outcome)}"><span class="pl-tag label">wk${esc(b.week)} · ${esc(b.outcome)}</span> ${esc(b.bet)}</li>`).join("")}</ul>` +
+        `<ul class="pl-list">${ledger.slice(0, 12).map((b) => `<li class="pl-${esc(b.outcome)}"><span class="pl-tag label">wk${esc(b.week)} · ${esc(b.outcome)}</span> ${esc(b.bet)}</li>`).join("")}</ul>` +
         (lg.disclosure ? `<p class="correlative">${esc(lg.disclosure)}</p>` : "") +
         `</section>`;
     }
@@ -466,12 +476,18 @@ async function renderRead(s, id) {
   const all = entriesFor(s, await secFetch(s));
   const ent = all.find((x) => String(x.id) === String(id));
   if (!ent) { read.innerHTML = `<p class="dx-prose">Pick an entry to read it here.</p>`; return; }
+  // Honest read-time from the real word count (~220 wpm) — replaces nothing, adds truth.
+  const readMins = ent.word_count ? Math.max(1, Math.round(Number(ent.word_count) / 220)) : null;
   const readmore = ent.url
-    ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
-    : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words</p>` : "");
+    ? `<p class="dx-readmore"><button type="button" class="dx-readfull" data-url="${esc(ent.url)}">Read the full piece${ent.word_count ? ` (${esc(ent.word_count)} words · ~${readMins} min)` : ""} →</button></p><div class="dx-fulltext" data-fulltext hidden></div>`
+    : (ent.word_count ? `<p class="dx-foot label">${esc(ent.word_count)} words · ~${readMins} min</p>` : "");
   const episode = s.key === "chronicle" ? await podcastEpisode(ent) : null;
+  // Duration: trust the real duration_sec first; the byte estimate must be WAV-aware
+  // (24kHz·16-bit·mono ≈ 48000 B/s) — the old MP3-only guess labeled a 12.9 MB WAV
+  // "~102 min". Mirrors the correct logic at the podcast renderer above.
+  const _epSecs = episode ? (episode.duration_sec || Math.round((episode.bytes || 0) / (/\.wav(\?|$)/i.test(episode.url || "") ? 48000 : 2097))) : 0;
   const listen = episode
-    ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round((episode.bytes || 0) / 1024 / 1024 / 0.12))} min)</span></div>`
+    ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round(_epSecs / 60))} min)</span></div>`
     : "";
   const art = ent.image_url
     ? `<figure class="editorial-img"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`
