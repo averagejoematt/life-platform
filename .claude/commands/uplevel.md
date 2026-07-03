@@ -33,10 +33,11 @@ Fan out a multi-agent survey (Workflow tool; ~6–8 agents, one per lens):
   Matthew-daily-return, friends/family, QS skeptic). Where does the loop break? What's the first
   moment of boredom or confusion? What would make them come back tomorrow?
 
-Seeds the agents may build on but must NOT limit themselves to: MCP tool bulk-pruning (~11 of
-136 used), serial phases 2–4 + SS tail (SS-08/09/11), reading/Mind pillar merge + Phase-E
-backlog, coach-fabrication grounding frontier, the deferred doc-truth batch. Fresh discovery
-outranks backlog replay.
+Seeds come from the LIVE backlog, not a static list (ADR-099 — GitHub issues are the single
+source of truth for forward work): run `gh issue list --label type:story --milestone Now
+--state open --limit 30` and treat the top-ranked open stories as candidate seeds. Agents may
+build on them but must NOT limit themselves to them — fresh discovery outranks backlog replay.
+When a session ships a story, the PR carries `Fixes #N`.
 
 **Then verify adversarially:** historical false-positive rate for survey findings is ~50%.
 Each candidate must be confirmed against actual code/live state (a second agent or your own
