@@ -10,7 +10,8 @@
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
-import { sigil } from "/assets/js/sigils.js";
+import { sigil, instrumentMark } from "/assets/js/sigils.js";
+import { icon } from "/assets/js/icons.js";
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -22,8 +23,8 @@ import { sigil } from "/assets/js/sigils.js";
 // Matt's OWN blog: a separate, Matt-authored source (/journal/blog.json), honestly
 // empty until he writes one — never the AI-written chronicle content.
 const SECTIONS = [
-  { key: "chronicle", label: "Chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/journal/posts.json" },
-  { key: "panel", label: "Podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
+  { key: "chronicle", label: "Chronicle", icon: "chronicle", kicker: "written weekly by Elena Voss", kind: "posts", url: "/journal/posts.json" },
+  { key: "panel", label: "Podcast", icon: "podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
   { key: "journal", label: "In my own words", kicker: "Matt's own blog", kind: "posts", url: "/journal/blog.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
@@ -449,7 +450,8 @@ async function renderRead(s, id) {
     } else {
       body = `<p class="dx-prose">No milestones logged yet — the timeline fills as the score climbs. Day 1 starts the clock.</p>`;
     }
-    read.innerHTML = `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2>` +
+    read.innerHTML = `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>` +
+      `<p class="dx-kicker label">${esc(s.kicker)}</p><h2 class="dx-title">The journey so far</h2>` +
       `<p class="dx-prose">Walk back through the arc — milestones, life events, and <strong>character level-ups</strong> — and jump into the chronicle week each moment was written. <a href="/method/character/">What's a character level?</a></p>` +
       recap + quiet + body;
     return;
@@ -577,7 +579,7 @@ async function selectSection(key, preId, push = true) {
 
 function build() {
   const tabsEl = $("[data-dx-tabs]"); if (!tabsEl) return;
-  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}" aria-pressed="false">${esc(s.label)}</button>`).join("");
+  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}" aria-pressed="false">${s.icon ? icon(s.icon, { cls: "tab-ico" }) : ""}${esc(s.label)}</button>`).join("");
   tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
   const start = (window.__DISPATCH_START__ && BYKEY[window.__DISPATCH_START__]) ? window.__DISPATCH_START__ : "chronicle";
   const hashId = (location.hash || "").replace("#", "") || undefined;
