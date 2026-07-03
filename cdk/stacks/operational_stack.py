@@ -456,6 +456,28 @@ class OperationalStack(Stack):
             alerts_topic=None,
         )
 
+        # ── AI Quality Canary (#385) — standing eyes on the two public AI
+        # endpoints. Invokes site-api-ai directly (no reader rate-limit spend),
+        # runs pre-registered probes with deterministic quality checks +
+        # regression cases for the 2026-07 review defects, emits LifePlatform/
+        # AICanary (→ digest alarm + heartbeat), persists findings to
+        # ai-canary-log/. Weekly + read-only + idempotent.
+        create_platform_lambda(
+            self,
+            "AiQualityCanary",
+            function_name="life-platform-ai-quality-canary",
+            source_file="lambdas/operational/ai_quality_canary_lambda.py",
+            handler="operational.ai_quality_canary_lambda.lambda_handler",
+            schedule="cron(20 16 ? * MON *)",  # weekly, Mon 09:20 AM PT, UTC-fixed
+            timeout_seconds=120,
+            memory_mb=256,
+            custom_policies=rp.operational_ai_quality_canary(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=None,
+        )
+
         # ── 9. Insight Email Parser — SES inbound trigger (previously unmanaged)
         insight_parser = create_platform_lambda(
             self,
