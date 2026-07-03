@@ -93,6 +93,15 @@
 
   <!-- ── THE ARC: scrollytelling waveform with honest down-beats ──────────── -->
   <main id="arc" class="arc">
+    <!-- Returnability strip (uplevel P5): what moved since YOUR last visit (keyed to the
+         reader's own localStorage stamp — the cockpit owns the stamp; this only reads) +
+         anything the correlation engine newly unlocked this month. Self-hides entirely
+         for first-time visitors and quiet windows — honest silence, never an empty box. -->
+    <section class="beat beat-since" data-home-since-wrap hidden aria-label="What's new">
+      <div class="home-since" data-home-since hidden></div>
+      <p class="nu-line label" data-home-unlocked hidden></p>
+    </section>
+
     <!-- The loop: what this site IS, in one screen — the through-line every door serves. -->
     <section class="beat beat-loop" aria-label="What this is">
       <p class="beat-kicker label">what this is · the loop</p>

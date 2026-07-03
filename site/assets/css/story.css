@@ -560,6 +560,17 @@ body { overflow-x: hidden; }
 .askboard-out { margin: 0; min-height: 1.2em; color: var(--ink-muted); }
 @media (max-width: 440px) { .askboard-email { flex-basis: 100%; } .askboard-btn { width: 100%; } }
 
+/* ── Returnability (uplevel P5) — the since-strip + NEW badges. Quiet by design:
+   a single mono line, ember only on the section key; hides entirely when silent. ── */
+.beat-since { padding: var(--sp-4) 0; }
+.sv-line { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); line-height: 1.7; max-width: none; }
+.sv-k { color: var(--ember); margin-right: var(--sp-2); }
+.sv-bit .label { color: var(--ink-faint); margin-right: 4px; }
+.sv-more { color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); white-space: nowrap; }
+.nu-line { margin-top: var(--sp-2); color: var(--ink-faint); }
+.dx-since { margin-top: var(--sp-4); }
+.dx-new { color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 0 5px; margin-left: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.85em; vertical-align: 1px; }
+
 /* ── The machinery ribbon (uplevel P3) — one quiet line above the coaching tabs
    surfacing the live disagreement + the falsifiable record. Ember only when a
    tension is genuinely live (earned); the record chip stays ink. ── */
