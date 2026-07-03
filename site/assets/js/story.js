@@ -285,7 +285,7 @@ function dxEntries(src, data) {
   if (!data) return [];
   if (src === "labnotes") return (data.entries || []).map((e) => { const lbl = e.week_label || `Week ${e.week}`; return ({ id: e.week, label: lbl, title: `${lbl} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "", meta: e.ai_tone }); });
   const posts = data.posts || data.entries || (Array.isArray(data) ? data : []);
-  return posts.map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count }); });
+  return posts.map((p) => { const lbl = p.label || `Week ${p.week}`; return ({ id: p.week, label: lbl, title: p.title || lbl, date: p.date, meta: p.stats_line, excerpt: p.excerpt, word_count: p.word_count, image_url: p.image_url || "", image_credit: p.image_credit || "" }); });
 }
 
 async function dxRenderRead(src, id) {
@@ -354,8 +354,14 @@ async function dxTeaser() {
         const days = Math.max(0, Math.round((Date.now() - Date.parse(latest.date)) / 86400000));
         ago = days >= 2 ? ` · ${days} days ago` : days === 1 ? " · yesterday" : " · today";
       }
+      // Editorial cover (visual uplevel P3): the same duotone treatment the Story
+      // reader uses — fills the teaser's empty left column when a cover exists.
+      const cover = latest.image_url
+        ? `<figure class="editorial-img editorial-cover"><img class="img-duotone" src="${esc(latest.image_url)}" alt="" loading="lazy">${latest.image_credit ? `<figcaption class="img-credit label">${esc(latest.image_credit)}</figcaption>` : ""}</figure>`
+        : "";
       read.innerHTML =
         `<p class="dx-kicker label">latest from the chronicle · Elena Voss${latest.date ? ` · ${esc(latest.date)}${ago}` : ""}</p>` +
+        cover +
         `<h3 class="dx-title">${esc(latest.title || latest.label || "")}</h3>` +
         (latest.excerpt ? `<p class="dx-prose">${esc(String(latest.excerpt).slice(0, 240))}…</p>` : "") +
         `<p class="dx-foot label">The chronicle, journal &amp; podcast read in full in <a href="/story/">Story</a>; the AI lab notes live in <a href="/coaching/">Coaching</a>. This is just the latest beat.</p>`;

@@ -68,7 +68,14 @@ class EmailStack(Stack):
         # (slo-daily-brief-delivery, life-platform-daily-brief-errors,
         #  daily-brief-no-invocations-24h, daily-brief-duration-high).
         # Suppressed here to avoid ingestion-error-daily-brief duplicate. COST-A 2026-03-10.
-        _email_env = {"ANTHROPIC_SECRET": "life-platform/ai-keys"}
+        _email_env = {
+            "ANTHROPIC_SECRET": "life-platform/ai-keys",
+            # Editorial cover imagery (visual uplevel P3, 2026-07-03): the durable ON
+            # switch for editorial_image.py — chronicle + podcast covers. Must live here
+            # (a CLI env-set is wiped by the next stack deploy). Fail-soft by design;
+            # flip to "off" + redeploy to roll back.
+            "EDITORIAL_IMAGES": "on",
+        }
 
         # daily-brief timeout bumped 300s → 900s (Lambda max) on 2026-05-03 v6.8.10.
         # Pre-existing chronic timeout: 6 coach V2 narratives + IC-3 + ensemble work
