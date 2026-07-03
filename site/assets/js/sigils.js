@@ -65,9 +65,12 @@ export function sigil(coach, { title, cls = "" } = {}) {
   const innerR = 27;
   const SW = `stroke-width="1.7" vector-effect="non-scaling-stroke"`;
 
-  let body = `<circle class="sigil-ring" cx="${C}" cy="${C}" r="${outerR}" fill="none" stroke="currentColor" ${SW}/>`;
+  // pathLength="1" normalizes each stroke so the CSS draw-in (tokens.css §13,
+  // sigilDraw) can animate dashoffset 1→0 without measuring — self-contained,
+  // runs on every injection, fail-open (reduced-motion media query skips it).
+  let body = `<circle class="sigil-ring" cx="${C}" cy="${C}" r="${outerR}" fill="none" stroke="currentColor" pathLength="1" ${SW}/>`;
   if (rings === 2) {
-    body += `<circle class="sigil-ring" cx="${C}" cy="${C}" r="${innerR}" fill="none" stroke="currentColor" ${SW}/>`;
+    body += `<circle class="sigil-ring" cx="${C}" cy="${C}" r="${innerR}" fill="none" stroke="currentColor" pathLength="1" ${SW}/>`;
   }
 
   // Radial measuring-ticks just inside the outer ring.
@@ -75,7 +78,7 @@ export function sigil(coach, { title, cls = "" } = {}) {
     const a = rot + (360 / tickN) * i;
     const [x1, y1] = pt(C, C, outerR - 5, a);
     const [x2, y2] = pt(C, C, outerR, a);
-    body += `<line class="sigil-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" ${SW}/>`;
+    body += `<line class="sigil-tick" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="currentColor" pathLength="1" ${SW}/>`;
   }
 
   // Orbital nodes on a mid radius, at seeded angles, with a spoke to centre.

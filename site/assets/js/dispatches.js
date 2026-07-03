@@ -101,7 +101,7 @@ const ABOUT = `
 
 function entriesFor(s, data) {
   if (!data) return [];
-  if (s.kind === "coaches") return [{ id: "team", title: "🧭 My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.headline_stat || c.domain || "" })));
+  if (s.kind === "coaches") return [{ id: "team", title: "My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.headline_stat || c.domain || "" })));
   if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, guest_id: e.guest_id, guest_name: e.guest_name, excerpt: e.excerpt, image_url: e.image_url || "", image_credit: e.image_credit || "" }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "posts") {

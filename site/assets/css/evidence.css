@@ -233,7 +233,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 @media (min-width: 560px) { .coach-grid { grid-template-columns: 1fr 1fr; } }
 @media (min-width: 880px) { .coach-grid { grid-template-columns: 1fr 1fr 1fr; } }
 .coach { display: flex; align-items: center; gap: var(--sp-3); border: var(--border-hair); border-left: 2px solid var(--coach, var(--ember)); border-radius: var(--radius); background: var(--surface); padding: var(--sp-3) var(--sp-4); }
-.coach-badge { flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ember)); border: 1px solid var(--coach, var(--ember-line)); background: color-mix(in oklch, var(--coach, var(--ember)) 10%, transparent); }
+.coach-badge { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ember)); border: 1px solid var(--coach, var(--ember-line)); background: color-mix(in oklch, var(--coach, var(--ember)) 10%, transparent); }
 .coach-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
 .coach-title { color: var(--ink-faint); text-transform: none; letter-spacing: 0; margin-top: 2px; }
 /* clickable expert picker + the selected coach's read */
