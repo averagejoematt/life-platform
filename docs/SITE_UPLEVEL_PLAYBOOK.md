@@ -51,6 +51,12 @@ moment someone actually looked at it.
 - **Build scripts are run manually**, then the generated HTML is committed. `sync_site_to_s3.sh`
   only auto-runs the RSS build. After editing a `v4_build_*.py`, re-run it and commit the output.
 - **The pre-commit hook auto-bumps doc dates** (`sync_doc_metadata.py`) — cosmetic, expect it.
+- **Assets are hashed across the FULL module graph, not just HTML** (ADR-098). `deploy/hash_site_assets.py`
+  hashes every CSS/JS file leaves-first and rewrites HTML refs, intra-module `import`s, and CSS. If you
+  ever get a "frozen page" report (static shell renders, JS-populated content blank, hard-reload fixes it,
+  reproduces after a browser restart), the tell is a **stale intra-module import / dynamic `import()` path** —
+  an ES module graph fails atomically when one dependency is a cache-skewed version. Don't reach for the SW
+  or an HTML ref first. (Memory: `reference_asset_hashing_full_graph`; INCIDENT_LOG 2026-07-03.)
 
 ## Verification checklist (per change)
 - Python: `py_compile` + `black --check --line-length 140` (the format gate **reds main** otherwise) + `flake8`.
