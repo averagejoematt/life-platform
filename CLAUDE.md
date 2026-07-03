@@ -18,7 +18,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - **The forward-work backlog is GitHub Issues (ADR-099)** — epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones; seed sessions from `gh issue list --label type:story --milestone Now --state open`; a shipping PR carries `Fixes #N`. `docs/BACKLOG.md` is a frozen archive.
-- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-099), why things are the way they are
+- `docs/DECISIONS.md` — ADRs (ADR-001 through ADR-103), why things are the way they are; **ADR-103 = the complexity-posture ledger** (load-bearing / portfolio / retire-candidate per subsystem — consult it before adding or removing machinery)
 - `docs/PHASE_TAXONOMY.md` — experiment-restart data semantics (ADR-077): the 4-class registry for what resets vs. what's kept
 - `docs/REMEDIATION_TAXONOMY.md` — classifier rubric for the self-healing agent (auto-fix-safe / fix-via-pr / needs-human / stale)
 - `docs/DATA_GOVERNANCE.md` — PII classification + retention policy (added v7.2.0)

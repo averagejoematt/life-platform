@@ -444,6 +444,7 @@ scaling; N-05 V2 audit drift (~2026-08-17).
 - **Gate:** none — decision-only, no deploy risk.
 
 ### ER-08 — DynamoDB-vs-analytical-store decision ADR · Tier 4 (defer-leaning) · Effort S + optional spike
+- **➡️ DECIDED as ADR-102 (2026-07-03)** — and this entry's premise was CORRECTED there: correlation reads are bounded paginated queries (the codebase has exactly one `.scan()`, in data deletion), and two GSIs now exist (ADR-097). The honest costs are query expressiveness + single-tenant keys, not scan expense.
 - **Why:** single-table DDB (no GSIs) is an awkward fit for analytical/time-series/cross-source data and the big MCP query layer partly compensates; the choice may be right but is implicit. **Do NOT migrate.**
 - **Action:** ADR stating why DDB, what it costs in query expressiveness, and the revisit trigger (e.g. DuckDB-over-Parquet-in-S3 as a read-side layer *alongside* DDB if ad-hoc analytics are needed); optional `spikes/er08_duckdb_readside/` re-implementing one correlation query to size the alternative.
 - **Acceptance:** ADR makes the implicit explicit with an honest cost statement + concrete trigger; any spike stays in `spikes/`, ships nothing.
