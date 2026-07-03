@@ -268,11 +268,16 @@ def _synthesize_dialogue(turns: list) -> bytes:
 
 
 def _episode_exists(week) -> bool:
-    try:
-        s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.mp3")
-        return True
-    except Exception:
-        return False
+    # The weekly publisher writes wk{n}.wav; wk0 (the legacy intro) is .mp3. Check
+    # both so "already published" is never a false negative that re-synthesizes a
+    # week (the .mp3-only check silently missed every .wav episode).
+    for ext in ("wav", "mp3"):
+        try:
+            s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}")
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def _xml(s: str) -> str:
@@ -281,6 +286,34 @@ def _xml(s: str) -> str:
 
 def _rfc822(date_str: str) -> str:
     return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).strftime("%a, %d %b %Y 16:00:00 GMT")
+
+
+# Podcast-standard feed metadata (#374). The feed is served at the stable viewer
+# URL {SITE}/panelcast/feed.xml (S3 key generated/panelcast/feed.xml → CloudFront
+# S3GeneratedOrigin). Cover art must be a square 1400–3000px image that resolves,
+# or Apple/Spotify reject the feed — generated once to {PREFIX}/cover.jpg.
+FEED_URL = f"{SITE}/panelcast/feed.xml"
+COVER_URL = os.environ.get("PANELCAST_COVER_URL", f"{SITE}/panelcast/cover.jpg")
+OWNER_NAME = "The Measured Life"
+OWNER_EMAIL = os.environ.get("PANELCAST_OWNER_EMAIL", SENDER)
+FEED_CATEGORY = "Health & Fitness"
+
+
+def _hms(seconds) -> str:
+    """iTunes duration as HH:MM:SS (the widest-compatible form)."""
+    s = max(0, int(seconds or 0))
+    return f"{s // 3600:d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
+def _enclosure_type(url: str) -> str:
+    """MIME from the audio extension — the episodes are .wav (wk1+) or .mp3 (wk0);
+    a hardcoded audio/mpeg on a .wav enclosure is a validator failure."""
+    u = (url or "").lower()
+    if u.endswith(".mp3"):
+        return "audio/mpeg"
+    if u.endswith(".m4a") or u.endswith(".mp4"):
+        return "audio/mp4"
+    return "audio/wav"
 
 
 def _write_indexes(episodes: list) -> None:
@@ -295,21 +328,42 @@ def _write_indexes(episodes: list) -> None:
         f"""  <item>
     <title>{_xml(e["title"])}</title>
     <description>{_xml(e.get("excerpt") or e["title"])}</description>
-    <enclosure url="{SITE}{e["url"]}" length="{e["bytes"]}" type="audio/mpeg"/>
+    <itunes:summary>{_xml(e.get("excerpt") or e["title"])}</itunes:summary>
+    <enclosure url="{SITE}{e["url"]}" length="{e.get("bytes", 0)}" type="{_enclosure_type(e["url"])}"/>
     <guid isPermaLink="false">measured-life-panel-wk{e["week"]}</guid>
     <pubDate>{_rfc822(e["date"])}</pubDate>
+    <itunes:duration>{_hms(e.get("duration_sec"))}</itunes:duration>
+    <itunes:episode>{int(e["week"])}</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="{_xml(e.get("image_url") or COVER_URL)}"/>
   </item>"""
         for e in episodes
     )
     feed = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
 <channel>
   <title>The Measured Life — The Panel</title>
+  <atom:link href="{FEED_URL}" rel="self" type="application/rss+xml"/>
   <link>{SITE}/story/panel/</link>
-  <description>A weekly two-host show: Elena Voss and a rotating AI coach review the week's data, findings, and themes. AI voices, correlative, fact-anchored.</description>
+  <description>A weekly two-host show: Elena Voss and a rotating AI coach review the week's data, findings, and themes from a public N=1 health experiment. AI voices, correlative, fact-anchored.</description>
   <language>en-us</language>
-  <itunes:author>averagejoematt</itunes:author>
+  <copyright>© averagejoematt</copyright>
+  <itunes:author>The Measured Life</itunes:author>
+  <itunes:summary>A weekly two-host show reviewing the week's data from a public N=1 health experiment. AI voices, correlative, fact-anchored.</itunes:summary>
+  <itunes:type>episodic</itunes:type>
   <itunes:explicit>false</itunes:explicit>
+  <itunes:owner>
+    <itunes:name>{_xml(OWNER_NAME)}</itunes:name>
+    <itunes:email>{_xml(OWNER_EMAIL)}</itunes:email>
+  </itunes:owner>
+  <itunes:image href="{_xml(COVER_URL)}"/>
+  <itunes:category text="{_xml(FEED_CATEGORY)}"/>
+  <image>
+    <url>{_xml(COVER_URL)}</url>
+    <title>The Measured Life — The Panel</title>
+    <link>{SITE}/story/panel/</link>
+  </image>
 {items}
 </channel>
 </rss>
@@ -1216,6 +1270,8 @@ def _hold_and_alert(week, reasons: list, draft: dict, hold_class: str = "safety"
         "This week's episode is in final review — it'll drop here as soon as it clears the quality bar.",
     )
     logger.warning("[panel] wk%s HELD (%s) — %s", week, hold_class, reasons)
+    # Reason code (#374): a quality HOLD is auto-retriable; a safety HOLD is not.
+    _emit_outcome("held-safety" if (hold_class if hold_class in ("safety", "quality") else "safety") == "safety" else "held-quality")
     return {"statusCode": 200, "body": json.dumps({"week": week, "held": True, "hold_class": hold_class, "reasons": reasons})}
 
 
@@ -1338,6 +1394,36 @@ def _emit_published_metric() -> None:
         )
     except Exception as e:
         logger.warning("[panel] published-metric emit failed — %s", e)
+
+
+# The distinct outcomes every real (non-dry) run resolves to. Each run emits
+# exactly one so the no-episode alarm can say WHY the show is silent instead of
+# reading a bare metric gap (#374). "published" also keeps the legacy
+# PanelcastPublished metric alive for the existing >8d-silence alarm.
+_OUTCOME_REASONS = ("published", "held-quality", "held-safety", "no-input", "already-published", "budget-skip", "error")
+
+
+def _emit_outcome(reason: str) -> None:
+    """One reason code per run → CloudWatch (LifePlatform/Podcast / PanelcastRun,
+    dimension Reason). Lets an alarm/dashboard distinguish a deliberate editorial
+    or safety HOLD from a genuine breakage or a no-material week. Fail-open — a
+    telemetry hiccup must never change the pipeline's decision."""
+    if reason not in _OUTCOME_REASONS:
+        reason = "error"
+    try:
+        boto3.client("cloudwatch", region_name=REGION).put_metric_data(
+            Namespace="LifePlatform/Podcast",
+            MetricData=[
+                {
+                    "MetricName": "PanelcastRun",
+                    "Dimensions": [{"Name": "Reason", "Value": reason}],
+                    "Value": 1,
+                    "Unit": "Count",
+                }
+            ],
+        )
+    except Exception as e:
+        logger.warning("[panel] outcome-metric emit failed (%s) — %s", reason, e)
 
 
 def _notify_new_episode(ep: dict) -> None:
@@ -1472,6 +1558,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     post = _select_week_post()
     week = post["week"]
     if not force and not dry_run and _episode_exists(week):
+        _emit_outcome("already-published")
         return {"statusCode": 200, "body": json.dumps({"week": week, "already_published": True})}
 
     bible = _load_bible()
@@ -1488,6 +1575,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
                 f"Episode for week {week} is pending — no chronicle or coach reads to review yet.",
                 post.get("date"),
             )
+            _emit_outcome("no-input")
         return {
             "statusCode": 200,
             "body": json.dumps({"week": week, "skipped": "no material (no chronicle or coach reads)", "date": post.get("date")}),
@@ -1681,6 +1769,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     )
     _write_indexes(existing)
     _emit_published_metric()  # safety-net: a CloudWatch alarm fires if this metric goes absent (no episode > 8d)
+    _emit_outcome("published")  # reason code (#374) — the positive outcome in the same vocabulary as the holds
     _notify_new_episode(ep)  # operator SNS ping (best-effort; never blocks publish)
     # Confirmed-subscriber email blast — OFF by default (PANELCAST_NOTIFY_SUBSCRIBERS).
     # Flip on only after a {"notify_test": "<addr>"} dry-run looks right, so the very
@@ -1708,6 +1797,8 @@ def lambda_handler(event, context):
         tier = current_tier()
         if tier >= SKIP_TIER:
             logger.info("[panel] budget tier %s >= %s — skipping (PG-10)", tier, SKIP_TIER)
+            if not dry_run:
+                _emit_outcome("budget-skip")
             return {"skipped": True, "tier": tier}
     except Exception:
         pass
@@ -1751,4 +1842,6 @@ def lambda_handler(event, context):
         return _run_weekly(force, dry_run=dry_run)
     except Exception as e:
         logger.error("[panel] weekly run failed — %s", e)
+        if not dry_run:
+            _emit_outcome("error")  # a live pipeline error is distinct from a deliberate HOLD (#374)
         return {"statusCode": 500, "body": json.dumps({"weekly": "failed", "error": str(e)[:200]})}
