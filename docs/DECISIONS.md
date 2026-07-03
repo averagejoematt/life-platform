@@ -2822,3 +2822,50 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 **Revisit trigger.** The trigger firing (either arm) re-opens monetization as a deliberate session with this ADR and ADR-078 on the table — not as a side effect of a feature branch.
 
 **Consequences.** The backlog's parked register points here as the single written rationale for every parked monetization item; future sessions route around the question instead of re-litigating it; the growth epics (#338, #339) become the only sanctioned path toward the first dollar.
+
+## ADR-102: Single-table DynamoDB, chosen on purpose — keep it, do not migrate (ER-08)
+
+**Date:** 2026-07-03 · **Status:** Accepted · **Relates:** ADR-005 (single-table), ADR-097 (the two reading GSIs)
+
+**Context.** Everything lives in one DynamoDB table (`life-platform`, `pk USER#matthew#SOURCE#{source}` / `sk DATE#…`). The choice was never recorded, and internal notes justified revisiting it with a premise the 2026-07 review verified to be FALSE: the analytics do not scan the table. The correlation engine runs bounded, paginated `Key`-condition queries over date windows (e.g. `weekly_correlation_compute` fans out per-source `fetch_range` queries over a 90-day lookback) and precomputes results; the codebase contains **exactly one `.scan()`** — in `delete_user_data_lambda` (data deletion, where a scan is the correct tool). Measured shape: ~42 MB, ~31.6k items, PAY_PER_REQUEST, PITR on. Storage and read cost are a rounding error against the $75 ceiling.
+
+**Decision. Keep single-table DynamoDB. Do not migrate.** The model fits the access pattern this platform actually has — per-source, per-date-range reads feeding Python compute — and five more years of daily data (~×5 item growth) changes nothing material about that fit.
+
+**The honest costs (named so nobody is surprised by them):**
+1. **Query expressiveness.** Cross-source joins are hand-rolled in Python over a multi-source window fan-out. Every "correlate X with Y" is N queries + an in-memory join, not one expression. This is a real tax on exploratory/ad-hoc analytics — the MCP query layer partly exists to compensate.
+2. **Single-tenant key design.** `USER#matthew` is hardcoded throughout the key schema and much of the code. Any multi-reader/multi-tenant pivot (the shelved wedge C) is a re-key, not a config change. That is an accepted consequence of ADR-078 shelving wedge C, not an oversight.
+3. **Out-of-IaC config surface.** The table is imported by name in CDK; its GSIs/PITR/billing/TTL live outside code review (tracked separately as backlog #371/#379 — the managed-where ledger + drift sentinel).
+
+**Revisit trigger (concrete, not "someday"):** introduce a READ-SIDE analytical layer (DuckDB/Athena over the S3 `raw/` mirror — alongside DynamoDB, never replacing it) only when ad-hoc analytics are a demonstrated recurring need: **three or more working sessions in one quarter blocked on a question the query layer cannot express**. A one-query spike (`spikes/er08_duckdb_readside/`) is the sanctioned sizing tool if the trigger nears. Docs claiming the correlation engine "scans the table daily" are corrected as of this ADR.
+
+## ADR-103: The complexity-posture ledger — every subsystem carries its frame (ER-07)
+
+**Date:** 2026-07-03 · **Status:** Accepted
+
+**Context.** A one-person platform has accumulated systems at home in a mid-size org: experiment-phase machinery, three AI boards, a self-healing agent, a coherence sentinel. The 2026-07 review's most consistent theme was "subtract more than add" — but subtraction needs recorded verdicts, or every session re-litigates posture per subsystem. This ledger assigns each major subsystem one of three postures: **load-bearing** (the product or its safety depends on it), **portfolio** (justified as a publicly-demonstrated pattern — the ADR-078 wedge-B frame — even if utilization is low), or **retire-candidate** (named removal path or trigger, never an open-ended "someday").
+
+**The ledger (2026-07-03):**
+
+| Subsystem | Posture | Notes / trigger |
+|---|---|---|
+| Phase machinery (ADR-077 taxonomy, restart pipeline) | **Load-bearing** | The experiment's reset semantics; coverage-asserted |
+| Coherence sentinel + canonical_facts/measurable_metrics contracts | **Load-bearing** | The honesty moat's enforcement layer |
+| The 8-coach board + stance engine + orchestrator | **Load-bearing** | The COACHING pillar — the product |
+| Budget governor + budget_guard | **Load-bearing** | The $75 ceiling's enforcement (ADR-063/100) |
+| Freshness / ingest-liveness / reconciliation detectors | **Load-bearing** | The silent-failure coverage class |
+| Character engine + sheet | **Load-bearing** | Public flagship page since #326–#328 |
+| Deploy guardrails (clobber guard, postflight, layer gate) | **Load-bearing** | Each earned by a real incident |
+| Weekly Panel podcast pipeline | **Load-bearing** (STORY) | Currently dark — revival is backlog #374, not retirement |
+| Reading pillar (2 GSIs, tools, page) | **Load-bearing (small)** | The owner's real instrument; Phase-E stays finish-gated |
+| MCP server | **Load-bearing but overweight** | The instrument itself is core; ~105 unused tools are the retire-candidate INSIDE it (#398) |
+| Remediation agent (auto-merge apparatus) | **Portfolio** | Safety design is exemplary; ~zero output at current scale. #396 decides: earns `auto` or returns to `shadow`. Becomes load-bearing only if it ships real fixes monthly |
+| Personal/Product deliberation boards (BOARDS.md summits) | **Portfolio** | Decision-quality tooling demonstrated in public; no runtime footprint |
+| AI-vision QA (Bedrock semantic screenshots) | **Load-bearing** | Gating CI since 2026-06-05 |
+| `/legacy` preserved v3 site | **Portfolio (archive)** | Zero maintenance; never linked; retire only if storage/privacy cost appears |
+| ~105 unused MCP tools + the 64-entry orphan allowlist | **Retire-candidate** | Path: the #398 AUDITED_AT ratchet prune, batches of 10–20 |
+| `chronicle-podcast` season-1 lambda (unscheduled zombie) | **Retire-candidate** | Trigger: delete after one further back-catalogue re-render need-window (2026-Q3 review) |
+| `hevy-webhook` FunctionURL lambda (parked — Hevy has no webhooks) | **Retire-candidate** | Trigger: Hevy ships webhooks, else remove at the 2026-Q4 review |
+
+**The standing rule.** Any NEW enterprise-pattern infrastructure must name its frame — load-bearing (what product/safety need), portfolio (what pattern it demonstrates publicly), or it does not land — in its PR description or ADR. "It would be cool to have" is not a frame.
+
+**Maintenance.** Posture changes are one-line edits to this table with a dated note; the quarterly review re-reads it. Referenced from the docs index so sessions consult it instead of re-litigating.
