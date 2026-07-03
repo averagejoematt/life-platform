@@ -182,6 +182,7 @@ from web.site_api_social import (
 from web.site_api_vitals import (
     handle_achievements,
     handle_character,
+    handle_character_config,
     handle_character_stats,
     handle_journey,
     handle_journey_timeline,
@@ -345,6 +346,7 @@ ROUTES = {
     "/api/inference_receipt": handle_inference_receipt,
     "/api/wrong": handle_wrong,
     "/api/survival": handle_survival,
+    "/api/character_config": handle_character_config,  # the sheet's "how the engine works" contract (P1.2)
     "/api/character_stats": handle_character_stats,
     "/api/habit_streaks": handle_habit_streaks,
     "/api/experiments": handle_experiments,
