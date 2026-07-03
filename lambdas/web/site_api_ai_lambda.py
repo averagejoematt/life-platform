@@ -163,8 +163,9 @@ def _error(status: int, message: str) -> dict:
 
 
 def _ai_paused_response():
-    """If the budget tier has paused website AI (Tier ≥ 2), return a friendly
-    HTTP-200 'paused' payload the frontend renders calmly; else None. Fail-open."""
+    """If the budget tier has paused website AI (the tier-3 hard stop — ADR-100:
+    readers degrade LAST), return a friendly HTTP-200 'paused' payload the
+    frontend renders calmly; else None. Fail-open."""
     try:
         from budget_guard import allow
 

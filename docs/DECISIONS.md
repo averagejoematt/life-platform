@@ -1743,9 +1743,9 @@ A two-component guardrail system:
 1. **`cost_governor_lambda`** (hourly, in `operational_stack`) — projects month-end spend using `mtd + (non_ai_daily + ai_daily) × days_remaining`. `non_ai_daily` averaged across elapsed days; `ai_daily` averaged across days that actually had AI activity (not full month). Writes the resulting **tier 0–3** to SSM `/life-platform/budget-tier`.
 2. **`lambdas/budget_guard.py`** (shared-layer module) — `current_tier()` reads SSM with 5-min cache (fail-open to 0). `allow(feature)` returns False once tier ≥ that feature's cutoff. `BudgetExceeded` raised by `bedrock_client.invoke()` at Tier 3 as a hard chokepoint failsafe.
 
-Feature → tier cutoffs (priority ordering "protect daily brief longest"):
-- `coach_narrative`, `ensemble`, `chronicle`: tier 1
-- `website_ai` (`/api/ask`, `/api/board_ask`): tier 2
+Feature → tier cutoffs (priority ordering "protect daily brief longest"; amended by ADR-100 — readers degrade last):
+- `coach_narrative`, `ensemble`: tier 1 (`chronicle` later raised to tier 2 to keep the Panel fed)
+- `website_ai` (`/api/ask`, `/api/board_ask`): tier 3 (was 2 — see ADR-100)
 - `daily_brief_ai`: tier 3 (last to degrade)
 
 Plus a single `CfnBudget` `life-platform-monthly-75` in `core_stack` with 50/70/85/100% email alerts via SES.
@@ -2791,3 +2791,19 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 **Alternatives considered.** Keeping BACKLOG.md with stricter discipline (rejected: discipline is what failed — the fix must be structural, and `Fixes #N` closes issues mechanically); GitHub Projects v2 board (deferred: milestones + labels are CLI-scriptable and sufficient; a board view can be layered on later without migration).
 
 **Outcome.** 12 epics + 74 stories + 1 parked-register issue filed 2026-07-03 from the review (83 verified findings + 41 verified-open ledger items, duplicates merged), every body privacy-passed before creation.
+
+## ADR-100: The budget ceiling protects readers — the public ask endpoints degrade LAST
+
+**Date:** 2026-07-03 · **Status:** Accepted · **Amends:** ADR-063
+
+**Context.** June 2026 closed at $79.80 — the first breach of the $75/month all-in ceiling — driven by dev-session AI re-runs, not production traffic. The review (finding cost-01) surfaced a shape problem underneath the number: ~$35/month of the ceiling is fixed non-AI overhead at zero readers, and the automatic budget defense turned off the PUBLIC ask endpoints at tier 2 (85% of budget) while internal content generation kept running. The first casualty of growth would have been the exact feature that converts a curious visitor into a returning reader — backwards for a platform whose north star is returnability.
+
+**Decision.**
+1. **The sacrifice order inverts: readers degrade last.** `website_ai` moves from tier 2 to tier 3 in `budget_guard._FEATURE_CUTOFF`. The degradation ladder is now: tier 1 pauses the heavy internal daily AI (coach narratives, ensemble); tier 2 additionally pauses the weekly chronicle (with the Panel podcast in lockstep); tier 3 — the hard stop — pauses everything, including the ask endpoints, which return their existing honest "paused for the rest of the month" message (never a degraded fake answer).
+2. **The ceiling stays $75 for now, chosen on purpose rather than inherited.** The number is re-affirmed with unit economics attached (below), and a revisit trigger: **when the traffic digest shows ≥50 ask-questions/week sustained for a month, or ≥100 confirmed subscribers, re-size the ceiling as a product cost, not an instrument cost.**
+
+**Unit economics (the per-reader sketch, 2026-07 Bedrock Haiku pricing ≈ $1/MTok in · $5/MTok out).** One `/api/ask` answer ≈ 3k in + 600 out ≈ **$0.006**. One full-board convene (8 personas × ~600 in + 300 out, system blocks prompt-cached) ≈ **$0.017**; the default trio ≈ $0.006. The 5/hr/IP rate limit caps a single visitor at ~$0.09/hour worst-case. At 100 board questions/day — far beyond current traffic — the month costs ~$50, which is the point of the revisit trigger: that problem is called growth, and the ceiling gets re-sized deliberately when it arrives.
+
+**What this does NOT change.** The $75 AWS Budget alerts, the cost governor's tier computation, the tier-3 `BudgetExceeded` chokepoint in `bedrock_client.invoke()`, and the daily brief's protect-longest position all stand. Dev-session AI attribution (the actual June driver) is separate work (#366).
+
+**Verification.** `tests/test_budget_guard_ladder.py` simulates tier escalation and asserts the ask endpoints still answer at tier 2 (where they previously went dark), every internal narrative feature is off at or before tier 2, and tier 3 blocks everything.

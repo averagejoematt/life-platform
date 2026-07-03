@@ -11,9 +11,12 @@ Tiers (cumulative — higher tier disables more):
   1 Caution   heavy DAILY coach AI off (narrative/ensemble); weekly flagship
               content (chronicle + the Friday Panel podcast) keeps running —
               it's ~$1/wk and is the product, so it survives until tier 2.
-  2 Restrict  + public website AI off (/api/ask, /api/board_ask) + chronicle off
-              (matches the Panel's own SKIP_TIER=2, so the two stay in lockstep)
-  3 Hard stop + ALL Bedrock off; daily brief is data-only
+  2 Restrict  + chronicle off (matches the Panel's own SKIP_TIER=2, so the two
+              stay in lockstep). The PUBLIC ask endpoints keep answering —
+              readers degrade LAST (ADR-100): a reader question costs ~$0.02
+              at worst and it's the platform's most differentiating hook.
+  3 Hard stop + ALL Bedrock off (incl. /api/ask + /api/board_ask, which return
+              an honest friendly 'paused' message); daily brief is data-only
 
 Fail-open: if SSM is unreadable (transient error, missing grant, param absent)
 we return tier 0 — a monitoring blip must never take AI down. The AWS Budgets
@@ -40,7 +43,12 @@ _FEATURE_CUTOFF = {
     # 2 so the flagship weekly Story+podcast survives tier 1, in lockstep with the
     # Panel lambda's own SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs $75.
     "chronicle": 2,
-    "website_ai": 2,
+    # website_ai: was 2 — the budget defense switched off the PUBLIC ask
+    # endpoints while internal content kept running, making the reader-facing
+    # hook the first casualty of growth. ADR-100 inverts the sacrifice order:
+    # readers degrade LAST. Rate limits (5/hr/IP) + Haiku pricing bound the
+    # worst case; the tier-3 hard stop keeps its honest 'paused' message.
+    "website_ai": 3,
     "daily_brief_ai": 3,
 }
 
