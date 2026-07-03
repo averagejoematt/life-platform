@@ -54,12 +54,12 @@ function entriesFor(s, data) {
   if (s.kind === "read") return READ_SCOPES.slice();
   // Reader Q&A — the ask form first, then any questions the board has answered.
   if (s.kind === "qa")
-    return [{ id: "ask", title: "✍️ Ask a question", date: "to the whole board" }].concat(
+    return [{ id: "ask", title: "Ask a question", date: "to the whole board" }].concat(
       (((data && data.answers) || []).slice().reverse()).map((a) => ({ id: String(a.id), title: a.question, date: a.answered_at || "" }))
     );
   if (!data) return [];
   if (s.kind === "bycoach" || s.kind === "team")
-    return (data.coaches || []).map((c) => ({ id: c.persona_id, title: `${c.emoji || ""} ${c.name}`.trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
+    return (data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "scorecard") {
     const o = (data && data.overall) || {};
@@ -171,8 +171,9 @@ async function renderReadToday(read) {
     h += `<section class="read-digest"><p class="dx-kicker label">each coach's read · click to go deeper</p><ul class="rd-list">`;
     for (const c of coaches) {
       h += `<li class="rd-card" data-coach="${esc(c.coach_id + "_coach")}" style="--coach:${esc(c.color || "")}"><button type="button" class="rd-btn">` +
-        `<span class="rd-top"><span class="coach-mark">${sigil(c, { title: "" })}</span><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
-        `<span class="rd-say">${esc(c.position_summary)}</span></button></li>`;
+        `<span class="sigil-md">${sigil(c, { title: "" })}</span><span class="rd-body">` +
+        `<span class="rd-top"><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
+        `<span class="rd-say">${esc(c.position_summary)}</span></span></button></li>`;
     }
     h += `</ul></section>`;
   } else {
@@ -490,7 +491,7 @@ function renderAskBoard(read) {
       personas.map((pid) => {
         const p = BOARD_PERSONAS[pid];
         return `<article class="cv-card" data-pid="${esc(pid)}">` +
-          `<header class="cv-head"><span class="coach-mark">${sigil({ coach_id: pid, name: p.name }, { title: "" })}</span>` +
+          `<header class="cv-head"><span class="sigil-md">${sigil({ coach_id: pid, name: p.name }, { title: "" })}</span>` +
           `<span class="cv-who"><span class="cv-name">${esc(p.name)}</span><span class="cv-title label">${esc(p.title)}</span></span></header>` +
           `<p class="cv-text is-thinking"><span class="shimmer">deliberating…</span></p></article>`;
       }).join("");
