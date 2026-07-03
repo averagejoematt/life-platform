@@ -199,3 +199,110 @@ def test_qa_review_fails_open_on_judge_error(monkeypatch):
     monkeypatch.setattr(bedrock_client, "invoke", _boom)
     ok, fails = panel._qa_review([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
     assert ok is True and fails == []
+
+
+# ── #374: podcast-standard feed + per-run reason codes ───────────────────────
+
+_ITUNES = "http://www.itunes.com/dtds/podcast-1.0.dtd"
+_ATOM = "http://www.w3.org/2005/Atom"
+
+
+def _render_feed(monkeypatch, episodes):
+    """Capture the feed.xml body _write_indexes writes, without touching S3/CDN."""
+    captured = {}
+
+    def _put(**kw):
+        if kw.get("Key", "").endswith("feed.xml"):
+            captured["feed"] = kw["Body"]
+        return {}
+
+    monkeypatch.setattr(panel.s3, "put_object", lambda **kw: _put(**kw))
+    monkeypatch.setattr(panel, "_invalidate_cdn", lambda: None)
+    panel._write_indexes(episodes)
+    return captured["feed"]
+
+
+def test_feed_is_well_formed_and_podcast_standard(monkeypatch):
+    import xml.etree.ElementTree as ET
+
+    eps = [
+        {
+            "week": 3,
+            "title": "EP3 · The Wall",
+            "date": "2026-06-30",
+            "url": "/panelcast/wk3.wav",
+            "bytes": 12897210,
+            "duration_sec": 402,
+            "excerpt": "The week the data hit a wall.",
+            "image_url": "",
+        },
+        {
+            "week": 0,
+            "title": "EP0 · Welcome",
+            "date": "2026-06-18",
+            "url": "/panelcast/wk0.mp3",
+            "bytes": 1003200,
+            "duration_sec": 250,
+            "excerpt": "Meet the Panel.",
+            "image_url": "",
+        },
+    ]
+    feed = _render_feed(monkeypatch, eps)
+    root = ET.fromstring(feed)  # noqa: S314 — our own generated feed (trusted); raises on malformed XML
+    ch = root.find("channel")
+    # Apple-required channel tags
+    assert ch.find(f"{{{_ITUNES}}}image").get("href")
+    assert ch.find(f"{{{_ITUNES}}}category").get("text")
+    owner = ch.find(f"{{{_ITUNES}}}owner")
+    assert owner.find(f"{{{_ITUNES}}}email").text and "@" in owner.find(f"{{{_ITUNES}}}email").text
+    assert ch.find(f"{{{_ITUNES}}}explicit").text == "false"
+    assert ch.find(f"{{{_ITUNES}}}type").text == "episodic"
+    self_link = ch.find(f"{{{_ATOM}}}link")
+    assert self_link.get("rel") == "self" and self_link.get("href").endswith("/panelcast/feed.xml")
+    # every item has an enclosure with a correct-per-file MIME + duration + episode number
+    items = ch.findall("item")
+    assert len(items) == 2
+    by_wav = next(i for i in items if i.find("enclosure").get("url").endswith(".wav"))
+    by_mp3 = next(i for i in items if i.find("enclosure").get("url").endswith(".mp3"))
+    assert by_wav.find("enclosure").get("type") == "audio/wav"
+    assert by_mp3.find("enclosure").get("type") == "audio/mpeg"
+    for it in items:
+        assert it.find("enclosure").get("length")
+        assert it.find(f"{{{_ITUNES}}}duration").text.count(":") == 2  # HH:MM:SS
+        assert it.find(f"{{{_ITUNES}}}episode").text
+        assert it.find("guid").text.startswith("measured-life-panel-wk")
+
+
+def test_hms_formats_seconds():
+    assert panel._hms(402) == "0:06:42"
+    assert panel._hms(3725) == "1:02:05"
+    assert panel._hms(None) == "0:00:00"
+
+
+def test_enclosure_mime_by_extension():
+    assert panel._enclosure_type("/panelcast/wk3.wav") == "audio/wav"
+    assert panel._enclosure_type("/panelcast/wk0.mp3") == "audio/mpeg"
+    assert panel._enclosure_type("/panelcast/wk4.m4a") == "audio/mp4"
+
+
+def test_reason_codes_cover_every_terminal_outcome():
+    # the vocabulary the alarm reads — published + the distinct silence causes.
+    for r in ("published", "held-quality", "held-safety", "no-input", "error"):
+        assert r in panel._OUTCOME_REASONS
+
+
+def test_emit_outcome_is_fail_open_and_normalizes(monkeypatch):
+    calls = []
+
+    class _CW:
+        def put_metric_data(self, **kw):
+            calls.append(kw)
+
+    monkeypatch.setattr(panel.boto3, "client", lambda *a, **k: _CW())
+    panel._emit_outcome("held-quality")
+    md = calls[0]["MetricData"][0]
+    assert md["MetricName"] == "PanelcastRun"
+    assert md["Dimensions"][0] == {"Name": "Reason", "Value": "held-quality"}
+    # an unknown reason is coerced to "error", never raises
+    panel._emit_outcome("bogus")
+    assert calls[1]["MetricData"][0]["Dimensions"][0]["Value"] == "error"
