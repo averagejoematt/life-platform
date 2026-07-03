@@ -2077,7 +2077,7 @@ TOOLS = {
                 "Log a meaningful social interaction with a specific person. Tracks contact frequency, "
                 "depth (surface/meaningful/deep), and channel diversity for Pillar 7 (Relationships). "
                 "Murthy: 3-5 close relationships is the threshold for wellbeing. "
-                "Use for: 'I called Tom today', 'had coffee with Sarah', 'texted Brittany', "
+                "Use for: 'I called Tom today', 'had coffee with Sarah', 'texted Partner', "
                 "'log a deep conversation with my therapist', 'had lunch with a coworker'."
             ),
             "inputSchema": {

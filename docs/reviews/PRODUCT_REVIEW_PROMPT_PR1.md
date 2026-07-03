@@ -101,7 +101,7 @@ Entry: Lands on homepage because Matthew shared the link at work. Knows Matthew 
 Entry: Returns to homepage for the 10th time. Subscribed to the newsletter. Looking for: What's new since last week? How's Matthew doing? Any discoveries I can apply to my own health? Is the chronicle entry out?
 *Trace their journey. What keeps them coming back? What's stale? What would make them unsubscribe?*
 
-**Visitor 5 — "Brittany (Matthew's Partner)"**
+**Visitor 5 — "Partner (Matthew's Partner)"**
 Entry: Reads the weekly accountability email. Clicks through to the site. Looking for: Is Matthew actually following through? Is the platform helping him or is it another distraction project? Does the public framing feel honest?
 *Trace their journey. What gives her confidence? What concerns her? Is the platform serving Matthew's actual health goals or just his building instincts?*
 

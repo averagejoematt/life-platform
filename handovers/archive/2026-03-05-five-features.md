@@ -70,7 +70,7 @@ Added inline policy `s3-export-write` to `lambda-mcp-server-role`:
 
 ## Next Session Suggestions
 1. **#50 Adaptive Email Frequency** — engagement scoring driving brief length
-2. **Brittany Accountability Email** — next major feature per roadmap
+2. **Partner Accountability Email** — next major feature per roadmap
 3. **#31 Light Exposure + #37 Breathwork** — quick Habitify-based correlation tools
 4. **#16 Grip Strength** — buy dynamometer, build 2 MCP tools
 

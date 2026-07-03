@@ -68,7 +68,7 @@ confirmation from TB7-15. Alarms are silent until confirmed.
 3. **S3 lifecycle rule** — expire `deploys/*/` zips after 30 days.
 4. **TB7-24** — Lambda handler integration tests (larger effort, future session).
 5. **TB7-28/29** — SIMP-1 + Architecture Review #8 (~2026-04-08).
-6. **Brittany weekly email** — needs real email address.
+6. **Partner weekly email** — needs real email address.
 
 ---
 

@@ -23,7 +23,7 @@ for a in alarms:
         cats['INGESTION'].append(n)
     elif any(x in n for x in ['compute','character-sheet','daily-metrics','daily-insight','adaptive','hypothesis','dashboard']):
         cats['COMPUTE'].append(n)
-    elif any(x in n for x in ['brief','digest','chronicle','plate','compass','nutrition','anomaly','freshness','brittany']):
+    elif any(x in n for x in ['brief','digest','chronicle','plate','compass','nutrition','anomaly','freshness','partner']):
         cats['EMAIL'].append(n)
     elif any(x in n for x in ['canary','dlq','slo','data-export','reconciliation','pip-audit','qa-smoke']):
         cats['INFRA'].append(n)

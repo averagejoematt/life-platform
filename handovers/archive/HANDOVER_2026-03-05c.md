@@ -57,7 +57,7 @@ One stale secret reference in daily-brief logs: `get_anthropic_key()` still has 
 
 ## What's Next
 
-1. **Brittany accountability email** — next major feature. Weekly email for Matthew's partner. Scope TBD; open question whether to include Character Sheet data.
+1. **Partner accountability email** — next major feature. Weekly email for Matthew's partner. Scope TBD; open question whether to include Character Sheet data.
 2. **Google Calendar integration** — highest-priority remaining roadmap item (demand-side data, Board Rank #9).
 3. **daily_brief monolith Phase 2** — `ai_calls.py` extraction (~350 lines, 5 functions). Low urgency.
 4. **Stale SECRET_NAME env var audit** — quick check across all Lambdas for any other overrides pointing at deleted secrets (see Known Issues in PROJECT_PLAN.md).

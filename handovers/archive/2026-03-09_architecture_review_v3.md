@@ -55,8 +55,8 @@ Architecture Review #3 conducted by Technical Board of Directors (12 seats). No 
 
 1. **Save downloaded review file** → `docs/reviews/REVIEW_2026-03-09.md` (replace placeholder)
 2. **Git commit:** `git add -A && git commit -m "v3.3.11: Architecture Review #3 — Tech Board assessment, B+ overall" && git push`
-3. **Brittany weekly email** — next major feature, fully unblocked by Chair's verdict
-4. Items 1-5 above can be done alongside Brittany email (small, Sonnet)
+3. **Partner weekly email** — next major feature, fully unblocked by Chair's verdict
+4. Items 1-5 above can be done alongside Partner email (small, Sonnet)
 
 ---
 
@@ -67,4 +67,4 @@ Architecture Review #3 conducted by Technical Board of Directors (12 seats). No 
 - **Elena:** `ingestion_framework.py` has zero consumers — dead code until proven otherwise
 - **Henning:** EMA λ=0.85 has ~6.2 day effective lookback; 7-day correlations need ≥14 days minimum
 - **Viktor:** Consider consolidating pip-audit + reconciliation + failure-pattern into one maintenance Lambda
-- **Chair:** Build Brittany email, then Review #4 at ~2026-04-08 after 30 days of production data
+- **Chair:** Build Partner email, then Review #4 at ~2026-04-08 after 30 days of production data

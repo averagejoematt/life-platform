@@ -82,7 +82,7 @@ aws s3 rm s3://matthew-life-platform/raw/ --recursive --exclude 'raw/matthew/*'
 ```
 
 ### Feature Work (fully unblocked)
-- Brittany weekly email
+- Partner weekly email
 - Prompt Intelligence fixes P1-P5
 - Google Calendar integration
 

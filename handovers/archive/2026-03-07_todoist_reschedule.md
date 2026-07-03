@@ -77,9 +77,9 @@ Token: reads from Secrets Manager `life-platform/api-keys` (`todoist_api_token`)
 - **[PENDING] Decision fatigue signal (#34)** — deployed, needs ~2 weeks of new-format Todoist data (post-reschedule) before meaningful correlation output
 - **[PENDING] Google Calendar integration** — Board rank #2, next major integration after Todoist is stable
 - **[PENDING] Monarch Money** — Board rank #14
-- **[PENDING] Brittany weekly accountability email** — next major feature, prerequisite: reward seeding
+- **[PENDING] Partner weekly accountability email** — next major feature, prerequisite: reward seeding
 - **[PENDING] Reward seeding** — prerequisite for Character Sheet Phase 4
-- **[PENDING] BRITTANY_EMAIL env var** — Lambda deployed with placeholder
+- **[PENDING] PARTNER_EMAIL env var** — Lambda deployed with placeholder
 
 ## Platform State
 - **Version:** v2.84.0

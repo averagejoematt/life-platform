@@ -28,7 +28,7 @@ $D hypothesis-engine           lambdas/hypothesis_engine_lambda.py;  sleep $DELA
 echo ""
 echo "--- Email stack ---"
 SHARED="--extra-files lambdas/ai_calls.py lambdas/output_writers.py lambdas/board_loader.py lambdas/html_builder.py"
-$D brittany-weekly-email       lambdas/brittany_email_lambda.py     $SHARED; sleep $DELAY
+$D partner-weekly-email       lambdas/partner_email_lambda.py     $SHARED; sleep $DELAY
 $D daily-brief                 lambdas/daily_brief_lambda.py        $SHARED; sleep $DELAY
 $D monday-compass              lambdas/monday_compass_lambda.py     $SHARED; sleep $DELAY
 $D monthly-digest              lambdas/monthly_digest_lambda.py     $SHARED; sleep $DELAY

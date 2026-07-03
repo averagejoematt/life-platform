@@ -99,7 +99,7 @@ python3 -c "import json; d=json.load(open('/tmp/st.json')); assert 'errorType' n
 - wednesday-chronicle → wednesday_chronicle_lambda.py
 - weekly-plate → weekly_plate_lambda.py
 - monday-compass → monday_compass_lambda.py
-- brittany-weekly-email → brittany_email_lambda.py
+- partner-weekly-email → partner_email_lambda.py
 - evening-nudge → evening_nudge_lambda.py
 - chronicle-email-sender → chronicle_email_sender_lambda.py
 - chronicle-approve → chronicle_approve_lambda.py

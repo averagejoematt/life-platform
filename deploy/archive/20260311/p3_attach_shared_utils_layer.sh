@@ -40,7 +40,7 @@ LAMBDAS=(
     "weekly-plate"
     "monday-compass"
     "anomaly-detector"
-    "brittany-weekly-email"
+    "partner-weekly-email"
     # Compute Lambdas (use scoring_engine, character_engine, output_writers)
     "character-sheet-compute"
     "daily-metrics-compute"

@@ -187,7 +187,7 @@ aws cloudtrail lookup-events --region us-west-2 \
 - Audit S3 raw/ + uploads/ for data exfiltration (CloudTrail data events catch this)
 - Rotate the Anthropic API key (manually via console.anthropic.com — no programmatic API)
 - Reset Garmin / Whoop / etc. external service passwords (the platform's tokens were potentially compromised)
-- Notify Brittany / Matthew of potential email-recipient exposure if SES was used by attacker
+- Notify Partner / Matthew of potential email-recipient exposure if SES was used by attacker
 
 ---
 

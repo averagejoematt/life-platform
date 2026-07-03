@@ -51,12 +51,12 @@ HIGH_SENSITIVITY_VARS=(
   "SECRET_NAME"
   "HABITIFY_SECRET_NAME"
   "NOTION_SECRET_NAME"
-  "BRITTANY_EMAIL"
+  "PARTNER_EMAIL"
 )
 
 # ── Lambda → stack mapping ────────────────────────────────────────────────────
 declare -A STACK_LAMBDAS
-STACK_LAMBDAS["LifePlatformEmail"]="daily-brief weekly-digest monthly-digest nutrition-review wednesday-chronicle weekly-plate monday-compass brittany-weekly-email"
+STACK_LAMBDAS["LifePlatformEmail"]="daily-brief weekly-digest monthly-digest nutrition-review wednesday-chronicle weekly-plate monday-compass partner-weekly-email"
 STACK_LAMBDAS["LifePlatformCompute"]="anomaly-detector character-sheet-compute daily-metrics-compute daily-insight-compute adaptive-mode-compute hypothesis-engine failure-pattern-compute dashboard-refresh"
 STACK_LAMBDAS["LifePlatformIngestion"]="whoop-data-ingestion garmin-data-ingestion withings-data-ingestion habitify-data-ingestion strava-data-ingestion journal-enrichment todoist-data-ingestion eightsleep-data-ingestion activity-enrichment macrofactor-data-ingestion weather-data-ingestion dropbox-poll apple-health-ingestion health-auto-export-webhook notion-journal-ingestion"
 STACK_LAMBDAS["LifePlatformOperational"]="life-platform-canary dlq-consumer life-platform-freshness-checker insight-email-parser data-export qa-smoke mcp-key-rotator"

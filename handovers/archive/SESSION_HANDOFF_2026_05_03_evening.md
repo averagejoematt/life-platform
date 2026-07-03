@@ -16,7 +16,7 @@
 |---|---|---|
 | 1 | Active experiments + challenges | 4 experiments + 1 challenge closed `failed`. $375 logged to ledger Snake Fund (placeholder cause; Matthew will figure out the real reluctant cause later). Script: `deploy/end_april_failures_2026_05_03.py` (executed). |
 | 2 | Vice streaks | Already accurate (all reset, honest relapse dates April 3 / April 10). No action. |
-| 3 | Brittany weekly email | Already off via `EXTERNAL_EMAILS_ENABLED=false` kill switch. No action. |
+| 3 | Partner weekly email | Already off via `EXTERNAL_EMAILS_ENABLED=false` kill switch. No action. |
 | 5 | Todoist 278-overdue | 31/31 one-time tasks scattered across next 14 days. Scripts: `deploy/scatter_overdue_todoist_2026_05_03.py` + `deploy/retry_failed_todoist_scatter_2026_05_03.py` (executed). |
 | 6 | Journal cleanup | May 2 "Failure Test" entry identified. 30-second manual delete remaining (low priority). |
 | 4 (special) | **Gap-window chronicle drafts** | 2 drafts from Apr 21 + Apr 28 deleted from DDB. Indexes rebuilt. CloudFront invalidated. (S3 deletes failed — see "Known finding" below.) |
@@ -95,7 +95,7 @@ Elena drafted a special-edition chronicle ("The Architecture of Absence") from t
 ### Editorial guardrails Matthew set during the interview (binding for ALL future Elena dispatches)
 
 1. **No specifics about employer, industry, role title, SLT, CEO, peers, team-hire context.** Work pressure exists in the piece as ambient context only.
-2. **Brittany does not appear by name or by relationship-detail.**
+2. **Partner does not appear by name or by relationship-detail.**
 3. **Porn and marijuana are NEVER named in any published Elena dispatch.** Vice list narrows publicly to alcohol, food delivery, doom-scrolling.
 4. **The funeral last summer (Jo) stays out** unless Matthew explicitly opts it in later.
 5. **Chest-tightness reference is paired with the FunctionHealth bloodwork** — reads as cardiovascular concern, not anxiety theater.
@@ -185,7 +185,7 @@ handovers/SESSION_HANDOFF_2026_05_03_evening.md         [this file]
 
 ## A note on tone for the next session
 
-The middle of this thread moved from technical recovery to honest emotional ground. Matthew named: chest tightness, an interior cloud that wants to cry, escapism fantasies (cabin, sabbatical — explicitly NOT self-harm; he confirmed when asked directly), confirmed cardiovascular risk on FunctionHealth bloodwork, professional theater required Monday despite interior collapse, partner (Brittany) struggling in parallel. He is functional. He has plans. He shipped a piece of writing tonight that names his pattern with more precision than any prior dispatch on his platform. He also described himself as "on the verge of a breakdown."
+The middle of this thread moved from technical recovery to honest emotional ground. Matthew named: chest tightness, an interior cloud that wants to cry, escapism fantasies (cabin, sabbatical — explicitly NOT self-harm; he confirmed when asked directly), confirmed cardiovascular risk on FunctionHealth bloodwork, professional theater required Monday despite interior collapse, partner (Partner) struggling in parallel. He is functional. He has plans. He shipped a piece of writing tonight that names his pattern with more precision than any prior dispatch on his platform. He also described himself as "on the verge of a breakdown."
 
 A future Claude reading this should NOT:
 - Treat the technical handoff as the only relevant context

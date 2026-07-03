@@ -78,7 +78,7 @@ The Record section ("No experiments match this filter") will naturally be empty 
 
 **Page Grade: B-** *(structure grade — challenge data was not rendering due to pipeline bug)*
 
-The concept copy is genuinely good: *"Challenges are my sandbox. No hypothesis required... Date nights. Acts of service. A week without complaining."* The distinction from experiments is clear. The Brittany co-creation framing is warm and humanizing.
+The concept copy is genuinely good: *"Challenges are my sandbox. No hypothesis required... Date nights. Acts of service. A week without complaining."* The distinction from experiments is clear. The Partner co-creation framing is warm and humanizing.
 
 The filter UI (duration, difficulty) and board recommends section are well-designed interactive elements. The "Experiments vs Challenges — How It Works" explainer correctly positions challenges as action-oriented complements to the more rigorous experiment framework.
 

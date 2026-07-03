@@ -63,10 +63,10 @@ aws lambda invoke --function-name life-platform-mcp \
 - **Phase 2:** Daily Brief email integration — add Character Sheet section to the brief, level-up event notifications, Board commentary on tier transitions
 - **Phase 3:** Dashboard radar chart + pixel-art avatar + buddy page + Chronicle hooks
 - **Phase 4:** User-defined rewards, protocol recommendations, Weekly Digest integration
-- **Other roadmap items:** Brittany weekly email, Monarch Money, Google Calendar, Annual Health Report
+- **Other roadmap items:** Partner weekly email, Monarch Money, Google Calendar, Annual Health Report
 
 ## Open Questions (from design session)
 1. Avatar generation method — AI image tools vs commissioned pixel art
-2. Brittany email inclusion of character sheet data
+2. Partner email inclusion of character sheet data
 3. Notification channel — Daily Brief only vs additional push notifications
 4. Sparse data handling — neutral score (40) vs last known value for days with missing data

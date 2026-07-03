@@ -14,10 +14,10 @@ COMPUTE_ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/life-platform-compute-role"
 echo "=== SEC-1 Finish: Reassigning 2 remaining Lambdas ==="
 echo ""
 
-# brittany-weekly-email is an email Lambda → email role
-echo -n "  brittany-weekly-email → life-platform-email-role ... "
+# partner-weekly-email is an email Lambda → email role
+echo -n "  partner-weekly-email → life-platform-email-role ... "
 aws lambda update-function-configuration \
-  --function-name brittany-weekly-email \
+  --function-name partner-weekly-email \
   --role "$EMAIL_ROLE_ARN" \
   --region "$REGION" \
   --no-cli-pager > /dev/null
@@ -36,7 +36,7 @@ echo "✅"
 
 echo ""
 echo "=== Verification ==="
-for fn in "brittany-weekly-email" "life-platform-qa-smoke"; do
+for fn in "partner-weekly-email" "life-platform-qa-smoke"; do
   role=$(aws lambda get-function-configuration \
     --function-name "$fn" --region "$REGION" \
     --query "Role" --output text --no-cli-pager | sed 's|.*role/||')

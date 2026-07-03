@@ -3,7 +3,7 @@
 # Changes:
 #   1. Elena's system prompt: synthesis over recounting, no day-by-day
 #   2. Editorial guidance in user message
-#   3. Age fix (37, lives with Brittany)
+#   3. Age fix (37, lives with Partner)
 #   4. Redesigned blog homepage with hero/featured layout
 #   5. Updated build_blog_index for future installments
 
@@ -57,7 +57,7 @@ echo "==========================================="
 echo ""
 echo "  Changes:"
 echo "    • Elena's voice: synthesis over day-by-day recounting"
-echo "    • Age/bio fix: 37, lives with Brittany"
+echo "    • Age/bio fix: 37, lives with Partner"
 echo "    • Blog homepage: hero layout, clear read CTA"
 echo "    • build_blog_index: featured latest + archive list"
 echo ""

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # deploy_obs1_ai3_apikeys.sh
-# Deploys: OBS-1 + AI-3 rollout to brittany-weekly-email
+# Deploys: OBS-1 + AI-3 rollout to partner-weekly-email
 #          api-keys pre-deletion fixes (journal-enrichment, habitify CDK bug)
 #
 # Lambda code changes:
-#   brittany_email_lambda.py   — add platform_logger (OBS-1) + ai_output_validator (AI-3)
+#   partner_email_lambda.py   — add platform_logger (OBS-1) + ai_output_validator (AI-3)
 #   journal_enrichment_lambda.py — fix ANTHROPIC_SECRET default (api-keys → ai-keys)
 #   habitify_lambda.py           — fix SECRET_NAME default (api-keys → habitify)
 #   notion_lambda.py             — fix SECRET_NAME default (api-keys → ingestion-keys)
@@ -41,8 +41,8 @@ deploy_lambda() {
 echo "=== OBS-1 + AI-3 + api-keys pre-deletion fixes ==="
 echo ""
 
-# 1. brittany-weekly-email — OBS-1 + AI-3
-deploy_lambda "brittany-weekly-email" "brittany_email_lambda.py"
+# 1. partner-weekly-email — OBS-1 + AI-3
+deploy_lambda "partner-weekly-email" "partner_email_lambda.py"
 
 # 2. journal-enrichment — fix ANTHROPIC_SECRET default (api-keys → ai-keys)
 deploy_lambda "journal-enrichment" "journal_enrichment_lambda.py"

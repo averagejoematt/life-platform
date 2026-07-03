@@ -3,7 +3,7 @@
 ## Session Summary
 
 Full hygiene sweep following Architecture Review #4. All 10 items complete.
-All deploys verified. Platform fully clean heading into Brittany email feature.
+All deploys verified. Platform fully clean heading into Partner email feature.
 
 ---
 
@@ -46,6 +46,6 @@ All deploys verified. Platform fully clean heading into Brittany email feature.
 
 ## Next Steps
 
-1. **Brittany weekly accountability email** — next major feature
+1. **Partner weekly accountability email** — next major feature
 2. **SIMP-1** — MCP tool usage audit ~2026-04-08
 3. **Review #5** — ~2026-04-08

@@ -283,9 +283,9 @@ One new cost observation: the `role_policies.py` file means CDK creates and mana
 
 *The v3.4.0 session also produced a P1 (EventBridge rule deletion) and 4 other incidents. This is the cost of major infrastructure changes done in a single session. The lesson — recorded in code but not yet in the INCIDENT_LOG or DECISIONS.md — is that CDK resource naming and cleanup script interactions are a high-risk area. Record the lesson. Archive the one-time scripts. Update the docs.*
 
-*The top 10 improvements are all small (S effort, all Sonnet). That's the hallmark of a mature system — the remaining work is documentation and hygiene, not architecture. Do them before starting the Brittany email.*
+*The top 10 improvements are all small (S effort, all Sonnet). That's the hallmark of a mature system — the remaining work is documentation and hygiene, not architecture. Do them before starting the Partner email.*
 
-*Next review: ~2026-04-08 (30 days of production operation). Focus: SLO performance, reconciliation trends, cost trajectory, Brittany email lessons, IC feature quality with 30+ days of data.*
+*Next review: ~2026-04-08 (30 days of production operation). Focus: SLO performance, reconciliation trends, cost trajectory, Partner email lessons, IC feature quality with 30+ days of data.*
 
 *The platform is at A-/B+ and climbing. Well done."*
 
@@ -294,5 +294,5 @@ One new cost observation: the `role_policies.py` file means CDK creates and mana
 ## NEXT REVIEW
 
 **Scheduled:** ~2026-04-08 (30 days production operation)
-**Focus:** SLO breach history, reconciliation trends, IC feature quality assessment, MCP tool usage audit (SIMP-1), Brittany email operational impact, cost trajectory with 30 days of data
+**Focus:** SLO breach history, reconciliation trends, IC feature quality assessment, MCP tool usage audit (SIMP-1), Partner email operational impact, cost trajectory with 30 days of data
 **Process:** `bash deploy/generate_review_bundle.sh` → `docs/REVIEW_METHODOLOGY.md`

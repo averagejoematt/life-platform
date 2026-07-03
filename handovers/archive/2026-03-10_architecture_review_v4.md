@@ -78,6 +78,6 @@ Also updated `docs/REVIEW_METHODOLOGY.md` with the new process.
 
 1. **Save downloaded review** → `docs/reviews/REVIEW_2026-03-10.md`
 2. **Git commit:** `git add -A && git commit -m "v3.4.2: Architecture Review #4 + review bundle generator" && git push`
-3. **Hygiene items 1-10** above (can be done alongside Brittany email, all Sonnet)
-4. **Brittany weekly email** — next major feature
+3. **Hygiene items 1-10** above (can be done alongside Partner email, all Sonnet)
+4. **Partner weekly email** — next major feature
 5. **Review #5:** ~2026-04-08 — use `python3 deploy/generate_review_bundle.py` first!

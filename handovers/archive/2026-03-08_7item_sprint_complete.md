@@ -107,6 +107,6 @@ git add -A && git commit -m "v3.1.5: 7-item doc + wiring sprint complete" && git
 - AI-2: Fix causal language in prompts (~2 hr)
 
 **Next feature (after hardening gate passes):**
-- Brittany weekly accountability email — next major feature
+- Partner weekly accountability email — next major feature
 
 **Platform state:** Solid. Docs are current. Safety modules wired into the highest-traffic Lambdas. Ready to proceed to full rollout or feature work.

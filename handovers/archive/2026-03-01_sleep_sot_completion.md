@@ -49,5 +49,5 @@ Already updated at top of `docs/CHANGELOG.md` (v2.55.0 entry written in prior se
 1. Prologue fix + Chronicle v1.1 deploy (still pending)
 2. Nutrition Review email feedback
 3. Buddy data.json verification
-4. Brittany weekly email (next accountability feature)
+4. Partner weekly email (next accountability feature)
 5. Monarch Money integration (financial tracking)

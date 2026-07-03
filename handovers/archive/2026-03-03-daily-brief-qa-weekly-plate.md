@@ -34,7 +34,7 @@ New Friday evening food magazine email — personalized from actual MacroFactor 
   4. *The Wildcard* — one missing ingredient + Met Market recommendation
   5. *The Grocery Run* — screenshot-able grocery list by store section
 - **Design:** Dark theme (#1a1a2e), gold accent (#f59e0b), mobile-first 600px
-- **Tone:** Food magazine column — fun, warm, Brittany-readable
+- **Tone:** Food magazine column — fun, warm, Partner-readable
 
 ### Deploy Issues Resolved
 
@@ -95,7 +95,7 @@ New Friday evening food magazine email — personalized from actual MacroFactor 
 | Daily Brief QA verification | ⏸️ | Tomorrow's email — check subject date + training commentary |
 | Notion journal test with real entry | ⏸️ | Lambda deployed, needs manual test |
 | Character Sheet Phase 3 | ⏸️ | Dashboard radar chart, avatar, buddy tile, Chronicle hooks |
-| Brittany weekly email | ⏸️ | Accountability feature expansion |
+| Partner weekly email | ⏸️ | Accountability feature expansion |
 | Strava ingestion-time dedup | ⏸️ | DDB cleanup for MCP tools |
 | Monarch Money integration | ⏸️ | Financial tracking |
 | Google Calendar integration | ⏸️ | Demand-side scheduling data |

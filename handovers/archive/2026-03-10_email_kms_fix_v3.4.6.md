@@ -59,7 +59,7 @@ Today's 9 AM PT brief was missed (platform was broken since COST-A deploy earlie
 | `life-platform/api-keys` auto-deletion | ~2026-04-07 | Saves $0.40/mo |
 | `life-platform/habitify` secret creation | Before 2026-04-07 | Before `api-keys` expires |
 | SIMP-1 MCP tool usage audit | ~2026-04-08 | 30 days usage data needed |
-| Brittany weekly email | Next major feature | Requires reward seeding first |
+| Partner weekly email | Next major feature | Requires reward seeding first |
 | Character Sheet Phase 4 | Backlog | Rewards, protocol recommendations |
 
 ---

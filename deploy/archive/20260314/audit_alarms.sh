@@ -53,7 +53,7 @@ CDK_EXPECTED=(
   ingestion-error-wednesday-chronicle
   ingestion-error-weekly-plate
   ingestion-error-monday-compass
-  # ingestion-error-brittany-weekly-email  (not yet deployed)
+  # ingestion-error-partner-weekly-email  (not yet deployed)
   # Operational
   freshness-checker-errors
   key-rotator-errors

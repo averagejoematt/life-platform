@@ -33,7 +33,7 @@ Built and deployed a mobile-first accountability partner interface for Tom in Si
 
 **Design decisions:**
 - Board of Directors approved (5/5) engagement-based over metric-driven approach
-- Two accountability interfaces planned: Tom (mobile dashboard, done), Brittany (weekly email, future)
+- Two accountability interfaces planned: Tom (mobile dashboard, done), Partner (weekly email, future)
 - Conservative beacon: biased toward "he's fine" — only alerts on data silence
 - No actual health numbers exposed — just "heading in the right direction" / activity names
 
@@ -58,7 +58,7 @@ Built and deployed a mobile-first accountability partner interface for Tom in Si
 
 ## Pending / Next Steps
 
-1. **Brittany's weekly email** — Second accountability interface (lives with Matthew, different needs than Tom). Weekly summary email, not a dashboard.
+1. **his partner's weekly email** — Second accountability interface (lives with Matthew, different needs than Tom). Weekly summary email, not a dashboard.
 2. **Nutrition Review feedback** — Matthew still has feedback pending on first Saturday nutrition email
 3. **Chronicle v1.1 deploy** — `deploy/deploy_chronicle_v1.1.sh` still pending execution
 4. **Prologue fix** — `deploy/fix_prologue.sh` still pending execution

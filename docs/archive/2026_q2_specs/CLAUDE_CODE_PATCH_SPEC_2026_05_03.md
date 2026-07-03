@@ -346,7 +346,7 @@ life-platform:create_todoist_task \
 
 life-platform:create_todoist_task \
   content="Schedule one in-person, non-transactional conversation this week" \
-  description="Per Murthy (FH 2026 board) — Pillar 7 has been the thinnest data layer for 12+ months. Threshold: both parties leave knowing something about each other they didn't know before. Not Brittany, not Tom, not a healthcare provider. Coffee, walk, dinner all qualify. Log via life-platform:log_interaction depth='deep'." \
+  description="Per Murthy (FH 2026 board) — Pillar 7 has been the thinnest data layer for 12+ months. Threshold: both parties leave knowing something about each other they didn't know before. Not Partner, not Tom, not a healthcare provider. Coffee, walk, dinner all qualify. Log via life-platform:log_interaction depth='deep'." \
   due_string="every! week" \
   due_date="2026-05-08" \
   priority=3

@@ -92,7 +92,7 @@ now correctly defaults to `life-platform/api-keys`).
 
 ## Pending / Next Steps
 
-1. **Brittany accountability email** — next major feature. Weekly email for Matthew's partner.
+1. **Partner accountability email** — next major feature. Weekly email for Matthew's partner.
    Open question: include Character Sheet data?
 
 2. **Character Sheet Phase 4** — user-defined rewards, protocol recommendations, Weekly Digest

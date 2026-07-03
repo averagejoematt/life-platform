@@ -43,7 +43,7 @@ All items from the backlog are now closed. Platform is clean.
 | Habitify secret | ✅ Done — keys already in ingestion-keys |
 | CloudFront TLS | ✅ Fixed — v3.4.9 |
 
-**Next session:** Brittany weekly email feature build.
+**Next session:** Partner weekly email feature build.
 
 ---
 

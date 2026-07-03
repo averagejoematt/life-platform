@@ -138,7 +138,7 @@ All 13 affected Lambdas updated with backwards-compatible field extraction:
 - **Adaptive mode journal score = 0** — still correct, no journal entries yet
 
 ## Next Session Suggestions
-1. **Brittany accountability email** — next major planned feature (weekly email for Matthew's partner)
+1. **Partner accountability email** — next major planned feature (weekly email for Matthew's partner)
 2. **#31 Light exposure tracking** (2-3 hr) — Habitify habit + correlation tool
 3. **#16 Grip strength** (2 hr) — buy dynamometer + Notion manual log + percentile tool
 4. **P2 backlog from audit** — if appetite: secrets consolidation verification + `weekly_digest` smoke test, then consider `daily_brief_lambda.py` monolith breakdown (4,002 lines → extract scoring_engine.py, ai_calls.py, html_builder.py, data_writers.py)

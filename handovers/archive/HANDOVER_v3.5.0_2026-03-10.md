@@ -21,8 +21,8 @@ Fixed 9 Lambdas with hardcoded `"life-platform/api-keys"` default → all update
 
 Fixed CDK `cdk/stacks/email_stack.py`:
 - Added `_email_env = {"ANTHROPIC_SECRET": "life-platform/ai-keys"}` applied to all 7 email Lambdas
-- Added `_brittany_env = {**_email_env, "BRITTANY_EMAIL": "brittany@mattsusername.com"}` (placeholder)
-- **⚠️ Confirm Brittany's real email, then `cdk deploy LifePlatformEmail`**
+- Added `_partner_env = {**_email_env, "PARTNER_EMAIL": "(partner address — SSM /life-platform/partner-email)"}` (placeholder)
+- **⚠️ Confirm his partner's real email, then `cdk deploy LifePlatformEmail`**
 
 #### ✅ Item 6 — SEC-1 cleanup (already done in v3.4.0)
 All 43 Lambdas have CDK-owned dedicated roles. Removed stale ARCHITECTURE.md note.
@@ -31,7 +31,7 @@ All 43 Lambdas have CDK-owned dedicated roles. Removed stale ARCHITECTURE.md not
 Removed `deploy_dst_spring_2026.sh` reference and ⚠️ warning emoji.
 
 #### ✅ Item 9 — Lambda count in ARCHITECTURE.md
-Corrected 41 → 43 everywhere in ARCHITECTURE.md (+brittany-weekly-email, +failure-pattern-compute). Header bumped to v3.5.0.
+Corrected 41 → 43 everywhere in ARCHITECTURE.md (+partner-weekly-email, +failure-pattern-compute). Header bumped to v3.5.0.
 
 #### ✅ Item 4 — Unit tests for shared modules
 `tests/test_shared_modules.py` — 60 tests, all passing, verified against real source files:
@@ -58,9 +58,9 @@ Run: `bash deploy/smoke_test_cloudfront.sh`
 
 ## ⚠️ Still Pending
 
-### Item 3 — Ship Brittany email
+### Item 3 — Ship Partner email
 Code is complete and CDK has it wired. Two steps remain:
-1. **Confirm Brittany's actual email** → update `_brittany_env["BRITTANY_EMAIL"]` in `cdk/stacks/email_stack.py`
+1. **Confirm his partner's actual email** → update `_partner_env["PARTNER_EMAIL"]` in `cdk/stacks/email_stack.py`
 2. `npx cdk deploy LifePlatformEmail` (or `LifePlatformEmail LifePlatformCompute` to push api-keys fixes too)
 
 ### ✅ Item 10 — cleanup_dead_files.sh
@@ -75,7 +75,7 @@ Executed and self-removed. Deleted: `lambdas/weather_lambda.py.archived`, `lambd
 
 | Item | When |
 |------|------|
-| Confirm Brittany's email + deploy | ASAP |
+| Confirm his partner's email + deploy | ASAP |
 | `life-platform/api-keys` permanent deletion | ~2026-04-07 |
 | `life-platform/todoist/notion/dropbox` deletion | ~2026-04-10 |
 | SIMP-1 MCP tool audit | ~2026-04-08 |
@@ -84,7 +84,7 @@ Executed and self-removed. Deleted: `lambdas/weather_lambda.py.archived`, `lambd
 ---
 
 ## Next Session Priority Order
-1. Confirm Brittany email → `cdk deploy LifePlatformEmail`
+1. Confirm Partner email → `cdk deploy LifePlatformEmail`
 2. `cdk deploy LifePlatformCompute` (api-keys env var fixes live)
 3. `bash deploy/smoke_test_cloudfront.sh` (post-CDK validation)
 4. `bash deploy/cleanup_dead_files.sh`

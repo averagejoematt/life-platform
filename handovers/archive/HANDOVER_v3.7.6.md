@@ -24,12 +24,12 @@ Completed 4 days ahead of the 2026-03-17 deadline.
 Confirmed `production` environment exists in repo Settings → Environments with
 1 protection rule active.
 
-### TB7-2 — Brittany weekly email ✅
+### TB7-2 — Partner weekly email ✅
 Two missing env vars identified: `EMAIL_SENDER` (required, no default) and
-`BRITTANY_EMAIL` (was placeholder `awsdev@mattsusername.com`).
+`PARTNER_EMAIL` (was placeholder `awsdev@mattsusername.com`).
 - Updated live Lambda with both vars
-- Updated CDK source: `email_stack.py` `_brittany_env`
-- Smoke test: HTTP 200, "Brittany email v1.1.0 sent: Matthew's Week · 2026-03-13"
+- Updated CDK source: `email_stack.py` `_partner_env`
+- Smoke test: HTTP 200, "Partner email v1.1.0 sent: Matthew's Week · 2026-03-13"
 Next scheduled run: Sunday 2026-03-15 at 09:30 PT (17:30 UTC).
 
 ### TB7-15 — AI cost billing alarm ✅
@@ -79,5 +79,5 @@ Will self-heal on next `cdk deploy McpStack`.
 - Platform: v3.7.6, 42 Lambdas, 19 data sources, 8 CDK stacks
 - `life-platform/api-keys` secret: DELETED (2026-03-13)
 - Billing alarm: `life-platform-ai-cost-soft-alarm` in us-east-1
-- Brittany email: `brittany@mattsusername.com`, sender `awsdev@mattsusername.com`
+- Partner email: `(partner address — SSM /life-platform/partner-email)`, sender `awsdev@mattsusername.com`
 - Post-deploy rule: run `bash deploy/post_cdk_reconcile_smoke.sh` after every `cdk deploy`

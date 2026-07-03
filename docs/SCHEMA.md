@@ -551,7 +551,7 @@ Periodic (every 4-8 weeks) body tape measurements. Source: `USER#matthew#SOURCE#
 | Field | Type | Description |
 |-------|------|-------------|
 | `session_number` | number | Sequential session count |
-| `measured_by` | string | Person taking measurements (hardcoded `"brittany"` in the ingestion Lambda) |
+| `measured_by` | string | Person taking measurements (hardcoded `"partner"` in the ingestion Lambda) |
 | `unit` | string | Always "in" (inches) |
 | `source_file` | string | `s3://` path of the source CSV |
 | `notes` | string | Optional free-text notes from the CSV |

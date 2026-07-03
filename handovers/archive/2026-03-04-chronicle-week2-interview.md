@@ -26,7 +26,7 @@
   - The Rolex: 300→190 achievement, now sits in a drawer
   - Jo's death, company reorg, the spiral back to 300+
   - "I don't even know what I want" — purpose, happiness, community, defensiveness
-  - Brittany: preparing aligned meals, showing up without being asked (softened per Matthew's request)
+  - Partner: preparing aligned meals, showing up without being asked (softened per Matthew's request)
   - Maslow's hierarchy: physical layer is controllable, existential layer isn't
   - "Onboarding shift" — everything takes twice the energy it eventually will
 - **Title:** "The Empty Journal"
@@ -34,8 +34,8 @@
 - **Matthew's edits:** 4 corrections applied:
   1. Rolex in a drawer, not on wrist
   2. Removed implication of more cancer after Jo
-  3. Softened Brittany — kept meals/showing up, removed her as a named "question"
-  4. Removed Brittany from next-week teaser
+  3. Softened Partner — kept meals/showing up, removed her as a named "question"
+  4. Removed Partner from next-week teaser
 
 ### 4. Deploy Script — Lambda Fix + Content Push
 - **Script:** `deploy/deploy_chronicle_week2.sh`
@@ -62,7 +62,7 @@ chmod +x ~/Documents/Claude/life-platform/deploy/deploy_chronicle_week2.sh
 ### Ongoing
 - State of Mind: verify How We Feel → HealthKit path on iPhone
 - DST timing check: March 8 (this Sunday)
-- Brittany weekly accountability email: next major feature
+- Partner weekly accountability email: next major feature
 - Supplement dosages: update defaults in `habitify_lambda.py`
 
 ---

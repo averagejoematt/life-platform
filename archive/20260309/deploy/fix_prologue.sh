@@ -2,13 +2,13 @@
 # fix_prologue.sh — Fix age and living situation in prologue
 set -euo pipefail
 
-echo "=== Fixing prologue (age + Brittany) ==="
+echo "=== Fixing prologue (age + Partner) ==="
 
 # Download current
 aws s3 cp s3://matthew-life-platform/blog/week-00.html /tmp/week-00-fix.html
 
 # Fix
-sed -i '' 's/Matthew is thirty-five. He lives alone in Seattle./Matthew is thirty-seven. He lives with his girlfriend, Brittany, in Seattle./' /tmp/week-00-fix.html
+sed -i '' 's/Matthew is thirty-five. He lives alone in Seattle./Matthew is thirty-seven. He lives with his girlfriend, Partner, in Seattle./' /tmp/week-00-fix.html
 
 # Verify
 if grep -q "thirty-seven" /tmp/week-00-fix.html; then

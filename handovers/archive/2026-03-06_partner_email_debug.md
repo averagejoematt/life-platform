@@ -1,15 +1,15 @@
-# Handover — 2026-03-06 — Brittany Email: Broken, Needs Debug Tomorrow
+# Handover — 2026-03-06 — Partner Email: Broken, Needs Debug Tomorrow
 
 ## Session Summary
 
-Built and deployed the Brittany weekly email Lambda (`brittany-weekly-email`). Lambda deploys
+Built and deployed the Partner weekly email Lambda (`partner-weekly-email`). Lambda deploys
 and runs without crashing, but the Board of Directors sections are not rendering in the email.
 Two versions shipped tonight — both have the same symptom: data sections render, AI narrative
 does not appear.
 
 ---
 
-## Current State of `brittany_email_lambda.py`
+## Current State of `partner_email_lambda.py`
 
 **Version in Lambda:** v1.1.0 (deployed, confirmed running)
 **Version on disk:** v1.1.0
@@ -45,14 +45,14 @@ Two possibilities, in order of likelihood:
 ```bash
 # Get latest log stream
 aws logs describe-log-streams \
-  --log-group-name /aws/lambda/brittany-weekly-email \
+  --log-group-name /aws/lambda/partner-weekly-email \
   --order-by LastEventTime --descending --limit 1 \
   --region us-west-2 --no-cli-pager \
   --query 'logStreams[0].logStreamName' --output text
 
 # Read the logs (replace STREAM with output above — wrap in quotes, escape $ as \$)
 aws logs get-log-events \
-  --log-group-name /aws/lambda/brittany-weekly-email \
+  --log-group-name /aws/lambda/partner-weekly-email \
   --log-stream-name 'STREAM_NAME' \
   --region us-west-2 --no-cli-pager \
   --query 'events[*].message' --output text
@@ -94,24 +94,24 @@ DO NOT revert to metric cards and character sheet pillar bars — that was the v
 
 | File | Status |
 |------|--------|
-| `lambdas/brittany_email_lambda.py` | v1.1.0 — deployed, Board sections not rendering |
+| `lambdas/partner_email_lambda.py` | v1.1.0 — deployed, Board sections not rendering |
 | `deploy/deploy_v2.79.0.sh` | Done — Lambda exists, don't re-run create |
 | `docs/CHANGELOG.md` | Updated (v2.79.0) |
-| `docs/PROJECT_PLAN.md` | Updated (30 Lambdas, Brittany email in cadence table) |
+| `docs/PROJECT_PLAN.md` | Updated (30 Lambdas, Partner email in cadence table) |
 
 ---
 
 ## To Do Tomorrow (in order)
 
-1. **Pull CloudWatch logs** from brittany-weekly-email — identify AI call vs parser failure
+1. **Pull CloudWatch logs** from partner-weekly-email — identify AI call vs parser failure
 2. **Fix the root cause** (likely: bump timeout + add raw response logging)
 3. **Re-deploy and test invoke**
-4. **Confirm Board sections render** before setting Brittany's real email address
-5. **Set BRITTANY_EMAIL env var** once email looks right:
+4. **Confirm Board sections render** before setting his partner's real email address
+5. **Set PARTNER_EMAIL env var** once email looks right:
    ```bash
    aws lambda update-function-configuration \
-     --function-name brittany-weekly-email \
-     --environment 'Variables={TABLE_NAME=life-platform,EMAIL_SENDER=awsdev@mattsusername.com,BRITTANY_EMAIL=REAL_EMAIL_HERE,ANTHROPIC_SECRET=life-platform/api-keys}' \
+     --function-name partner-weekly-email \
+     --environment 'Variables={TABLE_NAME=life-platform,EMAIL_SENDER=awsdev@mattsusername.com,PARTNER_EMAIL=REAL_EMAIL_HERE,ANTHROPIC_SECRET=life-platform/api-keys}' \
      --region us-west-2 --no-cli-pager
    ```
 
@@ -120,6 +120,6 @@ DO NOT revert to metric cards and character sheet pillar bars — that was the v
 ## Platform State
 
 - **Version:** v2.79.0
-- **Lambdas:** 30 (brittany-weekly-email deployed but not fully working)
+- **Lambdas:** 30 (partner-weekly-email deployed but not fully working)
 - **MCP tools:** 124 (unchanged)
-- **Next after Brittany email fixed:** Reward seeding → Google Calendar
+- **Next after Partner email fixed:** Reward seeding → Google Calendar

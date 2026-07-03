@@ -15,7 +15,7 @@ profile = table.get_item(Key={"pk": "USER#matthew", "sk": "PROFILE#v1"}).get("It
 height_in = int(profile.get("height_inches", 69))
 print(f"Height from profile: {height_in} inches")
 
-# Day 1 measurements (2026-03-29, captured by Brittany)
+# Day 1 measurements (2026-03-29, captured by Partner)
 date_str = "2026-03-29"
 raw = {
     "neck_in": Decimal("17.0"),
@@ -54,7 +54,7 @@ item = {
     "date": date_str,
     "unit": "in",
     "session_number": session_number,
-    "measured_by": "brittany",
+    "measured_by": "partner",
     **raw,
     "waist_height_ratio": waist_height_ratio,
     "bilateral_symmetry_bicep_in": bilateral_bicep,

@@ -64,7 +64,7 @@ Added Daily Brief compute refactor to roadmap.
 
 ## Next Up
 
-1. **Set BRITTANY_EMAIL** — command in previous handover, just needs real address
+1. **Set PARTNER_EMAIL** — command in previous handover, just needs real address
 2. **Reward seeding** — prerequisite for Character Sheet Phase 4 completion
 3. **Google Calendar** — #2 North Star gap, Board rank #9
 4. **Daily Brief compute refactor** (#53) — when ready to tackle tech debt

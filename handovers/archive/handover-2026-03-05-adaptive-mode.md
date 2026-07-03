@@ -67,7 +67,7 @@ Computed daily by `adaptive-mode-compute` at 9:36 AM PT:
 - Chronicle adaptive frequency (weekly → biweekly based on narrative density) — was part of original spec but complex; deferred as Phase 2
 
 ## Next Session Suggestions
-1. **Brittany Accountability Email** — next major planned feature
+1. **Partner Accountability Email** — next major planned feature
 2. **#31 Light Exposure** (2-3 hr) — Habitify habit + correlation tool
 3. **#16 Grip Strength** (2 hr) — Notion manual log + percentile tool
 4. **#40 Life Event Tagging** (2-3 hr) — Board rank #1 unbuilt

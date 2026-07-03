@@ -34,7 +34,7 @@ This session completed:
 3. **Other pending items:**
    - Prologue fix + Chronicle v1.1 deploy still pending
    - Nutrition Review feedback pending
-   - Brittany weekly email is next accountability feature
+   - Partner weekly email is next accountability feature
 
 ### Files changed
 - `mcp/registry.py` — +1 import, +3 tool entries (102 tools)

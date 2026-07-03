@@ -24,7 +24,7 @@ The v1 audit shipped real plumbing (retry_utils, shared layer, coach evaluator a
 1. Fix `_emit_token_metrics` in 5 coach Lambdas (1-line change × 5 files, then 5 redeploys) → real visibility
 2. Fix coach-computation-engine TypeError → restore daily coach compute
 3. Add metric_hint whitelist validation in coach_state_updater post-LLM → unblock prediction loop verdicts
-4. Promote field-notes-generate, brittany_email, site_api_ai to retry_utils and re-deploy with layer → token telemetry on 3 more Lambdas
+4. Promote field-notes-generate, partner_email, site_api_ai to retry_utils and re-deploy with layer → token telemetry on 3 more Lambdas
 5. Decide on the unused coach-quality-gate: wire it into the daily-brief flow OR delete
 
 **v1 drift:** P1.9 (token telemetry) is half-shipped. P3.4 (retry coverage) is partially shipped (field-notes not deployed). P3.8 (shared-preamble cache) is wired but unverifiable. P5.5 (quality gate retry) never started. P5.6 (COACH# write expansion) never started. ADR-055 (prediction evaluator) is running but 100% inconclusive.
@@ -66,7 +66,7 @@ if experiment_start_dt.tzinfo is None: experiment_start_dt = experiment_start_dt
 ## HIGH FINDINGS
 
 ### HIGH-AI-1: Only 2 of 22 AI-calling Lambdas emit ANY token metrics
-**Evidence:** `aws cloudwatch list-metrics --namespace LifePlatform/AI` returns dimensions only for `daily-brief` and `coach-state-updater`. Checked 20 other lambdas: `nutrition-review`, `wednesday-chronicle`, `monday-compass`, `weekly-digest`, `monthly-digest`, `anomaly-detector`, `hypothesis-engine`, `ai-expert-analyzer`, `challenge-generator`, `brittany-weekly-email`, `weekly-plate`, `journal-enrichment`, `journal-analyzer`, `daily-insight-compute`, `coach-ensemble-digest`, `coach-history-summarizer`, `coach-narrative-orchestrator`, `coach-quality-gate`, `coach-prediction-evaluator`, `field-notes-generate` — all 0 metrics.
+**Evidence:** `aws cloudwatch list-metrics --namespace LifePlatform/AI` returns dimensions only for `daily-brief` and `coach-state-updater`. Checked 20 other lambdas: `nutrition-review`, `wednesday-chronicle`, `monday-compass`, `weekly-digest`, `monthly-digest`, `anomaly-detector`, `hypothesis-engine`, `ai-expert-analyzer`, `challenge-generator`, `partner-weekly-email`, `weekly-plate`, `journal-enrichment`, `journal-analyzer`, `daily-insight-compute`, `coach-ensemble-digest`, `coach-history-summarizer`, `coach-narrative-orchestrator`, `coach-quality-gate`, `coach-prediction-evaluator`, `field-notes-generate` — all 0 metrics.
 **Root causes:**
 - Some don't actually call Anthropic (coach-quality-gate has 0 invocations this week, coach-prediction-evaluator doesn't call API).
 - Some short-circuit before AI (anomaly-detector "Flagged metrics: 0" most runs; daily-insight-compute "IC-8: No intention data — skipping" 5/6 daily runs).
@@ -138,8 +138,8 @@ if experiment_start_dt.tzinfo is None: experiment_start_dt = experiment_start_dt
 **Action:** Add `AI_MODEL` and `AI_MODEL_HAIKU` as defaulted env vars in each Lambda's CDK definition. Enables "test new model on 1 Lambda by changing env var" workflows.
 **Effort:** S (CDK + redeploy). **Risk:** None.
 
-### MED-AI-3: brittany-weekly-email has custom 2-attempt retry — bypasses shared retry_utils
-**Evidence:** `brittany_email_lambda.py:472-484` uses inline 2-attempt loop with hardcoded 5s sleep. Not using retry_utils (which has 4 attempts with 5/15/45s backoff). Hardcoded model `claude-sonnet-4-6` (line 463) — no AI_MODEL env override.
+### MED-AI-3: partner-weekly-email has custom 2-attempt retry — bypasses shared retry_utils
+**Evidence:** `partner_email_lambda.py:472-484` uses inline 2-attempt loop with hardcoded 5s sleep. Not using retry_utils (which has 4 attempts with 5/15/45s backoff). Hardcoded model `claude-sonnet-4-6` (line 463) — no AI_MODEL env override.
 **Action:** Replace with `from retry_utils import call_anthropic_raw`. Also adds telemetry.
 **Effort:** XS. **Risk:** None.
 
@@ -204,7 +204,7 @@ if experiment_start_dt.tzinfo is None: experiment_start_dt = experiment_start_dt
 | Prompt caching (12 + 7 Lambdas) | UNVERIFIABLE | Cache metrics absent from CloudWatch; logs show coach-state-updater always cache_read=0 |
 | SIMP-2 ingestion framework (8 Lambdas) | SHIPPED | All 6 SIMP-2 cohort Lambdas on layer v49 (newer than main cohort) |
 | Shared preamble cache (P3.8 daily-brief) | WIRED, UNVERIFIED | Code calls correctly; no telemetry confirms cache hits |
-| Retry rollout via retry_utils (P3.4) | PARTIAL | field-notes-generate not redeployed; brittany-email still custom 2-attempt |
+| Retry rollout via retry_utils (P3.4) | PARTIAL | field-notes-generate not redeployed; partner-email still custom 2-attempt |
 | run_id idempotency observability (P3.3) | SHIPPED | character_sheet, daily_metrics, adaptive_mode all tagged via compute_metadata.tag_record |
 | Coach state writing expansion (P5.6) | NOT SHIPPED | journal_enrichment, hypothesis_engine, challenge_generator, anomaly_detector all have 0 `COACH#` write references |
 | Coach quality gate retry (P5.5) | NOT SHIPPED | Still advisory-only per `coach_quality_gate.py` — and not even invoked |

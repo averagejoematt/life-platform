@@ -43,7 +43,7 @@ Built and deployed the visual layer for the Character Sheet system: dashboard ra
 
 ### Soon
 4. **DST cron fix** — EventBridge `character-sheet-compute` schedule is 17:35 UTC (9:35 AM PST). After March 8 spring forward → 10:35 AM PDT, which is AFTER the 10:00 AM Daily Brief. Must update to 16:35 UTC before March 8.
-5. **Brittany weekly email** — Accountability email feature, next major social feature
+5. **Partner weekly email** — Accountability email feature, next major social feature
 6. **Prologue fix script** — Still pending deployment
 
 ### Backlog

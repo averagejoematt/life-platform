@@ -307,7 +307,7 @@ The 90-day compliance arc has reference lines at 100% and 50%. With 3-4 days of 
 2. 🟡 **Pre-populate nudge section with starter data or hide until first nudge arrives** — All dashes ("—") looks like the feature doesn't work. Show "Be the first to send a nudge" instead. *Effort: XS.*
 3. 🟢 **Add milestone progression bar** — "Next milestone: 7d (7 to go)" exists but isn't very visual. A progress bar from 0 to 7 with day-by-day fills would create daily return motivation. *Effort: S.*
 4. 🟢 **Elevate the community section** — The Discord link gets one small mention at the bottom. For a page about accountability, community should be a primary section, not an afterthought. *Effort: S.*
-5. ⚪ **Consider weekly "accountability email to Brittany" preview** — The page mentions the accountability email but doesn't show what it looks like. A sample or most-recent snapshot would add transparency. *Effort: M.*
+5. ⚪ **Consider weekly "accountability email to Partner" preview** — The page mentions the accountability email but doesn't show what it looks like. A sample or most-recent snapshot would add transparency. *Effort: M.*
 
 ---
 

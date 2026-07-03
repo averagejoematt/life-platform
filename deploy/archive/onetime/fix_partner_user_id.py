@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-fix_brittany_user_id.py — Fix hardcoded USER#matthew in brittany_email_lambda.py (D1 compliance)
+fix_partner_user_id.py — Fix hardcoded USER#matthew in partner_email_lambda.py (D1 compliance)
 
 Run from project root:
-    python3 deploy/fix_brittany_user_id.py
+    python3 deploy/fix_partner_user_id.py
 """
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-TARGET = ROOT / "lambdas" / "brittany_email_lambda.py"
+TARGET = ROOT / "lambdas" / "partner_email_lambda.py"
 
 REPLACEMENTS = [
     # 1. Add USER_ID env var alongside existing constants
@@ -58,7 +58,7 @@ def fix():
 
     if changed:
         TARGET.write_text(src, encoding="utf-8")
-        print("[OK]   brittany_email_lambda.py written")
+        print("[OK]   partner_email_lambda.py written")
     else:
         print("[INFO] No changes needed")
     return True
@@ -66,7 +66,7 @@ def fix():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("D1 fix — brittany_email_lambda.py USER_ID")
+    print("D1 fix — partner_email_lambda.py USER_ID")
     print("=" * 60)
     fix()
     print("\nRun: python3 -m pytest tests/ -x -q")

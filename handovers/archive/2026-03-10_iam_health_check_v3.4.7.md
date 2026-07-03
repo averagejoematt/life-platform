@@ -57,5 +57,5 @@ Full platform health check following the COST-A/COST-B CDK migration. Found and 
 | `life-platform/api-keys` deletion | ~2026-04-07 | Auto, saves $0.40/mo |
 | `life-platform/habitify` secret creation | Before 2026-04-07 | Before api-keys expires |
 | SIMP-1 MCP tool usage audit | ~2026-04-08 | 30 days data needed |
-| Brittany weekly email | Next major feature | |
+| Partner weekly email | Next major feature | |
 | Character Sheet Phase 4 | Backlog | |

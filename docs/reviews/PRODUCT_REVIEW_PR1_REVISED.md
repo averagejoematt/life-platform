@@ -105,7 +105,7 @@ The site's primary weakness is not data or content — it's *information archite
 | **Ask** | `/ask/` | B | AI-powered Q&A against 26 data sources. Prompt suggestions well-chosen. | Subscribe upsell premature on Day 4. |
 | **Community** | `/community/` | C | Discord link. Three activity types listed. | An empty Discord is worse than no community page. Remove until 50+ members. |
 | **Explorer** | `/explorer/` | B+ | Cross-domain correlation explorer. Real correlation pairs will populate as data matures. Dr. Brandt's analysis card. | Will become one of the most valuable pages once 30+ days of data enable meaningful correlations. |
-| **Challenges** | `/challenges/` | B | "Sandbox" framing differentiating from experiments is smart. Brittany collaboration mention is humanizing. No DoorDash challenge active. | Challenge data may not render on the public page despite existing in the API. Verify. |
+| **Challenges** | `/challenges/` | B | "Sandbox" framing differentiating from experiments is smart. Partner collaboration mention is humanizing. No DoorDash challenge active. | Challenge data may not render on the public page despite existing in the API. Verify. |
 | **Subscribe** | `/subscribe/` | B+ | 2-column layout clean. "What you get" is specific. Double opt-in, privacy link, previous installments. Subscriber count loads dynamically. | "Week 1 ships after April 1" urgency banner is stale (it's April 4). |
 | **Start** | `/start/` | D | Sitemap page. Strategy calls for removal. | Should be redirected to home. |
 | **Data** | `/data/` | C | Technical data page. Strategy calls for move under Platform. | Redundant. |
@@ -191,7 +191,7 @@ The site's primary weakness is not data or content — it's *information archite
 
 **One-sentence summary:** "I like checking in but I can never tell what's new — I need a reason to come back each time."
 
-### Visitor 5 — "Brittany (Matthew's Partner)"
+### Visitor 5 — "Partner (Matthew's Partner)"
 
 **Entry:** Weekly accountability email → clicks through.
 
@@ -307,7 +307,7 @@ Cross-domain intelligence, public accountability with narrative, AI coaching lay
 "The Mind page avoids toxic positivity entirely. The Day 1 journal entry is psychologically honest — health anxiety, work anxiety, the test of no doom-scrolling. The temptation logging system (vice streaks at 0/8) is honest about where he's starting."
 
 ### Dr. Vivek Murthy — Social Connection & Accountability
-"The accountability framing is healthy. Brittany partnership in challenges, the subscriber relationship — all point toward connection. The Day 1 journal's mention of work relationships and imposter syndrome shows Matthew is tracking social health, not just physical."
+"The accountability framing is healthy. Partner partnership in challenges, the subscriber relationship — all point toward connection. The Day 1 journal's mention of work relationships and imposter syndrome shows Matthew is tracking social health, not just physical."
 
 ### Elena Voss — Editorial Voice
 "Voice is consistent. Three editorial rules maintained. The distinction between Elena's narrative and Matthew's first-person content is clear. The `/elena/` meta-page is elegant. Quality depends on underlying data — a bad week produces better narrative than a good week."
@@ -359,7 +359,7 @@ The deepest vanity: building 14 AI intelligence systems when 3 would suffice (Ch
 ## Section 10: Strategic Assessment
 
 ### 5A: Does the Platform Serve Matthew?
-The platform creates genuine accountability. Real data, public visibility, character score, daily brief, Brittany's email. The intelligence layer will become increasingly valuable. **However:** building consumes time that could go toward health behaviors. Feature freeze for 90 days recommended.
+The platform creates genuine accountability. Real data, public visibility, character score, daily brief, his partner's email. The intelligence layer will become increasingly valuable. **However:** building consumes time that could go toward health behaviors. Feature freeze for 90 days recommended.
 
 ### 5B: Does the Platform Serve Readers?
 

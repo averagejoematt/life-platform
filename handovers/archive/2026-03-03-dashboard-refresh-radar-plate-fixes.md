@@ -81,7 +81,7 @@
 1. **Verify radar chart** — check https://dash.averagejoematt.com/ for readable labels
 2. **Verify dashboard refresh** — check `data.json` after 2 PM PT tomorrow for `refreshed_at` timestamp
 3. **Verify Friday email** — next Weekly Plate should not hallucinate food pairings
-4. **Brittany weekly accountability email** — not started
+4. **Partner weekly accountability email** — not started
 5. **Monarch Money integration** — not started
 
 ---

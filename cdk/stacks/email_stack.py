@@ -9,7 +9,7 @@ v2.2 (FEAT-12): chronicle-approve Lambda + preview-before-publish workflow.
 
 Lambdas (11):
   daily-brief, weekly-digest, monthly-digest, nutrition-review,
-  wednesday-chronicle, weekly-plate, monday-compass, brittany-weekly-email,
+  wednesday-chronicle, weekly-plate, monday-compass, partner-weekly-email,
   evening-nudge, chronicle-email-sender (BS-03), chronicle-approve (FEAT-12),
   weekly-signal (PB-06)
 
@@ -246,25 +246,29 @@ class EmailStack(Stack):
         )
 
         # EXTERNAL_EMAILS_ENABLED kill switch — flip to "true" to resume sending to
-        # non-Matthew recipients (Brittany, confirmed subscribers). Used by
-        # brittany-weekly-email, chronicle-email-sender, weekly-signal.
-        _brittany_env = {
+        # non-Matthew recipients (Partner, confirmed subscribers). Used by
+        # partner-weekly-email, chronicle-email-sender, weekly-signal.
+        # The recipient address is PII and lives OUT of the repo: SSM parameter
+        # /life-platform/partner-email (created via CLI; on the managed-where
+        # ledger). The lambda reads it at runtime with a cached client and falls
+        # back to Matthew's own address if the parameter is absent.
+        _partner_env = {
             **_email_env,
-            "BRITTANY_EMAIL": "brittany@mattsusername.com",
+            "PARTNER_EMAIL_PARAM": "/life-platform/partner-email",
             "EMAIL_SENDER": "awsdev@mattsusername.com",
             "EXTERNAL_EMAILS_ENABLED": "false",
         }
         create_platform_lambda(
             self,
-            "BrittanyWeeklyEmail",
-            function_name="brittany-weekly-email",
-            handler="emails.brittany_email_lambda.lambda_handler",
-            source_file="lambdas/emails/brittany_email_lambda.py",
+            "PartnerWeeklyEmail",
+            function_name="partner-weekly-email",
+            handler="emails.partner_email_lambda.lambda_handler",
+            source_file="lambdas/emails/partner_email_lambda.py",
             schedule="cron(30 17 ? * 1 *)",
             timeout_seconds=90,
             memory_mb=256,
-            environment=_brittany_env,
-            custom_policies=rp.email_brittany(),
+            environment=_partner_env,
+            custom_policies=rp.email_partner(),
             **shared,
         )
 

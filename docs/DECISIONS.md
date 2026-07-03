@@ -1071,7 +1071,7 @@ Supporting files: `data_sources.json` (source registry), `lint_site_content.py` 
 - `field_notes_lambda.py`: Haiku (weekly lab notes)
 - All downgrades use `AI_MODEL` env var — instant rollback without code deploy.
 
-**NOT downgraded (quality-critical narrative content):** daily-brief (BoD, TL;DR, training/nutrition, journal coaches), wednesday-chronicle, weekly-plate, nutrition-review, monday-compass, weekly-digest, brittany-email.
+**NOT downgraded (quality-critical narrative content):** daily-brief (BoD, TL;DR, training/nutrition, journal coaches), wednesday-chronicle, weekly-plate, nutrition-review, monday-compass, weekly-digest, partner-email.
 
 **Phase 3 — Batch API (deferred):** 50% discount via async batch submission. Evaluated but deferred: $1.11-1.66/month savings doesn't justify the architectural complexity (split monolithic Lambdas into submit/collect pairs, handle batch timeouts, fallback paths). ~$0.04/month additional AWS costs.
 
@@ -1690,7 +1690,7 @@ Move Claude inference to **AWS Bedrock** (`bedrock-runtime invoke_model`):
   Request for backward-compat — it extracts the body and forwards to Bedrock).
 - Stragglers migrated (direct urllib callers): the 5 `coach_*` Lambdas,
   `site_api_ai_lambda` (/api/ask + /api/board_ask), `hypothesis_engine`,
-  `challenge_generator`, `brittany_email` (fallback path), `canary` (AI
+  `challenge_generator`, `partner_email` (fallback path), `canary` (AI
   health-check now probes Bedrock).
 - IAM: `_bedrock_statement()` in `role_policies.py`, wired into `_compute_base`
   (when `needs_ai_keys`), `_email_base` (all email roles), the 2 inline

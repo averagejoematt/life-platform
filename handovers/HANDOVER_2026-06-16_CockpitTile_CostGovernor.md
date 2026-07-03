@@ -47,7 +47,7 @@ aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String 
 
 ## 4. Still available, NOT pursued (Matt's call, not urgent — under budget)
 - **Secrets consolidation (~$2–3/mo):** bundle rarely-rotated secrets (18→~10) per the `ingestion-keys` pattern. Real lever but can break ingestion auth if rushed — deserves its own carefully-verified PR. Only worth it for margin.
-- **Tier-2 AI model-tiering** (weekly/monthly/brittany Sonnet→Haiku, ~$2–4/mo): also unnecessary while under budget.
+- **Tier-2 AI model-tiering** (weekly/monthly/partner Sonnet→Haiku, ~$2–4/mo): also unnecessary while under budget.
 
 ## 5. Verified
 #136 live on `/now/` (tile markup + renderCircadian in deployed JS; `/api/circadian` returns real data). #137/#138 unit-verified + `cdk synth` passes; full suite **1860 passed**. Budget tier still **2** until #137 deploys (then expect de-escalation to 0). Plan file: `~/.claude/plans/lively-swimming-rocket.md` (cost plan).

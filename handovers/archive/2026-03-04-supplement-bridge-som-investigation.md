@@ -74,4 +74,4 @@
 ## Next Session Priorities
 1. Resolve State of Mind data path (verify How We Feel or switch to Apple native)
 2. Integrate supplement bridge into Habitify backfill Lambda (if not already covered by gap-fill)
-3. Pending from previous sessions: prologue fix script, Chronicle v1.1 synthesis rewrite, weekly accountability email for Brittany
+3. Pending from previous sessions: prologue fix script, Chronicle v1.1 synthesis rewrite, weekly accountability email for Partner

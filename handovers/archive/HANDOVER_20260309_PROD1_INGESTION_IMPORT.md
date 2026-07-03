@@ -91,6 +91,6 @@ Apply the patterns above to:
 - **MonitoringStack** — CloudWatch alarms, dashboards
 
 ### Other Upcoming
-- Brittany weekly email (fully unblocked)
+- Partner weekly email (fully unblocked)
 - Prompt Intelligence fixes P1-P5
 - Google Calendar integration

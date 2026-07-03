@@ -922,7 +922,7 @@ Front-end rebuild into the locked Direction 05 design system — one engine, thr
 ## [Marathon 2026-05-29] — Bedrock cutover, budget guard, self-healing
 
 ### Added
-- **ADR-062 — Bedrock cutover.** All Claude inference routed through `lambdas/bedrock_client.invoke()` (IAM auth via `bedrock:InvokeModel` + cross-region inference profiles `us.anthropic.claude-sonnet-4-6` / `us.anthropic.claude-haiku-4-5-20251001-v1:0`). `retry_utils.call_anthropic_raw` rewritten to extract the body from the legacy urllib Request and forward to Bedrock — backward-compatible plumbing across the 5 coaches + site-api-ai + hypothesis-engine + challenge-generator + brittany-email + canary.
+- **ADR-062 — Bedrock cutover.** All Claude inference routed through `lambdas/bedrock_client.invoke()` (IAM auth via `bedrock:InvokeModel` + cross-region inference profiles `us.anthropic.claude-sonnet-4-6` / `us.anthropic.claude-haiku-4-5-20251001-v1:0`). `retry_utils.call_anthropic_raw` rewritten to extract the body from the legacy urllib Request and forward to Bedrock — backward-compatible plumbing across the 5 coaches + site-api-ai + hypothesis-engine + challenge-generator + partner-email + canary.
 - **ADR-063 — $75/month budget guardrails.** `lambdas/operational/cost_governor_lambda.py` (hourly) projects MTD spend (Cost Explorer non-AI + Bedrock token metrics) and writes tier 0–3 to SSM `/life-platform/budget-tier`. `lambdas/budget_guard.py` (shared layer) gates AI features by tier with the "protect daily-brief longest" priority: tier 1 pauses coach narratives + ensemble + chronicle, tier 2 pauses website AI (`/api/ask`, `/api/board_ask` return a friendly "paused" response), tier 3 hard-stops at `bedrock_client.invoke()` with `BudgetExceeded`. One `CfnBudget` `life-platform-monthly-75` with SES alerts at 50/70/85/100%. **Enforcement enabled.**
 - **ADR-064 — self-healing remediation agent.** `.github/workflows/remediation-agent.yml` runs Claude (Sonnet 4.6 on Bedrock) daily ~07:45 PT via OIDC role `github-actions-remediation-role` (read-only diagnosis + scoped log/SES, NO deploy/IAM mutate). Triages alarms / failed CI runs / DLQ depth / QA-smoke. Buckets each signal A/B/C/D per `docs/REMEDIATION_TAXONOMY.md`. Sends one curated SES email replacing the raw `[LP digest]` noise. Kill-switch: SSM `/life-platform/remediation-mode` ∈ `{off, shadow, auto}`. Tier-3 budget no-ops the run.
 - **ADR-065 — auto-merge as a deterministic gate, not the agent.** `remediation/automerge.py` is the only thing that merges `auto-fix-safe` PRs. Six guards must all hold: mode=auto, narrow ALLOWLIST (role_policies, lambda_map, monitoring_stack, freshness_checker, qa_smoke, tests/), DENYLIST clean, diff ≤ 60 lines, lint + offline unit-tests pass on the PR branch, daily cap (3) not reached. **Phase 2 enabled** (mode=auto). Does NOT bypass CI's `environment: production` approval gate.
@@ -1060,7 +1060,7 @@ Continued the v7.19.0 pivot. Shipped 4 more items; uncovered + restored from a r
 
 Reuses existing `inventory["latest"]` dates so no new queries. Closes the original ADR-051 failure mode: coaches confidently opining on sources that haven't reported in weeks. **Code staged but NOT deployed** — `intelligence_common.py` lives in the shared layer (v49). Live activation requires `bash deploy/build_layer.sh` + cascading update of consumer Lambdas (high blast radius). Deferred to a dedicated deploy session.
 
-**2. P5.1 prompt-caching audit** — completed as audit-only (zero code changes). 21 Lambdas hit Anthropic; 12 have explicit `cache_control`, 7 more route through `retry_utils` (which adds it internally), leaving 3 stragglers (`site_api_lambda.py`, `brittany_email_lambda.py`, `canary_lambda.py`). All 3 have system prompts below Anthropic's ~1024-token cache threshold — adding `cache_control` would be no-op like P5.2 was. Plan's "32 Lambdas bypass" framing was outdated; the actual gap is structural (small prompts) not behavioral. **Audit closed, no code shipped.**
+**2. P5.1 prompt-caching audit** — completed as audit-only (zero code changes). 21 Lambdas hit Anthropic; 12 have explicit `cache_control`, 7 more route through `retry_utils` (which adds it internally), leaving 3 stragglers (`site_api_lambda.py`, `partner_email_lambda.py`, `canary_lambda.py`). All 3 have system prompts below Anthropic's ~1024-token cache threshold — adding `cache_control` would be no-op like P5.2 was. Plan's "32 Lambdas bypass" framing was outdated; the actual gap is structural (small prompts) not behavioral. **Audit closed, no code shipped.**
 
 **3. P8.10 SEO JSON-LD** — added schema.org structured data in 2 places:
 - `site/index.html` — `@graph` with `WebSite`, `Organization`, `Person` entities. Validated as parseable JSON before upload.
@@ -1122,7 +1122,7 @@ After v7.18.0 left every coach-loop next-step data-blocked (7-30 day wait for ve
 - `weekly_digest_lambda.py` (f-string, braces escaped)
 - `monthly_digest_lambda.py` (f-string, braces escaped)
 - `wednesday_chronicle_lambda.py` (f-string, braces escaped)
-- `brittany_email_lambda.py` (plain triple-quoted, no escaping needed)
+- `partner_email_lambda.py` (plain triple-quoted, no escaping needed)
 
 CSS uses inline-style attribute selectors (`div[style*="background:#fff"]`) to flip the actual color palette these emails build with hardcoded backgrounds. Daily-brief was checked but is already dark-default (background:#0f0f23) — no work needed. monday_compass and weekly_plate emit content fragments without `<head>` tags by design (per their own docstrings) — out of scope. The pre-existing `dark_mode_css()` helper in `email_framework.py` remains stubbed for future emails written through the framework.
 
@@ -1147,7 +1147,7 @@ Each closure preserves the original task ID for traceability with a rationale fi
 **Whoop reserved-concurrency = 1** (P1.5 follow-up from v7.14.0): AWS Service Quotas API rejects `request-service-quota-increase` for `L-B99A9384` because this account's current cap (10) is below the AWS default (1000) — a custom cap that must be raised via support ticket. AWS Support API (`aws support create-case`) requires Business+ support plan; current account doesn't have that. **Manual step**: AWS Console → Support → Create case → Service: Service Quotas → Quota: "Concurrent executions" (L-B99A9384) → request 50. ~24h turnaround. Once raised, re-enable the line at `cdk/stacks/ingestion_stack.py:68` and `cdk deploy LifePlatformIngestion`.
 
 ### Files changed
-- `lambdas/weekly_digest_lambda.py`, `lambdas/monthly_digest_lambda.py`, `lambdas/wednesday_chronicle_lambda.py`, `lambdas/brittany_email_lambda.py` — `<head>` CSS additions
+- `lambdas/weekly_digest_lambda.py`, `lambdas/monthly_digest_lambda.py`, `lambdas/wednesday_chronicle_lambda.py`, `lambdas/partner_email_lambda.py` — `<head>` CSS additions
 - `archive/README.md`, `backfill/README.md`, `patches/README.md` — new
 - `docs/CHANGELOG.md` — this entry
 
@@ -1181,7 +1181,7 @@ bash deploy/deploy_lambda.sh <fn> lambdas/<source>
 - weekly-digest → weekly_digest_lambda.py
 - monthly-digest → monthly_digest_lambda.py
 - wednesday-chronicle → wednesday_chronicle_lambda.py
-- brittany-weekly-email → brittany_email_lambda.py
+- partner-weekly-email → partner_email_lambda.py
 
 Reply "deploy emails" to commit all 4, or specify a subset.
 
@@ -2016,7 +2016,7 @@ None are blocking your day-to-day. All can be scheduled when there's appetite.
 
 ### What shipped
 
-**1. Email framework extraction (P4.10)** — new `lambdas/email_framework.py` with the shared HTML scaffolding that was duplicated across 5+ email Lambdas (`weekly_digest`, `monthly_digest`, `monday_compass`, `wednesday_chronicle`, `weekly_plate`, `brittany_email`, `evening_nudge`). API:
+**1. Email framework extraction (P4.10)** — new `lambdas/email_framework.py` with the shared HTML scaffolding that was duplicated across 5+ email Lambdas (`weekly_digest`, `monthly_digest`, `monday_compass`, `wednesday_chronicle`, `weekly_plate`, `partner_email`, `evening_nudge`). API:
 
 - `email_envelope(title, subtitle, body_html, include_dark_mode=False)` — the full `<!DOCTYPE>...<head>...<body>...header...content...</body></html>` shell
 - `section(title, emoji, content)` — single content section
@@ -2027,7 +2027,7 @@ None are blocking your day-to-day. All can be scheduled when there's appetite.
 
 13 unit tests in `tests/test_email_framework.py` covering envelope structure, helper composability, dark-mode opt-in, balanced tags.
 
-Added to shared layer (`SharedUtilsLayer:48`). No Lambda was migrated in this batch — the framework's correctness is proven by tests; per-Lambda migration is best done in sessions where the user can visually QA each email (`brittany_email` arrives at a third party, `weekly_digest` is your primary). Migration pattern documented in `email_framework.py` module docstring.
+Added to shared layer (`SharedUtilsLayer:48`). No Lambda was migrated in this batch — the framework's correctness is proven by tests; per-Lambda migration is best done in sessions where the user can visually QA each email (`partner_email` arrives at a third party, `weekly_digest` is your primary). Migration pattern documented in `email_framework.py` module docstring.
 
 **2. HAE handler registry refactor (P4.6) — DEFERRED with rationale.** On audit, `health_auto_export_lambda.py` is already organized into well-named `process_X` functions (`process_blood_glucose`, `process_generic_metrics`, `process_state_of_mind`, `process_workouts`) plus `save_X_to_s3` helpers. The "monolith" was 1,492 LOC of necessary domain logic, not poor structure. A handler-registry refactor would be cosmetic (1-2 days for limited gain) and risks breaking a working ingestion path. Documented in task tracker as "audit overestimated; revisit only if testability becomes a blocker."
 
@@ -2416,12 +2416,12 @@ Phase 2 of the comprehensive tech-debt plan (`/Users/matthewwalker/.claude/plans
 
 **4. CloudFront security headers on subdomain distributions (P2.3)** — extended the R17-15 pattern (CSP + HSTS + X-Frame-Options + Referrer-Policy + X-Content-Type-Options) from main `averagejoematt.com` to `dash.`, `blog.`, `buddy.` subdomains via new shared `SubdomainSecurityHeadersPolicy`. Slightly more permissive CSP (`connect-src 'self' https://averagejoematt.com https://*.averagejoematt.com`) to allow cross-subdomain API calls.
 
-**5. DEBUG print sweep (P2.9)** — 3 `print("[DEBUG] ...")` calls in `lambdas/brittany_email_lambda.py` replaced with `logger.debug(...)`. PII leakage risk reduced.
+**5. DEBUG print sweep (P2.9)** — 3 `print("[DEBUG] ...")` calls in `lambdas/partner_email_lambda.py` replaced with `logger.debug(...)`. PII leakage risk reduced.
 
 ### Files changed
 
 - **New:** `lambdas/rate_limiter.py`, `tests/test_rate_limiter.py`
-- **Lambda code:** `lambdas/site_api_ai_lambda.py` (rate limiter wiring, cache headers), `lambdas/health_auto_export_lambda.py` (hmac, logger), `lambdas/brittany_email_lambda.py` (logger.debug)
+- **Lambda code:** `lambdas/site_api_ai_lambda.py` (rate limiter wiring, cache headers), `lambdas/health_auto_export_lambda.py` (hmac, logger), `lambdas/partner_email_lambda.py` (logger.debug)
 - **CDK:** `cdk/stacks/role_policies.py` (`site_api_ai()` IAM update — `RATE#*` write, KMS GenerateDataKey), `cdk/stacks/web_stack.py` (`SubdomainSecurityHeadersPolicy` + 3 distribution refs)
 
 ### Deploy
@@ -3396,7 +3396,7 @@ Major architectural evolution: stateless prompt templates replaced by persistent
 - `ai_expert_analyzer_lambda.py` deprecated (replaced by coach-observatory-renderer)
 
 ### AI Prompt Evolution
-- **Bug fixes**: HRV KeyError crash in ai_calls.py, stale "10+ months" narrative in nutrition_review, wrong journey week in brittany_email (Feb 22 → Apr 1), wrong start weight fallbacks (302 → 307), hardcoded context in hypothesis_engine, hardcoded weight in /api/ask
+- **Bug fixes**: HRV KeyError crash in ai_calls.py, stale "10+ months" narrative in nutrition_review, wrong journey week in partner_email (Feb 22 → Apr 1), wrong start weight fallbacks (302 → 307), hardcoded context in hypothesis_engine, hardcoded weight in /api/ask
 - **Persona names**: Rhonda Patrick → Dr. Amara Patel, Paul Conti → Dr. Nathan Reeves, Layne Webb → Dr. Marcus Webb (all fictitious names)
 - **Epistemological framing**: Each observatory expert persona now has distinct analytical lens (systems thinking, behavioral, psychodynamic, longevity, mechanistic, etc.)
 - **Elena Quote evolution**: Reframed from stylistic flourish to cross-domain meta-analysis
@@ -3841,7 +3841,7 @@ Full content audit and rewrite pass across 13 pages. All placeholder/AI-generate
 ### Pages Updated
 - **Character** — pull-quote rewritten (RPG metaphor → personal data philosophy)
 - **Habits** — hero subtitle rewritten (3 paragraphs on habit philosophy), removed duplicate streak description
-- **Challenges** — hero subtitle and source descriptions rewritten (sandbox framing, Brittany collaboration)
+- **Challenges** — hero subtitle and source descriptions rewritten (sandbox framing, Partner collaboration)
 - **Experiments** — hero subtitle refined, AI monitoring paragraph rewritten (informal experiments → scientific method)
 - **Intelligence** — subtitle simplified, hardcoded sample Daily Brief replaced with API placeholder
 - **Benchmarks** — fabricated VO2 max reflection replaced with deliberate trade-offs framing

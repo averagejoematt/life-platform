@@ -157,7 +157,7 @@ aws logs describe-log-streams --log-group-name /aws/lambda/daily-brief \
 - **[PENDING]** IC-5 momentum detection / early warning (Month 2)
 - **[PENDING]** IC-7 cross-pillar trade-off reasoning (low effort, high value, no data maturity req)
 - **[PENDING]** Google Calendar integration (Board rank #2, North Star gap #2)
-- **[PENDING]** Brittany weekly accountability email
+- **[PENDING]** Partner weekly accountability email
 - **[PENDING]** HAE/Notion data gap backfill assessment (from v2.84.2)
 
 ## Version

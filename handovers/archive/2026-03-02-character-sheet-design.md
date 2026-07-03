@@ -67,6 +67,6 @@ Key design decisions from Board review:
 
 ## Remaining Open Questions
 1. Notification channel — Daily Brief only vs additional push
-2. Brittany email inclusion
+2. Partner email inclusion
 3. Avatar generation method — AI image tools vs commissioned art
 4. Sparse data handling — neutral score (40) vs last known value

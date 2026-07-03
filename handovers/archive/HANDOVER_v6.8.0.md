@@ -43,7 +43,7 @@ Switched structured/templated tasks from Sonnet to Haiku:
 | `challenge-generator` | Sonnet → Haiku | Structured JSON challenge output |
 | `field-notes-generate` | Sonnet → Haiku | Weekly lab notes |
 
-**NOT downgraded:** daily-brief main calls, wednesday-chronicle, weekly-plate, nutrition-review, monday-compass, weekly-digest, brittany-email (narrative content where quality matters).
+**NOT downgraded:** daily-brief main calls, wednesday-chronicle, weekly-plate, nutrition-review, monday-compass, weekly-digest, partner-email (narrative content where quality matters).
 
 All model assignments use `AI_MODEL` env var — rollback via `aws lambda update-function-configuration` without code deploy.
 

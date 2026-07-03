@@ -94,7 +94,7 @@ Otherwise every CDK deploy will re-break these.
 
 3. **TB7-1** — Verify GitHub Settings → Environments → `production` has required reviewers.
 
-4. **TB7-2 / Brittany email** — Set `BRITTANY_EMAIL` env var to her real address.
+4. **TB7-2 / Partner email** — Set `PARTNER_EMAIL` env var to her real address.
 
 5. **Google Calendar integration** — Next major feature (6–8h).
 

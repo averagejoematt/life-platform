@@ -1,8 +1,8 @@
-# Handover — 2026-03-06 — Brittany Weekly Email (v2.79.0)
+# Handover — 2026-03-06 — Partner Weekly Email (v2.79.0)
 
 ## Session Summary
 
-Built the Brittany accountability email — a weekly partner-focused update sent to Brittany
+Built the Partner accountability email — a weekly partner-focused update sent to Partner
 every Sunday at 9:30 AM PT (one hour after Matthew's weekly digest). Full Board of Directors
 consultation, with elevated psychological and relationship weighting.
 
@@ -10,9 +10,9 @@ consultation, with elevated psychological and relationship weighting.
 
 ## What Was Built
 
-### New Lambda: `brittany-weekly-email` (30th Lambda)
+### New Lambda: `partner-weekly-email` (30th Lambda)
 
-**File:** `lambdas/brittany_email_lambda.py`
+**File:** `lambdas/partner_email_lambda.py`
 
 **Board consultation strategy:**
 - Full Board of Directors consulted on Matthew's week data
@@ -46,7 +46,7 @@ consultation, with elevated psychological and relationship weighting.
 
 **Model:** Sonnet 4.6 (1200 max tokens)
 **Schedule:** Sunday 17:30 UTC = 9:30 AM PT
-**Recipient:** `BRITTANY_EMAIL` env var — must be set manually post-deploy
+**Recipient:** `PARTNER_EMAIL` env var — must be set manually post-deploy
 
 ---
 
@@ -56,11 +56,11 @@ consultation, with elevated psychological and relationship weighting.
 bash ~/Documents/Claude/life-platform/deploy/deploy_v2.79.0.sh
 ```
 
-**IMPORTANT — After deploy, set Brittany's email:**
+**IMPORTANT — After deploy, set his partner's email:**
 ```bash
 aws lambda update-function-configuration \
-  --function-name brittany-weekly-email \
-  --environment 'Variables={TABLE_NAME=life-platform,EMAIL_SENDER=awsdev@mattsusername.com,BRITTANY_EMAIL=YOUR_EMAIL_HERE,ANTHROPIC_SECRET=life-platform/api-keys}' \
+  --function-name partner-weekly-email \
+  --environment 'Variables={TABLE_NAME=life-platform,EMAIL_SENDER=awsdev@mattsusername.com,PARTNER_EMAIL=YOUR_EMAIL_HERE,ANTHROPIC_SECRET=life-platform/api-keys}' \
   --region us-west-2 \
   --no-cli-pager
 ```
@@ -68,11 +68,11 @@ aws lambda update-function-configuration \
 **Test invoke:**
 ```bash
 aws lambda invoke \
-  --function-name brittany-weekly-email \
+  --function-name partner-weekly-email \
   --payload '{}' \
   --cli-binary-format raw-in-base64-out \
   --region us-west-2 \
-  /tmp/brittany_out.json && cat /tmp/brittany_out.json
+  /tmp/partner_out.json && cat /tmp/partner_out.json
 ```
 
 ---
@@ -81,7 +81,7 @@ aws lambda invoke \
 
 | File | Change |
 |------|--------|
-| `lambdas/brittany_email_lambda.py` | New — full Lambda (~430 lines) |
+| `lambdas/partner_email_lambda.py` | New — full Lambda (~430 lines) |
 | `deploy/deploy_v2.79.0.sh` | New — deploy script (create + EventBridge) |
 | `docs/CHANGELOG.md` | v2.79.0 entry |
 | `docs/PROJECT_PLAN.md` | Version bump, Lambda count 29→30, email cadence table |
@@ -92,8 +92,8 @@ aws lambda invoke \
 
 - **Version:** v2.79.0
 - **MCP:** 124 tools, 26 modules (unchanged)
-- **Lambdas:** 30 (1 new: brittany-weekly-email)
-- **Email cadence:** 9 emails (Daily Brief, Weekly Digest, **Brittany Weekly**, Monthly Digest,
+- **Lambdas:** 30 (1 new: partner-weekly-email)
+- **Email cadence:** 9 emails (Daily Brief, Weekly Digest, **Partner Weekly**, Monthly Digest,
   Anomaly Detector, Freshness Alerter, Nutrition Review, Wednesday Chronicle, The Weekly Plate)
 
 ---
@@ -108,10 +108,10 @@ aws lambda invoke \
    both worse. Also allows independent tuning without touching Matthew's digest.
 
 3. **Why 9:30 AM PT (after Matthew's 8:30 AM digest)?**
-   Matthew gets his full technical digest first. Brittany gets a human-language version
-   one hour later. If there's ever a data issue, Matthew can see it before Brittany does.
+   Matthew gets his full technical digest first. Partner gets a human-language version
+   one hour later. If there's ever a data issue, Matthew can see it before Partner does.
 
-4. **BRITTANY_EMAIL env var, not hardcoded:**
+4. **PARTNER_EMAIL env var, not hardcoded:**
    No personal email addresses in source code. Set in Lambda environment post-deploy.
 
 5. **No raw numbers in support guidance sections:**
@@ -122,7 +122,7 @@ aws lambda invoke \
 
 ## Next Steps (priority order)
 
-1. **Deploy v2.79.0** — run deploy script, then set BRITTANY_EMAIL env var
+1. **Deploy v2.79.0** — run deploy script, then set PARTNER_EMAIL env var
 2. **Test invoke** — verify email arrives and reads well
-3. **Reward seeding** — Matthew + Brittany pick rewards, seed via `set_reward`
+3. **Reward seeding** — Matthew + Partner pick rewards, seed via `set_reward`
 4. **Google Calendar integration** — highest-priority remaining roadmap item

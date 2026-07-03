@@ -71,7 +71,7 @@ TO_DELETE=(
   # Misc orphans
   "ai-anthropic-api-failures"           # overlaps with slo-ai-coaching-success
   "daily-metrics-compute-duration-high" # orphan duration alarm, pre-CDK remnant
-  "ingestion-error-brittany-weekly-email" # CDK will recreate when Brittany deploys
+  "ingestion-error-partner-weekly-email" # CDK will recreate when Partner deploys
 )
 
 echo "=== Deleting ${#TO_DELETE[@]} orphan alarms ==="

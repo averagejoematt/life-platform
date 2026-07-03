@@ -24,7 +24,7 @@
 - Added "METRICS AS TEXTURE, NOT STRUCTURE": weave numbers into narrative, don't catalogue
 - Added editorial guidance block injected into every user message
 - Added explicit prohibition: "Don't walk through the week day by day — this is the cardinal sin"
-- Fixed bio: age 37 (not 35), lives with girlfriend Brittany (not alone)
+- Fixed bio: age 37 (not 35), lives with girlfriend Partner (not alone)
 - `build_blog_index()` redesigned with hero/featured layout
 
 ### 3. Blog Homepage Redesign
@@ -38,7 +38,7 @@
 **Status:** ✅ Deployed and working
 
 ### 5. Prologue Content Fix
-**Problem:** Says "thirty-five" and "lives alone" (should be thirty-seven, lives with Brittany)
+**Problem:** Says "thirty-five" and "lives alone" (should be thirty-seven, lives with Partner)
 **Fix:** `deploy/fix_prologue.sh` — sed replace + S3 upload + cache invalidation
 **Status:** ⚠️ PENDING — Matthew needs to run this script
 

@@ -60,6 +60,6 @@ Audit + delete scripts written. ~$4.60/month savings once orphan deletion runs.
 5. **Run audit again** to confirm alarm count is ~41
 
 ### Then
-6. **Brittany weekly email** — next major feature
+6. **Partner weekly email** — next major feature
 7. **SIMP-1** — MCP tool usage audit ~2026-04-08
 8. **Delete api-keys secret** — ~2026-04-07 (saves $0.40/mo)

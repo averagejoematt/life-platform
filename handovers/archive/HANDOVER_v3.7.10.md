@@ -1,6 +1,6 @@
 # Life Platform Handover — v3.7.10
 **Date:** 2026-03-13
-**Session type:** Housekeeping + incident response (SIMP-1 instrumentation, S3 lifecycle, Brittany email, alarm storm RCA)
+**Session type:** Housekeeping + incident response (SIMP-1 instrumentation, S3 lifecycle, Partner email, alarm storm RCA)
 
 ---
 
@@ -18,15 +18,15 @@ New script expires objects under `deploys/` prefix after 30 days.
 bash deploy/apply_s3_lifecycle.sh
 ```
 
-### Brittany Weekly Email — Already Correct ✅
-`email_stack.py` already had `brittany@mattsusername.com` as `BRITTANY_EMAIL`.
+### Partner Weekly Email — Already Correct ✅
+`email_stack.py` already had `(partner address — SSM /life-platform/partner-email)` as `PARTNER_EMAIL`.
 No CDK change needed.
 
-**SES status:** Account is in **Sandbox mode**. Brittany's address must be verified
+**SES status:** Account is in **Sandbox mode**. his partner's address must be verified
 before she'll receive emails. Matthew needs to run:
 ```bash
 aws sesv2 create-email-identity \
-  --email-identity brittany@mattsusername.com \
+  --email-identity (partner address — SSM /life-platform/partner-email) \
   --region us-west-2
 ```
 She'll receive a verification link — clicks once, permanent.
@@ -75,7 +75,7 @@ Alarms are silent until confirmed. Has been pending since v3.7.3.
 |--------|---------|
 | S3 lifecycle rule | `bash deploy/apply_s3_lifecycle.sh` |
 | Freshness checker bug fix | `bash deploy/deploy_lambda.sh freshness-checker lambdas/freshness_checker_lambda.py` |
-| Brittany SES verification | `aws sesv2 create-email-identity --email-identity brittany@mattsusername.com --region us-west-2` |
+| Partner SES verification | `aws sesv2 create-email-identity --email-identity (partner address — SSM /life-platform/partner-email) --region us-west-2` |
 
 ---
 
@@ -84,7 +84,7 @@ Alarms are silent until confirmed. Has been pending since v3.7.3.
 1. **Google Calendar integration** — TB7-18, Board rank #2, ~6–8h. Next major feature.
 2. **S3 lifecycle rule** — run `bash deploy/apply_s3_lifecycle.sh`
 3. **Freshness checker deploy** — bug fix ready, needs deploy
-4. **Brittany SES verification** — send verification email to Brittany
+4. **Partner SES verification** — send verification email to Partner
 5. **SNS subscription confirmation** — check `awsdev@mattsusername.com`
 6. **SIMP-1** — ~2026-04-08, ~4h. 6-week data window accumulating now.
 7. **TB7-24** — Lambda handler integration tests (larger effort, future session).

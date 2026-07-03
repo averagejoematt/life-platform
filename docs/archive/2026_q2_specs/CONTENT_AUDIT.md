@@ -33,7 +33,7 @@
 
 `site/chronicle/posts/week-00/index.html`
 
-**[MATTHEW-VERIFY]** — 3,000-word Elena Voss prologue. Contains real facts (age 37, weight 302, goal 185, girlfriend Brittany, board members) but written entirely by Claude as narrative journalism. It sets the scene for the experiment.
+**[MATTHEW-VERIFY]** — 3,000-word Elena Voss prologue. Contains real facts (age 37, weight 302, goal 185, girlfriend Partner, board members) but written entirely by Claude as narrative journalism. It sets the scene for the experiment.
 
 **Decision needed:** Keep as the official prologue, or rewrite? It's well-written and factually accurate, but Matthew didn't write it.
 

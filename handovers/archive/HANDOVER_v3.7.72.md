@@ -31,7 +31,7 @@
 ### Test debt cleared (all pre-existing, now documented)
 - `D3_KNOWN_GAPS` in `test_ddb_patterns.py`: `dropbox_poll_lambda.py` + `health_auto_export_lambda.py`
 - `_mock_dispatcher` in `test_business_logic.py`: returns sentinel directly — dispatcher `_disclaimer` injection no longer causes false failures
-- `brittany_email_lambda.py`: D1 compliance — `USER_ID` env var wired, 3 hardcoded strings replaced
+- `partner_email_lambda.py`: D1 compliance — `USER_ID` env var wired, 3 hardcoded strings replaced
 - Net test improvement: 50 failing → 44 failing (+4 passing)
 
 ### Syntax fix

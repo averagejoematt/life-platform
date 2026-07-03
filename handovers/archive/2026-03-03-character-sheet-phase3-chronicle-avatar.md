@@ -100,7 +100,7 @@
 
 ### Short-term
 4. **Pixel art sprite generation** — Replace programmatic SVG placeholders with actual 48×48 pixel art sprites per AVATAR_DESIGN_STRATEGY.md
-5. **Brittany weekly accountability email** — Next social feature expansion
+5. **Partner weekly accountability email** — Next social feature expansion
 6. **Daily Brief QA verification** — Check subject date + training commentary from v2.62.0 fixes
 
 ### Pending from Previous Sessions
@@ -109,7 +109,7 @@
 | DST cron fix (March 8) | ⏸️ CRITICAL | Script ready, 5 days away |
 | Pixel art sprites | ⏸️ | Creative effort, deferred from Phase 3 |
 | Notion journal real test | ⏸️ | Lambda deployed v1.2, needs manual test |
-| Brittany weekly email | ⏸️ | Accountability feature expansion |
+| Partner weekly email | ⏸️ | Accountability feature expansion |
 | Strava ingestion-time dedup | ⏸️ | DDB cleanup for MCP tools |
 | Monarch Money integration | ⏸️ | Financial tracking |
 | Google Calendar integration | ⏸️ | Demand-side scheduling data |

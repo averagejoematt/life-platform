@@ -9,7 +9,7 @@
 ### Pending Deploys (from v3.7.10) — ALL COMPLETE ✅
 - `life-platform-freshness-checker` deployed (duplicate sick-day suppression block bug fix)
 - S3 lifecycle rule applied (`deploys/` prefix, 30-day expiry)
-- Brittany SES: `AlreadyExistsException` — already verified (`VerifiedForSendingStatus: true`)
+- Partner SES: `AlreadyExistsException` — already verified (`VerifiedForSendingStatus: true`)
 - SNS subscription: confirmed ACTIVE (subscription ARN returned, not PendingConfirmation)
 
 ### TB7-24 CLOSED ✅
@@ -58,5 +58,5 @@ Force-deleted without recovery window.
 ## Key Architecture Notes
 - Platform: v3.7.12, 42 Lambdas, 19 data sources, 8 CDK stacks
 - CI test suite: 7 files in Job 2 (added mcp_registry + lambda_handlers this session)
-- All alarms: OK | DLQ: 0 | SNS: confirmed active | Brittany SES: verified
+- All alarms: OK | DLQ: 0 | SNS: confirmed active | Partner SES: verified
 - Review #9 target: ~2026-04-08 (alongside SIMP-1)

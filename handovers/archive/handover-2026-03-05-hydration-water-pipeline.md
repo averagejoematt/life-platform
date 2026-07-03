@@ -76,6 +76,6 @@ Journal = 0 across all (correct — no journal entries yet). Grade trend = 50 ne
 | `docs/HANDOVER_LATEST.md` | Updated |
 
 ## Next Session
-1. **Brittany accountability email** — next major feature
+1. **Partner accountability email** — next major feature
 2. **#31 Light exposure** — Habitify habit + `get_light_exposure_correlation` tool
 3. **#16 Grip strength** — dynamometer + Notion log + percentile tool

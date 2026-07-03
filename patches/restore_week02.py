@@ -53,7 +53,7 @@ body_html = """<p>Here is something I did not expect to find two weeks into this
 
 <p>I like that framing. You don't judge an onboarding by its elegance. You judge it by whether the person shows up the next day.</p>
 
-<p>There is one detail I keep returning to, small enough that he almost didn't mention it. Brittany, his girlfriend, has been preparing meals aligned to his nutritional targets. She eats alongside him. He skips the carbs; she does not. But she is there, at the table, having quietly reorganized her own plate.</p>
+<p>There is one detail I keep returning to, small enough that he almost didn't mention it. Partner, his girlfriend, has been preparing meals aligned to his nutritional targets. She eats alongside him. He skips the carbs; she does not. But she is there, at the table, having quietly reorganized her own plate.</p>
 
 <p>I don't know yet what role she plays in the longer arc of this story. But I know what it looks like when someone shows up without being asked, and this is that.</p>
 

@@ -47,9 +47,9 @@ Detected: 42 Lambdas, 150 MCP tools (header now current).
 
 | Priority | Item |
 |----------|------|
-| 🔴 ASAP | Confirm Brittany's real email → update `_brittany_env["BRITTANY_EMAIL"]` in `cdk/stacks/email_stack.py` |
+| 🔴 ASAP | Confirm his partner's real email → update `_partner_env["PARTNER_EMAIL"]` in `cdk/stacks/email_stack.py` |
 | 🔴 ASAP | `bash deploy/build_layer.sh` → redeploy Layer + Lambdas (AI-3 middleware not live until this runs) |
-| 🔴 ASAP | `npx cdk deploy LifePlatformEmail LifePlatformCompute` — pushes api-keys env var fixes + Brittany Lambda |
+| 🔴 ASAP | `npx cdk deploy LifePlatformEmail LifePlatformCompute` — pushes api-keys env var fixes + Partner Lambda |
 | 🔴 ASAP | `bash deploy/post_cdk_smoke.sh` — run after CDK deploy |
 | ~Apr 7 | `life-platform/api-keys` secret permanent deletion |
 | ~Apr 8 | SIMP-1 MCP tool audit + Architecture Review #7 |
@@ -77,7 +77,7 @@ Detected: 42 Lambdas, 150 MCP tools (header now current).
 | Status | Item |
 |--------|------|
 | 🔴 Blocked on deploy | Layer rebuild + CDK deploy (AI-3 middleware not live yet) |
-| 🔴 Blocked on Brittany email | `brittany-weekly-email` Lambda deployed but BRITTANY_EMAIL is placeholder |
+| 🔴 Blocked on Partner email | `partner-weekly-email` Lambda deployed but PARTNER_EMAIL is placeholder |
 | ⚠️ Partial | OBS-1: `platform_logger` wired in email Lambdas only — ingestion rollout pending |
 | 🔴 Open | SIMP-1: MCP tool rationalization (~Apr 8, after 30 days EMF data) |
 | 🔴 Open | SEC-4: WAF rate limiting |
@@ -95,7 +95,7 @@ Detected: 42 Lambdas, 150 MCP tools (header now current).
 - `scripts/install_hooks.sh` — run once per clone to install hook
 - `tests/test_shared_modules.py` — 66 tests, all passing
 - `docs/CHANGELOG.md` — v3.6.0 entry written
-- `cdk/stacks/email_stack.py` — Brittany email placeholder ⚠️
+- `cdk/stacks/email_stack.py` — Partner email placeholder ⚠️
 
 ---
 

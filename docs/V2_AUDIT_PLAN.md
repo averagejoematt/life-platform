@@ -140,8 +140,8 @@ confidence = max(0.0, min(1.0, val))
 Default to 0.5 on parse fail.
 **Effort:** XS (15 min). **Risk:** None. **ROI:** Recovers ~11 lost extractions/week. Drops error rate 17% → ~0%.
 
-### P1.4 [HIGH] Roll out token telemetry to 4 site_api / brittany / canary Lambdas
-**Evidence:** `lambdas/site_api_lambda.py:2819,7841` (board_ask, /api/ask), `lambdas/site_api_ai_lambda.py:517,614`, `lambdas/brittany_email_lambda.py:468`, `lambdas/canary_lambda.py:68` all use raw `urllib.request.urlopen("https://api.anthropic.com/v1/messages", ...)`. Zero retry, zero telemetry, zero cache_control on system. v1 CHANGELOG explicitly noted as "deferred to v2."
+### P1.4 [HIGH] Roll out token telemetry to 4 site_api / partner / canary Lambdas
+**Evidence:** `lambdas/site_api_lambda.py:2819,7841` (board_ask, /api/ask), `lambdas/site_api_ai_lambda.py:517,614`, `lambdas/partner_email_lambda.py:468`, `lambdas/canary_lambda.py:68` all use raw `urllib.request.urlopen("https://api.anthropic.com/v1/messages", ...)`. Zero retry, zero telemetry, zero cache_control on system. v1 CHANGELOG explicitly noted as "deferred to v2."
 **Action:** Refactor each to `from retry_utils import call_anthropic_raw`. site_api_ai is intentionally layer-less for cold-start — copy ~30 lines of `_emit_token_metrics` inline instead. Add cache_control on board_ask + /api/ask system prompts (both >1024 tokens).
 **Effort:** M (4-6h). **Risk:** Low — `call_anthropic_raw` battle-tested in daily-brief. **ROI:** $0.50-1/mo cache savings on board_ask + visibility into ~30% of currently-dark Anthropic spend + retry resilience for user-facing AI.
 
@@ -152,11 +152,11 @@ Default to 0.5 on parse fail.
 **Effort:** XS for log; S for diagnosis (1-2 days observation). **Risk:** None.
 
 ### P1.6 [HIGH] Enable SES configuration set + open/click tracking
-**Evidence:** `aws sesv2 list-configuration-sets` → empty. Daily-brief, weekly-digest, monthly-digest, brittany-email open rates are unknowable. v1 promised; not shipped.
+**Evidence:** `aws sesv2 list-configuration-sets` → empty. Daily-brief, weekly-digest, monthly-digest, partner-email open rates are unknowable. v1 promised; not shipped.
 **Action:**
 1. `aws sesv2 create-configuration-set --configuration-set-name life-platform-emails`
 2. Wire CloudWatch event destination for Open/Click/Bounce/Complaint
-3. Update `daily_brief_lambda`, `weekly_digest_lambda`, `monthly_digest_lambda`, `brittany_email_lambda`, `subscriber_onboarding_lambda` to set `ConfigurationSetName='life-platform-emails'` on `SendEmail`
+3. Update `daily_brief_lambda`, `weekly_digest_lambda`, `monthly_digest_lambda`, `partner_email_lambda`, `subscriber_onboarding_lambda` to set `ConfigurationSetName='life-platform-emails'` on `SendEmail`
 4. Inject pixel + UTM-tagged links in email templates
 **Effort:** S (1-2h setup). **Risk:** Privacy-conscious clients block pixels — expect 40-60% reported opens. **ROI:** First-ever signal on whether anyone reads these emails. Without this, every content investment is blind.
 
@@ -248,8 +248,8 @@ Also wire `log_retention=aws_logs.RetentionDays.ONE_MONTH` as default in `cdk/st
 **Action:** Per ADR-056 mitigation note, swap in numeric/http_retry/auth_breaker where applicable. ~4 lines per Lambda.
 **Effort:** S. **Risk:** Low. **ROI:** Brings 6 exempt sources into same reliability baseline as the migrated 7.
 
-### P2.8 [MEDIUM] Brittany email — replace inline 2-attempt retry with `retry_utils.call_anthropic_raw` + env-vary model
-**Evidence:** `brittany_email_lambda.py:472-484` inline 2-attempt loop, hardcoded 5s sleep, hardcoded `model: "claude-sonnet-4-6"` at line 463.
+### P2.8 [MEDIUM] Partner email — replace inline 2-attempt retry with `retry_utils.call_anthropic_raw` + env-vary model
+**Evidence:** `partner_email_lambda.py:472-484` inline 2-attempt loop, hardcoded 5s sleep, hardcoded `model: "claude-sonnet-4-6"` at line 463.
 **Action:** Replace with `from retry_utils import call_anthropic_raw`. Replace literal model with `os.environ.get("AI_MODEL", "claude-sonnet-4-6")`. Adds telemetry + 4-attempt retry + env override.
 **Effort:** XS. **Risk:** None. **ROI:** Resilience + model-deprecation safety.
 
@@ -512,7 +512,7 @@ Add READMEs to remaining dirs without one: `datadrops/`, `handovers/`, `seeds/`,
 | P2.7 HAE auth | ⚠ CODE-ONLY | API GW `AuthorizationType: NONE`; Lambda checks signature | OK as designed |
 | P3.1 Pipeline schedule race | ✅ HOLDS | CDK source: character→adaptive→metrics→insight→brief = 16:30..17:00 UTC | P2.9 fix docstring |
 | P3.3 Run_id idempotency | ✅ SHIPPED | character_sheet, daily_metrics, adaptive_mode tagged | P2.6 expand to 6 more |
-| P3.4 Retry rollout | ⚠ PARTIAL | field-notes-generate not redeployed; brittany still custom | P1.2 + P2.8 |
+| P3.4 Retry rollout | ⚠ PARTIAL | field-notes-generate not redeployed; partner still custom | P1.2 + P2.8 |
 | P3.8 Daily-brief shared preamble cache | ⚠ WIRED, UNVERIFIABLE | Code correct; 0 cache datapoints in 30d | P1.5 diagnose |
 | P4.1 SIMP-2 framework migration | ✅ SHIPPED (substantial) | 7 Lambdas, −2,383 LOC | — |
 | P4.3 Split intelligence_common | ✅ CLOSED PER ADR-057 (correct decision, wrong importer name) | 1 importer (`ai_expert_analyzer`, not `daily_brief`) | P2.10 fix doc |
@@ -631,9 +631,9 @@ User directed: "work through the 76 distinct findings." This section logs what a
 - P1.1 verified already shipped (`_normalize_metric_hint` enforces whitelist)
 - P1.2 field-notes-generate redeployed with layer v50 attached
 - P1.3 `_parse_confidence` defensive parser (12-case test passing) + deployed
-- P1.4 brittany_email migrated to `retry_utils.call_anthropic_raw` + AI_MODEL env-override + deployed. site_api / site_api_ai deferred (layer changes needed).
+- P1.4 partner_email migrated to `retry_utils.call_anthropic_raw` + AI_MODEL env-override + deployed. site_api / site_api_ai deferred (layer changes needed).
 - P1.5 cache diagnosis — data-blocked (needs 7d observation)
-- P1.6 SES configuration set `life-platform-emails` + CloudWatch event destination + 4 Lambdas wired (daily_brief×2, weekly_digest, monthly_digest, brittany_email) — engagement measurable for the first time
+- P1.6 SES configuration set `life-platform-emails` + CloudWatch event destination + 4 Lambdas wired (daily_brief×2, weekly_digest, monthly_digest, partner_email) — engagement measurable for the first time
 - P1.7 CloudTrail data events enabled for S3 raw/* + uploads/*
 - P1.8 Logs Insights saved query — deferred
 
@@ -645,7 +645,7 @@ User directed: "work through the 76 distinct findings." This section logs what a
 - P2.5 email_framework POC — deferred
 - P2.6 compute_metadata expansion — deferred (incremental)
 - P2.7 shared modules in 6 exempt Lambdas — deferred
-- P2.8 brittany retry — done in P1.4
+- P2.8 partner retry — done in P1.4
 - P2.9 compute_stack docstring corrected
 - P2.10 ADR-057 wrong importer name fixed (daily_brief → ai_expert_analyzer)
 - P2.11 CLAUDE.md drift refresh (layer v50, 14 ingestion, 135 MCP tools)
@@ -721,7 +721,7 @@ User directed: "work through the 76 distinct findings." This section logs what a
 ## Final accounting
 
 - Commits: **14 new commits** preserving v1 + v2 work (`eff7a2f`..`{latest}`)
-- Lambdas redeployed: 11 (coach-computation-engine, freshness-checker, 5 coach Lambdas, brittany, daily-brief×2, weekly-digest, monthly-digest, field-notes, site-api)
+- Lambdas redeployed: 11 (coach-computation-engine, freshness-checker, 5 coach Lambdas, partner, daily-brief×2, weekly-digest, monthly-digest, field-notes, site-api)
 - Code edits: 13 lambda files, 3 CDK files, 4 docs, 3 tests, 1 .github workflow, .gitignore, pytest.ini
 - AWS-side changes: layer bumps ×53, IAM grants ×7 roles, log retention ×2, HAE timeout, CloudTrail selectors, SES config set, KMS CMK schedule, 2 secret deletions, CFN stack deletion
 - Realized cost savings: **~$2.85/mo recurring** (matched plan estimate)

@@ -100,7 +100,7 @@ deploy "life-platform-qa-smoke"           "qa_smoke_lambda.py"
 deploy "life-platform-canary"             "canary_lambda.py"
 deploy "life-platform-key-rotator"        "key_rotator_lambda.py"
 deploy "dropbox-poll"                     "dropbox_poll_lambda.py"
-deploy "brittany-weekly-email"            "brittany_email_lambda.py"
+deploy "partner-weekly-email"            "partner_email_lambda.py"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

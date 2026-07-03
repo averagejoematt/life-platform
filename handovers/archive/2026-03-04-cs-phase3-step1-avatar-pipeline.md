@@ -81,7 +81,7 @@
 |------|--------|-------|
 | State of Mind verification | ⏸️ Matthew | Check iPhone Settings → Privacy → Health → How We Feel |
 | DST cron fix (March 8) | ⏸️ CRITICAL | 4 days away |
-| Brittany weekly email | ⏸️ | Next major social feature |
+| Partner weekly email | ⏸️ | Next major social feature |
 | Supplement dosages | ⏸️ Matthew | Update defaults in habitify_lambda.py |
 | Todoist cleanup | ⏸️ Matthew | Before enrichment layer build |
 

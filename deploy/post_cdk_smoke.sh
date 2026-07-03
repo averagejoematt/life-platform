@@ -94,7 +94,7 @@ EMAIL_LAMBDAS=(
   "wednesday-chronicle"
   "weekly-plate"
   "monday-compass"
-  "brittany-weekly-email"
+  "partner-weekly-email"
 )
 COMPUTE_LAMBDAS=(
   "anomaly-detector"

@@ -20,7 +20,7 @@ lambdas/site_api_lambda.py:2985:  Weight: {ctx.get('weight_lbs', '?')} lbs (star
 lambdas/site_api_lambda.py:3318:    start_weight = float(_get_profile().get("journey_start_weight_lbs", 307.0))
 lambdas/site_api_lambda.py:4276:    start_weight = float(_p.get("journey_start_weight_lbs", 307))
 lambdas/site_api_lambda.py:4640:    start_weight = float(_p.get("journey_start_weight_lbs", 307))
-lambdas/brittany_email_lambda.py:256:    journey_start = profile.get("journey_start_weight_lbs", 307)
+lambdas/partner_email_lambda.py:256:    journey_start = profile.get("journey_start_weight_lbs", 307)
 lambdas/weekly_plate_lambda.py:348:    start_w = profile.get("journey_start_weight_lbs", 307)
 lambdas/intelligence_common.py:260:            "start_weight_lbs": 307,
 lambdas/nutrition_review_lambda.py:765:        _start_w = profile.get("journey_start_weight_lbs", 307)
@@ -61,7 +61,7 @@ archive/051726_downloadsfolder_backup/reviews/PRODUCT_REVIEW_PR1.md:234:**Weight
 config/user_goals.json:11:    "start_weight_lbs": 307,
 patches/archive/pre_2026_03/patch_ascvd_risk.py:52:    "ln_hdl":          -0.307,
 docs/CHANGELOG.md:2241:- Weight: 307 → 185 lbs (122 lb loss target with interim milestones)
-docs/CHANGELOG.md:2399:- **Bug fixes**: HRV KeyError crash in ai_calls.py, stale "10+ months" narrative in nutrition_review, wrong journey week in brittany_email (Feb 22 → Apr 1), wrong start weight fallbacks (302 → 307), hardcoded context in hypothesis_engine, hardcoded weight in /api/ask
+docs/CHANGELOG.md:2399:- **Bug fixes**: HRV KeyError crash in ai_calls.py, stale "10+ months" narrative in nutrition_review, wrong journey week in partner_email (Feb 22 → Apr 1), wrong start weight fallbacks (302 → 307), hardcoded context in hypothesis_engine, hardcoded weight in /api/ask
 docs/CHANGELOG.md:2556:- Weight baseline: standardized to 307 lbs across 6 files (was 302 in 16 places)
 docs/CHANGELOG.md:2877:- Corrected start weight: 302 lbs → **307 lbs**
 docs/CHANGELOG.md:3167:- Journey start weight: 302 → 307 (April 1 baseline, not Feb beta)

@@ -80,7 +80,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CloudFront (buddy) | CDN (public) | `ETTJ44FT0Z4GO` (`d1empeau04e0eg.cloudfront.net`) → S3 `/buddy`, alias `buddy.averagejoematt.com` |
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
-| SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `brittany-weekly-email` |
+| SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
 | CloudWatch | Alarms + logs | **~56 metric alarms** (12 redundant ingestion-error alarms consolidated 2026-05-29). |
 | CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `web_stack`, `monitoring_stack`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
@@ -433,7 +433,7 @@ Target: under $25/month | Current: ~$13/month
     #   site_stats_refresh, challenge_generator, og_image_generator,
     #   email_subscriber, pipeline_health_check, chronicle_approve,
     #   canary, dlq_consumer, data_reconciliation, pip_audit,
-    #   brittany_email, mcp_warmer)
+    #   partner_email, mcp_warmer)
     # 2 Lambda@Edge (cf-auth, buddy-auth)
     board_loader.py               ← Shared: Board of Directors config loader
     ai_calls.py                   ← Shared: AI call utilities (prompt caching, model selection)

@@ -84,7 +84,7 @@ Since my mum passed in 2019, I lost my cheerleader. That sounds simple but it is
 
 Maybe this site is me trying to find my cheerleaders.
 
-I don't mean that in a self-pitying way. I mean it practically: I perform better when someone is watching. Not judging — watching. When I was in shape last May, part of what kept me going was that people could see it. The gym regulars. Brittany's family. The old man who said I was determined. The visibility wasn't vanity. It was accountability with a human face.
+I don't mean that in a self-pitying way. I mean it practically: I perform better when someone is watching. Not judging — watching. When I was in shape last May, part of what kept me going was that people could see it. The gym regulars. his partner's family. The old man who said I was determined. The visibility wasn't vanity. It was accountability with a human face.
 
 So I decided to publish everything. The weight. The streaks. The days I didn't show up. The weeks where the data flatlines because I was on the couch ordering delivery food and calling it "sick days." If I'm going to build a system that demands honesty from the data, I should demand the same from myself.
 

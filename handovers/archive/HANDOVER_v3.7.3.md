@@ -70,7 +70,7 @@ Fixed: second occurrence removed. File is now 863 lines, syntax verified clean.
 - **Version:** v3.7.3
 - **TB7 board:** All tasks complete (TB7-1 through TB7-17, noting TB7-10 N/A)
 - **api-keys secret:** Permanent delete scheduled 2026-03-17 (grep sweep TB7-4 still needed to confirm no references remain)
-- **Brittany email:** Live at awsdev@mattsusername.com; `BRITTANY_EMAIL` env var still needs to be set to her real address
+- **Partner email:** Live at awsdev@mattsusername.com; `PARTNER_EMAIL` env var still needs to be set to her real address
 - **GitHub `production` Environment:** TB7-1 — still needs verification in GitHub Settings
 
 ---
@@ -86,8 +86,8 @@ Fixed: second occurrence removed. File is now 863 lines, syntax verified clean.
 2. **TB7-1 — GitHub `production` Environment approval gate**
    Verify GitHub Settings → Environments → `production` is configured with required reviewers.
 
-3. **TB7-2 — Brittany email** (already marked complete but env var still needed)
-   Set `BRITTANY_EMAIL` env var on the Brittany email Lambda to her real address.
+3. **TB7-2 — Partner email** (already marked complete but env var still needed)
+   Set `PARTNER_EMAIL` env var on the Partner email Lambda to her real address.
 
 4. **Google Calendar integration** — highest-priority remaining data gap (6–8h estimated)
 

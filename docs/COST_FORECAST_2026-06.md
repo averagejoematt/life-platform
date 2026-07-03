@@ -30,7 +30,7 @@ and it's controllable through the AI levers below — **not** by cutting infrast
 | Coach board narratives + state/quality/ensemble | Haiku | ~$22 | **daily** — the dominant AI cost |
 | Daily brief (executive summary / BoD) | Sonnet | ~$6 | daily |
 | Compute intelligence (insight, adaptive, anomaly, hypothesis) | Haiku | ~$6 | daily / weekly |
-| Weekly + monthly digests, Brittany email | Sonnet | ~$3 | weekly / monthly |
+| Weekly + monthly digests, Partner email | Sonnet | ~$3 | weekly / monthly |
 | Weekly podcast (write + editor + gate) | Sonnet/Haiku | ~$1 | Fridays |
 | Website AI (`/api/ask`, `/api/board_ask`) | Sonnet/Haiku | traffic | **currently paused (tier 2)** |
 
@@ -52,7 +52,7 @@ split is a designed allocation — see telemetry gap in §3, guardrail G1.)*
 ### ⚠️ Reduce only if you *want* the savings (feature trade-offs)
 - **Change-gated coach narratives** — regenerate a coach only when its inputs moved meaningfully;
   reuse yesterday's otherwise. **Biggest single AI lever (~−$10/mo)**, small UX hit.
-- **Model-tiering** weekly/monthly/Brittany Sonnet→Haiku ≈ −$2–4/mo, minor quality risk.
+- **Model-tiering** weekly/monthly/Partner Sonnet→Haiku ≈ −$2–4/mo, minor quality risk.
 
 ### 🚫 Not recommended to change
 - **Prompt caching** — can't re-enable; cross-region Bedrock (mandatory `us.` prefix) defeats it (D-01).

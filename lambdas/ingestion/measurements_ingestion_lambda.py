@@ -2,7 +2,7 @@
 Measurements Ingestion Lambda — periodic body tape measurements via CSV/Excel file drop.
 
 Trigger: S3 ObjectCreated on matthew-life-platform, prefix imports/measurements/
-Cadence: every 4-8 weeks (manual upload by Brittany)
+Cadence: every 4-8 weeks (manual upload by Partner)
 Schema: USER#matthew#SOURCE#measurements / DATE#YYYY-MM-DD
 """
 
@@ -212,7 +212,7 @@ def lambda_handler(event, context):
         "date": session_date,
         "unit": "in",
         "session_number": session_number,
-        "measured_by": "brittany",
+        "measured_by": "partner",
         **measurements,
         **derived,
         "ingested_at": datetime.now(timezone.utc).isoformat(),

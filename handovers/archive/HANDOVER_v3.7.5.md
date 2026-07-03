@@ -57,7 +57,7 @@ Both test files run in CI `test` job (offline, no AWS credentials needed). 9/9 p
 
 2. **TB7-1** — Verify GitHub Settings → Environments → `production` has required reviewers.
 
-3. **TB7-2 / Brittany email** — Set `BRITTANY_EMAIL` env var to her real address.
+3. **TB7-2 / Partner email** — Set `PARTNER_EMAIL` env var to her real address.
 
 4. **TB7-15** — Run `bash deploy/create_ai_cost_alarm.sh` (enable billing alerts in AWS Console first).
 

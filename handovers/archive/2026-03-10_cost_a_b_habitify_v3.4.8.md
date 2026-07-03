@@ -70,9 +70,9 @@ bash deploy/finish_cost_a.sh
 | OBS-1 structured logging rollout | Ongoing | daily-brief only; remaining Lambdas pending |
 | AI-3 output validation rollout | Ongoing | daily-brief only; remaining Lambdas pending |
 | COST-2 MCP tool usage audit | Backlog | CloudWatch metric per tool, archive 0-invocation |
-| **Brittany weekly email** | Next major feature | Priority after this session |
+| **Partner weekly email** | Next major feature | Priority after this session |
 
 ---
 
 ## Next Session
-Start with: Brittany weekly email feature build.
+Start with: Partner weekly email feature build.

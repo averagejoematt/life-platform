@@ -8,7 +8,7 @@
 
 ## Overview
 
-Add `measurements` as a new periodic data source to the Life Platform. This is tape-measure body measurements captured every 4–8 weeks by Brittany. The import mechanism is a CSV (or Excel) file drop to S3, mirroring the MacroFactor import pattern. No API, no OAuth, no secrets needed.
+Add `measurements` as a new periodic data source to the Life Platform. This is tape-measure body measurements captured every 4–8 weeks by Partner. The import mechanism is a CSV (or Excel) file drop to S3, mirroring the MacroFactor import pattern. No API, no OAuth, no secrets needed.
 
 **Key decisions:**
 - Source key: `measurements`
@@ -17,7 +17,7 @@ Add `measurements` as a new periodic data source to the Life Platform. This is t
 - Import: CSV/Excel → S3 → Lambda trigger
 - `height_inches` is already in the profile (`USER#matthew` / `PROFILE#v1` = **69**) — read from there at import time
 - Raw measurements never go public — only the derived waist-to-height ratio trend
-- Photos: not part of this implementation (manual folder system by Brittany is sufficient)
+- Photos: not part of this implementation (manual folder system by Partner is sufficient)
 
 ---
 
@@ -33,7 +33,7 @@ Add `measurements` as a new periodic data source to the Life Platform. This is t
     "sk": "DATE#2026-03-29",          # session date
     "unit": "in",                      # inches — always
     "session_number": 1,               # sequential, computed at import
-    "measured_by": "brittany",
+    "measured_by": "partner",
 
     # TRUNK
     "neck_in": Decimal("17.0"),
@@ -81,7 +81,7 @@ trunk_sum_in = waist_navel_in + waist_narrowest_in
 
 ## 2. CSV Import Format
 
-The file Brittany sends each session. Claude Code should accept both `.csv` and `.xlsx` (auto-detect by extension, use openpyxl for xlsx).
+The file Partner sends each session. Claude Code should accept both `.csv` and `.xlsx` (auto-detect by extension, use openpyxl for xlsx).
 
 **S3 path:** `s3://matthew-life-platform/imports/measurements/YYYY-MM-DD.csv`  
 The filename date becomes the session date / SK.
@@ -362,7 +362,7 @@ measurements_ingestion_fn.add_event_source(
 
 ## 8. Day 1 Seed Data
 
-Session 1 measurements from 2026-03-29 (captured today by Brittany):
+Session 1 measurements from 2026-03-29 (captured today by Partner):
 
 | Measurement | Value (in) |
 |---|---|

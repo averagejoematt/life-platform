@@ -62,7 +62,7 @@ The H3/H5 linters caught real bugs that had been lurking:
 ## Open Tier 1 Items (from PROJECT_PLAN.md)
 - R8-QS3: Update COST_TRACKER model routing entry (10 min, documentation hygiene)
 - TB7-1: GitHub `production` Environment gate (5 min)
-- TB7-2: Update `BRITTANY_EMAIL` env var to real address (5 min)
+- TB7-2: Update `PARTNER_EMAIL` env var to real address (5 min)
 
 ---
 

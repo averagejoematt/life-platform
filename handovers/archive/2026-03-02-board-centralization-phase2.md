@@ -56,4 +56,4 @@ aws logs tail /aws/lambda/daily-brief --since 5m --region us-west-2 | grep "conf
 - **Sunday:** Weekly Digest follows
 - **Test persona editing:** Use MCP `update_board_member` to tweak a voice/principle → verify next Lambda run picks up the change with no redeploy
 - **Future cleanup:** After 2-3 weeks of clean config-driven operation, consider removing `_FALLBACK_*` constants to reduce code size
-- **Next features on roadmap:** Brittany weekly accountability email, Monarch Money integration, Google Calendar integration, Annual Health Report
+- **Next features on roadmap:** Partner weekly accountability email, Monarch Money integration, Google Calendar integration, Annual Health Report

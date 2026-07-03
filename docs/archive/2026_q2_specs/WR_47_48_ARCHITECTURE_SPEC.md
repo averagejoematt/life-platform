@@ -251,7 +251,7 @@ life-platform:get_freshness_status
 
 The freshness checker checks data freshness. **What checks the freshness checker?** If the Lambda silently stops running (which is likely what happened during the silence), nothing detects it.
 
-Add a CloudWatch alarm: if no `StaleSourceCount` metric is emitted in the last 26 hours (Lambda runs daily), alarm fires to a *separate* SNS topic, ideally to a *separate* email address (e.g. a partner's email — Brittany), specifically because if Matthew's primary inbox is what's failing, the same failure mode catches the meta-alarm.
+Add a CloudWatch alarm: if no `StaleSourceCount` metric is emitted in the last 26 hours (Lambda runs daily), alarm fires to a *separate* SNS topic, ideally to a *separate* email address (e.g. a partner's email — Partner), specifically because if Matthew's primary inbox is what's failing, the same failure mode catches the meta-alarm.
 
 This is the cheapest, highest-leverage piece of WR-36. Build it first regardless of the rest.
 

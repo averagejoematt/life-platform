@@ -100,7 +100,7 @@ apple-health, garmin, enrichment, journal-enrich, daily-brief
 2. **Complete AI-3 rollout** — wire `ai_output_validator.py` into remaining email Lambdas (weekly-digest, monthly-digest, etc.)
 3. **SEC-4** — WAF rate limiting on API Gateway webhook (~1 hr)
 4. **MAINT-3** — move 6 stale .zips from `lambdas/` to `deploy/zips/`
-5. **Next feature** — Brittany weekly accountability email (unblocked; reward seeding still deferred but email itself doesn't depend on it)
+5. **Next feature** — Partner weekly accountability email (unblocked; reward seeding still deferred but email itself doesn't depend on it)
 
 ---
 

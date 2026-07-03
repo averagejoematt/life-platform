@@ -832,7 +832,7 @@ aws ses describe-configuration-set --configuration-set-name life-platform-emails
   --configuration-set-attribute-names eventDestinations
 ```
 
-Four email Lambdas explicitly send through this config set: `daily-brief`, `weekly-digest`, `monthly-digest`, `brittany-weekly-email`. Other email Lambdas (chronicle, weekly-plate, monday-compass, nutrition-review, evening-nudge) currently send without the config set — V2 P3 follow-up tracks wiring them.
+Four email Lambdas explicitly send through this config set: `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email`. Other email Lambdas (chronicle, weekly-plate, monday-compass, nutrition-review, evening-nudge) currently send without the config set — V2 P3 follow-up tracks wiring them.
 
 **SES IAM regression watch-out (V2 P2):** SES requires `ses:SendEmail` on BOTH the identity ARN AND the configuration-set ARN. A 2026-05-17 regression dropped the config-set permission and silently failed deliveries with `AccessDenied`. Fixed via `role_policies.py` — both ARNs in the `Resource` list.
 
@@ -857,7 +857,7 @@ aws cloudwatch get-metric-statistics --namespace "LifePlatform/AI" \
 | wednesday-chronicle | Sonnet | Literary narrative |
 | weekly-plate, nutrition-review | Sonnet | Long-form meal/nutrition analysis |
 | monday-compass, weekly-digest | Sonnet | Weekly intelligence narrative |
-| brittany-email | Sonnet | Partner update |
+| partner-email | Sonnet | Partner update |
 | ai-expert-analyzer | **Haiku** | Templated observatory content |
 | hypothesis-engine | **Haiku** | Structured JSON output |
 | challenge-generator | **Haiku** | Structured JSON output |

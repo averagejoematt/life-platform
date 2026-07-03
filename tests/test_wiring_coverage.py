@@ -88,7 +88,7 @@ ALL_LAMBDAS = [
     "wednesday_chronicle_lambda.py",
     "weekly_plate_lambda.py",
     "monday_compass_lambda.py",
-    "brittany_email_lambda.py",
+    "partner_email_lambda.py",
     # AI-compute
     "anomaly_detector_lambda.py",
     "daily_insight_compute_lambda.py",
@@ -141,7 +141,7 @@ AI_OUTPUT_LAMBDAS = [
     "wednesday_chronicle_lambda.py",
     "weekly_plate_lambda.py",
     "monday_compass_lambda.py",
-    "brittany_email_lambda.py",
+    "partner_email_lambda.py",
     # AI-compute
     "anomaly_detector_lambda.py",
     "daily_insight_compute_lambda.py",
@@ -159,7 +159,7 @@ PROMPT_LAMBDAS = [
     "wednesday_chronicle_lambda.py",
     "weekly_plate_lambda.py",
     "monday_compass_lambda.py",
-    "brittany_email_lambda.py",
+    "partner_email_lambda.py",
     "anomaly_detector_lambda.py",
     "daily_insight_compute_lambda.py",
     "hypothesis_engine_lambda.py",

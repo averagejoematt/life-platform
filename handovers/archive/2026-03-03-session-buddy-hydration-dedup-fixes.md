@@ -100,7 +100,7 @@
 | Create Notion templates (Morning/Evening) | ⏸️ | Pre-set Template + Date |
 | Hide 36 Notion property fields | ⏸️ | Database view cleanup |
 | Chronicle v1.1 integration | ⏸️ | Fetch character_sheet from DDB |
-| Brittany weekly email | ⏸️ | Accountability feature expansion |
+| Partner weekly email | ⏸️ | Accountability feature expansion |
 | Prologue fix script deployment | ⏸️ | |
 | Avatar v2 integration into dashboard | ⏸️ | |
 | Strava ingestion-time dedup | ⏸️ | DDB cleanup for MCP tools |

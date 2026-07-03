@@ -119,7 +119,7 @@ Decisions where cost was a factor in the design:
 | WAF rate limiting | ~$5/month | Tier 3 backlog — rejected in favor of reserved concurrency ($0) |
 | Monarch Money integration | $0 (API polling, consolidate into `life-platform/api-keys`) | Tier 1 backlog |
 | Google Calendar integration | $0 (OAuth, follows existing token rotation pattern) | Tier 1 backlog |
-| Brittany accountability email | $0 (reuses existing SES + Daily Brief Lambda pattern) | Next planned feature |
+| Partner accountability email | $0 (reuses existing SES + Daily Brief Lambda pattern) | Next planned feature |
 | Provisioned concurrency (rejected) | $10.80/month | ❌ Rejected — caching solved the problem |
 | Additional Secrets Manager secrets | $0.40/each | OAuth sources (new integrations) stay separate; static API keys merge into `life-platform/ingestion-keys` bundle (the new home, since `api-keys` was retired). |
 

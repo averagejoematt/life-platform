@@ -1,10 +1,11 @@
 """
-Brittany Weekly Email — v1.1.0
+Partner Weekly Email — v1.1.0
 Fires Sunday 9:30 AM PT (17:30 UTC) via EventBridge.
 
 Design philosophy: narrative-first, not a data dashboard.
-Brittany is Matthew's partner, not his doctor. She doesn't need Whoop scores.
-She needs to understand how he's doing emotionally and how to show up for him.
+The recipient is Matthew's partner, not his doctor. She doesn't need Whoop
+scores. She needs to understand how he's doing emotionally and how to show up
+for him.
 
 Structure:
   - Hero: Elena's one-line narrative lede
@@ -39,17 +40,31 @@ from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 try:
     from platform_logger import get_logger
 
-    logger = get_logger("brittany-weekly")
+    logger = get_logger("partner-weekly")
 except ImportError:
-    logger = logging.getLogger("brittany-weekly")
+    logger = logging.getLogger("partner-weekly")
     logger.setLevel(logging.INFO)
 
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 SENDER = os.environ["EMAIL_SENDER"]
-RECIPIENT = os.environ.get("BRITTANY_EMAIL", "awsdev@mattsusername.com")
 ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
+# The recipient is PII — resolved at runtime from SSM (kept out of the repo),
+# cached warm; falls back to Matthew's own address if the parameter is absent.
+_RECIPIENT_PARAM = os.environ.get("PARTNER_EMAIL_PARAM", "/life-platform/partner-email")
+_recipient_cache = {"v": None}
+
+
+def _recipient():
+    if not _recipient_cache["v"]:
+        try:
+            ssm = boto3.client("ssm", region_name=_REGION)
+            _recipient_cache["v"] = ssm.get_parameter(Name=_RECIPIENT_PARAM)["Parameter"]["Value"].strip()
+        except Exception:
+            _recipient_cache["v"] = os.environ.get("PARTNER_EMAIL", "awsdev@mattsusername.com")
+    return _recipient_cache["v"]
+
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -376,9 +391,9 @@ def gather_all():
 # AI PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
-BOARD_PROMPT = """You are writing Brittany's weekly update about Matthew — her partner.
+BOARD_PROMPT = """You are writing his partner's weekly update about Matthew — her partner.
 Matthew is on a major health transformation: losing weight, building fitness, improving sleep.
-He tracks everything obsessively. This email is for Brittany so she understands how he's doing
+He tracks everything obsessively. This email is for Partner so she understands how he's doing
 and how to be a great partner to him this week.
 
 IMPORTANT CONTEXT ABOUT MATTHEW:
@@ -405,7 +420,7 @@ THIS WEEK'S DATA (plain language context only — do NOT repeat these numbers in
 - Notable journal quotes: {notable_quotes}
 
 WRITING RULES (strictly follow these):
-- Write TO Brittany. Warm, personal, direct.
+- Write TO Partner. Warm, personal, direct.
 - NO jargon. Don't say "Whoop recovery" or "HRV" or "Zone 2". Translate everything to plain English.
 - NEVER mention specific numbers except in context where it's meaningful and already translated
   (e.g. "he slept just over 6 hours most nights" is fine; "sleep score 61%" is not)
@@ -413,7 +428,7 @@ WRITING RULES (strictly follow these):
 - Be honest. If it was a hard week, say so clearly but compassionately.
 - Each section has one specific job. Don't repeat content across sections.
 - Short, clear paragraphs. This is an email, not a report.
-- Speak to Brittany's intelligence — she knows Matthew well.
+- Speak to his partner's intelligence — she knows Matthew well.
 - Do NOT use markdown formatting. No ##, no **, no ---, no bullet points. Plain text only.
 - Do NOT mention percentage of goal completion, gamification levels, or frame him as being at the start/early in his journey. Focus on this week's effort and what it means.
 
@@ -426,25 +441,25 @@ Capture the emotional texture of the week. Reference something real.
 💚 HOW HE'S FEELING — COACH RODRIGUEZ
 Coach Maya Rodriguez specialises in the psychology of behaviour change. She reads the whole picture.
 3 short paragraphs. Cover: What is Matthew's emotional state this week? What's driving it?
-What should Brittany know about where he is right now — not just the data, but the person?
+What should Partner know about where he is right now — not just the data, but the person?
 
 🧠 WHAT'S HAPPENING UNDERNEATH — DR. CONTI
 Dr. Conti is a psychiatrist who pays attention to what's not being said.
 3 short paragraphs. Cover: What psychological patterns are showing up this week?
-What might Matthew be protecting himself from? What does Brittany need to understand
+What might Matthew be protecting himself from? What does Partner need to understand
 about how to reach him — not what to do, but how to be with him?
 
 🤝 HOW TO SHOW UP FOR HIM — DR. MURTHY
 Dr. Vivek Murthy is the world's leading expert on connection and loneliness.
 His research shows close relationships are the single strongest predictor of health outcomes.
-3 short paragraphs. What does Matthew actually need from Brittany this week?
+3 short paragraphs. What does Matthew actually need from Partner this week?
 Specific to where he is right now. End with one concrete, small thing she can do in the next 48 hours.
 
 💪 HIS BODY THIS WEEK — THE CHAIR
 The Chair synthesises the full medical panel's view (sports science, nutrition, sleep medicine,
-longevity, psychiatry) into plain English for Brittany.
+longevity, psychiatry) into plain English for Partner.
 2 short paragraphs. How is he doing physically — honestly? Is the body supporting the mind
-or fighting it this week? What does Brittany need to know about his physical state to understand
+or fighting it this week? What does Partner need to know about his physical state to understand
 his energy and mood levels?
 
 Be warm. Be honest. Be human."""
@@ -511,7 +526,7 @@ def build_commentary(data):
 
         resp = call_anthropic_raw(req, timeout=45)
         text = resp["content"][0]["text"]
-        logger.debug("brittany_ai_response_excerpt: %s", text[:300])
+        logger.debug("partner_ai_response_excerpt: %s", text[:300])
         return text
     except ImportError:
         # ADR-062: layer not attached — fall back to bedrock_client directly
@@ -644,7 +659,7 @@ def build_html(data, commentary_text):
     mood = data["mood"]
     dates = data["dates"]
 
-    logger.debug("brittany_parsed_sections=%s lede_excerpt=%s", list(sections.keys()), sections.get("lede", "(empty)")[:80])
+    logger.debug("partner_parsed_sections=%s lede_excerpt=%s", list(sections.keys()), sections.get("lede", "(empty)")[:80])
 
     try:
         start_dt = datetime.strptime(dates["start"], "%Y-%m-%d")
@@ -703,10 +718,10 @@ def build_html(data, commentary_text):
         + "</div></div>"
     )
 
-    # ── Weight sentence ── (removed per design: Brittany doesn't need raw numbers)
+    # ── Weight sentence ── (removed per design: Partner doesn't need raw numbers)
     weight_block = ""
 
-    # ── Separator ── (no label — Brittany knows who these people are)
+    # ── Separator ── (no label — Partner knows who these people are)
     sep = '<div style="border-top:1px solid #e5e7eb;margin:28px 0;"></div>'
 
     # ── Board sections ──
@@ -740,7 +755,7 @@ def build_html(data, commentary_text):
 
   <!-- Header -->
   <div style="background:linear-gradient(135deg,#1a1a2e 0%,#2d1b69 100%);padding:28px 32px;">
-    <p style="color:#a78bfa;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin:0 0 6px;font-weight:700;">For Brittany · Weekly Update</p>
+    <p style="color:#a78bfa;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin:0 0 6px;font-weight:700;">For Partner · Weekly Update</p>
     <h1 style="color:#fff;font-size:22px;font-weight:800;margin:0 0 4px;">How Matthew's Week Went</h1>
     <p style="color:#c4b5fd;font-size:13px;margin:0;">"""
         + week_label
@@ -802,9 +817,9 @@ def lambda_handler(event, context):
     if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # OBS-1
     if os.environ.get("EXTERNAL_EMAILS_ENABLED", "true").lower() != "true":
-        logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Brittany send")
+        logger.info("[kill-switch] EXTERNAL_EMAILS_ENABLED=false — skipping Partner send")
         return {"statusCode": 200, "body": "skipped: external emails disabled", "skipped": True}
-    logger.info("Brittany Weekly Email v1.1.0 starting...")
+    logger.info("Partner Weekly Email v1.1.0 starting...")
     data = gather_all()
 
     logger.info("Calling Sonnet 4.6 for Board commentary...")
@@ -817,7 +832,7 @@ def lambda_handler(event, context):
 
             _val = validate_ai_output(commentary, AIOutputType.WEEKLY_DIGEST)
             if _val.was_replaced:
-                logger.warning("[AI-3] Brittany commentary replaced with fallback: %s", _val.failure_reason)
+                logger.warning("[AI-3] Partner commentary replaced with fallback: %s", _val.failure_reason)
             commentary = _val.final_text
         except ImportError:
             pass
@@ -837,7 +852,7 @@ def lambda_handler(event, context):
 
     ses.send_email(
         FromEmailAddress=SENDER,
-        Destination={"ToAddresses": [RECIPIENT]},
+        Destination={"ToAddresses": [_recipient()]},
         Content={
             "Simple": {
                 "Subject": {"Data": subject, "Charset": "UTF-8"},
@@ -845,7 +860,7 @@ def lambda_handler(event, context):
             }
         },
         ConfigurationSetName="life-platform-emails",  # V2 P1.6: open/bounce tracking
-        EmailTags=[{"Name": "message_type", "Value": "brittany_weekly"}],
+        EmailTags=[{"Name": "message_type", "Value": "partner_weekly"}],
     )
-    print("[INFO] Sent to " + RECIPIENT + ": " + subject)
-    return {"statusCode": 200, "body": "Brittany email v1.1.0 sent: " + subject}
+    print("[INFO] Sent to the partner address: " + subject)
+    return {"statusCode": 200, "body": "Partner email v1.1.0 sent: " + subject}

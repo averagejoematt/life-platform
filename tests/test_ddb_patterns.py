@@ -81,7 +81,7 @@ DDB_LAMBDAS = [
     "wednesday_chronicle_lambda.py",
     "weekly_plate_lambda.py",
     "monday_compass_lambda.py",
-    "brittany_email_lambda.py",
+    "partner_email_lambda.py",
     "anomaly_detector_lambda.py",
     "daily_insight_compute_lambda.py",
     "hypothesis_engine_lambda.py",

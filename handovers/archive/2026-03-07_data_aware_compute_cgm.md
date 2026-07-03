@@ -88,7 +88,7 @@ The data-aware compute will auto-recompute all 6 days on next catchup cycle sinc
 ## Pending Items
 
 - **[NEXT]** Google Calendar integration — Board rank #2
-- **[PENDING]** Brittany weekly accountability email — prerequisite: reward seeding  
+- **[PENDING]** Partner weekly accountability email — prerequisite: reward seeding  
 - **[PENDING]** Reward seeding → Character Sheet Phase 4
 - **[PENDING]** `deploy_lambda.sh` multi-module fix (daily-brief still needs manual deploy command)
 - **[WATCH]** HAE individual samples setting — confirm it persists for ongoing syncs (not just the manual 7-day push)

@@ -6,7 +6,7 @@
   "WednesdayChronicle06572E73":      { "FunctionName": "wednesday-chronicle" },
   "WeeklyPlate72587CF1":             { "FunctionName": "weekly-plate" },
   "MondayCompass37779F0F":           { "FunctionName": "monday-compass" },
-  "BrittanyWeeklyEmailFFB976C5":     { "FunctionName": "brittany-weekly-email" },
+  "PartnerWeeklyEmailFFB976C5":     { "FunctionName": "partner-weekly-email" },
 
   "DailyBriefSchedule99515B48":          { "Arn": "arn:aws:events:us-west-2:205930651321:rule/daily-brief-schedule" },
   "WeeklyDigestScheduleF14466BB":        { "Arn": "arn:aws:events:us-west-2:205930651321:rule/weekly-digest-sunday" },
@@ -15,5 +15,5 @@
   "WednesdayChronicleSchedule73F96ECC":  { "Arn": "arn:aws:events:us-west-2:205930651321:rule/wednesday-chronicle-schedule" },
   "WeeklyPlateSchedule00BB38FF":         { "Arn": "arn:aws:events:us-west-2:205930651321:rule/weekly-plate" },
   "MondayCompassScheduleAD38164E":       { "Arn": "arn:aws:events:us-west-2:205930651321:rule/monday-compass" },
-  "BrittanyWeeklyEmailScheduleAE7E2228": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/brittany-weekly-email-schedule" }
+  "PartnerWeeklyEmailScheduleAE7E2228": { "Arn": "arn:aws:events:us-west-2:205930651321:rule/partner-weekly-email-schedule" }
 }

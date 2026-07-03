@@ -38,5 +38,5 @@ chmod +x deploy/fix_daily_brief_p0_bugs.sh
 - [ ] Run DST script before Mar 8, 5:45 AM PDT
 - [ ] Nutrition Review email feedback
 - [ ] Prologue fix + Chronicle v1.1 deploy
-- [ ] Brittany weekly email (next accountability feature)
+- [ ] Partner weekly email (next accountability feature)
 - [ ] Monarch Money integration (#1)

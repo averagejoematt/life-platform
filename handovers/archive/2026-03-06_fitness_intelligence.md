@@ -93,7 +93,7 @@ Tool will have ~10 days of valid data immediately.
 ## Next Steps (priority order)
 
 1. **Deploy v2.78.0** — run the deploy script
-2. **Reward seeding** — Matthew + Brittany pick rewards, seed via `set_reward`. Phase 4 done once this happens.
-3. **Brittany accountability email** — next major feature
+2. **Reward seeding** — Matthew + Partner pick rewards, seed via `set_reward`. Phase 4 done once this happens.
+3. **Partner accountability email** — next major feature
 4. **Google Calendar integration** — highest-priority remaining roadmap item
 5. **Monthly Digest character sheet section** — deployed as of this session ✅

@@ -60,7 +60,7 @@ _BEDROCK = None
 # the one correct place to meter token usage + spend. Metering here (rather than
 # only in ai_calls / retry_utils, which cover just the daily-brief path) makes
 # per-feature AI cost attributable in one CloudWatch query — site-api-ai,
-# brittany, the podcast, coach reflections, the canary etc. were previously
+# partner, the podcast, coach reflections, the canary etc. were previously
 # invisible — and feeds the daily-spend anomaly alarm (G2). Strictly fail-open:
 # a telemetry error must never surface to an AI caller.
 _CW_NAMESPACE = "LifePlatform/AI"

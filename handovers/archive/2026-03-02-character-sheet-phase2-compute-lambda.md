@@ -72,7 +72,7 @@ Character sheet computation lives in its own Lambda rather than inside the Daily
 - **Phase 3:** Dashboard radar chart + pixel-art avatar + buddy page Character Sheet tile + Chronicle hooks
 - **Phase 4:** User-defined rewards, protocol recommendations, Weekly Digest integration
 - **DST warning:** March 8 is DST spring forward — character-sheet-compute cron is fixed UTC, verify timing still correct
-- **Other roadmap:** Brittany weekly email, Monarch Money, Google Calendar, Annual Health Report
+- **Other roadmap:** Partner weekly email, Monarch Money, Google Calendar, Annual Health Report
 
 ## Open Questions
 1. Avatar generation method (AI tools vs commissioned pixel art)

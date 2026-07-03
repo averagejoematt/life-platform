@@ -89,7 +89,7 @@ SEC-3 MCP input validation is well-implemented: required field checking, type co
 
 3. **Lambda Function URL `AuthType=NONE` remains.** The HMAC Bearer validation is good, but the Function URL is discoverable via AWS API calls by anyone with the account ID. The URL is 40 random characters (unguessable), but security-in-depth would add a CloudFront distribution with WAF in front of it. For a personal platform, the current approach is acceptable.
 
-4. **The `brittany_email_lambda.py` exists in lambdas/ and was detected as already deployed to AWS** (per v3.3.3 changelog). This Lambda presumably sends emails to a second person (Brittany). Verify that the IAM role and SES permissions scope to the correct recipient — not a wildcard.
+4. **The `partner_email_lambda.py` exists in lambdas/ and was detected as already deployed to AWS** (per v3.3.3 changelog). This Lambda presumably sends emails to a second person (Partner). Verify that the IAM role and SES permissions scope to the correct recipient — not a wildcard.
 
 5. **Insight email parser ALLOWED_SENDERS whitelist** — noted in Review #1, still the sole protection. If the SES receipt rule `insight-capture` is misconfigured to accept from any sender, arbitrary content could be written to the insights DDB partition.
 
@@ -235,7 +235,7 @@ The 34/35 hardening completion rate proves this team (of one) can execute discip
 
 IC-4 (failure patterns) and IC-5 (early warning) are the highest-leverage features the platform could have built. They target the North Star ("reduce the gap between knowing and doing") more directly than any data source integration.
 
-**My one challenge:** The feature roadmap still has 51 items plus 30 IC features. At the current burn rate, that's years of work. The Brittany email is the right next feature — it's the first feature that serves a second human. Build it, learn from it, and let that learning inform whether features #2-81 still matter.
+**My one challenge:** The feature roadmap still has 51 items plus 30 IC features. At the current burn rate, that's years of work. The Partner email is the right next feature — it's the first feature that serves a second human. Build it, learn from it, and let that learning inform whether features #2-81 still matter.
 
 ---
 
@@ -346,7 +346,7 @@ The `COST_TRACKER.md` with per-service breakdown and the `DECISIONS.md` cost tra
 
 *The system is not production-ready for external users — that's a B- for production readiness, not an A. IAM roles and EventBridge rules live outside CDK. There are no tests. The ingestion validator covers 3 of 13 sources. But these are finishable gaps, not architectural rewrites.*
 
-*My recommendation: build the Brittany email. It's the first feature that serves a second human, which will reveal every assumption baked in for a single user. Then come back for Review #4 after 30 days of production operation — that's when the SLOs, the reconciliation job, and the IC intelligence features will have enough runtime data to evaluate properly.*
+*My recommendation: build the Partner email. It's the first feature that serves a second human, which will reveal every assumption baked in for a single user. Then come back for Review #4 after 30 days of production operation — that's when the SLOs, the reconciliation job, and the IC intelligence features will have enough runtime data to evaluate properly.*
 
 *The platform has earned the right to build features again."*
 
@@ -355,5 +355,5 @@ The `COST_TRACKER.md` with per-service breakdown and the `DECISIONS.md` cost tra
 ## NEXT REVIEW
 
 **Scheduled:** ~2026-04-08 (30 days of production operation)
-**Focus:** SLO breach history, reconciliation job trends, IC feature quality assessment, MCP tool usage audit (SIMP-1), Brittany email operational impact, cost trajectory
+**Focus:** SLO breach history, reconciliation job trends, IC feature quality assessment, MCP tool usage audit (SIMP-1), Partner email operational impact, cost trajectory
 **Process:** `bash deploy/generate_review_bundle.sh` → `docs/REVIEW_METHODOLOGY.md` prompt template

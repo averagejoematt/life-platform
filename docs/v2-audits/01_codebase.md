@@ -53,14 +53,14 @@ v1's framework/refactor work is high quality and the new test suite enforces it 
 **ROI:** Closes a 24h alarm-flood window for the 6 exempt sources. Non-monetary reliability win.
 
 ### H2 — Site-api makes raw Anthropic calls bypassing retry_utils — no telemetry, no retry, no cache
-**Evidence:** `lambdas/site_api_lambda.py:2819-2832` (board_ask) and `:7841-7860` (`/api/ask`) both call `urllib.request.urlopen("https://api.anthropic.com/v1/messages", ...)` directly. Same in `lambdas/site_api_ai_lambda.py:517,614`, `lambdas/brittany_email_lambda.py:468`, `lambdas/canary_lambda.py:68`. None invoke `_emit_token_metrics()` or use `retry_utils.call_anthropic_raw`. CHANGELOG v7.21.0 explicitly noted "only daily-brief + coach-state-updater currently emit token telemetry" — the audit's own gap.
+**Evidence:** `lambdas/site_api_lambda.py:2819-2832` (board_ask) and `:7841-7860` (`/api/ask`) both call `urllib.request.urlopen("https://api.anthropic.com/v1/messages", ...)` directly. Same in `lambdas/site_api_ai_lambda.py:517,614`, `lambdas/partner_email_lambda.py:468`, `lambdas/canary_lambda.py:68`. None invoke `_emit_token_metrics()` or use `retry_utils.call_anthropic_raw`. CHANGELOG v7.21.0 explicitly noted "only daily-brief + coach-state-updater currently emit token telemetry" — the audit's own gap.
 **Action:** For each of the 4 Lambdas, refactor to `from retry_utils import call_anthropic_raw`. This single change adds (a) 4-attempt exponential backoff, (b) `LifePlatform/AI` CloudWatch token metrics, (c) cache_control wrapper. site_api's board_ask is invoked per-user — without retry, transient Anthropic 5xx → user sees error. Add `cache_control` on the board_of_directors system prompt (which IS >1024 tokens, qualifies for caching).
 **Effort:** M (4 file changes + reasonably-careful testing of public-facing endpoints)  
 **Risk:** Low — `call_anthropic_raw` already battle-tested in daily_brief.  
 **ROI:** ~$0.50-1/mo cache savings on board_ask (high-traffic) + visibility into ~30% of Anthropic spend that's currently dark + retry resilience for user-facing AI calls.
 
-### H3 — `brittany_email_lambda.py` hardcodes `model: "claude-sonnet-4-6"` — no env override
-**Evidence:** `lambdas/brittany_email_lambda.py:463`: literal string. Compare `ai_calls.py:39` (`AI_MODEL = os.environ.get("AI_MODEL", ...)`) and `retry_utils.py:33`. The CDK constants set `AI_MODEL_HAIKU` but no `AI_MODEL` — meaning when the next Anthropic model deprecation hits, brittany breaks silently with no env-var escape.
+### H3 — `partner_email_lambda.py` hardcodes `model: "claude-sonnet-4-6"` — no env override
+**Evidence:** `lambdas/partner_email_lambda.py:463`: literal string. Compare `ai_calls.py:39` (`AI_MODEL = os.environ.get("AI_MODEL", ...)`) and `retry_utils.py:33`. The CDK constants set `AI_MODEL_HAIKU` but no `AI_MODEL` — meaning when the next Anthropic model deprecation hits, partner breaks silently with no env-var escape.
 **Action:** Replace literal with `os.environ.get("AI_MODEL", "claude-sonnet-4-6")`. Add env propagation in CDK stack if not present.
 **Effort:** XS  
 **Risk:** None.  
@@ -148,7 +148,7 @@ v1's framework/refactor work is high quality and the new test suite enforces it 
 
 ### M4 — `email_framework.py` is a new module — who uses it?
 **Evidence:** `grep -rn "from email_framework" lambdas/` → only `email_framework.py` itself (self-test). 166 LOC. New, untracked, never imported.
-**Action:** Either adopt in one of the 7 email Lambdas (daily-brief, weekly-digest, monthly-digest, wednesday-chronicle, brittany-email, evening-nudge, weekly-plate, monday-compass) as a proof-of-concept, OR delete + commit-message that v1's email-framework idea didn't pan out.
+**Action:** Either adopt in one of the 7 email Lambdas (daily-brief, weekly-digest, monthly-digest, wednesday-chronicle, partner-email, evening-nudge, weekly-plate, monday-compass) as a proof-of-concept, OR delete + commit-message that v1's email-framework idea didn't pan out.
 **Effort:** S (delete) or M (adopt in 1 Lambda)  
 **Risk:** None.  
 **ROI:** Stops the "what's this for?" cost of carrying an unused module.
@@ -344,7 +344,7 @@ See C3. CI bookkeeping incomplete.
 **Phase B — Drift closure (single session, ~3h):**
 - H1 adopt auth_breaker in 3 exempt Lambdas OR delete
 - M4 adopt email_framework in 1 Lambda OR delete
-- H3 brittany model env-override
+- H3 partner model env-override
 - H7 add log_retention to CDK lambda_helpers
 
 **Phase C — Dark-call visibility (single session, ~4h):**

@@ -38,7 +38,7 @@ Two full architecture reviews conducted back-to-back:
 
 ## NEXT SESSION — 7 Immediate Items (Sonnet, ~6 hours)
 
-> **Context for Sonnet:** Three critical safety modules were built during the hardening sprint but never integrated into their consuming Lambdas. Four core docs are stale. These 7 items close the gap before the Brittany email feature.
+> **Context for Sonnet:** Three critical safety modules were built during the hardening sprint but never integrated into their consuming Lambdas. Four core docs are stale. These 7 items close the gap before the Partner email feature.
 
 ### Item 1: Wire `ai_output_validator.py` into `ai_calls.py` (1-2 hr)
 
@@ -212,7 +212,7 @@ mv lambdas/wednesday_chronicle.zip deploy/zips/
 - COST-2: MCP tool usage audit (Sonnet)
 - SIMP-1: Archive low-usage tools (Sonnet)
 
-### Then: Brittany weekly email
+### Then: Partner weekly email
 First feature after hardening gate passes.
 
 ---

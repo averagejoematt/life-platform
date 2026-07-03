@@ -15,8 +15,8 @@
 ### 2. Chronicle Week 2 — "The Empty Journal" (v2.67.0)
 - **Format:** Off-the-record interview (Elena × Matthew) replacing empty journal week
 - **Thesis:** The empty journal IS the story — gap between what's easy to measure and what's hard to face
-- **Interview covered:** Mum's death at 29, grief-driven withdrawal, Jo's death + company reorg, the Rolex in a drawer, "I don't know what I want," Brittany showing up with meals, Maslow's hierarchy, onboarding metaphor
-- **Matthew's edits (4):** Rolex not on wrist, no more cancer implication, Brittany softened (not named as a "question"), no Brittany in next-week teaser
+- **Interview covered:** Mum's death at 29, grief-driven withdrawal, Jo's death + company reorg, the Rolex in a drawer, "I don't know what I want," Partner showing up with meals, Maslow's hierarchy, onboarding metaphor
+- **Matthew's edits (4):** Rolex not on wrist, no more cancer implication, Partner softened (not named as a "question"), no Partner in next-week teaser
 - **Published:** DynamoDB + S3 blog (week-02.html) + email newsletter + updated blog index
 - **Week 1 backfilled:** week-01.html also published (was missing due to AccessDenied)
 - **Chronicle Lambda packaging fixed:** `wednesday_chronicle_lambda.py` → `lambda_function.py` + `board_loader.py`
@@ -60,7 +60,7 @@
 
 ### Platform Items
 - Todoist enrichment layer — build after Matthew cleans up Todoist structure (2-3 hr)
-- Brittany weekly accountability email — next major feature
+- Partner weekly accountability email — next major feature
 - Conti + Murthy voices — will appear in Sunday's Weekly Digest (first test of new board composition)
 - Supplement dosages — update defaults in `habitify_lambda.py` when actual doses confirmed
 - Lambda packaging discipline — every deploy script MUST rename source to `lambda_function.py` before zipping

@@ -27,9 +27,9 @@
 - OAuth token management paragraph updated
 - Cost profile updated: Secrets Manager ~$3.60/month (was ~$2.40)
 
-### ✅ Brittany email address confirmed + deployed
-- Updated `cdk/stacks/email_stack.py`: `BRITTANY_EMAIL` placeholder → `awsdev@mattsusername.com`
-- `brittany-weekly-email` Lambda verified live with correct env vars
+### ✅ Partner email address confirmed + deployed
+- Updated `cdk/stacks/email_stack.py`: `PARTNER_EMAIL` placeholder → `awsdev@mattsusername.com`
+- `partner-weekly-email` Lambda verified live with correct env vars
 
 ### ✅ CDK deploy — LifePlatformCompute + LifePlatformEmail
 - Both stacks deployed cleanly (43.68s total)

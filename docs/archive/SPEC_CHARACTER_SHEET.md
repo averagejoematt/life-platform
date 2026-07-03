@@ -605,7 +605,7 @@ $0 incremental. DynamoDB writes are trivial (~1 item/day), computation happens w
 ## 11. Open Questions for Build
 
 1. **Notification channel:** Level-up events in Daily Brief only, or also push to a separate notification (SNS/email)?
-2. **Brittany email:** Should the upcoming Brittany accountability email include Character Sheet data?
+2. **Partner email:** Should the upcoming Partner accountability email include Character Sheet data?
 3. **Avatar artist:** Generate pixel art via AI image tools, or commission? AI is faster and free; commissioned art is higher quality.
 4. **Sparse data handling:** For days where a source has no data (e.g., no Strava activity), should Movement raw_score use last known value, or score 0? Current design: neutral 40.
 

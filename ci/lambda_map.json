@@ -119,8 +119,8 @@
     "lambdas/emails/anomaly_detector_lambda.py": {
       "function": "anomaly-detector"
     },
-    "lambdas/emails/brittany_email_lambda.py": {
-      "function": "brittany-weekly-email"
+    "lambdas/emails/partner_email_lambda.py": {
+      "function": "partner-weekly-email"
     },
     "lambdas/emails/chronicle_approve_lambda.py": {
       "function": "chronicle-approve"

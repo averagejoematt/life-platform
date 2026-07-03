@@ -82,7 +82,7 @@ OBS-3 and AI-4 move from 🔴 → ✅.
 - **SIMP-1:** Audit low-usage MCP tools — target <100 active tools (overlaps with COST-2)
 
 ### Medium Efforts (Opus, 1-2 sessions)
-- **Brittany weekly email** — the long-queued major feature, fully unblocked
+- **Partner weekly email** — the long-queued major feature, fully unblocked
 
 ### Large Efforts (Opus, multi-session — scoped in SCOPING_LARGE_OPUS.md)
 - **MAINT-4:** CI/CD with GitHub Actions (2 sessions)

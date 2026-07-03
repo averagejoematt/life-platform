@@ -596,8 +596,8 @@ The homepage "What's New Pulse" section (HOME-5) can pull from `/api/pulse` to s
 ### Accountability Page
 The accountability page can embed the glyph strip as a compact status bar showing Matt's current state to accountability partners.
 
-### Brittany Weekly Email
-The weekly email to Brittany can include a visual representation of the week's daily pulse states — 7 rows of colored dots.
+### Partner Weekly Email
+The weekly email to Partner can include a visual representation of the week's daily pulse states — 7 rows of colored dots.
 
 ### Tom's Buddy Page
 `buddy.averagejoematt.com` can display today's pulse status as a compact widget.

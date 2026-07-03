@@ -80,10 +80,10 @@ No deployment needed — Lambda code changes take effect on next invocation.
 
 ## Pending / Next Steps
 
-1. **Reward seeding** — Matthew + Brittany review reward list, confirm picks, seed via `set_reward`.
+1. **Reward seeding** — Matthew + Partner review reward list, confirm picks, seed via `set_reward`.
    Phase 4 fully complete once rewards are in DynamoDB. Reward table is in prior handover.
 
-2. **Brittany accountability email** — next major feature after rewards.
+2. **Partner accountability email** — next major feature after rewards.
 
 3. **Google Calendar integration** — highest-priority remaining roadmap item.
 

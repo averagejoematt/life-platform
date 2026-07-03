@@ -112,7 +112,7 @@ rm -rf "$WORK_DIR"
 - **[ASSESS]** Extent of Apple Health data gap since v2.75.0 — steps, gait, glucose also affected; may want to backfill if HAE exports historical data
 - **[ASSESS]** Notion journal gap since v2.75.0 — journal entries may be missing; journal ingestion Lambda should be manually triggered to backfill
 - **[NEXT]** Google Calendar integration — Board rank #2
-- **[PENDING]** Brittany weekly accountability email — prerequisite: reward seeding
+- **[PENDING]** Partner weekly accountability email — prerequisite: reward seeding
 - **[PENDING]** Reward seeding → Character Sheet Phase 4
 - **[PENDING]** `deploy_todoist_integration.sh` bundling fix (caused today's html_builder outage)
 

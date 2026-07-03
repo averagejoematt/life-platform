@@ -16,7 +16,7 @@ had been incorrectly carried forward as pending.
 
 - **Prologue fix:** Confirmed complete via S3 version history (March 1 deploy, 26-byte delta confirmed)
 - **Chronicle v1.1:** Confirmed complete — editorial voice overhaul (synthesis over recapping,
-  "cardinal sin" prohibition, 37/Brittany bio) is in the deployed Lambda. IAM blog publish fix
+  "cardinal sin" prohibition, 37/Partner bio) is in the deployed Lambda. IAM blog publish fix
   applied March 4. Both Week 1 and Week 2 published.
 
 These are fully closed. Removed from pending list.
@@ -59,10 +59,10 @@ entries, but all future check-ins will flow through the pipeline automatically.
 
 **Reward ideation session held with Matthew.** A full menu of reward ideas was generated across
 7 categories (Character Level milestones, per-pillar tier crossings, weight journey milestones).
-Matthew wants to share the list with Brittany first — she'll co-own some of the rewards as his
+Matthew wants to share the list with Partner first — she'll co-own some of the rewards as his
 partner, making it a shared motivational system.
 
-**Reward ideas generated (pending Brittany review):**
+**Reward ideas generated (pending Partner review):**
 
 | Category | Milestone | Reward Idea |
 |----------|-----------|-------------|
@@ -73,10 +73,10 @@ partner, making it a shared motivational system.
 | Character Level | 50 | Overnight trip |
 | Character Level | 60 | Dinner at Canlis |
 | Character Level | 75 | Long weekend away |
-| Character Level | 90 | Brittany picks |
+| Character Level | 90 | Partner picks |
 | Sleep | Momentum (21) | Pillow/sleep upgrade |
 | Sleep | Discipline (41) | Couples massage |
-| Sleep | Mastery (61) | Brittany picks |
+| Sleep | Mastery (61) | Partner picks |
 | Movement | Momentum (21) | New running shoes/kit |
 | Movement | First 100 workouts | Splurge meal, no tracking |
 | Movement | Discipline (41) | Race entry |
@@ -89,10 +89,10 @@ partner, making it a shared motivational system.
 | Weight | 25 lbs lost | New wardrobe piece |
 | Weight | 50 lbs lost | Couples photoshoot |
 | Weight | 75 lbs lost | Celebration dinner |
-| Weight | 185 lbs (goal) | Brittany picks |
+| Weight | 185 lbs (goal) | Partner picks |
 | Capstone | 185 lbs | The Rolex goes back on |
 
-**Next step:** Matthew and Brittany review the list, pick the ones that resonate, then seed
+**Next step:** Matthew and Partner review the list, pick the ones that resonate, then seed
 them via `set_reward` MCP tool (or I can seed them in bulk next session).
 
 ---
@@ -111,10 +111,10 @@ them via `set_reward` MCP tool (or I can seed them in bulk next session).
 
 ## Pending / Next Steps
 
-1. **Reward seeding** — Matthew + Brittany review reward list, confirm picks, then seed via
+1. **Reward seeding** — Matthew + Partner review reward list, confirm picks, then seed via
    `set_reward` in next session. Phase 4 will be fully complete once rewards are in DynamoDB.
 
-2. **Brittany accountability email** — next major feature. Weekly email for Matthew's partner.
+2. **Partner accountability email** — next major feature. Weekly email for Matthew's partner.
 
 3. **Google Calendar integration** — highest-priority remaining roadmap item (#2).
 

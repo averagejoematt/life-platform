@@ -108,7 +108,7 @@ Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL across m
 | `life-platform/dropbox` | **scheduled for deletion 2026-05-24** | Path migrated to `ingestion-keys` bundle. |
 | `life-platform/todoist` | `life-platform-mcp` (via `mcp/tools_todoist.py`) | NEW (PR 0) — MCP write tools only |
 | `life-platform/ingestion-keys` | `todoist-data-ingestion`, `notion-journal-ingestion`, `dropbox-poll`, `health-auto-export-webhook`, `pipeline-health-check` | bundled — multiple keys per source |
-| `life-platform/ai-keys` | 24 Lambdas (ai-expert-analyzer, anomaly-detector, brittany-email, challenge-generator, all 5 coach_*, daily-brief, daily-insight-compute, hypothesis-engine, journal-enrichment, monday-compass, monthly-digest, nutrition-review, weekly-digest, weekly-plate, weekly-signal, wednesday-chronicle, ai_calls module, etc.) | Anthropic API key. Run `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the full list. |
+| `life-platform/ai-keys` | 24 Lambdas (ai-expert-analyzer, anomaly-detector, partner-email, challenge-generator, all 5 coach_*, daily-brief, daily-insight-compute, hypothesis-engine, journal-enrichment, monday-compass, monthly-digest, nutrition-review, weekly-digest, weekly-plate, weekly-signal, wednesday-chronicle, ai_calls module, etc.) | Anthropic API key. Run `grep -lrn life-platform/ai-keys lambdas/ mcp/` for the full list. |
 | `life-platform/site-api-ai-key` | `site-api-ai-lambda`, `life-platform-site-api`, `pipeline-health-check` | Isolated per R17-04 |
 | `life-platform/mcp-api-key` | `life-platform-mcp` (config), `canary-lambda`, `qa-smoke`, `mcp-key-rotator` | HMAC bearer; auto-rotates 90d |
 | `life-platform/anthropic-api-key` | **none — scheduled for deletion 2026-05-23** | Orphan. V2 P5. |

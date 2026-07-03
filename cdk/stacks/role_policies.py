@@ -910,9 +910,16 @@ def email_monday_compass() -> list[iam.PolicyStatement]:
     return _email_base()
 
 
-def email_brittany() -> list[iam.PolicyStatement]:
-    """Brittany weekly email: DDB read, S3 config, ai-keys, SES."""
-    return _email_base()
+def email_partner() -> list[iam.PolicyStatement]:
+    """Partner weekly email: DDB read, S3 config, ai-keys, SES + the recipient
+    SSM parameter (the address is PII, kept out of the repo)."""
+    return _email_base() + [
+        iam.PolicyStatement(
+            sid="PartnerRecipientParam",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/partner-email"],
+        )
+    ]
 
 
 def email_evening_nudge() -> list[iam.PolicyStatement]:

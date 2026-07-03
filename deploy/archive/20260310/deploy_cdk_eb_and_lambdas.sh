@@ -102,7 +102,7 @@ OLD_RULES=(
     weekly-digest-sunday
     weekly-plate
     weekly-plate-schedule
-    brittany-weekly-email-schedule
+    partner-weekly-email-schedule
     # KEEP: life-platform-nightly-warmer (MCP custom payload, managed via add_permission)
     # KEEP: life-platform-monthly-export (data-export monthly trigger, not yet in CDK)
 )

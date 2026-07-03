@@ -133,7 +133,7 @@ All of these are prefixed per-observatory (`.t-` for training, `.s-` for sleep, 
 
 ### Context
 
-During the v3.7.82 → v4.3.0 pre-launch sprint, at least 6 Lambdas were created via AWS CLI outside CDK management. They don't get IAM role management, EventBridge rules, alarm creation, or layer attachment through the pipeline. Past incidents (Mar 12 Todoist, Mar 11 Brittany email) were caused by this exact pattern.
+During the v3.7.82 → v4.3.0 pre-launch sprint, at least 6 Lambdas were created via AWS CLI outside CDK management. They don't get IAM role management, EventBridge rules, alarm creation, or layer attachment through the pipeline. Past incidents (Mar 12 Todoist, Mar 11 Partner email) were caused by this exact pattern.
 
 ### Current CDK Stacks
 

@@ -25,7 +25,7 @@ The `gather_dynamodb()` scan used `Limit=500` with no pagination. With 15,420 it
 | `USER_GUIDE.md` | v2.66.1 | v2.75.0 |
 
 Key updates:
-- **COST_TRACKER:** 6 secrets (not 12), ~$3/mo, Feb actuals filled in, Brittany email in planned features
+- **COST_TRACKER:** 6 secrets (not 12), ~$3/mo, Feb actuals filled in, Partner email in planned features
 - **INFRASTRUCTURE:** 29 Lambdas, 6 secrets (api-keys bundle), 35 alarms, 121 tools/26 modules, 27 DDB partitions
 - **INCIDENT_LOG:** 4 new incidents (chronicle/anomaly P2, dashboard-refresh IAM P2, character-sheet IAM P3, state-of-mind deploy P3), resolved gaps noted
 - **USER_GUIDE:** 121 tools, 18 sections, 3 new email types, 13-member Board, new Q&A sections, new tool tables for Character Sheet / Social / Longevity / Board / Adaptive Mode
@@ -75,5 +75,5 @@ cat /tmp/brief_test.json | python3 -c "import sys,json; r=json.load(sys.stdin); 
 ## What's Next
 
 1. **Deploy** daily_brief_v2.76.0 (scoring_engine extraction) — terminal, 2 min
-2. **Brittany accountability email** — next major feature, scope TBD
+2. **Partner accountability email** — next major feature, scope TBD
 3. **Google Calendar integration** — highest-priority remaining roadmap item (demand-side data)

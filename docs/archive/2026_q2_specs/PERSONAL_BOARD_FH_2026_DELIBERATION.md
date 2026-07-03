@@ -109,7 +109,7 @@ I'll be the shortest voice in the room because my contribution is narrow but I t
 
 Insulin resistance, like many chronic disease states, has a robust social-isolation correlate. The literature on social isolation and inflammatory markers is unambiguous — Lp-PLA2, CRP, IL-6 — these are downstream of chronic stress states, and chronic stress is downstream of unmet attachment needs. Your hs-CRP 1.4 is not just metabolic. It is also social.
 
-I notice your platform's Pillar 7 (Relationships) has been the thinnest data layer for over a year. I notice you have an accountability partner in Singapore — Tom — and a partner in Brittany. That is a foundation. But the question I want you to sit with: when was the last time you had a meaningful conversation with a friend who was not your partner, your accountability partner, or a healthcare provider?
+I notice your platform's Pillar 7 (Relationships) has been the thinnest data layer for over a year. I notice you have an accountability partner in Singapore — Tom — and a partner in Partner. That is a foundation. But the question I want you to sit with: when was the last time you had a meaningful conversation with a friend who was not your partner, your accountability partner, or a healthcare provider?
 
 The metabolic protocol my colleagues prescribed will work better in a connected nervous system than in an isolated one. I am asking you to add one item to the stack: **one in-person, non-transactional conversation with a friend per week.** Coffee, a walk, dinner. The threshold is "you both leave the conversation knowing something about each other you didn't know before."
 

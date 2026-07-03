@@ -373,7 +373,7 @@ def handle_status() -> dict:
             "manual",
             "Periodic Uploads",
             True,
-            "CSV upload (Brittany)",
+            "CSV upload (Partner)",
         ),
         # ── Lab & Clinical (infrequent) ──
         (

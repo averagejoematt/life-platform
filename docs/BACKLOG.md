@@ -487,7 +487,7 @@ scaling; N-05 V2 audit drift (~2026-08-17).
 - **Action when data exists:** Read `coach_quality_gate.PASS_SCORE_THRESHOLD = 60`; tune based on actual hit_rate_pct distribution; promote advisory → blocking on score < 40
 
 ### D-03 — Per-Lambda AI spend ranking (V2 P1.4 followup) — ✅ checked 2026-06-03
-- **Data now exists.** 7 Lambdas emit input/output tokens via `LifePlatform/AI` (`LambdaFunction` dim): coach-narrative-orchestrator, daily-brief, coach-history-summarizer, coach-ensemble-digest, coach-state-updater, coach-quality-gate, api_ask. (Fewer than the "9 of 22" BACKLOG estimated — site_api/site_api_ai/brittany dimensions not observed in the 14d window.)
+- **Data now exists.** 7 Lambdas emit input/output tokens via `LifePlatform/AI` (`LambdaFunction` dim): coach-narrative-orchestrator, daily-brief, coach-history-summarizer, coach-ensemble-digest, coach-state-updater, coach-quality-gate, api_ask. (Fewer than the "9 of 22" BACKLOG estimated — site_api/site_api_ai/partner dimensions not observed in the 14d window.)
 - **Ranking (input tokens, 14d ending 2026-06-03):**
   1. **coach-narrative-orchestrator — 8.03M in / 539K out** ← dominant spender, ~8× the next. Sonnet narrative path. Caching already engaged (D-01).
   2. daily-brief — 1.02M in / 163K out (cache wasted — see D-01)

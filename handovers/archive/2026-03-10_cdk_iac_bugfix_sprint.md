@@ -84,7 +84,7 @@ hotfix deploy revealing a cascade of issues in the CDK stack definitions.
 ## Next Steps
 
 1. **Monitor alarms** — should clear over next 24h as scheduled Lambda runs succeed
-2. **Brittany email** — next major feature (prerequisite: reward seeding is done)
+2. **Partner email** — next major feature (prerequisite: reward seeding is done)
 3. **COST-A** — CloudWatch alarm audit & pruning (~87 → ~35 alarms, saves ~$2/mo)
 4. **COST-B** — Secrets Manager consolidation review (todoist/notion/dropbox → ingestion-keys)
 5. **Architecture Review #5** — ~2026-04-08

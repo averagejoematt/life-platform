@@ -99,7 +99,7 @@ The single most impressive thing about the platform is the Inner Life page (`/mi
 | **Ask** | `/ask/` | B | AI-powered Q&A against 26 data sources. 5 questions/hour for free, 20 for subscribers. Prompt suggestions are well-chosen. | The "Subscribe for more" upsell is premature on Day 4. |
 | **Community** | `/community/` | C | Discord link. Three activity types listed. | Very thin. No evidence of community activity. A Discord with 0 members is worse than no Discord link. |
 | **Explorer** | `/explorer/` | B+ | Cross-domain correlation explorer. Predictive intelligence framing. Dr. Brandt's analysis card. | Needs more data to show meaningful correlations. The concept is excellent. |
-| **Challenges** | `/challenges/` | B | The "sandbox" framing differentiating challenges from experiments is smart. Brittany collaboration mention is humanizing. | 0 active, 0 done on the page (the No DoorDash challenge exists in the API but may not render). |
+| **Challenges** | `/challenges/` | B | The "sandbox" framing differentiating challenges from experiments is smart. Partner collaboration mention is humanizing. | 0 active, 0 done on the page (the No DoorDash challenge exists in the API but may not render). |
 | **Subscribe** | `/subscribe/` | B+ | 2-column layout is clean. "What you get" breakdown is specific. Double opt-in, privacy link, previous installments. | "Week 1 ships after April 1" urgency banner is already stale (it's April 4). Subscriber count shows "—". |
 | **Start** | `/start/` | D | Sitemap page. Strategy calls for removal. | Should be redirected to home. |
 | **Data** | `/data/` | C | Technical data page. Strategy calls for move under Platform. | Redundant. |
@@ -192,7 +192,7 @@ Three patterns emerge across all 50+ pages:
 
 **One-sentence summary:** "I like checking in but I can never tell what's new — I need a reason to come back each time."
 
-### Visitor 5 — "Brittany (Matthew's Partner)"
+### Visitor 5 — "Partner (Matthew's Partner)"
 
 **Entry:** Weekly accountability email → clicks through.
 
@@ -201,7 +201,7 @@ Three patterns emerge across all 50+ pages:
 3. Reads the Chronicle if a new one is published → Is Elena's account honest?
 4. Checks Challenges → "No DoorDash for 30 Days" — is he sticking to it?
 
-**What gives her confidence:** The accountability mechanisms are real. The public nature of the data means Matthew can't hide from bad weeks. The Brittany collaboration mention on Challenges is a good signal that this isn't just Matthew's obsession — she's part of it.
+**What gives her confidence:** The accountability mechanisms are real. The public nature of the data means Matthew can't hide from bad weeks. The Partner collaboration mention on Challenges is a good signal that this isn't just Matthew's obsession — she's part of it.
 
 **What concerns her:** The sheer volume of the platform. 72 pages, 62 Lambdas, 121 tools — is the building becoming a substitute for the doing? When Matthew spends a Saturday shipping a QA sweep instead of going for a walk, the platform is working against its own purpose.
 
@@ -326,7 +326,7 @@ The narrative infrastructure exists. The editorial content carries the throughli
 
 ### Raj Mehta — Product Strategy
 **Grade: B-**
-"Does this move the needle on the metric that matters? The metric that matters is: does Matthew lose weight and keep it off? The platform can't answer that yet — it's Day 4. What I can evaluate is whether the platform is structured to serve that goal. The accountability mechanisms (public data, Elena's chronicle, Brittany's email, character score) are strong. The intelligence layer (anomaly detection, adaptive mode, daily brief) is well-designed. But the product has a feature proliferation problem — 72 pages, 121 tools, 14 AI systems — and I worry that building more features has become a substitute for behavior change. The next 90 days should be a feature freeze focused on using the existing system, not extending it."
+"Does this move the needle on the metric that matters? The metric that matters is: does Matthew lose weight and keep it off? The platform can't answer that yet — it's Day 4. What I can evaluate is whether the platform is structured to serve that goal. The accountability mechanisms (public data, Elena's chronicle, his partner's email, character score) are strong. The intelligence layer (anomaly detection, adaptive mode, daily brief) is well-designed. But the product has a feature proliferation problem — 72 pages, 121 tools, 14 AI systems — and I worry that building more features has become a substitute for behavior change. The next 90 days should be a feature freeze focused on using the existing system, not extending it."
 
 ### Tyrell Washington — Visual Design / Brand
 **Grade: A-**
@@ -356,7 +356,7 @@ The narrative infrastructure exists. The editorial content carries the throughli
 "The Mind page avoids toxic positivity entirely — a rare achievement in the health optimization space. 'The disruptions aren't coming from abundance anymore. Something is driving them that I haven't fully located yet' is psychologically honest and suggests genuine introspection, not performance. The temptation logging system (resist/succumb with context) could be a meaningful self-awareness tool if used consistently. My concern: the public nature of this content creates a performance dynamic that could interfere with genuine self-exploration. Matthew should be aware that writing for an audience is not the same as writing for himself."
 
 ### Dr. Vivek Murthy — Social Connection & Accountability
-"The accountability framing is healthy: 'Made public because accountability needs an audience.' The Brittany partnership in challenges, the Discord community intention, and the subscriber relationship all point toward connection rather than isolation. The social connection tracking (journal-based, not just interaction counting) is more sophisticated than most health apps. The risk: the platform could become Matthew's primary social connection, substituting digital engagement for human relationship. The fact that Brittany is mentioned by name and involved in challenges is a positive signal."
+"The accountability framing is healthy: 'Made public because accountability needs an audience.' The Partner partnership in challenges, the Discord community intention, and the subscriber relationship all point toward connection rather than isolation. The social connection tracking (journal-based, not just interaction counting) is more sophisticated than most health apps. The risk: the platform could become Matthew's primary social connection, substituting digital engagement for human relationship. The fact that Partner is mentioned by name and involved in challenges is a positive signal."
 
 ### Elena Voss — Editorial Voice
 "The editorial voice is consistent across the Chronicle entries. The three rules (show data honestly, ask uncomfortable questions, no cheerleading) are maintained in the pre-launch installments. The distinction between Elena's narrative and Matthew's first-person content is clear. The meta-page (`/elena/`) is an elegant solution to the 'is this real?' question. The voice quality depends heavily on the underlying data — a bad week produces better narrative than a good week, which creates a perverse incentive. Margaret Calloway's editorial oversight role should be more visible."
@@ -418,7 +418,7 @@ The deepest vanity: building 14 AI intelligence systems in the first 6 weeks whe
 
 ### 5A: Does the Platform Serve Matthew?
 
-The platform creates genuine accountability. The public data, the daily brief, the character score, Brittany's weekly email, Elena's chronicle — these are real mechanisms that make it harder to hide from bad weeks. The intelligence layer (anomaly detection, adaptive mode, correlation engine) will become increasingly valuable as data accumulates.
+The platform creates genuine accountability. The public data, the daily brief, the character score, his partner's weekly email, Elena's chronicle — these are real mechanisms that make it harder to hide from bad weeks. The intelligence layer (anomaly detection, adaptive mode, correlation engine) will become increasingly valuable as data accumulates.
 
 **However:** The building itself has become a partially competing activity. The changelog shows Matthew shipped 57 QA fixes on Day 3, a documentation sprint on Day 4, and 15 editorial rewrites on Day 1. The platform is consuming the time and energy that could go toward the health behaviors it tracks. This is not a hypothetical concern — it's the same pattern Matthew describes in the Mind page: intellectualizing instead of feeling, building instead of doing.
 
@@ -588,7 +588,7 @@ The Board of Directors persona system, the character scoring framework, and the 
 You built a 62-Lambda AI system, wrote 72 pages of content, shipped 57 QA fixes in a single day, and completed a documentation sprint — all in the first 4 days of an experiment about health transformation. On Day 4, your changelog has more entries than your habit heatmap has cells. What would happen if you couldn't touch the codebase for 30 days?
 
 **2. Who is going to tell you when the building becomes the problem?**
-Elena Voss is designed to ask uncomfortable questions. But Elena is generated by the same system you control. Brittany sees the weekly email. But does she see the GitHub commit history? The platform needs a human circuit-breaker — someone with permission to say "stop building and go for a walk." Does that person exist?
+Elena Voss is designed to ask uncomfortable questions. But Elena is generated by the same system you control. Partner sees the weekly email. But does she see the GitHub commit history? The platform needs a human circuit-breaker — someone with permission to say "stop building and go for a walk." Does that person exist?
 
 **3. If the Inner Life page is the most important content on the site, why isn't it the homepage?**
 The homepage leads with data gauges and statistics. The Mind page leads with "the pillar I avoided building" and a confessional about unexplainable relapses. Which one would make a stranger stop scrolling? The site's emotional center of gravity is in the wrong place. The data is impressive. The honesty is unforgettable.

@@ -98,7 +98,7 @@ The vast majority of 307 references aren't narrative copy. They're the `profile.
 
 ```
 lambdas/ai_calls.py                        2x (LLM prompt context)
-lambdas/brittany_email_lambda.py           1x
+lambdas/partner_email_lambda.py           1x
 lambdas/character_engine.py                1x
 lambdas/daily_brief_lambda.py              2x
 lambdas/dashboard_refresh_lambda.py        3x

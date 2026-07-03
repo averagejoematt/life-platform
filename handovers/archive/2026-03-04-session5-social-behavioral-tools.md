@@ -85,7 +85,7 @@ bash deploy/deploy_social_tools_v2.70.sh
 ### Other Priorities
 - [ ] DST cron fix — **CRITICAL: March 8 is 4 days away**
 - [ ] State of Mind verification (iPhone permissions)
-- [ ] Brittany weekly accountability email
+- [ ] Partner weekly accountability email
 - [ ] Supplement dosages update
 - [ ] Todoist cleanup (blocks #34 Decision Fatigue)
 

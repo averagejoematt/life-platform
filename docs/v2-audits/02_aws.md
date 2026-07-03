@@ -129,7 +129,7 @@
 - **Effort:** 2-3h · **ROI:** Disaster recovery; non-monetary. · **Risk:** Adds $5-10/mo.
 
 ### L4. SES has no Configuration Set / no event destination
-- **Evidence:** `list-configuration-sets` = empty. Suppression list IS active (1 entry, brittany@). But open/click tracking, delivery events, bounce-firehose all unattached. v1 P7.7 implemented suppression at account level but skipped the config-set layer.
+- **Evidence:** `list-configuration-sets` = empty. Suppression list IS active (1 entry, partner@). But open/click tracking, delivery events, bounce-firehose all unattached. v1 P7.7 implemented suppression at account level but skipped the config-set layer.
 - **Action:** If you want to know which weekly digests get opened, create a `life-platform-default` configuration set with open/click destinations → S3 or EventBridge. If you don't care, this is fine.
 - **Effort:** 1h · **ROI:** Engagement data. · **Risk:** None.
 
@@ -157,7 +157,7 @@
 | P1.8 DDB PITR | ✅ HOLDS | 35-day PITR enabled, earliest restore 2026-04-12. |
 | P2.5 CloudTrail data events | ❌ NEVER DEPLOYED | Only management events. See H2. |
 | P2.7 HAE auth | ⚠ CODE-ONLY | API GW `AuthorizationType: NONE`. Auth must be in Lambda code (signature/key check). |
-| P7.7 SES suppression | ✅ HOLDS | Account-level suppression on BOUNCE+COMPLAINT, 1 suppressed (brittany@). |
+| P7.7 SES suppression | ✅ HOLDS | Account-level suppression on BOUNCE+COMPLAINT, 1 suppressed (partner@). |
 | ADR-052 schedule order | ✅ HOLDS | character-sheet 16:30 → adaptive-mode 16:35 → daily-metrics 16:40 → daily-insight 16:45 → daily-brief 17:00. Correct. |
 | ADR-053 S3 KMS rollback | ⚠ DEBT | Bucket reverted to AES256 but the orphan CMK was never scheduled for deletion. See H3. |
 | ADR-054 website origin | ✅ HOLDS | All 4 CF distributions point to `matthew-life-platform.s3-website-us-west-2.amazonaws.com`. |

@@ -80,6 +80,6 @@ aws lambda invoke --function-name daily-metrics-compute --payload "$PAYLOAD" \
 
 ## Next Up
 
-1. **`BRITTANY_EMAIL` env var** — Lambda deployed but env var has placeholder, not real address
+1. **`PARTNER_EMAIL` env var** — Lambda deployed but env var has placeholder, not real address
 2. **Reward seeding** — prerequisite for Character Sheet Phase 4 completion
 3. **Google Calendar** — North Star gap #2, Board rank #9

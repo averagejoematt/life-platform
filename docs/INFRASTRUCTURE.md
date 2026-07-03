@@ -102,7 +102,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Sender / Recipient | `awsdev@mattsusername.com` |
 | Inbound rule set | `life-platform-inbound` (active) |
 | Inbound rule | `insight-capture` → routes `insight@aws.mattsusername.com` → S3 |
-| Outbound configuration set | `life-platform-emails` — wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `brittany-weekly-email` |
+| Outbound configuration set | `life-platform-emails` — wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
 
 ---
 
@@ -181,7 +181,7 @@ Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(F
 `coach-computation-engine` · `coach-narrative-orchestrator` · `coach-quality-gate` (WIRED v51) · `coach-state-updater` · `coach-ensemble-digest` · `coach-prediction-evaluator` · `coach-history-summarizer` · `coach-observatory-renderer` · plus legacy `ai-expert-analyzer` (deprecated, fallback only)
 
 ### Email / Digest (11)
-`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` (EventBridge ENABLED) · `chronicle-email-sender` (EventBridge ENABLED) · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `brittany-weekly-email`
+`daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` (EventBridge ENABLED) · `chronicle-email-sender` (EventBridge ENABLED) · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `partner-weekly-email`
 
 ### Infrastructure / Operational (~17)
 `life-platform-mcp` · `life-platform-mcp-warmer` · `life-platform-site-api` · `life-platform-site-api-ai` · `site-stats-refresh` · `life-platform-freshness-checker` · `life-platform-key-rotator` · `dashboard-refresh` · `life-platform-data-export` · `life-platform-data-reconciliation` · `life-platform-delete-user-data` · `life-platform-dlq-consumer` · `life-platform-canary` · `life-platform-pip-audit` · `life-platform-qa-smoke` · `life-platform-alert-digest` · `insight-email-parser` · `challenge-generator` · `pipeline-health-check` · `chronicle-approve` · `subscriber-onboarding`

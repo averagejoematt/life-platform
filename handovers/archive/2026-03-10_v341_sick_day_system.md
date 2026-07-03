@@ -95,9 +95,9 @@ All 7 Compute Lambdas updated to `life-platform-shared-utils:6` via AWS CLI.
 
 ## Next Sessions
 
-### 1. Brittany Weekly Email (next major feature)
-Lambda slot exists (`brittany-weekly-email`), source file exists. No blockers.
-- Styled accountability email for Brittany (vs Tom's read-only buddy page)
+### 1. Partner Weekly Email (next major feature)
+Lambda slot exists (`partner-weekly-email`), source file exists. No blockers.
+- Styled accountability email for Partner (vs Tom's read-only buddy page)
 - Weekly cadence, Sonnet, personal tone
 
 ### 2. KMS audit (quick)

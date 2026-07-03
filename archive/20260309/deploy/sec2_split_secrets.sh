@@ -72,7 +72,7 @@ if [ "$AI_KEYS_ARN" = "MISSING" ]; then
 fi
 echo "  ✅ life-platform/ai-keys: $AI_KEYS_ARN"
 
-for fn in "daily-brief" "weekly-digest" "monday-compass" "brittany-weekly-email"; do
+for fn in "daily-brief" "weekly-digest" "monday-compass" "partner-weekly-email"; do
   SECRET=$(aws lambda get-function-configuration \
     --function-name "$fn" --region "$REGION" \
     --query "Environment.Variables.ANTHROPIC_SECRET" --output text --no-cli-pager 2>/dev/null || echo "N/A")

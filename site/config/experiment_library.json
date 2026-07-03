@@ -1427,7 +1427,7 @@
       ],
       "experiment_type": "behavioral",
       "hypothesis_template": "Logging 3 specific gratitudes daily for {duration} days will measurably improve mood and wellbeing scores.",
-      "protocol_template": "Each evening, write 3 specific things from today (not generic). E.g., 'Brittany made me laugh during dinner' not 'grateful for family.' Platform journal or paper.",
+      "protocol_template": "Each evening, write 3 specific things from today (not generic). E.g., 'Partner made me laugh during dinner' not 'grateful for family.' Platform journal or paper.",
       "why_it_matters": "The brain defaults to scanning for threats. Gratitude practice rewires it to scan for good. Specificity is the key — generic gratitude doesn't stick.",
       "tags": [
         "mental",
@@ -1539,7 +1539,7 @@
     {
       "id": "date-night-weekly",
       "name": "Date Night Per Week",
-      "description": "One dedicated date night per week with Brittany — no phones, no logistics talk",
+      "description": "One dedicated date night per week with Partner — no phones, no logistics talk",
       "pillar": "social",
       "evidence_tier": "moderate",
       "evidence_summary": "Regular couple time is associated with relationship satisfaction and reduced conflict. Quality time (not just proximity) drives the effect.",
@@ -1558,7 +1558,7 @@
       "tags": [
         "social",
         "relationship",
-        "brittany",
+        "partner",
         "connection"
       ],
       "related_protocols": [],

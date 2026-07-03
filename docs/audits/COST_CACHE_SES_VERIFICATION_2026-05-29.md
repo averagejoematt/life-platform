@@ -72,7 +72,7 @@ The ~8x gap between the upper-bound table ($34 / 7d) and the real bill (~$4 / 30
 - Bounce: 5 (BounceRate=0.72% — acceptable)
 - Complaint: 0
 
-**Configuration set `life-platform-emails` per-event dim:** every event lands in `SesEventType=unknown` because sending Lambdas (daily_brief, weekly_digest, monthly_digest, brittany, chronicle) set `ConfigurationSetName` but do not pass `Tags=[{Name:"SesEventType", Value:"daily_brief"}, ...]` per send. This makes per-email-type open-rate analysis impossible.
+**Configuration set `life-platform-emails` per-event dim:** every event lands in `SesEventType=unknown` because sending Lambdas (daily_brief, weekly_digest, monthly_digest, partner, chronicle) set `ConfigurationSetName` but do not pass `Tags=[{Name:"SesEventType", Value:"daily_brief"}, ...]` per send. This makes per-email-type open-rate analysis impossible.
 
 **Two stacked issues:**
 

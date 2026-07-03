@@ -123,7 +123,7 @@ Order: daily-brief → 10s → weekly-plate-schedule → 10s → life-platform-m
 - **[NEXT]** IC-3 chain-of-thought two-pass for BoD + TL;DR
 - **[NEXT]** IC-6 milestone architecture (weight milestone waypoints stored in profile)
 - **[NEXT]** Google Calendar integration — Board rank #2, North Star gap #2
-- **[PENDING]** Brittany weekly accountability email
+- **[PENDING]** Partner weekly accountability email
 - **[PENDING]** Reward seeding → Character Sheet Phase 4
 
 ## Version
