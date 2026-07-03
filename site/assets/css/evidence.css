@@ -467,3 +467,93 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rdg-fin-head { display: flex; gap: 0.9rem; align-items: center; margin-bottom: 0.5rem; }
 .rdg-fin-cover { width: 48px; height: auto; border-radius: 3px; flex: 0 0 auto; box-shadow: 0 2px 8px -3px rgba(0, 0, 0, 0.5); }
 .rdg-fin-title { font-family: var(--font-serif); font-size: 1.15rem; color: var(--ink); margin: 0; }
+
+/* ── The character sheet (/data/character/, §8.6) ─────────────────────────── */
+/* Hero: the figure held in the pillar ring, the tier emblem beside it. */
+.ch-hero { padding-top: var(--sp-4); }
+.ch-stage { display: grid; grid-template-columns: minmax(0, 380px) 1fr; gap: clamp(1.25rem, 1rem + 2.5vw, 3rem); align-items: center; }
+.ch-figwrap { max-width: 380px; margin: 0 auto; width: 100%; }
+.ch-ringsvg { display: block; width: 100%; height: auto; }
+.pring-seg { opacity: 0.14; }
+.pring-fill { transition: stroke-dashoffset 0.9s var(--ease-out); }
+.ch-body { fill: var(--ink); stroke: none; }
+.ch-center { font-size: 84px; fill: var(--ink); font-family: var(--font-mono); }
+.ch-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-3); color: var(--ink-faint); }
+.ch-leg { display: inline-flex; align-items: center; gap: 5px; }
+.ch-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ch-id { min-width: 0; }
+.ch-emblem { width: 96px; color: var(--tier-accent, var(--ember)); margin-bottom: var(--sp-2); }
+.ch-emblem .emblem { display: block; width: 100%; height: auto; overflow: visible; }
+.ch-class { color: var(--tier-accent, var(--ember)); letter-spacing: var(--tracking-label); text-transform: uppercase; }
+.ch-idnote { color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); max-width: var(--measure-narrow); margin-top: var(--sp-2); }
+
+/* The seven pillars — stat block + radar. */
+.ch-statgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 280px); gap: var(--sp-6); align-items: center; }
+.ch-rows { display: grid; gap: var(--sp-3); }
+.ch-row { display: grid; grid-template-columns: 22px 6.8rem 2.9rem minmax(90px, 1fr) 4rem 3.4rem 64px; gap: var(--sp-2); align-items: center; }
+.ch-ric .ico { width: 18px; height: 18px; display: block; }
+.ch-rname { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink); }
+.ch-rlv { color: var(--ink-muted); }
+.ch-rbar { position: relative; height: 8px; background: var(--surface-sunken, var(--surface)); border: var(--border-hair); border-radius: 4px; overflow: hidden; }
+.ch-rbar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.ch-rbar b { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule); }
+.ch-rraw { font-size: var(--fs-small); color: var(--ink); text-align: right; }
+.ch-rraw small { color: var(--ink-faint); font-size: 0.72em; }
+.ch-d { font-family: var(--font-mono); font-size: var(--fs-label); text-align: right; }
+.ch-dup { color: var(--ember); }
+.ch-d0 { color: var(--ink-faint); }
+.ch-ddn { color: var(--ink-muted); }
+.ch-rspark { display: block; }
+.ch-rspark .spark { width: 72px; height: 26px; display: block; }
+.radar-chart { margin: 0; }
+.radar-chart svg { width: 100%; height: auto; display: block; }
+.radar-grid { stroke: var(--rule); }
+.radar-poly { fill: color-mix(in oklch, var(--ember) 14%, transparent); stroke: var(--ember-line); stroke-width: 1.5; }
+.radar-lbl { font-family: var(--font-mono); font-size: 10px; fill: var(--ink-faint); letter-spacing: 0.08em; }
+
+/* The tier ladder. */
+.ch-ladder { display: grid; gap: var(--sp-2); }
+.ch-rung { display: grid; grid-template-columns: 34px 7.5rem 5.2rem minmax(0, 1fr) auto; gap: var(--sp-3); align-items: center; padding: var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); }
+.ch-rung-em { width: 30px; color: var(--tier-accent, var(--ink-faint)); }
+.ch-rung-em .emblem { display: block; width: 100%; height: auto; }
+.ch-rung-name { font-family: var(--font-sans); color: var(--ink); }
+.ch-rung-band { color: var(--ink-muted); }
+.ch-rung-fl { color: var(--ink-faint); font-size: var(--fs-small); }
+.ch-rung-now { color: var(--ember); }
+.ch-rung.is-current { border-color: var(--ember-line); background: var(--ember-wash); }
+.ch-rung.is-locked { opacity: 0.55; }
+.ch-rung.is-locked .ch-rung-em { color: var(--ink-faint); }
+
+/* The record — level events, heatmap, waveform. */
+.ch-tl { list-style: none; margin: 0 0 var(--sp-4); padding: 0; display: grid; gap: var(--sp-2); }
+.ch-tl li { display: flex; gap: var(--sp-3); align-items: baseline; border-left: 2px solid var(--ember-line); padding-left: var(--sp-3); }
+.ch-tl .label { color: var(--ink-faint); flex: none; }
+.ch-tl-ev { color: var(--ink); font-size: var(--fs-small); }
+.ch-tl-lv { color: var(--ember); margin-left: auto; }
+.ch-heat { display: grid; gap: 3px; margin: var(--sp-4) 0; }
+.ch-heat-row { display: grid; grid-template-columns: 26px repeat(auto-fit, minmax(18px, 34px)); gap: 3px; align-items: center; }
+.ch-heat-head .label { color: var(--ink-faint); font-size: 9px; text-align: center; }
+.ch-heat-lbl .ico { width: 15px; height: 15px; display: block; }
+.ch-cell { display: block; height: 18px; border-radius: 3px; border: 1px solid color-mix(in oklch, var(--rule) 60%, transparent); }
+.ch-wave { margin: var(--sp-4) 0 0; }
+.ch-wave svg { width: 100%; height: 44px; display: block; }
+.ch-wave figcaption { color: var(--ink-faint); margin-bottom: var(--sp-2); }
+.ch-wv { fill: var(--ember); }
+.ch-wv-na { fill: var(--ink-faint); opacity: 0.4; }
+
+/* Follow the level-ups. */
+.ch-sub .ask-row { max-width: 30rem; }
+
+@media (max-width: 819px) {
+  .ch-stage { grid-template-columns: 1fr; }
+  .ch-id { text-align: center; }
+  .ch-emblem { margin-inline: auto; }
+  .ch-idnote { margin-inline: auto; }
+  .ch-statgrid { grid-template-columns: 1fr; }
+  .radar-chart { max-width: 320px; margin: 0 auto; }
+  .ch-row { grid-template-columns: 20px minmax(0, 1fr) 3rem 4rem; }
+  .ch-rbar { grid-column: 1 / -1; }
+  .ch-rspark { display: none; }
+  .ch-rung { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .ch-rung-fl { grid-column: 2 / -1; }
+}

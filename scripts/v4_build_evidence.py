@@ -150,6 +150,21 @@ REGISTRY = [
         None,
         "/legacy/ledger/",
     ),
+    # ── The character ──────────────────────────────────────────────────────
+    # The live RPG sheet, resurrected from the legacy site (2026-07). Same slug as
+    # the /method/ editorial explainer — safe: registry_json filters by group and
+    # each pillar writes its own dir, so this builds /data/character/ while the
+    # explainer keeps /method/character/. See _REGROUP note below.
+    (
+        "character",
+        "The character sheet",
+        "The live RPG sheet — 7 pillars, XP, streak-gated levels, and the figure drawn from the real numbers.",
+        "The character",
+        "data",
+        "/api/character",
+        None,
+        "/legacy/character/",
+    ),
     # ── Protocol & experiments ─────────────────────────────────────────────
     (
         "supplements",
@@ -236,7 +251,8 @@ REGISTRY = [
         "character",
         "The character",
         "What the Character Level means — 7 pillars, 100 levels, 5 tiers, and why level-ups are rare.",
-        "Credibility & the machine",
+        # Inline (not via _REGROUP): the slug also names the /data/ live sheet.
+        "How it holds up",
         "editorial",
         None,
         None,
@@ -446,7 +462,9 @@ _REGROUP = {
     "postmortems": "How it holds up",
     "survival": "How it holds up",
     "methodology": "How it holds up",
-    "character": "How it holds up",
+    # NB: no "character" entry here — _REGROUP is keyed by slug and the slug now
+    # appears TWICE (the /data/ live sheet + the /method/ editorial explainer, whose
+    # tuple carries "How it holds up" inline). A regroup entry would clobber both.
     "predictions": "How it holds up",
     "benchmarks": "How it holds up",
     "biology": "How it holds up",
@@ -468,7 +486,15 @@ _REGROUP = {
 }
 REGISTRY = [(s, t, b, _REGROUP.get(s, g), *rest) for (s, t, b, g, *rest) in REGISTRY]
 
-GROUP_ORDER = ["The body", "Mind & accountability", "Protocol & experiments", "How it holds up", "The machine", "The reset log"]
+GROUP_ORDER = [
+    "The body",
+    "Mind & accountability",
+    "The character",
+    "Protocol & experiments",
+    "How it holds up",
+    "The machine",
+    "The reset log",
+]
 
 # Authored editorial content (faithful to the preserved legacy + the locked docs).
 EDITORIAL = {
@@ -490,15 +516,16 @@ EDITORIAL = {
         '<section class="rd-sec"><h2 class="rd-h">Five tiers</h2>'
         '<p class="rd-prose">The 100 levels are grouped into five tiers, each a band of twenty:</p>'
         '<ul class="rd-tierlist">'
-        "<li>🔨 <strong>Foundation</strong> — levels 1–20. Laying the base: the habits and the floor.</li>"
-        "<li>🔥 <strong>Momentum</strong> — levels 21–40. The base holds and starts compounding.</li>"
-        "<li>⚔️ <strong>Discipline</strong> — levels 41–60. Consistency under load, not just on good weeks.</li>"
-        "<li>🏆 <strong>Mastery</strong> — levels 61–80. The system runs itself most days.</li>"
-        "<li>👑 <strong>Elite</strong> — levels 81–100. The far end of what an N=1 can reach.</li>"
+        "<li><strong>Foundation</strong> — levels 1–20. Laying the base: the habits and the floor.</li>"
+        "<li><strong>Momentum</strong> — levels 21–40. The base holds and starts compounding.</li>"
+        "<li><strong>Discipline</strong> — levels 41–60. Consistency under load, not just on good weeks.</li>"
+        "<li><strong>Mastery</strong> — levels 61–80. The system runs itself most days.</li>"
+        "<li><strong>Elite</strong> — levels 81–100. The far end of what an N=1 can reach.</li>"
         "</ul>"
         '<p class="rd-prose">So "<strong>Level 8 · Foundation</strong>" — what the cockpit shows today — means level 8 of 100, still in the first tier: early, building the base, exactly where a few weeks in should be. The tier is the chapter; the level is the page.</p></section>'
         '<section class="rd-sec"><h2 class="rd-h">Why level-ups are rare (and mean something)</h2>'
         '<p class="rd-prose">A level only moves after a sustained shift — roughly <strong>five or more days of real improvement</strong> to go up, and <strong>seven or more of decline</strong> to go down. That deliberate stickiness means a single great (or terrible) day can\'t swing it, and an "up" is earned, not noise. Expect only a handful of level events in a month. When a pillar crosses a tier line, that\'s a genuine milestone — the kind of thing the weekly chronicle writes about.</p>'
+        '<p class="rd-archive">The live sheet — today\'s levels, XP, the tier ladder, and the figure drawn from the real numbers — lives at <a href="/data/character/">/data/character/</a>.</p>'
         '<p class="correlative">It\'s a motivational lens on real data, not a medical score — every input is correlative and N=1. <span class="confidence conf-low">N=1</span></p></section>'
     ),
     "kitchen": (
@@ -621,7 +648,7 @@ PILLARS = [
         "nav_key": "data",
         "h1": "The Data",
         "lede": "Every source the platform reads — the body, the mind, and the signals the engine finds across them. Live now and over time. Correlative, read-only, flagged when thin.",
-        "groups": ["The body", "Mind & accountability"],
+        "groups": ["The body", "Mind & accountability", "The character"],
     },
     {
         "dir": "protocols",

@@ -13,8 +13,8 @@
     window.__START_SLUG__ = "<slug>"
 */
 
-import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero, autonomicQuadrant } from "/assets/js/charts.js";
-import { sigil } from "/assets/js/sigils.js";
+import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero, autonomicQuadrant, pillarRing, radarChart } from "/assets/js/charts.js";
+import { sigil, tierEmblem } from "/assets/js/sigils.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
 
@@ -2257,8 +2257,189 @@ async function renderReading(d) {
   return head + body + note("The Mind pillar — measuring what's kept, not what's consumed. Private fields (retention, mood) never reach this page.");
 }
 
+/* ── The character sheet (/data/character/) — resurrected from the legacy RPG
+   page at v5 quality. The hero composes the three proven primitives: the real
+   weight-driven silhouette (dfBody) held inside the 7-segment pillar ring
+   (arcs fill by raw_score), framed by the tier emblem. Everything below is a
+   readout of the nightly character engine — nothing here computes a score.
+   Data: /api/character (live, 900s) + character_stats.json (daily: timeline,
+   tiers, weekly history) + /api/journey_waveform + /api/journey. Every section
+   degrades independently; post-reset empties render honest "not yet" states.
+   Emoji served by the APIs are IGNORED (§8) — pillars render domainIcon marks. */
+const CH_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"];
+const CH_ABBR = { sleep: "SLP", movement: "MOV", nutrition: "NUT", metabolic: "MET", mind: "MIN", relationships: "REL", consistency: "CON" };
+const CH_FLAVOR = {
+  Foundation: "Laying the base: the habits and the floor.",
+  Momentum: "The base holds and starts compounding.",
+  Discipline: "Consistency under load, not just on good weeks.",
+  Mastery: "The system runs itself most days.",
+  Elite: "The far end of what an N=1 can reach.",
+};
+const chDelta = (v, unit = "") => {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n === 0) return `<span class="ch-d ch-d0">0${unit}</span>`;
+  return n > 0 ? `<span class="ch-d ch-dup">+${fmt(n)}${unit}</span>` : `<span class="ch-d ch-ddn">−${fmt(Math.abs(n))}${unit}</span>`;
+};
+
+async function renderCharacter(d) {
+  const ch = (d && d.character) || {};
+  const pillars = ((d && d.pillars) || []).slice().sort((a, b) => CH_ORDER.indexOf(a.name) - CH_ORDER.indexOf(b.name));
+  if (!pillars.length) return empty("The character sheet computes nightly — it fills in as the first days of data land.");
+  const [stats, wave, j] = await Promise.all([
+    tryJSON("/data/character_stats.json"), tryJSON("/api/journey_waveform"), tryJSON("/api/journey"),
+  ]);
+  const sc = (stats && stats.character) || {};
+  const tier = String(ch.tier || "Foundation");
+  const level = Math.round(Number(ch.level) || 1);
+  const composite = Number(ch.composite_score);
+  const jj = (j && j.journey) || null;
+
+  /* 1 · Hero — the figure, leveled. Silhouette girth = the real weight; ring
+     segments = the seven pillar scores; the emblem = tier + level. If the
+     journey isn't available the composite number holds the center instead. */
+  const RING = 360;
+  let center;
+  if (jj && isFinite(Number(jj.start_weight_lbs)) && isFinite(Number(jj.current_weight_lbs)) && Number(jj.start_weight_lbs) !== Number(jj.goal_weight_lbs)) {
+    const g = Math.max(0, Math.min(1, (Number(jj.current_weight_lbs) - Number(jj.goal_weight_lbs)) / (Number(jj.start_weight_lbs) - Number(jj.goal_weight_lbs))));
+    center = `<svg x="118" y="76" width="124" height="208" viewBox="0 0 300 620" aria-hidden="true">` +
+      `<circle class="ch-body" cx="150" cy="64" r="${(29 + 6 * g).toFixed(1)}"></circle>` +
+      `<path class="ch-body" d="${dfBody(g)}"></path></svg>`;
+  } else {
+    center = `<text class="ch-center num" x="180" y="192" text-anchor="middle">${Number.isFinite(composite) ? Math.round(composite) : "—"}</text>`;
+  }
+  const legend = pillars.map((p) => `<span class="ch-leg"><i class="ch-dot" style="background:var(--pillar-${esc(p.name)},var(--ember))"></i>${esc(CH_ABBR[p.name] || p.name)}</span>`).join("");
+  const hero = `<section class="rd-sec ch-hero" data-tier="${esc(tier.toLowerCase())}">
+    <div class="ch-stage">
+      <div class="ch-figwrap">
+        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven pillar ring around the body silhouette — each arc fills with its pillar's score">${pillarRing(pillars, { size: RING })}${center}</svg>
+        <div class="ch-legend label">${legend}</div>
+      </div>
+      <div class="ch-id">
+        <div class="ch-emblem">${tierEmblem(tier, level)}</div>
+        <p class="ch-class label">${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · as of ${esc(String(ch.as_of_date))}` : ""}</p>
+        <p class="ch-idnote">One character, seven pillars — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's pillar scores; the emblem evolves with the tier.</p>
+        ${figs([
+          Number.isFinite(composite) && fig(fmt(composite), "composite", ch.composite_delta_1d != null ? `${Number(ch.composite_delta_1d) >= 0 ? "+" : ""}${fmt(ch.composite_delta_1d)} d/d` : ""),
+          ch.xp_total != null && fig(fmt(ch.xp_total), "xp"),
+          (wave && wave.day_n) != null && fig(`day ${wave.day_n}`, "of the experiment"),
+        ])}
+      </div>
+    </div>
+  </section>`;
+
+  /* 2 · The seven pillars — RPG stat block + radar. */
+  const hist = (stats && stats.pillar_history) || [];
+  const rows = pillars.map((p) => {
+    const scoreVals = hist.map((w) => ({ v: (w.pillars && w.pillars[p.name]) || 0, d: w.week_end })).slice(-8);
+    const spark = scoreVals.filter((s) => s.v > 0).length >= 2 ? sparkline(scoreVals, { height: 26 }) : "";
+    const raw = Math.max(0, Math.min(Number(p.raw_score) || 0, 100));
+    return `<div class="ch-row">
+      <span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>
+      <span class="ch-rname">${esc(ttl(p.name))}</span>
+      <span class="ch-rlv label">Lv ${Math.round(Number(p.level) || 1)}</span>
+      <span class="ch-rbar"><i style="width:${raw}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></span>
+      <span class="ch-rraw num">${fmt(raw)}<small>/100</small></span>
+      ${chDelta(p.xp_delta, " xp")}
+      ${spark ? `<span class="ch-rspark">${spark}</span>` : ""}
+    </div>`;
+  }).join("");
+  const radar = radarChart(pillars.map((p) => ({ key: p.name, label: CH_ABBR[p.name] || p.name, value: p.raw_score })));
+  const statblock = sec("The seven pillars", `<div class="ch-statgrid"><div class="ch-rows">${rows}</div>${radar}</div>
+    <p class="rd-why">Each pillar scores 0–100 nightly from its own real data (wearables, the food log, habits, labs), then an EMA smooths it and a streak gate decides level moves — one great day can't swing a level. XP is the daily currency: strong days earn it, weak days bleed it.</p>`);
+
+  /* 3 · The tier ladder. */
+  const tiers = (stats && stats.tiers) || [];
+  const ladder = tiers.length ? sec("The tier ladder", `<div class="ch-ladder">` + tiers.map((t) => {
+    const cur = t.status === "current";
+    return `<div class="ch-rung${cur ? " is-current" : ""}${t.status === "locked" ? " is-locked" : ""}" data-tier="${esc(String(t.name || "").toLowerCase())}">
+      <span class="ch-rung-em">${tierEmblem(t.name, null)}</span>
+      <span class="ch-rung-name">${esc(t.name)}</span>
+      <span class="ch-rung-band label">Lv ${t.min_level}–${t.max_level}</span>
+      <span class="ch-rung-fl">${esc(CH_FLAVOR[t.name] || "")}</span>
+      ${cur ? `<span class="ch-rung-now label">now</span>` : ""}
+    </div>`;
+  }).join("") + `</div>` +
+    (sc.next_tier ? `<p class="rd-archive">Next tier: <strong>${esc(sc.next_tier)}</strong> at level ${esc(String(sc.next_tier_level || ""))} — crossing a tier line takes a longer sustained streak than a normal level-up.</p>` : "")) : "";
+
+  /* 4 · The record — level events, the weekly heatmap, the daily waveform. */
+  const tl = (stats && stats.timeline) || [];
+  const tlHtml = tl.length
+    ? `<ul class="ch-tl">${tl.slice(-14).reverse().map((e) => `<li><span class="label">${esc(String(e.date || "").slice(0, 10))}</span><span class="ch-tl-ev">${esc(e.event || "")}</span>${e.character_level != null ? `<span class="ch-tl-lv label">Lv ${esc(String(Math.round(e.character_level)))}</span>` : ""}</li>`).join("")}</ul>`
+    : `<p class="rd-archive">No level events yet this cycle — a level only moves after a sustained multi-day streak, so the first entries here are earned, not noise.</p>`;
+  let heat = "";
+  if (hist.length) {
+    const weeks = hist.slice(-12);
+    heat = `<div class="ch-heat" role="img" aria-label="Weekly pillar scores, ${weeks.length} weeks">` +
+      `<div class="ch-heat-row ch-heat-head"><span></span>${weeks.map((w) => `<span class="label">${esc(w.week_label || "")}</span>`).join("")}</div>` +
+      pillars.map((p) => `<div class="ch-heat-row"><span class="ch-heat-lbl" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>` +
+        weeks.map((w) => {
+          const v = Math.max(0, Math.min(Number((w.pillars || {})[p.name]) || 0, 100));
+          return `<span class="ch-cell" title="${esc(ttl(p.name))} · ${esc(w.week_label || "")} · ${fmt(v)}" style="background:color-mix(in oklch, var(--ember) ${Math.round(4 + v * 0.6)}%, var(--surface))"></span>`;
+        }).join("") + `</div>`).join("") + `</div>`;
+  }
+  let waveHtml = "";
+  const days = (wave && wave.days) || [];
+  if (days.length >= 2) {
+    const W = Math.max(120, days.length * 6), H = 44, MAX = Number(wave.max_score) || 700;
+    const bars = days.map((dd, i) => {
+      const v = Number(dd.score);
+      if (!Number.isFinite(v) || dd.color === "gray") return `<rect x="${i * 6}" y="${H - 2}" width="4" height="2" class="ch-wv-na"/>`;
+      const h = Math.max(2, (v / MAX) * (H - 4));
+      return `<rect x="${i * 6}" y="${(H - h).toFixed(1)}" width="4" height="${h.toFixed(1)}" class="ch-wv" style="opacity:${(0.3 + 0.7 * (v / MAX)).toFixed(2)}"><title>${esc(dd.date || "")} · ${Math.round(v)}/${MAX}</title></rect>`;
+    }).join("");
+    waveHtml = `<figure class="chart ch-wave"><figcaption class="label">The waveform — whole-life score (0–${MAX}), one bar per day since genesis</figcaption><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="max-width:${days.length * 14}px" aria-label="Daily whole-life score since genesis">${bars}</svg></figure>`;
+  }
+  const record = sec("The record", tlHtml + heat + waveHtml);
+
+  /* 5 · Follow the level-ups. */
+  const sub = `<section class="rd-sec ch-sub">
+    <h2 class="rd-h">Follow the level-ups</h2>
+    <p class="rd-prose">One email when the character levels up — the only thing this page will ever send.</p>
+    <form class="ask-row" data-lvlsub><input class="ask-in" type="email" required autocomplete="email" placeholder="you@example.com" aria-label="Email for level-up alerts"><button class="ask-btn" type="submit">notify me</button></form>
+    <p class="rd-archive" data-lvlsub-status hidden></p>
+  </section>`;
+
+  return hero + statblock + ladder + record + sub +
+    `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>` +
+    note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
+}
+
+function wireCharacter() {
+  // Ring sweep-in: each segment's fill arc starts hidden (dashoffset pushed a
+  // full circumference) then transitions to its true offset — the legacy page's
+  // own animation, motion-gated. Fail-open: without motion the arcs are simply drawn.
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const fills = [...document.querySelectorAll(".pring-fill")];
+    fills.forEach((el) => {
+      const final = el.getAttribute("stroke-dashoffset") || "0";
+      const circ = 2 * Math.PI * Number(el.getAttribute("r") || 0);
+      el.style.strokeDashoffset = String(circ);
+      requestAnimationFrame(() => requestAnimationFrame(() => { el.style.strokeDashoffset = final; }));
+    });
+  }
+  // Level-up subscribe — same contract as /subscribe/ (double-opt-in), tagged
+  // with its own source so the alert list is separable server-side.
+  const form = document.querySelector("[data-lvlsub]");
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = form.querySelector("input"), btn = form.querySelector("button"), status = document.querySelector("[data-lvlsub-status]");
+      const email = (input.value || "").trim();
+      if (!email || !email.includes("@")) { input.focus(); return; }
+      btn.disabled = true;
+      try {
+        const r = await fetch("/api/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, source: "levelup_alert" }) });
+        status.hidden = false;
+        status.textContent = r.ok ? "Check your inbox to confirm — you'll hear from this page only when a level moves." : "That didn't go through — try again in a moment.";
+        if (r.ok) form.hidden = true;
+      } catch (err) { status.hidden = false; status.textContent = "Network hiccup — try again in a moment."; }
+      btn.disabled = false;
+    });
+  }
+}
+
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks, character: renderCharacter };
 const WIRE = {
   ask: () => {
     const mount = document.querySelector("[data-ask-mount]");
@@ -2288,6 +2469,7 @@ const WIRE = {
     if (start) load(start);
   },
   results: () => wireDataFigure(),
+  character: wireCharacter,
   physical: () => {
     // P0.2 — silhouette scrubs the trend marker in lockstep; P4 adds the inverse:
     // hovering the weight chart drives the silhouette to that day's weigh-in.

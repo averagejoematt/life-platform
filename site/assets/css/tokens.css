@@ -1126,6 +1126,29 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .coach-head .dx-kicker { margin: 0; }
 .coach-head .dx-title { margin: 0.1em 0 0; }
 
+/* ── Pillar identity colors (§8.6) — the character sheet's seven pillars.
+   Like --coach, these encode IDENTITY only (ring segments, radar vertices,
+   stat-bar fills, heatmap row accents, sparkline strokes) — never buttons,
+   text, alerts, or non-pillar data. Ember stays the "earned/up" accent.
+   Desaturated toward the v5 register; mid-lightness so one set reads on
+   both themes. */
+:root {
+  --pillar-sleep:         #7B87C4;   /* indigo, calmed   */
+  --pillar-movement:      #4E9E7C;   /* green, muted     */
+  --pillar-nutrition:     #B8862F;   /* wheat gold       */
+  --pillar-metabolic:     #4E93A5;   /* teal, quiet      */
+  --pillar-mind:          #9781BC;   /* violet, muted    */
+  --pillar-relationships: #B06E6A;   /* clay rose        */
+  --pillar-consistency:   #8A9455;   /* olive            */
+}
+/* Tier accent — set via data-tier on the character sheet's section root; used
+   only on the tier emblem + hero frame (the tier IS an identity, not data). */
+[data-tier="foundation"] { --tier-accent: color-mix(in oklch, var(--ember) 55%, var(--ink)); }
+[data-tier="momentum"]   { --tier-accent: var(--ember); }
+[data-tier="discipline"] { --tier-accent: #8BA6B5; }
+[data-tier="mastery"]    { --tier-accent: #C4A24A; }
+[data-tier="elite"]      { --tier-accent: #D4B45C; }
+
 /* ── Editorial imagery (Part II) — atmospheric, free-license cover art on the
    narrative Story surfaces ONLY (chronicle · podcast · blog). A warm duotone
    treatment ties any photo to the ember/ink palette so it reads as editorial
