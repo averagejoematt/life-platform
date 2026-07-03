@@ -190,7 +190,10 @@ truthfulness moat. The generators call it automatically for each new post (fail-
 `EDITORIAL_IMAGES` default OFF). Front-end renders `image_url` under `.editorial-img .img-duotone`
 (a warm ink↔ember wash so any photo reads as editorial texture, not glossy stock) + `.img-credit`
 attribution. New narrative surfaces should follow the same `{image_url, image_credit}` optional
-contract + the duotone classes.
+contract + the duotone classes. Live since 2026-07-03 (visual uplevel P3): the kill-switch is ON
+durably via the email stack's `_email_env`; chronicle AND podcast generators both fetch covers
+(the home teaser renders the latest chronicle cover too). SS-11 guardrail applies — a post with
+no qualifying image ships honestly bare.
 
 ### 8.4 The instrument mark on share cards — `lambdas/og_image_lambda.mjs`
 The OG card is on the v5 palette and carries the **same sigil vocabulary** (`instrumentMark()` =
