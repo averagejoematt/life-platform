@@ -439,15 +439,20 @@ async function renderFieldNote(read, id) {
 // shows all answers at once. Every failure state is honest: rate-limited (429 +
 // Retry-After), budget-paused ({paused:true}), and a per-persona unavailability.
 // The moderated weekly Reader Q&A stays as the considered-answer fallback path.
+// #373: ONE cast — the same eight coaches the rest of the site displays, so the
+// sigils and names on the convene cards match the roster (the phantom second
+// cast answered ungrounded and is retired; the API maps old cached ids).
 const BOARD_PERSONAS = {
-  vasquez: { name: "Dr. Elena Vasquez", title: "Metabolic Medicine & Longevity" },
-  okafor: { name: "Dr. James Okafor", title: "Performance Neuroscience" },
-  patel: { name: "Dr. Amara Patel", title: "Cellular Biology & Nutrition" },
-  norton: { name: "Dr. Marcus Webb", title: "Evidence-Based Nutrition" },
-  cole: { name: "Dr. Naomi Cole", title: "Habit Architecture" },
-  driggs: { name: "Marcus Driggs", title: "Mental Toughness" },
+  training_coach: { name: "Dr. Sarah Chen", title: "Training & Movement" },
+  nutrition_coach: { name: "Dr. Marcus Webb", title: "Evidence-Based Nutrition" },
+  sleep_coach: { name: "Dr. Lisa Park", title: "Sleep & Recovery" },
+  physical_coach: { name: "Dr. Victor Reyes", title: "Physical & Metabolic Health" },
+  glucose_coach: { name: "Dr. Amara Patel", title: "Glucose & Metabolic Response" },
+  mind_coach: { name: "Dr. Nathan Reeves", title: "Mind & Behaviour" },
+  labs_coach: { name: "Dr. James Okafor", title: "Labs & Biomarkers" },
+  explorer_coach: { name: "Dr. Henning Brandt", title: "Cross-Domain Patterns" },
 };
-const BOARD_TRIO = ["vasquez", "okafor", "driggs"];
+const BOARD_TRIO = ["training_coach", "nutrition_coach", "sleep_coach"];
 
 function renderAskBoard(read) {
   read.innerHTML =
@@ -456,7 +461,7 @@ function renderAskBoard(read) {
     `<form class="askboard-form" novalidate>` +
     `<textarea class="askboard-in" name="q" rows="3" maxlength="500" placeholder="e.g. Is the glucose spike the supplement, or just a bad night's sleep?" aria-label="Your question for the board"></textarea>` +
     `<div class="askboard-row">` +
-    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene all six</label>` +
+    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene the full board (8)</label>` +
     `<button class="askboard-btn" type="submit">Convene the board</button>` +
     `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>` +
     `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +
