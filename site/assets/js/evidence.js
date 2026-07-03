@@ -16,6 +16,7 @@
 import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero, autonomicQuadrant } from "/assets/js/charts.js";
 import { sigil } from "/assets/js/sigils.js";
 import { domainIcon } from "/assets/js/icons.js";
+import { mountAsk } from "/assets/js/ask.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -1777,13 +1778,9 @@ const ASK_CHIPS = [
   "What changed in the data this week?",
 ];
 function renderAsk() {
-  return `<form class="ask-form" data-ask>` +
-    `<label class="label" for="askq">Ask a question of the experiment's data</label>` +
-    `<div class="ask-row"><input id="askq" class="ask-in" type="text" placeholder="e.g. how does my sleep affect recovery?" autocomplete="off" maxlength="300"><button class="ask-btn" type="submit">Ask</button></div>` +
-    `</form>` +
-    `<div class="ask-chips" aria-label="Suggested questions">${ASK_CHIPS.map((q) => `<button type="button" class="ask-chip" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>` +
-    `<div class="ask-out" data-ask-out aria-live="polite"></div>` +
-    note("Answers are AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour), and may be paused by the budget guard.");
+  // The widget itself is the shared module (assets/js/ask.js) — mounted by WIRE.ask
+  // so Home and this archive render the SAME experience. The container is all we emit.
+  return `<div data-ask-mount></div>`;
 }
 function renderExplorer(d) { const v = (d.vitals && d.vitals.vitals) || d.vitals || {}; const ch = (d.character && d.character.character) || {}; const j = (d.journey && d.journey.journey) || d.journey || {}; const rows = { weight_lbs: j.current_weight_lbs, character_level: ch.level, ...Object.fromEntries(Object.entries(v).filter(([k, x]) => ["string", "number"].includes(typeof x)).slice(0, 12)) }; return `<p class="rd-archive">Today's raw record, straight from the pipeline. For the full historical day-by-day browser, open the preserved Explorer below.</p>` + sec("Today", kvtable(rows)) + note("The unfiltered daily record."); }
 
@@ -2264,42 +2261,12 @@ const RENDERERS = {
   vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks };
 const WIRE = {
   ask: () => {
-    const f = document.querySelector("[data-ask]");
-    if (!f) return;
-    const input = f.querySelector(".ask-in");
-    const btn = f.querySelector(".ask-btn");
-    const out = document.querySelector("[data-ask-out]");
-    const history = [];  // last 3 Q/A pairs → follow-ups have context server-side
-    const submit = async () => {
-      const q = input.value.trim();
-      if (!q || btn.disabled) return;
-      btn.disabled = true;
-      input.value = "";
-      // Thread, not replace: each exchange appends so a visitor can follow up.
-      out.insertAdjacentHTML("beforeend",
-        `<div class="ask-turn"><p class="ask-q"><span class="label">you</span>${esc(q)}</p><p class="ask-answer is-pending"><span class="shimmer">Reading the data…</span></p></div>`);
-      const slot = out.lastElementChild.querySelector(".ask-answer");
-      slot.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      try {
-        const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question: q, history: history.slice(-3) }) });
-        const d = await r.json().catch(() => ({}));
-        const ans = d.answer || d.response || d.text || "";
-        if (r.status === 429) {
-          slot.outerHTML = `<p class="rd-archive">Hourly question limit reached — it resets within the hour. <a href="/subscribe/">Subscribers</a> get a higher limit.</p>`;
-        } else if (ans && !isBad(ans)) {
-          history.push({ q, a: ans });
-          slot.outerHTML = `<p class="ask-answer"><span class="label">the platform</span>${esc(ans)}</p>`;
-        } else {
-          slot.outerHTML = `<p class="rd-archive">The data Q&amp;A is paused right now (budget guard) — try again later, or browse the Evidence directly.</p>`;
-        }
-      } catch (x) {
-        slot.outerHTML = `<p class="rd-archive">Couldn't reach the Q&amp;A service just now.</p>`;
-      }
-      btn.disabled = false;
-      input.focus();
-    };
-    f.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
-    document.querySelectorAll(".ask-chip").forEach((c) => c.addEventListener("click", () => { input.value = c.dataset.q; submit(); }));
+    const mount = document.querySelector("[data-ask-mount]");
+    if (!mount) return;
+    mountAsk(mount, {
+      chips: ASK_CHIPS,
+      note: "Answers are AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour), and may be paused by the budget guard.",
+    });
   },
   board: () => {
     const picks = [...document.querySelectorAll(".coach-pick")];

@@ -429,33 +429,107 @@ async function renderFieldNote(read, id) {
   enhanceCoachNames(read);
 }
 
-// ── ASK THE BOARD (moved off the first screen into its own section) ──
+// ── CONVENE THE BOARD (uplevel P2) — the live 6-persona panel, made visible.
+// /api/board_ask existed with ZERO front-end callers; this is the site's clearest
+// "watch the AI think" moment. Three of the six answer by default (latency + cost —
+// the server's 5/IP/hour rate limit and budget tiers bound the spend); a toggle
+// convenes all six. Cards render in a "deliberating" shimmer the moment you ask,
+// then reveal in sequence — interaction, not animation, so reduced-motion simply
+// shows all answers at once. Every failure state is honest: rate-limited (429 +
+// Retry-After), budget-paused ({paused:true}), and a per-persona unavailability.
+// The moderated weekly Reader Q&A stays as the considered-answer fallback path.
+const BOARD_PERSONAS = {
+  vasquez: { name: "Dr. Elena Vasquez", title: "Metabolic Medicine & Longevity" },
+  okafor: { name: "Dr. James Okafor", title: "Performance Neuroscience" },
+  patel: { name: "Dr. Amara Patel", title: "Cellular Biology & Nutrition" },
+  norton: { name: "Dr. Marcus Webb", title: "Evidence-Based Nutrition" },
+  cole: { name: "Dr. Naomi Cole", title: "Habit Architecture" },
+  driggs: { name: "Marcus Driggs", title: "Mental Toughness" },
+};
+const BOARD_TRIO = ["vasquez", "okafor", "driggs"];
+
 function renderAskBoard(read) {
   read.innerHTML =
-    `<p class="dx-kicker label">ask the board</p><h2 class="dx-title">Got a question for the AI team?</h2>` +
-    `<p class="dx-prose">Submit it — Matthew picks one and the board answers it in an upcoming lab note. This stores your question; it doesn't run a live AI answer.</p>` +
+    `<p class="dx-kicker label">convene the board</p><h2 class="dx-title">Put a question to the AI board.</h2>` +
+    `<p class="dx-prose">Ask, and the board answers live — each member from their own discipline, reading the same real data. Correlative, never medical advice.</p>` +
     `<form class="askboard-form" novalidate>` +
     `<textarea class="askboard-in" name="q" rows="3" maxlength="500" placeholder="e.g. Is the glucose spike the supplement, or just a bad night's sleep?" aria-label="Your question for the board"></textarea>` +
     `<div class="askboard-row">` +
-    `<input class="askboard-email" name="email" type="email" maxlength="254" placeholder="email (optional — for a reply)" aria-label="Email, optional" />` +
-    `<button class="askboard-btn" type="submit">Ask the board</button>` +
-    `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>`;
+    `<label class="cv-all label"><input type="checkbox" name="allsix"> convene all six</label>` +
+    `<button class="askboard-btn" type="submit">Convene the board</button>` +
+    `</div><p class="askboard-out label" role="status" aria-live="polite"></p></form>` +
+    `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +
+    `<p class="dx-disclosure label">Rate-limited (5/hour) and budget-guarded. Prefer a considered, human-reviewed answer? ` +
+    `<button type="button" class="dx-readfull" data-cv-queue>Send it to the weekly Reader Q&amp;A →</button></p>`;
   const form = read.querySelector(".askboard-form");
   const out = read.querySelector(".askboard-out");
+  const panel = read.querySelector("[data-cv-panel]");
+  // The moderated path stays first-class: the same question can go to the weekly
+  // Reader Q&A queue (existing /api/board_question capture — no AI on submit).
+  read.querySelector("[data-cv-queue]").addEventListener("click", async () => {
+    const q = form.q.value.trim();
+    if (q.length < 10) { out.textContent = "Type the question above first (at least 10 characters), then send it to the queue."; return; }
+    out.textContent = "Sending to the queue…";
+    try {
+      const res = await fetch("/api/board_question", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ question: q }) });
+      if (res.ok) { out.textContent = "Queued — Matthew reviews these, and the board answers a selection in the weekly Reader Q&A."; form.q.value = ""; }
+      else if (res.status === 429) { out.textContent = "You've queued a few already — give it an hour."; }
+      else { out.textContent = "Couldn't queue that just now — try again shortly."; }
+    } catch (e) { out.textContent = "Network hiccup — try again in a moment."; }
+  });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const q = form.q.value.trim();
-    const email = form.email.value.trim();
     if (q.length < 10) { out.textContent = "A little more detail — at least 10 characters."; return; }
     const btn = form.querySelector(".askboard-btn");
-    btn.disabled = true; out.textContent = "Sending…";
+    const personas = form.allsix.checked ? Object.keys(BOARD_PERSONAS) : BOARD_TRIO;
+    btn.disabled = true; out.textContent = "";
+    // The deliberation, visible: every convened member's card appears immediately,
+    // thinking — then the answers land.
+    panel.innerHTML = `<p class="cv-q"><span class="label">the question</span>${esc(q)}</p>` +
+      personas.map((pid) => {
+        const p = BOARD_PERSONAS[pid];
+        return `<article class="cv-card" data-pid="${esc(pid)}">` +
+          `<header class="cv-head"><span class="coach-mark">${sigil({ coach_id: pid, name: p.name }, { title: "" })}</span>` +
+          `<span class="cv-who"><span class="cv-name">${esc(p.name)}</span><span class="cv-title label">${esc(p.title)}</span></span></header>` +
+          `<p class="cv-text is-thinking"><span class="shimmer">deliberating…</span></p></article>`;
+      }).join("");
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     try {
-      const res = await fetch("/api/board_question", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify(email ? { question: q, email } : { question: q }) });
-      if (res.ok) { form.q.value = ""; form.email.value = ""; out.textContent = "Question received — Matthew reviews these, and the board answers a selection in the lab notes."; }
-      else if (res.status === 429) { out.textContent = "You've sent a few already — give it an hour and try again."; }
-      else { const d = await res.json().catch(() => ({})); out.textContent = (d && d.error) || "Couldn't send that just now — try again shortly."; }
-    } catch (err) { out.textContent = "Network hiccup — try again in a moment."; }
-    finally { btn.disabled = false; }
+      const res = await fetch("/api/board_ask", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ question: q, personas }) });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const mins = Math.max(1, Math.round(Number(res.headers.get("Retry-After") || 3600) / 60));
+        panel.innerHTML = `<p class="cv-note">The board's hourly limit is reached — it reconvenes in about ${mins} min. Or leave the question for the weekly Reader Q&amp;A below.</p>`;
+      } else if (d && d.paused) {
+        panel.innerHTML = `<p class="cv-note">${esc(d.answer || "The board is paused for the rest of the month to stay within budget — it's back on the 1st.")}</p>`;
+      } else if (d && d.responses && Object.keys(d.responses).length) {
+        personas.forEach((pid, i) => {
+          const card = panel.querySelector(`[data-pid="${pid}"]`);
+          if (!card) return;
+          const text = String(d.responses[pid] || "");
+          const unavailable = !text || /^\[.*unavailable\]$/i.test(text.trim());
+          const el = card.querySelector(".cv-text");
+          el.classList.remove("is-thinking");
+          el.style.setProperty("--cv-delay", `${i * 0.35}s`);
+          if (unavailable) {
+            el.classList.add("cv-unavailable");
+            el.textContent = `${BOARD_PERSONAS[pid].name} couldn't join this one.`;
+          } else {
+            el.textContent = text;
+          }
+          el.classList.add("is-answered");
+        });
+        out.textContent = "";
+        form.q.value = "";
+      } else {
+        panel.innerHTML = `<p class="cv-note">The board couldn't convene just now — try again shortly, or leave it for the weekly Reader Q&amp;A.</p>`;
+      }
+    } catch (err) {
+      panel.innerHTML = `<p class="cv-note">Couldn't reach the board just now — try again in a moment.</p>`;
+    } finally {
+      btn.disabled = false;
+    }
   });
 }
 
