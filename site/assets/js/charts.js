@@ -584,3 +584,57 @@ export function barChart(items, { valueKey = "value", labelKey = "label", height
   const bars = rows.map((r) => `<div class="cbar" title="${escAttr(r.l)}: ${escAttr(Math.round(r.v * 10) / 10)}"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
   return `<figure class="chart"><div class="cbars" style="--cbar-h:${height}px">${bars}</div>${label ? `<figcaption class="chart-cap label">${escAttr(label)}</figcaption>` : ""}</figure>`;
 }
+
+/* ── The character sheet (§8.6) ──────────────────────────────────────────────
+   pillarRing — the legacy 7-segment donut, ported: each arc segment fills in
+   proportion to its pillar's raw_score (0-100), colored by the pillar's §8.6
+   identity token. Center content is the caller's (HTML overlay via .pring-c).
+   radarChart — the 7-axis spider: the polygon literally reshapes as scores
+   move. Both stroke-drawn, token-driven, no gradients. */
+export function pillarRing(pillars, { size = 360, rimR = 0.46, width = 10 } = {}) {
+  const ps = (pillars || []).filter((p) => p && p.name);
+  if (!ps.length) return "";
+  const C = size / 2, R = size * rimR, N = ps.length;
+  const GAP_DEG = 4, SEG_DEG = (360 - N * GAP_DEG) / N, circ = 2 * Math.PI * R;
+  let out = "";
+  ps.forEach((p, i) => {
+    const color = `var(--pillar-${escAttr(String(p.name).toLowerCase())}, var(--ember))`;
+    const segLen = (SEG_DEG / 360) * circ;
+    const fillLen = segLen * Math.max(0, Math.min(Number(p.raw_score) || 0, 100)) / 100;
+    const off = (-i * (SEG_DEG + GAP_DEG) * circ) / 360;
+    const rot = `transform="rotate(-90 ${C} ${C})"`;
+    out += `<circle class="pring-seg" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${segLen.toFixed(2)} ${(circ - segLen).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" ${rot}/>`;
+    out += `<circle class="pring-fill" data-i="${i}" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${fillLen.toFixed(2)} ${(circ - fillLen).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" ${rot} style="transition-delay:${(0.2 + i * 0.1).toFixed(1)}s"/>`;
+  });
+  return out;
+}
+
+export function radarChart(axes, { size = 320 } = {}) {
+  const ax = (axes || []).filter((a) => a && a.label != null);
+  if (ax.length < 3) return "";
+  const C = size / 2, R = size * 0.36, N = ax.length;
+  const pt = (i, r) => {
+    const a = (i / N) * 2 * Math.PI - Math.PI / 2;
+    return [C + r * Math.cos(a), C + r * Math.sin(a)];
+  };
+  let grid = "";
+  for (const f of [0.25, 0.5, 0.75, 1]) {
+    grid += `<polygon class="radar-grid" points="${ax.map((_, i) => pt(i, R * f).map((n) => n.toFixed(1)).join(",")).join(" ")}" fill="none" vector-effect="non-scaling-stroke"/>`;
+  }
+  let spokes = "", labels = "", dots = "";
+  ax.forEach((a, i) => {
+    const [ex, ey] = pt(i, R);
+    spokes += `<line class="radar-grid" x1="${C}" y1="${C}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
+    const [lx, ly] = pt(i, R + size * 0.075);
+    labels += `<text class="radar-lbl" x="${lx.toFixed(1)}" y="${(ly + 3).toFixed(1)}" text-anchor="middle">${escAttr(a.label)}</text>`;
+    const v = Math.max(0, Math.min(Number(a.value) || 0, 100));
+    const [dx, dy] = pt(i, (R * v) / 100);
+    const color = a.key ? `var(--pillar-${escAttr(String(a.key).toLowerCase())}, var(--ember))` : "var(--ember)";
+    dots += `<circle class="radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.5" fill="${color}"/>`;
+  });
+  const poly = ax.map((a, i) => pt(i, (R * Math.max(0, Math.min(Number(a.value) || 0, 100))) / 100).map((n) => n.toFixed(1)).join(",")).join(" ");
+  return `<figure class="chart radar-chart"><svg viewBox="0 0 ${size} ${size}" role="img" aria-label="Pillar radar: ${escAttr(ax.map((a) => `${a.label} ${Math.round(a.value || 0)}`).join(", "))}">` +
+    grid + spokes +
+    `<polygon class="radar-poly" points="${poly}"/>` +
+    dots + labels + `</svg></figure>`;
+}

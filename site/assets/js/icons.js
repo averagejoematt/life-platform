@@ -16,6 +16,8 @@ const KNOWN = new Set([
   // interface + narrative marks (visual uplevel): the ask glyph, the milestone
   // flag, transport marks, and the two narrative-medium marks.
   "ask", "milestone", "play", "pause", "podcast", "chronicle",
+  // the character sheet (figure-in-ring — echoes the /data/character/ hero)
+  "character",
 ]);
 
 /*
@@ -56,6 +58,8 @@ export const DOMAIN_ICON = {
   habits: "habits", consistency: "habits",
   // relationships / social
   relationships: "people", social: "people", people: "people",
+  // the character sheet
+  character: "character", tier: "character",
 };
 
 // domainIcon(key, opts) — convenience: resolve a domain name-space key to its icon.

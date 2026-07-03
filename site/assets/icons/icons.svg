@@ -84,4 +84,10 @@
     <path d="M17.2 3.8l3 3L8.7 18.3 4.5 19.5l1.2-4.2L17.2 3.8Z"/>
     <path d="M14.8 6.2l3 3"/>
   </symbol>
+  <!-- the character sheet: a figure held in the pillar ring (echo of the hero mark) -->
+  <symbol id="i-character" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9.25" stroke-dasharray="4.6 1.6"/>
+    <circle cx="12" cy="9" r="2.4"/>
+    <path d="M7.8 17.5a4.2 4.2 0 0 1 8.4 0"/>
+  </symbol>
 </svg>

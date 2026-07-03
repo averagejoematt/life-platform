@@ -122,3 +122,48 @@ export function instrumentMark({ cls = "" } = {}) {
     `<circle class="sigil-node" cx="${r2(nx)}" cy="${r2(ny)}" r="4" fill="currentColor"/>` +
     `<circle class="sigil-node" cx="${C}" cy="${C}" r="3" fill="currentColor"/></svg>`;
 }
+
+// ── The tier emblem — the character sheet's identity device, resurrected from
+// the legacy page (site/legacy/character/index.html tierEmblem) and redrawn to
+// §8: stroke-only, currentColor (host sets color: var(--tier-accent)), NO
+// gradient fills — the tier is earned, not gloss. The shape evolves with the
+// tier: hexagon → flame-arc hexagon → shield → crowned shield → crown + shield.
+// Rings ride the shared pathLength draw-in. `level` renders inside.
+export function tierEmblem(tier, level, { cls = "" } = {}) {
+  const t = String(tier || "foundation").toLowerCase();
+  // level=null → a bare glyph (ladder rungs); a number → the identity device.
+  const lvl = level != null && Number.isFinite(Number(level)) ? Math.round(Number(level)) : null;
+  const S = `fill="none" stroke="currentColor" pathLength="1" vector-effect="non-scaling-stroke"`;
+  const num = (y) => (lvl == null ? "" :
+    `<text x="55" y="${y}" text-anchor="middle" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="34" font-weight="500" fill="currentColor">${lvl}</text>` +
+    `<text x="55" y="${y + 18}" text-anchor="middle" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="8" fill="currentColor" opacity="0.6" letter-spacing="2.4">LEVEL</text>`);
+  let body;
+  if (t === "momentum") {
+    body =
+      `<polygon class="sigil-ring" points="55,4 102,28 102,76 55,100 8,76 8,28" ${S} stroke-width="2"/>` +
+      `<polygon class="sigil-ring" points="55,14 92,34 92,70 55,90 18,70 18,34" ${S} stroke-width="1" opacity="0.5"/>` +
+      `<path class="sigil-tick" d="M40,8 Q55,-6 70,8" ${S} stroke-width="2" opacity="0.6"/>` + num(60);
+  } else if (t === "discipline") {
+    body =
+      `<path class="sigil-ring" d="M55,4 L100,20 L100,65 Q100,95 55,112 Q10,95 10,65 L10,20 Z" ${S} stroke-width="2"/>` +
+      `<path class="sigil-ring" d="M55,16 L90,28 L90,62 Q90,86 55,100 Q20,86 20,62 L20,28 Z" ${S} stroke-width="0.8" opacity="0.3"/>` + num(62);
+  } else if (t === "mastery") {
+    body =
+      `<path class="sigil-ring" d="M55,4 L100,20 L100,65 Q100,95 55,112 Q10,95 10,65 L10,20 Z" ${S} stroke-width="2.4"/>` +
+      `<path class="sigil-tick" d="M30,4 L40,14 L55,4 L70,14 L80,4" ${S} stroke-width="1.5" opacity="0.7"/>` + num(62);
+  } else if (t === "elite") {
+    body =
+      `<path class="sigil-ring" d="M55,18 L100,32 L100,70 Q100,98 55,114 Q10,98 10,70 L10,32 Z" ${S} stroke-width="2.6"/>` +
+      `<path class="sigil-tick" d="M20,14 L35,2 L55,14 L75,2 L90,14 L82,18 L55,6 L28,18 Z" ${S} stroke-width="2"/>` +
+      `<circle class="sigil-node" cx="35" cy="4" r="3" fill="currentColor"/><circle class="sigil-node" cx="55" cy="10" r="3" fill="currentColor"/><circle class="sigil-node" cx="75" cy="4" r="3" fill="currentColor"/>` + num(70);
+  } else {
+    // foundation
+    body =
+      `<polygon class="sigil-ring" points="55,4 102,28 102,76 55,100 8,76 8,28" ${S} stroke-width="1.5" opacity="0.4"/>` +
+      `<polygon class="sigil-ring" points="55,14 92,34 92,70 55,90 18,70 18,34" ${S} stroke-width="1"/>` + num(60);
+  }
+  const a11y = lvl == null
+    ? `aria-hidden="true" focusable="false"`
+    : `role="img" aria-label="${escAttr(`Level ${lvl} · ${tier || "Foundation"} tier emblem`)}"`;
+  return `<svg class="sigil emblem${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 110 120" ${a11y}>${body}</svg>`;
+}

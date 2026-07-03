@@ -205,3 +205,24 @@ Before adding a glyph, avatar, emoji, or decorative image: **reach for these mod
 (`icons.js`, `sigils.js`, `editorial_image.py`, the OG `instrumentMark`). If a new thing needs a
 mark, extend the system (a sprite symbol, a `DOMAIN_ICON` entry) rather than introducing a one-off.
 That is what keeps the identity coherent as the platform grows.
+
+### 8.6 Pillar identity colors + the character sheet (2026-07)
+The character sheet (`/data/character/`) resurrects the legacy RPG page inside this language.
+Two sanctioned extensions, same clause structure as `--coach` (§8.2):
+
+- **`--pillar-*` tokens** (`tokens.css`): seven desaturated identity hues, one per pillar
+  (sleep · movement · nutrition · metabolic · mind · relationships · consistency). They color
+  **pillar-identity encodings only** — ring segments, radar vertices, stat-bar fills, heatmap
+  row accents, sparkline strokes — never buttons, text, alerts, or non-pillar data. Ember stays
+  the "earned/up" accent; down stays muted ink, never red.
+- **`--tier-accent`** (set via `data-tier` on the sheet's section root): used only on the tier
+  emblem + hero frame. The **tier emblem** (`sigils.js tierEmblem()`) is the character's identity
+  device — stroke-only, currentColor, no gradients — and its shape evolves with the tier
+  (hexagon → flame hexagon → shield → crowned shield → crown).
+
+The APIs serve emoji fields (`tier_emoji`, per-pillar `emoji`, effect emoji, challenge `icon`) —
+**renderers ignore them all** and resolve marks via `domainIcon()`: movement → `i-training`,
+metabolic → `i-glucose`, relationships → `i-people`, consistency → `i-habits`, mind → `i-mind`,
+sleep → `i-sleep`, nutrition → `i-nutrition`; the sheet itself → `i-character` (figure-in-ring).
+The hero composes the three proven primitives — the weight-driven silhouette (`dfBody`), the
+7-segment pillar ring (`charts.js pillarRing`), the tier emblem — all drawn from real data.
