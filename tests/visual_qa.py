@@ -39,7 +39,7 @@ SITE_URL = "https://averagejoematt.com"
 # (Others are tables/cards — and even chart topics legitimately show an honest
 # "N readings so far" text instead of a chart when data is sparse, per
 # site/assets/js/charts.js's >=4-points rule — so missing-chart is a WARNING.)
-CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training"}
+CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training", "character"}
 # /data/ door topics — the body + mind/accountability readouts.
 EVIDENCE_TOPICS = [
     "vitals",
@@ -50,6 +50,7 @@ EVIDENCE_TOPICS = [
     "training",
     "nutrition",
     "habits",
+    "character",
 ]
 # /method/ door topics — "how it holds up" + "the machine" (footer-tier in the v5 IA).
 # These were 404ing under /data/ because the harness used the wrong base path
