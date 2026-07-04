@@ -65,6 +65,11 @@ _BEDROCK = None
 # a telemetry error must never surface to an AI caller.
 _CW_NAMESPACE = "LifePlatform/AI"
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "unknown")
+# COST-05: "prod" for scheduled production triggers; set to "dev" on the MCP Lambda
+# so that interactive debugging sessions are attributable separately in CloudWatch
+# (June's breach was dev sessions driving $4-5 spike days on a ~$1.50 baseline).
+# Default to "prod" so untagged scheduled lambdas don't inflate the dev bucket.
+_INVOCATION_CONTEXT = os.environ.get("INVOCATION_CONTEXT", "prod")
 # $/1M tokens, keyed by a substring of the resolved model id. Mirrors
 # cost_governor._PRICES; an unmapped model prices as the most expensive tier so
 # a new/unknown model can never under-report spend.
@@ -123,6 +128,7 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
             return
         cost = estimate_cost_usd(usage, model_id)
         fn_dim = [{"Name": "LambdaFunction", "Value": _LAMBDA_NAME}]
+        ctx_dim = [{"Name": "Context", "Value": _INVOCATION_CONTEXT}]
         md = [
             {"MetricName": "AnthropicInputTokens", "Dimensions": fn_dim, "Value": in_tok, "Unit": "Count"},
             {"MetricName": "AnthropicOutputTokens", "Dimensions": fn_dim, "Value": out_tok, "Unit": "Count"},
@@ -131,6 +137,8 @@ def _emit_usage_metrics(usage: dict, model_id: str) -> None:
             # Estimated spend: per-feature attribution + a dimensionless aggregate (G2 alarm).
             {"MetricName": "EstimatedCostUSD", "Dimensions": fn_dim, "Value": cost, "Unit": "None"},
             {"MetricName": "EstimatedCostUSD", "Value": cost, "Unit": "None"},
+            # COST-05: Context-tagged spend — enables prod vs dev attribution in CloudWatch.
+            {"MetricName": "EstimatedCostUSD", "Dimensions": ctx_dim, "Value": cost, "Unit": "None"},
         ]
         if cache_read or cache_write:
             md.append({"MetricName": "AnthropicCacheReadTokens", "Dimensions": fn_dim, "Value": cache_read, "Unit": "Count"})
@@ -188,6 +196,20 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
     ModelTimeoutException, ServiceUnavailableException, AccessDeniedException, …)
     — callers handle retry/backoff.
     """
+    # COST-05: Shadow mode — exercises the pipeline without model calls (for debugging
+    # coach regeneration without burning budget). Set BEDROCK_SHADOW_MODE=1 to enable.
+    if os.environ.get("BEDROCK_SHADOW_MODE"):
+        return {
+            "id": "shadow-stub",
+            "type": "message",
+            "role": "assistant",
+            "content": [{"type": "text", "text": "[SHADOW MODE — Bedrock call suppressed; BEDROCK_SHADOW_MODE=1]"}],
+            "model": "shadow",
+            "stop_reason": "end_turn",
+            "stop_sequence": None,
+            "usage": {"input_tokens": 0, "output_tokens": 0},
+        }
+
     # Budget guardrail (Tier-3 hard stop): the single backstop every AI call
     # routes through. If the monthly $75 ceiling is reached, refuse — callers
     # catch this and degrade (coaches → fallback brief, ai_calls → [AI_UNAVAILABLE]).

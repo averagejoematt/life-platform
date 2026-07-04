@@ -775,6 +775,38 @@ def fetch_stale_insights(days_threshold=7):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# WEDGE-A GATE TELEMETRY (PROD-MON-06 / #360)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
+
+
+def _count_real_subscribers() -> int:
+    """Count confirmed subscribers, excluding synthetic canary records.
+
+    Scans the subscribers partition and filters for status=confirmed and
+    source != canary. Fail-open: returns -1 on any error so the caller can
+    display "?" without blocking the digest.
+    """
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk",
+            FilterExpression="#st = :confirmed AND (#src <> :canary OR attribute_not_exists(#src))",
+            ExpressionAttributeNames={"#st": "status", "#src": "source"},
+            ExpressionAttributeValues={
+                ":pk": _SUBSCRIBERS_PK,
+                ":confirmed": "confirmed",
+                ":canary": "canary",
+            },
+            Select="COUNT",
+        )
+        return int(resp.get("Count", 0))
+    except Exception as e:
+        logger.warning("_count_real_subscribers failed (non-fatal): %s", e)
+        return -1
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # DATA ASSEMBLY
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1796,6 +1828,32 @@ def build_html(data, commentary, profile):
         f'<div style="background:#f0f4ff;border-left:4px solid #4a6cf7;padding:16px;border-radius:0 8px 8px 0;">{board_html}</div>',
     )
 
+    # ── Wedge-A gate readout (owner-private, PROD-MON-06 / #360) ──
+    gate_html = ""
+    _g = data.get("_gate") or {}
+    _gs = _g.get("real_subscribers", -1)
+    _gcw = _g.get("current_weight")
+    _gsw = _g.get("start_weight") or 0
+    _ggw = _g.get("goal_weight") or 185
+    _sub_label = str(_gs) if _gs >= 0 else "?"
+    if _gcw and _gsw and _gsw > _gcw:
+        _lbs_since = round(_gsw - _gcw, 1)
+        _lbs_to_goal = round(_gcw - _ggw, 1)
+        _wt_label = f"{_lbs_since} lbs lost · {_lbs_to_goal} to goal"
+    elif _gcw and _gsw:
+        _lbs_to_goal = round(_gcw - _ggw, 1)
+        _wt_label = f"{_lbs_to_goal} lbs to goal"
+    else:
+        _wt_label = "—"
+    gate_html = (
+        '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;'
+        'padding:10px 16px;margin-bottom:20px;font-size:12px;color:#0369a1;">'
+        '<span style="font-weight:700;">Gate status</span> &nbsp;·&nbsp; '
+        f"confirmed subscribers (real): <strong>{_sub_label}</strong> &nbsp;·&nbsp; "
+        f"weight: <strong>{_wt_label}</strong>"
+        "</div>"
+    )
+
     # ── Assemble ──
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>@media (prefers-color-scheme: dark){{body{{background:#1a1a1f !important;color:#e5e5e5 !important}}div[style*="background:#fff"],div[style*="background:#fafafa"],div[style*="background:#f8f9fc"],table[style*="background:#fafafa"]{{background:#22222a !important;color:#e5e5e5 !important}}div[style*="background:#fffbeb"]{{background:#3a2f15 !important}}h1,h2,h3,h4{{color:#f5f5f5 !important}}td{{color:#d5d5d5 !important}}}}</style></head>
@@ -1806,6 +1864,7 @@ def build_html(data, commentary, profile):
 <p style="color:#8892b0;font-size:13px;margin:0;">{week_label} · Deltas vs prior week · 4-week trend arrows</p>
 </div>
 <div style="padding:28px 32px;">
+{gate_html}
 {grade_section}
 {character_section}
 {scorecard_html}
@@ -1891,6 +1950,20 @@ def lambda_handler(event, context):
     # Store raw grades for component scorecard
     raw_grades = query_range("day_grade", dates["this_start"], dates["this_end"])
     data["_raw_grades"] = raw_grades
+
+    # PROD-MON-06 (#360): gate telemetry — add subscriber count + weight progress
+    # so build_html can render the private gate readout at the top of the digest.
+    _real_subs = _count_real_subscribers()
+    _cur_w = (data.get("this") or {}).get("withings", {}).get("weight_latest")
+    _start_w = profile.get("journey_start_weight_lbs", 0)
+    _goal_w = profile.get("goal_weight_lbs", 185)
+    data["_gate"] = {
+        "real_subscribers": _real_subs,
+        "current_weight": _cur_w,
+        "start_weight": _start_w,
+        "goal_weight": _goal_w,
+    }
+    logger.info("Gate telemetry: subs=%s weight=%s start=%s goal=%s", _real_subs, _cur_w, _start_w, _goal_w)
 
     api_key = get_anthropic_key()
     if hasattr(logger, "set_date"):
