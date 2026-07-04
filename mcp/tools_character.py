@@ -616,10 +616,15 @@ def tool_update_character_config(args):
             "level_down_streak_days",
             "tier_up_streak_days",
             "tier_down_streak_days",
+            "level_step_threshold",
+            "level_change_min_coverage",  # ADR-104: no-signal coverage floor (0-1)
         ]
         if field not in valid_fields:
             return {"error": f"Unknown leveling field '{field}'. Valid: {valid_fields}"}
-        config["leveling"][field] = float(value) if "lambda" in field else int(value)
+        _float_fields = ("ema_lambda", "level_change_min_coverage")
+        if field == "level_change_min_coverage" and not (0 <= float(value) <= 1):
+            return {"error": "level_change_min_coverage must be between 0 and 1 (e.g., 0.5)."}
+        config["leveling"][field] = float(value) if field in _float_fields else int(value)
 
     else:
         return {"error": f"Unknown action '{action}'. Valid: view, update_weight, update_target, update_leveling"}

@@ -14,6 +14,8 @@ Usage:
 
 v1.0.0 — 2026-03-02
 v1.1.0 — 2026-03-30  (Statistical review: F-01 through F-15)
+v1.2.0 — 2026-07-03  (ADR-104 believability: behavioral absence scores 0,
+                      coverage gate on level changes, per-pillar drivers)
 """
 
 import json
@@ -32,7 +34,10 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.1.0"
+ENGINE_VERSION = "1.2.0"
+
+# ── ADR-104: coverage floor below which a day carries no leveling signal ──
+DEFAULT_LEVEL_CHANGE_MIN_COVERAGE = 0.5
 
 # ── XP defaults (also in config) [F-02] ──
 DEFAULT_XP_PER_LEVEL = 100
@@ -224,8 +229,17 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
         sleep_hrs = sleep_hrs / 3600
     scores["duration_vs_target"] = _pct_of_target(sleep_hrs, target_hrs, 1.15) if sleep_hrs else None
 
-    # Efficiency
-    eff = _safe_float(sleep, "sleep_performance") or _safe_float(sleep, "sleep_efficiency_pct")
+    # Efficiency — v1.2.0: include the field names the Whoop v2 ingestion actually
+    # writes (sleep_performance_percentage / sleep_efficiency_percentage). The old
+    # names left this component permanently None → sleep stuck below the coverage
+    # floor despite full data.
+    eff = (
+        _safe_float(sleep, "sleep_performance")
+        or _safe_float(sleep, "sleep_performance_percentage")
+        or _safe_float(sleep, "sleep_efficiency_pct")
+        or _safe_float(sleep, "sleep_efficiency_percentage")
+        or _safe_float(sleep, "sleep_quality_score")
+    )
     scores["efficiency"] = _clamp(eff) if eff is not None else None
 
     # Deep sleep %
@@ -237,6 +251,11 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
         total_s = _safe_float(sleep, "total_sleep_seconds")
         if deep_s and total_s and total_s > 0:
             deep_pct = deep_s / total_s
+    if deep_pct is None:  # v1.2.0: Whoop v2 stores hours (slow-wave = deep)
+        deep_h = _safe_float(sleep, "slow_wave_sleep_hours")
+        total_h = _safe_float(sleep, "sleep_duration_hours")
+        if deep_h and total_h and total_h > 0:
+            deep_pct = deep_h / total_h
     if deep_pct is not None:
         if deep_pct > 1:
             deep_pct = deep_pct / 100
@@ -253,6 +272,11 @@ def compute_sleep_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[flo
         total_s = _safe_float(sleep, "total_sleep_seconds")
         if rem_s and total_s and total_s > 0:
             rem_pct = rem_s / total_s
+    if rem_pct is None:  # v1.2.0: Whoop v2 stores hours
+        rem_h = _safe_float(sleep, "rem_sleep_hours")
+        total_h = _safe_float(sleep, "sleep_duration_hours")
+        if rem_h and total_h and total_h > 0:
+            rem_pct = rem_h / total_h
     if rem_pct is not None:
         if rem_pct > 1:
             rem_pct = rem_pct / 100
@@ -705,20 +729,37 @@ def compute_consistency_raw(
 
 
 def _weighted_pillar_score(component_scores, components_config):
-    """Weighted average with data completeness confidence penalty. [F-01]"""
+    """Weighted average with data completeness confidence penalty. [F-01]
+
+    ADR-104: components flagged ``behavioral: true`` in config measure a
+    behavior the owner either did or didn't do (logging, journaling, training).
+    When such a component has no data, the behavior didn't happen — it scores
+    0 at full weight instead of dropping out of the weight sum. Only *measured*
+    components (device readings) revert toward neutral when absent; a device
+    gap is not a failure, but an unlogged habit is.
+    """
     weighted_sum = 0.0
     total_weight = 0.0
     max_possible_weight = 0.0
     details = {}
+    absent_behaviors = []
 
     for comp_name, score in component_scores.items():
         comp_cfg = components_config.get(comp_name, {})
         weight = comp_cfg.get("weight", 0) if isinstance(comp_cfg, dict) else comp_cfg
+        behavioral = comp_cfg.get("behavioral", False) if isinstance(comp_cfg, dict) else False
         max_possible_weight += weight
-        details[comp_name] = {"score": score, "weight": weight}
+        if score is None and behavioral and weight > 0:
+            score = 0.0
+            absent_behaviors.append(comp_name)
+            details[comp_name] = {"score": 0.0, "weight": weight, "absent": True}
+        else:
+            details[comp_name] = {"score": score, "weight": weight}
         if score is not None and weight > 0:
             weighted_sum += score * weight
             total_weight += weight
+
+    details["_absent_behaviors"] = absent_behaviors
 
     if total_weight == 0:
         details["_confidence"] = 0.0
@@ -768,10 +809,44 @@ def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, A
     return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
+def _level_step(delta: float, leveling: dict[str, Any]) -> int:
+    """Step size for a level move given the gap between target and current.
+
+    ADR-104: graduated bands (config leveling.level_step_bands) let a pillar
+    with a large honest gap converge faster than the old fixed 1/2 step —
+    post-reset, levels should differentiate by performance, not march in
+    lockstep at one shared pace. Falls back to the v1.1 threshold rule.
+    """
+    bands = leveling.get("level_step_bands")
+    if bands:
+        for band in sorted(bands, key=lambda b: -b.get("min_delta", 0)):
+            if delta > band.get("min_delta", 0):
+                return int(band.get("step", 1))
+        return 1
+    return 2 if delta > leveling.get("level_step_threshold", 10) else 1
+
+
 def evaluate_level_changes(
-    pillar_name: str, current_level_score: float, previous_state: dict[str, Any], config: dict[str, Any]
+    pillar_name: str,
+    current_level_score: float,
+    previous_state: dict[str, Any],
+    config: dict[str, Any],
+    data_coverage: Optional[float] = None,
+    raw_score: Optional[float] = None,
 ) -> dict[str, Any]:
-    """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]"""
+    """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]
+
+    ADR-104 believability rules:
+    - a day whose data_coverage is below leveling.level_change_min_coverage
+      carries no leveling signal — both streaks hold and no level moves in
+      either direction (the confidence blend pulls thin-data scores toward
+      neutral 50, which must never be climbable; nor should a pillar crash
+      on no information).
+    - a level-up additionally requires the day's own raw_score to be at the
+      new level: the EMA decides the target, but you climb only on days you
+      actually performed. This stops a pillar from continuing to level up on
+      EMA momentum after the behavior stopped.
+    """
     leveling = config.get("leveling", {})
 
     # Progressive streak overrides by tier [F-15]
@@ -792,9 +867,6 @@ def evaluate_level_changes(
     tier_up_streak_needed = tier_cfg.get("tier_boundary_up", leveling.get("tier_up_streak_days", 7))
     tier_down_streak_needed = tier_cfg.get("tier_boundary_down", leveling.get("tier_down_streak_days", 10))
 
-    # Variable step size [F-10]
-    level_step_threshold = leveling.get("level_step_threshold", 10)
-
     # XP buffer gate for level-down [F-02]
     xp_per_level = leveling.get("xp_per_level", DEFAULT_XP_PER_LEVEL)
     xp_buffer_threshold = leveling.get("xp_buffer_threshold", DEFAULT_XP_BUFFER_THRESHOLD)
@@ -803,20 +875,32 @@ def evaluate_level_changes(
     target_level = max(1, min(100, round(current_level_score)))
     events = []
 
-    if target_level > current_level:
+    # ADR-104: no-signal day — insufficient coverage to judge either direction
+    min_coverage = leveling.get("level_change_min_coverage", DEFAULT_LEVEL_CHANGE_MIN_COVERAGE)
+    coverage_hold = data_coverage is not None and data_coverage < min_coverage
+
+    # ADR-104: the EMA sets the target, but climbing also requires the day
+    # itself to have performed at the next level — no up-credit on EMA momentum.
+    day_supports_up = raw_score is None or raw_score >= current_level + 1
+
+    if coverage_hold:
+        pass  # hold both streaks; levels frozen until real data returns
+    elif target_level > current_level and not day_supports_up:
+        pass  # target above, but today wasn't lived at that level — hold [ADR-104]
+    elif target_level > current_level:
         streak_above += 1
         streak_below = 0
         if streak_above >= up_streak_needed:
+            delta = target_level - current_level
+            step = _level_step(delta, leveling)
             old_tier = get_tier(current_level, config)["name"]
-            new_tier = get_tier(current_level + 1, config)["name"]
+            new_tier = get_tier(min(current_level + step, 100), config)["name"]
             would_cross_tier = old_tier != new_tier
 
             if would_cross_tier and streak_above < tier_up_streak_needed:
                 pass  # Hold — need longer streak for tier transition
             else:
                 old_level = current_level
-                delta = target_level - current_level
-                step = 2 if delta > level_step_threshold else 1
                 current_level = min(current_level + step, 100)
                 streak_above = 0
                 events.append(
@@ -835,15 +919,17 @@ def evaluate_level_changes(
             if xp_buffer >= xp_buffer_threshold:
                 pass  # Buffer absorbs the pressure — hold level
             else:
+                delta = current_level - target_level
+                step = _level_step(delta, leveling)
                 old_tier = get_tier(current_level, config)["name"]
-                new_tier = get_tier(current_level - 1, config)["name"]
+                new_tier = get_tier(max(current_level - step, 1), config)["name"]
                 would_cross_tier = old_tier != new_tier
 
                 if would_cross_tier and streak_below < tier_down_streak_needed:
                     pass  # Hold — need longer streak for tier demotion
                 else:
                     old_level = current_level
-                    current_level = max(current_level - 1, 1)
+                    current_level = max(current_level - step, 1)
                     streak_below = 0
                     events.append(
                         {
@@ -883,8 +969,40 @@ def evaluate_level_changes(
         "streak_below": streak_below,
         "xp_total": xp_total,
         "xp_buffer": xp_buffer,
+        "coverage_hold": coverage_hold,
         "events": events,
     }
+
+
+def pillar_drivers(details: dict[str, Any], top_n: int = 2) -> dict[str, list[str]]:
+    """ADR-104: derive a provenance summary from a pillar's component details.
+
+    Returns {"top": [...], "dragging": [...], "absent": [...], "no_data": [...]}
+    — the components lifting the pillar, the scored-but-weak ones pulling it
+    down, the behaviors that didn't happen, and the measurements with no data.
+    Pure function of the details dict; every value is computed, never narrated.
+    """
+    scored = {}
+    no_data = []
+    absent = list(details.get("_absent_behaviors", []))
+    for name, d in details.items():
+        if name.startswith("_") or not isinstance(d, dict):
+            continue
+        weight = d.get("weight") or 0
+        if weight <= 0:
+            continue
+        if d.get("absent"):
+            continue  # already in absent_behaviors
+        score = d.get("score")
+        if score is None:
+            no_data.append(name)
+        else:
+            scored[name] = (float(score), float(weight))
+
+    by_contribution = sorted(scored.items(), key=lambda kv: kv[1][0] * kv[1][1], reverse=True)
+    top = [n for n, (s, _w) in by_contribution if s >= 60][:top_n]
+    dragging = [n for n, (s, _w) in sorted(scored.items(), key=lambda kv: kv[1][0]) if s < 40][:top_n]
+    return {"top": top, "dragging": dragging, "absent": absent, "no_data": no_data}
 
 
 # ==============================================================================
@@ -1050,7 +1168,14 @@ def compute_character_sheet(
     pillar_results = {}
     for pillar_name in pillar_raw_scores:
         prev_state = prev_pillars.get(pillar_name)
-        level_state = evaluate_level_changes(pillar_name, adjusted_level_scores[pillar_name], prev_state, config)
+        level_state = evaluate_level_changes(
+            pillar_name,
+            adjusted_level_scores[pillar_name],
+            prev_state,
+            config,
+            data_coverage=pillar_details[pillar_name].get("_data_coverage"),
+            raw_score=pillar_raw_scores[pillar_name],
+        )
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
         xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number)
@@ -1070,6 +1195,9 @@ def compute_character_sheet(
             "xp_buffer": level_state.get("xp_buffer", 0),
             "streak_above": level_state["streak_above"],
             "streak_below": level_state["streak_below"],
+            "coverage_hold": level_state.get("coverage_hold", False),
+            "absent_behaviors": pillar_details[pillar_name].get("_absent_behaviors", []),
+            "drivers": pillar_drivers(pillar_details[pillar_name]),
             "components": pillar_details[pillar_name],
         }
         # Annotate level events with "why" context for the event log
@@ -1078,9 +1206,13 @@ def compute_character_sheet(
             ev["level_score"] = round(adjusted_level_scores[pillar_name], 1)
             ev["xp_earned"] = xp_earned
             ev["streak_days"] = level_state.get("streak_above", 0) or level_state.get("streak_below", 0)
-            # Extract top contributing component (skip private keys)
+            # Extract top contributing component (skip private keys).
+            # v1.2.0: detail values are {"score", "weight"} dicts — read the score
+            # (the old isinstance(v, (int, float)) filter matched nothing).
             components = {
-                k: v for k, v in pillar_details[pillar_name].items() if not k.startswith("_") and isinstance(v, (int, float)) and v > 0
+                k: v.get("score")
+                for k, v in pillar_details[pillar_name].items()
+                if not k.startswith("_") and isinstance(v, dict) and isinstance(v.get("score"), (int, float)) and v.get("score") > 0
             }
             if components:
                 top = max(components, key=components.get)

@@ -2430,33 +2430,51 @@ function chHeroHtml(ch, pillars, jj, wave) {
 }
 
 /* 2 · The seven pillars — RPG stat block + radar. Also a builder (time travel). */
+/* ADR-104: each pillar carries its own honest "why" — engine-computed provenance
+   (coverage holds, behaviors that didn't happen, what's dragging), never narrated. */
+function chWhy(p) {
+  const drv = p.drivers || {};
+  const names = (a) => (a || []).map((n) => ttl(n)).join(", ");
+  if (p.coverage_hold) {
+    const cov = p.data_coverage != null ? `${Math.round(Number(p.data_coverage) * 100)}%` : "too little";
+    return `Levels frozen — only ${cov} of this pillar's data exists right now. The engine won't judge on gaps: no data can't climb, and no data can't crash.`;
+  }
+  const bits = [];
+  if (drv.absent && drv.absent.length) bits.push(`not happening: ${names(drv.absent)} (scores 0 while absent)`);
+  if (drv.dragging && drv.dragging.length) bits.push(`dragging: ${names(drv.dragging)}`);
+  if (drv.top && drv.top.length) bits.push(`carried by: ${names(drv.top)}`);
+  if (!bits.length) return "";
+  return bits.join(" · ");
+}
+
 function chStatHtml(pillars, hist) {
   const rows = pillars.map((p) => {
     const scoreVals = hist.map((w) => ({ v: (w.pillars && w.pillars[p.name]) || 0, d: w.week_end })).slice(-8);
     const spark = scoreVals.filter((s) => s.v > 0).length >= 2 ? sparkline(scoreVals, { height: 26 }) : "";
     const raw = Math.max(0, Math.min(Number(p.raw_score) || 0, 100));
+    const why = chWhy(p);
     return `<div class="ch-row">
       <span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>
       <span class="ch-rname">${esc(ttl(p.name))}</span>
-      <span class="ch-rlv label">Lv ${Math.round(Number(p.level) || 1)}</span>
+      <span class="ch-rlv label">Lv ${Math.round(Number(p.level) || 1)}${p.coverage_hold ? `<span class="ch-hold" title="levels frozen — not enough data to judge">held</span>` : ""}</span>
       <span class="ch-rbar"><i style="width:${raw}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></span>
       <span class="ch-rraw num">${fmt(raw)}<small>/100</small></span>
       ${chDelta(p.xp_delta, " xp")}
       ${spark ? `<span class="ch-rspark">${spark}</span>` : ""}
-    </div>`;
+    </div>${why ? `<p class="ch-rwhy">${esc(why)}</p>` : ""}`;
   }).join("");
   const radar = radarChart(pillars.map((p) => ({ key: p.name, label: CH_ABBR[p.name] || p.name, value: p.raw_score })));
   return sec("The seven pillars", `<div class="ch-statgrid"><div class="ch-rows">${rows}</div>${radar}</div>
-    <p class="rd-why">Each pillar scores 0–100 nightly from its own real data (wearables, the food log, habits, labs), then an EMA smooths it and a streak gate decides level moves — one great day can't swing a level. XP is the daily currency: strong days earn it, weak days bleed it.</p>`);
+    <p class="rd-why">Each pillar scores 0–100 nightly from its own real data (wearables, the food log, habits, labs), then an EMA smooths it and a streak gate decides level moves — one great day can't swing a level, and a level-up also needs the day itself to have been lived at that level. Behaviors that didn't happen score zero; a missing sensor reading doesn't. XP is the daily currency: strong days earn it, weak days bleed it.</p>`);
 }
 
 async function renderCharacter(d) {
   const ch = (d && d.character) || {};
   const pillars = ((d && d.pillars) || []).slice().sort((a, b) => CH_ORDER.indexOf(a.name) - CH_ORDER.indexOf(b.name));
   if (!pillars.length) return empty("The character sheet computes nightly — it fills in as the first days of data land.");
-  const [stats, wave, j, cfgRaw, ach] = await Promise.all([
+  const [stats, wave, j, cfgRaw, ach, pres] = await Promise.all([
     tryJSON("/data/character_stats.json"), tryJSON("/api/journey_waveform"), tryJSON("/api/journey"),
-    tryJSON("/api/character_config"), tryJSON("/api/achievements"),
+    tryJSON("/api/character_config"), tryJSON("/api/achievements"), tryJSON("/api/presence"),
   ]);
   // The mechanics contract (P1.2) — fail-soft: without it the mechanics panels
   // simply don't render and the sheet stands on P1.1 alone.
@@ -2469,6 +2487,12 @@ async function renderCharacter(d) {
   _chCtx = { jj, wave, hist, genesis: (wave && wave.genesis) || null };
 
   const hero = chHeroHtml(ch, pillars, jj, wave);
+  /* ADR-104: the quiet stretch, said plainly — fail-closed /api/presence, same
+     calm voice as the cockpit/story lines. No red banner; the sheet just tells
+     the truth about why some pillars are falling or frozen right now. */
+  const quiet = pres && pres.available && pres.in_lull && Number(pres.gap_days) >= 2
+    ? `<p class="rd-archive ch-quiet">A quiet stretch — manual logging has been dark for ${esc(String(Math.round(Number(pres.gap_days))))} days${pres.passive_still_flowing ? " while the wearables keep flowing" : ""}. The sheet doesn't look away: behaviors that aren't happening score zero, thin pillars freeze instead of climbing, and the levels below are what the data actually earns.</p>`
+    : "";
   const statblock = chStatHtml(pillars, hist);
 
   /* 12 · Time travel — scrub the sheet to any past day (the cockpit's own
@@ -2652,11 +2676,11 @@ async function renderCharacter(d) {
   /* 10 · The math — prose interpolated from the live config so it can never lie. */
   const lvv = (cfg && cfg.leveling) || null;
   const math = lvv
-    ? sec("The math", `<p class="rd-prose">Each pillar scores 0–100 nightly from weighted components (above). An exponential moving average (λ = ${esc(String(lvv.ema_lambda))} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate before a level moves, and crossing a tier boundary demands a longer streak still. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. The character level is the weighted average of the seven pillar levels, floored — so it understates, never flatters.</p>
+    ? sec("The math", `<p class="rd-prose">Each pillar scores 0–100 nightly from weighted components (above). Components that measure a <strong>behavior</strong> — logging food, journaling, training — score zero when the behavior doesn't happen; components that measure a <strong>sensor</strong> simply go quiet, and the engine won't judge what it can't see${lvv.level_change_min_coverage != null ? ` (below ${esc(String(Math.round(Number(lvv.level_change_min_coverage) * 100)))}% data coverage, levels freeze in both directions)` : ""}. An exponential moving average (λ = ${esc(String(lvv.ema_lambda))} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate, a level-up also requires the day itself to have scored at the new level, and crossing a tier boundary demands a longer streak still. Bigger honest gaps move in bigger steps, so pillars converge to what the data earns instead of marching in lockstep. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. The character level is the weighted average of the seven pillar levels, floored — so it understates, never flatters.</p>
       <p class="rd-archive">The plain-language version lives on <a href="/method/character/">the character explainer</a>; the engine itself runs nightly in the platform's compute layer, and every number in this section is read live from its config.</p>`)
     : `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
 
-  return hero + scrub + statblock + ladder + mechanics + record + badges + sub + math +
+  return hero + quiet + scrub + statblock + ladder + mechanics + record + badges + sub + math +
     note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
 }
 

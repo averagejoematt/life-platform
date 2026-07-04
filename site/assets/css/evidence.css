@@ -505,6 +505,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-ddn { color: var(--ink-muted); }
 .ch-rspark { display: block; }
 .ch-rspark .spark { width: 72px; height: 26px; display: block; }
+/* ADR-104 provenance — the honest per-pillar "why" line + the levels-held marker. */
+.ch-rwhy { margin: calc(-1 * var(--sp-2)) 0 0 calc(22px + var(--sp-2)); color: var(--ink-faint); font-size: var(--fs-label); line-height: 1.4; max-width: var(--measure-narrow); }
+.ch-hold { margin-left: var(--sp-1); padding: 0 4px; border: var(--border-hair); border-radius: 3px; color: var(--ink-faint); font-size: 0.85em; letter-spacing: 0.04em; }
+.ch-quiet { max-width: var(--measure-narrow); }
 .radar-chart { margin: 0; }
 .radar-chart svg { width: 100%; height: auto; display: block; }
 .radar-grid { stroke: var(--rule); }

@@ -350,6 +350,7 @@ def handle_character(date: str | None = None) -> dict:
     pillars = []
     for p in PILLAR_ORDER:
         pd = record.get(f"pillar_{p}", {})
+        _drivers = pd.get("drivers") or {}
         pillars.append(
             {
                 "name": p,
@@ -360,6 +361,19 @@ def handle_character(date: str | None = None) -> dict:
                 "xp_delta": float(pd.get("xp_delta", 0)),
                 "xp_earned": float(pd.get("xp_earned", 0)),
                 "score_delta": None,  # day-over-day move; filled below when a prior day exists
+                # ADR-104 provenance — computed by the engine, never narrated:
+                # how much real data backs the score, which behaviors didn't
+                # happen, what's lifting/dragging, and whether levels are frozen
+                # because the day carried no signal.
+                "data_coverage": (float(pd["data_coverage"]) if pd.get("data_coverage") is not None else None),
+                "coverage_hold": bool(pd.get("coverage_hold", False)),
+                "absent_behaviors": [str(b) for b in (pd.get("absent_behaviors") or [])],
+                "drivers": {
+                    "top": [str(x) for x in (_drivers.get("top") or [])],
+                    "dragging": [str(x) for x in (_drivers.get("dragging") or [])],
+                    "absent": [str(x) for x in (_drivers.get("absent") or [])],
+                    "no_data": [str(x) for x in (_drivers.get("no_data") or [])],
+                },
             }
         )
 
@@ -440,6 +454,8 @@ _CHAR_CONFIG_LEVELING_KEYS = (
     "tier_up_streak_days",
     "tier_down_streak_days",
     "level_step_threshold",
+    "level_step_bands",  # ADR-104: graduated step sizes by target gap
+    "level_change_min_coverage",  # ADR-104: no-signal days can't move levels
     "xp_per_level",
     "daily_xp_decay",
     "xp_buffer_threshold",

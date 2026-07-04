@@ -688,6 +688,53 @@ def _handle_ask(event: dict) -> dict:
 
         answer = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
 
+        # ADR-104 grounding gate (reader-facing → fail-closed): every number in
+        # the answer must exist in what the model was given (system context,
+        # the question, prior turns). One corrective regen; if numbers still
+        # can't be grounded, say so honestly instead of serving them.
+        try:
+            import grounded_generation as _gg
+
+            _allowed = _gg.allowed_numbers(system_prompt, question, [a_ for _, a_ in history])
+
+            def _ask_findings(_t):
+                return _gg.grounding_findings(_t, allowed=_allowed)
+
+            _pre = _ask_findings(answer)
+            if _pre:
+                logger.warning(f"[site_api_ai] /api/ask ungrounded: {[f['detail'] for f in _pre][:4]}")
+
+                def _ask_regen(_corr):
+                    _r2 = _bedrock_invoke(
+                        {
+                            "model": AI_MODEL_HAIKU,
+                            "max_tokens": 600,
+                            "system": system_prompt,
+                            "messages": (
+                                [m for q_, a_ in history for m in ({"role": "user", "content": q_}, {"role": "assistant", "content": a_})]
+                                + [
+                                    {"role": "user", "content": question},
+                                    {"role": "assistant", "content": answer},
+                                    {"role": "user", "content": _corr},
+                                ]
+                            ),
+                        }
+                    )
+                    _emit_token_metrics(_r2.get("usage", {}), endpoint="api_ask")
+                    return "".join(b["text"] for b in _r2.get("content", []) if b.get("type") == "text")
+
+                answer, _left, _ = _gg.regen_once(answer, _ask_findings, _ask_regen)
+                if _left:
+                    answer = (
+                        "I couldn't ground part of that answer in the data I actually have, "
+                        "so I'd rather not guess at numbers. Try asking about something the "
+                        "current record covers — sleep, recovery, weight trend, training, or nutrition."
+                    )
+        except ImportError:
+            pass  # helper not bundled — serve as before
+        except Exception as _gg_e:
+            logger.warning(f"[site_api_ai] grounding gate error (fail-open): {_gg_e}")
+
         return {
             "statusCode": 200,
             "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
@@ -790,6 +837,7 @@ def _handle_board_ask(event: dict) -> dict:
                 + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
                 + f"READER QUESTION: {question}"
             )
+            _sys_txt = _coach_system(pid)
             req_body = json.dumps(
                 {
                     "model": AI_MODEL_HAIKU,
@@ -797,7 +845,7 @@ def _handle_board_ask(event: dict) -> dict:
                     "system": [
                         {
                             "type": "text",
-                            "text": _coach_system(pid),
+                            "text": _sys_txt,
                             "cache_control": {"type": "ephemeral"},
                         }
                     ],
@@ -815,7 +863,29 @@ def _handle_board_ask(event: dict) -> dict:
             result = _bedrock_invoke(json.loads(req_body))
             # V2 follow-up: emit per-persona token metrics (was dark)
             _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")
-            responses[pid] = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
+            _txt = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
+
+            # ADR-104 grounding gate (reader-facing → fail-closed, no regen —
+            # board_ask already costs ~6 calls/request): any number the coach
+            # states must exist in its system context, the facts, its stance,
+            # or the question. Ungrounded → an honest in-voice refusal, never
+            # a fabricated figure served to a reader.
+            try:
+                import grounded_generation as _gg
+
+                _gf = _gg.grounding_findings(_txt, allowed=_gg.allowed_numbers(_sys_txt, user_msg))
+                if _gf:
+                    logger.warning(f"[board_ask] {pid} ungrounded: {[f['detail'] for f in _gf][:3]}")
+                    _txt = (
+                        "I'd want to answer that with numbers I can actually stand behind, and I can't "
+                        "ground them in today's record — ask me about something the current data covers."
+                    )
+            except ImportError:
+                pass  # helper not bundled — serve as before
+            except Exception as _gg_e:
+                logger.warning(f"[board_ask] {pid} grounding gate error (fail-open): {_gg_e}")
+
+            responses[pid] = _txt
         except Exception as e:
             logger.error(f"[board_ask] {pid} failed: {e}")
             responses[pid] = f"[{p['name']} is temporarily unavailable]"

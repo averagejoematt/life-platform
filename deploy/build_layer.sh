@@ -72,6 +72,12 @@ MODULES=(
     # the get_exercise_notes MCP tool, and backfill_training_notes.py.
     training_notes.py
     training_notes_llm.py
+    # ADR-104 (2026-07-03): grounded-generation harness — fact injection + the
+    # allow-list number gate + regen-once, shared by every AI narrative surface.
+    # canonical_facts is its facts schema; grounding_guard is flat-copied below
+    # (it lives in lambdas/intelligence/).
+    grounded_generation.py
+    canonical_facts.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"
@@ -92,6 +98,15 @@ if [ -f "$VOCAB" ]; then
     cp "$VOCAB" "$BUILD_DIR/food_vocabulary.json"
 else
     echo "⚠️  Missing: config/food_vocabulary.json (meal grouper will fail to load vocab)"
+fi
+
+# ADR-104: grounding_guard lives in lambdas/intelligence/ — flat-copy it so the
+# layer's grounded_generation can import it (`from grounding_guard import ...`).
+GUARD="$LAMBDAS/intelligence/grounding_guard.py"
+if [ -f "$GUARD" ]; then
+    cp "$GUARD" "$BUILD_DIR/grounding_guard.py"
+else
+    echo "⚠️  Missing: lambdas/intelligence/grounding_guard.py (grounded_generation loses the contradiction check)"
 fi
 
 echo "✅ Layer built: $(ls "$BUILD_DIR" | wc -l | tr -d ' ') files in cdk/layer-build/python/"

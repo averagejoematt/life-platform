@@ -67,6 +67,18 @@ COACH_IDS = [
     "explorer_coach",
 ]
 EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "labs", "sleep"]
+# ADR-104: the V2 operational coaches whose served OUTPUT# narratives the facts
+# pass now also covers (matches coach_narrative_orchestrator.ALL_COACH_IDS).
+V2_COACHES = [
+    "sleep_coach",
+    "training_coach",
+    "nutrition_coach",
+    "mind_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
+]
 
 try:
     from phase_filter import with_phase_filter
@@ -192,6 +204,29 @@ def _gather_facts_and_narratives():
             if txt.strip():
                 narratives.append(txt)
                 labels.append(f"expert:{key}")
+    # ADR-104: the V2 operational-coach narratives (daily brief) — previously the
+    # highest-traffic coach surface with NO Sentinel coverage. Latest OUTPUT# per
+    # coach, but only if served today/yesterday: the facts are the LATEST record,
+    # so checking an old narrative against new facts would manufacture false
+    # contradictions (the day-boundary-skew lesson).
+    _fresh_floor = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+    for coach_id in V2_COACHES:
+        try:
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"COACH#{coach_id}") & Key("sk").begins_with("OUTPUT#"),
+                ScanIndexForward=False,
+                Limit=1,
+            )
+            items = resp.get("Items", [])
+        except Exception:  # noqa: BLE001
+            items = []
+        if items:
+            item = _decimal(items[0])
+            _out_date = str(item.get("sk", ""))[7:17]  # OUTPUT#YYYY-MM-DD#...
+            txt = str(item.get("content") or "")
+            if txt.strip() and _out_date >= _fresh_floor:
+                narratives.append(txt)
+                labels.append(f"coach:{coach_id}")
     return facts, narratives, labels
 
 

@@ -1067,6 +1067,30 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         brief = generation_brief.get("generation_brief", generation_brief)
         voice_guidance = brief.get("voice_guidance", {})
 
+        # ADR-104: canonical facts — this render previously injected only the
+        # hard-coded goals, so coaches had no authoritative vitals to cite and
+        # nothing gated what they invented. Fail-soft: without the helpers the
+        # render works exactly as before (no facts block, no gate).
+        _gg_mod = None
+        _canon_facts = {}
+        _facts_block = ""
+        try:
+            import grounded_generation as _gg_mod  # bundled + layer (ADR-104)
+            from boto3.dynamodb.conditions import Key as _Key
+            from canonical_facts import build_canonical_facts as _bcf
+
+            _tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+            _cm = _tbl.query(
+                KeyConditionExpression=_Key("pk").eq("USER#matthew#SOURCE#computed_metrics"),
+                ScanIndexForward=False,
+                Limit=1,
+            ).get("Items", [])
+            if _cm:
+                _canon_facts = {k: v for k, v in _bcf(_cm[0]).items() if k != "as_of"}
+                _facts_block = _gg_mod.authoritative_facts_block(_canon_facts)
+        except Exception as _gf_e:
+            print(f"[COACH-V2:{coach_id}] canonical facts unavailable (non-blocking): {_gf_e}")
+
         system_prompt = f"""You are {voice_spec['display_name']}, {voice_spec.get('domain', '')} specialist.
 
 VOICE RULES:
@@ -1100,6 +1124,8 @@ MATTHEW'S GOALS (standing targets — the fixed backdrop, not your read):
 - Training philosophy: building from walking + Zone 2 base; structured strength training planned but not yet started
 - Timeline: 12-month experiment, genesis {EXPERIMENT_START_DATE}
 - Key priorities: sleep quality, protein adherence (190g/day target), consistent movement (8,000+ steps/day)
+
+{_facts_block}
 
 YOUR CURRENT STANCE: If the generation brief includes `current_stance`, that is YOUR own evolving, evidence-derived read of Matthew — let it LEAD your framing (what you're focused on now, what you've set aside, how your read has changed). The goals above are the standing targets; the stance is where you actually are with him today. If no stance is present (early cycles), frame against the goals.
 
@@ -1158,6 +1184,31 @@ Write your {domain_label} coaching section now."""
         print(f"[COACH-V2:{coach_id}] Generating output...")
         output = call_anthropic(system_prompt + "\n\n" + user_message, api_key, max_tokens=600)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
+
+        # Step 5.5 (ADR-104): deterministic grounding gate — the highest-traffic
+        # coach surface previously shipped with NO numeric check. Findings = hard
+        # canonical contradictions (RHR/recovery/HRV) + the allow-list gate (every
+        # number in the output must appear in the prompt/data/facts — kills invented
+        # trend endpoints). One corrective rewrite, kept only if strictly better.
+        if _gg_mod is not None and output:
+            try:
+                _allowed = _gg_mod.allowed_numbers(system_prompt, user_message)
+
+                def _findings_fn(_t):
+                    return _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed)
+
+                _pre = _findings_fn(output)
+                if _pre:
+                    print(f"[COACH-V2:{coach_id}] grounding finding(s): {[f['detail'] for f in _pre][:5]}")
+                output, _left, _corrected = _gg_mod.regen_once(
+                    output,
+                    _findings_fn,
+                    lambda _corr: call_anthropic(system_prompt + "\n\n" + user_message + "\n\n" + _corr, api_key, max_tokens=600),
+                )
+                if _corrected:
+                    print(f"[COACH-V2:{coach_id}] grounding self-corrected: {len(_pre)}→{len(_left)} finding(s)")
+            except Exception as _gg_e:
+                print(f"[COACH-V2:{coach_id}] grounding gate failed (non-blocking): {_gg_e}")
 
         # Step 6: Invoke state updater (async)
         try:
