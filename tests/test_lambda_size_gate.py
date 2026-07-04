@@ -17,6 +17,7 @@ MAX_LINES = 2000
 GRANDFATHERED = {
     "lambdas/emails/daily_brief_lambda.py",
     "lambdas/emails/wednesday_chronicle_lambda.py",
+    "lambdas/emails/weekly_digest_lambda.py",  # tightly-coupled email pipeline; #360 gate readout added
     "lambdas/compute/daily_insight_compute_lambda.py",
 }
 
