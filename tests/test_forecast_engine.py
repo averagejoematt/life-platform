@@ -152,3 +152,17 @@ class TestDecimalDiscipline:
         assert isinstance(out["b"][0], Decimal)
         assert isinstance(out["b"][1]["c"], Decimal)
         assert out["d"] == "s"
+
+
+class TestBoundsClamp:
+    def test_interval_clamped_to_metric_bounds(self):
+        fc = {"point": 98.0, "lo": 80.0, "hi": 112.0, "alpha": 0.3, "sigma": 9.0, "n": 30, "horizon": 7, "confidence": 0.80}
+        item = eng.build_forecast_item(RECOVERY_CFG, fc, "2026-07-04", "2026-07-11")
+        assert item["hi"] == 100.0  # a 112% recovery ceiling is an artifact, not an expectation
+        assert item["lo"] == 80.0
+
+    def test_unbounded_metric_untouched(self):
+        weight_cfg = next(c for c in eng.METRICS if c["metric"] == "weight_lbs")
+        fc = {"point": 216.0, "lo": 214.0, "hi": 218.0, "alpha": 0.3, "sigma": 1.0, "n": 30, "horizon": 1, "confidence": 0.80}
+        item = eng.build_forecast_item(weight_cfg, fc, "2026-07-04", "2026-07-05")
+        assert (item["lo"], item["hi"]) == (214.0, 218.0)
