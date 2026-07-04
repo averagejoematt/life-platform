@@ -1113,6 +1113,14 @@ jobs:
             -v --tb=short -m integration 2>&1
           echo "I9 complete"
 
+      - name: I22 — Live site /version.json SHA on origin/main (#369)
+        # Catches main==live divergence after a squash-merge. A benign divergence
+        # (main ahead of live) passes; a SHA not in main’s history fails.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i22_site_version_sha_on_main \
+            -v --tb=short -m integration 2>&1
+          echo "I22 complete"
+
   # ════════════════════════════════════════════════════════════════
   # Job 6: Auto-rollback on smoke failure (TB7-25)
   # Fires when smoke-test fails AFTER a successful deploy.

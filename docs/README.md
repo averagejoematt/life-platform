@@ -32,6 +32,7 @@ top and stop when you have what you need.
 | [MONITORING.md](MONITORING.md) · [SLOs.md](SLOs.md) | Alarms / what fires · service levels |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Deploy mechanics |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (layer sequence, deploy-from-main, squash-drift, CI ordering, asset-staging trap) + the drift-discovery commands |
+| [MANAGED_WHERE_LEDGER.md](MANAGED_WHERE_LEDGER.md) | **Out-of-IaC resources** (DynamoDB table+GSIs, S3 bucket policy, SES, DNS, SSM) — what's managed where + automated assertions |
 | [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) | Backups + recovery |
 | [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) | Operator onboarding + daily checks |
 | [RESERVED_CONCURRENCY.md](RESERVED_CONCURRENCY.md) | Concurrency strategy |
