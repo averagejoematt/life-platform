@@ -9,7 +9,7 @@ This module owns:
   • Configuration constants (TABLE_NAME, USER_ID, USER_PREFIX, EXPERIMENT_START)
   • Request envelope helpers (_ok, _error, CORS_HEADERS)
   • DDB helpers (_query_source, _latest_item, _decimal_to_float)
-  • Cross-cutting business helpers (_get_profile, _scrub_blocked_terms, etc.)
+  • Cross-cutting business helpers (_get_profile, _scrub_blocked_terms [hardened], _is_blocked_vice, etc.)
   • Per-request correlation ID state (set by lambda_handler, read by _ok/_error)
 
 site_api_lambda.py + sibling handler modules import from here.
@@ -308,19 +308,55 @@ def _load_content_filter():
     return _content_filter_cache
 
 
+# Zero-width / invisible characters that can smuggle a blocked term past a
+# literal substring scrub (e.g. a zero-width space inside "marijuana").
+_ZERO_WIDTH_CHARS = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
+
+
+def _normalize_for_detection(text: str) -> str:
+    """Lowercase + drop non-alphanumeric after stripping zero-width chars.
+
+    Collapses spaced / punctuated obfuscation ("m a r i j u a n a",
+    "c-a-n-n-a-b-i-s") so a blocked term is detectable even when it slipped
+    past the literal pass.
+    """
+    return re.sub(r"[^a-z0-9]", "", text.translate(_ZERO_WIDTH_CHARS).lower())
+
+
 def _scrub_blocked_terms(text: str) -> str:
-    """Remove any mention of blocked terms from public-facing text."""
+    """Remove any mention of blocked terms from public-facing text.
+
+    Two layers:
+      1. Literal case-insensitive removal — the common case; surgical, with no
+         false-positives on normal text. Zero-width chars are stripped first so
+         "mari<zwsp>juana" can't smuggle a term past it.
+      2. Fail-safe detection on a normalized (de-spaced, de-punctuated) copy: if
+         a LONG, unambiguous blocked term (>=7 normalized chars — "marijuana",
+         "cannabis", "pornography"…) survived the literal pass, it was obfuscated
+         on purpose, so we drop the WHOLE answer rather than surgically excise an
+         obfuscated span (which would mangle legit text). Short terms
+         ("thc"/"weed"/"porn") are too substring-prone to detect this way safely
+         and are left to the literal pass — a documented residual.
+
+    This is the canonical shared implementation. AI endpoints layer
+    privacy_guard.scrub() on top for real-name redaction.
+    """
     cf = _load_content_filter()
+    text = text.translate(_ZERO_WIDTH_CHARS)
     result = text
     for term in cf.get("blocked_vice_keywords", []):
-        pattern = re.compile(re.escape(term), re.IGNORECASE)
-        result = pattern.sub("[filtered]", result)
+        result = re.compile(re.escape(term), re.IGNORECASE).sub("", result)
     for vice in cf.get("blocked_vices", []):
-        pattern = re.compile(re.escape(vice), re.IGNORECASE)
-        result = pattern.sub("[filtered]", result)
+        result = re.compile(re.escape(vice), re.IGNORECASE).sub("", result)
     result = re.sub(r"\[filtered\]", "", result)
-    result = re.sub(r"\s{2,}", " ", result)
-    return result.strip()
+    result = re.sub(r"\s{2,}", " ", result).strip()
+
+    norm = _normalize_for_detection(result)
+    for term in cf.get("blocked_vice_keywords", []) + cf.get("blocked_vices", []):
+        nt = _normalize_for_detection(term)
+        if len(nt) >= 7 and nt in norm:
+            return "I can't share that."
+    return result
 
 
 def _is_blocked_vice(name: str) -> bool:

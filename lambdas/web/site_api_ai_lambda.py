@@ -30,6 +30,8 @@ from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
 
+from web.site_api_common import _scrub_blocked_terms as _scrub_blocked_terms_base  # canonical shared helpers (#368)
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -117,9 +119,6 @@ except ImportError:
 
 # ── Anthropic API key cache ────────────────────────────────
 _anthropic_key_cache = None
-
-# ── Content safety filter cache ────────────────────────────
-_content_filter_cache = None
 
 # ── Subscriber token secret cache ──────────────────────────
 _token_secret_cache = None
@@ -244,77 +243,20 @@ def _validate_subscriber_token(token: str) -> bool:
         return False
 
 
-def _load_content_filter():
-    """Load blocked terms from S3 config/content_filter.json. Cached after first call."""
-    global _content_filter_cache
-    if _content_filter_cache is not None:
-        return _content_filter_cache
-    try:
-        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
-        s3 = boto3.client("s3", region_name=S3_REGION)
-        resp = s3.get_object(Bucket=S3_BUCKET, Key="config/content_filter.json")
-        _content_filter_cache = json.loads(resp["Body"].read())
-        return _content_filter_cache
-    except Exception as e:
-        logger.warning(f"[content_filter] Failed to load from S3: {e}")
-        # Return the hardcoded floor WITHOUT caching it, so the fuller S3 list
-        # is retried next invocation instead of a blip pinning the container
-        # to the minimal set for its lifetime.
-        return {
-            "blocked_vices": ["No porn", "No marijuana"],
-            "blocked_vice_keywords": ["porn", "pornography", "marijuana", "cannabis", "weed", "thc", "edible", "edibles"],
-        }
-
-
-# Zero-width / invisible characters that can smuggle a blocked term past a
-# literal substring scrub (e.g. a zero-width space inside "marijuana").
-_ZERO_WIDTH_CHARS = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
-
-
-def _normalize_for_detection(text: str) -> str:
-    """Lowercase + drop everything non-alphanumeric (after stripping zero-width
-    chars) — collapses spaced / punctuated obfuscation ("m a r i j u a n a",
-    "c-a-n-n-a-b-i-s") so a blocked term is detectable even when it slipped past
-    the literal pass."""
-    return re.sub(r"[^a-z0-9]", "", text.translate(_ZERO_WIDTH_CHARS).lower())
-
-
 def _scrub_blocked_terms(text: str) -> str:
-    """Remove any mention of blocked terms from public-facing text.
+    """Vice scrub (canonical impl in site_api_common) + real-name redaction for AI responses.
 
-    Two layers:
-      1. Literal case-insensitive removal — the common case; surgical, with no
-         false-positives on normal text. Zero-width chars are stripped first so
-         "mari<zwsp>juana" can't smuggle a term past it.
-      2. Fail-safe detection on a normalized (de-spaced, de-punctuated) copy: if
-         a LONG, unambiguous blocked term (>=7 normalized chars — "marijuana",
-         "cannabis", "pornography"…) survived the literal pass, it was obfuscated
-         on purpose, so we drop the WHOLE answer rather than surgically excise an
-         obfuscated span (which would mangle legit text). Short terms
-         ("thc"/"weed"/"porn") are too substring-prone to detect this way safely
-         and are left to the literal pass — a documented residual; the realistic
-         trigger (a model coaxed into emitting "w e e d") requires prompt
-         injection, which the history-replay gating closes separately.
+    The base two-layer scrub (zero-width strip, literal removal, obfuscation
+    fail-safe) lives in site_api_common._scrub_blocked_terms. This wrapper adds
+    privacy_guard.scrub() for coach persona real-name redaction — AI-endpoint
+    specific and not needed for non-AI content filtering.
     """
-    cf = _load_content_filter()
-    text = text.translate(_ZERO_WIDTH_CHARS)
-    result = text
-    for term in cf.get("blocked_vice_keywords", []):
-        result = re.compile(re.escape(term), re.IGNORECASE).sub("", result)
-    for vice in cf.get("blocked_vices", []):
-        result = re.compile(re.escape(vice), re.IGNORECASE).sub("", result)
-    result = re.sub(r"\[filtered\]", "", result)
-    result = re.sub(r"\s{2,}", " ", result).strip()
-
-    norm = _normalize_for_detection(result)
-    for term in cf.get("blocked_vice_keywords", []) + cf.get("blocked_vices", []):
-        nt = _normalize_for_detection(term)
-        if len(nt) >= 7 and nt in norm:
-            return "I can't share that."
-    # Real-public-figure redaction (the coaches here are fictional). privacy_guard
+    result = _scrub_blocked_terms_base(text)
+    if result == "I can't share that.":
+        return result
+    # Real-public-figure redaction (the coaches are fictional personas). privacy_guard
     # catches names the vice list doesn't — e.g. a persona channeling a real expert.
-    result = privacy_guard.scrub(result)[0]
-    return result
+    return privacy_guard.scrub(result)[0]
 
 
 def _emit_rate_limit_metric(endpoint: str) -> None:

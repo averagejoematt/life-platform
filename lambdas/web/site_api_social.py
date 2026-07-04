@@ -1189,6 +1189,7 @@ def _handle_challenge_checkin(event: dict) -> dict:
 
     Body: {"challenge_id": "...", "completed": true/false, "note": "...", "date": "YYYY-MM-DD"}
     Uses localStorage on the client to prevent double-taps.
+    Rate-limited: 1 check-in per IP per challenge per day (#358).
     """
     try:
         body = json.loads(event.get("body") or "{}")
@@ -1204,6 +1205,20 @@ def _handle_challenge_checkin(event: dict) -> dict:
         return _error(400, "challenge_id required")
     if completed is None:
         return _error(400, "completed (true/false) required")
+
+    # Rate limit: 1 check-in per IP per challenge per day (#358).
+    if _RATE_LIMITER_READY:
+        ip = _extract_client_ip(event)
+        ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+        allowed, _rem, _retry = _ddb_rate_check(
+            table, endpoint=f"challenge_checkin:{challenge_id}", ip_hash=ip_hash, limit=1, window_seconds=86400, fail_open=True
+        )
+        if not allowed:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": "86400", "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "Already checked in for this challenge today."}),
+            }
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     if not date_str:
@@ -1271,7 +1286,25 @@ def _handle_challenge_checkin(event: dict) -> dict:
 
 
 def _handle_experiment_suggest(event: dict) -> dict:
-    """POST /api/experiment_suggest — Store reader experiment suggestion."""
+    """POST /api/experiment_suggest — Store reader experiment suggestion.
+
+    Rate-limited: 3 suggestions per IP per hour (#358). Suggestions are stored
+    with status="pending" so they're distinguishable from owner-created experiments
+    and can be moderated before surfacing publicly.
+    """
+    # Rate limit: 3 per IP per hour (#358).
+    if _RATE_LIMITER_READY:
+        ip = _extract_client_ip(event)
+        ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+        allowed, _rem, _retry = _ddb_rate_check(
+            table, endpoint="experiment_suggest", ip_hash=ip_hash, limit=3, window_seconds=3600, fail_open=True
+        )
+        if not allowed:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "Too many suggestions. Please try again later."}),
+            }
     try:
         body = json.loads(event.get("body", "{}"))
         idea = body.get("idea", "").strip()
@@ -1285,6 +1318,7 @@ def _handle_experiment_suggest(event: dict) -> dict:
                 "idea": idea,
                 "source": source,
                 "status": "pending",
+                "submitted_by": "reader",
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )

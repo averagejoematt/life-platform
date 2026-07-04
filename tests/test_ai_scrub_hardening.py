@@ -17,7 +17,10 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
-from web import site_api_ai_lambda as ai  # noqa: E402
+from web import (
+    site_api_ai_lambda as ai,  # noqa: E402
+    site_api_common as common,  # noqa: E402 — canonical scrub lives here (#368)
+)
 
 _FILTER = {
     "blocked_vices": ["No porn", "No marijuana"],
@@ -26,7 +29,8 @@ _FILTER = {
 
 
 def _set_filter(monkeypatch):
-    monkeypatch.setattr(ai, "_content_filter_cache", dict(_FILTER))
+    # Patch the canonical cache in site_api_common (the scrub impl moved there in #368).
+    monkeypatch.setattr(common, "_content_filter_cache", dict(_FILTER))
 
 
 def test_literal_term_still_removed(monkeypatch):
@@ -39,7 +43,7 @@ def test_zero_width_obfuscation_stripped(monkeypatch):
     _set_filter(monkeypatch)
     # zero-width space inside the word → must not survive
     out = ai._scrub_blocked_terms("about mari​juana today")
-    assert "marijuana" not in ai._normalize_for_detection(out)
+    assert "marijuana" not in common._normalize_for_detection(out)
 
 
 def test_spaced_long_term_drops_whole_answer(monkeypatch):
@@ -70,8 +74,9 @@ def test_short_substring_does_not_nuke_answer(monkeypatch):
 
 
 def test_normalize_collapses_separators(monkeypatch):
-    assert ai._normalize_for_detection("m a r i.j-u_a n a") == "marijuana"
-    assert ai._normalize_for_detection("CANNABIS") == "cannabis"
+    # _normalize_for_detection is the canonical impl from site_api_common; ai re-exports it.
+    assert common._normalize_for_detection("m a r i.j-u_a n a") == "marijuana"
+    assert common._normalize_for_detection("CANNABIS") == "cannabis"
 
 
 def test_history_turn_is_gated_and_scrubbed():
