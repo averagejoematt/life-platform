@@ -1,88 +1,92 @@
-# HANDOVER — the journal Phase 1 cluster: #502/#503/#504 shipped end-to-end — 2026-07-04
+# HANDOVER — the silent-failure batch: #466/#467/#469/#471/#472 + #511 shipped end-to-end — 2026-07-04 (session 5)
 
-**The data-source review's highest-value quick batch is merged, deployed, and live-verified.**
-The journal enrichment pipeline — dead end-to-end since the notion ingester started
-clobbering it — is repaired at every layer: the store is re-enriched, re-ingestion can't
-wipe it again, the three dead consumers read real field names, and the privacy leak is
-closed before journaling resumes. PRs **#510** (the cluster), **#512** (layer v98 pin),
-**#513** (CI de-flake). Issues #502/#503/#504 auto-closed.
+**Epic #459's Now-milestone slice is merged, deployed on layer v99, and live-verified —
+no scheduled data source can fail silently anymore.** The three pattern-exempt ingesters
+(hevy, notion, dropbox) write the ER-01 sentinel, the two known instrument misfires
+(Todoist false-stale, Strava reconciler edge) are fixed at the root, and the MacroFactor
+format-change trap raises instead of 200-skipping. PRs **#515** (#511 fix), **#516**
+(the batch), **#517** (v99 pin). Issues #466/#467/#469/#471/#472/#511 auto-closed;
+**#518 filed** (pre-existing pipeline-health-check probes a nonexistent
+`life-platform/dropbox` secret — found during live verification).
 
 ---
 
-## What shipped (PR #510)
+## What shipped
 
-**#502 — J-1 (P1), the clobber + the heal:**
-- `notion_lambda.write_entries` calls `preserve_enrichment()` before each full-item
-  `put_item`: `enriched_*`/`defense_*` attributes are grafted from the existing item
-  (`setdefault` — fresh ingest attributes win, enrichment survives).
-- Enricher skip logic is edit-aware: `notion_last_edited > enriched_at` → re-enrich
-  (both Haiku passes); unparseable timestamps fall back to the old skip-if-enriched.
-- Weekly safety net: the daily 2-day window widens to 30 days on Sundays.
+**#515 — #511:** both `tools_training` `_linear_regression` call sites passed `(xs, ys)`
+instead of a points list → TypeError the moment sessions existed
+(`get_lactate_threshold_estimate` + `get_exercise_efficiency_trend`). Fixed + 2 tests.
+Also salvaged an uncommitted 2026-07-03 handover from the stale `accuracy-phase3`
+worktree (worktree removed, `main` reclaimed by the primary tree).
 
-**#503 — J-3/J-4, the dead consumers:**
-- `tools_journal` trajectory reads `enriched_mood/energy/stress/ownership` (the
-  `*_score` variants never existed). **Bonus find:** the dead fields were masking a
-  latent crash — `_linear_regression` takes a points list, not `(xs, ys)`; the tool
-  would have raised TypeError the moment data existed. Fixed here; the identical bug
-  in `tools_training.py:1786,1915` (`get_exercise_efficiency_trend`) is filed as **#511**.
-- `wednesday_chronicle` reads `enriched_avoidance_flags` (plural, list-joined) +
-  `enriched_ownership`.
-- `ai_context._build_mind_data` (layer module) aggregates `data["journal_entries"]`
-  (the brief already fetches it) — the old `journal_analysis` key had zero assignments
-  anywhere in the codebase. Dr. Reeves gets mood/energy/stress means, latest sentiment,
-  themes/avoidance/growth unions.
-- `tests/test_journal_signal_wiring.py` (9 tests) pins the writer→reader contract.
+**#516 — the batch (21 new offline tests):**
+- **#466** — `hevy_backfill` writes the sentinel at every terminal path via a new
+  **public** `ingestion_framework.record_ingest_health()` (private `_record_…` now
+  delegates); fatal `HevyAPIError` **raises** (sentinel first) instead of a swallowed
+  500; `hevy_get` converges on `http_retry`. `hevy` added to `ACTIVE_API_SOURCES`.
+- **#467** — notion + dropbox record the sentinel (success / auth-suppressed skip /
+  failure). **X-13 root fix:** the framework's breaker was a metric-less private copy of
+  `auth_breaker` — it now delegates, so SIMP-2 sources emit `IngestAuthHealthy` and the
+  monitoring-stack comment is finally true.
+- **#469** — unknown-format MacroFactor CSV archives to `raw/…/unknown/` then **raises**
+  (dropbox_poll has already hash-marked + moved the file by then — the 22-day May
+  incident class); the dead daily `cron(0 16)` deleted (365 no-op invokes/yr).
+- **#471** — todoist `stale_hours` 48→72 (day-dated records + 1x-daily ingestion → max
+  healthy age ~62h; 48h false-staled request-time surfaces ~14h/day); CLAUDE.md cadence
+  corrected to 1x daily.
+- **#472** — strava reconciler brackets the stored-side fetch **±1 day** (store keyed by
+  local PT date, API window in UTC epochs → the evening-PT-walk edge false-positived).
 
-**#504 — J-8, the leak:**
-- `one_line_summary` dropped from the public `/api/journal_analysis` payload (grep
-  confirmed zero front-end consumers); `journal_analyzer` stamps `phase` on cache writes.
+## Deploy (all live 2026-07-04 ~15:15 UTC, explicit in-session merge+deploy approval)
 
-## Deploy (all live 2026-07-04 ~08:00 UTC)
-
-Layer dance per CONVENTIONS §1: built layer → Core deploy published **v98** →
-`SHARED_LAYER_VERSION=98` pinned (PR #512) → Ingestion/Compute/Email/Mcp/Operational
-stacks deployed from detached origin/main → site-api via `deploy_site_api.sh`
-(full `web/`). Asset-staging check done: deployed zips grep'd for each fix marker
-(notion, enrichment, analyzer, MCP, chronicle) — all present; daily-brief +
-wednesday-chronicle confirmed on layer v98.
+Layer dance per CONVENTIONS §1: build → Core published **v99** → pin merged (PR #517) →
+Ingestion (the MacroFactor schedule-rule destroy read + confirmed in `cdk diff`),
+Operational, Mcp, Compute, Email from detached origin/main → site-api via
+`deploy_site_api.sh`. Monitoring had **zero** template diff (comment-only). Asset check:
+deployed zips grep'd for all five fix markers + layer v99 zip for
+`record_ingest_health`/`_ab_clear_failure`/`"stale_hours": 72` — all present.
 
 ## Live verification (all ACs)
 
-- **Backfill:** `{"full_sync": true, "force": true}` → 50 found / 47 enriched / 3
-  skipped (sub-20-char stubs) / 0 errors. A second no-force pass enriched 12 more
-  entries that only surfaced via the ingester's own full-sync (the windowed ingester
-  had never fetched them) → **final: 62 journal items, 59 enriched, 43 defense-enriched**.
-- **Clobber-proof proven end-to-end:** invoked `notion-journal-ingestion`
-  `{"full_sync": true}` — 41 entries rewritten via `put_item`, enrichment count
-  unchanged (47→47). The exact operation that caused J-1 is now harmless.
-- **J-8 probe:** seeded a `journal_analysis` cache record with a sentinel
-  `one_line_summary` + `phase=experiment`, invoked site-api → 200, record served
-  through the phase filter, sentinel absent. Probe record deleted.
-- **Hypothesis engine:** reads `enriched_mood/energy/stress/social_quality`
-  (`hypothesis_engine_lambda.py:332-338`) — populated now; columns fill on its next
-  daily run (no manual invoke needed).
+- **#466 drill:** normal run → sentinel `streak=0/none`; **wrong-API-key drill** (secret
+  temporarily swapped, cold start forced via env-var touch) → Lambda **raised**
+  `HevyAPIError`, sentinel `streak=1/auth`, metric `ConsecutiveFailures{Source=hevy}`
+  now EXISTS in CloudWatch; secret restored, re-run reset to `0/none`; alarm stayed OK
+  (drill deliberately kept below the 3-streak page threshold — chain proven without a
+  6h synthetic URGENT page, since the alarm is 6h-Maximum).
+- **#467:** notion + dropbox invoked → sentinels live; `check_ingest_liveness` mode →
+  **notion/dropbox/hevy all `ok`** (no more permanent 'unknown'), unhealthy_count=0
+  (garmin `failing` correctly excluded as best-effort).
+- **#472:** live reconcile → 16 API / 18 stored / **missing_count 0** on the exact
+  window that was alarming.
+- **Alarms pending their evaluation cycles:** `ingest-reconciliation-strava` (1-day
+  Maximum) clears within 24h as yesterday's datapoint ages out; `slo-source-freshness`
+  (red since 06-27) should clear after the checker's 16:45 UTC run — **the #471 AC's
+  7-consecutive-day OK observation starts 2026-07-04.**
 
 ## Gotchas for the next session
 
-- **CI's layer-consistency check races a local layer rollout.** The #510 main run
-  failed "Plan deployments" because it observed layer v98 published while the consumer
-  stacks were mid-deploy (15 consumers still on v97 at that instant). Self-heals on
-  the next push; don't chase it.
-- **`test_presence_endpoint` flake (fixed, #513):** `"64" not in raw` matched
-  `_meta.generated_at` microseconds. Pattern to avoid: substring leak-checks over a
-  payload containing a timestamp.
-- **Stale `cdk/layer-build/` breaks local pytest collection** — two tests prepend it
-  to sys.path, so an old built copy of `ingestion_framework.py` shadows `lambdas/`.
-  `bash deploy/build_layer.sh` refreshes it (build-only, safe).
+- **The pre-commit hook rewrites `site_api_common.py` test_count AFTER `git add`** — the
+  bump chases you one commit behind. Check `git status` after every commit; both PRs
+  needed a trailing sync commit, and #515 vs #516 conflicted on exactly that line
+  (resolve = take either side, re-run `deploy/sync_doc_metadata.py --apply`).
+- **PR-level CI is Dependabot-validate only** — the real lint/test gates run on push to
+  main. Local black + ruff + flake8-E9 + full pytest + `cdk synth` is the pre-merge bar.
+- **Warm containers cache secrets forever** (`hevy_common._secret_cache` module global)
+  — a live failure drill needs a cold start; touching an env var
+  (`update-function-configuration`) is the clean way to force one.
+- `aws lambda invoke` with a JSON payload needs `--cli-binary-format raw-in-base64-out`
+  (bare `'{}'` happens to pass, anything with a space does not).
 
 ## Open / next
 
-- **#511** — the tools_training `_linear_regression` arity crash (filed this session,
-  S effort, pattern + test shape in PR #510).
-- Journal Phase 1 remainder from the review roadmap (not in this cluster's ACs):
-  J-2 (analyzer's dead Anthropic scaffolding + pointless secret fetch), J-6 (schema
-  rework: merge defense pass, drop dead fields), X-7 (raw S3 archive for notion),
-  E-6 (`last_edited_time` in the Notion query) → epic #464 has the ranked stories.
-- 21 Now-milestone stories remain on `gh issue list --label area:data --milestone Now`.
+- **#518** — pipeline-health-check's expected-secrets list probes `life-platform/dropbox`
+  which has never existed (creds live in `ingestion-keys`) → daily `failed: 1` misfire.
+- Watch: `slo-source-freshness` 7-day OK window (from 07-04); `ingest-reconciliation-strava`
+  should be OK by 07-05 — if either stays red, the diagnosis in the review doc §E-3/§C-1
+  is incomplete.
+- **13 area:data Now stories remain** — `gh issue list --label area:data --milestone Now
+  --state open`. Journal remainder (J-2/J-6/X-7/E-6) in epic #464; #474 (apple_health
+  XML decision) is the one opus-effort story.
 - 6 pre-existing local test failures on main (coaches_api ×4, hevy_compiler_isolation,
-  integration_aws i16) — env/live-data dependent, green in CI; untouched here.
+  integration_aws) — env/live-data dependent, green in CI; untouched.
