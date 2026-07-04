@@ -199,8 +199,12 @@ def _safe_test(lever, v):
 def lambda_handler(event: dict, context) -> dict:
     try:
         # One day-row assembly for the whole platform (ADR-105): the hypothesis
-        # engine's. Same asset bundle, so a plain sibling import.
-        import hypothesis_engine_lambda as eng
+        # engine's. Same asset bundle — package import at runtime (handler runs as
+        # compute.scenario_explorer_lambda), flat import under the test harness.
+        try:
+            from compute import hypothesis_engine_lambda as eng
+        except ImportError:
+            import hypothesis_engine_lambda as eng
 
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         data = eng.gather_data(days=LOOKBACK_DAYS)
