@@ -290,7 +290,7 @@ def build_data_narrative(data):
             row["sleep_efficiency"] = safe_float(whoop, "sleep_efficiency_percentage")
             row["deep_sleep_hrs"] = safe_float(whoop, "slow_wave_sleep_hours")
             row["rem_hrs"] = safe_float(whoop, "rem_sleep_hours")
-            row["total_sleep_hrs"] = safe_float(whoop, "total_in_bed_time_hrs")
+            row["total_sleep_hrs"] = safe_float(whoop, "sleep_duration_hours")
 
         # Garmin
         garmin = next((i for i in data.get("garmin", []) if i.get("date") == date), {})
@@ -341,7 +341,7 @@ def build_data_narrative(data):
         es = next((i for i in data.get("eightsleep", []) if i.get("date") == date), {})
         if es:
             row["sleep_onset_min"] = safe_float(es, "time_to_sleep_min")
-            row["bed_temp_f"] = safe_float(es, "avg_bed_temp_f")
+            row["bed_temp_f"] = safe_float(es, "bed_temp_f")
 
         # Filter None values
         row = {k: v for k, v in row.items() if v is not None}

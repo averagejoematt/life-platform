@@ -484,15 +484,15 @@ def compute_metabolic_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple
     components = pillar_cfg.get("components", {})
     scores = {}
 
-    # Body fat trajectory
-    withings_30d = data.get("withings_30d", [])
-    bf_vals = [_safe_float(w, "body_fat_pct") or _safe_float(w, "fat_mass_pct") for w in withings_30d]
-    bf_vals = [v for v in bf_vals if v is not None]
-    scores["body_fat_trajectory"] = _trend_score(bf_vals, higher_is_better=False) if len(bf_vals) >= 3 else None
+    # Body fat trajectory: REMOVED (#486/B-3). The Withings scale is weight-only —
+    # 0/1198 records ever carried body_fat_pct/fat_mass_pct, so the component
+    # could never score and structurally capped metabolic coverage at 0.75.
+    # Body composition lives in the sparse periodic `dexa` source, too infrequent
+    # for a 30-day trend. The component is gone from character_sheet.json too.
 
     # CGM glucose control
     apple = data.get("apple") or {}
-    tir = _safe_float(apple, "glucose_time_in_range_pct")
+    tir = _safe_float(apple, "blood_glucose_time_in_range_pct")
     if tir is not None:
         scores["cgm_glucose_control"] = _clamp(tir)
     else:

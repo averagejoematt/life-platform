@@ -589,7 +589,7 @@ class TestComputeReadiness:
 
     def test_no_data_returns_none(self):
         compute_readiness = self._import_fn()
-        score, colour = compute_readiness(
+        score, colour, _components = compute_readiness(
             {
                 "whoop": None,
                 "whoop_today": None,
@@ -603,7 +603,7 @@ class TestComputeReadiness:
 
     def test_high_recovery_gives_green(self):
         compute_readiness = self._import_fn()
-        score, colour = compute_readiness(
+        score, colour, _components = compute_readiness(
             {
                 "whoop": {"recovery_score": 95},
                 "whoop_today": None,
@@ -618,7 +618,7 @@ class TestComputeReadiness:
 
     def test_low_recovery_gives_red(self):
         compute_readiness = self._import_fn()
-        score, colour = compute_readiness(
+        score, colour, _components = compute_readiness(
             {
                 "whoop": {"recovery_score": 10},
                 "whoop_today": None,
@@ -633,7 +633,7 @@ class TestComputeReadiness:
 
     def test_score_clamped_0_100(self):
         compute_readiness = self._import_fn()
-        score, _ = compute_readiness(
+        score, _, _components = compute_readiness(
             {
                 "whoop": {"recovery_score": 100},
                 "whoop_today": None,

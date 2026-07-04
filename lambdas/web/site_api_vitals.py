@@ -101,26 +101,20 @@ def handle_vitals(date: str | None = None) -> dict:
             return "declining"
         return "stable"
 
-    # G-3: Latest weight — check Withings first, fall back to Apple Health (HAE).
+    # G-3 → #491/M-6: latest weight via the ONE shared resolution
+    # (weight_trend.latest_weight): Withings backscan + a 7-day apple_health
+    # window. The old code inspected only the single latest apple_health item —
+    # usually a steps record — so the Apple fallback engaged same-day only.
     # Time-travel: the latest weigh-in on-or-before the anchor (else the live latest).
     withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings")
-    current_weight = None
-    weight_as_of = None
-    if withings_latest:
-        wv = withings_latest.get("weight_lbs")
-        if wv is not None:
-            current_weight = float(wv)
-            weight_as_of = withings_latest.get("sk", "").replace("DATE#", "") or withings_latest.get("date")
-    # v1.4.2: Check apple_health for more recent weight (HAE fallback)
     try:
-        ah_latest = _latest_item_asof("apple_health", today, ip) if date else _latest_item("apple_health")
-        if ah_latest and ah_latest.get("weight_lbs"):
-            ah_date = ah_latest.get("sk", "").replace("DATE#", "")[:10]
-            if not weight_as_of or ah_date > weight_as_of:
-                current_weight = float(ah_latest["weight_lbs"])
-                weight_as_of = ah_date
+        _ah_start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+        _ah_7d = _query_source("apple_health", _ah_start, today, include_pilot=ip)
     except Exception:
-        pass
+        _ah_7d = []
+    _lw = weight_trend.latest_weight([withings_latest] if withings_latest else [], _ah_7d)
+    current_weight = _lw["weight_lbs"]
+    weight_as_of = _lw["as_of"]
 
     withings_30d = _query_source("withings", d30, today, include_pilot=ip)
     weight_vals = [float(w["weight_lbs"]) for w in withings_30d if w.get("weight_lbs")]
@@ -222,6 +216,17 @@ def handle_journey() -> dict:
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
     goal_weight = float(_p.get("goal_weight_lbs", 185.0))
     current_weight = weight_series[-1][1]
+    last_weighin_date = weight_series[-1][0]
+    # #491/M-6: the shared resolution can find a NEWER Apple Health weigh-in
+    # (travel scale) than the Withings series — same helper as vitals/character.
+    try:
+        _ah_start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+        _lw = weight_trend.latest_weight([], _query_source("apple_health", _ah_start, today))
+        if _lw["as_of"] and _lw["as_of"] > last_weighin_date:
+            current_weight = _lw["weight_lbs"]
+            last_weighin_date = _lw["as_of"]
+    except Exception:
+        pass
     lost_lbs = round(start_weight - current_weight, 1)
     remaining = round(current_weight - goal_weight, 1)
     progress_pct = round(lost_lbs / (start_weight - goal_weight) * 100, 1) if start_weight != goal_weight else 0
@@ -259,7 +264,7 @@ def handle_journey() -> dict:
                 # The date behind current_weight_lbs/lost_lbs — the front-end pairs the
                 # (possibly days-stale) weight with a live day counter, so it needs the
                 # as-of anchor to stay honest during a weigh-in gap.
-                "last_weighin_date": weight_series[-1][0],
+                "last_weighin_date": last_weighin_date,
                 "day_n": _day_n,
                 "week_n": (max(_day_n - 1, 0) // 7) + 1,
                 # Height (profile, authoritative) so the page can show a de-emphasized BMI
@@ -1460,16 +1465,16 @@ def _latest_readiness() -> dict | None:
     rec = _latest_item("computed_metrics")
     if not rec or rec.get("readiness_score") is None:
         return None
-    comp = rec.get("component_scores") or {}
-    # Normalise the stored component keys to display labels (stable order).
-    label_map = [
-        ("recovery", "recovery"),
-        ("sleep_quality", "sleep"),
-        ("movement", "movement"),
-        ("habits_mvp", "habits"),
-        ("hydration", "hydration"),
+    # #492/M-4: serve the score's ACTUAL inputs (stored as readiness_components
+    # by daily-metrics-compute). The old fallback borrowed the day-grade
+    # component set — a different model — so when the breakdown is absent
+    # (pre-#492 records) we serve none rather than the wrong ones.
+    label_map = {"recovery": "recovery", "sleep": "sleep", "hrv_trend": "HRV trend", "tsb": "training balance"}
+    components = [
+        {"key": c.get("key"), "label": label_map.get(c.get("key"), c.get("key")), "score": round(float(c["score"]), 1)}
+        for c in (rec.get("readiness_components") or [])
+        if c.get("score") is not None
     ]
-    components = [{"key": k, "label": lbl, "score": round(float(comp[k]), 1)} for k, lbl in label_map if comp.get(k) is not None]
     return {
         "score": round(float(rec["readiness_score"]), 1),
         "band": rec.get("readiness_colour"),  # green / yellow / red

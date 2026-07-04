@@ -249,23 +249,26 @@ TODAY = "2026-06-19"
 
 
 @pytest.mark.skipif(not _SS_OK, reason="source_state (shared layer) unavailable")
-def test_source_state_live_after_strava_reenable():
-    """The flip Matthew wants visible: Strava is declared paused, but the moment it
-    re-ingests fresh data the state resolves to 'live' (freshness wins) — no second edit.
+def test_source_state_strava_unpaused_2026_07():
+    """#496/C-3: Strava's cron has been live since 06-20, so the stale 'paused'
+    declaration is GONE — a quiet strava now resolves 'stale' (real-outage
+    detection restored) and fresh data still resolves 'live'.
     """
-    assert ss.is_paused("strava") is True
-    # While off (last record 2026-06-14, today 2026-06-19) → paused, not stale.
-    assert ss.resolve_source_state("strava", "2026-06-14", TODAY) == "paused"
-    # After re-enable, a fresh record lands → live, despite still being declared paused.
+    assert ss.is_paused("strava") is False
+    assert ss.resolve_source_state("strava", "2026-06-14", TODAY) == "stale"
     assert ss.resolve_source_state("strava", TODAY, TODAY) == "live"
     assert ss.resolve_source_state("strava", "2026-06-18", TODAY) == "live"
 
 
 @pytest.mark.skipif(not _SS_OK, reason="source_state (shared layer) unavailable")
-def test_source_state_distinguishes_paused_rate_limited_stale():
-    """paused ≠ rate_limited ≠ stale — a deliberately-off source is never 'broken'."""
-    # Strava (declared paused) with no fresh data → paused.
+def test_source_state_distinguishes_paused_rate_limited_stale(monkeypatch):
+    """paused ≠ rate_limited ≠ stale — a deliberately-off source is never 'broken'.
+    (Mechanism test: nothing is declared paused today, so pin a synthetic entry.)"""
+    monkeypatch.setattr(ss, "DECLARED_PAUSED_SOURCES", {"strava"})
+    # A declared-paused source with no fresh data → paused.
     assert ss.resolve_source_state("strava", "2026-06-14", TODAY) == "paused"
+    # Freshness still wins for a declared-paused source (the re-enable flip).
+    assert ss.resolve_source_state("strava", TODAY, TODAY) == "live"
     # Garmin with a rate-limit marker + stale data → rate_limited (marker outranks stale).
     assert ss.resolve_source_state("garmin", "2026-06-15", TODAY, rate_limited=True) == "rate_limited"
     # Garmin fresh → live (freshness beats the marker).
@@ -277,11 +280,13 @@ def test_source_state_distinguishes_paused_rate_limited_stale():
 
 
 @pytest.mark.skipif(not (_SS_OK and _IC_OK), reason="layer modules unavailable")
-def test_guard_reads_resolved_paused_state_end_to_end():
-    """Resolver → guard: a paused Strava resolves to 'paused', which the honesty guard
+def test_guard_reads_resolved_paused_state_end_to_end(monkeypatch):
+    """Resolver → guard: a paused source resolves to 'paused', which the honesty guard
     treats as not-assessable and withholds the under-training verdict. This is the wiring
     the coach uses (resolve_source_state feeds movement_source_state feeds the guard).
+    (Mechanism test — pins a synthetic paused declaration, #496.)
     """
+    monkeypatch.setattr(ss, "DECLARED_PAUSED_SOURCES", {"strava"})
     state = {
         "strava": ss.resolve_source_state("strava", "2026-06-14", TODAY),  # → paused
         "garmin": ss.resolve_source_state("garmin", "2026-06-15", TODAY, rate_limited=True),  # → rate_limited
@@ -309,15 +314,14 @@ def test_guard_stops_withholding_once_strava_live():
 
 
 @pytest.mark.skipif(not _SS_OK, reason="source_state (shared layer) unavailable")
-def test_pipeline_health_does_not_mask_paused_source():
-    """The liveness-pinger masking is killed: a paused source is legible as paused, so
-    the health check can skip its boot-probe instead of reporting a hollow 'ok'.
-    """
-    # The pipeline health check gates on is_paused() to skip the probe + exclude from
-    # the liveness alarm. Assert the contract it relies on.
-    assert ss.is_paused("strava") is True
+def test_pipeline_health_counts_strava_again():
+    """#496/C-3: with the stale declaration gone, the pipeline health check's
+    is_paused() gate no longer excludes strava from UnhealthySourceCount or its
+    boot probe — a real Strava outage pages again. Nothing is declared paused
+    today (garmin's pause is registry-driven, not source_state-driven)."""
+    assert ss.is_paused("strava") is False
     assert ss.is_paused("whoop") is False
-    assert "strava" in ss.DECLARED_PAUSED_SOURCES
+    assert ss.DECLARED_PAUSED_SOURCES == set()
 
 
 # ==============================================================================

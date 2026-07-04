@@ -280,15 +280,24 @@ def _sleep_onset_minutes(iso_ts: str | None) -> int | None:
 
 
 def _compute_sleep_consistency(date_str: str, current_onset: int) -> float | None:
-    """Query last 6 days; compute 7-day StdDev of onset times (midnight-aware)."""
+    """Query the prior 6 nights; compute 7-day StdDev of onset times (midnight-aware).
+
+    The whoop partition interleaves DATE#{d}#WORKOUT#{id} sub-records with the
+    date-only night records, so a bare Limit=6 descending page can be mostly
+    workouts on training-heavy weeks (#488/A-6). Bound the key range to the
+    actual 7-day window and skip the workout sub-records.
+    """
+    window_start = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
     resp = _table.query(
-        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#whoop") & Key("sk").lt(f"DATE#{date_str}"),
-        ProjectionExpression="sleep_onset_minutes",
+        KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#whoop") & Key("sk").between(f"DATE#{window_start}", f"DATE#{date_str}"),
+        ProjectionExpression="sk, sleep_onset_minutes",
         ScanIndexForward=False,
-        Limit=6,
     )
     onsets = [current_onset]
     for item in resp.get("Items", []):
+        sk = item.get("sk", "")
+        if "#WORKOUT#" in sk or sk == f"DATE#{date_str}":
+            continue
         val = item.get("sleep_onset_minutes")
         if val is not None:
             onsets.append(int(val))

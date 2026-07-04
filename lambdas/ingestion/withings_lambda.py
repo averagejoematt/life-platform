@@ -10,7 +10,8 @@ Source-specific concerns preserved:
   - 401-in-body (not HTTP) → retry-with-refresh on first invocation
   - Multi-measurement-group parsing (scale + BPM produce separate groups)
   - kg→lbs derived fields for weight/composition metrics
-  - 14-day body-comp delta query for lean_mass_delta_14d / fat_mass_delta_14d
+  (the 14-day body-comp delta query was deleted 2026-07-04, #486/B-3 — the
+  scale is weight-only, so it early-returned on every record)
 
 DDB shape unchanged from pre-migration.
 """
@@ -23,9 +24,6 @@ import os
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
-
-import boto3
-from boto3.dynamodb.conditions import Key
 
 try:
     from platform_logger import get_logger
@@ -70,12 +68,6 @@ MEAS_TYPES = {
     137: "qt_interval_ms",
     155: "vascular_age",
 }
-
-# Module-level DDB resource for transform_fn's delta query (framework's table
-# isn't exposed to the callback).
-_dynamodb = boto3.resource("dynamodb", region_name=REGION)
-_table = _dynamodb.Table(os.environ.get("TABLE_NAME", "life-platform"))
-
 
 # ── Withings API helpers ───────────────────────────────────────────────────────
 
@@ -190,38 +182,6 @@ def _parse_measurements(raw_body: dict) -> dict:
     return result
 
 
-def _compute_body_comp_deltas(date_str: str, measurements: dict) -> dict:
-    """Query ~14 days ago and compute lean/fat mass deltas (search 11-17d window)."""
-    deltas = {}
-    current_lean = measurements.get("fat_free_mass_lbs")
-    current_fat = measurements.get("fat_mass_lbs")
-    if current_lean is None and current_fat is None:
-        return deltas
-    target_dt = datetime.strptime(date_str, "%Y-%m-%d")
-    search_start = (target_dt - timedelta(days=17)).strftime("%Y-%m-%d")
-    search_end = (target_dt - timedelta(days=11)).strftime("%Y-%m-%d")
-    try:
-        resp = _table.query(
-            KeyConditionExpression=Key("pk").eq(DYNAMO_PK) & Key("sk").between(f"DATE#{search_start}", f"DATE#{search_end}"),
-            ProjectionExpression="fat_free_mass_lbs, fat_mass_lbs, #d",
-            ExpressionAttributeNames={"#d": "date"},
-            ScanIndexForward=False,
-            Limit=1,
-        )
-    except Exception as e:
-        logger.warning("body_comp_deltas query failed: %s", e)
-        return deltas
-    items = resp.get("Items", [])
-    if not items:
-        return deltas
-    prev = items[0]
-    if current_lean is not None and prev.get("fat_free_mass_lbs") is not None:
-        deltas["lean_mass_delta_14d"] = round(float(current_lean) - float(prev["fat_free_mass_lbs"]), 2)
-    if current_fat is not None and prev.get("fat_mass_lbs") is not None:
-        deltas["fat_mass_delta_14d"] = round(float(current_fat) - float(prev["fat_mass_lbs"]), 2)
-    return deltas
-
-
 # ── SIMP-2 callbacks ───────────────────────────────────────────────────────────
 
 # Per-invocation: cache the secret dict after auth so fetch_day reuses it
@@ -259,14 +219,14 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
 
 
 def transform(raw: dict, date_str: str) -> list[dict]:
-    """Parse measurements + compute 14-day body-comp deltas."""
+    """Parse measurements. (#486/B-3: the 14-day body-comp delta computation was
+    deleted — the scale is weight-only, so its fat/lean inputs never existed and
+    the function early-returned on every record since 2021.)"""
     if not raw:
         return []
     measurements = _parse_measurements(raw)
     if not measurements:
         return []
-    deltas = _compute_body_comp_deltas(date_str, measurements)
-    measurements.update(deltas)
     return [
         {
             "source": "withings",

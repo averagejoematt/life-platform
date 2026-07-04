@@ -22,9 +22,13 @@ from datetime import datetime
 # Sources intentionally OFF (no live ingestion cron). A paused source is off-by-design,
 # not broken. Flip here when re-enabling — though freshness wins for 'live', so removing
 # a source is only needed to relabel a future *real* outage as 'stale' rather than
-# 'paused'. (Strava: paused 2026-06-14 at the 402 paywall; remove when the subscription
-# + cron are restored — DI-1.1.)
-DECLARED_PAUSED_SOURCES = {"strava"}
+# 'paused'. (Strava was paused 2026-06-14 at the 402 paywall and REMOVED 2026-07-04
+# (#496/C-3) — its cron has been live again since 06-20, and the stale declaration
+# was suppressing real-outage detection: the health check skipped it, MCP freshness
+# said 'paused' for behavioral lapses, and the training coach was told it wasn't a
+# live ingest path. Currently empty on purpose; garmin's pause is registry-driven
+# (source_registry paused=True, ADR-074), not declared here.)
+DECLARED_PAUSED_SOURCES = set()
 
 STATE_LIVE = "live"
 STATE_PAUSED = "paused"

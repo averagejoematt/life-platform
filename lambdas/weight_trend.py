@@ -16,6 +16,58 @@ Early-cut water weight makes a raw rate wildly fast, so the rate is flagged
 from datetime import datetime, timedelta, timezone
 
 
+def _record_date(item):
+    """YYYY-MM-DD for a DDB day record (date attr, else the sk)."""
+    d = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")[:10]
+    return d if len(str(d)) == 10 else None
+
+
+def _record_weight_lbs(item):
+    """weight_lbs from a record, converting weight_kg when only kg is stored."""
+    w = item.get("weight_lbs")
+    if w is not None:
+        try:
+            return float(w)
+        except (TypeError, ValueError):
+            return None
+    kg = item.get("weight_kg")
+    try:
+        kg = float(kg) if kg is not None else None
+    except (TypeError, ValueError):
+        return None
+    if kg is not None and kg < 200:  # sanity: a >200 "kg" value is a mis-unit record
+        return kg * 2.20462
+    return None
+
+
+def latest_weight(withings_records, apple_records=None):
+    """The ONE latest-weight resolution (#491/M-5/M-6): Withings backscan +
+    Apple Health backscan, most recent date wins (Withings wins ties — it is
+    the source of truth; Apple is the travel/fallback scale).
+
+    Before this, three surfaces resolved "current weight" three different ways —
+    vitals checked only the single latest apple_health item (a steps record →
+    fallback dead, M-6), journey ignored Apple entirely, and the character sheet
+    had its own kg-converting backscan. Pure function over already-fetched
+    record lists (callers bound the Apple query to ~7 days); no I/O.
+
+    Returns {"weight_lbs": float|None, "as_of": "YYYY-MM-DD"|None,
+             "source": "withings"|"apple_health"|None}.
+    """
+    best = {"weight_lbs": None, "as_of": None, "source": None}
+    for source, records in (("withings", withings_records), ("apple_health", apple_records)):
+        for item in records or []:
+            if not isinstance(item, dict):
+                continue
+            d, w = _record_date(item), _record_weight_lbs(item)
+            if d is None or w is None:
+                continue
+            # strictly-newer keeps Withings on ties (it's scanned first)
+            if best["as_of"] is None or d > best["as_of"]:
+                best = {"weight_lbs": w, "as_of": d, "source": source}
+    return best
+
+
 def weight_trajectory(
     weight_series,
     current_weight,

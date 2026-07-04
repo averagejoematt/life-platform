@@ -53,6 +53,10 @@ function nightOf(wakeIso) {
 // The night a sleep readout came from: the unified record already exposes night_of
 // (the evening date); otherwise derive it from the sleep-detail wake date.
 const lastNightDate = (s, uni) => (uni && uni.night_of) ? fmtShort(uni.night_of) : nightOf(s && s.as_of_date);
+// #491/M-5: today/yesterday in the experiment's timezone (PT) — used to
+// date-condition recency labels so an 8-day-old weigh-in is never "today".
+const todayPT = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+const dayBefore = (iso) => { const t = Date.parse(String(iso || "").slice(0, 10)); return Number.isFinite(t) ? new Date(t - 86400000).toISOString().slice(0, 10) : ""; };
 const fig = (v, k, extra) => `<div class="fig"><span class="fig-v num">${esc(v)}</span><span class="fig-k label">${esc(k)}</span>${extra ? `<span class="rd-delta">${esc(extra)}</span>` : ""}</div>`;
 const figs = (a) => `<div class="figs">${a.filter(Boolean).join("")}</div>`;
 const sec = (t, inner) => inner ? `<section class="rd-sec"><h2 class="rd-h">${esc(t)}</h2>${inner}</section>` : "";
@@ -156,11 +160,18 @@ function physicalStatCluster(readings, j, goal) {
   const high = Math.max(...ws), low = Math.min(...ws);
   const prev = ws.length >= 2 ? ws[ws.length - 2] : null;
   const dayDelta = prev != null ? Math.round((ws[ws.length - 1] - prev) * 10) / 10 : null;
-  const ydayCap = dayDelta == null ? "yesterday" : `yesterday · ${dayDelta > 0 ? "+" : ""}${fmt(dayDelta)} lb`;
+  // #491/M-5: label the readings by their actual dates — "yesterday" only when the
+  // previous reading truly is yesterday's; a gap shows "Jun 26", never a fake day-delta.
+  const withDates = readings.filter((r) => Number.isFinite(Number(r.weight_lbs)));
+  const latestD = String((withDates[withDates.length - 1] || {}).date || "").slice(0, 10);
+  const prevD = withDates.length >= 2 ? String(withDates[withDates.length - 2].date || "").slice(0, 10) : "";
+  const latestCap = latestD && latestD !== todayPT() ? `latest · ${_physShortDate(latestD)}` : "latest";
+  const prevWord = prevD && prevD === dayBefore(todayPT()) && latestD === todayPT() ? "yesterday" : (_physShortDate(prevD) || "previous");
+  const ydayCap = dayDelta == null ? prevWord : `${prevWord} · ${dayDelta > 0 ? "+" : ""}${fmt(dayDelta)} lb`;
   const pct = j.progress_pct != null ? j.progress_pct : Math.round((j.start_weight_lbs - latest) / (j.start_weight_lbs - goal) * 1000) / 10;
   return figs([
     fig(fmt(high) + " lb", "high"),
-    fig(fmt(latest) + " lb", "latest"),
+    fig(fmt(latest) + " lb", latestCap),
     fig(fmt(low) + " lb", "low"),
     prev != null && fig(fmt(prev) + " lb", ydayCap),
     pct != null && fig(fmt(pct) + "%", `to goal · ${fmt(j.start_weight_lbs ?? 314.5)}→${fmt(goal)}`),
@@ -1041,8 +1052,14 @@ async function renderSleep(d) {
   if (fcHero) parts.push(fcHero);
   // §1 — last night, demoted to EVIDENCE beneath the forecast.
   const lastNightHdr = "Last night — the evidence" + (lastNightDate(s, uni) ? ` · the night of ${lastNightDate(s, uni)}` : "");
+  // #495/M-9: when the API substituted an older night's Whoop recovery (its own
+  // night rides in recovery_night_of), caption the splice everywhere those
+  // figures render — never night-A hours + night-B recovery under one header.
+  const recNote = s.recovery_night_of
+    ? `<p class="rd-meta label">Recovery, HRV and resting HR are from the night of ${fmtShort(s.recovery_night_of)} — the latest night with a Whoop reading; last night's isn't in yet.</p>`
+    : "";
   if (Object.values(s).some(has)) {
-    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
+    parts.push(sec(lastNightHdr, figs([s.total_sleep_hours != null && fig(fmt(s.total_sleep_hours, 1), "hours"), s.sleep_efficiency != null && fig(fmt(s.sleep_efficiency) + "%", "efficiency"), s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv), "hrv ms"), s.sleep_score != null && fig(fmt(s.sleep_score), "composite score")]) + recNote + `<p class="rd-meta label">One night is noise, not a verdict — it's evidence the forecast above gets graded against. The composite "score" is Eight Sleep's black box; the hours, efficiency and stages are what actually move it.</p>`));
     if (s.deep_sleep_hours != null && s.rem_sleep_hours != null) parts.push(sec("Last night's stages", stackedBar([{ label: "Deep", value: s.deep_sleep_hours, tone: "ember" }, { label: "REM", value: s.rem_sleep_hours, tone: "ink" }, { label: "Light", value: Math.max(0, (s.total_sleep_hours || 0) - (s.deep_sleep_hours || 0) - (s.rem_sleep_hours || 0)), tone: "faint" }], { label: "Hours by stage", unit: "h" })));
     // §2 — dual-device stage agreement (P0.3): Eight Sleep % vs Whoop % per stage.
     const _wh = s.whoop_hours; const _dev = [];
@@ -1081,7 +1098,7 @@ async function renderSleep(d) {
       const _rec = s.recovery_score;
       const state = _rec == null ? "not assessable" : (_rec >= 67 ? "downshifted — parasympathetic" : _rec >= 34 ? "partial downshift" : "stayed elevated — sympathetic");
       parts.push(sec("Autonomic downshift — did the body let go?",
-        figs([_rec != null && fig(fmt(_rec), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR")]) +
+        figs([_rec != null && fig(fmt(_rec), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR")]) + recNote +
         `<p class="rd-meta label">Tonight's autonomic state: <strong>${esc(state)}</strong>. HRV up + RHR down = the body downshifting into recovery. A one-night state snapshot — honest at n=1, not a claimed relationship.</p>`));
     }
     parts.push(sec("Sleep-score trend · latest = last night", lineChart(d.sleep_trend || [], { valueKey: "sleep_score", label: "Sleep score · nightly", spine: true, emptyMsg: "The sleep-score trend fills in nightly." })));
@@ -1090,7 +1107,7 @@ async function renderSleep(d) {
   // deficit (cross-link to training). RHR-down = good (ember-positive); never red.
   if (s.recovery_score != null || s.hrv != null || s.rhr != null) {
     parts.push(sec("Recovery — what the sleep defends",
-      figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) +
+      figs([s.recovery_score != null && fig(fmt(s.recovery_score), "recovery"), s.hrv != null && fig(fmt(s.hrv) + "ms", "HRV"), s.rhr != null && fig(fmt(s.rhr), "resting HR"), s["30d_avg_recovery"] != null && fig(fmt(s["30d_avg_recovery"]), "30d avg recovery")]) + recNote +
       `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/data/training/">Training</a> for what it buys.</p>`));
   }
   // §6b — last-meal-time cross-link (P1.2): reuse the nutrition eating window, observation-only.
@@ -1732,7 +1749,7 @@ function dataFigure(j) {
   </section>`;
 }
 
-async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), "today"), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), j.projected_goal_date && fig(j.projected_goal_date, "projected goal")]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — not a promise."); }
+async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), j.projected_goal_date && fig(j.projected_goal_date, "projected goal")]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — not a promise."); }
 function renderTools(d) { return figs([fig(d.mcp_tools ?? "—", "MCP tools"), fig(d.data_sources ?? "—", "data sources")]) + `<p class="rd-archive">The tools Claude uses to read this data back — spanning sleep, training, nutrition, labs, CGM, the character sheet, the board, correlations and more. They're how a conversation with the data is possible at all.</p>` + note("The interface between the model and the measured life."); }
 // Post-mortems — what each closed cycle taught, derived live from the record.
 async function renderPostmortems(d) {
