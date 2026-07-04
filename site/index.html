@@ -158,6 +158,24 @@
       <p class="beat-deeper"><a href="/method/results/" class="cta">The full results &amp; body composition →</a></p>
     </section>
 
+    <!-- #413: "where would you land" — the reader becomes a participant for one
+         number, without the site learning anything. PURELY client-side: the input
+         never leaves this page (no fetch, no storage — verifiable as zero network
+         writes); the comparison uses only Matthew's already-public numbers. -->
+    <section class="beat beat-mirror" aria-label="Where would you land">
+      <p class="beat-kicker label">try it on · your one number</p>
+      <h2 class="beat-h">Where would you land?</h2>
+      <p class="beat-note">Type one of your own numbers and see where it sits next to Matthew's real band.
+        <strong>Nothing you type leaves this page</strong> — no request, no cookie, no storage.
+        And this is one subject's data (N=1), not a benchmark or health advice.</p>
+      <form class="mirror-form" data-mirror novalidate hidden>
+        <select class="mirror-metric" name="metric" aria-label="Which number to compare"></select>
+        <input class="mirror-in num" name="value" type="number" inputmode="decimal" step="any" min="0" aria-label="Your number">
+        <button class="mirror-btn" type="submit">place me</button>
+      </form>
+      <div class="mirror-out" data-mirror-out aria-live="polite"></div>
+    </section>
+
     <!-- The Third Wall: machine says / how Matthew actually felt -->
     <section class="beat beat-wall">
       <p class="beat-kicker label">the third wall · ai says ↔ how it felt</p>

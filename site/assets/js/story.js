@@ -475,3 +475,76 @@ mountAsk(document.querySelector("[data-home-ask]"), {
 // three on the whole site; the OG card's own device, so on- and off-site share
 // one vocabulary). aria-hidden, decorative-but-branded, draw-in via tokens §13.
 document.querySelectorAll("[data-imark]").forEach((el) => { el.innerHTML = instrumentMark(); });
+
+/* ── #413 "where would you land" — the client-only mirror ───────────────────
+   The reader types ONE number; it is compared against Matthew's already-public
+   band and NEVER leaves the page: submit is preventDefault-ed, there is no
+   fetch/beacon/storage in this flow (the only network reads happen at render,
+   before any input exists). N=1 framing and no-advice copy live in the HTML. */
+async function wireMirror() {
+  const form = $("[data-mirror]");
+  const out = $("[data-mirror-out]");
+  if (!form || !out) return;
+  // Matthew's public numbers only — fetched read-only at render time.
+  const [stats, wk] = await Promise.all([
+    getJSON("/public_stats.json").catch(() => null),
+    getJSON("/api/observatory_week?domain=sleep").catch(() => null),
+  ]);
+  const v = (stats && stats.vitals) || {};
+  const j = (stats && stats.journey) || {};
+  const spark = ((((wk || {}).summary || {}).primary || {}).sparkline || []).filter((n) => typeof n === "number" && n > 0);
+
+  const metrics = {};
+  if (spark.length >= 3) {
+    metrics.sleep = {
+      label: "sleep last night (hours)", unit: "h", max: 16,
+      markers: () => {
+        const lo = Math.min(...spark), hi = Math.max(...spark);
+        const avg = spark.reduce((a, b) => a + b, 0) / spark.length;
+        return { lo, hi, points: [{ v: lo, l: "his low" }, { v: avg, l: "his avg" }, { v: hi, l: "his high" }],
+          read: (x) => `Matthew's last ${spark.length} nights ran ${lo.toFixed(1)}–${hi.toFixed(1)}h (avg ${avg.toFixed(1)}). Your ${x.toFixed(1)}h sits ${x < lo ? "below" : x > hi ? "above" : "inside"} that band.` };
+      },
+    };
+  }
+  if (typeof v.rhr_bpm === "number") {
+    metrics.rhr = {
+      label: "resting heart rate (bpm)", unit: "bpm", max: 220,
+      markers: () => ({ lo: Math.min(v.rhr_bpm, 40), hi: Math.max(v.rhr_bpm, 90), points: [{ v: v.rhr_bpm, l: "Matthew now" }],
+        read: (x) => `Matthew's current resting HR is ${Math.round(v.rhr_bpm)} bpm. Yours is ${Math.round(x)} — ${Math.abs(Math.round(x - v.rhr_bpm))} bpm ${x < v.rhr_bpm ? "lower" : x > v.rhr_bpm ? "higher" : "— the same"}. One body's number, not a target.` }),
+    };
+  }
+  if (typeof j.start_weight_lbs === "number" && typeof j.current_weight_lbs === "number" && typeof j.goal_weight_lbs === "number") {
+    metrics.weight = {
+      label: "weight (lbs)", unit: "lbs", max: 1000,
+      markers: () => ({ lo: Math.min(j.goal_weight_lbs, j.current_weight_lbs) - 20, hi: j.start_weight_lbs + 20,
+        points: [{ v: j.start_weight_lbs, l: "his start" }, { v: j.current_weight_lbs, l: "him today" }, { v: j.goal_weight_lbs, l: "his goal" }],
+        read: (x) => `Matthew started at ${j.start_weight_lbs} lbs, is at ${j.current_weight_lbs} today, aiming for ${j.goal_weight_lbs}. Your ${Math.round(x)} sits ${x > j.start_weight_lbs ? "above his start" : x > j.current_weight_lbs ? "between his start and today" : x > j.goal_weight_lbs ? "between him today and his goal" : "past his goal"}.` }),
+    };
+  }
+  const keys = Object.keys(metrics);
+  if (!keys.length) return; // no public numbers to mirror — the beat stays honestly hidden
+
+  const sel = form.querySelector(".mirror-metric");
+  sel.innerHTML = keys.map((k) => `<option value="${k}">${esc(metrics[k].label)}</option>`).join("");
+  form.hidden = false;
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault(); // the number stays HERE — no request is ever made
+    const m = metrics[sel.value];
+    const x = parseFloat(form.value.value);
+    if (!m || !Number.isFinite(x) || x <= 0 || x > m.max) {
+      out.innerHTML = `<p class="mirror-read label">That doesn't look like a plausible ${esc(m ? m.label : "number")} — try again.</p>`;
+      return;
+    }
+    const { lo, hi, points, read } = m.markers();
+    const span = Math.max(hi - lo, 1e-6);
+    const clamp = (n) => Math.max(2, Math.min(98, ((n - lo) / span) * 96 + 2));
+    out.innerHTML =
+      `<div class="mirror-strip" role="img" aria-label="${esc(read(x))}">` +
+      points.map((p) => `<span class="ms-mark" style="left:${clamp(p.v)}%"><i></i><span class="label">${esc(p.l)}</span></span>`).join("") +
+      `<span class="ms-mark ms-you" style="left:${clamp(x)}%"><i></i><span class="label">you</span></span></div>` +
+      `<p class="mirror-read">${esc(read(x))}</p>` +
+      `<p class="mirror-note label">single-subject comparison (n=1) — context, not a verdict. your number was not sent or saved.</p>`;
+  });
+}
+wireMirror();
