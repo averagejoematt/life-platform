@@ -37,7 +37,8 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # v101: #482 public phase_for_date; #481 loud secret-writeback; #480 validator spec truth
 # v103: #490 training_load.py — one TSS-like load scale for every Banister consumer
 # v104: #505 retry_utils.call_anthropic_raw accepts a plain Messages dict (journal v2)
-SHARED_LAYER_VERSION = 104
+# v105: #529 stats_core.py — the one sanctioned statistics module (ADR-105)
+SHARED_LAYER_VERSION = 105
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 

@@ -284,7 +284,7 @@ def _banister_core(load_by_date, today):
 # ═════════════════════════════════════════════════════════════════════════════
 
 
-def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, days_of_data=None):
+def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, days_of_data=None, n_eff=None):
     """
     BS-05 / IC-27: Compute AI insight confidence level.
     Returns a dict with level (HIGH / MEDIUM / LOW) and a short reason string.
@@ -297,24 +297,31 @@ def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, day
     Convenience helpers:
       sources  = list of source names that contributed data (to check source completeness)
       days_of_data = days of actual observations (for non-paired analyses)
+      n_eff    = autocorrelation-corrected effective n (stats_core, #529/ADR-105);
+                 when provided it is the gating sample size, not raw n — daily
+                 series are not i.i.d., so raw n overstates the evidence.
 
     Returns:
       {"level": "HIGH" | "MEDIUM" | "LOW",
        "reason": str,
        "badge_html": str (inline HTML pill for email)}
     """
-    # Determine effective n
+    # Determine effective n — a corrected n_eff takes precedence over raw n
+    n_label = "n"
     effective_n = n
+    if n_eff is not None:
+        effective_n = n_eff
+        n_label = "n_eff"
     if effective_n is None and days_of_data is not None:
         effective_n = days_of_data
 
     # LOW gates (Henning: n<30 = low confidence regardless of p-value)
     if effective_n is not None and effective_n < 14:
-        reason = f"n={effective_n} (need ≥14 for any signal)"
+        reason = f"{n_label}={effective_n} (need ≥14 for any signal)"
         return {"level": "LOW", "reason": reason, "badge_html": _confidence_badge("LOW")}
 
     if effective_n is not None and effective_n < 30:
-        reason = f"n={effective_n} (preliminary — need ≥30 for moderate confidence)"
+        reason = f"{n_label}={effective_n} (preliminary — need ≥30 for moderate confidence)"
         return {"level": "LOW", "reason": reason, "badge_html": _confidence_badge("LOW")}
 
     if days_of_data is not None and days_of_data < 14:
@@ -331,7 +338,7 @@ def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, day
     eff_ok = effect_size is None or abs(effect_size) >= 0.2  # Cohen's d ≥0.2 or r ≥0.2
 
     if n_ok and p_ok and eff_ok:
-        parts = [f"n={effective_n}"]
+        parts = [f"{n_label}={effective_n}"]
         if p_value is not None:
             parts.append(f"p={p_value:.3f}")
         if effect_size is not None:
@@ -342,7 +349,7 @@ def compute_confidence(n=None, p_value=None, effect_size=None, sources=None, day
     # MEDIUM: 30 ≤ n < 50, or p not significant, or effect too small
     parts = []
     if effective_n is not None:
-        parts.append(f"n={effective_n}")
+        parts.append(f"{n_label}={effective_n}")
     if p_value is not None and p_value >= 0.05:
         parts.append(f"p={p_value:.3f} (not significant)")
     if not n_ok and effective_n is not None and effective_n >= 30:

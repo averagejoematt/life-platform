@@ -374,6 +374,7 @@
       "lambdas/intelligence_common.py",
       "lambdas/item_size_guard.py",
       "lambdas/numeric.py",
+      "lambdas/stats_core.py",
       "lambdas/output_writers.py",
       "lambdas/phase_filter.py",
       "lambdas/platform_logger.py",

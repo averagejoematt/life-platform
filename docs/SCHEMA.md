@@ -1543,6 +1543,11 @@ Pearson correlations between 20 key metric pairs computed weekly over a 90-day r
 | `pearson_r` | number | Pearson r (−1 to 1), null if <10 paired days |
 | `r_squared` | number | r² (explained variance) |
 | `n_days` | number | Paired data points used |
+| `n_eff` | number | Autocorrelation-corrected effective n (AR(1)/Bartlett, stats_core #529); the p-value is computed on this, not `n_days` |
+| `ci95_low` / `ci95_high` | number | Moving-block-bootstrap 95% CI on r (preserves day-to-day memory); null if <5 pairs |
+| `p_value` | number | Two-tailed p on `n_eff` (anticonservative raw-n p replaced 2026-07-04) |
+| `p_value_fdr` | number | Benjamini-Hochberg adjusted p across all pairs (R13-F15) |
+| `fdr_significant` | bool | `p_value_fdr <= 0.05` |
 | `interpretation` | string | strong/moderate/weak/negligible/insufficient_data |
 | `direction` | string | positive/negative/null |
 

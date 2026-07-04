@@ -34,6 +34,9 @@ MODULES=(
     phase_filter.py
     # Phase 4.2 (2026-05-16): shared numeric helpers (replaces 8 dup copies)
     numeric.py
+    # #529/ADR-105 (2026-07-04): the one sanctioned statistics module (pearson,
+    # effective-n, block-bootstrap CIs, BH-FDR) — replaces 3 pearson + 2 p-value copies
+    stats_core.py
     # email_framework.py removed V2 (2026-05-19) — zero importers, 7 email
     # Lambdas too divergent for a single framework.
     # Phase 3.6 (2026-05-16): standalone auth-failure circuit breaker
