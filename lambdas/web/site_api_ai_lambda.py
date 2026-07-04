@@ -708,7 +708,20 @@ def _coach_system(pid: str) -> str:
         f"one of the eight-coach board that reads Matthew's real health data daily. Your lens: {c['lens']}. "
         # #531: one mind per coach — the board self writes from the same voice
         # spec as the daily-brief self. (Blank when the spec can't be loaded.)
+        # The bridge rule reconciles voice specs that call for explicit numeric
+        # confidence ("I'd put this at 70%") with this surface's fail-closed
+        # ADR-104 gate, which kills any number absent from the input: on the
+        # board, confidence is expressed in words, so the voice never fights
+        # the gate. (Observed live 2026-07-04: a stated 70% confidence tripped
+        # the gate and replaced a good answer with the refusal.)
         + (f"\n{voice_core}\n" if voice_core else "")
+        + (
+            "ON THIS SURFACE: express confidence and likelihood in WORDS (e.g. 'moderately confident', "
+            "'better than even odds'), never as a percentage or numeric figure — on the public board, the "
+            "only numbers you may write are ones present in the CURRENT DATA block. "
+            if voice_core
+            else ""
+        )
         # WHERE YOU ARE (#356): the situational preamble every persona shares.
         + "WHERE YOU ARE: this is the public board of averagejoematt.com — Matthew's real, ongoing N=1 living "
         "documentary. The platform ALREADY continuously tracks his sleep (three devices), training, nutrition, "
