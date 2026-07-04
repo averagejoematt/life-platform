@@ -50,12 +50,8 @@ def _get_published_posts(max_posts=3):
     """Read posts.json from S3 to get actually-published Chronicle posts.
     Returns list of dicts with label, title, path — or FALLBACK_PAGES if none exist.
 
-    NOTE (PG-04): the subscriber-onboarding role has no s3:GetObject grant
-    (`role_policies.subscriber_onboarding`), so in prod this read AccessDenies and
-    the bridge email always uses the (now v4-correct) FALLBACK_PAGES. To surface
-    real dispatch cards, add an S3 grant for `site/chronicle/posts.json` + point the
-    key there + deep-link `/story/chronicle/#<week>`. Deferred to post-reset so the
-    IAM/CDK change doesn't ride along with the Monday reset (BACKLOG PG-04 follow-up)."""
+    The subscriber-onboarding role has s3:GetObject on generated/journal/posts.json
+    (role_policies.subscriber_onboarding, added #352)."""
     try:
         resp = s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")
         data = json.loads(resp["Body"].read())

@@ -1214,7 +1214,8 @@ def operational_alert_digest() -> list[iam.PolicyStatement]:
 
 def operational_traffic_digest() -> list[iam.PolicyStatement]:
     """Weekly traffic digest: reads CloudFront access logs from the log bucket
-    (aggregate-only, IPs hashed-then-discarded, no PII retained) + one SES email."""
+    (aggregate-only, IPs hashed-then-discarded, no PII retained) + one SES email
+    + CloudWatch metric for the empty-log-source heartbeat (#349)."""
     log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
     return [
         iam.PolicyStatement(
@@ -1226,6 +1227,11 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
             sid="SES",
             actions=["ses:SendEmail", "sesv2:SendEmail"],
             resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
         ),
     ]
 
@@ -2169,7 +2175,7 @@ def pipeline_health_check() -> list[iam.PolicyStatement]:
 
 
 def subscriber_onboarding() -> list[iam.PolicyStatement]:
-    """Subscriber onboarding: DDB read, SES send, Secrets Manager read."""
+    """Subscriber onboarding: DDB read, SES send, Secrets Manager read, S3 dispatch cards."""
     return [
         iam.PolicyStatement(
             sid="DynamoDB", actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"], resources=[TABLE_ARN]
@@ -2180,5 +2186,13 @@ def subscriber_onboarding() -> list[iam.PolicyStatement]:
             sid="SecretsRead",
             actions=["secretsmanager:GetSecretValue"],
             resources=[f"arn:aws:secretsmanager:{REGION}:{ACCT}:secret:life-platform/ai-keys*"],
+        ),
+        # Day-2 bridge email reads the live dispatch cards from S3 (#352).
+        # Without this grant the s3.get_object call raises AccessDenied and the
+        # bridge falls back to generic FALLBACK_PAGES on every run.
+        iam.PolicyStatement(
+            sid="S3DispatchCards",
+            actions=["s3:GetObject"],
+            resources=_s3("generated/journal/posts.json"),
         ),
     ]
