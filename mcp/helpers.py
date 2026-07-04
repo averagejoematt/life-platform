@@ -7,6 +7,8 @@ import math
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+import stats_core  # shared layer (#529): the one sanctioned stats implementation
+
 from mcp.config import FIELD_ALIASES, P40_GROUPS, logger
 from mcp.core import decimal_to_float, get_profile, get_sot, query_source
 
@@ -104,16 +106,10 @@ def compute_ewa(daily_values_chrono, decay_days):
 
 
 def pearson_r(xs, ys):
-    n = len(xs)
-    if n < 3:
-        return None
-    mx = sum(xs) / n
-    my = sum(ys) / n
-    num = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
-    denom = math.sqrt(sum((x - mx) ** 2 for x in xs) * sum((y - my) ** 2 for y in ys))
-    if denom == 0:
-        return None
-    return round(num / denom, 3)
+    """Delegates to stats_core (#529 — the one sanctioned implementation); keeps
+    this module's historical contract: min n=3, rounded to 3 decimals."""
+    r = stats_core.pearson_r(xs, ys, min_n=3)
+    return round(r, 3) if r is not None else None
 
 
 def _linear_regression(points):

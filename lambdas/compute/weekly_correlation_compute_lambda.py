@@ -24,13 +24,13 @@ v1.0.0 — 2026-03-14 (R8-LT9)
 """
 
 import logging
-import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import stats_core  # shared layer (#529): the one sanctioned stats implementation
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger
@@ -123,46 +123,18 @@ def safe_float(rec, field):
 
 
 # ==============================================================================
-# PEARSON CORRELATION
+# PEARSON CORRELATION (math lives in stats_core — #529/ADR-105; only the
+# results-dict plumbing stays here)
 # ==============================================================================
 
 
 def pearson_r(xs, ys):
-    """Compute Pearson r for paired lists. Returns None if insufficient variance."""
-    pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
-    n = len(pairs)
-    if n < 10:
-        return None, n
-    xs2, ys2 = zip(*pairs)
-    mx = sum(xs2) / n
-    my = sum(ys2) / n
-    num = sum((x - mx) * (y - my) for x, y in pairs)
-    dxs = math.sqrt(sum((x - mx) ** 2 for x in xs2))
-    dys = math.sqrt(sum((y - my) ** 2 for y in ys2))
-    if dxs == 0 or dys == 0:
-        return None, n
-    r = num / (dxs * dys)
-    return round(max(-1.0, min(1.0, r)), 4), n
-
-
-def pearson_p_value(r: float, n: int) -> float | None:
-    """Compute two-tailed p-value for Pearson r via t-distribution approximation.
-
-    Uses math.erf — no scipy dependency. Accurate to ~3 decimal places for n>10.
-    Returns None if r is None or n <= 2.
-    """
-    if r is None or n <= 2 or abs(r) >= 1.0:
-        return None
-    t_stat = r * math.sqrt(n - 2) / math.sqrt(max(1e-10, 1.0 - r**2))
-    df = n - 2
-    # Normal approximation: exact for large df, conservative for small df
-    if df >= 30:
-        z = abs(t_stat)
-    else:
-        # Correction for small df: z ≈ t * sqrt(df/(df+2))
-        z = abs(t_stat) * math.sqrt(df / (df + 2.0))
-    p_approx = 2.0 * (1.0 - 0.5 * (1.0 + math.erf(z / math.sqrt(2.0))))
-    return round(max(0.0, min(1.0, p_approx)), 4)
+    """Pearson r for paired lists via stats_core; keeps this lambda's contract:
+    (r rounded to 4, n) with min n=10."""
+    xs2, ys2 = stats_core.clean_pairs(xs, ys)
+    n = len(xs2)
+    r = stats_core.pearson_r(xs2, ys2, min_n=10)
+    return (round(r, 4) if r is not None else None), n
 
 
 def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
@@ -174,51 +146,36 @@ def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
     error rate (Bonferroni), making it appropriate for exploratory health data
     where some true correlations exist.
 
+    #529/ADR-105: each pair's p-value is computed on its autocorrelation-corrected
+    effective n (`n_eff`, stamped by compute_correlations) rather than raw n_days —
+    daily series are not i.i.d., and raw-n p-values were anticonservative.
+
     Modifies each result in-place, adding:
-      p_value          : individual two-tailed p-value
+      p_value          : individual two-tailed p-value (on n_eff)
       p_value_fdr      : BH-adjusted p-value
       fdr_significant  : True if p_value_fdr <= alpha
 
     Pairs without a valid r (insufficient data) get p_value=None, fdr_significant=False.
     Returns modified results dict.
     """
-    # Collect pairs that have a valid r
-    labeled = []
-    for label, data in results.items():
+    labels = list(results.keys())
+    pvals = []
+    for label in labels:
+        data = results[label]
         r = data.get("pearson_r")
-        n = data.get("n_days", 0)
-        p = pearson_p_value(r, n) if r is not None else None
+        n = data.get("n_eff") or data.get("n_days", 0)
+        p = stats_core.pearson_p_value(r, n) if r is not None else None
         data["p_value"] = p
-        if p is not None:
-            labeled.append((label, p))
+        pvals.append(p)
+
+    adjusted = stats_core.bh_fdr(pvals)
+    for label, p_adj in zip(labels, adjusted):
+        if p_adj is None:
+            results[label]["p_value_fdr"] = None
+            results[label]["fdr_significant"] = False
         else:
-            data["p_value_fdr"] = None
-            data["fdr_significant"] = False
-
-    if not labeled:
-        return results
-
-    m = len(labeled)
-    # Sort by p-value ascending for BH procedure
-    labeled.sort(key=lambda x: x[1])
-
-    # BH step-up: for rank k (1-indexed), reject if p <= k/m * alpha
-    bh_threshold = [((k + 1) / m) * alpha for k in range(m)]
-    # Find the largest k where p <= threshold
-    last_sig = -1
-    for k, (label, p) in enumerate(labeled):
-        if p <= bh_threshold[k]:
-            last_sig = k
-
-    # Compute BH-adjusted p-values: p_adj[k] = min(m/k * p[k], 1.0), non-decreasing
-    adj = [min(1.0, m / (k + 1) * p) for k, (_, p) in enumerate(labeled)]
-    # Enforce non-decreasing from the end
-    for k in range(m - 2, -1, -1):
-        adj[k] = min(adj[k], adj[k + 1])
-
-    for k, (label, _) in enumerate(labeled):
-        results[label]["p_value_fdr"] = round(adj[k], 4)
-        results[label]["fdr_significant"] = k <= last_sig
+            results[label]["p_value_fdr"] = round(p_adj, 4)
+            results[label]["fdr_significant"] = p_adj <= alpha
 
     return results
 
@@ -479,12 +436,23 @@ def compute_correlations(series):
             correlation_type = f"lagged_{lag_days}d"
 
         r, n = pearson_r(xs, ys)
+        # #529/ADR-105: effective n (AR(1)/Bartlett) feeds the p-value; the
+        # moving-block bootstrap CI preserves day-to-day memory. Flat ci95_* keys —
+        # store_correlations' Decimal conversion only handles top-level values.
+        n_eff = ci95 = None
+        if r is not None:
+            xs2, ys2 = stats_core.clean_pairs(xs, ys)
+            n_eff = round(stats_core.effective_sample_size(xs2, ys2), 1)
+            ci95 = stats_core.moving_block_bootstrap_ci(xs2, ys2)
         results[label] = {
             "metric_a": metric_a,
             "metric_b": metric_b,
             "pearson_r": r,
             "r_squared": round(r**2, 4) if r is not None else None,
             "n_days": n,
+            "n_eff": n_eff,
+            "ci95_low": round(ci95[0], 3) if ci95 else None,
+            "ci95_high": round(ci95[1], 3) if ci95 else None,
             "interpretation": interpret_r(r, n),  # n-gated: moderate≥30, strong≥50
             "direction": ("positive" if r > 0 else "negative") if r is not None else None,
             "correlation_type": correlation_type,  # Henning R12: cross_sectional vs lagged

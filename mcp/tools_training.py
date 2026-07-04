@@ -9,6 +9,8 @@ import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+import stats_core  # shared layer (#529): the one sanctioned stats implementation
+
 from mcp.config import (
     EXPERIMENTS_PK,
     FIELD_ALIASES,
@@ -314,8 +316,9 @@ def tool_get_cross_source_correlation(args):
       n < 50  → "moderate" label is the maximum allowed strength
       n >= 50 → all labels allowed
 
-    P-value: two-tailed t-test on r (t = r * sqrt(n-2) / sqrt(1-r²), df=n-2).
-    95% CI: Fisher z-transform method.
+    P-value: stats_core.pearson_p_value on the AR(1)-corrected effective n (#529) —
+    daily series are autocorrelated, so raw-n significance would be anticonservative.
+    95% CI: Fisher z-transform, also on effective n.
     """
 
     source_a = args.get("source_a")
@@ -382,52 +385,13 @@ def tool_get_cross_source_correlation(args):
     ys = [p[2] for p in pairs]
     r = pearson_r(xs, ys)
 
-    # ── P-value (two-tailed t-test, df = n-2) ───────────────────────────────
-    p_value = None
-    if r is not None and abs(r) < 1.0 and n > 2:
-        t_stat = r * math.sqrt(n - 2) / math.sqrt(max(1e-10, 1 - r**2))
-        # Approximation of two-tailed p-value using complementary error function
-        # This avoids a scipy dependency — accurate to ~3 decimal places for df>5
-        df = n - 2
-        x = df / (df + t_stat**2)
-        # Regularised incomplete beta function approximation
-        # For df > 5 this gives p accurate to <0.005
-        try:
-            # math is imported at module top (line 7); a local `import math` here
-            # shadowed it and made the earlier math.sqrt() an UnboundLocalError (F823).
-            # Use a simple but sufficiently accurate p-value from the t-distribution
-            # via the beta function approximation
-            a = df / 2.0
-            b = 0.5
-            # Compute using log-gamma (available in math module Python 3.2+)
-            # p = I_x(a, b) where x = df/(df+t^2) — regularised incomplete beta
-            # For coaching purposes, we just need 3 buckets: <0.05, 0.05-0.10, >0.10
-            # Use a conservative normal approximation when df is large enough
-            if df >= 30:
-                # Normal approximation: z ≈ t for large df
-                z = abs(t_stat)
-                p_approx = 2 * (1 - (0.5 * (1 + math.erf(z / math.sqrt(2)))))
-                p_value = round(max(0.0, min(1.0, p_approx)), 4)
-            else:
-                # For small df, use a rougher approximation
-                # p ≈ 2 * (1 - normal_cdf(|t| * sqrt(df/(df+2))))
-                z = abs(t_stat) * math.sqrt(df / (df + 2))
-                p_approx = 2 * (1 - (0.5 * (1 + math.erf(z / math.sqrt(2)))))
-                p_value = round(max(0.0, min(1.0, p_approx)), 4)
-        except Exception:
-            p_value = None
-
-    # ── 95% CI via Fisher z-transform ──────────────────────────────────────
-    ci_lower = ci_upper = None
-    if r is not None and abs(r) < 1.0 and n > 3:
-        try:
-            z_r = math.atanh(r)  # Fisher z
-            se = 1.0 / math.sqrt(n - 3)
-            z_crit = 1.96  # 95% two-tailed
-            ci_lower = round(math.tanh(z_r - z_crit * se), 3)
-            ci_upper = round(math.tanh(z_r + z_crit * se), 3)
-        except Exception:
-            ci_lower = ci_upper = None
+    # ── Significance + CI on autocorrelation-corrected effective n (#529, ADR-105) ──
+    # Daily physiological series carry day-to-day memory, so raw n overstates the
+    # evidence; p and CI use the AR(1)/Bartlett effective sample size instead.
+    n_eff = stats_core.effective_sample_size(xs, ys)
+    p_value = stats_core.pearson_p_value(r, n_eff)
+    ci = stats_core.fisher_ci(r, n_eff)
+    ci_lower, ci_upper = (round(ci[0], 3), round(ci[1], 3)) if ci else (None, None)
 
     # ── N-gated interpretation ──────────────────────────────────────────────
     # R13-F06: Downgrade strength label if n is too small to support it.
@@ -488,6 +452,8 @@ def tool_get_cross_source_correlation(args):
         "start_date": start_date,
         "end_date": end_date,
         "n_paired_days": n,
+        "effective_n": round(n_eff, 1),
+        "effective_n_note": "AR(1)-corrected sample size; p-value and CI use this, not raw n (daily series are autocorrelated).",
         "pearson_r": r,
         "r_squared": round(r**2, 3) if r is not None else None,
         "p_value": p_value,
