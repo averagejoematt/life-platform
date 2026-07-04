@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
 """
-Apple Health export.xml backfill processor.
-Parses the full export, groups by date, uploads to S3 + DynamoDB.
-Run: python3 backfill_apple_health.py
+Apple Health export.xml backfill processor. RETIRED 2026-07-04 (#474/D-5, ADR-103).
 
-Processes ~2.6M records. Takes 5-15 minutes depending on machine.
+HARD-GUARDED: this script full-replace put_items over records the live HAE
+webhook merge-enriches — running it would wipe the _rd_* dedup maps, SoM/TIR
+fields and monotonic guards, and its unguarded all-source sums reintroduce the
+double-count the webhook filters. The XML import lambda was deleted the same
+day. If a historical XML import is ever genuinely needed, rewrite the write
+path onto health_auto_export_lambda.merge_day_to_dynamo (merge semantics) first.
 """
 
+import os
 import sys
+
+if os.environ.get("I_UNDERSTAND_THIS_CLOBBERS_HAE_RECORDS") != "yes":
+    sys.exit(
+        "REFUSING TO RUN (retired 2026-07-04, #474/D-5, ADR-103): this script's\n"
+        "full-replace writes clobber the HAE webhook's merge-enriched apple_health\n"
+        "records. Read the module docstring. To override (you almost certainly\n"
+        "should not): I_UNDERSTAND_THIS_CLOBBERS_HAE_RECORDS=yes python3 " + __file__
+    )
 import xml.etree.ElementTree as ET
 import json
 import boto3

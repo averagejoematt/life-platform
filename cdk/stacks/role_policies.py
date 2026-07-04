@@ -381,35 +381,9 @@ def ingestion_dropbox() -> list[iam.PolicyStatement]:
     )
 
 
-def ingestion_apple_health() -> list[iam.PolicyStatement]:
-    """Apple Health: S3-triggered, reads XML from imports/, writes to DDB."""
-    return [
-        iam.PolicyStatement(
-            sid="DynamoDB",
-            actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem", "dynamodb:Query"],
-            resources=[TABLE_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="KMS",
-            actions=["kms:Decrypt", "kms:GenerateDataKey"],
-            resources=[KMS_KEY_ARN],
-        ),
-        iam.PolicyStatement(
-            sid="S3Read",
-            actions=["s3:GetObject"],
-            resources=_s3("imports/apple_health/*"),
-        ),
-        iam.PolicyStatement(
-            sid="S3Write",
-            actions=["s3:PutObject"],
-            resources=_s3("raw/matthew/apple_health/*"),
-        ),
-        iam.PolicyStatement(
-            sid="DLQ",
-            actions=["sqs:SendMessage"],
-            resources=[DLQ_ARN],
-        ),
-    ]
+# ingestion_apple_health() deleted 2026-07-04 (#474/D-5, ADR-103): the XML import
+# lambda was a latent full-replace clobber of HAE-merged records with no S3
+# trigger — retired; the HAE webhook is the sole apple_health writer.
 
 
 def ingestion_hae() -> list[iam.PolicyStatement]:

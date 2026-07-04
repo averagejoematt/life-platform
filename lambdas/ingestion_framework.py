@@ -411,16 +411,24 @@ def _find_missing_dates(table, config, logger):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _phase_for_date(date_str: str) -> str:
+def phase_for_date(date_str: str) -> str:
     """Return phase tag ('pilot' or 'experiment') for a given DATE# value.
 
     Records written for dates before EXPERIMENT_START_DATE are pilot data;
     records for the genesis date or later are live experiment data. The
     read-path phase_filter (lambdas/phase_filter.py) excludes pilot by default.
+
+    PUBLIC since #482/X-6: every standalone (non-framework) DDB writer stamps
+    phase through this one helper, so an untagged backfill can never surface
+    pre-genesis data as current (phase_filter passes attribute_not_exists).
     """
     if date_str and date_str < EXPERIMENT_START_DATE:
         return "pilot"
     return EXPERIMENT_PHASE_CURRENT
+
+
+# Backward-compat alias (hevy_common and older callers import the private name).
+_phase_for_date = phase_for_date
 
 
 def _store_item(table, s3, config, item, date_str, logger):
@@ -572,16 +580,30 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
             _record_ingest_health(table, config, logger, attempted=True, succeeded=False, error_class=_err_class)
             raise
 
-        # Write back updated credentials (OAuth token refresh)
+        # Write back updated credentials (OAuth token refresh).
+        # #481/A-9: for rotating-token sources (Whoop rotates the single-use
+        # refresh_token every run) this writeback is the ONLY persist path — a
+        # lost write strands the rotated token: next run 400s → breaker →
+        # manual re-auth. So: retry once, and a double failure is an ERROR
+        # ('re-auth likely needed'), never a shrugged-off warning.
         if config.enable_secret_writeback and credentials:
-            try:
-                secrets_client.update_secret(
-                    SecretId=config.secret_id,
-                    SecretString=json.dumps(credentials),
-                )
-                logger.info("Credentials updated in Secrets Manager")
-            except Exception as e:
-                logger.warning(f"Secret writeback failed (non-fatal): {e}")
+            for _wb_attempt in (1, 2):
+                try:
+                    secrets_client.update_secret(
+                        SecretId=config.secret_id,
+                        SecretString=json.dumps(credentials),
+                    )
+                    logger.info("Credentials updated in Secrets Manager")
+                    break
+                except Exception as e:
+                    if _wb_attempt == 1:
+                        logger.warning(f"Secret writeback failed (attempt 1/2, retrying): {e}")
+                        time.sleep(1)
+                    else:
+                        logger.error(
+                            f"Secret writeback FAILED twice for {config.secret_id} — the rotated "
+                            f"token may be stranded; re-auth likely needed on the next run: {e}"
+                        )
     else:
         credentials = authenticate_fn({})
 

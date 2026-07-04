@@ -105,18 +105,21 @@ class ValidationResult:
 #   at_least_one_of:        list[str] — WARNING if ALL absent
 
 _SCHEMAS: dict[str, dict] = {
+    # #480/A-7: field names matched to what the writer ACTUALLY stores —
+    # the old sleep_score checks could never fire (written name is
+    # sleep_quality_score, since ever).
     "whoop": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
             "recovery_score": (int, float),
-            "sleep_score": (int, float),
+            "sleep_quality_score": (int, float),
             "hrv": (int, float),
             "resting_heart_rate": (int, float),
             "sleep_duration_hours": (int, float),
         },
         "range_checks": {
             "recovery_score": (0, 100),
-            "sleep_score": (0, 100),
+            "sleep_quality_score": (0, 100),
             "hrv": (0, 300),
             "resting_heart_rate": (20, 200),
             "sleep_duration_hours": (0, 24),
@@ -124,9 +127,26 @@ _SCHEMAS: dict[str, dict] = {
         },
         "critical_range_checks": {
             "recovery_score": (-1, 101),  # allow float edge cases
-            "sleep_score": (-1, 101),
+            "sleep_quality_score": (-1, 101),
         },
-        "at_least_one_of": ["recovery_score", "sleep_score", "hrv"],
+        "at_least_one_of": ["recovery_score", "sleep_quality_score", "hrv"],
+    },
+    # #480/A-7: whoop per-workout sub-records (sk DATE#{d}#WORKOUT#{id}) carry
+    # strain/HR/zones, not the night fields — they were tripping the whoop
+    # at_least_one_of warning 1,500+ times per fortnight. Their own mini-schema.
+    "whoop_workout": {
+        "required_fields": ["pk", "sk", "date"],
+        "typed_fields": {
+            "strain": (int, float),
+            "average_heart_rate": (int, float),
+            "max_heart_rate": (int, float),
+        },
+        "range_checks": {
+            "strain": (0, 21),
+            "average_heart_rate": (20, 220),
+            "max_heart_rate": (20, 230),
+        },
+        "at_least_one_of": ["strain", "average_heart_rate", "kilojoule", "sport_name"],
     },
     "garmin": {
         "required_fields": ["pk", "sk", "date"],
@@ -224,7 +244,7 @@ _SCHEMAS: dict[str, dict] = {
         "range_checks": {
             "sleep_efficiency_pct": (0, 100),
             "sleep_duration_hours": (0, 24),
-            "heart_rate_avg": (20, 200),
+            "hr_avg": (20, 200),  # #480/A-7: written name (was heart_rate_avg — never fired)
         },
         "at_least_one_of": ["sleep_efficiency_pct", "sleep_duration_hours", "bed_temp_f"],
     },
@@ -263,17 +283,20 @@ _SCHEMAS: dict[str, dict] = {
         "range_checks": {},
         "at_least_one_of": ["raw_text", "enriched_mood", "enriched_energy"],
     },
+    # #480/A-7: written names are completed_count/active_count/overdue_count
+    # (the old tasks_completed/tasks_added matched nothing).
     "todoist": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {
-            "tasks_completed": (int, float),
-            "tasks_added": (int, float),
+            "completed_count": (int, float),
+            "active_count": (int, float),
         },
         "range_checks": {
-            "tasks_completed": (0, 500),
-            "tasks_added": (0, 500),
+            "completed_count": (0, 500),
+            "active_count": (0, 500),
+            "overdue_count": (0, 500),
         },
-        "at_least_one_of": ["tasks_completed", "tasks_added", "overdue_count"],
+        "at_least_one_of": ["completed_count", "active_count", "overdue_count"],
     },
     "weather": {
         "required_fields": ["pk", "sk", "date"],
@@ -291,11 +314,14 @@ _SCHEMAS: dict[str, dict] = {
         },
         "at_least_one_of": ["temp_high_f", "temp_avg_f"],
     },
+    # #480/E-5: both writers (habitify bridge + MCP log_supplement) store a
+    # `supplements` list — the old batches/total_supplements_logged spec
+    # matched no writer ever.
     "supplements": {
         "required_fields": ["pk", "sk", "date"],
         "typed_fields": {},
         "range_checks": {},
-        "at_least_one_of": ["batches", "total_supplements_logged"],
+        "at_least_one_of": ["supplements"],
     },
     "computed_metrics": {
         "required_fields": ["pk", "sk", "date", "computed_at"],
@@ -420,6 +446,10 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
             return
         table.put_item(Item=item)
     """
+    # #480/A-7: whoop per-workout sub-records get their own schema — validating
+    # them against the night schema flooded ~100 false warnings/day.
+    if source == "whoop" and "#WORKOUT#" in str(item.get("sk", "")):
+        source = "whoop_workout"
     schema = _SCHEMAS.get(source, _DEFAULT_SCHEMA)
     result = ValidationResult(source=source, date_str=date_str)
 

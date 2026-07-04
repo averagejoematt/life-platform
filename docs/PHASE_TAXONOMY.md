@@ -53,6 +53,7 @@ The Wednesday Chronicle (`SOURCE#chronicle`, written installments) is experiment
 5. **Write-time stamping** — experiment_scoped writers stamp `phase`/`cycle` so the wipe can reach tagger-blind partitions at the next restart.
 6. **Shared registry** — the tagger and wipe import `phase_taxonomy.py` instead of divergent hand-rolled lists (the root cause).
 7. **Dead partitions** — composite_scores (ADR-025) + google_calendar (no writer) classified system_state and excluded.
+8. **Standalone-writer stamping closed (#482/X-6, 2026-07-04)** — phase tagging was framework+hevy only; the six standalone writers depended on the manual reset sweep, so an untagged backfill could surface pre-genesis data as current (`phase_filter` passes `attribute_not_exists`). Now every standalone DDB-writing ingestion path stamps `phase` via the public `ingestion_framework.phase_for_date()`: HAE (`if_not_exists` in the merge update), notion, macrofactor, food_delivery (DATE#-keyed records), measurements. The apple_health XML writer was retired the same day (#474) rather than stamped. Pinned by `tests/test_now_remainder_batch.py`.
 
 ---
 

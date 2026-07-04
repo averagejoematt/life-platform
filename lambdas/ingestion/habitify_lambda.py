@@ -331,6 +331,16 @@ def supplement_bridge(items: list[dict], date_str: str) -> None:
         return
 
     try:
+        # #480/E-5: MERGE, don't clobber. MCP log_supplement appends manual
+        # entries to the same key; the old full put_item destroyed any same-day
+        # manual log on the next hourly bridge run. The bridge owns only its own
+        # entries (source == habitify_bridge) — everything else is preserved.
+        manual_entries = []
+        try:
+            existing = _table.get_item(Key={"pk": _SUPPLEMENTS_PK, "sk": f"DATE#{date_str}"}).get("Item") or {}
+            manual_entries = [e for e in existing.get("supplements", []) if isinstance(e, dict) and e.get("source") != "habitify_bridge"]
+        except Exception as ge:
+            logger.warning("Supplement bridge: read-before-merge failed (%s) — writing bridge entries only", ge)
         _table.put_item(
             Item={
                 "pk": _SUPPLEMENTS_PK,
@@ -338,12 +348,14 @@ def supplement_bridge(items: list[dict], date_str: str) -> None:
                 "date": date_str,
                 "source": "supplements",
                 "schema_version": 1,
-                "supplements": entries,
+                "supplements": manual_entries + entries,
                 "bridge_source": "habitify",
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-        logger.info("Supplement bridge: wrote %d supplements for %s", len(entries), date_str)
+        logger.info(
+            "Supplement bridge: wrote %d bridge + %d preserved manual supplements for %s", len(entries), len(manual_entries), date_str
+        )
     except Exception as e:
         logger.error("Supplement bridge write failed for %s: %s", date_str, e)
 
@@ -359,6 +371,11 @@ _config = IngestionConfig(
     lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
     enable_item_size_guard=True,
     refresh_today=True,  # Habits update throughout day → re-write today every run
+    # #477/E-2: the last write of UTC-day D is the 23:05 UTC run, while checks can
+    # still be 'pending' — without a post-midnight rewrite a 48% day froze as 100%
+    # forever (pending is excluded from the pct denominator) and late-evening
+    # checks never landed. One trailing-day refresh finalizes yesterday every run.
+    refresh_trailing_days=1,
 )
 
 

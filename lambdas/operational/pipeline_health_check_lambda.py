@@ -387,15 +387,20 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
 
     # Secret health check — detect deleted/missing secrets
     sm = boto3.client("secretsmanager", region_name=REGION)
+    # #518: audited against `aws secretsmanager list-secrets` 2026-07-04.
+    # `life-platform/dropbox` NEVER existed (dropbox creds live in
+    # ingestion-keys) — it had this check red every day since 2026-05-25.
+    # todoist + hevy added: real, load-bearing secrets the list was missing.
     REQUIRED_SECRETS = [
         "life-platform/whoop",
         "life-platform/withings",
         "life-platform/strava",
+        "life-platform/todoist",
         "life-platform/eightsleep",
         "life-platform/garmin",
         "life-platform/habitify",
         "life-platform/notion",
-        "life-platform/dropbox",
+        "life-platform/hevy",
         "life-platform/ai-keys",
         "life-platform/site-api-ai-key",
         "life-platform/ingestion-keys",

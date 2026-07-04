@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-04 (v8.6.0 — 144 MCP tools, 20 data sources, 87 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-04 (v8.6.0 — 144 MCP tools, 20 data sources, 86 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 

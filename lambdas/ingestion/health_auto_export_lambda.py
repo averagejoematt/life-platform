@@ -882,6 +882,17 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
     names["#dt"] = "date"
     values[":dt"] = date_str
 
+    # #482/X-6: stamp phase like the framework does (if_not_exists — never
+    # overwrite an explicit tag from the reset sweep or an admin backfill).
+    try:
+        from ingestion_framework import phase_for_date as _pfd
+
+        set_parts.append("#ph = if_not_exists(#ph, :ph)")
+        names["#ph"] = "phase"
+        values[":ph"] = _pfd(date_str)
+    except ImportError:  # pragma: no cover — layer unavailable locally
+        pass
+
     table.update_item(
         Key={"pk": PK, "sk": f"DATE#{date_str}"},
         UpdateExpression="SET " + ", ".join(set_parts),

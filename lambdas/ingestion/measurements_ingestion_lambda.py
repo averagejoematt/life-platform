@@ -4,6 +4,11 @@ Measurements Ingestion Lambda — periodic body tape measurements via CSV/Excel 
 Trigger: S3 ObjectCreated on matthew-life-platform, prefix imports/measurements/
 Cadence: every 4-8 weeks (manual upload by Partner)
 Schema: USER#matthew#SOURCE#measurements / DATE#YYYY-MM-DD
+
+#473 (B-4/X-12, 2026-07-04): multi-row CSVs now ingest EVERY session row (the old
+parser silently used rows[0] only), and session_number derives from the session's
+date rank among all stored sessions — stable and monotonic across re-imports (the
+old COUNT+1 drifted on every re-import). Records stamp phase (#482/X-6).
 """
 
 import csv
@@ -64,27 +69,29 @@ def _to_decimal(val):
         return None
 
 
-def _parse_csv(content: str) -> dict:
-    """Parse CSV content into a measurement dict."""
+def _row_to_session(row_dict: dict) -> dict:
+    """Normalize one parsed row (str keys) into a session dict."""
+    result = {}
+    for field in MEASUREMENT_FIELDS:
+        val = _to_decimal(row_dict.get(field))
+        if val is not None:
+            result[field] = val
+    result["date"] = str(row_dict.get("date") or "").strip() or None
+    result["notes"] = str(row_dict.get("notes") or "").strip() or None
+    return result
+
+
+def _parse_csv(content: str) -> list[dict]:
+    """Parse CSV content into a list of session dicts — ALL rows (#473/X-12)."""
     reader = csv.DictReader(io.StringIO(content))
     rows = list(reader)
     if not rows:
         raise ValueError("CSV has no data rows")
-    row = rows[0]  # Only first data row
-
-    result = {}
-    for field in MEASUREMENT_FIELDS:
-        val = _to_decimal(row.get(field))
-        if val is not None:
-            result[field] = val
-
-    result["date"] = row.get("date", "").strip() or None
-    result["notes"] = row.get("notes", "").strip() or None
-    return result
+    return [_row_to_session(row) for row in rows]
 
 
-def _parse_xlsx(content_bytes: bytes) -> dict:
-    """Parse Excel file into a measurement dict."""
+def _parse_xlsx(content_bytes: bytes) -> list[dict]:
+    """Parse Excel file into a list of session dicts — ALL rows (#473/X-12)."""
     try:
         import openpyxl
     except ImportError:
@@ -97,19 +104,15 @@ def _parse_xlsx(content_bytes: bytes) -> dict:
         raise ValueError("Excel file needs header row + at least one data row")
 
     headers = [str(h).strip().lower() if h else "" for h in rows[0]]
-    values = rows[1]
-
-    row_dict = {headers[i]: values[i] for i in range(min(len(headers), len(values)))}
-
-    result = {}
-    for field in MEASUREMENT_FIELDS:
-        val = _to_decimal(row_dict.get(field))
-        if val is not None:
-            result[field] = val
-
-    result["date"] = str(row_dict.get("date", "")).strip() or None
-    result["notes"] = str(row_dict.get("notes", "")).strip() or None
-    return result
+    sessions = []
+    for values in rows[1:]:
+        if values is None or all(v is None or str(v).strip() == "" for v in values):
+            continue  # skip blank trailing rows
+        row_dict = {headers[i]: values[i] for i in range(min(len(headers), len(values)))}
+        sessions.append(_row_to_session(row_dict))
+    if not sessions:
+        raise ValueError("Excel file has no non-empty data rows")
+    return sessions
 
 
 def _compute_derived(measurements: dict, height_in: int) -> dict:
@@ -142,6 +145,33 @@ def _compute_derived(measurements: dict, height_in: int) -> dict:
     return derived
 
 
+def _existing_session_dates() -> set[str]:
+    """All stored session dates (DATE#-keyed), for date-rank numbering."""
+    dates = set()
+    kwargs = {
+        "KeyConditionExpression": boto3.dynamodb.conditions.Key("pk").eq(PK) & boto3.dynamodb.conditions.Key("sk").begins_with("DATE#"),
+        "ProjectionExpression": "sk",
+    }
+    while True:
+        resp = table.query(**kwargs)
+        for it in resp.get("Items", []):
+            dates.add(it["sk"].replace("DATE#", "")[:10])
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return dates
+
+
+def _phase_for(date_str: str) -> str:
+    """#482/X-6: standalone writer stamps phase like the framework does."""
+    try:
+        from ingestion_framework import phase_for_date
+
+        return phase_for_date(date_str)
+    except ImportError:  # pragma: no cover — layer unavailable locally
+        return "experiment"
+
+
 def lambda_handler(event, context):
     if hasattr(logger, "set_date"):
         logger.set_date(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
@@ -158,7 +188,7 @@ def lambda_handler(event, context):
 
     logger.info(f"Processing s3://{bucket}/{source_key}")
 
-    # Infer date from filename
+    # Infer date from filename (fallback for single-session files without a date column)
     filename = source_key.split("/")[-1]
     date_match = re.search(r"(\d{4}-\d{2}-\d{2})", filename)
     filename_date = date_match.group(1) if date_match else None
@@ -167,23 +197,11 @@ def lambda_handler(event, context):
     resp = s3.get_object(Bucket=bucket, Key=source_key)
     content_bytes = resp["Body"].read()
 
-    # Parse based on extension
+    # Parse based on extension — ALL rows (#473/X-12)
     if source_key.lower().endswith(".xlsx"):
-        measurements = _parse_xlsx(content_bytes)
+        sessions = _parse_xlsx(content_bytes)
     else:
-        measurements = _parse_csv(content_bytes.decode("utf-8"))
-
-    # Determine session date
-    session_date = measurements.pop("date", None) or filename_date
-    if not session_date:
-        return {"statusCode": 400, "body": "Cannot determine session date from CSV or filename"}
-
-    notes = measurements.pop("notes", None)
-
-    # Validate required fields
-    for field in REQUIRED_FIELDS:
-        if field not in measurements:
-            return {"statusCode": 400, "body": f"Missing required field: {field}"}
+        sessions = _parse_csv(content_bytes.decode("utf-8"))
 
     # Fetch height from profile
     try:
@@ -192,49 +210,71 @@ def lambda_handler(event, context):
     except Exception:
         height_in = 69
 
-    # Compute session number
+    # #473/X-12: session_number = the session date's rank among ALL sessions
+    # (stored + this file), 1-indexed by date. Stable across re-imports —
+    # re-uploading the same file yields the same numbers, and a backfilled
+    # older session renumbers correctly instead of appending COUNT+1.
     try:
-        count_resp = table.query(
-            KeyConditionExpression=boto3.dynamodb.conditions.Key("pk").eq(PK),
-            Select="COUNT",
-        )
-        session_number = count_resp.get("Count", 0) + 1
-    except Exception:
-        session_number = 1
+        all_dates = _existing_session_dates()
+    except Exception as e:
+        logger.warning(f"session-date query failed ({e}) — ranking within this file only")
+        all_dates = set()
 
-    # Compute derived fields
-    derived = _compute_derived(measurements, height_in)
+    written = []
+    errors = []
+    for idx, session in enumerate(sessions):
+        session = dict(session)
+        session_date = session.pop("date", None) or (filename_date if len(sessions) == 1 else None)
+        if not session_date:
+            errors.append(f"row {idx + 1}: no date column and no filename date")
+            continue
+        notes = session.pop("notes", None)
+        missing = [f for f in REQUIRED_FIELDS if f not in session]
+        if missing:
+            errors.append(f"row {idx + 1} ({session_date}): missing required {missing}")
+            continue
+        all_dates.add(session_date)
+        written.append((session_date, session, notes))
 
-    # Build item
-    item = {
-        "pk": PK,
-        "sk": f"DATE#{session_date}",
-        "date": session_date,
-        "unit": "in",
-        "session_number": session_number,
-        "measured_by": "partner",
-        **measurements,
-        **derived,
-        "ingested_at": datetime.now(timezone.utc).isoformat(),
-        "source_file": f"s3://{bucket}/{source_key}",
-    }
-    if notes:
-        item["notes"] = notes
+    if not written:
+        return {"statusCode": 400, "body": json.dumps({"error": "no ingestible rows", "row_errors": errors})}
 
-    table.put_item(Item=item)
+    date_rank = {d: i + 1 for i, d in enumerate(sorted(all_dates))}
 
-    logger.info(f"Session {session_number} written: DATE#{session_date}")
-    logger.info(f"  waist_height_ratio: {derived.get('waist_height_ratio', '?')}")
-    logger.info(f"  trunk_sum: {derived.get('trunk_sum_in', '?')}")
+    results = []
+    for session_date, measurements, notes in written:
+        derived = _compute_derived(measurements, height_in)
+        item = {
+            "pk": PK,
+            "sk": f"DATE#{session_date}",
+            "date": session_date,
+            "unit": "in",
+            "session_number": date_rank[session_date],
+            "measured_by": "partner",
+            **measurements,
+            **derived,
+            "ingested_at": datetime.now(timezone.utc).isoformat(),
+            "source_file": f"s3://{bucket}/{source_key}",
+            "phase": _phase_for(session_date),
+        }
+        if notes:
+            item["notes"] = notes
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps(
+        table.put_item(Item=item)
+        logger.info(f"Session {date_rank[session_date]} written: DATE#{session_date}")
+        results.append(
             {
                 "session_date": session_date,
-                "session_number": session_number,
+                "session_number": date_rank[session_date],
                 "waist_height_ratio": str(derived.get("waist_height_ratio", "")),
                 "fields_captured": len(measurements),
             }
-        ),
+        )
+
+    if errors:
+        logger.warning(f"Rows skipped: {errors}")
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({"sessions_written": len(results), "sessions": results, "row_errors": errors}),
     }

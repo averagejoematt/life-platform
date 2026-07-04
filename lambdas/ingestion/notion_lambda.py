@@ -78,6 +78,19 @@ def _record_health(*, succeeded: bool, exc=None) -> None:
     record_ingest_health(table, "notion", logger, attempted=True, succeeded=succeeded, error_class=error_class)
 
 
+def _stamp_phase(item: dict, date_str: str) -> None:
+    """#482/X-6: standalone writers stamp phase like the framework does, so an
+    untagged (re-)ingest can never surface pre-genesis data as current."""
+    if "phase" in item:
+        return
+    try:
+        from ingestion_framework import phase_for_date
+
+        item["phase"] = phase_for_date(date_str)
+    except ImportError:  # pragma: no cover — layer unavailable locally
+        item["phase"] = "experiment"
+
+
 SECRET_NAME = os.environ.get("NOTION_SECRET_NAME", "life-platform/ingestion-keys")
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"  # Pinned API version -- changing may alter property formats; test thoroughly before updating
@@ -588,6 +601,7 @@ def write_entries(entries_by_date):
                     except ImportError:
                         pass
                     preserve_enrichment(item)
+                    _stamp_phase(item, date_str)
                     table.put_item(Item=item)
                     written += 1
                     logger.info(f"Wrote {sk} ({template})")
@@ -616,6 +630,7 @@ def write_entries(entries_by_date):
                 except ImportError:
                     pass
                 preserve_enrichment(item)
+                _stamp_phase(item, date_str)
                 table.put_item(Item=item)
                 written += 1
                 logger.info(f"Wrote {sk} ({template})")

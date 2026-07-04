@@ -164,9 +164,6 @@
     "lambdas/emails/weekly_plate_lambda.py": {
       "function": "weekly-plate"
     },
-    "lambdas/ingestion/apple_health_lambda.py": {
-      "function": "apple-health-ingestion"
-    },
     "lambdas/ingestion/dropbox_poll_lambda.py": {
       "function": "dropbox-poll"
     },
