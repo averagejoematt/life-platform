@@ -154,7 +154,9 @@
       "function": "chronicle-podcast"
     },
     "lambdas/emails/coach_panel_podcast_lambda.py": {
-      "function": "coach-panel-podcast"
+      "function": "coach-panel-podcast",
+      "cdk_only": true,
+      "_cdk_only_reason": "Imports the sibling emails/podcast_script_v2.py (#547 two-pass engine, not a layer module). Single-file hot-deploy would strip it. Only cdk deploy ships the full bundle."
     },
     "lambdas/emails/daily_brief_lambda.py": {
       "function": "daily-brief"
