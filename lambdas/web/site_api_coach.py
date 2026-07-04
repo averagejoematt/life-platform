@@ -491,6 +491,36 @@ def handle_panel_ledger(event):
     )
 
 
+def _latest_dispute():
+    """#540: the most recent inter-coach dispute thread — an ACTUAL exchange
+    (coach B answered coach A's specific claim, gated turns), not a post-hoc
+    summary. None when nothing has aired; the page renders nothing rather than
+    inventing a fight."""
+    try:
+        items = table.query(
+            KeyConditionExpression=Key("pk").eq("ENSEMBLE#dispute"),
+            ScanIndexForward=False,
+            Limit=1,
+        ).get("Items", [])
+        if not items:
+            return None
+        t = _decimal_to_float(items[0])
+        return {
+            "topic": t.get("topic"),
+            "week": t.get("week"),
+            "coach_a": t.get("coach_a"),
+            "coach_b": t.get("coach_b"),
+            "turns": [
+                {"speaker": x.get("speaker"), "name": x.get("name"), "line": x.get("line"), "kind": x.get("kind")}
+                for x in (t.get("turns") or [])
+            ],
+            "created_at": t.get("created_at"),
+        }
+    except Exception as e:
+        logger.warning(f"[coach_team] dispute unavailable: {e}")
+        return None
+
+
 def handle_coach_team(event):
     """GET /api/coach_team — the "My Team" view (CC-10): the team's collective read
     on Matthew right now. Stance focus + per-coach huddle + the live tension map.
@@ -538,6 +568,7 @@ def handle_coach_team(event):
                 "team_focus": team_focus,
                 "huddle": huddle,
                 "tensions": _team_tensions(),
+                "dispute": _latest_dispute(),
                 "all_same_stage": all_same,
                 "current_stage": next(iter(stages.values())) if all_same else None,
                 "disclosure": _DISCLOSURE,

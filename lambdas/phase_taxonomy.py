@@ -159,6 +159,7 @@ _PK_RULES: list = [
     (lambda pk, sk: pk.startswith("COACH#"), EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#digest", EXPERIMENT_SCOPED),
     (lambda pk, sk: pk == "ENSEMBLE#disagreements", EXPERIMENT_SCOPED),
+    (lambda pk, sk: pk == "ENSEMBLE#dispute", EXPERIMENT_SCOPED),  # #540 inter-coach threads
     (lambda pk, sk: pk == "ENSEMBLE#influence_graph", SYSTEM_STATE),  # static config
     (lambda pk, sk: pk == "NARRATIVE#arc", EXPERIMENT_SCOPED),
     # Reading / Mind pillar (ADR-097). Durable identity data — a person's library and

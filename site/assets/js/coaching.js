@@ -150,6 +150,18 @@ function tensionsHTML(d) {
   } else {
     h += `<p class="dx-prose">No live disagreements right now — the board's aligned (or it's early and the threads haven't formed). When they pull in different directions, the tradeoff shows here.</p>`;
   }
+  // #540 — THE DISPUTE: a real exchange, not a summary. Coach B answered coach A's
+  // specific recorded claim (gated turns); shown verbatim from the persisted thread.
+  const dp = d.dispute;
+  if (dp && Array.isArray(dp.turns) && dp.turns.length >= 2) {
+    const kindLabel = { position: "the claim", reply: "the reply", rejoinder: "the rejoinder" };
+    h += `<div class="tt-dispute"><p class="dx-kicker label">the dispute · an actual exchange${dp.week ? ` · ${esc(dp.week)}` : ""}</p>` +
+      `<p class="tt-topic">${esc(dp.topic || "")}</p>` +
+      dp.turns.map((t) =>
+        `<div class="ttd-turn ttd-${esc(t.kind || "turn")}"><span class="ttd-who label">${esc(t.name || t.speaker || "")}` +
+        `<span class="ttd-kind"> · ${esc(kindLabel[t.kind] || t.kind || "")}</span></span><p class="ttd-line">${esc(t.line || "")}</p></div>`).join("") +
+      `<p class="ttd-note label">Generated in each coach's own voice from their recorded positions — grounded, no invented numbers. AI characters arguing over real data.</p></div>`;
+  }
   return h + `</section>`;
 }
 
