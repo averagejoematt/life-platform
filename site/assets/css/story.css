@@ -721,3 +721,13 @@ body { overflow-x: hidden; }
 .sc-refuted .sc-call-st { color: var(--ember); }
 .sc-call-m { font-family: var(--font-mono); color: var(--ink-faint); }
 @media (max-width: 560px) { .sc-tiles { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── #407: the loop teaser above the fold + the constellation scale ───────── */
+.hero-loop { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); color: var(--ink-faint); }
+.hero-loop a { color: var(--ink-muted); text-decoration: none; border-bottom: 1px solid var(--rule); padding-bottom: 1px; transition: color var(--dur-fast), border-color var(--dur-fast); }
+.hero-loop a:hover { color: var(--ember); border-color: var(--ember-line); }
+.hl-arrow, .hl-loop { color: var(--ink-faint); }
+.const-legend { display: inline-flex; align-items: center; gap: var(--sp-1); margin-right: var(--sp-2); color: var(--ink-faint); white-space: nowrap; }
+.cl-dot { display: inline-block; border-radius: 50%; background: var(--ink-faint); }
+.cl-dot.cl-sm { width: 5px; height: 5px; }
+.cl-dot.cl-lg { width: 11px; height: 11px; margin-left: var(--sp-2); }
