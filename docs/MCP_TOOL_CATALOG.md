@@ -1,10 +1,10 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-07-03 | **Total tools:** 144
+**Version:** v8.6.0 | **Last updated:** 2026-07-04 | **Total tools:** 144
 
-> Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **133**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
+> Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **144**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
-> SIMP-1 Phase 1 (v3.7.17–19) collapsed 116 → 86 tools via 13 view-dispatchers; subsequent feature work has grown the count to 133. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar). **V2 cleanup (2026-05-17):** `mcp/tools_calendar.py` DELETED.
+> SIMP-1 Phase 1 (v3.7.17–19) collapsed 116 → 86 tools via 13 view-dispatchers; subsequent feature work has grown the count to 144. ADR-030 (v3.7.46): `get_calendar_events` + `get_schedule_load` retired (Google Calendar). **V2 cleanup (2026-05-17):** `mcp/tools_calendar.py` DELETED.
 > Many previously standalone tools are now `view=` parameters of a parent dispatcher.
 > For architecture and schema details, see ARCHITECTURE.md and SCHEMA.md.
 
@@ -31,7 +31,7 @@
 
 ---
 
-## Quick Reference — All 133 Tools
+## Quick Reference — All 144 Tools
 
 ### Core Data Access
 | Tool | Key Params | Description |

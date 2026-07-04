@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-04 (v8.6.0 — 144 tools, 43-module MCP package, 20 data sources, 86 Lambdas, 9 secrets, 56 alarms, 8 CDK stacks deployed).
 
-> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared-layer version: see the discovery command in [CONVENTIONS.md](CONVENTIONS.md#facts-that-drift-run-the-command-never-quote-a-number) (don't hand-write it — it drifts). **78 ADRs** (ADR-001 → ADR-078; newest: ADR-076 visual + AI-vision QA harness, ADR-077 phase taxonomy, ADR-078 commercial wedge). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared-layer version: see the discovery command in [CONVENTIONS.md](CONVENTIONS.md#facts-that-drift-run-the-command-never-quote-a-number) (don't hand-write it — it drifts). **91 ADRs** (ADR-001 → ADR-103; newest: ADR-101 distribution-before-monetization, ADR-102 single-table-DynamoDB-kept-on-purpose, ADR-103 complexity-posture ledger). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
@@ -224,7 +224,7 @@ SK: DATE#YYYY-MM-DD
 
 **Lambda:** `life-platform-mcp` | **Tools:** 127 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 26 (`mcp/tools_*.py` + helpers)
 **Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/`
-**Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: `grep -E '^\s*"name":\s*"[a-z_]+"' mcp/registry.py | wc -l`.
+**Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
 
 Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.
 
@@ -463,7 +463,7 @@ Target: under $25/month | Current: ~$13/month
 
 ---
 
-**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda counts via `aws lambda list-functions`; layer version via `aws lambda list-layer-versions` and `cdk/stacks/constants.py:37`; MCP tool count via `grep -E '^\s*"name":' mcp/registry.py | wc -l`; SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; alarm count via `aws cloudwatch describe-alarms`; secret list via `aws secretsmanager list-secrets`.
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda counts via `aws lambda list-functions`; layer version via `aws lambda list-layer-versions` and `cdk/stacks/constants.py:37`; MCP tool count via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`); SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; alarm count via `aws cloudwatch describe-alarms`; secret list via `aws secretsmanager list-secrets`.
 
 
 ### Experiment Phase Filtering
