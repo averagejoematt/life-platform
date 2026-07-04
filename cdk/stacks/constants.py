@@ -40,7 +40,8 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # v105: #529 stats_core.py — the one sanctioned statistics module (ADR-105)
 # v106: #541 stats_core.ewma_fit/ewma_forecast (+0.80 z) + ai_calls forecast block
 # v107: #539 experiment_design.py — n-of-1 pre-registration + paired analysis
-SHARED_LAYER_VERSION = 107
+# v108: #506 ai_calls journal-signals preamble line (journal Phase 2)
+SHARED_LAYER_VERSION = 108
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 

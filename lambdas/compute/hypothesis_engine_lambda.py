@@ -877,7 +877,48 @@ two things move together. This applies to ANY variable where the desirable direc
 OUTPUT ONLY valid JSON. No preamble, no markdown, no backticks."""
 
 
-def generate_hypotheses(daily_rows, existing_hypotheses, api_key, profile=None):
+def fetch_journal_candidates(limit=5):
+    """#506: testable journal-derived candidates (HYPO_CANDIDATE# rows written by
+    the journal analyzer) — cause/effect already mapped into SPEC_METRICS, verbatim
+    quotes as provenance. Fail-soft: no candidates, no block."""
+    try:
+        from boto3.dynamodb.conditions import Key
+
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"USER#{USER_ID}#SOURCE#journal_analysis") & Key("sk").begins_with("HYPO_CANDIDATE#"),
+        )
+        rows = [d2f(i) for i in resp.get("Items", [])]
+        testable = [r for r in rows if r.get("status") == "testable"]
+        testable.sort(key=lambda r: (-(r.get("mentions") or 0), r.get("slug", "")))
+        return testable[:limit]
+    except Exception as e:
+        logger.warning(f"[#506] journal candidates unavailable (non-blocking): {e}")
+        return []
+
+
+def format_journal_candidates(candidates):
+    """The prompt block for journal-derived seeds. Empty string when none."""
+    if not candidates:
+        return ""
+    lines = []
+    for c in candidates:
+        quote = ""
+        quotes = c.get("quotes") or []
+        if quotes:
+            quote = f" — journal quote ({quotes[0].get('date', '?')}): \"{quotes[0].get('quote', '')[:160]}\""
+        lines.append(
+            f"- \"{c.get('cause', '?')}\" -> \"{c.get('effect', '?')}\" "
+            f"(metric mapping: {c.get('cause_metric')} -> {c.get('effect_metric')}; "
+            f"mentioned {int(c.get('mentions') or 1)}x{quote})"
+        )
+    return (
+        "\n\nJOURNAL-DERIVED CANDIDATES (#506 — Matthew's own stated cause->effect hints, quotes are verbatim provenance).\n"
+        "Prefer formalizing one of these into a hypothesis when the data supports it, using the given metric mapping in test_spec:\n"
+        + "\n".join(lines)
+    )
+
+
+def generate_hypotheses(daily_rows, existing_hypotheses, api_key, profile=None, journal_candidates=None):
     """Run Claude to generate new cross-domain hypotheses from 14 days of data."""
     p = profile or {}
     start_w = p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
@@ -890,6 +931,7 @@ def generate_hypotheses(daily_rows, existing_hypotheses, api_key, profile=None):
     existing_block = ""
     if existing_texts:
         existing_block = "\n\nEXISTING HYPOTHESES (do NOT duplicate these):\n" + "\n".join(f"- {t}" for t in existing_texts)
+    candidates_block = format_journal_candidates(journal_candidates or [])
 
     user_message = f"""Here is {len(daily_rows)} days of Matthew's health data:
 
@@ -901,7 +943,7 @@ Context:
 - 16:8 intermittent fasting (eating window ~11am-7pm)
 - Primary training: walking + strength training, building Zone 2 base
 - Data sources: Whoop (HRV/recovery), Eight Sleep (bed temp), Strava (activities), MacroFactor (nutrition), Habitify (habits), Apple Health (steps/glucose/gait), Notion journal (mood/stress/energy)
-{existing_block}
+{existing_block}{candidates_block}
 
 Generate {MAX_NEW_HYPOTHESES} cross-domain hypotheses. Each should be:
 - A non-obvious relationship between 2+ domains
@@ -1216,7 +1258,14 @@ def lambda_handler(event, context):
             logger.info(f"Generating {n_to_generate} new hypotheses ({slots_available} slots)")
 
             # #530: generation sees only the recent window; checks used the full 30d
-            result = generate_hypotheses(daily_rows[-GENERATION_DAYS:], all_hypotheses, api_key, profile=profile)
+            # #506: journal-derived candidates (testable cause->effect hints with
+            # verbatim quotes) seed the generation prompt.
+            journal_candidates = fetch_journal_candidates()
+            if journal_candidates:
+                logger.info(f"[#506] Seeding generation with {len(journal_candidates)} journal candidates")
+            result = generate_hypotheses(
+                daily_rows[-GENERATION_DAYS:], all_hypotheses, api_key, profile=profile, journal_candidates=journal_candidates
+            )
 
             if result and "hypotheses" in result:
                 existing_texts = [h.get("hypothesis", "")[:100] for h in all_hypotheses]

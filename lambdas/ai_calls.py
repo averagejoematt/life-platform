@@ -211,6 +211,21 @@ def daily_brief_shared_system(
     ]
     if day_grade is not None and grade is not None:
         parts.append(f"- Today's day-grade: {grade} (score {day_grade:.0f}/100)")
+    # #506: one-line journal-signals block — the subjective layer every coach sees.
+    # Built only from enriched aggregates already computed (extract_journal_signals);
+    # honest-when-sparse: no entries → no line, never a padded placeholder.
+    js = (data or {}).get("journal_signals") or {}
+    js_bits = []
+    if js.get("mood_avg") is not None:
+        js_bits.append(f"mood {js['mood_avg']}/10")
+    if js.get("energy_avg") is not None:
+        js_bits.append(f"energy {js['energy_avg']}/10")
+    if js.get("stress_avg") is not None:
+        js_bits.append(f"stress {js['stress_avg']}/10")
+    if js.get("themes"):
+        js_bits.append("themes: " + ", ".join(str(t) for t in js["themes"][:3]))
+    if js_bits:
+        parts.append(f"- Journal signals (recent entries): {'; '.join(js_bits)}")
     parts.extend(
         [
             "",
