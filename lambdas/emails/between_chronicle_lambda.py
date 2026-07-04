@@ -159,6 +159,16 @@ def gather_digest() -> dict:
             logger.warning("stance read skipped for %s: %s", cid, e)
     digest["stance_shifts"] = digest["stance_shifts"][:4]
 
+    # 4. #537: Elena's editorial read — she signs this email, so her one-line
+    # stance (PERSONA#elena STANCE#latest, receipts-gated) frames it. Garnish,
+    # never content: it doesn't count toward has_real_content.
+    try:
+        st = _d2f(table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {})
+        if st.get("headline_stance") and not st.get("grounding_flag"):
+            digest["elena_note"] = str(st["headline_stance"])[:320]
+    except Exception as e:
+        logger.warning("elena stance read skipped: %s", e)
+
     return digest
 
 
@@ -179,6 +189,10 @@ def build_email(digest: dict, sub_email: str) -> tuple:
         '<div style="background:#0b0f0d;color:#e8f0e8;font-family:Georgia,serif;padding:28px;max-width:640px;margin:auto;">',
         '<p style="font-family:monospace;font-size:11px;letter-spacing:.08em;color:#8aaa90;text-transform:uppercase;">since the last installment · what the machine found</p>',
     ]
+    # #537: Elena signs this email — her current editorial read opens it.
+    if digest.get("elena_note"):
+        parts.append(f'<p style="margin:14px 0 4px;font-size:14px;font-style:italic;color:#cfd8cf;">{_scrub(digest["elena_note"])}</p>')
+        parts.append('<p style="margin:0 0 10px;font-family:monospace;font-size:11px;color:#5a7565;">— Elena, where I currently stand</p>')
     if digest["deltas"]:
         parts.append('<h2 style="font-size:18px;margin:18px 0 6px;">The month moved</h2>')
         for d in digest["deltas"]:

@@ -357,11 +357,28 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # #537: Elena Voss persona state updater — post-PUBLISH Haiku extraction
+        # into PERSONA#elena (threads, callbacks ledger, motifs, receipts-gated
+        # stance). No schedule — async-invoked from the chronicle publish paths
+        # (chronicle-approve's approve click + stale-draft sweep, and
+        # wednesday-chronicle's direct-publish branch when PREVIEW_MODE=false).
+        create_platform_lambda(
+            self,
+            "ElenaStateUpdater",
+            function_name="elena-state-updater",
+            handler="emails.elena_state_updater.lambda_handler",
+            source_file="lambdas/emails/elena_state_updater.py",
+            timeout_seconds=120,
+            memory_mb=256,
+            custom_policies=rp.email_elena_state_updater(),
+            **shared,
+        )
+
         # FEAT-12: Chronicle Approve Lambda — one-click approve/reject for Chronicle drafts.
         # Invoked via Lambda Function URL embedded in the preview email.
         # No EventBridge schedule — triggered only by Matthew clicking the preview email link.
-        # approve → writes pre-built S3 artifacts, invalidates CF, invokes chronicle-email-sender.
-        # request_changes → marks DDB status, no publish.
+        # approve → writes pre-built S3 artifacts, invalidates CF, invokes chronicle-email-sender
+        # + elena-state-updater (#537). request_changes → marks DDB status, no publish.
         chronicle_approve = create_platform_lambda(
             self,
             "ChronicleApprove",

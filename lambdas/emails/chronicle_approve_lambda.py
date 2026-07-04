@@ -48,6 +48,8 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 USER_ID = os.environ.get("USER_ID", "matthew")
 CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 CHRONICLE_EMAIL_SENDER_ARN = os.environ.get("CHRONICLE_EMAIL_SENDER_ARN", "")
+# #537: Elena's post-publish state extraction (name, not ARN — same account/region).
+ELENA_STATE_UPDATER_NAME = os.environ.get("ELENA_STATE_UPDATER_NAME", "elena-state-updater")
 
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 
@@ -280,6 +282,22 @@ def _invoke_email_sender() -> None:
         logger.warning("Failed to invoke chronicle-email-sender (non-fatal): %s", exc)
 
 
+def _invoke_elena_state_updater(date_str: str) -> None:
+    """#537: async-invoke Elena's post-publish state extraction. Runs ONLY on the
+    publish paths (approve click + stale-draft sweep) — never at draft time, so a
+    rejected draft can't poison her memory. Fail-soft: a missed invoke just means
+    her notebook ages a week."""
+    try:
+        lam.invoke(
+            FunctionName=ELENA_STATE_UPDATER_NAME,
+            InvocationType="Event",  # async
+            Payload=json.dumps({"date": date_str}).encode(),
+        )
+        logger.info("Invoked elena-state-updater for %s (async)", date_str)
+    except Exception as exc:
+        logger.warning("Failed to invoke elena-state-updater (non-fatal): %s", exc)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTO-PUBLISH SWEEP (SS-01) — the self-sustaining fail-safe: a chronicle draft must
 # never stay dark just because the approve link wasn't clicked. A daily schedule
@@ -333,6 +351,7 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
             _invalidate_cloudfront(paths)
             _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
             _mark_published(date_str)
+            _invoke_elena_state_updater(date_str)  # #537: published → update her memory
             published.append({"date": date_str, "week": wk})
             logger.info("sweep: auto-published Week %s (%s) — no approval within %sh", wk, date_str, hours)
         except Exception as exc:
@@ -446,6 +465,7 @@ def _handle(event: dict) -> dict:
         _commit_recap(item)  # Phase 3: commit the "previously on" recap with the week
         _mark_published(date_str)
         _invoke_email_sender()
+        _invoke_elena_state_updater(date_str)  # #537: published → update her memory
 
         return _html_response(
             200,

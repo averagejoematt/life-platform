@@ -12,8 +12,9 @@ For each coach:
   4. Read CONFIDENCE# records for all subdomains
   5. Read current RELATIONSHIP#state
   6. Read current VOICE#state
-  7. Call Haiku to compress into ~500-token summary
-  8. Write to COACH#{coach_id} / COMPRESSED#latest
+  7. Query newest INTERACTION# records (#531: public board Q&A write-back)
+  8. Call Haiku to compress into ~500-token summary
+  9. Write to COACH#{coach_id} / COMPRESSED#latest
 
 DynamoDB patterns:
   PK=COACH#{coach_id}  SK=OUTPUT#*
@@ -22,6 +23,7 @@ DynamoDB patterns:
   PK=COACH#{coach_id}  SK=CONFIDENCE#*
   PK=COACH#{coach_id}  SK=RELATIONSHIP#state
   PK=COACH#{coach_id}  SK=VOICE#state
+  PK=COACH#{coach_id}  SK=INTERACTION#*  (#531: board Q&A episodic records)
   PK=COACH#{coach_id}  SK=COMPRESSED#latest  (output)
 
 Schedule: Weekly (Sunday 6:00 AM PT / 14:00 UTC via EventBridge)
@@ -73,17 +75,27 @@ ALL_COACH_IDS = [
     "explorer_coach",
 ]
 
-# Coach display names and domains — used in compressed state output
-COACH_META = {
-    "sleep_coach": {"display_name": "Dr. Lisa Park", "domain": "sleep_science"},
-    "nutrition_coach": {"display_name": "Elena Vasquez", "domain": "nutrition"},
-    "training_coach": {"display_name": "Marcus Chen", "domain": "training"},
-    "mind_coach": {"display_name": "Dr. James Okafor", "domain": "mind_performance"},
-    "physical_coach": {"display_name": "Dr. Sarah Kim", "domain": "physical_health"},
-    "glucose_coach": {"display_name": "Dr. Anil Mehta", "domain": "glucose_metabolism"},
-    "labs_coach": {"display_name": "Dr. Rachel Johansson", "domain": "biomarkers"},
-    "explorer_coach": {"display_name": "Jordan Rivera", "domain": "cross_domain"},
-}
+# #531: display names/domains come from the canonical persona registry
+# (config/personas.json via persona_registry) — the hand-copied dict that used
+# to live here had drifted to the RETIRED cast, so every COMPRESSED#/STANCE#
+# record carried the wrong byline. One registry, no local copies.
+try:
+    import persona_registry as _persona_registry
+except ImportError:  # pragma: no cover — environment-dependent
+    _persona_registry = None
+
+
+def _coach_meta(coach_id):
+    """{display_name, domain} for a coach from the canonical registry."""
+    if _persona_registry is not None:
+        try:
+            p = _persona_registry.resolve(coach_id, s3, S3_BUCKET) or {}
+            if p.get("name"):
+                return {"display_name": p["name"], "domain": p.get("domain", "unknown")}
+        except Exception as e:
+            logger.warning("[persona] registry lookup failed for %s: %s", coach_id, e)
+    return {"display_name": coach_id, "domain": "unknown"}
+
 
 # Maximum OUTPUT# records to fetch per coach
 MAX_OUTPUT_RECORDS = 20
@@ -108,6 +120,9 @@ MAX_PREDICTION_SCAN = 120  # newest PREDICTION# records scanned for active ones
 MAX_QUERY_PAGES = 20  # hard stop on any partition pagination
 MAX_COMPRESSION_INPUT_CHARS = 24_000  # ≈6k tokens — well inside Haiku's budget
 MIN_WINDOW_FLOOR = 5  # the budget guard never shrinks a window below this
+# #531: newest public-board Q&A records (INTERACTION#, written by site-api-ai)
+# folded into the weekly compression so board answers enter the coach's memory.
+MAX_INTERACTIONS_IN_PROMPT = 10
 
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -382,6 +397,12 @@ def _gather_coach_state(coach_id):
     # 6. Read VOICE#state
     voice_state = _get_item(coach_pk, "VOICE#state")
 
+    # 7. #531: newest public-board interactions (episodic Q&A written back by
+    # site-api-ai) — the SK embeds the date, so a reverse bounded query is a
+    # true recency window.
+    interactions = _query_begins_with(coach_pk, "INTERACTION#", scan_forward=False, limit=MAX_INTERACTIONS_IN_PROMPT)
+    logger.info("Fetched %d INTERACTION# records for %s (window %d)", len(interactions), coach_id, MAX_INTERACTIONS_IN_PROMPT)
+
     return {
         "outputs": outputs,
         "open_threads": open_threads,
@@ -391,6 +412,7 @@ def _gather_coach_state(coach_id):
         "confidence_records": confidence_records,
         "relationship_state": relationship_state,
         "voice_state": voice_state,
+        "interactions": interactions,
     }
 
 
@@ -412,7 +434,9 @@ COMPRESSION_SYSTEM_PROMPT = (
     "- Prediction track record (confirmed/refuted/pending counts)\n"
     "- Voice pattern observations (overused openings, signature patterns)\n"
     "- Standing recommendations that remain active\n"
-    "- Key concerns the coach is currently monitoring\n\n"
+    "- Key concerns the coach is currently monitoring\n"
+    "- Notable public reader interactions (board Q&A) — positions the coach took "
+    "publicly, so future outputs can reference and never contradict them\n\n"
     "## What to NOT preserve (saves tokens):\n"
     "- Specific daily data values (e.g., 'HRV was 45 on Tuesday')\n"
     "- Full text of prior outputs\n"
@@ -451,7 +475,7 @@ def _build_compression_message(coach_id, state):
     Assembles all gathered state into a structured prompt that gives the
     LLM everything it needs to produce a high-quality compressed summary.
     """
-    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    meta = _coach_meta(coach_id)
     parts = [
         f"## Coach: {coach_id}",
         f"## Display Name: {meta['display_name']}",
@@ -601,6 +625,24 @@ def _build_compression_message(coach_id, state):
         parts.append("## Voice State: NONE")
         parts.append("")
 
+    # #531: public-board Q&A (episodic) — what the coach told READERS. Folding
+    # these in means a board answer becomes part of the coach's one memory.
+    interactions = state.get("interactions", [])
+    if interactions:
+        parts.append(f"## Reader Interactions ({len(interactions)} newest public board Q&A)")
+        for it in interactions:
+            sk_parts = str(it.get("sk", "")).split("#")
+            date = sk_parts[1] if len(sk_parts) > 1 else "unknown"
+            q = str(it.get("question", ""))[:200]
+            a = str(it.get("answer", ""))[:300]
+            flag = "" if it.get("grounded", True) else " [answered with a grounding refusal]"
+            parts.append(f"  - [{date}]{flag} Q: {q}")
+            parts.append(f"    A: {a}")
+        parts.append("")
+    else:
+        parts.append("## Reader Interactions: NONE")
+        parts.append("")
+
     parts.append(
         "Compress all the above into a ~500-token summary following the JSON "
         "schema exactly. The summary field should be a dense narrative that "
@@ -621,7 +663,7 @@ def _build_fallback_compressed_state(coach_id, state):
 
     Better than nothing — preserves structural data without AI narrative.
     """
-    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # Derive last output date from outputs
@@ -728,7 +770,7 @@ def _compress_coach(coach_id, state):
     Returns the compressed state dict ready for DynamoDB write.
     Falls back to structural-only compression if the LLM call fails.
     """
-    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # Build the compression prompt inside the deterministic input budget (#410)
@@ -972,7 +1014,7 @@ def _summarize_track_record(learning, confidence_records):
 
 def _build_stance_message(coach_id, compressed, track, prior_stance):
     """Assemble the grounding the stance LLM call reasons from."""
-    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    meta = _coach_meta(coach_id)
     grounding = {
         "coach": meta["display_name"],
         "domain": meta["domain"],
@@ -1031,7 +1073,7 @@ def _generate_stance(coach_id, compressed, track, prior_stance):
     stance dict, or None on a hard failure (caller treats a missing stance as
     fail-soft — the public render keeps the ladder fallback).
     """
-    meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
+    meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 

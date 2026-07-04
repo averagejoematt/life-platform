@@ -15,7 +15,11 @@ Two content pipelines exist in the platform:
      Writes: COACH#{coach_id} OUTPUT# records
 
 Both pipelines share intelligence_common.py utilities (data inventory, maturity,
-goals, coach preamble, threads, validator).
+goals, coach preamble, threads, validator) AND — since #531 — a shared persona
+core: build_prompt() renders the SAME voice-spec fields (config/coaches/*.json
+via persona_core) the daily-brief self writes from, so an expert here is the
+same person as its brief + public-board selves. EXPERT_PERSONAS keeps only the
+observatory-specific framing (title/focus/epistemology).
 
 Features (V2.1):
   - Intelligence preamble: goals, data inventory, data maturity, first-person voice
@@ -70,6 +74,13 @@ try:
 except ImportError:
     _HAS_AI_VALIDATOR = False
 
+# #531: shared persona core — one voice-spec rendering across brief/board/observatory.
+try:
+    import persona_core as _persona_core
+except ImportError:  # pragma: no cover — environment-dependent
+    _persona_core = None
+    logger.warning("persona_core not available — expert prompts keep persona-dict voice only")
+
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
@@ -81,6 +92,9 @@ EXPERTS = ["mind", "nutrition", "training", "physical", "explorer", "glucose", "
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
+# #531: voice specs live at S3 config/coaches/ (role already has config/* read).
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+s3 = boto3.client("s3", region_name="us-west-2")
 
 _api_key_cache = None
 
@@ -646,11 +660,22 @@ experiment" — these are periodic lab draws over time.
             f"VOICE: Write in FIRST PERSON. You ARE {p['name']}. Say \"I\" not \"{p['name']}\". Address Matthew directly as \"you\".\n"
         )
 
+    # #531: the shared persona core — the same voice-spec fields the daily-brief
+    # and public-board selves write from. Fail-soft: "" keeps the pre-#531 prompt.
+    voice_core = ""
+    if _persona_core is not None:
+        try:
+            voice_core = _persona_core.persona_block(f"{expert_key}_coach", s3_client=s3, bucket=S3_BUCKET)
+        except Exception as _vc_e:
+            logger.warning("persona core unavailable for %s (fail-soft): %s", expert_key, _vc_e)
+
     return f"""You are {p['name']}, {p['title']}.
 
 Your communication style: {p['style']}.
 Your analytical focus: {p['focus']}.
 {p.get('epistemology', '')}
+
+{voice_core}
 
 {preamble_block}
 

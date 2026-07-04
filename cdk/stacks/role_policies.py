@@ -871,6 +871,13 @@ def email_wednesday_chronicle() -> list[iam.PolicyStatement]:
     return _email_base(
         needs_s3_write=["blog/*", "site/journal/*", "generated/journal/*", "generated/assets/images/editorial/*"],
         extra_secrets=["life-platform/pexels"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="InvokeElenaStateUpdater",  # #537: direct-publish path (PREVIEW_MODE=false)
+                actions=["lambda:InvokeFunction"],
+                resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:elena-state-updater"],
+            )
+        ],
     )
 
 
@@ -1024,6 +1031,51 @@ def email_weekly_signal() -> list[iam.PolicyStatement]:
     ]
 
 
+def email_elena_state_updater() -> list[iam.PolicyStatement]:
+    """#537: Elena persona state updater — reads the published chronicle record,
+    one Haiku extraction (Bedrock), writes ONLY the PERSONA#* partition
+    (LeadingKeys-scoped: threads, callbacks ledger, motifs, stance). Budget-tier
+    SSM read for the tier-1 narrative pause. No SES, no S3, no secrets."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDBRead",
+            actions=["dynamodb:GetItem", "dynamodb:Query"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DynamoDBPersonaWrite",
+            actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["PERSONA#*"],
+                },
+            },
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="BudgetTierParam",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",  # retry_utils token telemetry
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+        _bedrock_statement(),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
 def email_chronicle_approve() -> list[iam.PolicyStatement]:
     """Chronicle approve Lambda (FEAT-12): reads + updates DDB draft, writes pre-built
     artifacts to S3, creates CloudFront invalidation, invokes chronicle-email-sender.
@@ -1055,8 +1107,11 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="InvokeEmailSender",
             actions=["lambda:InvokeFunction"],
-            # chronicle-email-sender ARN pattern
-            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:chronicle-email-sender"],
+            # chronicle-email-sender + (#537) elena-state-updater on publish
+            resources=[
+                f"arn:aws:lambda:{REGION}:{ACCT}:function:chronicle-email-sender",
+                f"arn:aws:lambda:{REGION}:{ACCT}:function:elena-state-updater",
+            ],
         ),
         iam.PolicyStatement(
             sid="DLQ",
@@ -1867,6 +1922,20 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             conditions={
                 "ForAllValues:StringLike": {
                     "dynamodb:LeadingKeys": ["RATE#*"],
+                },
+            },
+        ),
+        # #531: board_ask episodic write-back — a coach's public answer enters its
+        # own memory (PK=COACH#{id}, SK=INTERACTION#...). PutItem only (no
+        # UpdateItem): the code writes content-addressed interaction records and
+        # must never be able to mutate STANCE#/COMPRESSED#/OUTPUT# in place.
+        iam.PolicyStatement(
+            sid="DynamoDBCoachInteractionWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["COACH#*"],
                 },
             },
         ),

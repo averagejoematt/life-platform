@@ -2396,6 +2396,86 @@ def record_email_send(table, lambda_name):
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
+def _elena_notebook_block(current_week):
+    """#537: Elena's persistent memory (PERSONA#elena, maintained post-publish by
+    elena-state-updater) rendered as prompt obligations: open threads with ages,
+    the promise ledger (due/overdue callbacks — the payoff is ENFORCED here, not
+    hoped for), running motifs, and her editorial stance with receipts. This is
+    structured continuity on top of the raw prior-installment dump. Fail-soft ""."""
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+
+        pk = "PERSONA#elena"
+        parts = []
+
+        stance = table.get_item(Key={"pk": pk, "sk": "STANCE#latest"}).get("Item") or {}
+        if stance.get("headline_stance") and not stance.get("grounding_flag"):
+            parts.append("YOUR EDITORIAL STANCE (it evolves only with receipts — never claim a change you can't back):")
+            parts.append(f"  {stance['headline_stance']}")
+            for p in (stance.get("positions") or [])[:5]:
+                parts.append(f"  - position: {p}")
+            if stance.get("how_my_stance_changed"):
+                parts.append(f"  How my read changed after last week: {stance['how_my_stance_changed']}")
+
+        resp = table.query(KeyConditionExpression=_Key("pk").eq(pk) & _Key("sk").begins_with("THREAD#"), ScanIndexForward=False, Limit=60)
+        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open"][:8]
+        if open_threads:
+            parts.append("OPEN STORY THREADS (advance, resolve, or complicate — a thread stuck 3+ weeks must move or close):")
+            for t in open_threads:
+                opened = int(t.get("opened_week") or current_week)
+                last_ref = int(t.get("last_referenced_week") or opened)
+                stale = " [STALE — close it or complicate it THIS week]" if (current_week - last_ref) >= 3 else ""
+                parts.append(f"  - [opened wk {opened}, age {max(0, current_week - opened)} wk]{stale} {t.get('slug')}: {t.get('summary')}")
+
+        resp = table.query(KeyConditionExpression=_Key("pk").eq(pk) & _Key("sk").begins_with("CALLBACK#"), ScanIndexForward=False, Limit=60)
+        pending = [c for c in resp.get("Items", []) if c.get("status") == "pending"]
+        due = sorted(
+            (c for c in pending if int(c.get("due_by_week") or 10**6) <= current_week), key=lambda c: int(c.get("due_by_week") or 0)
+        )
+        upcoming = sorted(
+            (c for c in pending if int(c.get("due_by_week") or 10**6) > current_week), key=lambda c: int(c.get("due_by_week") or 0)
+        )
+        if due:
+            parts.append("PROMISES DUE (you made these to readers — PAY EACH OFF this week, or explicitly extend it in-text):")
+            for c in due[:5]:
+                overdue = current_week - int(c.get("due_by_week") or current_week)
+                tag = f"OVERDUE by {overdue} wk" if overdue > 0 else "due now"
+                parts.append(f"  - [made wk {c.get('made_in_week')}, {tag}] {c.get('promise')}")
+        if upcoming:
+            parts.append("PROMISES OUTSTANDING (not yet due — keep them alive, don't pay them off early without reason):")
+            for c in upcoming[:4]:
+                parts.append(f"  - [due wk {c.get('due_by_week')}] {c.get('promise')}")
+
+        motif_state = table.get_item(Key={"pk": pk, "sk": "MOTIF#state"}).get("Item") or {}
+        motifs = [m.get("phrase") if isinstance(m, dict) else str(m) for m in (motif_state.get("motifs") or [])[:6]]
+        motifs = [m for m in motifs if m]
+        if motifs:
+            parts.append("YOUR RUNNING MOTIFS (yours to reuse sparingly — at most one per installment): " + "; ".join(motifs))
+
+        if not parts:
+            return ""
+        return "\n\n=== YOUR NOTEBOOK (persistent memory — carried across installments) ===\n" + "\n".join(parts)
+    except Exception as e:
+        logger.warning(f"[elena-notebook] block build failed (fail-soft): {e}")
+        return ""
+
+
+def _invoke_elena_state_updater(date_str):
+    """#537: async-invoke the post-publish state extraction. Publish paths only —
+    a draft never updates her memory. Fail-soft: a missed invoke means her
+    notebook ages a week, never a failed publish."""
+    try:
+        lam = boto3.client("lambda", region_name="us-west-2")
+        lam.invoke(
+            FunctionName=os.environ.get("ELENA_STATE_UPDATER_NAME", "elena-state-updater"),
+            InvocationType="Event",
+            Payload=json.dumps({"date": date_str}).encode(),
+        )
+        logger.info(f"[elena-state] invoked for {date_str}")
+    except Exception as e:
+        logger.warning(f"[elena-state] invoke failed (non-fatal): {e}")
+
+
 def lambda_handler(event, context):
     logger.info("Wednesday Chronicle v1.1.0 (Board Centralization) — The Measured Life — starting...")
 
@@ -2491,6 +2571,12 @@ def lambda_handler(event, context):
             "\n\nThis is the FIRST installment. Establish the story from the beginning. Who is Matthew? Why is he doing this? What are the stakes? Set the scene in Seattle. Introduce the platform, the data, the obsession. Make the reader want to come back next week."
         )
 
+    # #537: Elena's persistent notebook — open threads, the promise ledger
+    # (due callbacks are OBLIGATIONS), motifs, and her receipts-backed stance.
+    notebook_block = _elena_notebook_block(week_num)
+    if notebook_block:
+        user_parts.append(notebook_block)
+
     user_message = "\n".join(user_parts)
     logger.info(f"Full prompt: {len(user_message)} chars")
 
@@ -2530,6 +2616,28 @@ def lambda_handler(event, context):
         return {"statusCode": 500, "body": f"AI generation failed: {e}"}
 
     logger.info(f"Installment received: {len(raw_installment)} chars, ~{len(raw_installment.split())} words")
+
+    # #537 / ADR-104: the chronicle joins the grounded-generation gate. Every
+    # number in the installment must exist somewhere in what Elena was given
+    # (the data packet, prior installments, her notebook). Keep-best mode: one
+    # corrective rewrite, kept only if strictly better — the weekly story is
+    # human-reviewed (PREVIEW_MODE) + privacy-gated downstream, so a residual
+    # finding degrades to the best draft instead of going dark.
+    try:
+        import grounded_generation as _gg
+
+        _allowed = _gg.allowed_numbers(elena_prompt, user_message)
+        _findings_fn = lambda t: _gg.grounding_findings(t, allowed=_allowed)  # noqa: E731
+        _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, api_key)  # noqa: E731
+        raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
+        if _corrected:
+            logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
+        elif _residual:
+            logger.warning(f"[ADR-104] chronicle keeps {len(_residual)} residual grounding findings (best draft)")
+    except ImportError:
+        pass  # gate module unavailable — serve as before
+    except Exception as _gg_e:
+        logger.warning(f"[ADR-104] chronicle grounding gate error (fail-open): {_gg_e}")
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and raw_installment:
@@ -2713,6 +2821,9 @@ def lambda_handler(event, context):
         # This path publishes immediately → commit the recap now (fail-soft).
         if recap:
             _write_recap(recap, date_str)
+
+        # #537: published now → update Elena's memory now (fail-soft).
+        _invoke_elena_state_updater(date_str)
 
         try:
             blog_url = publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments)

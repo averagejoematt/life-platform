@@ -151,21 +151,58 @@ def _short_title(*candidates, max_words: int = 6, max_chars: int = 52) -> str:
     return ""
 
 
+def _elena_host_state() -> str:
+    """#537: the host reads from the same PERSONA#elena memory the chronicle
+    writes — her editorial stance (receipts-gated) + a couple of open threads
+    she may call back to on-air. Volatile → user turn. Fail-soft ""."""
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+
+        bits = []
+        st = table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {}
+        if st.get("headline_stance") and not st.get("grounding_flag"):
+            bits.append(f"Elena's current editorial read (her own, persistent): {str(st['headline_stance'])[:300]}")
+        resp = table.query(
+            KeyConditionExpression=_Key("pk").eq("PERSONA#elena") & _Key("sk").begins_with("THREAD#"),
+            ScanIndexForward=False,
+            Limit=20,
+        )
+        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open"][:2]
+        if open_threads:
+            bits.append(
+                "Story threads Elena is carrying (she may call back to one): "
+                + "; ".join(str(t.get("summary") or "")[:120] for t in open_threads)
+            )
+        return "\n".join(bits)
+    except Exception as e:
+        logger.warning("elena host state skipped: %s", e)
+        return ""
+
+
 def _build_script(week, title, chronicle_text, coach_id, coach_out, coach_name) -> list:
     import bedrock_client
 
     coach_block = ""
     if coach_out:
         coach_block = f"\n{coach_name}'s recent read: {coach_out['summary']}\nThemes: {', '.join(coach_out['themes']) or '(none)'}"
+    # #537: the host carries her own memory — stance + threads from PERSONA#elena.
+    elena_block = _elena_host_state()
+    if elena_block:
+        elena_block = f"\n{elena_block}"
     system = (
         "You write a short two-host podcast script reviewing one week of a public health experiment. "
         f"HOST is Elena Voss (embedded journalist). CO-HOST is {coach_name}, an AI coach. "
         'Output ONLY a JSON array of turns: [{"speaker":"elena"|"coach","line":"..."}]. '
         "8–14 turns, conversational and warm, Elena frames topics and asks, the coach reviews findings. "
+        "If Elena's own editorial read or story threads are provided, let her voice them naturally — "
+        "they are HER opinions and callbacks, never the coach's. "
         "Hard rules: correlative only (never claim causation); use only numbers present in the source; "
         "hedge — the data is early/small-sample; never open a line with 'Matt'; no preamble or JSON fences."
     )
-    user = f"Week {week}: {title}.\n\nThis week's chronicle:\n{chronicle_text[:4000]}{coach_block}\n\n" "Write the JSON dialogue array now."
+    user = (
+        f"Week {week}: {title}.\n\nThis week's chronicle:\n{chronicle_text[:4000]}{coach_block}{elena_block}\n\n"
+        "Write the JSON dialogue array now."
+    )
     body = {"model": MODEL, "max_tokens": 1600, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=MODEL)
     text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
