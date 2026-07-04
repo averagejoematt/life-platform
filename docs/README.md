@@ -43,7 +43,7 @@ top and stop when you have what you need.
 | [SECRETS_MAP.md](SECRETS_MAP.md) · [SECRETS_ROTATION.md](SECRETS_ROTATION.md) | Inventory · rotation |
 
 ## Decisions, taxonomy & cost
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–079)** — why things are the way they are |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–105)** — why things are the way they are; ADR-103 = complexity-posture ledger, ADR-104 = honest numbers, ADR-105 = the rigor bar |
 |---|---|
 | [TAG_CODES.md](TAG_CODES.md) | Decode the internal tag alphabet (PG/SIMP/IC/SEC/…) |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
