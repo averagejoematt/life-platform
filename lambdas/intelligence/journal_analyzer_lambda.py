@@ -191,13 +191,25 @@ def derive_daily_row(entry, date_str):
     return row
 
 
+def _as_dict(item, key):
+    """Enrichment lists exist in two vintages: plain strings (the live data —
+    e.g. enriched_entities: ["Britt"]) and dicts per the v2 spec sketch
+    ({name, type, sentiment, ...}). Accept both; strings become {key: s}."""
+    if isinstance(item, dict):
+        return item
+    if isinstance(item, str) and item.strip():
+        return {key: item.strip()}
+    return None
+
+
 def build_entity_registry(dated_entries):
     """ENTITY_REGISTRY#current body: per entity — type, mentions, first/last seen,
     sentiment counts. Counts only; no trends (honest-when-sparse)."""
     reg = {}
     for date_str, entry in dated_entries:
-        for ent in entry.get("enriched_entities") or []:
-            if not isinstance(ent, dict) or not ent.get("name"):
+        for raw in entry.get("enriched_entities") or []:
+            ent = _as_dict(raw, "name")
+            if not ent or not ent.get("name"):
                 continue
             key = _norm(str(ent["name"]))
             slot = reg.setdefault(
@@ -255,8 +267,9 @@ def build_behavior_registry(dated_entries, habit_names):
     first/last seen, habitify_match (the free-text side of #422)."""
     reg = {}
     for date_str, entry in dated_entries:
-        for beh in entry.get("enriched_behaviors") or []:
-            if not isinstance(beh, dict) or not beh.get("behavior"):
+        for raw in entry.get("enriched_behaviors") or []:
+            beh = _as_dict(raw, "behavior")
+            if not beh or not beh.get("behavior"):
                 continue
             key = _norm(str(beh["behavior"]))
             slot = reg.setdefault(
