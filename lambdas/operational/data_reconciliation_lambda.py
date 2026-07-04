@@ -65,30 +65,21 @@ USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 # Each entry: (source_name, expected_days_per_week, notes)
 # expected_days: 7 = daily, 5 = weekdays only, 1 = weekly
 # Gaps are only flagged if days_missing > (7 - expected_days)
-SOURCES = [
-    # Daily sources (expected every day)
-    ("whoop", 7, "Sleep + recovery — wrist sensor"),
-    ("apple_health", 7, "Steps, CGM, gait — iPhone webhook"),
-    ("weather", 7, "Open-Meteo daily fetch"),
+# #498 (X-10): source rows derive from the registry's expected_days facet.
+# Computed partitions stay local — they are compute-lambda OUTPUTS, not sources;
+# their expected cadence is the compute schedule, not an ingestion property.
+from source_registry import reconciliation_sources
+
+COMPUTED_PARTITIONS = [
     ("day_grade", 7, "Computed by daily-metrics-compute"),
     ("habit_scores", 7, "Computed by daily-metrics-compute"),
     ("computed_metrics", 7, "Computed by daily-metrics-compute"),
     ("character_sheet", 7, "Computed by character-sheet-compute"),
     ("adaptive_mode", 7, "Computed by adaptive-mode-compute"),
     ("computed_insights", 7, "Computed by daily-insight-compute"),
-    # Highly active but may miss days
-    ("strava", 5, "Exercise days only — OK to miss 2+"),
-    ("garmin", 5, "Exercise days only — OK to miss 2+"),
-    ("eightsleep", 7, "Bed environment — every night"),
-    ("withings", 5, "Weight — may skip weekends"),
-    ("habitify", 7, "Habits — daily logging expected"),
-    ("todoist", 7, "Tasks — daily expected"),
-    ("macrofactor", 6, "Nutrition CSV — may miss 1 day/week"),
-    # Journal — variable
-    ("notion", 5, "Journal entries — weekdays typical"),
-    # Supplements — every day logged
-    ("supplements", 7, "Supplement bridge — every day"),
 ]
+
+SOURCES = reconciliation_sources() + COMPUTED_PARTITIONS
 
 # Sources that DON'T use DATE# sk prefix (skip or handle differently)
 _SKIP_SOURCES = set()

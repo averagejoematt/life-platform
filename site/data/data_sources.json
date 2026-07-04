@@ -1,28 +1,177 @@
 {
   "_meta": {
-    "purpose": "Single source of truth for all data sources. Consumed by methodology/, platform/, and about/ pages. When a source is added or removed, edit this file only.",
-    "updated": "2026-03-24",
-    "count": 19
+    "generated_by": "scripts/v4_build_data_sources.py — from lambdas/source_registry.py (#498); never hand-edit",
+    "updated": "2026-07-04",
+    "count": 21
   },
   "sources": [
-    { "id": "whoop",         "name": "Whoop",              "category": "wearable",   "metrics": "Recovery score, HRV, resting HR, sleep staging, strain",    "method": "Daily Lambda (6:00 AM PT)" },
-    { "id": "eightsleep",    "name": "Eight Sleep",         "category": "sleep",      "metrics": "Sleep score, efficiency, bed environment, RHR",              "method": "Daily Lambda (7:00 AM PT)" },
-    { "id": "garmin",        "name": "Garmin",              "category": "wearable",   "metrics": "Body Battery, stress, HR zones, training load, VO2 max",    "method": "Daily Lambda (6:00 AM PT)" },
-    { "id": "strava",        "name": "Strava",              "category": "training",   "metrics": "Running, cycling, hiking, walking + GPS data",              "method": "Daily Lambda (6:30 AM PT)" },
-    { "id": "withings",      "name": "Withings",            "category": "scale",      "metrics": "Weight, body fat %, lean mass, fat mass",                   "method": "Daily Lambda (6:15 AM PT)" },
-    { "id": "macrofactor",   "name": "MacroFactor",         "category": "nutrition",  "metrics": "Calories, macros, micronutrients, meal timing",             "method": "Phone export → Dropbox → Lambda" },
-    { "id": "habitify",      "name": "Habitify",            "category": "habits",     "metrics": "65 habits across 9 groups, P40 score, vice streaks",        "method": "Daily Lambda (6:15 AM PT)" },
-    { "id": "notion",        "name": "Notion Journal",      "category": "journal",    "metrics": "Daily journal entries (5 templates) + AI enrichment",       "method": "Daily Lambda (6:00 AM PT)" },
-    { "id": "applehealth",   "name": "Apple Health",        "category": "phone",      "metrics": "Steps, gait, active calories, caffeine, water",             "method": "HAE webhook (hourly iOS push)" },
-    { "id": "dexcom",        "name": "Dexcom Stelo (CGM)",  "category": "cgm",        "metrics": "Continuous glucose (5-min readings), time in range",        "method": "Via Apple Health webhook" },
-    { "id": "todoist",       "name": "Todoist",             "category": "productivity","metrics": "Tasks completed, overdue, project breakdown",              "method": "Daily Lambda (6:45 AM PT)" },
-    { "id": "labs",          "name": "Function Health + GP", "category": "manual",    "metrics": "Blood work (107 biomarkers, 7 draws 2019–2025)",            "method": "Manual seed" },
-    { "id": "dexa",          "name": "DEXA",                "category": "manual",     "metrics": "Body composition scan (visceral fat, FFMI, BMD)",           "method": "Manual seed" },
-    { "id": "genome",        "name": "Genome",              "category": "manual",     "metrics": "110 SNP clinical interpretations",                          "method": "Manual seed" },
-    { "id": "mf_workouts",   "name": "MacroFactor Workouts","category": "training",   "metrics": "Strength training (sets/reps/weight)",                      "method": "Phone export → Dropbox pipeline" },
-    { "id": "weather",       "name": "Weather (Open-Meteo)", "category": "environment","metrics": "Temperature, daylight, pressure, humidity",                "method": "Daily Lambda (5:45 AM PT)" },
-    { "id": "supplements",   "name": "Supplements",         "category": "manual",     "metrics": "Supplement/medication doses, timing, adherence",            "method": "Manual via MCP tool" },
-    { "id": "stateofmind",   "name": "State of Mind (HWF)", "category": "mood",       "metrics": "Mood valence, emotions, life area associations",            "method": "Via Apple Health webhook" },
-    { "id": "bloodpressure", "name": "Blood Pressure",      "category": "manual",     "metrics": "Systolic, diastolic, pulse, AHA classification",            "method": "Via Apple Health webhook" }
+    {
+      "id": "apple_health",
+      "name": "Apple Health",
+      "category": "Wearables",
+      "metrics": "Steps, active energy, CGM, blood pressure, state of mind",
+      "method": "Health Auto Export webhook, near-real-time",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "habitify",
+      "name": "Habitify",
+      "category": "Inputs",
+      "metrics": "Daily habit completions",
+      "method": "API pull, hourly",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "hevy",
+      "name": "Hevy",
+      "category": "Manual logs",
+      "metrics": "Strength sets, reps, load, rest times",
+      "method": "API-key pull, hourly 12–23 UTC",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "macrofactor",
+      "name": "MacroFactor",
+      "category": "Manual logs",
+      "metrics": "Calories, macros, meals",
+      "method": "Manual CSV export via Dropbox poller, ~24h behind by design",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "strava",
+      "name": "Strava",
+      "category": "Wearables",
+      "metrics": "Activities, walks, heart rate",
+      "method": "OAuth API pull, hourly",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "supplements",
+      "name": "Supplements",
+      "category": "Manual logs",
+      "metrics": "Supplement & medication adherence",
+      "method": "Habitify bridge (name-mapped habits)",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "whoop",
+      "name": "Whoop",
+      "category": "Wearables",
+      "metrics": "Recovery, sleep, HRV, resting HR, strain",
+      "method": "OAuth API pull, hourly",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "withings",
+      "name": "Withings",
+      "category": "Wearables",
+      "metrics": "Weight, body composition",
+      "method": "OAuth API pull, hourly",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "eightsleep",
+      "name": "Eight Sleep",
+      "category": "Wearables",
+      "metrics": "Sleep stages, bed temperature, HR/HRV",
+      "method": "API pull, hourly",
+      "posture": "portfolio"
+    },
+    {
+      "id": "food_delivery",
+      "name": "Food delivery",
+      "category": "Manual logs",
+      "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
+      "method": "Manual log",
+      "posture": "portfolio"
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "category": "Inputs",
+      "metrics": "Journal entries — the subjective layer",
+      "method": "API pull (journal database), hourly",
+      "posture": "portfolio"
+    },
+    {
+      "id": "measurements",
+      "name": "Tape measure",
+      "category": "Manual logs",
+      "metrics": "Body tape measurements",
+      "method": "Manual entry via MCP",
+      "posture": "portfolio"
+    },
+    {
+      "id": "todoist",
+      "name": "Todoist",
+      "category": "Inputs",
+      "metrics": "Tasks completed",
+      "method": "API pull, 1x daily (14:00 UTC)",
+      "posture": "portfolio"
+    },
+    {
+      "id": "weather",
+      "name": "Weather",
+      "category": "Inputs",
+      "metrics": "Temperature, precipitation, daylight",
+      "method": "Open-Meteo API pull, 2x daily",
+      "posture": "portfolio"
+    },
+    {
+      "id": "garmin",
+      "name": "Garmin",
+      "category": "Wearables",
+      "metrics": "Stress, body battery, steps",
+      "method": "OAuth API pull, 4x daily — paused (ADR-074)",
+      "posture": "paused"
+    },
+    {
+      "id": "labs",
+      "name": "Blood labs",
+      "category": "Clinical",
+      "metrics": "Blood biomarkers (episodic panels)",
+      "method": "Manual entry from lab PDFs",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "dexa",
+      "name": "DEXA",
+      "category": "Clinical",
+      "metrics": "Body-composition scans",
+      "method": "Manual entry per scan",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "genome",
+      "name": "Genome",
+      "category": "Clinical",
+      "metrics": "SNP clinical interpretations",
+      "method": "One-time import",
+      "posture": "load-bearing"
+    },
+    {
+      "id": "state_of_mind",
+      "name": "State of Mind",
+      "category": "Inputs",
+      "metrics": "Affect self-reports (Apple State of Mind)",
+      "method": "Health Auto Export webhook",
+      "posture": "portfolio"
+    },
+    {
+      "id": "macrofactor_workouts",
+      "name": "MacroFactor workouts",
+      "category": "Archive",
+      "metrics": "Historical strength log (pre-Hevy)",
+      "method": "Frozen archive — no writer",
+      "posture": "archive"
+    },
+    {
+      "id": "chronicling",
+      "name": "Chronicling",
+      "category": "Archive",
+      "metrics": "Pre-platform habit history",
+      "method": "Frozen archive — no writer",
+      "posture": "archive"
+    }
   ]
 }

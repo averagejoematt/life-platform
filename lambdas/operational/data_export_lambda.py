@@ -46,71 +46,27 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 
-# All known source partitions for export.
-# Phase 7.1 audit (2026-05-16): reconciled against live DDB scan — was missing
-# 26 partitions, had 6 stale entries (exposures/food_responses/interactions/
-# rewards/ruck_log/temptations no longer exist). List below mirrors actual
-# `USER#matthew#SOURCE#*` partitions, minus operational/internal ones.
-ALL_SOURCES = [
-    # ── Raw ingestion sources ──
-    "whoop",
-    "withings",
-    "strava",
-    "garmin",
-    "eightsleep",
-    "apple_health",
-    "macrofactor",
-    "macrofactor_workouts",
-    "habitify",
-    "notion",
-    "todoist",
-    "weather",
-    "food_delivery",
-    "measurements",
-    "dexa",
-    "genome",
-    "labs",
-    "supplements",
-    "google_calendar",
-    "hevy",
-    # ── User-curated / manual ──
-    "chronicle",
-    "chronicling",
-    "journal_analysis",
-    "sick_days",
-    "discovery_annotations",
-    "field_notes",
-    "subscribers",
-    # ── Computed / derived ──
-    "character_sheet",
-    "computed_metrics",
-    "computed_insights",
-    "composite_scores",
-    "day_grade",
-    "habit_scores",
-    "sleep_unified",
-    "centenarian_progress",
-    "circadian",
-    "adaptive_mode",
-    "ai_analysis",
-    # ── Coaching state + analytics ──
-    "anomalies",
-    "insights",
-    "experiments",
-    "challenges",
-    "protocols",
-    "hypotheses",
-    "weekly_correlations",
-    "platform_memory",
-    "nutrition_review",
-    "ledger",
-]
+# #498 (X-10): the export census derives from phase_taxonomy.SOURCE_CLASS — the
+# one registry that already names every `USER#…#SOURCE#*` partition (with a
+# coverage assertion). Everything except SYSTEM_STATE exports: system-state is
+# ops plumbing, regenerating caches, and dead partitions. The hand-rolled list
+# this replaces had silently omitted 14 partitions (engagement_state, calibration,
+# forecast, travel, mood, temptations, …) — exports were quietly incomplete.
+from phase_taxonomy import SOURCE_CLASS, SYSTEM_STATE
 
-# Partitions intentionally EXCLUDED from export:
-# - email_log#* (operational records of email sends)
-# - health_check (operational; status of pipeline probes)
-# - dropbox_tracker (operational; not user data)
-# (These are documented to make future audits easy.)
+# Exported despite not deriving cleanly:
+# - platform_memory: category-split in the taxonomy (durable vs coach-state), but
+#   the partition is real user data — export all of it.
+# - google_calendar: dead (no writer, ADR-030) but the historical rows are data.
+_EXPORT_EXTRAS = ["platform_memory", "google_calendar"]
+
+ALL_SOURCES = sorted([k for k, cls in SOURCE_CLASS.items() if cls != SYSTEM_STATE] + _EXPORT_EXTRAS)
+
+# Partitions intentionally EXCLUDED (all SYSTEM_STATE in phase_taxonomy):
+# - email_log (sent-mail archive), health_check, dropbox_tracker (ops)
+# - journal_analysis (regenerating nightly cache — was exported by the old list)
+# - composite_scores (partition removed, ADR-025 — was exported by the old list)
+# - hevy_id_map / routine_index (infra caches)
 
 
 class DecimalEncoder(json.JSONEncoder):

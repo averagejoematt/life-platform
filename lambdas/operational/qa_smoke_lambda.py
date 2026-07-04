@@ -125,27 +125,16 @@ def check_ddb_freshness():
     # to OPTIONAL: they're event-driven, so a missing day is normal, not a fault
     # (Garmin already covers daily steps/activity). This was the source of the
     # chronic "🔴 QA: 3 failures" emails.
-    REQUIRED = [
-        ("whoop", "Sleep/Recovery"),
-        ("habitify", "Habits"),
-        ("apple_health", "Apple Health (daily steps/activity)"),
-    ]
-    OPTIONAL = [
-        ("withings", "Weight (weigh-ins are sporadic)"),
-        ("eightsleep", "Eight Sleep"),
-        ("supplements", "Supplements"),
-        ("journal", "Notion Journal"),
-        # #496/C-3: strava re-enabled 2026-06-20 (subscription restored). OPTIONAL,
-        # not REQUIRED — workouts are event-driven, so a missing day is behavior,
-        # not breakage. It sat mislabeled "paused (API 402)" here for two weeks.
-        ("strava", "Strava (workouts are event-driven)"),
-    ]
-    # PAUSED = intentionally off, but kept visible so they're not forgotten and can
-    # be returned to. Shown ⏸, never a fault. Garmin: 2026 anti-automation crackdown
-    # 429-blocks server-side auth (ADR-074).
-    PAUSED = [
-        ("garmin", "Garmin — paused (server-side auth 429-blocked); will return"),
-    ]
+    # #498 (X-10): the three tiers derive from the registry's qa_tier + paused
+    # facets — this list previously drifted twice (strava sat mislabeled "paused
+    # (API 402)" for two weeks; the phantom "journal" partition was checked
+    # instead of notion). Tier semantics unchanged: REQUIRED missing = FAIL,
+    # OPTIONAL missing = warn, PAUSED = ⏸ never a fault.
+    from source_registry import qa_optional, qa_paused, qa_required
+
+    REQUIRED = qa_required()
+    OPTIONAL = qa_optional()
+    PAUSED = qa_paused()
 
     for source, label in REQUIRED:
         c = Check(f"DDB:{source}", "Data Freshness")
