@@ -2,7 +2,7 @@
 # Usage: make <target>
 # All targets run from the repo root.
 
-.PHONY: help test lint syntax deploy-mcp deploy-site deploy-cdk-web \
+.PHONY: help test lint syntax preflight deploy-mcp deploy-site deploy-cdk-web \
         deploy-cdk-operational layer commit clean
 
 PYTHON  := python3
@@ -28,9 +28,28 @@ format:  ## Apply ruff (lint+import-sort) then black. Config in pyproject.toml.
 	$(PYTHON) -m ruff check --fix lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 	$(PYTHON) -m black lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
-format-check:  ## Verify formatting (no changes) — this is the enforced CI gate (black --check + ruff check)
+format-check:  ## Verify formatting (no changes) — will gate CI once the baseline lands
 	$(PYTHON) -m ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 	$(PYTHON) -m black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+
+preflight:  ## Match CI gates locally: black==25.9.0 + ruff==0.14.0 + mypy + py_compile + test_shared_modules
+	@echo "Installing CI-pinned tool versions (black==25.9.0 ruff==0.14.0 mypy==2.1.0)…"
+	pip install --quiet black==25.9.0 ruff==0.14.0 mypy==2.1.0
+	@echo "1/5  black --check…"
+	black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+	@echo "2/5  ruff check…"
+	ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
+	@echo "3/5  mypy (tier-1 clean-module set)…"
+	$(PYTHON) -m mypy --config-file mypy.ini \
+		lambdas/secret_cache.py lambdas/retry_utils.py lambdas/phase_filter.py \
+		lambdas/constants.py lambdas/bedrock_client.py lambdas/scoring_engine.py \
+		lambdas/character_engine.py lambdas/intelligence_common.py lambdas/ai_calls.py \
+		lambdas/ai_context.py lambdas/ai_summaries.py
+	@echo "4/5  py_compile…"
+	find lambdas/ mcp/ -name '*.py' -exec $(PYTHON) -m py_compile {} \;
+	@echo "5/5  pytest test_shared_modules (matching CI scope)…"
+	$(PYTEST) tests/test_shared_modules.py -v --tb=short
+	@echo "Preflight passed — CI gates clear."
 
 syntax:  ## Syntax-check all Python files in lambdas/ and mcp/
 	find lambdas/ mcp/ -name '*.py' -exec $(PYTHON) -m py_compile {} \;

@@ -17,14 +17,12 @@ Tiers (projected month-end total, $75 all-in ceiling):
   2 Restrict $65-73   → + pause public website AI (/api/ask, /api/board_ask)
   3 Hard stop ≥ $73   → + pause ALL Bedrock; daily brief goes data-only
 
-Runs 3x/day (every 8h). Sets SSM /life-platform/budget-tier (default 0). Alerts on
-change. Auto-resets to 0 at month rollover (estimate is month-to-date). The 8h
-cadence means up to ~8h of detection lag; the actual-month-to-date cap in
-bedrock_client.invoke() is the same-invocation backstop.
+Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
+Auto-resets to 0 at month rollover (estimate is month-to-date).
 
 IAM: ce:GetCostAndUsage, cloudwatch:GetMetricData, cloudwatch:PutMetricData,
      ssm:GetParameter, ssm:PutParameter, sns:Publish.
-Schedule: every 8h (EventBridge; see operational_stack.py).
+Schedule: hourly (EventBridge).
 """
 
 import calendar
@@ -328,16 +326,51 @@ def _alert(prev: int, new: int, mtd: float, projected: float) -> None:
         logger.warning(f"SNS publish failed: {e}")
 
 
-def _emit_metrics(mtd: float, projected: float, tier: int) -> None:
+def _self_reported_cost_mtd(start: datetime, now: datetime) -> float:
+    """Sum LifePlatform/AI::EstimatedCostUSD over [start, now). This is the
+    self-emitted metric from bedrock_client._emit_usage_metrics() — it under-counts
+    because it only fires for calls with EMF instrumentation (misses dev sessions,
+    MCP direct calls, etc.). Used only to compute the drift ratio vs the authoritative
+    AWS/Bedrock-derived estimate; never used for tier decisions."""
     try:
-        _cw.put_metric_data(
-            Namespace="LifePlatform/Budget",
-            MetricData=[
-                {"MetricName": "EstimatedMonthToDateSpend", "Value": mtd, "Unit": "None"},
-                {"MetricName": "ProjectedMonthlySpend", "Value": projected, "Unit": "None"},
-                {"MetricName": "BudgetTier", "Value": tier, "Unit": "None"},
-            ],
+        resp = _cw.get_metric_statistics(
+            Namespace="LifePlatform/AI",
+            MetricName="EstimatedCostUSD",
+            StartTime=start,
+            EndTime=now,
+            Period=2678400,
+            Statistics=["Sum"],
         )
+        return sum(d["Sum"] for d in resp.get("Datapoints", []))
+    except Exception as e:
+        logger.debug(f"self-reported cost query failed (non-critical): {e}")
+        return 0.0
+
+
+def _emit_metrics(mtd: float, projected: float, tier: int, self_reported_mtd: float) -> None:
+    data = [
+        {"MetricName": "EstimatedMonthToDateSpend", "Value": mtd, "Unit": "None"},
+        {"MetricName": "ProjectedMonthlySpend", "Value": projected, "Unit": "None"},
+        {"MetricName": "BudgetTier", "Value": tier, "Unit": "None"},
+        # AuthoritativeCostMTD = the governor's own accurate AI estimate (AWS/Bedrock
+        # token metrics × prices) + non-AI (Cost Explorer). Allows dashboards to compare
+        # against the self-reported LifePlatform/AI::EstimatedCostUSD metric, which only
+        # counts calls made through bedrock_client._emit_usage_metrics() and therefore
+        # under-counts (dev sessions, MCP calls without EMF instrumentation, etc.).
+        {"MetricName": "AuthoritativeCostMTD", "Value": mtd, "Unit": "None"},
+    ]
+    # Drift metric: how much larger the authoritative estimate is vs self-reported.
+    # Values > 1.5 (50% gap) indicate significant under-counting in self-emitted metrics.
+    if self_reported_mtd > 0:
+        drift_ratio = mtd / self_reported_mtd
+        data.append({"MetricName": "CostMetricDriftRatio", "Value": drift_ratio, "Unit": "None"})
+        if drift_ratio > 1.5:
+            logger.warning(
+                f"CostMetricDrift: authoritative ${mtd:.2f} vs self-reported ${self_reported_mtd:.2f} "
+                f"= {drift_ratio:.2f}x — self-emitted metrics are significantly under-counting"
+            )
+    try:
+        _cw.put_metric_data(Namespace="LifePlatform/Budget", MetricData=data)
     except Exception as e:
         logger.warning(f"PutMetricData failed: {e}")
 
@@ -373,12 +406,14 @@ def lambda_handler(event, context):
         computed_tier = _decide_tier(projected, mtd, elapsed_days)
         prev = _read_tier()
 
+        self_reported = _self_reported_cost_mtd(month_start, now)
         logger.info(
             f"Spend: non_ai=${non_ai:.2f} ai=${ai:.2f} (trailing_7d over {trailing_days:.1f}d: "
             f"non_ai ~${non_ai_daily:.2f}/day + ai ~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
-            f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE}"
+            f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE} "
+            f"self_reported_mtd=${self_reported:.2f}"
         )
-        _emit_metrics(mtd, projected, computed_tier)
+        _emit_metrics(mtd, projected, computed_tier, self_reported)
 
         # Phase B ships in OBSERVE mode: emit metrics + log the computed tier, but
         # do NOT write SSM or alert — lets us validate the estimate vs the real
