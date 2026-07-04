@@ -117,7 +117,9 @@
       "function": "scenario-explorer",
       "handler": "compute.scenario_explorer_lambda.lambda_handler",
       "note": "#550: nightly what-followed conditional distributions. 12:10 UTC. Writes SOURCE#scenarios.",
-      "stack": "LifePlatformCompute"
+      "stack": "LifePlatformCompute",
+      "cdk_only": true,
+      "_cdk_only_reason": "Imports the sibling compute/hypothesis_engine_lambda.py (the one day-row assembly, ADR-105) which is NOT a layer module. Single-file hot-deploy strips it -> Runtime.ImportModuleError (bit us 2026-07-04). Only cdk deploy ships the full bundle."
     },
     "lambdas/compute/sleep_reconciler_lambda.py": {
       "function": "sleep-reconciler"
