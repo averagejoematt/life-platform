@@ -2663,11 +2663,22 @@ def tool_create_experiment(args):
     duration_tier = (args.get("duration_tier") or "").strip()
     experiment_type = (args.get("experiment_type") or "").strip()
     planned_duration_days = args.get("planned_duration_days")
+    design = args.get("design")
 
     if not name:
         raise ValueError("name is required (e.g. 'Creatine 5g daily', 'No caffeine after 10am')")
     if not hypothesis:
         raise ValueError("hypothesis is required (e.g. 'Will improve deep sleep % by >5%')")
+
+    # #539: pre-registration — the design is validated NOW and frozen on the record.
+    # An invalid design rejects the creation outright (a sloppy design silently
+    # accepted would be worse than none), and nothing may mutate it afterward.
+    if design is not None:
+        import experiment_design
+
+        ok, issues = experiment_design.validate_design(design)
+        if not ok:
+            raise ValueError("invalid design (pre-registration rejected): " + "; ".join(issues))
 
     now = datetime.now(timezone.utc)
     if not start_date:
@@ -2717,6 +2728,10 @@ def tool_create_experiment(args):
         "experiment_type": experiment_type or None,
         "planned_duration_days": int(planned_duration_days) if planned_duration_days else None,
         "iteration": iteration,
+        # #539: the frozen n-of-1 design + its public pre-registration stamp.
+        # Floats → Decimal for DDB (min_effect is commonly fractional).
+        "design": json.loads(json.dumps(design), parse_float=Decimal) if design else None,
+        "pre_registered_at": now.strftime("%Y-%m-%dT%H:%M:%S") if design else None,
     }
 
     # Clean None values for DynamoDB
@@ -2736,6 +2751,8 @@ def tool_create_experiment(args):
         "duration_tier": duration_tier or None,
         "experiment_type": experiment_type or None,
         "iteration": iteration,
+        "design": design,
+        "pre_registered_at": item.get("pre_registered_at"),
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
             "Attia": "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",
@@ -3094,6 +3111,21 @@ def tool_end_experiment(args):
         update_expr += ", reflection = :ref"
         expr_values[":ref"] = reflection
 
+    # #539: designed experiments close with the pre-registered paired analysis \u2014
+    # baseline vs washout-trimmed intervention window, block-bootstrap 95% CI,
+    # deterministic verdict against the FROZEN criterion. Fail-soft: an analysis
+    # error never blocks closing (the honest state is analysis=None, not a guess).
+    analysis = None
+    design = existing.get("design")
+    if design and status == "completed":
+        try:
+            analysis = _run_design_analysis(existing, design, end_date)
+        except Exception as e:
+            logger.warning(f"end_experiment: design analysis failed for {exp_id}: {e}")
+    if analysis is not None:
+        update_expr += ", analysis = :an"
+        expr_values[":an"] = json.loads(json.dumps(analysis), parse_float=Decimal)
+
     table.update_item(
         Key={"pk": EXPERIMENTS_PK, "sk": sk},
         UpdateExpression=update_expr,
@@ -3121,7 +3153,53 @@ def tool_end_experiment(args):
         "compliance_pct": int(compliance_pct) if compliance_pct is not None else None,
         "reflection": reflection or None,
         "iteration": existing.get("iteration", 1),
+        "analysis": analysis,
         "tip": "Run get_experiment_results to see the full before/after comparison.",
+    }
+
+
+def _run_design_analysis(existing, design, end_date):
+    """#539: the deterministic close-path analysis for a pre-registered design.
+
+    Fetches the criterion metric's daily series for the baseline window and the
+    washout-trimmed intervention window, then evaluates against the frozen
+    criterion via experiment_design (stats_core underneath). Returns the analysis
+    dict (windows + stats + verdict + summary sentence), or None when the washout
+    consumed the whole experiment."""
+    import experiment_design
+
+    design_f = json.loads(json.dumps(design, default=float))  # Decimals → floats for math
+    windows = experiment_design.design_windows(existing.get("start_date", ""), end_date, design_f)
+    if windows is None:
+        return {
+            "verdict": "inconclusive",
+            "summary": "Washout consumed the whole experiment window — no analysis possible.",
+            "windows": None,
+        }
+    metric = (design_f.get("criterion") or {}).get("metric", "")
+    source, field, _label = experiment_design.DESIGN_METRICS[metric]
+
+    def _values(start, end):
+        items = query_source(source, start, end)
+        if source == "whoop":
+            items = [normalize_whoop_sleep(i) for i in items]
+        vals = []
+        for it in items:
+            v = _extract_metric(it, field)
+            if v is not None:
+                vals.append(v)
+        return vals
+
+    baseline_vals = _values(windows["baseline_start"], windows["baseline_end"])
+    window_vals = _values(windows["analysis_start"], windows["analysis_end"])
+    stats = experiment_design.evaluate_design(design_f, baseline_vals, window_vals)
+    return {
+        "windows": windows,
+        "metric": metric,
+        **stats,
+        "summary": experiment_design.analysis_summary(design_f, stats),
+        "analyzed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+        "engine": "n1-design-v1",
     }
 
 

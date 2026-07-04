@@ -1425,7 +1425,25 @@ async function renderExperiments(d) {
       : "";
     const finding = done && x.key_finding && !isBad(x.key_finding) ? `<p class="rd-line"><strong>${esc(x.key_finding)}</strong></p>` : "";
     const reflect = done && x.reflection && !isBad(x.reflection) ? `<p class="rd-reflect">“${esc(x.reflection)}”</p>` : "";
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+    // #539: the pre-registration stamp + the frozen criterion, rendered from the
+    // design fields only — the honesty claim is that the criterion predates the data.
+    let design = "";
+    if (x.design && x.design.criterion && x.design.criterion.metric) {
+      const c = x.design.criterion;
+      const wash = Number(x.design.washout_days) ? ` · washout ${esc(String(x.design.washout_days))}d` : "";
+      design = `<p class="rd-line"><span class="label">pre-registered design</span> ${esc(c.metric)} ${esc(c.direction || "")} by ≥${esc(String(c.min_effect))} · baseline ${esc(String(x.design.baseline_days))}d${wash}</p>`;
+    }
+    // #539: the deterministic close-path result — effect [CI, n/n] → verdict.
+    let analysis = "";
+    if (done && x.analysis && x.analysis.effect_size != null) {
+      const a = x.analysis;
+      const ci = a.ci95_low != null ? ` [95% CI ${esc(String(a.ci95_low))}, ${esc(String(a.ci95_high))}]` : "";
+      analysis = `<p class="rd-line"><strong>effect ${a.effect_size > 0 ? "+" : ""}${esc(String(a.effect_size))}${ci} · n ${esc(String(a.n_window))}/${esc(String(a.n_baseline))} → ${esc(String(a.verdict || ""))}</strong></p>`;
+    } else if (done && x.analysis && x.analysis.verdict) {
+      analysis = `<p class="rd-line label">paired analysis: ${esc(String(x.analysis.verdict))} (n ${esc(String(x.analysis.n_window ?? "?"))}/${esc(String(x.analysis.n_baseline ?? "?"))})</p>`;
+    }
+    const preReg = x.pre_registered_at ? String(x.pre_registered_at).slice(0, 10) : null;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${design}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${analysis}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, preReg && `pre-registered ${preReg}`, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
   };
   const libCard = (x) => {
     // P2.1 — evidence_tier gets the evClass chip treatment (strong/moderate/emerging).

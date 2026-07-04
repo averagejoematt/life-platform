@@ -1500,6 +1500,46 @@ TOOLS = {
                         "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking).",
                     },
                     "planned_duration_days": {"type": "integer", "description": "Target duration in days."},
+                    "design": {
+                        "type": "object",
+                        "description": (
+                            "#539: OPTIONAL but strongly preferred — the n-of-1 pre-registration design, "
+                            "validated at creation and FROZEN (immutable, publicly stamped 'pre-registered on DATE'). "
+                            "With a design, end_experiment runs the paired analysis automatically "
+                            "(baseline vs washout-trimmed window, block-bootstrap 95% CI, deterministic verdict). "
+                            "Example: {baseline_days: 14, washout_days: 3, criterion: {metric: 'deep_pct', "
+                            "direction: 'higher', min_effect: 2}}."
+                        ),
+                        "properties": {
+                            "baseline_days": {"type": "integer", "description": "Baseline window: days before start (7-56)."},
+                            "washout_days": {
+                                "type": "integer",
+                                "description": "Days after start excluded from analysis while the intervention takes effect (0-14).",
+                            },
+                            "criterion": {
+                                "type": "object",
+                                "description": "The frozen success criterion.",
+                                "properties": {
+                                    "metric": {
+                                        "type": "string",
+                                        "description": (
+                                            "One of: sleep_score, sleep_efficiency_pct, deep_pct, rem_pct, sleep_duration_hours, "
+                                            "sleep_onset_latency_min, recovery_score, hrv_rmssd, resting_heart_rate, garmin_stress, "
+                                            "body_battery_high, weight_lbs, calories, protein_g, steps, cgm_mean_glucose, "
+                                            "cgm_time_in_range_pct."
+                                        ),
+                                    },
+                                    "direction": {"type": "string", "description": "'higher' or 'lower' — the predicted change."},
+                                    "min_effect": {
+                                        "type": "number",
+                                        "description": "Minimum absolute effect (metric units) that would count as success.",
+                                    },
+                                },
+                                "required": ["metric", "direction", "min_effect"],
+                            },
+                        },
+                        "required": ["baseline_days", "criterion"],
+                    },
                 },
                 "required": ["name", "hypothesis"],
             },
