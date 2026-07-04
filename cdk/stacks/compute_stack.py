@@ -477,6 +477,24 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # #540: real inter-coach dialogue — the week's most persistent ensemble
+        # disagreement gets two gated in-voice Haiku turns, persisted as an
+        # ENSEMBLE#dispute thread. Sunday 18:00 UTC — after the history summarizer
+        # (17:00) so the week's disagreement ledger is settled. Tier>=1 self-pauses.
+        create_platform_lambda(
+            self,
+            "InterCoachDialogue",
+            function_name="inter-coach-dialogue",
+            handler="coach.inter_coach_dialogue_lambda.lambda_handler",
+            source_file="lambdas/coach/inter_coach_dialogue_lambda.py",
+            schedule="cron(0 18 ? * SUN *)",  # Sunday 11:00 AM PT (fixed UTC)
+            timeout_seconds=300,
+            memory_mb=256,
+            environment={"AI_MODEL_HAIKU": AI_MODEL_HAIKU},
+            custom_policies=rp.compute_coach_orchestrator(),
+            **shared,
+        )
+
         create_platform_lambda(
             self,
             "CoachHistorySummarizer",
