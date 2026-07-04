@@ -669,6 +669,22 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # /api/explain (#403) — one-tap server-grounded page explainer.
+                    # Same AI Lambda, same never-cache posture as /api/ask.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/api/explain",
+                        target_origin_id="AiLambdaOrigin",
+                        viewer_protocol_policy="https-only",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(
+                            query_string=False,
+                            headers=["Origin", "Content-Type", "X-Subscriber-Token"],
+                        ),
+                        default_ttl=0,
+                        max_ttl=0,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     # /api/ask — AI Q&A (POST only, no cache). ADR-036: routed to AI Lambda.
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/api/ask",

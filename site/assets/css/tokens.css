@@ -1206,3 +1206,15 @@ a.vg-lit:hover { background: var(--ember-wash); }
 [data-ask-mount] .correlative, .beat-ask .correlative { margin-top: var(--sp-5); padding: var(--sp-3) var(--sp-4); border: var(--honest-border);
   border-radius: var(--radius-xs); color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); max-width: var(--measure); }
 
+
+/* ── #403 'explain this page' — one-tap server-grounded explainer ─────────── */
+.explain-mount { margin-top: var(--sp-4); max-width: var(--measure); }
+.explain-btn { cursor: pointer; background: transparent; border: var(--border-hair); border-radius: var(--radius-sm);
+  color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.04em;
+  padding: var(--sp-2) var(--sp-3); transition: color var(--dur-fast), border-color var(--dur-fast); }
+.explain-btn:hover { color: var(--ember); border-color: var(--ember-line); }
+.explain-btn:disabled { opacity: 0.55; cursor: progress; }
+.explain-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.explain-out { margin-top: var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5;
+  color: var(--ink); border-left: 2px solid var(--rule); padding-left: var(--sp-4); }
+li.wk-explain { list-style: none; }

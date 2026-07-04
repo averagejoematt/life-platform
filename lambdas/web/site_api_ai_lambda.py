@@ -786,6 +786,12 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
             return _error(405, "Use POST method")
         return _handle_ask(event)
 
+    # ── POST /api/explain (#403) ───────────────────────────
+    if path == "/api/explain":
+        if method != "POST":
+            return _error(405, "Use POST method")
+        return _handle_explain(event)
+
     return _error(404, "Not found")
 
 
@@ -933,6 +939,184 @@ def _handle_ask(event: dict) -> dict:
         }
     except Exception as e:
         logger.error(f"[site_api_ai] /api/ask failed: {e}")
+        return _error(500, "AI service error")
+
+
+# ── #403: 'Explain this page' — server-grounded one-tap explainers ──────────
+# The affordance sends ONLY a surface name; the server refetches the
+# allowlisted read-only endpoint's JSON itself, so client-supplied numbers are
+# never trusted (the injection hole is closed by construction). One small
+# Haiku call per tap, sharing the ask endpoint's budget pause, DDB rate
+# limiting, prompt caching, and the ADR-104 fail-closed number gate.
+
+_SITE_BASE = os.environ.get("SITE_BASE_URL", "https://averagejoematt.com")
+
+# surface name -> what the reader is looking at (drives the prompt framing).
+# Fetching is per-surface in _fetch_surface_json; nothing outside this dict
+# can ever be explained.
+_EXPLAIN_SURFACES = {
+    "observatory_week": "the cockpit's week view — six instruments (sleep, training, nutrition, glucose, physical, mind), "
+    "each a 7-day sparkline with this week's primary number and its delta vs the week before",
+    "what_changed": "the cockpit's month view — real trailing-30-day vs prior-30-day averages per metric, "
+    "plus correlations that first passed FDR significance in the last 30 days; honest_null means a genuinely steady month",
+    "sleep_correlations": "the sleep page's cross-source signal board — candidate correlations with n, weeks of overlap, "
+    "and a confidence tag; under 2 weeks of overlap only a direction is shown, and thin pairs are flagged likely-noise",
+}
+
+_EXPLAIN_WEEK_DOMAINS = ("sleep", "training", "nutrition", "glucose", "physical", "mind")
+
+
+def _fetch_public_json(path: str):
+    """GET one of our own read-only public endpoints (server-side, stdlib)."""
+    import urllib.request
+
+    req = urllib.request.Request(f"{_SITE_BASE}{path}", headers={"accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=6) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    # Unwrap the standard {"data": ...} envelope when present.
+    if isinstance(data, dict) and isinstance(data.get("data"), (dict, list)) and len(data) <= 3:
+        return data["data"]
+    return data
+
+
+def _fetch_surface_json(surface: str):
+    """Refetch the surface's real payload — the ONLY numbers the model sees."""
+    if surface == "observatory_week":
+        out = {}
+        for d in _EXPLAIN_WEEK_DOMAINS:
+            try:
+                j = _fetch_public_json(f"/api/observatory_week?domain={d}") or {}
+                p = ((j.get("summary") or {}).get("primary") or {}) if isinstance(j, dict) else {}
+                if p:
+                    out[d] = {k: p.get(k) for k in ("value", "unit", "delta", "trend", "delta_label", "sparkline") if p.get(k) is not None}
+            except Exception as e:
+                logger.warning(f"[explain] {d} week read skipped: {e}")
+        return out
+    if surface == "what_changed":
+        return _fetch_public_json("/api/what_changed")
+    if surface == "sleep_correlations":
+        return _fetch_public_json("/api/sleep_correlations")
+    return None
+
+
+def _shrink_for_prompt(data, cap: int = 9000) -> str:
+    """Deterministically bound the JSON handed to the model: long lists are
+    trimmed (first 12 items) rather than the text being cut mid-token."""
+
+    def _trim(v):
+        if isinstance(v, list):
+            return [_trim(x) for x in v[:12]]
+        if isinstance(v, dict):
+            return {k: _trim(x) for k, x in v.items()}
+        return v
+
+    txt = json.dumps(_trim(data), default=str)
+    return txt[:cap]
+
+
+_EXPLAIN_SYSTEM = (
+    "You are the plain-English tour guide for averagejoematt.com — Matthew's public, single-subject (N=1) "
+    "health experiment. A reader tapped 'explain this page' on a data-dense surface. You receive the page's "
+    "REAL, server-fetched JSON and a description of what the surface shows.\n\n"
+    "RULES (absolute):\n"
+    "- 3-4 short sentences of plain English. No headers, no bullets, no markdown.\n"
+    "- Narrate ONLY values present in the JSON — never compute, average, or extrapolate a number yourself.\n"
+    "- Correlative framing only: 'tracks with', 'coincided with' — never causal claims, never health advice.\n"
+    "- If the data is thin or empty, say so honestly and plainly (the experiment-day context tells you why a "
+    "young record is short) — never pad with invented data.\n"
+    "- The reader is NOT Matthew; the data and devices are Matthew's.\n"
+    "- N=1: flag thin evidence as preliminary where it matters."
+)
+
+
+def _handle_explain(event: dict) -> dict:
+    """POST /api/explain — {surface} in, 3-4 grounded sentences out."""
+    _paused = _ai_paused_response()
+    if _paused:
+        return _paused
+    source_ip = (
+        event.get("requestContext", {}).get("http", {}).get("sourceIp")
+        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
+        or "unknown"
+    )
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except Exception:
+        return _error(400, "Invalid JSON")
+    surface = str(body.get("surface") or "").strip()
+    if surface not in _EXPLAIN_SURFACES:
+        return _error(400, "Unknown surface")
+
+    ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
+    sub_token = (event.get("headers") or {}).get("x-subscriber-token", "")
+    is_subscriber = bool(sub_token) and _validate_subscriber_token(sub_token)
+    allowed, remaining = _ask_rate_check(ip_hash, limit=20 if is_subscriber else 5)
+    if not allowed:
+        _emit_rate_limit_metric("explain")
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+            "body": json.dumps({"error": "Rate limit exceeded.", "remaining": 0}),
+        }
+
+    try:
+        payload = _fetch_surface_json(surface)
+    except Exception as e:
+        logger.warning(f"[explain] surface fetch failed for {surface}: {e}")
+        payload = None
+    if payload is None:
+        return _error(503, "That surface's data isn't reachable right now.")
+
+    payload_txt = _shrink_for_prompt(payload)
+    try:
+        from constants import EXPERIMENT_START_DATE
+
+        _day_n = (datetime.now(timezone.utc).date() - datetime.strptime(EXPERIMENT_START_DATE, "%Y-%m-%d").date()).days + 1
+        day_ctx = f"Experiment day {_day_n} (restarted {EXPERIMENT_START_DATE}) — a young record is short by design."
+    except Exception:
+        day_ctx = ""
+
+    user_msg = (
+        f"SURFACE: {_EXPLAIN_SURFACES[surface]}\n"
+        + (f"CONTEXT: {day_ctx}\n" if day_ctx else "")
+        + f"PAGE JSON (authoritative — cite only these numbers):\n{payload_txt}\n\n"
+        "Explain what this page is showing right now, in 3-4 plain sentences."
+    )
+    try:
+        from bedrock_client import invoke as _bedrock_invoke
+
+        result = _bedrock_invoke(
+            {
+                "model": AI_MODEL_HAIKU,
+                "max_tokens": 300,
+                "system": [{"type": "text", "text": _EXPLAIN_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+                "messages": [{"role": "user", "content": user_msg}],
+            }
+        )
+        _emit_token_metrics(result.get("usage", {}), endpoint="api_explain")
+        explanation = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text").strip()
+
+        # ADR-104 fail-closed gate: every number must exist in the fetched JSON.
+        try:
+            import grounded_generation as _gg
+
+            _allowed = _gg.allowed_numbers(payload_txt, day_ctx)
+            if _gg.grounding_findings(explanation, allowed=_allowed):
+                logger.warning(f"[explain] ungrounded numbers for {surface} — refusing")
+                explanation = (
+                    "I'd rather not narrate numbers I can't ground in this page's data. "
+                    "The chart itself is the honest read — try again in a moment."
+                )
+        except ImportError:
+            pass
+
+        return {
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+            "body": json.dumps({"explanation": _scrub_blocked_terms(explanation), "surface": surface, "remaining": remaining}),
+        }
+    except Exception as e:
+        logger.error(f"[site_api_ai] /api/explain failed: {e}")
         return _error(500, "AI service error")
 
 
