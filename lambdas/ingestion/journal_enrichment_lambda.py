@@ -3,8 +3,9 @@
 Life Platform — Journal Enrichment Lambda
 Runs after Notion ingestion (EventBridge: 6:30 AM PT).
 
-For each journal entry in the target date window, calls Claude Haiku to
-extract structured behavioral/psychological signals from raw_text:
+For each journal entry in the target date window, calls Claude Haiku ONCE
+(#505 schema v2 — the old second "defense" pass is folded in) to extract
+structured behavioral/psychological signals from raw_text:
 
   enriched_mood, enriched_energy, enriched_stress, enriched_sentiment,
   enriched_emotions, enriched_themes, enriched_cognitive_patterns,
@@ -12,7 +13,15 @@ extract structured behavioral/psychological signals from raw_text:
   enriched_social_quality, enriched_flow, enriched_values_lived,
   enriched_gratitude, enriched_alcohol, enriched_sleep_context,
   enriched_pain, enriched_exercise_context, enriched_notable_quote,
-  enriched_at
+  enriched_defense_patterns, enriched_primary_defense,
+  enriched_entities, enriched_behaviors, enriched_causal_hints (v2),
+  enriched_schema_version, enriched_at
+
+v2 (#505): entities/behaviors/causal_hints are the raw material for grounding
+and hypothesis candidates; every causal hint carries the verbatim sentence that
+asserts it, and hints whose quote isn't actually in the entry are dropped
+deterministically (the ADR-104 pattern). Dropped as dead (J-6): the second
+Haiku pass, enriched_emotional_depth, enriched_defense_context.
 
 Runs on:
   - Last 2 days by default (EventBridge daily); Sundays widen to 30 days
@@ -21,10 +30,10 @@ Runs on:
   - Date range: {"start": "...", "end": "..."}
   - Full re-enrichment: {"full_sync": true}
   - Skip already-enriched: default true, override with {"force": true}
+    (entries enriched under schema v1 re-enrich automatically)
 
 Environment variables:
   TABLE_NAME          — DynamoDB table (default: life-platform)
-  ANTHROPIC_SECRET    — Secrets Manager key for Anthropic API key
   MODEL               — Claude model (default: claude-haiku-4-5-20251001)
 """
 
@@ -33,8 +42,6 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from urllib.error import HTTPError
-from urllib.request import Request
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -50,32 +57,20 @@ except ImportError:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
-ANTHROPIC_SECRET = os.environ.get("ANTHROPIC_SECRET", "life-platform/ai-keys")
 MODEL = os.environ.get("MODEL", "claude-haiku-4-5-20251001")
-ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 # ── Config (env vars with backwards-compatible defaults) ──
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 PK = f"USER#{USER_ID}#SOURCE#notion"
-MIN_TEXT_LENGTH = 20  # Skip enrichment for very short entries
-ENRICH_DEFENSE_PATTERNS = True  # v2.72.0: Add defense mechanism detection (#41)
+# J-5 (#505): the floor is WORDS, aligned with journal_analyzer_lambda — the old
+# 20-CHAR floor let one-liners through that only produced junk extractions.
+MIN_TEXT_WORDS = 20
+SCHEMA_VERSION = 2  # #505: bump when the extraction schema changes; v1 entries re-enrich
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
-secrets = boto3.client("secretsmanager", region_name=REGION)
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
-
-_api_key_cache = None
-
-
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
 
 
 # ── Haiku Prompt ──────────────────────────────────────────────────────────────
@@ -89,6 +84,10 @@ Rules:
 - themes: max 4, ordered by prominence in the entry.
 - ownership_score: only rate if there's clear attribution language (internal vs external locus).
 - values_lived: infer from actions described, not stated intentions.
+- defense_patterns: psychodynamic defense mechanisms (Dr. Paul Conti school). Only flag what is CLEARLY demonstrated — most entries have 0-2, many have none. Intellectualization is NOT the same as being analytical; it requires AVOIDING emotional engagement through logic. Avoidance requires evidence of steering AWAY from something, not just not mentioning it.
+- entities: only things the text explicitly names. Normalize casing, keep names as written.
+- behaviors: concrete actions the author actually DID (past tense), not feelings, plans, or intentions.
+- causal_hints: ONLY links the author explicitly asserts ("X because Y", "Y so X", "X after Y — every time"). NEVER infer a link yourself. The quote must be the verbatim sentence from the entry that asserts the link — copy it exactly, character for character.
 - Respond with ONLY valid JSON. No preamble, no markdown fences, no explanation."""
 
 USER_PROMPT_TEMPLATE = """JOURNAL ENTRY:
@@ -119,147 +118,33 @@ Extract as JSON:
   "sleep_disruption_context": <brief reason if poor sleep mentioned, null otherwise>,
   "pain_mentions": [<body areas or pain types. Empty list if none>],
   "exercise_context": <brief subjective workout feel if mentioned, null otherwise>,
-  "notable_quote": <most revealing/insightful sentence verbatim from the entry, null if too brief>
-}}"""
-
-
-# ── Defense Mechanism Prompt (Conti-informed) ─────────────────────────────────
-
-DEFENSE_SYSTEM_PROMPT = """You are a clinical psychologist trained in psychodynamic therapy (Dr. Paul Conti school). Analyze this journal entry for psychological defense mechanisms.
-
-Rules:
-- Only flag defense mechanisms that are CLEARLY demonstrated in the text, not merely hinted at.
-- Be conservative — most entries will have 0-2 patterns. Many entries have none.
-- Intellectualization is NOT the same as being analytical. It requires AVOIDING emotional engagement through logic.
-- Avoidance requires evidence of steering AWAY from something, not just not mentioning it.
-- Return ONLY valid JSON. No preamble, no markdown fences."""
-
-DEFENSE_USER_TEMPLATE = """JOURNAL ENTRY:
-{raw_text}
-
-CONTEXT:
-- Date: {date}
-- Template: {template}
-- Mood: {mood}, Stress: {stress}
-- Themes: {themes}
-
-Extract as JSON:
-{{
+  "notable_quote": <most revealing/insightful sentence verbatim from the entry, null if too brief>,
   "defense_patterns": [<ONLY if clearly demonstrated. Valid patterns: "intellectualization", "avoidance", "displacement", "rationalization", "isolation_of_affect", "minimization", "projection", "denial", "sublimation", "humor_as_deflection", "compartmentalization". Empty list if none detected — this is the most common correct answer>],
   "primary_defense": <string or null — the single most prominent defense if any>,
-  "defense_context": <brief 1-sentence description of what's being defended against, null if no defenses detected>,
-  "emotional_depth_rating": <1-5: 1=very surface/avoidant, 3=moderate engagement, 5=deep emotional processing>
+  "entities": [<people/places/projects/things the entry explicitly names, e.g. "Sarah", "the Denver trip", "the platform". Max 8. Empty list if none>],
+  "behaviors": [<concrete actions the author DID, e.g. "skipped the evening walk", "meal-prepped for the week", "stayed up late scrolling". Max 6. Empty list if none>],
+  "causal_hints": [<cause→effect links the author EXPLICITLY asserts, each as {{"cause": "...", "effect": "...", "quote": "<the verbatim sentence from the entry that asserts the link>"}}. Max 4. Empty list if none — most entries have none>]
 }}"""
 
 
-def call_haiku_defense(raw_text, date, template, mood, stress, themes):
-    """Second Haiku call for defense mechanism detection."""
-    api_key = get_anthropic_key()
-
-    user_content = DEFENSE_USER_TEMPLATE.format(
-        raw_text=raw_text,
-        date=date,
-        template=template,
-        mood=mood or "unknown",
-        stress=stress or "unknown",
-        themes=", ".join(themes) if themes else "none",
-    )
-
-    body = {
-        "model": MODEL,
-        "max_tokens": 500,
-        "system": [{"type": "text", "text": DEFENSE_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        "messages": [{"role": "user", "content": user_content}],
-    }
-
-    req = Request(
-        ANTHROPIC_API,
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-    )
-
-    # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    try:
-        from retry_utils import call_anthropic_raw
-
-        result = call_anthropic_raw(req, timeout=30)
-    except HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        logger.error(f"Defense Haiku API {e.code}: {error_body}")
-        return None
-
-    text = ""
-    for block in result.get("content", []):
-        if block.get("type") == "text":
-            text += block["text"]
-
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse defense response: {e}\nRaw: {text[:300]}")
-        return None
-
-
-def apply_defense_enrichment(item, defense_data):
-    """Write defense mechanism fields to the DynamoDB item."""
-    update_parts = []
-    attr_names = {}
-    attr_values = {}
-
-    patterns = defense_data.get("defense_patterns", [])
-    if patterns and isinstance(patterns, list) and len(patterns) > 0:
-        attr_names["#edp"] = "enriched_defense_patterns"
-        attr_values[":edp"] = patterns
-        update_parts.append("#edp = :edp")
-
-    primary = defense_data.get("primary_defense")
-    if primary:
-        attr_names["#epd"] = "enriched_primary_defense"
-        attr_values[":epd"] = str(primary)
-        update_parts.append("#epd = :epd")
-
-    context = defense_data.get("defense_context")
-    if context:
-        attr_names["#edc"] = "enriched_defense_context"
-        attr_values[":edc"] = str(context)
-        update_parts.append("#edc = :edc")
-
-    depth = defense_data.get("emotional_depth_rating")
-    if depth is not None:
-        attr_names["#eed"] = "enriched_emotional_depth"
-        attr_values[":eed"] = Decimal(str(depth))
-        update_parts.append("#eed = :eed")
-
-    # Always set defense_enriched_at
-    attr_names["#dea"] = "defense_enriched_at"
-    attr_values[":dea"] = datetime.now(timezone.utc).isoformat()
-    update_parts.append("#dea = :dea")
-
-    if not update_parts:
-        return False
-
-    update_expr = "SET " + ", ".join(update_parts)
-    # DATA-2 note: journal enrichment updates existing notion records — validator runs at notion ingestion time
-    table.update_item(
-        Key={"pk": item["pk"], "sk": item["sk"]},
-        UpdateExpression=update_expr,
-        ExpressionAttributeNames=attr_names,
-        ExpressionAttributeValues=attr_values,
-    )
-    return True
+def _ground_causal_hints(hints, raw_text):
+    """#505: deterministic grounding — a causal hint survives only if its quote is
+    actually a substring of the entry (whitespace-normalized). The ADR-104 pattern:
+    the LLM proposes, the code verifies. Returns (kept, dropped_count)."""
+    if not isinstance(hints, list):
+        return [], 0
+    norm_text = " ".join(str(raw_text).split()).lower()
+    kept, dropped = [], 0
+    for h in hints:
+        if not isinstance(h, dict):
+            dropped += 1
+            continue
+        quote = " ".join(str(h.get("quote") or "").split()).lower()
+        if quote and h.get("cause") and h.get("effect") and quote in norm_text:
+            kept.append({"cause": str(h["cause"]), "effect": str(h["effect"]), "quote": str(h["quote"])})
+        else:
+            dropped += 1
+    return kept, dropped
 
 
 def build_structured_scores(item):
@@ -285,9 +170,9 @@ def build_structured_scores(item):
 
 
 def call_haiku(raw_text, date, template, structured_scores):
-    """Call Claude Haiku API and return parsed JSON."""
-    api_key = get_anthropic_key()
-
+    """One Haiku call for the full v2 extraction (#505 — J-2: the urllib Request
+    scaffolding and the dead api-key fetch are gone; retry_utils routes the plain
+    Messages body to Bedrock)."""
     user_content = USER_PROMPT_TEMPLATE.format(
         raw_text=raw_text,
         date=date,
@@ -297,32 +182,17 @@ def call_haiku(raw_text, date, template, structured_scores):
 
     body = {
         "model": MODEL,
-        "max_tokens": 1000,
+        # 1400, not 1000: schema v2 added entities/behaviors/causal_hints — a
+        # truncated ```json fence fails silently (see the max_tokens gotcha).
+        "max_tokens": 1400,
         "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         "messages": [{"role": "user", "content": user_content}],
     }
 
-    req = Request(
-        ANTHROPIC_API,
-        data=json.dumps(body).encode("utf-8"),
-        method="POST",
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-        },
-    )
-
     # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-    try:
-        from retry_utils import call_anthropic_raw
+    from retry_utils import call_anthropic_raw
 
-        result = call_anthropic_raw(req, timeout=30)
-    except HTTPError as e:
-        error_body = e.read().decode() if e.fp else ""
-        logger.error(f"Anthropic API {e.code}: {error_body}")
-        raise
+    result = call_anthropic_raw(body, timeout=30)
 
     # Extract text content
     text = ""
@@ -345,35 +215,50 @@ def call_haiku(raw_text, date, template, structured_scores):
         return None
 
 
+FIELD_MAPPING = {
+    "mood_score": ("enriched_mood", "N"),
+    "energy_score": ("enriched_energy", "N"),
+    "stress_score": ("enriched_stress", "N"),
+    "sentiment": ("enriched_sentiment", "S"),
+    "emotions": ("enriched_emotions", "L"),
+    "themes": ("enriched_themes", "L"),
+    "cognitive_patterns": ("enriched_cognitive_patterns", "L"),
+    "growth_signals": ("enriched_growth_signals", "L"),
+    "avoidance_flags": ("enriched_avoidance_flags", "L"),
+    "ownership_score": ("enriched_ownership", "N"),
+    "social_quality": ("enriched_social_quality", "S"),
+    "flow_indicators": ("enriched_flow", "BOOL"),
+    "values_lived": ("enriched_values_lived", "L"),
+    "gratitude_items": ("enriched_gratitude", "L"),
+    "alcohol_mention": ("enriched_alcohol", "BOOL"),
+    "sleep_disruption_context": ("enriched_sleep_context", "S"),
+    "pain_mentions": ("enriched_pain", "L"),
+    "exercise_context": ("enriched_exercise_context", "S"),
+    "notable_quote": ("enriched_notable_quote", "S"),
+    # v2 (#505): the defense pass folded in + the extraction trio
+    "defense_patterns": ("enriched_defense_patterns", "L"),
+    "primary_defense": ("enriched_primary_defense", "S"),
+    "entities": ("enriched_entities", "L"),
+    "behaviors": ("enriched_behaviors", "L"),
+    "causal_hints": ("enriched_causal_hints", "L"),  # list of {cause, effect, quote} maps
+}
+
+
 def apply_enrichment(item, enrichment):
     """Write enrichment fields back to the DynamoDB item."""
     update_parts = []
     attr_names = {}
     attr_values = {}
 
-    field_mapping = {
-        "mood_score": ("enriched_mood", "N"),
-        "energy_score": ("enriched_energy", "N"),
-        "stress_score": ("enriched_stress", "N"),
-        "sentiment": ("enriched_sentiment", "S"),
-        "emotions": ("enriched_emotions", "L"),
-        "themes": ("enriched_themes", "L"),
-        "cognitive_patterns": ("enriched_cognitive_patterns", "L"),
-        "growth_signals": ("enriched_growth_signals", "L"),
-        "avoidance_flags": ("enriched_avoidance_flags", "L"),
-        "ownership_score": ("enriched_ownership", "N"),
-        "social_quality": ("enriched_social_quality", "S"),
-        "flow_indicators": ("enriched_flow", "BOOL"),
-        "values_lived": ("enriched_values_lived", "L"),
-        "gratitude_items": ("enriched_gratitude", "L"),
-        "alcohol_mention": ("enriched_alcohol", "BOOL"),
-        "sleep_disruption_context": ("enriched_sleep_context", "S"),
-        "pain_mentions": ("enriched_pain", "L"),
-        "exercise_context": ("enriched_exercise_context", "S"),
-        "notable_quote": ("enriched_notable_quote", "S"),
-    }
+    # #505: grounding gate — causal hints whose quote isn't verbatim in the entry
+    # are dropped before anything is written.
+    if enrichment.get("causal_hints"):
+        kept, dropped = _ground_causal_hints(enrichment["causal_hints"], item.get("raw_text", ""))
+        enrichment["causal_hints"] = kept
+        if dropped:
+            logger.info(f"  Grounding gate dropped {dropped} ungrounded causal hint(s) for {item.get('sk')}")
 
-    for haiku_key, (dynamo_key, dtype) in field_mapping.items():
+    for haiku_key, (dynamo_key, dtype) in FIELD_MAPPING.items():
         val = enrichment.get(haiku_key)
         if val is None:
             continue
@@ -393,14 +278,17 @@ def apply_enrichment(item, enrichment):
         elif dtype == "BOOL":
             attr_values[placeholder] = bool(val)
         elif dtype == "L":
-            attr_values[placeholder] = val  # list of strings
+            attr_values[placeholder] = val  # list of strings (or maps for causal_hints)
 
         update_parts.append(f"{alias} = {placeholder}")
 
-    # Always set enriched_at
+    # Always set enriched_at + the schema version that produced this record
     attr_names["#enriched_at"] = "enriched_at"
     attr_values[":enriched_at"] = datetime.now(timezone.utc).isoformat()
     update_parts.append("#enriched_at = :enriched_at")
+    attr_names["#esv"] = "enriched_schema_version"
+    attr_values[":esv"] = Decimal(SCHEMA_VERSION)
+    update_parts.append("#esv = :esv")
 
     if not update_parts:
         logger.info(f"No enrichment to apply for {item['sk']}")
@@ -511,27 +399,33 @@ def lambda_handler(event, context):
             sk = item.get("sk", "")
             raw_text = item.get("raw_text", "")
 
-            # Skip if too short
-            if len(raw_text) < MIN_TEXT_LENGTH:
-                logger.info(f"Skipping {sk}: raw_text too short ({len(raw_text)} chars)")
+            # Skip if too short — WORD floor, aligned with journal_analyzer (J-5/#505)
+            word_count = len(raw_text.split())
+            if word_count < MIN_TEXT_WORDS:
+                logger.info(f"Skipping {sk}: raw_text too short ({word_count} words)")
                 skipped += 1
                 continue
 
             # Skip if already enriched (unless force) — but an entry edited in
-            # Notion after enrichment is stale and re-enriches (#502).
+            # Notion after enrichment (#502) or enriched under an older schema
+            # (#505) is stale and re-enriches. The Sunday 30-day sweep therefore
+            # self-heals v1 entries without a manual backfill.
             edited = edited_since_enrichment(item)
-            if not force and item.get("enriched_at") and not edited:
+            stale_schema = int(item.get("enriched_schema_version") or 1) < SCHEMA_VERSION
+            if not force and item.get("enriched_at") and not edited and not stale_schema:
                 logger.info(f"Skipping {sk}: already enriched at {item['enriched_at']}")
                 skipped += 1
                 continue
             if edited:
                 logger.info(f"Re-enriching {sk}: edited {item.get('notion_last_edited')} after enrichment {item.get('enriched_at')}")
+            elif stale_schema and item.get("enriched_at"):
+                logger.info(f"Re-enriching {sk}: schema v{item.get('enriched_schema_version') or 1} < v{SCHEMA_VERSION}")
 
             template = item.get("template", "Unknown")
             date = item.get("date", "")
             structured_scores = build_structured_scores(item)
 
-            logger.info(f"Enriching {sk} ({template}, {len(raw_text)} chars)...")
+            logger.info(f"Enriching {sk} ({template}, {word_count} words)...")
 
             try:
                 enrichment = call_haiku(raw_text, date, template, structured_scores)
@@ -543,25 +437,9 @@ def lambda_handler(event, context):
                             f"  ✓ Enriched {sk}: "
                             f"mood={enrichment.get('mood_score')}, "
                             f"stress={enrichment.get('stress_score')}, "
-                            f"themes={enrichment.get('themes', [])}"
+                            f"themes={enrichment.get('themes', [])}, "
+                            f"causal_hints={len(enrichment.get('causal_hints') or [])}"
                         )
-
-                        # Defense mechanism detection (second Haiku call) — v2.72.0 #41
-                        if ENRICH_DEFENSE_PATTERNS and (force or edited or not item.get("defense_enriched_at")):
-                            try:
-                                defense = call_haiku_defense(
-                                    raw_text,
-                                    date,
-                                    template,
-                                    enrichment.get("mood_score"),
-                                    enrichment.get("stress_score"),
-                                    enrichment.get("themes", []),
-                                )
-                                if defense:
-                                    apply_defense_enrichment(item, defense)
-                                    logger.info(f"    ✓ Defense: {defense.get('defense_patterns', [])}")
-                            except Exception as de:
-                                logger.warning(f"    Defense enrichment failed for {sk}: {de}")
                     else:
                         skipped += 1
                 else:
