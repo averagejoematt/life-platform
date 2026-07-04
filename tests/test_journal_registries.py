@@ -86,7 +86,9 @@ class TestEntityRegistry:
         assert jal.build_entity_registry([]) == []
 
     def test_malformed_entities_skipped(self):
-        dated = [("2026-07-01", _entry("2026-07-01", enriched_entities=["not-a-dict", {"type": "person"}]))]
+        # dicts without a name, empty strings, and non-string scalars are skipped;
+        # plain strings are VALID (the live-data vintage - see TestStringShapeTolerance)
+        dated = [("2026-07-01", _entry("2026-07-01", enriched_entities=[{"type": "person"}, "  ", 42]))]
         assert jal.build_entity_registry(dated) == []
 
 
@@ -190,3 +192,19 @@ class TestJournalCandidateSeeding:
         assert "workout -> recovery" in block
         assert "legs day wrecked my recovery" in block
         assert eng.format_journal_candidates([]) == ""
+
+
+class TestStringShapeTolerance:
+    """The live data stores entities/behaviors as plain strings (["Britt"]),
+    not the v2 dict sketch — both vintages must aggregate."""
+
+    def test_string_entities(self):
+        dated = [("2026-07-01", _entry("2026-07-01", enriched_entities=["Britt", "britt", "Dr. Chen"]))]
+        reg = jal.build_entity_registry(dated)
+        assert len(reg) == 2
+        assert reg[0]["name"] == "Britt" and reg[0]["mentions"] == 2
+
+    def test_string_behaviors_join(self):
+        dated = [("2026-07-01", _entry("2026-07-01", enriched_behaviors=["went on a morning walk"]))]
+        reg = jal.build_behavior_registry(dated, {"Morning Walk"})
+        assert reg[0]["habitify_match"] == "Morning Walk"
