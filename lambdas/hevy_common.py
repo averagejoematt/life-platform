@@ -41,6 +41,11 @@ from typing import Any, Optional
 import boto3
 
 try:
+    from http_retry import urlopen_with_retry
+except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+    urlopen_with_retry = urllib.request.urlopen
+
+try:
     from platform_logger import get_logger
 
     logger = get_logger("hevy")
@@ -127,7 +132,11 @@ class HevyAPIError(Exception):
 
 
 def hevy_get(path: str, timeout: int = 30) -> dict:
-    """Authenticated GET against the Hevy API. Returns parsed JSON dict."""
+    """Authenticated GET against the Hevy API. Returns parsed JSON dict.
+
+    Retries transient 429/5xx via http_retry (#466 — one retry policy across
+    the Hevy read + write clients) so a single blip doesn't abort the hour.
+    """
     api_key = load_secret()["api_key"]
     url = HEVY_BASE + path
     req = urllib.request.Request(
@@ -140,7 +149,7 @@ def hevy_get(path: str, timeout: int = 30) -> dict:
         method="GET",
     )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urlopen_with_retry(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
         body = ""

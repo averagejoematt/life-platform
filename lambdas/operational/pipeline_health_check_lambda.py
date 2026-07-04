@@ -64,8 +64,11 @@ PIPELINES = [
 # ── ER-01 infra-liveness ──────────────────────────────────────────────────────
 # Active OAuth/API *pull* sources that should run at least once per day. These are
 # the sources whose silent auth-rot / de-scheduling is the 44-day-outage class.
-# Webhook/push sources (apple_health/CGM, hevy) are excluded — they have no cron to
-# go stale, so the attempt-staleness arm doesn't apply to them.
+# Webhook/push sources (apple_health/CGM) are excluded — they have no cron to go
+# stale, so the attempt-staleness arm doesn't apply to them. Every source listed
+# here MUST write the INGEST_HEALTH sentinel (framework sources via run_ingestion;
+# hevy/notion/dropbox — pattern-exempt scheduled pulls — via record_ingest_health,
+# #466/#467), otherwise it sits at 'unknown' forever and the listing fakes coverage.
 ACTIVE_API_SOURCES = [
     "whoop",
     "withings",
@@ -77,6 +80,7 @@ ACTIVE_API_SOURCES = [
     "notion",
     "weather",
     "dropbox",
+    "hevy",
 ]
 
 # Best-effort sources: known-brittle by an accepted, unfixable upstream cause. They are

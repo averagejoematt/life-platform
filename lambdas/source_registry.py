@@ -100,10 +100,15 @@ SOURCE_REGISTRY = {
         "desc": "Tasks completed",
         "category": "Inputs",
         "behavioral": False,  # scheduled API pull
-        # Records are dated by completed DAY and the freshest is always
-        # "yesterday", so a 24h default false-fires every afternoon. 48h still
-        # catches a genuine 2-day outage.
-        "stale_hours": 48,
+        # #471 (X-5): records are dated by completed DAY and ingestion runs 1x
+        # daily, so the freshest record's age at its worst HEALTHY moment (just
+        # before the next daily run, record dated the day before yesterday) is
+        # ~62h. The old 48h threshold false-staled request-time surfaces (the
+        # public board + MCP) ~14h every day; the paging alarm only stayed quiet
+        # because its cron happened to sample outside the window. 72h is the
+        # tightest bound that can't false-fire and still pages a real outage
+        # within a day of the pipe breaking.
+        "stale_hours": 72,
     },
     "habitify": {
         "label": "Habitify",

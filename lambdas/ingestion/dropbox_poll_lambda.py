@@ -48,6 +48,27 @@ try:
     _HAS_AUTH_BREAKER = True
 except ImportError:
     _HAS_AUTH_BREAKER = False
+
+# #467 (X-2): ER-01 liveness sentinel. Dropbox is a scheduled pull outside the
+# framework, so without this it can never leave 'unknown' in pipeline_health_check
+# — a silently de-scheduled cron would go permanently undetected.
+try:
+    from ingest_health import classify_error
+    from ingestion_framework import record_ingest_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
+
+def _record_health(*, succeeded: bool, exc=None) -> None:
+    """Best-effort ER-01 sentinel write (the Lambda ran = attempted)."""
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    error_class = "none" if succeeded else (exc if isinstance(exc, str) else classify_error(exc))
+    record_ingest_health(table, "dropbox", logger, attempted=True, succeeded=succeeded, error_class=error_class)
+
+
 S3_BUCKET = os.environ["S3_BUCKET"]
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")
 
@@ -447,6 +468,8 @@ def lambda_handler(event, context):
         marker = check_breaker(table, source_name="dropbox", user_id=USER_ID, logger=logger)
         if marker:
             logger.warning(f"auth_breaker_skip source=dropbox marked_at={marker.get('marked_at')} error={marker.get('error', '')[:80]}")
+            # Auth-suppressed fetch = continued failure; the streak must grow (#467).
+            _record_health(succeeded=False, exc="auth")
             return {
                 "statusCode": 200,
                 "body": json.dumps(
@@ -475,6 +498,7 @@ def lambda_handler(event, context):
             tracker = get_tracker_item()
             if _is_recently_empty(tracker):
                 logger.info("COST-03: Dropbox was empty at last poll (<25 min ago) — skipping")
+                _record_health(succeeded=True)  # deliberate healthy skip, not a dead cron
                 return {"statusCode": 200, "body": "Skipped — recently checked, no new files"}
 
         # ── Auth ──
@@ -492,6 +516,7 @@ def lambda_handler(event, context):
 
         if not files:
             _mark_empty_poll()
+            _record_health(succeeded=True)
             return {"statusCode": 200, "body": "No files found"}
 
         # ── Filter to MacroFactor CSVs ──
@@ -526,6 +551,7 @@ def lambda_handler(event, context):
         if not csv_files:
             logger.info("No new MacroFactor CSVs to process")
             _mark_empty_poll()
+            _record_health(succeeded=True)
             return {"statusCode": 200, "body": "No MacroFactor CSVs found"}
 
         # ── Check which are new ──
@@ -602,10 +628,12 @@ def lambda_handler(event, context):
         if _HAS_AUTH_BREAKER:
             clear_failure(table, source_name="dropbox", user_id=USER_ID, logger=logger)
 
+        _record_health(succeeded=True)
         return {"statusCode": 200, "body": json.dumps(summary)}
     except Exception as e:
         # V2 P2.4: mark breaker on auth-shaped failures (suppresses next 24h)
         if _HAS_AUTH_BREAKER and looks_like_auth_failure(e):
             mark_failure(table, source_name="dropbox", user_id=USER_ID, error_msg=e, logger=logger)
         logger.error("lambda_handler failed: %s", e, exc_info=True)
+        _record_health(succeeded=False, exc=e)
         raise

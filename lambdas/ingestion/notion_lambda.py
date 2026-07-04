@@ -57,6 +57,27 @@ try:
     _HAS_AUTH_BREAKER = True
 except ImportError:
     _HAS_AUTH_BREAKER = False
+
+# #467 (X-2): ER-01 liveness sentinel. Notion is a scheduled pull outside the
+# framework, so without this it can never leave 'unknown' in pipeline_health_check
+# — a silently de-scheduled cron would go permanently undetected.
+try:
+    from ingest_health import classify_error
+    from ingestion_framework import record_ingest_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
+
+def _record_health(*, succeeded: bool, exc=None) -> None:
+    """Best-effort ER-01 sentinel write (the Lambda ran = attempted)."""
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    error_class = "none" if succeeded else (exc if isinstance(exc, str) else classify_error(exc))
+    record_ingest_health(table, "notion", logger, attempted=True, succeeded=succeeded, error_class=error_class)
+
+
 SECRET_NAME = os.environ.get("NOTION_SECRET_NAME", "life-platform/ingestion-keys")
 NOTION_API = "https://api.notion.com/v1"
 NOTION_VERSION = "2022-06-28"  # Pinned API version -- changing may alter property formats; test thoroughly before updating
@@ -614,6 +635,9 @@ def lambda_handler(event, context):
         marker = check_breaker(table, source_name="notion", user_id=USER_ID, logger=logger)
         if marker:
             logger.warning(f"auth_breaker_skip source=notion marked_at={marker.get('marked_at')} error={marker.get('error', '')[:80]}")
+            # The Lambda ran but the fetch is auth-suppressed — a continued failure,
+            # so the streak grows even with zero new data (the running-but-dead case).
+            _record_health(succeeded=False, exc="auth")
             return {
                 "statusCode": 200,
                 "body": json.dumps(
@@ -666,6 +690,7 @@ def lambda_handler(event, context):
         logger.info(f"Retrieved {len(pages)} pages from Notion")
 
         if not pages:
+            _record_health(succeeded=True)  # ran + fetched cleanly; no new entries is benign
             return {
                 "statusCode": 200,
                 "body": json.dumps(
@@ -704,6 +729,7 @@ def lambda_handler(event, context):
         if _HAS_AUTH_BREAKER:
             clear_failure(table, source_name="notion", user_id=USER_ID, logger=logger)
 
+        _record_health(succeeded=True)
         return {
             "statusCode": 200,
             "body": json.dumps(summary),
@@ -713,4 +739,5 @@ def lambda_handler(event, context):
         if _HAS_AUTH_BREAKER and looks_like_auth_failure(e):
             mark_failure(table, source_name="notion", user_id=USER_ID, error_msg=e, logger=logger)
         logger.error("lambda_handler failed: %s", e, exc_info=True)
+        _record_health(succeeded=False, exc=e)
         raise
