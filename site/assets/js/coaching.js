@@ -31,7 +31,7 @@ const SECTIONS = [
   { key: "lab-notes", label: "AI lab notes", kicker: "the AI's read ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
   // Reader Q&A — ask a question (form) AND read the ones the board has answered
   // (PG-ENG-2 static feed published by scripts/publish_board_answer.py; empty-but-honest).
-  { key: "qa", label: "Reader Q&A", kicker: "ask · the board answers", kind: "qa", url: "/board_answers/answers.json" },
+  { key: "qa", label: "Ask the Board", kicker: "your question — answered in lab notes", kind: "qa", url: "/board_answers/answers.json" },
 ];
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 // Coaches whose 7-day domain data is available via /api/observatory_week.

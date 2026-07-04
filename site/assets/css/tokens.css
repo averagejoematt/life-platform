@@ -937,6 +937,17 @@ a.vg-lit:hover { background: var(--ember-wash); }
   body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 }
 
+/* ── Follow link — desktop nav affordance; hidden on mobile (bottom bar has no room) ── */
+.nav-follow {
+  font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-faint); text-decoration: none;
+  border: 1px solid var(--ember-line, rgba(140,120,90,.28));
+  border-radius: 4px; padding: .1em .5em .15em; white-space: nowrap;
+}
+.nav-follow:hover { color: var(--ember); border-color: var(--ember); }
+@media (max-width: 600px) { .nav-follow { display: none !important; } }
+
 /* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */
 /* muted, but NOT below AA: --ink-faint is AA-tuned (4.9:1 on paper); the old opacity:0.6 dropped it to 2.34. */
 .build-stamp { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
