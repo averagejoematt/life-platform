@@ -103,6 +103,7 @@ from web.site_api_data import (
     handle_habits,
     handle_inference_receipt,
     handle_labs,
+    handle_last_sync,
     handle_ledger,
     handle_observatory_week,
     handle_phenoage,
@@ -369,6 +370,8 @@ ROUTES = {
     "/api/platform_stats": handle_platform_stats,
     # Live pipeline status: per-source freshness (fresh/stale/paused)
     "/api/source_freshness": handle_source_freshness,
+    # #406: real intra-day ingestion write times for the cockpit sync strip
+    "/api/last_sync": handle_last_sync,
     # Presence / quiet-stretch: is Matthew actively logging or has he gone quiet
     "/api/presence": handle_presence,
     # Discoveries page: active hypotheses + inner life + AI findings

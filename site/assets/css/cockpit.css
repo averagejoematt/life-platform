@@ -518,3 +518,15 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   padding: 2px var(--sp-2); color-scheme: dark; }
 [data-theme="light"] .scrub { color-scheme: light; }
 .scrub:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+/* ── #406: intra-day sync strip — real write times, earned glow only ──────── */
+.sync-line { margin-top: var(--sp-2); color: var(--ink-faint); display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: baseline; }
+.sync-src { white-space: nowrap; }
+.sync-ago { color: var(--ink-muted); }
+.sync-sep { color: var(--ink-faint); }
+.sync-freshest { color: var(--ink-faint); font-size: 0.9em; }
+.sync-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); margin-right: 4px; vertical-align: 1px; }
+/* The glow is EARNED: only a pipe that wrote within the fresh window pulses. */
+.sync-dot.is-fresh { background: var(--ember, #22c55e); }
+html.mo .sync-dot.is-fresh { animation: syncPulse 2.6s ease-in-out infinite; }
+@keyframes syncPulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--ember, #22c55e) 45%, transparent); } 50% { box-shadow: 0 0 0 4px transparent; } }

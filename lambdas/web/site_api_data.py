@@ -225,6 +225,46 @@ def handle_source_freshness() -> dict:
     return _ok({"sources": sources, "summary": summary}, cache_seconds=300)
 
 
+# ── #406: intra-day sync freshness (the cockpit's "measured — live" proof) ──
+# REAL ingestion write times only: the latest DATE# records' ingested_at /
+# webhook_ingested_at stamps, never the day-granular DATE key. Passive pipes
+# only — these sync without Matthew's participation, so an "x min ago" here is
+# genuine motion, not implied continuity.
+_SYNC_SOURCES = {"whoop": "Whoop", "eightsleep": "Eight Sleep", "apple_health": "Apple Health"}
+
+
+def handle_last_sync() -> dict:
+    """GET /api/last_sync — per passive source, the real last ingestion write.
+
+    Returns {sources: [{id, label, last_write}], freshest, server_now}. The
+    client computes and ticks the "ago" display (server_now closes clock skew).
+    A source with no write stamp is reported with last_write null — shown
+    honestly or omitted by the front-end, never faked."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    sources = []
+    for sid, label in _SYNC_SOURCES.items():
+        last_write = None
+        try:
+            kwargs = with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{sid}") & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 3,  # today's record + possible sub-records; max() picks the true latest write
+                    "ProjectionExpression": "ingested_at, webhook_ingested_at",
+                }
+            )
+            for it in table.query(**kwargs).get("Items", []):
+                ts = str(it.get("webhook_ingested_at") or it.get("ingested_at") or "")
+                if ts and (last_write is None or ts > last_write):
+                    last_write = ts
+        except Exception as e:
+            logger.warning("last_sync: %s failed: %s", sid, e)
+        sources.append({"id": sid, "label": label, "last_write": last_write})
+    with_writes = [s for s in sources if s["last_write"]]
+    freshest = max(with_writes, key=lambda s: s["last_write"]) if with_writes else None
+    return _ok({"sources": sources, "freshest": freshest, "server_now": now_iso}, cache_seconds=60)
+
+
 # Presence classes the public surface treats as "in a lull" (worth showing a line).
 _PRESENCE_LOUD = {"light", "quiet", "dark"}
 

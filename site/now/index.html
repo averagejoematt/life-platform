@@ -88,6 +88,11 @@
         <!-- P2.2 — anti-black-box: the level is the SUM of the seven pillars, decomposed below. -->
         <p class="hub-decomp label"><a href="#domains">the sum of seven pillars — see what builds it ↓</a></p>
 
+        <!-- #406: intra-day sync strip — REAL ingestion write times, ticking "ago";
+             glow only when a pipe wrote within the earned-glow window. Honest stale
+             states ("9h ago") shown as-is, never hidden. -->
+        <p class="sync-line label" data-bind="syncline" hidden></p>
+
         <!-- Honesty vocabulary: down/flat states, muted, never red, never hidden -->
         <p class="honest" data-bind="honest" hidden></p>
 
