@@ -1,6 +1,6 @@
 # Handover — 2026-07-04 (session 2, part 2) The Fable Later batch: #410 #403 #404 #406 #407 #413 #398
 
-**All seven `model:fable` Later-milestone stories implemented on branch `feat/fable-later-batch` (worktree `honesty-pair`), one commit per issue, PR pending merge.** Full suite **2,712 passed** (only the 5 known pre-existing failures: coaches_api ×4 + i16); synth clean for Email/Web/Operational; black/ruff clean; ~44 new tests. Earlier the same session: the Fable **Next** batch (#392/#387/#397/#396/#380) was merged (PR #453) **and deployed live** (layer v97, postflight 🟢) with wrap PR #454 also merged.
+**All seven `model:fable` Later-milestone stories SHIPPED — PR #455 merged by Matthew, ALL DEPLOYS RUN + LIVE-VERIFIED same session.** Full suite **2,712 passed** (only the 5 known pre-existing failures: coaches_api ×4 + i16); synth clean for Email/Web/Operational; black/ruff clean; ~44 new tests. Earlier the same session: the Fable **Next** batch (#392/#387/#397/#396/#380) was merged (PR #453) **and deployed live** (layer v97, postflight 🟢) with wrap PR #454 also merged.
 
 ## What each story shipped
 
@@ -12,7 +12,7 @@
 6. **#413** — "where would you land" beat on home: reader types one number (sleep/RHR/weight) → placed against Matthew's real public band; submit is preventDefault-only (no fetch/beacon/storage — local Playwright proved ZERO non-GET requests across the interaction); N=1 + no-advice copy; hides honestly with no public numbers.
 7. **#398** — `between-chronicle` email Lambda (Email stack, Sun 17:00 UTC): digest purely from already-computed records (what_changed snapshot, freshly graded predictions, stance shifts) — zero AI (test-pinned); sends ONLY on real, previously-unsent content (content-hash marker `SOURCE#email_digest/STATE#between_chronicle`); NO open tracking (no image at all); **ships dark behind `EXTERNAL_EMAILS_ENABLED=false`** (same kill switch as the chronicle — flipping it is Matthew's call). `dry_run` event previews the digest.
 
-## Deploy sequence (STAGED — run from detached origin/main after the PR merges)
+## Deploy sequence (EXECUTED 2026-07-04 — kept for the record)
 
 1. `git fetch && git checkout origin/main` + `rm -rf cdk/cdk.out`
 2. `cd cdk && npx cdk deploy LifePlatformWeb LifePlatformOperational LifePlatformEmail LifePlatformCompute --require-approval never`
@@ -30,3 +30,17 @@
 - `og_moments.build_moment_card` imports PIL lazily via og_image_lambda — tests stub it (CI has no Pillow).
 - The moments-index prediction key is a plain composite (`coach_id|date|text[:60]`) shared verbatim between `og_moments._prediction_key` and coaching.js — change both or neither.
 - Prior outstanding items: shadow-sweep re-measure vs 11/112 baseline (needs daily coach cycles); `EXTERNAL_EMAILS_ENABLED` flip = Matthew's call; todoist false-stale window (00:00–14:00 UTC) is known-benign.
+
+## Live verification (2026-07-04, post-deploy)
+
+- 4 stacks deployed clean (Web: `/api/explain` + `/moments/*` behaviors; Email: `between-chronicle` created; Operational: explain + moments sweep; Compute: windowed summarizer). site-api + site synced.
+- `/api/last_sync` live: whoop/eightsleep/apple_health real write stamps; cockpit strip renders "WHOOP 54M AGO · EIGHT SLEEP 6H AGO · APPLE HEALTH 9M AGO ← FRESHEST" — honest stale + earned freshest.
+- `/api/explain` live probe (what_changed): cited the real r=0.843/n=16 correlation, called the empty deltas honestly, preliminary caveat — fully grounded.
+- Moments: og-image-generator minted `/moments/week/2026-W27/` (shell 200, own card 200 image/png); qa + predictions honestly empty (none published/decided yet) — they mint as they exist.
+- #407 fold verified LIVE: teaser bottom 745/900 desktop, 685/844 mobile — in-fold both; screenshot shows the differentiated honest constellation (Sleep 87 · Fuel 2) + the /100 legend.
+- Mirror form visible on home (zero-write proof ran pre-merge).
+- `between-chronicle` dry_run: assembled 1 real finding (the newly-unlocked habit↔grade correlation); send stays dark behind EXTERNAL_EMAILS_ENABLED=false — flipping it is Matthew's call.
+
+## NEXT FABLE SESSION (Matthew's standing ask)
+
+**/plan the full data-source health review** — per-source (Whoop, Apple Health/HAE, Garmin, Strava, Withings, MacroFactor, Eight Sleep, Habitify, Todoist, Hevy, food delivery, measurements, Notion journal): what we pull / how (API, auth, rate limits, retries) / why (value, keep-or-retire vs ADR-103) / timing+frequency vs the source's real cadence / CRUD+dedup+idempotency / storage in the data model / custom calculations built on it / how it presents on the site — plus the forward piece: how far we can take structured extraction from free-text journal entries to feed the coaches (ADR-104-grounded). Full brief in memory: `project_data_source_health_review.md`.
