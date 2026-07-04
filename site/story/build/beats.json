@@ -96,6 +96,24 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/559"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-rest-reads-as-rest",
+      "date": "2026-07-04",
+      "title": "Rest finally reads as rest — the training-form number gets a real scale",
+      "shipped": "The platform's training stress balance was structurally wrong: its form bands assumed the classic sports-science scale while the loads underneath were raw kilojoules, so the number sat pinned at maximum fatigue — eight rest days publicly read as overtraining, and walking, the primary engine of this whole experiment, contributed zero load. One shared load model now scores everything on a TSS-like scale, walks count via a moving-time fallback, and five separate copies of the fatigue math were collapsed into it. Live result: TSB went from −87 (saturated) to −6 (neutral). The journal extractor also got a v2: entities, behaviors, and cause→effect claims — each backed by a verbatim quote a deterministic gate verifies against the entry before anything is stored.",
+      "gotcha": "Every place the number rendered had bands like ‘−30 to +20’ that were correct in spirit and impossible in practice — the inputs were on a scale roughly ten times larger. Nobody wrote a wrong band; the scale drifted underneath all of them. And the duration proxy created a brand-new trap: duplicate multi-device walk records were harmless when walks scored zero, but would silently double-count the moment walking earned load.",
+      "honest_miss": "Old records keep their old-scale values, so one correlation window straddles the discontinuity for about two weeks — that r is noise, and the record says so rather than pretending continuity. The quote-grounding gate dropped 11 of the extractor's proposed causal claims on the very first sweep: the model invents supporting quotes more often than you'd hope, which is exactly why the gate exists.",
+      "prs": [
+        {
+          "label": "PR #562",
+          "url": "https://github.com/averagejoematt/life-platform/pull/562"
+        },
+        {
+          "label": "PR #563",
+          "url": "https://github.com/averagejoematt/life-platform/pull/563"
+        }
+      ]
     }
   ]
 }
