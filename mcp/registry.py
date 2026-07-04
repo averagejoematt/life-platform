@@ -1054,11 +1054,12 @@ TOOLS = {
         "schema": {
             "name": "get_readiness_score",
             "description": (
-                "Unified readiness score (0-100) synthesising Whoop recovery (35%), Whoop sleep quality (25%), "
+                "Unified readiness score (0-100) synthesising Whoop recovery (40%), Whoop sleep quality (25%), "
                 "HRV 7-day trend vs 30-day baseline (20%), TSB training form (10%), and "
-                "Garmin Body Battery (10%) into a single GREEN / YELLOW / RED signal with a 1-line "
+                "Garmin Body Battery (5%) into a single GREEN / YELLOW / RED signal with a 1-line "
                 "actionable recommendation. Also includes a device_agreement section showing Whoop vs "
-                "Garmin HRV/RHR delta as a confidence signal — flag status means lower score reliability. "
+                "Garmin HRV/RHR delta as a confidence signal — flag status means lower score reliability; "
+                "when the cross-check can't run it returns status=unavailable with a reason instead of null. "
                 "Reduces cognitive load: one number instead of 5 separate metrics tells you "
                 "'train hard today' vs 'go easy' vs 'rest day'. Missing components are excluded and "
                 "remaining weights re-normalised. "

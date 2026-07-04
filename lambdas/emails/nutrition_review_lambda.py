@@ -359,16 +359,19 @@ def extract_cgm(cgm_data):
     days = []
     for date_str in sorted(cgm_data.keys()):
         rec = cgm_data[date_str]
-        glucose = safe_float(rec, "glucose_mean_mg_dl")
+        # #486/D-2: read the blood_glucose_* names the HAE aggregator actually
+        # writes — the old glucose_* reads matched nothing, so the CGM section
+        # was structurally absent from every review.
+        glucose = safe_float(rec, "blood_glucose_avg")
         if glucose:
             days.append(
                 {
                     "date": date_str,
                     "mean_mg_dl": glucose,
-                    "std_dev": safe_float(rec, "glucose_std_dev"),
-                    "time_in_range_pct": safe_float(rec, "glucose_time_in_range_pct"),
-                    "time_above_140_pct": safe_float(rec, "glucose_time_above_140_pct"),
-                    "spikes_above_140": safe_float(rec, "glucose_spikes_above_140"),
+                    "std_dev": safe_float(rec, "blood_glucose_std_dev"),
+                    "time_in_range_pct": safe_float(rec, "blood_glucose_time_in_range_pct"),
+                    "time_above_140_pct": safe_float(rec, "blood_glucose_time_above_140_pct"),
+                    "readings_count": safe_float(rec, "blood_glucose_readings_count"),
                 }
             )
     return days if days else None

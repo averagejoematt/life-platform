@@ -64,11 +64,13 @@ def test_missing_stamp_is_null_never_invented(monkeypatch):
     assert body["freshest"] is None
 
 
-def test_only_passive_pipes_are_in_the_strip():
-    """Behavioral sources (weigh-ins, lifts, food logs) must not appear — an
-    'ago' there would read as a nag, and their motion is Matthew's, not the
-    machine's."""
-    assert set(sad._SYNC_SOURCES) == {"whoop", "eightsleep", "apple_health"}
+def test_sync_strip_sources_pinned():
+    """Passive pipes + ONE deliberate behavioral exception: withings (#491/M-5).
+    Weigh-in recency is the honest anchor for every 'current weight' label, so
+    the strip carries it — its 'ago' reads as recency, not a nag, because the
+    scale is the one behavioral source whose staleness the site quotes as fact.
+    Lifts/food logs stay out."""
+    assert set(sad._SYNC_SOURCES) == {"whoop", "eightsleep", "apple_health", "withings"}
 
 
 def test_frontend_ticks_and_earns_the_glow():

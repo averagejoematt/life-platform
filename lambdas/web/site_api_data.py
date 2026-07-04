@@ -230,7 +230,9 @@ def handle_source_freshness() -> dict:
 # webhook_ingested_at stamps, never the day-granular DATE key. Passive pipes
 # only — these sync without Matthew's participation, so an "x min ago" here is
 # genuine motion, not implied continuity.
-_SYNC_SOURCES = {"whoop": "Whoop", "eightsleep": "Eight Sleep", "apple_health": "Apple Health"}
+# #491/M-5: withings included so the cockpit sync strip can carry the weigh-in
+# recency (behavioral cadence — a gap means "didn't step on", not "pipe broke").
+_SYNC_SOURCES = {"whoop": "Whoop", "eightsleep": "Eight Sleep", "apple_health": "Apple Health", "withings": "Withings scale"}
 
 
 def handle_last_sync() -> dict:
@@ -1874,13 +1876,21 @@ def handle_sleep_detail() -> dict:
     latest = eight_with_data[-1]
     latest_date = latest.get("sk", "").replace("DATE#", "")
     whoop_latest = whoop_by_date.get(latest_date, {})
-    # If latest Eight Sleep record has no matching Whoop recovery, use most recent that does
+    # #495/M-9: if the latest Eight Sleep night has no matching Whoop recovery,
+    # borrow the most recent night that has one — but ONLY the recovery block
+    # (recovery/HRV/RHR), and SAY SO via recovery_night_of. The old code swapped
+    # the whole Whoop record, so night-A hours/stages + night-B recovery rendered
+    # under one dated header with no per-field date.
+    whoop_recovery_rec = whoop_latest
+    recovery_night_of = None
     if not whoop_latest.get("recovery_score"):
         for r in reversed(eight_with_data):
             _rd = r.get("sk", "").replace("DATE#", "")
             _wm = whoop_by_date.get(_rd, {})
             if _wm.get("recovery_score"):
-                whoop_latest = _wm
+                whoop_recovery_rec = _wm
+                if _rd != latest_date:
+                    recovery_night_of = _rd
                 break
 
     # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
@@ -1996,9 +2006,18 @@ def handle_sleep_detail() -> dict:
                     round(float(whoop_latest.get("slow_wave_sleep_hours", 0)), 2) if whoop_latest.get("slow_wave_sleep_hours") else None
                 ),
                 "rem_sleep_hours": round(float(whoop_latest.get("rem_sleep_hours", 0)), 2) if whoop_latest.get("rem_sleep_hours") else None,
-                "recovery_score": round(float(whoop_latest.get("recovery_score", 0)), 0) if whoop_latest.get("recovery_score") else None,
-                "hrv": round(float(whoop_latest.get("hrv", 0)), 1) if whoop_latest.get("hrv") else None,
-                "rhr": round(float(whoop_latest.get("resting_heart_rate", 0)), 0) if whoop_latest.get("resting_heart_rate") else None,
+                "recovery_score": (
+                    round(float(whoop_recovery_rec.get("recovery_score", 0)), 0) if whoop_recovery_rec.get("recovery_score") else None
+                ),
+                # #495/M-9: when the recovery/HRV/RHR trio above comes from a different
+                # night than the Eight Sleep record, this carries that night's date (else null).
+                "recovery_night_of": recovery_night_of,
+                "hrv": round(float(whoop_recovery_rec.get("hrv", 0)), 1) if whoop_recovery_rec.get("hrv") else None,
+                "rhr": (
+                    round(float(whoop_recovery_rec.get("resting_heart_rate", 0)), 0)
+                    if whoop_recovery_rec.get("resting_heart_rate")
+                    else None
+                ),
                 "score_status": score_status,
                 "deep_pct": round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
                 "rem_pct": round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,

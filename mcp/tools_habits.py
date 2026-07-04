@@ -900,9 +900,13 @@ def tool_get_device_agreement(args):
     all_dates = sorted(set(whoop_items.keys()) & set(garmin_items.keys()))
 
     if not all_dates:
+        # #492/M-7: say why instead of implying a fixable ingestion gap —
+        # Garmin has been paused since 2026-06 (vendor anti-automation, ADR-074).
         return {
-            "error": f"No overlapping Whoop + Garmin data for {start_date} to {end_date}. "
-            "Ensure Garmin ingestion has run for this period."
+            "status": "unavailable",
+            "reason": f"No overlapping Whoop + Garmin data for {start_date} to {end_date}. "
+            "Garmin ingestion is paused (ADR-074, vendor anti-automation) — cross-device "
+            "agreement is unavailable until Garmin resumes.",
         }
 
     hrv_agree = hrv_minor = hrv_flag = 0

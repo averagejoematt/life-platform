@@ -212,18 +212,21 @@ def assemble_data(yesterday_str):
     withings_30d_start = (dt - timedelta(days=29)).strftime("%Y-%m-%d")
     data["withings_30d"] = fetch_range("withings", withings_30d_start, yesterday_str)
 
-    # Latest weight — search backwards through withings 30d
-    latest_weight = None
-    for rec in reversed(data["withings_30d"]):
-        w = _safe_float(rec, "weight_lbs")
-        if w is None:
-            w = _safe_float(rec, "weight_kg")
-            if w is not None and w < 200:
-                w = w * 2.20462
-        if w is not None:
-            latest_weight = w
-            break
-    data["latest_weight"] = latest_weight
+    # Latest weight — the ONE shared resolution (#491/M-6): Withings backscan +
+    # a 7-day apple_health window, via the weight_trend layer module (the same
+    # helper vitals/journey use, so no surface can disagree on "current weight").
+    try:
+        import weight_trend
+
+        _ah_7d_start = (dt - timedelta(days=6)).strftime("%Y-%m-%d")
+        _ah_7d = fetch_range("apple_health", _ah_7d_start, yesterday_str)
+        data["latest_weight"] = weight_trend.latest_weight(data["withings_30d"], _ah_7d)["weight_lbs"]
+    except ImportError:
+        # layer module missing (local test without layer) — withings-only backscan
+        data["latest_weight"] = next(
+            (_safe_float(rec, "weight_lbs") for rec in reversed(data["withings_30d"]) if _safe_float(rec, "weight_lbs") is not None),
+            None,
+        )
 
     # Latest labs — search backwards from yesterday
     labs_all = fetch_range("labs", "2020-01-01", yesterday_str)

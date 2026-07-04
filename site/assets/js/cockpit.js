@@ -189,10 +189,10 @@ function renderReadinessScore(readiness) {
   bind("readiness-score").textContent = Math.round(readiness.score);
   const bandEl = $("[data-bind=readiness-band]");
   bandEl.textContent = word; bandEl.className = "rd-score-band label " + cls;
-  // A 0-score is a REAL computed input (a quiet day scores 0 — e.g. no logged
-  // habits, near-zero movement), so it's never hidden or excused as "no data".
-  // But twin dead bars read sad-empty: de-emphasize the zero rows and say once,
-  // honestly, what a zero means.
+  // #492/M-4: these are now the score's ACTUAL inputs (recovery / sleep / HRV
+  // trend / training balance, stored by daily-metrics-compute), not the
+  // day-grade set. A 0 here is a real reading (e.g. deep fatigue), so zero
+  // rows stay de-emphasized but the caption no longer blames a "quiet day".
   const comps = readiness.components || [];
   comp.innerHTML = comps.map((c) => {
     const pct = Math.max(0, Math.min(100, Number(c.score) || 0));
@@ -200,7 +200,7 @@ function renderReadinessScore(readiness) {
       `<span class="rd-comp-track"><span class="rd-comp-fill" style="width:${pct}%"></span></span>` +
       `<span class="rd-comp-v num">${Math.round(pct)}</span></li>`;
   }).join("") + (comps.some((c) => !Number(c.score))
-    ? `<li class="rd-comp-note label">a quiet day scores 0 — counted, not hidden.</li>`
+    ? `<li class="rd-comp-note label">a 0 is a real reading — counted, not hidden.</li>`
     : "");
   wrap.hidden = false;
 }

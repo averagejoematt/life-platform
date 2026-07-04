@@ -135,13 +135,16 @@ def check_ddb_freshness():
         ("eightsleep", "Eight Sleep"),
         ("supplements", "Supplements"),
         ("journal", "Notion Journal"),
+        # #496/C-3: strava re-enabled 2026-06-20 (subscription restored). OPTIONAL,
+        # not REQUIRED — workouts are event-driven, so a missing day is behavior,
+        # not breakage. It sat mislabeled "paused (API 402)" here for two weeks.
+        ("strava", "Strava (workouts are event-driven)"),
     ]
     # PAUSED = intentionally off, but kept visible so they're not forgotten and can
     # be returned to. Shown ⏸, never a fault. Garmin: 2026 anti-automation crackdown
-    # 429-blocks server-side auth. Strava: API 402. (apple_health covers daily steps.)
+    # 429-blocks server-side auth (ADR-074).
     PAUSED = [
         ("garmin", "Garmin — paused (server-side auth 429-blocked); will return"),
-        ("strava", "Strava — paused (API 402); will return"),
     ]
 
     for source, label in REQUIRED:

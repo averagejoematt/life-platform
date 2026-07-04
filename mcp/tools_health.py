@@ -222,7 +222,7 @@ def tool_get_readiness_score(args):
 
     components = {}
 
-    # ── 1. Whoop recovery score (35%) ─────────────────────────────────────────
+    # ── 1. Whoop recovery score (40%) ─────────────────────────────────────────
     whoop_recent = query_source("whoop", d7_start, end_date)
     whoop_sorted = sorted(whoop_recent, key=lambda x: x.get("date", ""), reverse=True)
     whoop_today = next((w for w in whoop_sorted if w.get("recovery_score") is not None), None)
@@ -402,7 +402,19 @@ def tool_get_readiness_score(args):
             }
 
     # ── Device agreement: Whoop vs Garmin cross-validation ───────────────────
-    device_agreement = None
+    # #492/M-7: never a silent null — when the cross-check can't run, say why
+    # (structurally None since ~06-16 because Garmin is paused, ADR-074).
+    if garmin_today is None:
+        device_agreement = {"status": "unavailable", "reason": "garmin paused (ADR-074) — no recent Garmin record to cross-check"}
+    elif garmin_stale:
+        device_agreement = {
+            "status": "unavailable",
+            "reason": f"garmin record ({garmin_today.get('date')}) is >1 day older than whoop — stale data excluded",
+        }
+    elif "whoop_recovery" not in components:
+        device_agreement = {"status": "unavailable", "reason": "no whoop recovery record to cross-check against"}
+    else:
+        device_agreement = {"status": "unavailable", "reason": "overlapping garmin+whoop records lack comparable HRV/RHR fields"}
     if "whoop_recovery" in components and garmin_today is not None:
         whoop_hrv_val = components["whoop_recovery"]["raw"].get("hrv_ms")
         garmin_hrv_val = garmin_today.get("hrv_last_night")
@@ -439,6 +451,7 @@ def tool_get_readiness_score(args):
             all_agree = all(s == "agree" for s in agreement_signals)
             confidence = "high" if all_agree else ("low" if has_flag else "moderate")
             device_agreement = {
+                "status": "available",
                 "confidence": confidence,
                 "checks": checks,
                 "note": "flag = significant inter-device disagreement; readiness score may be less reliable on flagged days",

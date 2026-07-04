@@ -386,14 +386,18 @@ def compute_readiness(data):
         # TSB=0->score 60, TSB=-30->0, TSB=+20->100
         components.append(("tsb", clamp(round(60 + tsb * 2)), 0.10))
     if not components:
-        return None, "gray"
+        return None, "gray", []
     tw = sum(w for _, _, w in components)
     score = round(sum(v * w for _, v, w in components) / tw)
+    # #492/M-4: return the actual inputs so they can be stored beside the score —
+    # the cockpit previously displayed the day-grade component set next to this
+    # score, which is computed from an entirely different set.
+    breakdown = [{"key": k, "score": round(v, 1), "weight": w} for k, v, w in components]
     if score >= 80:
-        return score, "green"
+        return score, "green", breakdown
     if score >= 60:
-        return score, "yellow"
-    return score, "red"
+        return score, "yellow", breakdown
+    return score, "red", breakdown
 
 
 # ==============================================================================
@@ -538,6 +542,7 @@ def store_computed_metrics(
     atl=None,
     weight_traj=None,
     vitals=None,
+    readiness_components=None,
 ):
     """Write computed_metrics record — primary output of this Lambda."""
     item = {
@@ -556,6 +561,10 @@ def store_computed_metrics(
         item["day_grade_score"] = _to_dec(day_grade_score)
     if readiness_score is not None:
         item["readiness_score"] = _to_dec(readiness_score)
+    # #492/M-4: the score's ACTUAL inputs, stored beside it so the cockpit can
+    # show an honest breakdown instead of borrowing the day-grade component set.
+    if readiness_components:
+        item["readiness_components"] = _deep_dec(readiness_components)
     for field, val in [
         ("tsb", tsb),
         ("ctl", ctl),  # Banister fitness (>=0) — stored so consumers stop reverse-engineering it from tsb
@@ -1130,7 +1139,7 @@ def lambda_handler(event, context):
             logger.info(f"  {comp:<20} {score}")
 
     # ── Readiness ──
-    readiness_score, readiness_colour = compute_readiness(data)
+    readiness_score, readiness_colour, readiness_components = compute_readiness(data)
     logger.info(f"Readiness: {readiness_score} ({readiness_colour})")
 
     # ── Habit streaks ──
@@ -1164,6 +1173,7 @@ def lambda_handler(event, context):
         ctl=data.get("ctl"),
         atl=data.get("atl"),
         weight_traj=data.get("weight_traj"),
+        readiness_components=readiness_components,
         vitals={
             "recovery_pct": data.get("recovery_pct"),
             "hrv_ms": data.get("hrv_ms"),
