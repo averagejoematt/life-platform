@@ -757,6 +757,11 @@ def handle_experiments() -> dict:
                 "duration_tier": item.get("duration_tier"),
                 "experiment_type": item.get("experiment_type"),
                 "iteration": item.get("iteration", 1),
+                # #539: the frozen n-of-1 design + pre-registration stamp + the
+                # deterministic close-path analysis (effect, CI, n's, verdict).
+                "design": item.get("design"),
+                "pre_registered_at": item.get("pre_registered_at"),
+                "analysis": item.get("analysis"),
                 "origin": "live",  # an actual run on the ledger (this experiment cycle)
             }
         )
