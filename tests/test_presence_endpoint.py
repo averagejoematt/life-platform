@@ -67,7 +67,9 @@ def test_projection_is_fail_closed(monkeypatch):
     # None of the private internals leak — the projection is an explicit allowlist.
     for k in _PRIVATE_KEYS:
         assert k not in body, f"private field {k!r} leaked to /api/presence"
-    raw = json.dumps(body)
+    # Exclude _meta: its generated_at microseconds can legitimately contain "64"
+    # (flaked CI 2026-07-04 at generated_at=...07:55:12.464115).
+    raw = json.dumps({k: v for k, v in body.items() if k != "_meta"})
     assert "recovery_trend" not in raw and "64" not in raw
 
 
