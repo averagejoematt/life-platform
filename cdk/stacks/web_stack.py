@@ -719,6 +719,23 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # #397: the Reader Q&A payoff feed — publish_board_answer.py writes
+                    # generated/board_answers/answers.json and the coaching qa tab reads
+                    # /board_answers/answers.json. Without this behavior the fetch fell
+                    # through to the site origin and 404'd: readers could ask but the
+                    # answered-questions surface never existed. Short TTL — a freshly
+                    # published answer should land within minutes.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/board_answers/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=300,
+                        max_ttl=900,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/public_stats.json",
                         target_origin_id="S3GeneratedOrigin",
