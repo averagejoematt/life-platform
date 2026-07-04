@@ -34,8 +34,8 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-# v100: #496 strava un-pause; #491 weight_trend.latest_weight(); #486 honest CGM/metabolic
-SHARED_LAYER_VERSION = 100
+# v101: #482 public phase_for_date; #481 loud secret-writeback; #480 validator spec truth
+SHARED_LAYER_VERSION = 101
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 
