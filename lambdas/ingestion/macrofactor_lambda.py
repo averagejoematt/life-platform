@@ -651,9 +651,17 @@ def lambda_handler(event, context):
     except ImportError:
         _use_validator = False
 
+    # #482/X-6: standalone writer stamps phase like the framework does.
+    try:
+        from ingestion_framework import phase_for_date as _pfd
+    except ImportError:  # pragma: no cover — layer unavailable locally
+        _pfd = None
+
     written = 0
     for date_str_key, item in day_items.items():
         source_label = item.get("source", csv_type)
+        if _pfd and "phase" not in item:
+            item["phase"] = _pfd(date_str_key)
         _mf_item = floats_to_decimal(item)
         # ── DATA-2: Validate before write ──
         if _use_validator:

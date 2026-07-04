@@ -666,6 +666,17 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
             logger.info("Eight Sleep 401 — re-logging in and retrying...")
             secret = refresh_token(secret)
             _secret_cache_simp2["secret"] = secret
+            # #481/A-1: persist the fresh token. The framework writes the secret
+            # back BEFORE fetch_day runs, so this 401-path re-login was never
+            # persisted — every run started with the stale token and re-logged
+            # in (126 password grants/week against an unofficial API). This is
+            # save_secret()'s first call site; best-effort (a failed persist
+            # just means one more re-login next run).
+            try:
+                save_secret(secret)
+                logger.info("Eight Sleep fresh token persisted (401-path re-login)")
+            except Exception as se:
+                logger.warning("Eight Sleep token persist failed (non-fatal): %s", se)
             trends = api_get(f"/v1/users/{user_id_es}/trends", secret["access_token"], params={"from": from_date, "to": date_str, "tz": tz})
         else:
             raise

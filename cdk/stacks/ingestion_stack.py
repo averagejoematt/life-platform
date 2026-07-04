@@ -99,14 +99,20 @@ class IngestionStack(Stack):
         )
         whoop_recovery.add_target(targets.LambdaFunction(whoop))
 
-        # ── 2. Garmin — 4x daily (Garmin API rate-limits OAuth token exchange at hourly frequency)
+        # ── 2. Garmin — PAUSED, no schedule (#497/C-2, 2026-07-04). ADR-074
+        # declares the pause (vendor anti-automation 429-blocks server-side
+        # OAuth refresh), yet the cron kept firing 4×/day into the throttle —
+        # ~73 consecutive failures, and per the code's own note each hit only
+        # prolongs the lockout. Revive = manual re-auth (setup_garmin_browser_auth.py)
+        # + restore `schedule="cron(0 0,6,14,22 * * ? *)"` here. The function
+        # stays deployed for manual invokes; the INGEST_HEALTH sentinel keeps
+        # tracking whatever runs.
         garmin = create_platform_lambda(
             self,
             "GarminIngestion",
             function_name="garmin-data-ingestion",
             source_file="lambdas/ingestion/garmin_lambda.py",
             handler="ingestion.garmin_lambda.lambda_handler",
-            schedule="cron(0 0,6,14,22 * * ? *)",
             timeout_seconds=300,
             memory_mb=512,
             shared_layer=shared_utils_layer,
@@ -413,26 +419,12 @@ class IngestionStack(Stack):
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
         )
 
-        # ── 14. Apple Health — S3 trigger only (no EventBridge)
-        apple_health = create_platform_lambda(
-            self,
-            "AppleHealthIngestion",
-            function_name="apple-health-ingestion",
-            source_file="lambdas/ingestion/apple_health_lambda.py",
-            handler="ingestion.apple_health_lambda.lambda_handler",
-            timeout_seconds=300,
-            memory_mb=512,
-            alarm_name="ingestion-error-apple-health",
-            shared_layer=shared_utils_layer,
-            custom_policies=rp.ingestion_apple_health(),
-            **shared,
-        )
-        apple_health.add_permission(
-            "S3InvokeAppleHealth",
-            principal=iam.ServicePrincipal("s3.amazonaws.com"),
-            source_arn=f"arn:aws:s3:::{S3_BUCKET}",  # SEC-01: IAM level is bucket-scoped; prefix filtering enforced via S3 event notification filter on uploads/apple-health/ prefix
-            source_account=self.account,
-        )
+        # ── 14. (RETIRED 2026-07-04, #474/D-5, ADR-103) apple-health-ingestion —
+        # the export.xml import path. It was a latent full-replace clobber of the
+        # records the HAE webhook merge-enriches (_rd_* dedup maps, SoM/TIR,
+        # monotonic guards) and its S3 trigger never existed. Deleted; the HAE
+        # webhook is the sole apple_health writer. Historical XML backfill:
+        # backfill/archive/backfill_apple_health.py (hard-guarded).
 
         # ── 15. Health Auto Export Webhook — API Gateway trigger
         _ASSET_EXCLUDES = [
@@ -504,8 +496,10 @@ class IngestionStack(Stack):
             source_account=self.account,
         )
 
-        # ── 18. Measurements — manual/MCP-triggered (no schedule)
-        create_platform_lambda(
+        # ── 18. Measurements — S3 trigger on imports/measurements/ (#473/B-4:
+        # re-armed 2026-07-04 per ADR-044; the notification itself lives in the
+        # bucket config OUTSIDE CDK — see the runbook. This grants S3 invoke.)
+        measurements = create_platform_lambda(
             self,
             "MeasurementsIngestion",
             function_name="measurements-ingestion",
@@ -515,6 +509,12 @@ class IngestionStack(Stack):
             shared_layer=shared_utils_layer,
             custom_policies=rp.measurements_ingestion(),
             **shared,
+        )
+        measurements.add_permission(
+            "S3InvokeMeasurements",
+            principal=iam.ServicePrincipal("s3.amazonaws.com"),
+            source_arn=f"arn:aws:s3:::{S3_BUCKET}",
+            source_account=self.account,
         )
 
         cdk.CfnOutput(self, "WhoopFnArn", value=whoop.function_arn, description="Whoop ingestion Lambda ARN")

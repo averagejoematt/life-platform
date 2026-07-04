@@ -15,6 +15,17 @@ PLATFORM_MAP = {
 }
 
 
+def _phase_for(date_str):
+    """#482/X-6: standalone writer stamps phase on DATE#-keyed records like the
+    framework does, so a re-import can't surface pre-genesis data as current."""
+    try:
+        from ingestion_framework import phase_for_date
+
+        return phase_for_date(date_str)
+    except ImportError:  # pragma: no cover — layer unavailable locally
+        return "experiment"
+
+
 def normalize_platform(merchant, statement):
     text = (merchant + " " + statement).lower()
     for key, val in PLATFORM_MAP.items():
@@ -85,6 +96,7 @@ def lambda_handler(event, context):
                             "month": date_str[:7],
                             "year": int(date_str[:4]),
                             "import_date": import_date,
+                            "phase": _phase_for(date_str),
                         }
                     )
                     written += 1
@@ -207,6 +219,7 @@ def lambda_handler(event, context):
                 "sk": f"DATE#{import_date}",
                 "import_date": import_date,
                 "records_imported": written,
+                "phase": _phase_for(import_date),
             }
         )
 

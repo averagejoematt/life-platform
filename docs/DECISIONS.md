@@ -2219,8 +2219,8 @@ Confirmed live 503s (nutrition_overview, correlations) fixed in code; the rest a
 
 ## ADR-074: Garmin direct-API ingestion retired (paused) — vendor anti-automation
 
-**Date:** 2026-06-03
-**Status:** Paused — commented out of `freshness_checker_lambda.py` SOURCES + OAUTH_SECRETS + `qa_smoke_lambda.py` (shown ⏸).
+**Date:** 2026-06-03 (cron disabled 2026-07-04, #497)
+**Status:** Paused — commented out of `freshness_checker_lambda.py` SOURCES + OAUTH_SECRETS + `qa_smoke_lambda.py` (shown ⏸). **2026-07-04 (#497/C-2): the EventBridge cron is now DISABLED too** — it had kept firing 4×/day into the throttle (~73 consecutive failures) against this pause, and each hit only prolongs the lockout. The function stays deployed for manual invokes; the INGEST_HEALTH sentinel keeps tracking. Revive = manual re-auth (`setup/setup_garmin_browser_auth.py` from a residential IP) + restore `schedule=` in `cdk/stacks/ingestion_stack.py`.
 **Related:** `lambdas/ingestion/garmin_lambda.py` (garth + 429 circuit-breaker), `setup/setup_garmin_browser_auth.py`.
 
 ### Context
@@ -2863,6 +2863,7 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 | AI-vision QA (Bedrock semantic screenshots) | **Load-bearing** | Gating CI since 2026-06-05 |
 | `/legacy` preserved v3 site | **Portfolio (archive)** | Zero maintenance; never linked; retire only if storage/privacy cost appears |
 | ~105 unused MCP tools + the 64-entry orphan allowlist | **Retire-candidate** | Path: the #398 AUDITED_AT ratchet prune, batches of 10–20 |
+| apple_health XML import path (`apple-health-ingestion` lambda) | **RETIRED 2026-07-04** (#474/D-5) | Latent full-replace clobber of HAE-merged records; its S3 trigger never existed. Lambda + role deleted; `backfill/archive/backfill_apple_health.py` hard-guarded. HAE webhook is the sole apple_health writer; any future XML import must be rewritten onto `merge_day_to_dynamo` |
 | `chronicle-podcast` season-1 lambda (unscheduled zombie) | **Retire-candidate** | Trigger: delete after one further back-catalogue re-render need-window (2026-Q3 review) |
 | `hevy-webhook` FunctionURL lambda (parked — Hevy has no webhooks) | **Retire-candidate** | Trigger: Hevy ships webhooks, else remove at the 2026-Q4 review |
 

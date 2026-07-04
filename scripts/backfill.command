@@ -16,9 +16,9 @@ echo "  2) Strava      (runs, rides, hikes)"
 echo "  3) Whoop       (recovery, HRV, sleep)"
 echo "  4) Withings    (weight, body composition)"
 echo "  5) Todoist     (tasks completed)"
-echo "  6) Apple Health (steps, heart rate)"
+echo "  (Apple Health XML backfill retired 2026-07-04 — #474/ADR-103; HAE webhook is the sole writer)"
 echo ""
-read -p "Enter number (1-6): " CHOICE
+read -p "Enter number (1-5): " CHOICE
 echo ""
 
 case "$CHOICE" in
@@ -27,7 +27,6 @@ case "$CHOICE" in
   3) SCRIPT="backfill_whoop.py";       SOURCE="Whoop" ;;
   4) SCRIPT="backfill_withings.py";    SOURCE="Withings" ;;
   5) SCRIPT="backfill_todoist.py";     SOURCE="Todoist" ;;
-  6) SCRIPT="backfill_apple_health.py"; SOURCE="Apple Health" ;;
   *) echo "Invalid choice. Exiting."; exit 1 ;;
 esac
 
