@@ -44,9 +44,10 @@ def test_stale_thresholds_match_checker():
         ), f"{source}: site board threshold != checker ({hours}h)"
 
 
-def test_internal_behavioral_sources_marked_on_board():
-    """A checker-behavioral source (manual logging) must read behavioral publicly too,
-    so a lapse never renders as a broken pipeline. (The board may additionally mark
-    manual-upload sources like macrofactor behavioral for honest wording.)"""
+def test_behavioral_classification_identical():
+    """#392: the checker and the board must agree EXACTLY on behavioral-vs-infra.
+    The old subset assertion allowed the drift this replays: macrofactor read
+    behavioral publicly but infra in the checker, so a skipped food-log upload
+    paged the operator while the site said 'logging lapse'."""
     board_behavioral = {k for k, v in sad._FRESHNESS_SOURCES.items() if v.get("behavioral")}
-    assert checker.BEHAVIORAL_SOURCES <= board_behavioral
+    assert checker.BEHAVIORAL_SOURCES == board_behavioral

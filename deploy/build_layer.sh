@@ -22,6 +22,9 @@ MODULES=(
     # DI-1.1 (2026-06-19): source-state resolver (live/paused/rate_limited/stale).
     # Imported by get_freshness_status (MCP), the coach honesty guard, and pipeline_health_check.
     source_state.py
+    # #392 (2026-07-04): canonical source registry — behavioral-vs-infra classification
+    # + thresholds. Imported by freshness_checker, site-api source_freshness, MCP get_freshness_status.
+    source_registry.py
     ingestion_validator.py item_size_guard.py digest_utils.py
     sick_day_checker.py site_writer.py secret_cache.py
     intelligence_common.py

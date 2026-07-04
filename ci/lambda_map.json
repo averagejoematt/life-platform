@@ -397,6 +397,7 @@
       "lambdas/meal_templates_seed.py",
       "lambdas/meal_projection.py",
       "lambdas/source_state.py",
+      "lambdas/source_registry.py",
       "lambdas/training_notes.py",
       "lambdas/training_notes_llm.py",
       "lambdas/grounded_generation.py",
