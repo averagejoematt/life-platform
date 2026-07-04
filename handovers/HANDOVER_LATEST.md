@@ -1,46 +1,28 @@
-# Handover — 2026-07-04 (session 2, part 2) The Fable Later batch: #410 #403 #404 #406 #407 #413 #398
+# Handover — 2026-07-04 (session 3) The Data-Source Health Review
 
-**All seven `model:fable` Later-milestone stories SHIPPED — PR #455 merged by Matthew, ALL DEPLOYS RUN + LIVE-VERIFIED same session.** Full suite **2,712 passed** (only the 5 known pre-existing failures: coaches_api ×4 + i16); synth clean for Email/Web/Operational; black/ruff clean; ~44 new tests. Earlier the same session: the Fable **Next** batch (#392/#387/#397/#396/#380) was merged (PR #453) **and deployed live** (layer v97, postflight 🟢) with wrap PR #454 also merged.
+**The owner-requested per-source integration review is COMPLETE and awaiting Matthew's read.** Deliverables (this PR, branch `review/data-source-health`):
 
-## What each story shipped
+- `docs/reviews/DATA_SOURCE_HEALTH_REVIEW_2026-07.md` — 15 sources × 8 dimensions, per-source scorecards, posture table, 7 executive themes, the journal free-text extraction roadmap (3 phases), and the Stage-0 reconciliation record.
+- `docs/reviews/DATA_SOURCE_HEALTH_REVIEW_2026-07_findings.json` — the machine-readable appendix (same schema family as the 2026-07 platform review).
 
-1. **#410** — coach compression input BOUNDED: PREDICTION# queried newest-first with a hard limit (SK embeds the date — decided history ages out of the scan, stays stored); prompt windows (15 most-recently-referenced open threads / 15 newest active predictions) with HONEST rollup lines; 24k-char deterministic budget guard (halving, floored, logged). Replay test = the real 52-thread/39-prediction failure. Nothing deleted; track record untouched.
-2. **#403** — POST `/api/explain` on the site-api-**ai** lambda: client sends ONLY an allowlisted surface name (observatory_week / what_changed / sleep_correlations); the server refetches the public JSON itself (injection closed by construction, test-pinned); 3-4 correlative sentences, no model arithmetic, experiment-day context for honest thin-chart explanations; ADR-104 fail-closed number gate; shares ask's rate bucket + budget pause + prompt cache. Mounted on cockpit week/month + the sleep correlation board. **New CF behavior `/api/explain` → AiLambdaOrigin.**
-3. **#404** — permalinked moments: the daily og-image-generator ends with a moments sweep (`web/og_moments.py`) minting static shells + per-moment OG cards under `generated/moments/` for the weekly recap, each published board answer, and each graded prediction (sourced from the PUBLIC APIs/feeds — a moment can never say more than the site publishes); share buttons (navigator.share/clipboard) on the cockpit week view, answered Q&As, and graded scorecard calls, driven by `/moments/index.json`. **New CF behavior `/moments/*` → S3GeneratedOrigin; OG role + reads answers feed + writes moments prefix.** publish_board_answer.py triggers the sweep on publish.
-4. **#406** — GET `/api/last_sync` (site-api data lambda): REAL `ingested_at`/`webhook_ingested_at` stamps for the passive pipes (whoop/eightsleep/apple_health) + server_now; cockpit sync strip ticks "ago" client-side (30s), re-checks (5min), pulse-glows ONLY within the 45-min earned window, stale shown truthfully.
-5. **#407** — the loop teaser (data → coaching → protocols → story ↻) now sits UNDER THE H1, verified in-fold locally (y=710 @1440×900, y=509 @390×844, screenshots in scratchpad); constellation caption gains the low→high dot legend + "each scored out of 100 … not a broken one"; full below-fold diagram untouched.
-6. **#413** — "where would you land" beat on home: reader types one number (sleep/RHR/weight) → placed against Matthew's real public band; submit is preventDefault-only (no fetch/beacon/storage — local Playwright proved ZERO non-GET requests across the interaction); N=1 + no-advice copy; hides honestly with no public numbers.
-7. **#398** — `between-chronicle` email Lambda (Email stack, Sun 17:00 UTC): digest purely from already-computed records (what_changed snapshot, freshly graded predictions, stance shifts) — zero AI (test-pinned); sends ONLY on real, previously-unsent content (content-hash marker `SOURCE#email_digest/STATE#between_chronicle`); NO open tracking (no image at all); **ships dark behind `EXTERNAL_EMAILS_ENABLED=false`** (same kill switch as the chronicle — flipping it is Matthew's call). `dry_run` event previews the digest.
+**Funnel: 71 raw → 5 cross-lane duplicates merged → 66 distinct → all 66 adversarially confirmed (7 adjusted), 0 dropped; 4 sub-claims refuted and recorded.** Method: Stage-0 live evidence baseline (freshness API, alarm history, per-partition latest-SK, sentinels, EventBridge states, MCP EMF) → 5 per-source lanes + 3 cross-cutting lenses, probe-required findings → independent adversarial verifier per lane re-opened every citation and re-ran every probe (live numbers reproduced to the decimal).
 
-## Deploy sequence (EXECUTED 2026-07-04 — kept for the record)
+## Headlines (what Matthew should read first)
 
-1. `git fetch && git checkout origin/main` + `rm -rf cdk/cdk.out`
-2. `cd cdk && npx cdk deploy LifePlatformWeb LifePlatformOperational LifePlatformEmail LifePlatformCompute --require-approval never`
-   — Web: `/api/explain` + `/moments/*` CF behaviors; Operational: site-api-ai (explain) + og-image-generator (moments sweep + IAM); Email: the new `between-chronicle` lambda; Compute: coach-history-summarizer windowing. (No layer change this batch — v97 stands.)
-3. `bash deploy/deploy_site_api.sh` — /api/last_sync route (site-api data lambda ships via script, not cdk).
-4. `bash deploy/sync_site_to_s3.sh` — home (teaser/legend/mirror), cockpit (sync strip + explain + share), coaching/evidence JS, explain.js/share.js, css.
-5. Kick the moments sweep once: `aws lambda invoke --function-name og-image-generator --cli-read-timeout 0 /tmp/og.json` → verify `/moments/index.json` 200.
-6. Verify: `/api/explain` probe (surface=what_changed) grounded 200; `/api/last_sync` 200 with real stamps + cockpit strip renders; home fold screenshots (1440×900 + 390×844) show the teaser + legend (AC of #407); mirror widget zero-write interaction; `between-chronicle` `dry_run` invoke returns the digest (send stays dark until EXTERNAL_EMAILS_ENABLED flips).
+- **Two P1s:** X-1 — Hevy ingestion failure is invisible end-to-end (errors return a 500 *body* from a successful invocation; the liveness alarm watches a metric Hevy never emits, treat-missing NOT_BREACHING — it can never fire). J-1 — **the entire journal enrichment layer's output has been wiped**: Notion re-ingestion full-item `put_item` clobbers all 23 `enriched_*` fields; 0/50 records enriched; every consumer (coaches, hypothesis engine, /data/mind) reads None. The backfill fix costs cents.
+- **Both live alarms at review time are instrument misfires:** the Strava reconciliation ALARM is a UTC/local window-edge false positive (the "missing" walk is stored — C-1); the freshness ALARM's residual driver is Todoist's 62h-max-healthy-age vs 48h threshold (E-3). The June red was pre-#392 misclassification and #392 demonstrably fixed it (metric dropped 4→1 within hours of the deploy).
+- **A dozen dead writer↔reader couplings** (theme 2): TDEE chain (B-1), brief/digest strength wired to a partition dead since March (B-2), character body-fat fields that never existed (B-3), unified-sleep merge rules reading nonexistent fields (A-2), journal trajectory tool that can never output (J-3), mind coach double-dead (J-4).
+- **Honesty recorded, not surfaced** (theme 4): TSB is 100% Hevy-proxy with `confidence: hevy_fallback` stored and consumed by nothing while a coach prompt says "TSB −87" (M-3, C-5/C-6); the site labels an 8-day-old weight "today" (M-5).
+- **Two "S3-triggered" ingesters have no trigger:** measurements (B-4 — the next tape-measure upload silently does nothing) and the apple_health XML path (D-5 — which is lucky, since it's also a latent clobber).
+- **Privacy-forward:** J-8 — `/api/journal_analysis` will publicly serve per-day journal one-line summaries the moment journaling resumes (phaseless cache records pass the phase filter). Decide before Phase 2 of the roadmap.
 
-## Gotchas / notes
+## What happens next (Session 2 of the review→backlog pipeline, GATED)
 
-- test_i5/lambda_map: new lambdas register under `lambda_map["lambdas"]` (the canonical group) — a separate top-level group does NOT satisfy the orphan test.
-- KMS: any role with DDB write needs `kms:GenerateDataKey` (test_r2).
-- Static `get_item` keys that are lazily created need a `KNOWN_OPTIONAL` entry in test_ddb_key_contracts.
-- `og_moments.build_moment_card` imports PIL lazily via og_image_lambda — tests stub it (CI has no Pillow).
-- The moments-index prediction key is a plain composite (`coach_id|date|text[:60]`) shared verbatim between `og_moments._prediction_key` and coaching.js — change both or neither.
-- Prior outstanding items: shadow-sweep re-measure vs 11/112 baseline (needs daily coach cycles); `EXTERNAL_EMAILS_ENABLED` flip = Matthew's call; todoist false-stale window (00:00–14:00 UTC) is known-benign.
+1. Matthew reads the review. 2. On green-light: score the 66 findings per ADR-099 (gates → `(Impact×Confidence)/Effort` → terciles), file epics+stories (`area:data`, privacy-passed bodies), write the manifest. Consider authoring `scripts/file_backlog_from_manifest.py` — the missing automation link from the last batch (issues were filed ad-hoc). 3. The journal roadmap Phase 1 (backfill + clobber-proofing + dead-consumer fixes) is the single highest-value S-effort cluster and could ship as its own early batch.
 
-## Live verification (2026-07-04, post-deploy)
+## Notes for the fixer
 
-- 4 stacks deployed clean (Web: `/api/explain` + `/moments/*` behaviors; Email: `between-chronicle` created; Operational: explain + moments sweep; Compute: windowed summarizer). site-api + site synced.
-- `/api/last_sync` live: whoop/eightsleep/apple_health real write stamps; cockpit strip renders "WHOOP 54M AGO · EIGHT SLEEP 6H AGO · APPLE HEALTH 9M AGO ← FRESHEST" — honest stale + earned freshest.
-- `/api/explain` live probe (what_changed): cited the real r=0.843/n=16 correlation, called the empty deltas honestly, preliminary caveat — fully grounded.
-- Moments: og-image-generator minted `/moments/week/2026-W27/` (shell 200, own card 200 image/png); qa + predictions honestly empty (none published/decided yet) — they mint as they exist.
-- #407 fold verified LIVE: teaser bottom 745/900 desktop, 685/844 mobile — in-fold both; screenshot shows the differentiated honest constellation (Sleep 87 · Fuel 2) + the /100 legend.
-- Mirror form visible on home (zero-write proof ran pre-merge).
-- `between-chronicle` dry_run: assembled 1 real finding (the newly-unlocked habit↔grade correlation); send stays dark behind EXTERNAL_EMAILS_ENABLED=false — flipping it is Matthew's call.
-
-## NEXT FABLE SESSION (Matthew's standing ask)
-
-**/plan the full data-source health review** — per-source (Whoop, Apple Health/HAE, Garmin, Strava, Withings, MacroFactor, Eight Sleep, Habitify, Todoist, Hevy, food delivery, measurements, Notion journal): what we pull / how (API, auth, rate limits, retries) / why (value, keep-or-retire vs ADR-103) / timing+frequency vs the source's real cadence / CRUD+dedup+idempotency / storage in the data model / custom calculations built on it / how it presents on the site — plus the forward piece: how far we can take structured extraction from free-text journal entries to feed the coaches (ADR-104-grounded). Full brief in memory: `project_data_source_health_review.md`.
+- `source_state.py` (C-3) and any registry change ship in the **shared layer** — CONVENTIONS §1 sequence.
+- E-1's poisoned Todoist snapshot fields (since ≥05-10) are point-in-time and unrecoverable — annotate the range, don't try to backfill.
+- The review ran read-only from worktree `.claude/worktrees/ds-health-review` @ `40cbbc4a`; no code, config, or deploy was touched. Stage-0 baseline + lane reports + verdicts live in the session scratchpad (`…/scratchpad/dsr/`) if the findings need re-tracing.
+- CLAUDE.md drift the review itself hit (fold into any doc-truth batch): "Todoist at 2x daily" (actual 1×, TD-12), the `raw/{source}/{datatype}/…` S3 convention (matches nothing — X-9), ADR-057's "WAF protects HAE" (false — D-7).
