@@ -983,6 +983,36 @@ def email_chronicle_sender() -> list[iam.PolicyStatement]:
     ]
 
 
+def email_between_chronicle() -> list[iam.PolicyStatement]:
+    """#398 between-chronicle note: reads already-computed DDB records
+    (what_changed + predictions + stances + subscribers), writes ONLY its
+    content-hash dedup marker, SES send. Zero AI — no bedrock, no ai-keys."""
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            # GenerateDataKey required alongside Decrypt for PutItem on the
+            # CMK-encrypted table (the dedup marker write).
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="SES",
+            actions=["ses:SendEmail", "sesv2:SendEmail"],
+            resources=[SES_IDENTITY, SES_CONFIG_SET_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="DLQ",
+            actions=["sqs:SendMessage"],
+            resources=[DLQ_ARN],
+        ),
+    ]
+
+
 def email_weekly_signal() -> list[iam.PolicyStatement]:
     """Weekly Signal subscriber email (PB-06): reads DDB (insights + subscribers),
     S3 (generated/public_stats.json, generated/journal/posts.json), KMS, SES send, DLQ.
