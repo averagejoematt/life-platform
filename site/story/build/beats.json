@@ -64,6 +64,20 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/521"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-review-paid-to-zero",
+      "date": "2026-07-04",
+      "title": "The data-health review's must-fix list hits zero",
+      "shipped": "The last seven stories from the 15-source data-health audit, closed in one batch — plus two deliberate subtractions. Habit days now finalize after midnight, so a day that was 48% done can never freeze in the record as 100% (yesterday's real record sat at 61 unresolved checks; one run after the fix, honestly settled). A manually-logged supplement now survives the hourly sync instead of being silently overwritten. The bed sensor logs in once per token lifetime instead of 18 password logins a day. The tape-measure upload pipe — dead for months with no trigger wired — works end-to-end again, proven by uploading a file and watching the record land. And two zombie processes were put down on purpose: a dormant XML importer that would have silently corrupted live health records if ever run, and a cron that had spent 18 days hammering an API that was rate-limiting it harder with every attempt.",
+      "gotcha": "A validation layer that checks the wrong field names isn't a safety net, it's a decoy: five of the schema checks could never fire because they watched names no writer ever produced, while the workout records it did check tripped 1,500 false warnings a fortnight. The whole spec had to be re-audited against what the pipeline actually writes — not what the docs said it writes.",
+      "honest_miss": "The daily health check went fully green today for the first time since May 25 — not because everything was finally fixed, but partly because one of its checks had been probing a credential that never existed. Some of that red was the instrument, not the system. And historical habit days that froze before the fix stay frozen unless individually replayed; the record is honest going forward, not retroactively.",
+      "prs": [
+        {
+          "label": "PR #523",
+          "url": "https://github.com/averagejoematt/life-platform/pull/523"
+        }
+      ]
     }
   ]
 }
