@@ -1,48 +1,60 @@
-# HANDOVER — the "frozen page" fix: content-hash the full JS module graph — 2026-07-03
+# Handover — 2026-07-04 Now-milestone Sonnet Paydown
 
-**One focused bug, shipped + deployed live + doc'd.** Matthew reported many v5 pages loading "frozen" — the static shell rendered (header/title/footer) but the JS-populated content was blank; a hard reload fixed it, and it reproduced after a browser restart. Root-caused to a deploy-tooling gap, fixed structurally, deployed, and live-verified. **PR #332 open** (branch `worktree-asset-hash-fix-deploy`; docs added on `asset-hash-docs` → fold into #332). The fix was **already deployed to production** (Matthew authorized "deploy this conversation"); the PR is for durability.
+## State of play
 
----
+**main HEAD:** `22153698` (docs: wrap session)  
+**Layer:** v95 (bedrock_client INVOCATION_CONTEXT + Context-tagged spend metrics)  
+**Fleet:** all consumers on v95, postflight green, CI green  
+**Now-milestone:** 0 open stories — fully closed
 
-## The bug
+## What shipped this session (7 PRs)
 
-The v5 site is vanilla ES modules that `import` each other by absolute URL (`import ... from "/assets/js/charts.js"`). `sync_site_to_s3.sh` content-hashes CSS/JS and serves the hashed copies `max-age=31536000, immutable` (ADR-039) — but the old inline bash hashing rewrote references **only in `*.html`**. The intra-module import statements *inside* the modules were never rewritten, so they kept pointing at the **unhashed, mutable, `max-age=86400`** URL (the original file, also uploaded as ADR-039's "dynamic-load fallback").
+| PR | Stories closed | What |
+|---|---|---|
+| #444 | #373 #375 #376 #377 | Follow link in nav + ask-the-board tab + wedge-B GitHub link + doc-truth fixes |
+| #445 | #367 #372 | Cost-governor heartbeat CW alarm + scorecard "no decided predictions yet" payoff state |
+| #446 | #354 #358 #368 | Privacy scrub canonicalize (site_api_common is now SOT) + write-endpoint throttle (checkin/suggest) + content-policy CI scan (ENFORCED) |
+| #447 | #371 #369 | Managed-where ledger (docs/MANAGED_WHERE_LEDGER.md) + I4 GSI assertions + I22 site SHA reconciliation in post-deploy CI |
+| #448 | #366 #360 | Dev-vs-prod spend attribution (INVOCATION_CONTEXT env var, Context=prod/dev CW metric, BEDROCK_SHADOW_MODE dry-run) + wedge-A gate readout in weekly digest |
+| #449 | — | CI fixes: weekly_digest golden update + size-gate GRANDFATHERED |
+| #450 | — | Layer v95 constant bump in cdk/stacks/constants.py |
 
-So the entry module (`evidence.js`) was hashed/immutable, but its dependencies (`charts.js`, `sigils.js`, `icons.js`, `ask.js`) resolved to mutable 24h URLs. When a deploy changed an entry module **and** a dependency together (exactly what #260's graphic-identity change did), a returning browser paired a **fresh hashed entry module with a stale cached dependency**. An ES module graph fails atomically — one mismatched import throws at load, the whole module never executes — so the page rendered only its static shell (the frozen screenshot). Hard reload bypassed the HTTP cache; the stale copy survived a browser restart (≤24h TTL), so it reproduced reliably.
+## Session lesson
 
-Server-side freshness/QA never saw it — it's an interactive, cache-state bug.
+Pre-commit hook (`sync_doc_metadata.py`) updates `test_count` and other metadata in the **working tree** during the commit, but the change is NOT auto-staged — the committed file still has the old value. `test_platform_stats_truth::test_test_count_matches_suite` catches this on CI. **Reflex:** always run `python3 deploy/sync_doc_metadata.py` and stage the result before committing when adding/removing tests.
 
-## The fix (ADR-098)
+## Next wave (Next-milestone, model:sonnet — ranked)
 
-New **`deploy/hash_site_assets.py`** replaces the inline bash hashing:
-- Builds the module dependency graph from source, hashes **leaves-first** (topological sort; raises on a cycle) so a dependency's hash is final before any dependent is hashed.
-- Rewrites **every** reference: HTML `<link>`/`<script>`, intra-module `import`s, and CSS.
-- Writes `name.<hash>.ext` (immutable) and rewrites the original in place too (kept as the short-cache fallback), both internally consistent. Skips `legacy/`.
+Seed the next session with:
+```bash
+gh issue list --label type:story --milestone Next --state open --label model:sonnet
+```
 
-Every asset URL is now content-hashed and immutable → an entry module pins the exact hashed bytes of every transitive dependency → **version skew is structurally impossible**. Chose the graph approach over a hardcoded dep list precisely because it auto-discovers new imports (current `evidence.js` imports an `ask.js` the bug diagnosis didn't know about — hashed automatically).
+Top 10 by score:
+- **#390** Coach quality gate: promote from advisory → blocking (N-06 elapsed, re-eval done). `area:data`
+- **#389** sync_doc_metadata drift gate: `--check` mode asserts literals match discovered values; CI ENFORCED. `area:docs`
+- **#388** Recovery vs deficit overlay (RQA-08): day-level chart overlay on Cockpit. `area:data`
+- **#386** Cold newcomer hook: lead with the transformation hook, not the disengagement beat. `area:site-ux`
+- **#383** Phase-filter re-evaluation at 30-day checkpoint (ADR-058 §13). `area:data`
+- **#382** Guard dual deployment planes (script-pushed vs CDK assets). `area:infra`
+- **#381** Hermetic unit suite: creds isolation in conftest. `area:infra`
+- **#379** Fix Sentinel post-reset false alarm (BUG-05). `area:security`
+- **#378** HAE webhook token out of query string (PRIV-02). `area:security`
+- **#377** JS parse gate on site deploys (evidence.js 2,980-line SPOF). `area:infra`
 
-`sync_site_to_s3.sh` now just calls the helper. The SW (`site/sw.js`) needs no change — cache-first-on-immutable is now genuinely correct for these URLs.
+Fable-only items (need a separate Fable session):
+- **#397** Close the ask loop: reader Q→board answer as a returnable public feed
+- **#396** Remediation agent earns auto mode or returns to shadow
+- **#392** Split behavioral silence from infra failure in freshness alarms
+- **#387** Deepen /api/ask grounding to platform-computed drivers
 
-## Deploy + verification
+## What NOT to do next session
+- Do NOT attempt Fable stories with Sonnet — they're labeled `model:fable` for a reason
+- Do NOT run `aws s3 sync --delete` to bucket root
+- Do NOT deploy from a worktree branch; always deploy from `main` in the worktree (or main repo when not locked)
 
-Deployed from an **isolated worktree off fresh origin/main** — the shared checkout was 70 commits / 32 site-commits behind, and deploying from it would have clobbered live content (the clobber guard would also have blocked it). Live-verified:
-- `/data/` serves `evidence.<hash>.js` immutable + all 4 imports hashed/immutable/200.
-- Deepest chain `coaching → coach_popover → sigils` resolves; the `sigils` hash is **byte-identical across pages** (one consistent graph, no dup).
-- 0 dangling refs, 0 unhashed HTML refs; `version.json` build == `sw.js` VERSION.
-- Headless render (Playwright) executes the module and populates the content slots (opposite of the frozen shell).
-
-Stuck visitors self-heal within ~5 min (their cached HTML expires and points at the all-new hashed graph).
-
-## State of main + PR
-
-- **PR #332** (`worktree-asset-hash-fix-deploy`) — the 2-file tooling fix (`deploy/hash_site_assets.py` + `deploy/sync_site_to_s3.sh`). Already deployed to prod; PR lands it on main so future deploys keep full-graph hashing (else the next clean-checkout deploy reverts to HTML-only hashing and reintroduces the bug).
-- **Docs** (this handover + ADR-098 + INCIDENT_LOG P3 + CHANGELOG + SITE_UPLEVEL_PLAYBOOK gotcha) are on branch `asset-hash-docs` off #332 — **fold into #332 before merge** (or merge both).
-- Merge order doesn't matter; both are additive. After merge, delete both branches.
-
-## Notes / gotchas
-
-- The unhashed-original upload (`sync_site_to_s3.sh` "Original CSS/JS", `max-age=86400`) is now dead weight for statically-referenced modules but still correct for true runtime `document.createElement('script')` loads (ADR-039's `countdown.js`). Left in place; a candidate for later cleanup.
-- **CLAUDE.md verified-line NOT updated** — the shared checkout had CLAUDE.md dirty from a concurrent session; touching it here would collide. Left for Matthew / that session.
-- Memory: `reference_asset_hashing_full_graph` (the durable "for any frozen/stale-page report, check import()/module paths, not just HTML").
-
-See ADR-098, INCIDENT_LOG 2026-07-03 (P3).
+## Deployment notes for next session
+- `bedrock_client.py` layer changes → full build_layer.sh → CDK LifePlatformCore → CDK all consumer stacks
+- site-api multi-module deploy: `bash deploy/deploy_site_api.sh` (NOT single-file)
+- site-api-ai: manual full web/ zip (no dedicated script yet; pattern in this handover)
+- Weekly digest and other email lambdas: `bash deploy/deploy_lambda.sh <fn-name> lambdas/emails/<file>.py`
