@@ -34,7 +34,7 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-SHARED_LAYER_VERSION = 94  # v93: ai_calls ENGAGEMENT/PRESENCE steering — coaches notice the quiet stretch (presence feature)
+SHARED_LAYER_VERSION = 95  # v95: bedrock_client INVOCATION_CONTEXT + Context-tagged spend metrics (COST-05)
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 
