@@ -1759,6 +1759,8 @@ def handle_journal_analysis() -> dict:
 
     daily_themes = []
     for item in items:
+        # J-8 (#504): one_line_summary is a per-day journal digest — never
+        # public. Aggregates (themes, sentiment) are the public surface.
         daily_themes.append(
             {
                 "date": item.get("date", item.get("sk", "").replace("DATE#", "")),
@@ -1767,7 +1769,6 @@ def handle_journal_analysis() -> dict:
                 "sentiment_score": float(item.get("sentiment_score", 0)),
                 "sentiment_label": item.get("sentiment_label", "neutral"),
                 "word_count": item.get("word_count", 0),
-                "one_line_summary": item.get("one_line_summary", ""),
             }
         )
 

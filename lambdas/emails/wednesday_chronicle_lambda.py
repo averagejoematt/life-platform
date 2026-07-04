@@ -585,9 +585,9 @@ def build_data_packet(data):
         themes = entry.get("enriched_themes", [])
         emotions = entry.get("enriched_emotions", [])
         cognitive = entry.get("enriched_cognitive_patterns", [])
-        avoidance = entry.get("enriched_avoidance_flag")
+        avoidance = entry.get("enriched_avoidance_flags")  # J-3 (#503): plural list, not singular
         social = entry.get("enriched_social_quality")
-        ownership = entry.get("enriched_ownership_level")
+        ownership = entry.get("enriched_ownership")  # J-3 (#503): _level variant never written
 
         packet.append(f"--- {date} ({template}) ---")
         if raw:
@@ -607,7 +607,7 @@ def build_data_packet(data):
         if cognitive:
             signals.append(f"Cognitive: {', '.join(cognitive[:3])}")
         if avoidance:
-            signals.append(f"AVOIDANCE FLAG: {avoidance}")
+            signals.append(f"AVOIDANCE FLAGS: {', '.join(str(a) for a in avoidance)}")
         if social:
             signals.append(f"Social: {social}")
         if ownership:

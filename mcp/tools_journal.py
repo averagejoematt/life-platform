@@ -657,12 +657,14 @@ def tool_get_journal_sentiment_trajectory(args):
         if not date_str:
             continue
 
-        mood = entry.get("enriched_mood_score") or entry.get("mood_score")
-        energy = entry.get("enriched_energy_score") or entry.get("energy_score")
-        stress = entry.get("enriched_stress_score") or entry.get("stress_score")
+        # J-3 (#503): the enricher writes enriched_mood/energy/stress/ownership —
+        # the *_score variants never existed in the store.
+        mood = entry.get("enriched_mood") or entry.get("mood_score")
+        energy = entry.get("enriched_energy") or entry.get("energy_score")
+        stress = entry.get("enriched_stress") or entry.get("stress_score")
         themes = entry.get("enriched_themes", [])
         emotions = entry.get("enriched_emotions", [])
-        ownership = entry.get("enriched_ownership_score")
+        ownership = entry.get("enriched_ownership")
         social_q = entry.get("enriched_social_quality")
 
         if mood is None and energy is None and stress is None:
@@ -708,12 +710,10 @@ def tool_get_journal_sentiment_trajectory(args):
         vals = [(i, float(s.get(field))) for i, s in enumerate(signals) if s.get(field) is not None]
         if len(vals) < 5:
             return None, None
-        xs = [v[0] for v in vals]
-        ys = [v[1] for v in vals]
-        result = _linear_regression(xs, ys)
-        if result:
-            return round(result[0], 3), round(result[1], 2)  # slope, intercept
-        return None, None
+        slope, intercept, _r_sq = _linear_regression(vals)
+        if slope is None:
+            return None, None
+        return round(slope, 3), round(intercept, 2)
 
     mood_slope, _ = compute_slope(daily_signals, "mood")
     energy_slope, _ = compute_slope(daily_signals, "energy")

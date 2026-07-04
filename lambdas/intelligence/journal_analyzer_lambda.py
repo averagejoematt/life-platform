@@ -60,6 +60,9 @@ def _get_api_key():
     return _api_key_cache
 
 
+# J-8 (#504): cache writes must carry a phase attribute — an unstamped record
+# passes with_phase_filter forever and survives experiment resets untagged.
+from constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
 from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
@@ -195,6 +198,7 @@ Journal entry:
                         "one_line_summary": analysis.get("one_line_summary", ""),
                         "analyzed_at": now.isoformat(),
                         "model": AI_MODEL,
+                        "phase": EXPERIMENT_PHASE_CURRENT,
                         "ttl": ttl,
                     }
                 )
