@@ -9,8 +9,28 @@
       "gotcha": "The engine was still reading pre-2024 Whoop field names, so sleep — the single best-instrumented pillar — had been permanently stuck below the data-coverage floor and silently frozen. The believability bug and a real data bug were hiding behind the same symptom.",
       "honest_miss": "Before the gate, a shadow sweep of 112 stored coach narratives found 11 hard contradictions with the canonical facts (~10%). The gate kills invented numbers, but embellishment that uses no numbers at all is still open — that fabrication rate gets re-measured against the same baseline after a few daily coach cycles.",
       "prs": [
-        { "label": "PR #451", "url": "https://github.com/averagejoematt/life-platform/pull/451" },
-        { "label": "PR #452", "url": "https://github.com/averagejoematt/life-platform/pull/452" }
+        {
+          "label": "PR #451",
+          "url": "https://github.com/averagejoematt/life-platform/pull/451"
+        },
+        {
+          "label": "PR #452",
+          "url": "https://github.com/averagejoematt/life-platform/pull/452"
+        }
+      ]
+    },
+    {
+      "id": "2026-07-04-journal-pipeline-repair",
+      "date": "2026-07-04",
+      "title": "The journal pipeline was eating its own homework — repaired at every layer",
+      "shipped": "The platform's only free-text extraction — Haiku-enriched journal signals (mood, stress, themes, avoidance patterns) — was dead end-to-end: every re-ingestion from Notion silently wiped the enrichment, and the three consumers that should have read it were reading field names that never existed. Shipped in one batch: re-ingestion now preserves enrichment, edited entries re-enrich automatically, a Sunday sweep self-heals gaps, the mind coach and sentiment-trajectory tool finally receive real signals, and the full corpus was re-enriched for cents. 59 of 62 entries now carry structured signals; the other 3 are one-line stubs.",
+      "gotcha": "Dead code hides dead code. The wrong field names meant the trajectory tool always exited early — which masked a second bug further down: a helper called with two arguments that takes one. The moment the data existed, the tool would have crashed instead of working. The first test that fed it realistic data found it in seconds; the same crash pattern turned up in a second tool, now filed.",
+      "honest_miss": "A privacy hole was closed before it opened: the public API would have served per-day journal one-liners the moment journaling resumed — it only looked safe because the cache happened to be empty. And the deeper extraction rework (merged schema, verbatim quotes for grounding, raw-text archive) is still ahead; this batch only made the existing pipeline honest.",
+      "prs": [
+        {
+          "label": "PR #510",
+          "url": "https://github.com/averagejoematt/life-platform/pull/510"
+        }
       ]
     }
   ]
