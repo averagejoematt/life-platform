@@ -1,49 +1,29 @@
-# Handover — 2026-07-04 The Honesty Pair (ADR-104): believable gamification + grounded generation
+# Handover — 2026-07-04 (second session) The Fable Next batch: #392 #387 #397 #396 #380
 
-**One theme, two workstreams, one PR — the platform must not say things the data doesn't support.** Built in worktree `honesty-pair`; PR #451 merged. **ALL DEPLOYS RUN + LIVE-VERIFIED same session (Matthew: "you do all deploys this session, i approve")**: layer v96 published + fleet-uniform (postflight 🟢), config v1.2.0 in S3, site-api verified on /api/character, site synced + invalidated, **history recomputed genesis→2026-07-02 (19×200s, engine v1.2.0 confirmed in DDB)**. Live: /api/character serves drivers/coverage/holds; the page renders why-lines + HELD chips + the quiet-stretch beat; board_ask live-probed refusing to invent RHR/HRV numbers. Only remaining: re-run scripts/grounding_shadow_sweep.py after the next daily coach cycle vs the 11/112 baseline.
+**All five open `model:fable` Next-milestone stories implemented, tested, and bundled as PR #453** (branch `feat/fable-next-392`, worktree `honesty-pair`, five commits — one per issue, each `Fixes #N`). Full suite **2,660 passed** (only the 5 known pre-existing failures: coaches_api ×4 + i16, identical on untouched main); black/ruff clean on CI scope; `cdk synth LifePlatformWeb` clean; content-policy scan PASS; 33 new tests. **⚠️ PR #453 is OPEN, NOT merged — the merge was permission-blocked as self-approval (the "implement the issues" ask didn't extend to merging my own unreviewed PR). Deploys are staged, not run (deploy-from-main).**
 
-## Workstream B — the character sheet tells the truth (engine v1.2.0)
+## What each story shipped
 
-**The reported bug:** everything level 13 despite zero journaling all cycle and no habits/workouts for a week. **Root cause (from code):** `_weighted_pillar_score` scored missing data as neutral 50 (blend-toward-50), so every pillar targeted ≈50 ≫ level 1 and climbed +2/3 days in lockstep; the level-down path was unreachable.
+1. **#392 freshness split** — new canonical `lambdas/source_registry.py` (**new shared-layer module** → this PR's deploy includes a **layer bump to v97**). Behavioral-vs-infra classification + thresholds in one place; freshness_checker + `/api/source_freshness` + MCP `get_freshness_status` all derive from it (the MCP mirror still had food_delivery=90d, the pre-triage masking value). Withings/strava/macrofactor now behavioral → `slo-source-freshness` stops paging a quiet stretch; whoop-outage replay test proves real breakage still pages. `count_infra_stale()` extracted for testability.
+2. **#387 ask grounding** — `_ask_fetch_computed_reads()` in `site_api_ai_lambda.py`: adaptive-mode verdict + factor reasons, momentum, improving/declining, canonical weight-rate + protein trio, what-changed 30d deltas, FDR correlations, presence — all fail-soft. Prompt: narrate-only (no arithmetic), what-drove answers from computed reads w/ correlative framing, never ask the reader for data; "19 data sources" now derived from the registry (11 live + 1 paused), coach preamble too.
+3. **#397 ask loop** — CloudFront behavior `/board_answers/*` → S3GeneratedOrigin (was falling to site origin = the 404 that hid the whole payoff surface); `publish_board_answer.py` gains fail-closed `privacy_guard.assert_clean` on every published string; coaching qa tab shows honest feed state + kicker "you asked — the board answered". Private question queue stays non-public by design.
+4. **#396 remediation agent** — report-first skeleton (file exists with all signals `untriaged` BEFORE the agent runs; prompt requires incremental bucket moves; emails render "Not triaged this run"); alarm-ack ledger `remediation-log/ack_ledger.json` (7d TTL, needs_human/stale conclusions carried forward); earn-or-shadow (28d auto window with 0 merged auto-fix-safe PRs → standing needs-human item with the exact SSM dial-back command; merged PR restarts the window). Safety invariant test untouched + green.
+5. **#380 build log** — `/story/build/` section (Story app) fed by git-committed `site/story/build/beats.json`; session-end checklist `docs/content/BUILD_DISPATCH_CHECKLIST.md` wired into the CLAUDE.md wrap convention; format-enforced honesty (tests require honest_miss; privacy gate over every string; content-policy CI gate covers the feed). Seeded with the real ADR-104 beat. **Side catch:** the shell generator's nav was missing the #444 follow link — regen would have silently dropped it site-wide; template fixed (the stored-artifact-regen gotcha, again).
 
-**The fix (character_engine v1.2.0 + config v1.2.0):**
-- **Behavioral absence = 0** — components flagged `behavioral: true` (habits, journaling, nutrition logging, training freq/zone2/diversity) score 0 at full weight when absent. Measured (sensor) components keep the neutral blend. Sick-day freeze unchanged.
-- **Coverage gate** (`level_change_min_coverage` 0.5): thin-data days carry no leveling signal either direction (pillar shows "held").
-- **Raw-day gate**: a level-up needs the day's own raw ≥ the new level (kills post-quit climbing on EMA momentum).
-- **Step bands** (>25→3, >10→2): pillars converge at the pace their honest gap earns — no more lockstep.
-- **Drivers provenance** (top/dragging/absent/no_data + coverage) engine→DDB→`/api/character`→per-pillar "why" lines + a presence-wired quiet-stretch beat on `/data/character/` (render-QA'd locally via route-mock, all checks pass).
-- **Side catch (real bug):** the engine read pre-v2 Whoop field names — sleep (the BEST pillar) was permanently below the coverage floor. Fixed (`sleep_efficiency_percentage`, `slow_wave_sleep_hours`, `rem_sleep_hours`).
+## Deploy sequence (STAGED — run from detached origin/main AFTER #453 merges)
 
-**Simulated over the real 20 days** (`scripts/character_simulate.py`, read-only): sleep 19 (raw 87), movement 18-falling, mind 15, nutrition 1, metabolic+relationships held at 1, character 11 — differentiated and explainable vs the live all-13.
+1. `git checkout origin/main` (detached) + `rm -rf cdk/cdk.out`
+2. **Layer dance → v97** (CONVENTIONS §1): `bash deploy/build_layer.sh` → `cd cdk && npx cdk deploy LifePlatformCore` → verify new version → bump `SHARED_LAYER_VERSION=97` in `cdk/stacks/constants.py` (tiny follow-up PR like #452) → deploy consumers: Compute, Email, Operational (ships freshness-checker + site-api-ai bundle), Mcp, Ingestion.
+3. `npx cdk deploy LifePlatformWeb` — the `/board_answers/*` CloudFront behavior (distribution update, takes a few minutes).
+4. `bash deploy/deploy_site_api.sh` — site_api_data (registry-derived freshness board).
+5. `bash deploy/sync_site_to_s3.sh` — coaching.js, dispatches.js, story shells incl. `/story/build/`, beats.json.
+6. Seed the empty feed: `printf '{"answers": []}' | aws s3 cp - s3://matthew-life-platform/generated/board_answers/answers.json --content-type application/json`
+7. Verify: `slo-source-freshness` → OK within a day (next checker run emits StaleSourceCount=0); `curl https://averagejoematt.com/board_answers/answers.json` → 200; `/story/build/` renders the ADR-104 beat; `/api/ask` probe "what drove this morning's recovery?" cites computed reads; postflight 🟢.
 
-## Workstream A — grounded generation everywhere (the fabrication frontier)
+## Gotchas / notes
 
-**Baseline measured** (`scripts/grounding_shadow_sweep.py`, read-only): **11 hard canonical contradictions in 112 stored V2 coach narratives over 14d (~10%)**; experts 4/9 (today); field notes 0/3. The ungated V2 render was fabricating exactly as predicted.
-
-- **`lambdas/grounded_generation.py`** (new, pure; in layer + bundled): `authoritative_facts_block` (analyzer's exact wording) + `grounding_findings` = grounding_guard contradictions **+ er03-style allow-list number gate** (every output number must appear in input ∪ facts — kills "from X to Y" invented endpoints; small counts/durations/years benign) + `regen_once` keep-if-strictly-improved (extracted from the analyzer). 16 unit tests.
-- **Retrofitted:** V2 coach render (`ai_calls.py`: canonical facts injected into the system prompt + gate + regen-once, all fail-soft); `/api/ask` (gate + one regen → honest fallback, fail-closed); `/api/board_ask` (gate, no regen — 6 paid calls — in-voice refusal); analyzer adopts the shared harness + gains the allow-list.
-- **Validator woke up:** `validate_ai_output` auto-loads canonical facts as `health_context` when none passed (cached, fail-soft, `AI_VALIDATOR_AUTOLOAD=off` in conftest keeps units hermetic) — the ±25% check is now live at ~12 previously no-op call sites.
-- **Sentinel** facts pass now also covers the V2 coaches' fresh `OUTPUT#` narratives (day-boundary-skew-safe).
-- **ADR-104** written (incl. the per-engine absence-policy audit: readiness/adaptive keep neutral-on-missing — correct for sensors; character distinguishes behavioral vs measured). SCHEMA.md character fields updated. `ci/lambda_map.json` + `build_layer.sh` + `mypy.ini` updated for the new layer modules (grounded_generation, canonical_facts, flat-copied grounding_guard).
-
-## Verification state
-
-- Full suite: **2,623 passed**; only 5 pre-existing failures remain (`test_coaches_api` ×4 + `test_i16_recent_ingest_records_exist` — both fail identically on the untouched checkout; i16 is likely the quiet stretch itself). black + ruff + mypy green; evidence.js node-checked; character page render-QA'd with mocked API (why-lines, held marker, quiet beat all render).
-- **Deploys: ALL RUN + verified this session** (see the executed plan below). Live proof: DDB DATE#2026-07-02 record carries engine_version 1.2.0 + coverage_hold/absent_behaviors; `/api/character` serves the provenance fields; the live page renders them; postflight 🟢 fleet-uniform v96; board_ask adversarial probe served an in-voice no-invented-numbers answer. Outstanding: the post-cycle shadow-sweep re-measure only.
-
-## Deploy plan (EXECUTED 2026-07-04, this session — kept for the record)
-
-1. `bash deploy/build_layer.sh` → `cd cdk && npx cdk deploy LifePlatformCore` (publishes layer v96 with grounded_generation/canonical_facts/grounding_guard + character_engine v1.2.0) → bump `SHARED_LAYER_VERSION` in `cdk/stacks/constants.py` → deploy consumer stacks per CONVENTIONS §1 (Compute, Email, Operational — Operational also ships the Sentinel + site-api-ai bundle).
-2. `aws s3 cp config/character_sheet.json s3://matthew-life-platform/config/matthew/character_sheet.json` (engine config v1.2.0).
-3. `bash deploy/deploy_site_api.sh /api/character` (provenance fields in handle_character + config whitelist).
-4. `bash deploy/sync_site_to_s3.sh` (character page why-lines/quiet beat; full-graph hashing).
-5. `python3 deploy/restart_character_rebuild.py --apply` (recompute genesis→today with the new engine; then spot-check `/api/character` + the page).
-6. `python3 scripts/grounding_shadow_sweep.py --days 14` after the next daily coach cycle → compare vs the 11/112 baseline.
-
-## Gotchas / notes for the next session
-
-- The worktree branch is `worktree-honesty-pair`; PR carries both workstreams + ADR-104. CLAUDE.md status line + this handover ride the PR (merge conflicts with a concurrent wrap are one-block replaces).
-- field_notes deliberately NOT moved to `regen_once` (dict-shaped multi-field flow, already on the shared guard). STANCE# writer gate = named fast-follow.
-- `ci/lambda_map.json` layer list must exactly match `build_layer.sh` MODULES (test LV4); grounding_guard is special-copied, not in MODULES — layer-change detection won't fire on its edits (accepted, noted in ADR).
-- The board_ask/ask gate can fail-closed on legitimately-cited numbers if the grounding blob omits them — watch the `[board_ask] ... ungrounded` log line the first days; tolerance lives in `grounded_generation._BENIGN_NUMBERS`.
-- Character tuning knobs if the recomputed story needs adjustment: `level_step_bands`, `level_change_min_coverage`, per-component `behavioral` flags — all config, MCP-editable (`update_character_config` now permits the new leveling fields).
+- **source_registry.py is in the layer AND bundled** — CI layer-change detection covers it (ci/lambda_map.json updated; LV4 test green). Function-code copy shadows the layer copy harmlessly.
+- The remediation changes are repo-side (merge = live at next scheduled run, no deploy); the ack ledger + earn marker are created lazily in S3 on first run.
+- `remediation/` is NOT in CI's ruff/black scope (pre-existing unsorted imports on main) — don't chase style there.
+- The `/api/board_ask` coaches now also see the derived source count; drivers were deliberately NOT added to board_ask (6 paid calls, scoped to #387's /api/ask).
+- Prior session's outstanding item still stands: `python3 scripts/grounding_shadow_sweep.py --days 14` vs the 11/112 baseline after a few daily coach cycles.
