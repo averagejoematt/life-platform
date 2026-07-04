@@ -114,6 +114,28 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/563"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-the-math-arrives",
+      "date": "2026-07-04",
+      "title": "The hypothesis engine earns its 'scientific method' badge — pre-registration, effect sizes, and a calibration ledger",
+      "shipped": "The platform's weekly hypothesis engine was branded scientific method but contained no math: an AI model eyeballed seven days of data and voted. Now every hypothesis is born with a frozen, machine-checkable test spec — which metric splits the days, which metric should move, in which direction, by how much — and that spec is pre-registered: written down before the data that will judge it exists. The weekly verdict is pure computation (effect size plus a bootstrap confidence interval from a new tested statistics module), the AI only narrates decisions already made, and every resolution lands in a permanent calibration ledger so 'do the engine's high-confidence bets actually confirm more often?' finally has an answer coming. Correlations across the site also now use autocorrelation-corrected sample sizes — daily bodies remember yesterday, so 20 days of data was never really 20 independent observations.",
+      "gotcha": "Physiological time series are autocorrelated, and honoring that is humbling: the strongest correlation on the board this week (habit completion vs day grade, r=0.88 over 20 days) shrinks to an effective sample of just 7.1 days once day-to-day memory is priced in. It survives correction — most pairs don't. The anticonservative version looked more impressive every single week.",
+      "honest_miss": "The first live run rejected 2 of 5 generated hypotheses for failing the new spec gate — the stricter contract costs candidates. And the five hypotheses formed under the old engine can never be graded by the new one (their criteria were prose, not specs); they'll expire undecided over the next month, which is the honest price of upgrading the method mid-experiment.",
+      "prs": [
+        {
+          "label": "PR #567",
+          "url": "https://github.com/averagejoematt/life-platform/pull/567"
+        },
+        {
+          "label": "PR #568",
+          "url": "https://github.com/averagejoematt/life-platform/pull/568"
+        },
+        {
+          "label": "PR #570",
+          "url": "https://github.com/averagejoematt/life-platform/pull/570"
+        }
+      ]
     }
   ]
 }
