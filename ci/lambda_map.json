@@ -405,7 +405,8 @@
       "lambdas/training_notes_llm.py",
       "lambdas/grounded_generation.py",
       "lambdas/canonical_facts.py",
-      "lambdas/persona_core.py"
+      "lambdas/persona_core.py",
+      "lambdas/training_load.py"
     ]
   },
   "skip_deploy": {

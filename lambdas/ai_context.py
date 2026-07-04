@@ -667,8 +667,9 @@ def _build_cross_pillar_tradeoffs(component_scores, data, profile):
     # 2. Nutrition deficit vs Training load (TSB)
     if cal is not None and tsb is not None:
         if cal < cal_target * 0.80 and tsb < -10:
+            tsb_note = data.get("tsb_basis_note") or ""  # #490/M-3: e.g. " (duration-proxy basis)"
             tradeoffs.append(
-                f"  \u26a0\ufe0f Nutrition ({int(cal)} cal vs {cal_target} target) \u2194 Training fatigue (TSB {tsb:.0f}): "
+                f"  \u26a0\ufe0f Nutrition ({int(cal)} cal vs {cal_target} target) \u2194 Training fatigue (TSB {tsb:.0f}{tsb_note}): "
                 "Aggressive deficit + accumulated fatigue = under-fueling risk. "
                 "\u2192 Optimization call: protein preservation takes priority over hitting calorie floor exactly today."
             )

@@ -75,6 +75,7 @@ def build_data_summary(data: dict[str, Any], profile: dict[str, Any]) -> dict[st
         "current_weight": data.get("latest_weight"),
         "week_ago_weight": data.get("week_ago_weight"),
         "tsb": data.get("tsb"),
+        "tsb_basis_note": data.get("tsb_basis_note"),  # #490/M-3: provenance suffix
         "sleep_debt_7d_hrs": data.get("sleep_debt_7d_hrs"),
     }
 

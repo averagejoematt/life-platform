@@ -32,7 +32,6 @@ Sections:
 """
 
 import json
-import math
 import os
 import statistics
 import urllib.error
@@ -47,6 +46,7 @@ from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # A
 from digest_utils import (
     _normalize_whoop_sleep,
     avg,
+    compute_banister_from_dict,  # #490: shared TSS-like Banister
     compute_confidence,  # BS-05: confidence badges
     d2f,
     dedup_activities,
@@ -645,19 +645,10 @@ def ex_character_sheet(recs_dict):
 
 
 def compute_banister(strava_60d):
-    kj = {}
-    for date_str, r in strava_60d.items():
-        acts = dedup_activities(r.get("activities", []))
-        kj[date_str] = sum(float(a.get("kilojoules") or 0) for a in acts)
-    today = datetime.now(timezone.utc).date()
-    ctl = atl = 0.0
-    cd, ad = math.exp(-1 / 42), math.exp(-1 / 7)
-    for i in range(59, -1, -1):
-        day = (today - timedelta(days=i)).isoformat()
-        load = kj.get(day, 0)
-        ctl = ctl * cd + load * (1 - cd)
-        atl = atl * ad + load * (1 - ad)
-    return {"ctl": round(ctl, 1), "atl": round(atl, 1), "tsb": round(ctl - atl, 1)}
+    # #490: one Banister implementation — digest_utils scores activities on the shared
+    # TSS-like scale (walks count), so the digest's form bands mean the same thing as
+    # computed_metrics.
+    return compute_banister_from_dict(strava_60d)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

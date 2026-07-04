@@ -325,25 +325,35 @@ def tool_get_readiness_score(args):
     # tool_get_training_load (which queries 264 days of Strava + runs Banister model).
     tsb_cm = float(_cm["tsb"]) if _cm.get("tsb") is not None else None
     if tsb_cm is not None:
-        # TSB +12 = 100 (peak form), TSB -28 = 0 (deeply fatigued)
+        # TSB +12 = 100 (peak form), TSB -28 = 0 (deeply fatigued). #490: tsb is now
+        # on the shared TSS-like scale (training_load), which is what these bands
+        # always assumed. Band order: most-negative check first (the old ordering made
+        # "very fatigued" unreachable).
         tsb_score = _clamp(70.0 + tsb_cm * 2.5)
         form = (
             "fresh — good for key sessions or race"
             if tsb_cm > 5
             else (
-                "fatigued — accumulated training stress is high"
-                if tsb_cm < -10
-                else "very fatigued — recovery priority" if tsb_cm < -25 else "neutral"
+                "very fatigued — recovery priority"
+                if tsb_cm < -25
+                else "fatigued — accumulated training stress is high" if tsb_cm < -10 else "neutral"
             )
         )
+        # M-3 (#490): surface the stored load provenance beside the number.
+        _tsb_basis = _cm.get("tsb_load_basis") or {}
+        _tsb_conf = str(_tsb_basis.get("confidence") or "")
+        raw = {
+            "tsb_form": round(tsb_cm, 2),
+            "form_status": form,
+            "load_basis": _tsb_conf or "unknown",
+            "source": "pre_computed_metrics",
+        }
+        if _tsb_conf and _tsb_conf != "power":
+            raw["load_basis_note"] = "duration-proxy basis — loads are TSS-like estimates from duration/HR, not power-meter data"
         components["training_form"] = {
             "score": round(tsb_score, 1),
             "weight": 0.10,
-            "raw": {
-                "tsb_form": round(tsb_cm, 2),
-                "form_status": form,
-                "source": "pre_computed_metrics",
-            },
+            "raw": raw,
         }
     else:
         # Fallback: live Banister model (264d Strava query — only runs if pre-compute missing)

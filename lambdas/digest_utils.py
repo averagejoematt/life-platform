@@ -16,9 +16,10 @@ Contents:
   - Banister: compute_banister_from_list, compute_banister_from_dict
 """
 
-import math
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
+
+import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS
@@ -243,43 +244,37 @@ def compute_banister_from_list(strava_60d_list, today):
     """Compute Banister CTL/ATL/TSB from a list of Strava day records.
 
     Each record must have a 'date' key (YYYY-MM-DD) and optionally an
-    'activities' list where each activity may have a 'kilojoules' field.
-    Activities are deduped before summing kilojoules.
+    'activities' list. Activities are deduped, then scored on the shared
+    TSS-like scale (training_load, #490) so walks carry load and the digest
+    numbers band the same way as computed_metrics.
     """
-    kj = {}
+    load = {}
     for r in strava_60d_list:
         d = str(r.get("date", ""))
         if d:
             day_acts = dedup_activities(r.get("activities", []))
-            kj[d] = sum(float(a.get("kilojoules") or 0) for a in day_acts)
-    return _banister_core(kj, today)
+            load[d] = sum(training_load.activity_load(a)[0] for a in day_acts)
+    return _banister_core(load, today)
 
 
 def compute_banister_from_dict(strava_60d_dict):
     """Compute Banister CTL/ATL/TSB from a {date_str: record} dict of Strava records.
 
-    Dict keys must be YYYY-MM-DD date strings. Each record may have an
-    'activities' list with 'kilojoules' fields. Activities are deduped.
+    Dict keys must be YYYY-MM-DD date strings. Activities are deduped, then
+    scored on the shared TSS-like scale (training_load, #490).
     """
     today = datetime.now(timezone.utc).date()
-    kj = {}
+    load = {}
     for date_str, r in strava_60d_dict.items():
         day_acts = dedup_activities(r.get("activities", []))
-        kj[date_str] = sum(float(a.get("kilojoules") or 0) for a in day_acts)
-    return _banister_core(kj, today)
+        load[date_str] = sum(training_load.activity_load(a)[0] for a in day_acts)
+    return _banister_core(load, today)
 
 
-def _banister_core(kj_by_date, today):
+def _banister_core(load_by_date, today):
     """Shared Banister exponential decay loop (42-day CTL, 7-day ATL)."""
-    ctl = atl = 0.0
-    cd = math.exp(-1 / 42)
-    ad = math.exp(-1 / 7)
-    for i in range(59, -1, -1):
-        day = (today - timedelta(days=i)).isoformat()
-        load = kj_by_date.get(day, 0)
-        ctl = ctl * cd + load * (1 - cd)
-        atl = atl * ad + load * (1 - ad)
-    return {"ctl": round(ctl, 1), "atl": round(atl, 1), "tsb": round(ctl - atl, 1)}
+    ctl, atl, tsb = training_load.banister(load_by_date, today)
+    return {"ctl": ctl, "atl": atl, "tsb": tsb}
 
 
 # ═════════════════════════════════════════════════════════════════════════════

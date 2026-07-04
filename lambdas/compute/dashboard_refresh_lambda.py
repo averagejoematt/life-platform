@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -403,32 +404,15 @@ def refresh_dashboard(profile, yesterday, today):
     except Exception:
         pass
 
-    # TSB (training stress balance — may have logged a workout)
+    # TSB (training stress balance — may have logged a workout). #490: the shared
+    # TSS-like model replaces this lambda's private HR heuristic so an intraday
+    # refresh can no longer overwrite the morning compute with a different scale.
     try:
         strava_60d = fetch_range("strava", (today - timedelta(days=60)).isoformat(), today.isoformat())
-        if strava_60d:
-            day_loads = {}
-            for day_rec in strava_60d:
-                date_str = day_rec.get("sk", "").replace("DATE#", "")
-                daily_load = 0
-                for act in day_rec.get("activities") or []:
-                    dur_min = (safe_float(act, "moving_time_seconds") or 0) / 60
-                    avg_hr = safe_float(act, "average_heartrate") or 0
-                    if dur_min > 0 and avg_hr > 0:
-                        daily_load += dur_min * (avg_hr / 180)
-                    elif dur_min > 0:
-                        daily_load += dur_min * 0.5
-                if date_str:
-                    day_loads[date_str] = daily_load
-
-            atl = 0
-            ctl = 0
-            for i in range(60, 0, -1):
-                d = (today - timedelta(days=i)).isoformat()
-                load = day_loads.get(d, 0)
-                atl = atl + (load - atl) * (2 / 8)
-                ctl = ctl + (load - ctl) * (2 / 43)
-            existing["tsb"] = round(ctl - atl, 1)
+        hevy_60d = fetch_range("hevy", (today - timedelta(days=60)).isoformat(), today.isoformat())
+        if strava_60d or hevy_60d:
+            _ctl, _atl, tsb = training_load.compute_ctl_atl_tsb(strava_60d, today, hevy_60d)
+            existing["tsb"] = tsb
     except Exception:
         pass
 

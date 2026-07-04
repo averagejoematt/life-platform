@@ -1066,9 +1066,10 @@ def _brief_training_body(data, full_streak, mvp_streak, profile, training_nutrit
         if tsb is not None:
             tsb_color = "#22c55e" if tsb > 5 else "#f59e0b" if tsb > -10 else "#ef4444"
             tsb_label = "Fresh" if tsb > 10 else "Optimal" if tsb > 0 else "Tired" if tsb > -20 else "Overreached"
+            tsb_note = data.get("tsb_basis_note") or ""  # #490/M-3: e.g. " (duration-proxy basis)"
             out += (
                 '<p style="color:#475569;font-size:10px;margin:8px 0 0;">'
-                'TSB: <span style="color:' + tsb_color + ';">' + str(round(tsb, 1)) + " (" + tsb_label + ")</span></p>"
+                'TSB: <span style="color:' + tsb_color + ';">' + str(round(tsb, 1)) + " (" + tsb_label + ")</span>" + tsb_note + "</p>"
             )
 
         # BS-09: ACWR training load alert

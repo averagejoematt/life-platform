@@ -44,7 +44,6 @@ v2.54.0: Board of Directors prompt dynamically built from s3://matthew-life-plat
 """
 
 import json
-import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -160,6 +159,7 @@ except ImportError:
     logger.setLevel(_log.INFO)
 
 import ai_calls
+import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # -- Extracted module imports ---------------------------------------------------
 import html_builder
@@ -695,20 +695,10 @@ def fetch_anomaly_record(date_str):
 
 
 def compute_tsb(strava_60d, today):
-    kj = {}
-    for r in strava_60d:
-        d = str(r.get("date", ""))
-        if d:
-            kj[d] = sum(float(a.get("kilojoules") or 0) for a in r.get("activities", []))
-    ctl = atl = 0.0
-    cd = math.exp(-1 / 42)
-    ad = math.exp(-1 / 7)
-    for i in range(59, -1, -1):
-        day = (today - timedelta(days=i)).isoformat()
-        load = kj.get(day, 0)
-        ctl = ctl * cd + load * (1 - cd)
-        atl = atl * ad + load * (1 - ad)
-    return round(ctl - atl, 1)
+    # #490: shared TSS-like scale (walks count via the moving-time fallback) so this
+    # fallback bands the same way as the computed_metrics value it stands in for.
+    _ctl, _atl, tsb = training_load.compute_ctl_atl_tsb(strava_60d, today)
+    return tsb
 
 
 # ==============================================================================
@@ -1352,6 +1342,10 @@ def lambda_handler(event, context):
         # Overwrite data dict with pre-computed derived values for HTML rendering
         if _computed.get("tsb") is not None:
             data["tsb"] = float(_computed["tsb"])
+            # #490/M-3: carry the load provenance beside the number so every
+            # prompt/render that names TSB can qualify it.
+            data["tsb_load_basis"] = _computed.get("tsb_load_basis")
+            data["tsb_basis_note"] = training_load.basis_note(data["tsb_load_basis"])
         if _computed.get("hrv_7d") is not None:
             data["hrv"]["hrv_7d"] = float(_computed["hrv_7d"])
         if _computed.get("hrv_30d") is not None:

@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import training_load  # shared TSS-like load model (layer module, #490) — basis_note
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -452,6 +453,7 @@ def build_week_state_summary(health_data, profile):
         "hrv": hrv,
         "readiness": readiness,
         "tsb": tsb,
+        "tsb_basis_note": training_load.basis_note(metrics.get("tsb_load_basis")),  # #490/M-3
         "char_level": char_level,
         "char_tier": char_tier,
         "last_week_avg_grade": last_week_avg,
@@ -732,7 +734,7 @@ READINESS STATE:
   Recovery: {week_state.get('recovery', 'N/A')}%
   HRV: {week_state.get('hrv', 'N/A')} ms
   Readiness: {week_state.get('readiness', 'N/A')}%
-  TSB (training stress balance): {week_state.get('tsb', 'N/A')}
+  TSB (training stress balance): {week_state.get('tsb', 'N/A')}{week_state.get('tsb_basis_note') or ''}
 
 CHARACTER SHEET:
   Level {char_level} ({char_tier})

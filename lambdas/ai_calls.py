@@ -917,7 +917,7 @@ YESTERDAY'S SIGNALS:
 - Components: {", ".join(comp_lines)}
 - Recovery/readiness: {readiness_score} ({readiness_colour})
 - HRV: {data_summary.get("hrv_yesterday")}ms yesterday, 7d avg {data_summary.get("hrv_7d_avg")}ms, 30d avg {data_summary.get("hrv_30d_avg")}ms
-- TSB (training stress balance): {data_summary.get("tsb")}
+- TSB (training stress balance): {data_summary.get("tsb")}{data_summary.get("tsb_basis_note") or ""}
 - Sleep: {data_summary.get("sleep_duration_hrs")}hrs, score {data_summary.get("sleep_score")}, efficiency {data_summary.get("sleep_efficiency_pct")}%. {sleep_arch}
 - 7-day sleep debt: {data.get("sleep_debt_7d_hrs")}hrs
 - Calories: {data_summary.get("calories")}/target, Protein: {data_summary.get("protein_g")}g/{profile.get("protein_target_g", 190)}g
