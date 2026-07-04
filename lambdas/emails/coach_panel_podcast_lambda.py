@@ -1170,6 +1170,38 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
     return parsed
 
 
+# ── #547: podcast v2 — the two-pass engine lives in podcast_script_v2.py (the
+# *_lambda size gate); these wrappers inject this lambda's clients + helpers.
+import podcast_script_v2 as _psv2
+
+
+def _psv2_deps() -> dict:
+    return {
+        "table": table,
+        "s3": s3,
+        "bucket": S3_BUCKET,
+        "user_id": USER_ID,
+        "writer_model": WRITER_MODEL,
+        "invoke": __import__("bedrock_client").invoke,
+        "extract_json": _extract_json,
+        "elena_host_state": _elena_host_state,
+        "episode_angle": _episode_angle,
+        "logger": logger,
+    }
+
+
+def _build_weekly_script_v2(beats: dict, bible: dict) -> dict:
+    try:
+        return _psv2.build_weekly_script_v2(beats, bible, _psv2_deps())
+    except Exception as e:  # any v2 failure → v1 keeps the show alive
+        logger.warning("[panel] v2 script engine failed (%s) — falling back to v1", e)
+        return {}
+
+
+def _write_show_memory(week, title, pull_quote, guest_id, guest_name, open_bet) -> None:
+    _psv2.write_show_memory(table, USER_ID, logger, week, title, pull_quote, guest_id, guest_name, open_bet)
+
+
 def _revise_weekly_script(turns: list, fails: list, beats: dict, bible: dict) -> dict:
     """Self-correction: hand the writer its own draft + the QA judge's exact failures and ask for
     a fixed full script (same JSON shape). This is the loop that lets the show reach the read-aloud
@@ -1627,7 +1659,10 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     guest_id = (beats.get("guest") or {}).get("id") or persona_registry.OPERATIONAL_COACH_IDS[0]
     guest_name = (beats.get("guest") or {}).get("name", "Coach")
-    script = _build_weekly_script(beats, bible)
+    # #547: two-pass first (each speaker in-voice, real disputes, show memory);
+    # v1 single-call stays as the fail-soft fallback so an upgrade bug can't
+    # kill the show.
+    script = _build_weekly_script_v2(beats, bible) or _build_weekly_script(beats, bible)
     turns = script.get("turns") or []
     # Craft re-roll (cheap, deterministic): if the draft is monologue-y or one speaker
     # holds the floor too long, re-roll the writer once (generation is non-deterministic).
@@ -1805,6 +1840,10 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         }
     )
     _write_indexes(existing)
+    # #547: the show remembers itself — callbacks + guest history, real records only.
+    _write_show_memory(
+        week, ep.get("title") or _hook, script.get("pull_quote"), guest_id, (beats.get("guest") or {}).get("name"), script.get("open_bet")
+    )
     _emit_published_metric()  # safety-net: a CloudWatch alarm fires if this metric goes absent (no episode > 8d)
     _emit_outcome("published")  # reason code (#374) — the positive outcome in the same vocabulary as the holds
     _notify_new_episode(ep)  # operator SNS ping (best-effort; never blocks publish)
