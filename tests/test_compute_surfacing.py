@@ -119,3 +119,66 @@ def test_sleep_reconciliation_no_data(monkeypatch):
     body = __import__("json").loads(resp["body"])
     assert body["available"] is False
     assert "total_duration_hours" not in body
+
+
+# ── forecast (#541) ──────────────────────────────────────────────────────────
+
+
+def test_forecast_populated_shape(monkeypatch):
+    item = {
+        "pk": "USER#matthew#SOURCE#forecast",
+        "sk": "DATE#2026-07-04",
+        "record_type": "forecast_summary",
+        "date": "2026-07-04",
+        "model": "ewma-v1",
+        "confidence": Decimal("0.8"),
+        "forecasts": [
+            {
+                "metric": "recovery_pct",
+                "unit": "%",
+                "horizon_days": Decimal("1"),
+                "target_date": "2026-07-05",
+                "point": Decimal("64.2"),
+                "lo": Decimal("55"),
+                "hi": Decimal("73.4"),
+                "frame": "tomorrow",
+            }
+        ],
+        "resolutions_today": [
+            {
+                "metric": "recovery_pct",
+                "horizon_days": Decimal("1"),
+                "target_date": "2026-07-04",
+                "point": Decimal("62"),
+                "lo": Decimal("53"),
+                "hi": Decimal("71"),
+                "actual": Decimal("66"),
+                "covered": True,
+            }
+        ],
+        "coverage": {"n_resolved": Decimal("5"), "n_covered": Decimal("4"), "coverage_pct": Decimal("80")},
+        "run_id": "r1",
+        "phase": "experiment",
+    }
+    monkeypatch.setattr(data, "table", _FakeTable([item]))
+
+    resp = data.handle_forecast()
+    assert resp["statusCode"] == 200
+    body = __import__("json").loads(resp["body"])
+    assert body["available"] is True
+    assert body["model"] == "ewma-v1"
+    assert body["forecasts"][0]["point"] == 64.2
+    assert body["resolutions_today"][0]["covered"] is True
+    assert body["coverage"]["coverage_pct"] == 80
+    # anti-causal framing ships in the payload
+    assert "not causal" in body["framing"]
+    # internal keys stripped
+    for k in ("pk", "sk", "run_id", "phase", "record_type"):
+        assert k not in body
+
+
+def test_forecast_empty(monkeypatch):
+    monkeypatch.setattr(data, "table", _FakeTable([]))
+    resp = data.handle_forecast()
+    body = __import__("json").loads(resp["body"])
+    assert body["available"] is False

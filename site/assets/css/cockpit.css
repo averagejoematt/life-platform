@@ -360,6 +360,19 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .circadian[data-cat="poor"] .circ-meter i { background: color-mix(in oklch, var(--ember) 55%, var(--ink-faint)); }
 .circadian[data-cat="poor"] .circ-cat { color: var(--ink-muted); }
 
+/* The model expects (#541) — deterministic expectations with 80% ranges, graded
+   daily. Reads forward like the circadian panel; the coverage stat in the header
+   is the honesty line. */
+.forecast { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.fx-cov { color: var(--ink-faint); }
+.fx-rows { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
+.fx-row { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.fx-row > .label { min-width: 5.5em; }
+.fx-point { font-family: var(--font-mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.fx-point small { color: var(--ink-faint); }
+.fx-range { color: var(--ink-faint); }
+.fx-resolved { margin-top: var(--sp-2); color: var(--ink-muted); }
+
 /* Presence / quiet stretch (2026-06-30) — an honest note when the owner's own
    logging goes quiet, or when he's back. Calm, not alarmist: the accent only warms
    as the gap lengthens (dark), and a return reads neutral-warm. Never red. */

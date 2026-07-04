@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-04 (v8.6.0 — 144 MCP tools, 20 data sources, 87 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-04 (v8.6.0 — 144 MCP tools, 20 data sources, 88 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1874,6 +1874,27 @@ One row per hypothesis **resolution** (confirmed / refuted / expired_undecided),
 | `n_condition` / `n_comparison` / `days_observed` | number | Final arm sizes |
 | `test_spec` | map | The frozen spec, copied for audit |
 | `pre_registered_at` / `resolved_at` | string | The pre-registration proof pair |
+
+**Forecast resolutions (#541, 2026-07-04):** the forecast engine writes a second record class
+into this partition — `sk CALIB#<resolved-date>#forecast-<metric>-h<horizon>-<target-date>`,
+`record_type = forecast_resolution` — one row per graded forecast (`point`/`lo`/`hi`/`confidence`
+as frozen at issue, `actual`, `covered`, `abs_error`). Same CROSS_PHASE rationale: forecasting
+skill is a property of the platform, not a cycle.
+
+---
+
+## Forecast Partition (#541, 2026-07-04)
+
+**pk:** `USER#matthew#SOURCE#forecast` (taxonomy class **`EXPERIMENT_SCOPED`** — regenerated daily;
+the graded record lives in the calibration partition above)
+
+Written by `forecast-engine` (16:50 UTC daily): deterministic EWMA expectations
+(`stats_core.ewma_forecast`, 80% intervals) for recovery / sleep duration / weight at h=1 and h=7.
+
+| sk | Contents |
+|----|----------|
+| `FORECAST#<target-date>#<metric>#h<horizon>` | One frozen forecast: `metric`, `source`, `field`, `unit`, `model` (`ewma-v1`), `horizon_days`, `issued_date`, `target_date`, `point`, `lo`, `hi`, `confidence` (0.8), `alpha`, `n_history`; after grading also `actual`, `covered`, `resolved_at` |
+| `DATE#<issued-date>` | Daily summary consumed by `/api/forecast` + the coach prompt block: `forecasts` (today's issues, with `frame`), `resolutions_today` (expected-vs-actual), `coverage` (running interval-coverage overall + per horizon; `null` until something has resolved) |
 
 ---
 

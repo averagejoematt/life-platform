@@ -23,8 +23,10 @@ import math
 import random
 
 # Two-sided critical z per supported confidence level. A lookup, not an inverse-CDF,
-# because these three are the only levels any surface uses.
-_Z_CRIT = {0.90: 1.6449, 0.95: 1.9600, 0.99: 2.5758}
+# because these four are the only levels any surface uses (0.80 is the forecast
+# engine's interval — chosen so the coverage question "did the 80% interval cover
+# 80% of outcomes?" is answerable with ~weeks of resolutions, not months).
+_Z_CRIT = {0.80: 1.2816, 0.90: 1.6449, 0.95: 1.9600, 0.99: 2.5758}
 
 # Bootstrap defaults. 1000 replicates keeps a 23-pair weekly sweep under a second;
 # the fixed seed makes intervals reproducible (ADR-105: deterministic before narrative).
@@ -272,6 +274,92 @@ def cohens_d(baseline, window):
     if pooled == 0:
         return None
     return (mb - ma) / pooled
+
+
+def ewma_fit(xs, alpha=None):
+    """Fit simple exponential smoothing to a series (None entries dropped, order kept).
+
+    When alpha is None it is chosen by a deterministic grid search (0.05..0.95,
+    step 0.05) minimizing one-step-ahead squared error, ties going to the
+    smaller alpha — same data always yields the same fit. Returns
+    (level, alpha, residuals) where residuals are the one-step-ahead errors
+    under the chosen alpha, or None when fewer than 4 clean points.
+    """
+    v = clean_series(xs)
+    if len(v) < 4:
+        return None
+
+    def _sse(a):
+        level = v[0]
+        total = 0.0
+        for x in v[1:]:
+            err = x - level
+            total += err * err
+            level += a * err
+        return total
+
+    if alpha is None:
+        best = None
+        for step in range(1, 20):  # 0.05 .. 0.95
+            a = step / 20.0
+            s = _sse(a)
+            if best is None or s < best[1] - 1e-12:
+                best = (a, s)
+        alpha = best[0]
+    level = v[0]
+    residuals = []
+    for x in v[1:]:
+        err = x - level
+        residuals.append(err)
+        level += alpha * err
+    return (level, alpha, residuals)
+
+
+def ewma_forecast(xs, horizon=1, alpha=None, confidence=0.80, min_n=10):
+    """Deterministic h-step-ahead expectation with a residual-based interval.
+
+    Simple exponential smoothing: the point forecast at any horizon is the final
+    smoothed level; interval width grows with horizon via the SES forecast-variance
+    form sigma_h = sigma * sqrt(1 + (h-1) * alpha^2), where sigma is the sample SD
+    of the one-step-ahead residuals. This is an EXPECTATION from observed patterns
+    — never a causal claim (ADR-105 framing rule).
+
+    Returns {"point", "lo", "hi", "alpha", "sigma", "n", "horizon", "confidence"}
+    (unrounded — callers own presentation rounding), or None when fewer than
+    min_n clean points or the residuals are degenerate.
+    """
+    z_crit = _Z_CRIT.get(confidence)
+    if z_crit is None:
+        raise ValueError(f"unsupported confidence {confidence}; use one of {sorted(_Z_CRIT)}")
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1")
+    v = clean_series(xs)
+    n = len(v)
+    if n < max(min_n, 4):
+        return None
+    fit = ewma_fit(v, alpha=alpha)
+    if fit is None:
+        return None
+    level, a, residuals = fit
+    m = len(residuals)
+    if m < 3:
+        return None
+    mean_r = sum(residuals) / m
+    var_r = sum((r - mean_r) ** 2 for r in residuals) / (m - 1)
+    sigma = math.sqrt(var_r)
+    if sigma == 0:
+        return None
+    sigma_h = sigma * math.sqrt(1.0 + (horizon - 1) * a * a)
+    return {
+        "point": level,
+        "lo": level - z_crit * sigma_h,
+        "hi": level + z_crit * sigma_h,
+        "alpha": a,
+        "sigma": sigma,
+        "n": n,
+        "horizon": horizon,
+        "confidence": confidence,
+    }
 
 
 def bh_fdr(pvals):

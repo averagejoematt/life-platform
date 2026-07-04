@@ -188,6 +188,24 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # #541: forecast engine — deterministic EWMA next-day/next-7-day expectations
+        # with 80% intervals (stats_core, no AI). Runs at 16:50 UTC: after daily-metrics
+        # (16:40) so the same morning's actuals are in, before the 17:00 daily-brief lane
+        # so coaches narrate TODAY's expectation. Resolutions grade into the CROSS_PHASE
+        # calibration ledger.
+        create_platform_lambda(
+            self,
+            "ForecastEngine",
+            function_name="forecast-engine",
+            handler="compute.forecast_engine_lambda.lambda_handler",
+            source_file="lambdas/compute/forecast_engine_lambda.py",
+            schedule="cron(50 16 * * ? *)",  # 9:50 AM PT daily (fixed UTC, no DST drift)
+            timeout_seconds=120,
+            memory_mb=512,
+            custom_policies=rp.compute_forecast_engine(),
+            **shared,
+        )
+
         # #109 (2026-05-30): second daily run at 5 PM PT (00:00 UTC) so
         # workouts logged after the 9:40 AM PT compute (e.g. Hevy sessions
         # logged mid-morning) surface on averagejoematt.com + coach insights

@@ -1088,6 +1088,42 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
             if _cm:
                 _canon_facts = {k: v for k, v in _bcf(_cm[0]).items() if k != "as_of"}
                 _facts_block = _gg_mod.authoritative_facts_block(_canon_facts)
+
+            # #541: today's model expectations ride the same authoritative block, so
+            # the numbers land in the prompt → automatically in the ADR-104 allow-list.
+            # Fail-soft: no forecast summary, no block.
+            _fx = _tbl.query(
+                KeyConditionExpression=_Key("pk").eq("USER#matthew#SOURCE#forecast") & _Key("sk").begins_with("DATE#"),
+                ScanIndexForward=False,
+                Limit=1,
+            ).get("Items", [])
+            _fx_lines = []
+            if _fx:
+                from decimal import Decimal as _Dec
+
+                def _fnum(v):
+                    return float(v) if isinstance(v, (_Dec, int, float)) else None
+
+                for _f in _fx[0].get("forecasts", []):
+                    _p, _lo, _hi = _fnum(_f.get("point")), _fnum(_f.get("lo")), _fnum(_f.get("hi"))
+                    if _p is None or _lo is None or _hi is None:
+                        continue
+                    _fx_lines.append(
+                        f"  - {_f.get('metric', '?')} {_f.get('frame', '')}: the model expects {_p:g}{_f.get('unit', '')} "
+                        f"(80% interval {_lo:g}-{_hi:g})"
+                    )
+                _cov = _fx[0].get("coverage") or {}
+                if _cov.get("n_resolved") and _fnum(_cov.get("coverage_pct")) is not None:
+                    _fx_lines.append(
+                        f"  - Track record: the 80% interval covered {_fnum(_cov.get('coverage_pct')):g}% of "
+                        f"{int(_cov['n_resolved'])} graded forecasts so far"
+                    )
+            if _fx_lines:
+                _facts_block += (
+                    "\nMODEL EXPECTATIONS (deterministic forecast from Matthew's own recent data — "
+                    "an expectation from observed patterns, NEVER a causal claim or a promise; frame as "
+                    "'the model expects'):\n" + "\n".join(_fx_lines)
+                )
         except Exception as _gf_e:
             print(f"[COACH-V2:{coach_id}] canonical facts unavailable (non-blocking): {_gf_e}")
 
