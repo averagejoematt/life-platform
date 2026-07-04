@@ -40,28 +40,12 @@ MEM_CACHE_TTL = 600  # 10 minutes
 # Fields stripped in lean queries
 _LEAN_STRIP = {"activities", "sport_types", "pk", "sk", "ingested_at", "source"}
 
-SOURCES = [
-    "whoop",
-    "withings",
-    "strava",
-    "todoist",
-    "apple_health",
-    "eightsleep",
-    "chronicling",
-    "macrofactor",
-    "garmin",
-    "habitify",
-    "notion",
-    "labs",
-    "dexa",
-    "genome",
-    "weather",
-    "supplements",
-    "state_of_mind",
-    "habit_scores",
-    "health_auto_export",
-    "dropbox_poll",
-]
+# #498 (X-10): derived from the registry — every partition-bearing registry source
+# plus the non-ingestion partitions (labs/dexa/genome/…). Gains hevy, measurements,
+# and food_delivery, which the hand-rolled list had silently omitted.
+from source_registry import mcp_source_ids
+
+SOURCES = mcp_source_ids()
 
 # ── Source-of-truth domain ownership ──
 _DEFAULT_SOURCE_OF_TRUTH = {

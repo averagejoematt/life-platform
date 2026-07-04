@@ -69,26 +69,18 @@ PIPELINES = [
 # here MUST write the INGEST_HEALTH sentinel (framework sources via run_ingestion;
 # hevy/notion/dropbox — pattern-exempt scheduled pulls — via record_ingest_health,
 # #466/#467), otherwise it sits at 'unknown' forever and the listing fakes coverage.
-ACTIVE_API_SOURCES = [
-    "whoop",
-    "withings",
-    "garmin",
-    "strava",
-    "eightsleep",
-    "habitify",
-    "todoist",
-    "notion",
-    "weather",
-    "dropbox",
-    "hevy",
-]
+# #498 (X-10): derived from the registry's active_api facet — this was one of the
+# two hand-rolled copies of "which pulls must attempt daily".
+from source_registry import active_api_source_ids, best_effort_source_ids
+
+ACTIVE_API_SOURCES = active_api_source_ids()
 
 # Best-effort sources: known-brittle by an accepted, unfixable upstream cause. They are
 # still EVALUATED and logged for visibility, but excluded from UnhealthySourceCount so a
 # permanent expected failure can't keep `ingest-liveness-unhealthy` red or mask a real
 # source death. Garmin (2026-06-19): datacenter-IP 429 defeats server-side OAuth refresh;
-# sleep/HRV/recovery are covered by Whoop + Eight Sleep. Remove from here if it stabilizes.
-BEST_EFFORT_SOURCES = {"garmin"}
+# sleep/HRV/recovery are covered by Whoop + Eight Sleep. Flagged best_effort in the registry.
+BEST_EFFORT_SOURCES = best_effort_source_ids()
 
 # Per-source attempt-gap overrides (minutes). Unlisted sources use the default in
 # ingest_health (~26h). Garmin runs only 4x/day but still attempts daily, so the

@@ -361,9 +361,15 @@ def test_sleep_page_captions_the_substitution():
 
 
 def test_qa_smoke_strava_is_optional_not_paused():
+    # #498: the tiers now derive from source_registry — the C-3 regression pin
+    # moves to the registry classification (the single place it can drift).
     src = open(os.path.join(_REPO, "lambdas/operational/qa_smoke_lambda.py")).read()
     assert '("strava", "Strava — paused' not in src
-    assert '("strava", "Strava (workouts are event-driven)")' in src
+    sys.path.insert(0, os.path.join(_REPO, "lambdas"))
+    import source_registry as reg
+
+    assert reg.SOURCE_REGISTRY["strava"].get("qa_tier") == "optional"
+    assert not reg.SOURCE_REGISTRY["strava"].get("paused")
 
 
 # ==============================================================================
