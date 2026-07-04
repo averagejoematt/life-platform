@@ -50,8 +50,11 @@ def test_shelf_joins_book_and_state_public_only():
     item = body["reading"][0]
     assert item["book"]["title"] == "Klara and the Sun"
     assert item["state"]["status"] == "reading"
-    # the proof: private fields are gone from the public payload
-    blob = json.dumps(body)
+    # the proof: private fields are gone from the public payload. NB: check the
+    # payload minus _meta — asserting '"0.9" not in blob' on the whole body was a
+    # time-bomb: _meta.generated_at's fractional seconds contain "0.9" roughly one
+    # run in ten (redded main CI 2026-07-04).
+    blob = json.dumps({k: v for k, v in body.items() if k != "_meta"})
     assert "retentionScore" not in blob and "lastProbeAt" not in blob and "0.9" not in blob
 
 
