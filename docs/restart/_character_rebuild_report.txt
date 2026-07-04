@@ -1,3 +1,23 @@
 character rebuild report — mode=APPLY — genesis=2026-06-14
-end_date=2026-06-12  days_recomputed=0
+end_date=2026-07-02  days_recomputed=19
 stale_state_files_tombstoned=0
+
+  2026-06-14   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-14: Level 1 (🔨
+  2026-06-15   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-15: Level 2 (🔨
+  2026-06-16   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-16: Level 2 (🔨
+  2026-06-17   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-17: Level 2 (🔨
+  2026-06-18   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-18: Level 4 (🔨
+  2026-06-19   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-19: Level 4 (🔨
+  2026-06-20   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-20: Level 4 (🔨
+  2026-06-21   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-21: Level 6 (🔨
+  2026-06-22   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-22: Level 6 (🔨
+  2026-06-23   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-23: Level 6 (🔨
+  2026-06-24   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-24: Level 8 (🔨
+  2026-06-25   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-25: Level 8 (🔨
+  2026-06-26   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-26: Level 8 (🔨
+  2026-06-27   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-27: Level 9 (🔨
+  2026-06-28   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-28: Level 10 (
+  2026-06-29   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-29: Level 10 (
+  2026-06-30   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-06-30: Level 11 (
+  2026-07-01   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-07-01: Level 11 (
+  2026-07-02   status=200   body={"statusCode": 200, "body": "Character sheet computed for 2026-07-02: Level 11 (
