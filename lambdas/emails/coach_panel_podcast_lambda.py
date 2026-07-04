@@ -1172,7 +1172,10 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
 
 # ── #547: podcast v2 — the two-pass engine lives in podcast_script_v2.py (the
 # *_lambda size gate); these wrappers inject this lambda's clients + helpers.
-import podcast_script_v2 as _psv2
+try:
+    from emails import podcast_script_v2 as _psv2  # package import at runtime
+except ImportError:  # flat import under the test harness
+    import podcast_script_v2 as _psv2
 
 
 def _psv2_deps() -> dict:
