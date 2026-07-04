@@ -718,7 +718,9 @@ def _coach_system(pid: str) -> str:
         + (
             "ON THIS SURFACE: express confidence and likelihood in WORDS (e.g. 'moderately confident', "
             "'better than even odds'), never as a percentage or numeric figure — on the public board, the "
-            "only numbers you may write are ones present in the CURRENT DATA block. "
+            "only numbers you may write are ones present in the CURRENT DATA block. That block is deliberately "
+            "coarse: it carries NO sleep-stage, trend, per-day, or historical figures — describe all of those "
+            "qualitatively (rising, short of where I want it, stalled), never with an invented number. "
             if voice_core
             else ""
         )
@@ -1373,14 +1375,37 @@ def _handle_board_ask(event: dict) -> dict:
             try:
                 import grounded_generation as _gg
 
-                _gf = _gg.grounding_findings(_txt, allowed=_gg.allowed_numbers(_sys_txt, user_msg))
+                _allowed = _gg.allowed_numbers(_sys_txt, user_msg)
+                _gf = _gg.grounding_findings(_txt, allowed=_allowed)
                 if _gf:
                     logger.warning(f"[board_ask] {pid} ungrounded: {[f['detail'] for f in _gf][:3]}")
                     _grounded = False
-                    _txt = (
+                    _refusal = (
                         "I'd want to answer that with numbers I can actually stand behind, and I can't "
                         "ground them in today's record — ask me about something the current data covers."
                     )
+                    # #531 follow-up (live drill 2026-07-04): ONE corrective
+                    # rewrite before falling back to the refusal — the same
+                    # discipline the daily-brief self gets (regen-once). The
+                    # richer voice core raised fabrication pressure enough
+                    # that a fixable stray figure was turning good answers
+                    # into refusals. Bounded: at most one extra Haiku call per
+                    # flagged persona, inside the 5/hr/IP rate limit.
+                    try:
+                        _corr_body = json.loads(req_body)
+                        _corr_body["messages"] = [{"role": "user", "content": user_msg + "\n\n" + _gg.correction_prompt(_gf)}]
+                        _retry = _bedrock_invoke(_corr_body)
+                        _emit_token_metrics(_retry.get("usage", {}), endpoint="api_board_ask")
+                        _txt2 = _scrub_blocked_terms("".join(b["text"] for b in _retry.get("content", []) if b.get("type") == "text"))
+                        if _txt2.strip() and not _gg.grounding_findings(_txt2, allowed=_allowed):
+                            _txt = _txt2
+                            _grounded = True
+                            logger.info(f"[board_ask] {pid} corrected once — grounded on retry")
+                        else:
+                            _txt = _refusal
+                    except Exception as _rt_e:
+                        logger.warning(f"[board_ask] {pid} correction retry failed: {_rt_e}")
+                        _txt = _refusal
             except ImportError:
                 pass  # helper not bundled — serve as before
             except Exception as _gg_e:
