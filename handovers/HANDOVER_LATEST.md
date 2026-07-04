@@ -1,92 +1,95 @@
-# HANDOVER — the silent-failure batch: #466/#467/#469/#471/#472 + #511 shipped end-to-end — 2026-07-04 (session 5)
+# HANDOVER — the data-truth batch: #486/#488/#491/#492/#495/#496 shipped end-to-end — 2026-07-04 (session 6)
 
-**Epic #459's Now-milestone slice is merged, deployed on layer v99, and live-verified —
-no scheduled data source can fail silently anymore.** The three pattern-exempt ingesters
-(hevy, notion, dropbox) write the ER-01 sentinel, the two known instrument misfires
-(Todoist false-stale, Strava reconciler edge) are fixed at the root, and the MacroFactor
-format-change trap raises instead of 200-skipping. PRs **#515** (#511 fix), **#516**
-(the batch), **#517** (v99 pin). Issues #466/#467/#469/#471/#472/#511 auto-closed;
-**#518 filed** (pre-existing pipeline-health-check probes a nonexistent
-`life-platform/dropbox` secret — found during live verification).
+**Six Now stories merged, deployed on layer v100, and live-verified — surfaces and
+engines tell the truth about the data they actually have.** PRs **#520** (the batch)
+and **#521** (v100 pin). Issues #486/#488/#491/#492/#495/#496 auto-closed;
+**7 `area:data` Now stories remain.**
 
 ---
 
-## What shipped
+## What shipped (PR #520, 23 new tests in `test_data_truth_batch.py`)
 
-**#515 — #511:** both `tools_training` `_linear_regression` call sites passed `(xs, ys)`
-instead of a points list → TypeError the moment sessions existed
-(`get_lactate_threshold_estimate` + `get_exercise_efficiency_trend`). Fixed + 2 tests.
-Also salvaged an uncommitted 2026-07-03 handover from the stale `accuracy-phase3`
-worktree (worktree removed, `main` reclaimed by the primary tree).
+- **#491 (M-5/M-6)** — ONE shared `weight_trend.latest_weight()` (withings backscan
+  + 7-day apple_health window; kg→lbs conversion folded in) replaces the three
+  divergent resolutions in vitals / journey / character-sheet. The old apple
+  fallback inspected only the single latest item (usually a steps record) — dead
+  except same-day. `/api/last_sync` now includes withings; `evidence.js`
+  date-conditions the labels (`todayPT()` helper): /data/results says
+  "latest · Jun 26" when stale, /data/physical only says "yesterday" when the
+  previous reading truly is yesterday's.
+- **#492 (M-4/M-7)** — `compute_readiness` returns its inputs; stored as
+  `readiness_components` in computed_metrics; `_latest_readiness` serves them and
+  serves NONE for pre-#492 records (never the day-grade set). Cockpit zero-caption
+  reworded (a 0 is a reading now, not a "quiet day"). `device_agreement` always
+  explains an absent cross-check (`{status: unavailable, reason: garmin paused
+  (ADR-074)…}`) in both the readiness tool and the standalone tool; registry
+  description weights corrected 35/10 → 40/5.
+- **#495 (M-9)** — sleep_detail substitutes ONLY the recovery trio (was: the whole
+  whoop record — night-A hours + night-B stages under one header) and carries
+  `recovery_night_of`; evidence.js captions the splice in all three sections that
+  render the trio.
+- **#486 (B-3/D-2)** — character engine reads `blood_glucose_time_in_range_pct`
+  (the written name); `body_fat_trajectory` REMOVED from engine + config (scale is
+  weight-only — 0/1198 records ever had the fields; weights redistributed
+  cgm .3 / labs .4 / bp .15 / rhr .15); dead `_compute_body_comp_deltas` deleted
+  from withings_lambda; nutrition_review's `extract_cgm` was dead END-TO-END (all
+  five reads) — repointed to `blood_glucose_*`.
+- **#488 (A-5/A-6)** — hypothesis_engine reads `sleep_duration_hours` + `bed_temp_f`;
+  whoop `_compute_sleep_consistency` now key-bounds the real 7-day window and skips
+  `#WORKOUT#` sub-records (verifier had found 5 of 6 returned items were workouts).
+- **#496 (C-3)** — `DECLARED_PAUSED_SOURCES = set()` (strava live since 06-20);
+  qa_smoke: strava moved PAUSED→OPTIONAL. test_di1 posture tests now assert the
+  new posture; the paused *mechanism* tests pin a synthetic entry via monkeypatch.
 
-**#516 — the batch (21 new offline tests):**
-- **#466** — `hevy_backfill` writes the sentinel at every terminal path via a new
-  **public** `ingestion_framework.record_ingest_health()` (private `_record_…` now
-  delegates); fatal `HevyAPIError` **raises** (sentinel first) instead of a swallowed
-  500; `hevy_get` converges on `http_retry`. `hevy` added to `ACTIVE_API_SOURCES`.
-- **#467** — notion + dropbox record the sentinel (success / auth-suppressed skip /
-  failure). **X-13 root fix:** the framework's breaker was a metric-less private copy of
-  `auth_breaker` — it now delegates, so SIMP-2 sources emit `IngestAuthHealthy` and the
-  monitoring-stack comment is finally true.
-- **#469** — unknown-format MacroFactor CSV archives to `raw/…/unknown/` then **raises**
-  (dropbox_poll has already hash-marked + moved the file by then — the 22-day May
-  incident class); the dead daily `cron(0 16)` deleted (365 no-op invokes/yr).
-- **#471** — todoist `stale_hours` 48→72 (day-dated records + 1x-daily ingestion → max
-  healthy age ~62h; 48h false-staled request-time surfaces ~14h/day); CLAUDE.md cadence
-  corrected to 1x daily.
-- **#472** — strava reconciler brackets the stored-side fetch **±1 day** (store keyed by
-  local PT date, API window in UTC epochs → the evening-PT-walk edge false-positived).
+## Deploy (all live 2026-07-04, in-session merge+deploy approval carried over)
 
-## Deploy (all live 2026-07-04 ~15:15 UTC, explicit in-session merge+deploy approval)
+CONVENTIONS §1: build → Core published **v100** → pin merged (#521) → Ingestion,
+Compute, Email, Mcp, Operational from main (clean diffs: layer 99→100 + code zips)
+→ site-api via `deploy_site_api.sh` → site synced. **S3 config updated**:
+`config/matthew/character_sheet.json` — diffed live vs repo FIRST (only our change
+differed; backup in session scratchpad), then uploaded. Asset check: all deployed
+zips + the v100 layer zip grep-verified for the fix markers (note: zip entries are
+`compute/…`, `ingestion/…`, `mcp/…` — not root-level).
 
-Layer dance per CONVENTIONS §1: build → Core published **v99** → pin merged (PR #517) →
-Ingestion (the MacroFactor schedule-rule destroy read + confirmed in `cdk diff`),
-Operational, Mcp, Compute, Email from detached origin/main → site-api via
-`deploy_site_api.sh`. Monitoring had **zero** template diff (comment-only). Asset check:
-deployed zips grep'd for all five fix markers + layer v99 zip for
-`record_ingest_health`/`_ab_clear_failure`/`"stale_hours": 72` — all present.
+## Live verification
 
-## Live verification (all ACs)
-
-- **#466 drill:** normal run → sentinel `streak=0/none`; **wrong-API-key drill** (secret
-  temporarily swapped, cold start forced via env-var touch) → Lambda **raised**
-  `HevyAPIError`, sentinel `streak=1/auth`, metric `ConsecutiveFailures{Source=hevy}`
-  now EXISTS in CloudWatch; secret restored, re-run reset to `0/none`; alarm stayed OK
-  (drill deliberately kept below the 3-streak page threshold — chain proven without a
-  6h synthetic URGENT page, since the alarm is 6h-Maximum).
-- **#467:** notion + dropbox invoked → sentinels live; `check_ingest_liveness` mode →
-  **notion/dropbox/hevy all `ok`** (no more permanent 'unknown'), unhealthy_count=0
-  (garmin `failing` correctly excluded as best-effort).
-- **#472:** live reconcile → 16 API / 18 stored / **missing_count 0** on the exact
-  window that was alarming.
-- **Alarms pending their evaluation cycles:** `ingest-reconciliation-strava` (1-day
-  Maximum) clears within 24h as yesterday's datapoint ages out; `slo-source-freshness`
-  (red since 06-27) should clear after the checker's 16:45 UTC run — **the #471 AC's
-  7-consecutive-day OK observation starts 2026-07-04.**
+- `/api/vitals` + `/api/journey`: weight 301 · as_of **2026-06-26** (the exact M-5
+  scenario, now honest); `/data/physical/` renders **"LATEST · JUN 26"**, no
+  "yesterday" figure.
+- `/api/last_sync`: withings present (last write 06-26) beside whoop/8sleep/HAE.
+- daily-metrics-compute invoked → `readiness_components` stored (recovery .4 /
+  sleep .25 / hrv_trend .2 / tsb .1); cockpit renders the four real inputs + new
+  caption.
+- character-sheet-compute invoked → pillar_metabolic has the 4-component set, no
+  body_fat_trajectory; live coverage 0.15 (real absence: no CGM/BP/fresh labs —
+  the honest number, not the structural cap; 1.0 full-data case pinned in tests).
+- `/api/sleep_detail`: `recovery_night_of` served (null today — nights matched).
+- pipeline-health-check invoked → **paused: 0** (strava counted again); the 1
+  failure is pre-existing #518 (dropbox secret). `/api/source_freshness`: strava
+  = `behavioral-stale` (honest — no workouts logged, not "paused").
+- Visual QA: /now/, /data/sleep/, /data/physical/ all pass.
 
 ## Gotchas for the next session
 
-- **The pre-commit hook rewrites `site_api_common.py` test_count AFTER `git add`** — the
-  bump chases you one commit behind. Check `git status` after every commit; both PRs
-  needed a trailing sync commit, and #515 vs #516 conflicted on exactly that line
-  (resolve = take either side, re-run `deploy/sync_doc_metadata.py --apply`).
-- **PR-level CI is Dependabot-validate only** — the real lint/test gates run on push to
-  main. Local black + ruff + flake8-E9 + full pytest + `cdk synth` is the pre-merge bar.
-- **Warm containers cache secrets forever** (`hevy_common._secret_cache` module global)
-  — a live failure drill needs a cold start; touching an env var
-  (`update-function-configuration`) is the clean way to force one.
-- `aws lambda invoke` with a JSON payload needs `--cli-binary-format raw-in-base64-out`
-  (bare `'{}'` happens to pass, anything with a space does not).
+- **Deployed-zip verification paths**: lambda zips nest by package dir
+  (`compute/`, `ingestion/`, `emails/`, `mcp/`, `operational/`) — grepping the
+  root filename silently returns 0 matches (looked exactly like the CDK
+  asset-staging glitch; it wasn't).
+- `config/matthew/character_sheet.json` in S3 is runtime-mutable
+  (update_character_config MCP tool) — ALWAYS diff live vs repo before upload.
+- test_last_sync pinned the sync-source set; test_di1 pinned the paused posture —
+  posture pins live in tests, so a posture change is also a test change (good).
+- Known env-dependent local failures unchanged: coaches_api ×4,
+  hevy_compiler_isolation, integration_aws (fails on clean main too).
 
 ## Open / next
 
-- **#518** — pipeline-health-check's expected-secrets list probes `life-platform/dropbox`
-  which has never existed (creds live in `ingestion-keys`) → daily `failed: 1` misfire.
-- Watch: `slo-source-freshness` 7-day OK window (from 07-04); `ingest-reconciliation-strava`
-  should be OK by 07-05 — if either stays red, the diagnosis in the review doc §E-3/§C-1
-  is incomplete.
-- **13 area:data Now stories remain** — `gh issue list --label area:data --milestone Now
-  --state open`. Journal remainder (J-2/J-6/X-7/E-6) in epic #464; #474 (apple_health
-  XML decision) is the one opus-effort story.
-- 6 pre-existing local test failures on main (coaches_api ×4, hevy_compiler_isolation,
-  integration_aws) — env/live-data dependent, green in CI; untouched.
+- **7 `area:data` Now stories remain**: #473 (measurements re-arm), #474
+  (apple_health XML decision — the opus one), #477 (habitify finalize), #480
+  (supplement merge + validator truth), #481 (eightsleep token persist), #482
+  (phase-tag standalone writers), #497 (garmin cron coherence).
+- **#518** still open (dropbox secret misfire — red daily in pipeline-health-check).
+- Watch (from session 5): `slo-source-freshness` 7-day OK window counting from
+  07-04; `ingest-reconciliation-strava` should be OK by 07-05.
+- Cockpit "training balance 0" is real TSB output — C-5 (kJ-vs-TSS scale) is the
+  open story behind it, not a #492 regression.

@@ -46,6 +46,24 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/516"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-today-means-today",
+      "date": "2026-07-04",
+      "title": "'Today' now means today — six places the numbers stopped exaggerating",
+      "shipped": "The site was labeling an 8-day-old weigh-in 'today' and its day-over-day delta 'yesterday'. Now every weight label carries its real date ('latest · Jun 26'), all three surfaces that resolve 'current weight' share one function — which also fixed a fallback that could only ever find a same-day backup-scale reading — and the cockpit's sync strip shows when the scale last reported. The readiness dial's breakdown now shows the four inputs that actually produce the score, not a different model's components. The sleep page says so when recovery comes from an older night than the hours beside it. Two engines stopped reading field names no writer ever emits, a metabolic component that structurally couldn't score was removed instead of quietly dragging the pillar toward average, and Strava — live again since June 20 — is no longer declared 'paused', so a real outage would page again.",
+      "gotcha": "The sleep splice was subtler than filed: the API didn't just borrow recovery from an older night, it swapped in that night's entire record — so the 'two devices, one night' stage comparison could silently compare two different nights. And the nutrition review's CGM section turned out to be dead end-to-end: all five field reads matched nothing the pipeline writes, but the first dead read gated the rest, so it never crashed — it just never appeared, for months.",
+      "honest_miss": "Removing the fake metabolic component didn't make the pillar look better — it made the emptiness visible: honest coverage today is 0.15, because there are genuinely no recent CGM readings, no blood pressure, and the labs have decayed past their scoring window. That low number is the truth now on display until real inputs return. The training-balance input still reads 0 from a known scale mismatch in the fatigue model — separate story, still open.",
+      "prs": [
+        {
+          "label": "PR #520",
+          "url": "https://github.com/averagejoematt/life-platform/pull/520"
+        },
+        {
+          "label": "PR #521",
+          "url": "https://github.com/averagejoematt/life-platform/pull/521"
+        }
+      ]
     }
   ]
 }
