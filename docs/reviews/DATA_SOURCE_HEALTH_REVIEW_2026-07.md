@@ -409,6 +409,8 @@ No finding was dropped outright, but four claims were refuted or materially corr
 4. **D-1 live impact refuted:** the BP `break` bug is byte-exact real, but live payloads arrive in the *combined* format — the broken separate-format fallback is dead-in-practice. Severity P2→P3.
 5. **A-3 mechanism corrected:** the unified-sleep lag is caused by `DEFAULT_LOOKBACK=1` excluding today, not by cron ordering (Eight Sleep ingests hourly). Lag itself confirmed — and understated (2 nights, not 1, for most of each day).
 
-## What happens next (Session 2, gated)
+## Session 2 — FILED 2026-07-04 (green-lit same day)
 
-Findings are scored per ADR-099 — hard gates first (185 test, build cap, privacy absolutes, honesty moat), then `Score = (Impact × Confidence) / Effort` with Impact = 0.35·returnability + 0.25·credibility-moat + 0.20·monetization-readiness + 0.20·durability; terciles → Now/Next/Later. Issue filing (epics + stories, labels `type:` / `area:data`, privacy-passed bodies, manifest as idempotency record) awaits Matthew's read + green-light. Machine-readable appendix: `DATA_SOURCE_HEALTH_REVIEW_2026-07_findings.json`.
+All 66 findings were scored per ADR-099 (hard gates → `Score = (Impact × Confidence) / Effort`, Impact = 0.35·returnability + 0.25·credibility-moat + 0.20·monetization-readiness + 0.20·durability; terciles → Now/Next/Later, P1-cluster + misfiring-alarm + honesty quick-wins overridden to Now) and bundled into **7 epics (#459–#465) + 43 stories (#466–#508)**: 21 Now / 11 Next / 11 Later, every body privacy-passed, every finding mapped (66/66). Manifest: `DSR_BACKLOG_MANIFEST_2026-07.json`. The batch was filed by **`scripts/file_backlog_from_manifest.py`** — the reusable, idempotent ADR-099 filer this review contributes (the last batch was filed by hand). Machine-readable appendix: `DATA_SOURCE_HEALTH_REVIEW_2026-07_findings.json`.
+
+Epics: **E-DS1** silent-failure coverage (#459) · **E-DS2** CRUD integrity (#460) · **E-DS3** dead couplings (#461) · **E-DS4** honest surfaces (#462) · **E-DS5** one registry (#463) · **E-DS6** the journal instrument (#464) · **E-DS7** polling posture (#465).
