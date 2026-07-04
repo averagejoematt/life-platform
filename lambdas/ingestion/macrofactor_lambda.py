@@ -624,8 +624,15 @@ def lambda_handler(event, context):
         archive_raw(bucket, source_key, content_bytes, subfolder="daily_summary")
         day_items = build_summary_day_items(rows)
     else:
-        print(f"Unknown CSV format. Headers: {list(rows[0].keys())[:10]}")
-        return {"statusCode": 200, "body": "Unknown CSV format — skipped"}
+        # #469 (B-5): NEVER a silent 200. By the time this Lambda runs, dropbox_poll
+        # has already hash-marked the file processed and moved it — a silent skip
+        # here means an export-format change kills the pipe with zero retry and zero
+        # signal (the 22-day May incident). Archive for forensics, then raise so the
+        # ingestion-error alarm path fires and the failure is visible the same day.
+        archive_raw(bucket, source_key, content_bytes, subfolder="unknown")
+        headers = list(rows[0].keys())[:10]
+        print(f"Unknown CSV format. Headers: {headers}")
+        raise ValueError(f"Unknown MacroFactor CSV format (archived to raw/.../unknown/): headers={headers}")
 
     # REL-3: import safe_put_item once for the whole batch
     try:

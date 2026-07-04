@@ -386,10 +386,13 @@ class MonitoringStack(Stack):
         # (Was: garmin-auth-unhealthy-24h + garmin-token-expiring-7d.)
 
         # ── Fleet-wide ingestion auth-liveness (elite review 2026-06-15) ────────
-        # Generalises the Garmin auth-health signal to EVERY breaker-using source
-        # (notion + the SIMP-2 framework sources). auth_breaker.py now emits
-        # LifePlatform/OAuth IngestAuthHealthy = 1 on each successful run and 0 on
-        # every mark + 24h short-circuit. A tripped breaker returns a healthy 200
+        # Generalises the Garmin auth-health signal to every breaker-using source.
+        # auth_breaker.py emits LifePlatform/OAuth IngestAuthHealthy = 1 on each
+        # successful run and 0 on every mark + 24h short-circuit. Emitters: notion +
+        # dropbox call auth_breaker directly; the SIMP-2 framework sources emit via
+        # ingestion_framework's breaker hooks, which DELEGATE to auth_breaker since
+        # #467 (X-13 — before that the framework had a metric-less private copy and
+        # this comment overstated coverage). A tripped breaker returns a healthy 200
         # "skip", so without this a dead credential silently suppresses a source
         # for 24h — exactly how Garmin/Strava stayed dead for weeks. Dimensionless
         # + Minimum: if ANY breaker source emits a 0 in the window, Min=0 → fire.

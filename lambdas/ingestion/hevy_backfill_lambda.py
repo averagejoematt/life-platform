@@ -48,6 +48,18 @@ from hevy_common import (
     write_normalized,
 )
 
+# #466 (X-1): the ER-01 liveness sentinel. Hevy is pattern-exempt (no
+# run_ingestion), so without this the ingest-consecutive-failures-hevy alarm
+# watches a metric that never exists. Optional import — ingestion never breaks
+# if the layer module is absent.
+try:
+    from ingest_health import classify_error
+    from ingestion_framework import record_ingest_health
+
+    _INGEST_HEALTH_AVAILABLE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _INGEST_HEALTH_AVAILABLE = False
+
 try:
     from platform_logger import get_logger
 
@@ -82,6 +94,22 @@ def _derive_training_notes(rec: dict) -> None:
         logger.info("training-notes derived %s: %d records, %d pain", rec.get("workout_uid"), res["records"], res["pain"])
     except Exception as e:  # noqa: BLE001
         logger.warning("training-notes derive failed (non-fatal) %s: %s", rec.get("workout_uid"), e)
+
+
+def _record_health(*, attempted: bool, succeeded: bool, exc) -> None:
+    """Write the ER-01 INGEST_HEALTH sentinel + EMF metric (best-effort).
+
+    `exc` is None (clean run), an exception (fatal API error → classified), or
+    an error-class string (per-event transform failures → 'parse')."""
+    if not _INGEST_HEALTH_AVAILABLE:
+        return
+    if exc is None:
+        error_class = "none"
+    elif isinstance(exc, str):
+        error_class = exc
+    else:
+        error_class = classify_error(exc)
+    record_ingest_health(_table, SOURCE, logger, attempted=attempted, succeeded=succeeded, error_class=error_class)
 
 
 def _tombstone_deleted(workout_id: str) -> None:
@@ -185,19 +213,12 @@ def lambda_handler(event: dict, context: Any) -> dict:
 
     except HevyAPIError as e:
         logger.error("hevy backfill fatal API error: %s", e)
-        return {
-            "statusCode": 500,
-            "body": json.dumps(
-                {
-                    "source": "hevy",
-                    "error": str(e),
-                    "ingested": ingested,
-                    "deleted": deleted,
-                    "errors": errors,
-                    "pages_walked": pages_walked,
-                }
-            ),
-        }
+        _record_health(attempted=True, succeeded=False, exc=e)
+        # Raise (not a 200/500 dict) so the Lambda Errors metric + async retry/DLQ
+        # paths engage — a swallowed fatal was how Hevy could die invisibly (#466).
+        raise
+
+    _record_health(attempted=True, succeeded=(errors == 0), exc=None if errors == 0 else "parse")
 
     summary = {
         "source": "hevy",

@@ -110,6 +110,25 @@ except ImportError:  # pragma: no cover - layer-module fallback
 _AUTH_FAIL_SK = "AUTH_FAILURE"
 _AUTH_FAIL_TTL_SECONDS = 24 * 3600  # 24 hours
 
+# #467 (X-13): delegate to auth_breaker (same layer) instead of a private duplicate
+# implementation. The behavioral difference matters: auth_breaker emits the
+# LifePlatform/OAuth IngestAuthHealthy metric on every mark / short-circuit / clear,
+# which the framework's local copy never did — so the fleet-wide `ingest-auth-dead`
+# alarm only actually covered notion + dropbox, not the SIMP-2 framework sources
+# the monitoring-stack comment claimed. Marker schema (SK, TTL, fields) is identical,
+# so delegation is drop-in. Fallback copies keep local tooling importable.
+try:
+    from auth_breaker import (
+        check_breaker as _ab_check_breaker,
+        clear_failure as _ab_clear_failure,
+        looks_like_auth_failure as _ab_looks_like_auth_failure,
+        mark_failure as _ab_mark_failure,
+    )
+
+    _HAS_AUTH_BREAKER_MODULE = True
+except ImportError:  # pragma: no cover — layer-module fallback
+    _HAS_AUTH_BREAKER_MODULE = False
+
 _AUTH_FAIL_HTTP_CODES = ("401", "403")
 _AUTH_FAIL_KEYWORDS = (
     "unauthorized",
@@ -124,6 +143,8 @@ _AUTH_FAIL_KEYWORDS = (
 
 def _looks_like_auth_failure(exc: Exception) -> bool:
     """Heuristic: does this exception indicate an OAuth/API auth failure?"""
+    if _HAS_AUTH_BREAKER_MODULE:
+        return _ab_looks_like_auth_failure(exc)
     msg = str(exc).lower()
     if any(code in msg for code in _AUTH_FAIL_HTTP_CODES):
         return True
@@ -142,6 +163,8 @@ def _auth_breaker_pk(source_name: str, user_id: str) -> str:
 
 def _check_auth_breaker(table, source_name: str, user_id: str, logger):
     """Return the active marker if one exists and is still fresh, else None."""
+    if _HAS_AUTH_BREAKER_MODULE:
+        return _ab_check_breaker(table, source_name, user_id, logger)
     try:
         resp = table.get_item(Key={"pk": _auth_breaker_pk(source_name, user_id), "sk": _AUTH_FAIL_SK})
     except Exception as e:
@@ -165,6 +188,8 @@ def _check_auth_breaker(table, source_name: str, user_id: str, logger):
 
 def _mark_auth_failure(table, source_name: str, user_id: str, error_msg, logger):
     """Write the auth-failure marker with a 24h DDB TTL."""
+    if _HAS_AUTH_BREAKER_MODULE:
+        return _ab_mark_failure(table, source_name, user_id, error_msg, logger)
     now = datetime.now(timezone.utc)
     item = {
         "pk": _auth_breaker_pk(source_name, user_id),
@@ -182,24 +207,30 @@ def _mark_auth_failure(table, source_name: str, user_id: str, error_msg, logger)
 
 def _clear_auth_failure(table, source_name: str, user_id: str, logger):
     """Remove the marker after a successful run."""
+    if _HAS_AUTH_BREAKER_MODULE:
+        return _ab_clear_failure(table, source_name, user_id, logger)
     try:
         table.delete_item(Key={"pk": _auth_breaker_pk(source_name, user_id), "sk": _AUTH_FAIL_SK})
     except Exception as e:
         logger.warning(f"auth_breaker_clear_failed: {e}")
 
 
-def _record_ingest_health(table, config, logger, *, attempted: bool, succeeded: bool, error_class: str = "none"):
-    """ER-01: read-modify-write the source's INGEST_HEALTH sentinel + emit an EMF metric.
+def record_ingest_health(table, source_name: str, logger, *, attempted: bool, succeeded: bool, error_class: str = "none"):
+    """ER-01: read-modify-write a source's INGEST_HEALTH sentinel + emit an EMF metric.
 
     Best-effort: a failure here must never break ingestion. `attempted` stamps
     last_attempt_ts (the Lambda ran), independent of whether new data came back —
     that decoupling is the whole point (running-but-erroring ≠ unfed-but-healthy).
+
+    Public so pattern-exempt standalone ingesters (hevy, notion, dropbox — #466/#467)
+    write the same sentinel the framework sources do; the per-source
+    ingest-consecutive-failures alarms only watch metrics this emits.
     """
     if not _INGEST_HEALTH_AVAILABLE:
         return
     try:
         now = datetime.now(timezone.utc)
-        sk = ingest_health_sk(config.source_name)
+        sk = ingest_health_sk(source_name)
         key = {"pk": _INGEST_SYSTEM_PK, "sk": sk}
         prev = table.get_item(Key=key).get("Item")
         sentinel = update_outcome(
@@ -208,13 +239,13 @@ def _record_ingest_health(table, config, logger, *, attempted: bool, succeeded: 
             succeeded=succeeded,
             error_class=error_class,
             now_iso=now.isoformat(),
-            source=config.source_name,
+            source=source_name,
         )
         table.put_item(Item={**key, **sentinel, "updated_at": now.isoformat()})
         # EMF line — CloudWatch extracts RunSuccess + ConsecutiveFailures.
         print(
             emf_metric_line(
-                source=config.source_name,
+                source=source_name,
                 succeeded=succeeded,
                 consecutive_failures=int(sentinel.get("consecutive_failures", 0)),
                 error_class=sentinel.get("last_error_class", error_class),
@@ -222,7 +253,11 @@ def _record_ingest_health(table, config, logger, *, attempted: bool, succeeded: 
             )
         )
     except Exception as e:  # never let health-recording break ingestion
-        logger.warning(f"ingest_health_record_failed source={config.source_name}: {e}")
+        logger.warning(f"ingest_health_record_failed source={source_name}: {e}")
+
+
+def _record_ingest_health(table, config, logger, *, attempted: bool, succeeded: bool, error_class: str = "none"):
+    record_ingest_health(table, config.source_name, logger, attempted=attempted, succeeded=succeeded, error_class=error_class)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

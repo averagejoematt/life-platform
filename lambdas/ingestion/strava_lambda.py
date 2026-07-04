@@ -451,7 +451,14 @@ def _reconcile(event: dict, context) -> dict:
         api_activities, secret = _fetch_activities_in_range(secret, after_ts, before_ts)
         _secret_cache["secret"] = secret
 
-        stored = _fetch_stored_activities(table, start.isoformat(), today.isoformat())
+        # #472 (C-1): DDB partitions are keyed by LOCAL (Pacific) date while the
+        # API window above is UTC epochs, so a window-edge activity (the evening-PT
+        # walk whose UTC start falls just inside the window) lives under a local
+        # DATE# one day outside [start, today] and false-positives as missing.
+        # Bracket the stored-side fetch by ±1 day — the ingestion-side pattern.
+        # Extra stored rows only ADD id/time-tolerance match candidates; they can
+        # never create a false gap.
+        stored = _fetch_stored_activities(table, (start - timedelta(days=1)).isoformat(), (today + timedelta(days=1)).isoformat())
         missing = _activities_missing_from_store(api_activities, stored)
 
         _emit_reconciliation_metric(len(missing))

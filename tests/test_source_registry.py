@@ -99,3 +99,6 @@ def test_registry_thresholds_have_rationale_values():
     assert hours["food_delivery"] == 14 * 24  # was 90d in the MCP mirror — masking defect
     assert hours["withings"] == 7 * 24
     assert hours["hevy"] == 7 * 24
+    # #471 (X-5): day-dated records + 1x-daily ingestion → max healthy age ~62h.
+    # 48h false-staled request-time surfaces 14h/day; 72h is the tightest safe bound.
+    assert hours["todoist"] == 72

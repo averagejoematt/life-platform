@@ -358,14 +358,17 @@ class IngestionStack(Stack):
             **shared,
         )
 
-        # ── 11. MacroFactor — 8:00 AM PT daily + S3 trigger
+        # ── 11. MacroFactor — S3-trigger only (upload via dropbox_poll or manual).
+        # #469 (B-7): the old daily cron(0 16) was a guaranteed no-op — the handler
+        # requires an S3 record and 400'd every scheduled invoke (365 dead runs/year
+        # masquerading as coverage). The real paths are the S3 event notification
+        # below + dropbox_poll's upload; liveness is dropbox's ER-01 sentinel.
         macrofactor = create_platform_lambda(
             self,
             "MacrofactorIngestion",
             function_name="macrofactor-data-ingestion",
             source_file="lambdas/ingestion/macrofactor_lambda.py",
             handler="ingestion.macrofactor_lambda.lambda_handler",
-            schedule="cron(0 16 * * ? *)",
             timeout_seconds=300,
             alarm_name="ingestion-error-macrofactor",
             shared_layer=shared_utils_layer,
