@@ -234,7 +234,7 @@ def handle_subscribe(email: str, source_ip: str = "", referrer: str = "", source
         "confirm_token": token,
         "token_expires": token_exp,
         "ip_hash": _ip_hash(source_ip),
-        "source": referrer or "subscribe_page",
+        "source": source if source else (referrer or "subscribe_page"),
         "updated_at": now_iso,
     }
     if existing:
