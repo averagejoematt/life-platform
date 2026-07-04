@@ -15,7 +15,8 @@ extract structured behavioral/psychological signals from raw_text:
   enriched_at
 
 Runs on:
-  - Last 2 days by default (EventBridge daily)
+  - Last 2 days by default (EventBridge daily); Sundays widen to 30 days
+    as a safety-net sweep (#502)
   - Specific date: {"date": "YYYY-MM-DD"}
   - Date range: {"start": "...", "end": "..."}
   - Full re-enrichment: {"full_sync": true}
@@ -417,6 +418,26 @@ def apply_enrichment(item, enrichment):
     return True
 
 
+def _parse_ts(value):
+    """Parse an ISO timestamp (Notion 'Z' suffix or stdlib '+00:00') to an aware datetime; None on failure."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def edited_since_enrichment(item):
+    """True when the Notion entry was edited after its last enrichment (#502)."""
+    enriched_ts = _parse_ts(item.get("enriched_at"))
+    edited_ts = _parse_ts(item.get("notion_last_edited"))
+    return bool(enriched_ts and edited_ts and edited_ts > enriched_ts)
+
+
 def query_journal_entries(start_date, end_date, full_sync=False):
     """Query all Notion journal entries in date range."""
     kwargs = {
@@ -472,7 +493,10 @@ def lambda_handler(event, context):
             pacific = timezone(timedelta(hours=-8))
             now_pacific = datetime.now(pacific)
             end_date = now_pacific.strftime("%Y-%m-%d")
-            start_date = (now_pacific - timedelta(days=1)).strftime("%Y-%m-%d")
+            # Weekly safety net (#502): on Sundays sweep 30 days so anything the
+            # 2-day window missed (late edits, outages, clobbered records) self-heals.
+            lookback_days = 30 if now_pacific.weekday() == 6 else 1
+            start_date = (now_pacific - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
 
         logger.info(f"Enriching journal entries: {start_date} → {end_date} " f"(force={force}, full_sync={full_sync})")
 
@@ -493,11 +517,15 @@ def lambda_handler(event, context):
                 skipped += 1
                 continue
 
-            # Skip if already enriched (unless force)
-            if not force and item.get("enriched_at"):
+            # Skip if already enriched (unless force) — but an entry edited in
+            # Notion after enrichment is stale and re-enriches (#502).
+            edited = edited_since_enrichment(item)
+            if not force and item.get("enriched_at") and not edited:
                 logger.info(f"Skipping {sk}: already enriched at {item['enriched_at']}")
                 skipped += 1
                 continue
+            if edited:
+                logger.info(f"Re-enriching {sk}: edited {item.get('notion_last_edited')} after enrichment {item.get('enriched_at')}")
 
             template = item.get("template", "Unknown")
             date = item.get("date", "")
@@ -519,7 +547,7 @@ def lambda_handler(event, context):
                         )
 
                         # Defense mechanism detection (second Haiku call) — v2.72.0 #41
-                        if ENRICH_DEFENSE_PATTERNS and (force or not item.get("defense_enriched_at")):
+                        if ENRICH_DEFENSE_PATTERNS and (force or edited or not item.get("defense_enriched_at")):
                             try:
                                 defense = call_haiku_defense(
                                     raw_text,

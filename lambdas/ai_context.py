@@ -970,19 +970,40 @@ def _build_training_data(data):
 
 
 def _build_mind_data(data):
-    """Extract mind-domain data for the mind coach."""
-    journal = data.get("journal_entries") or data.get("journal") or []
-    ja = data.get("journal_analysis") or {}
+    """Extract mind-domain data for the mind coach.
+
+    J-4 (#503): aggregates the journal_entries list the brief already fetches —
+    no caller ever populated the old "journal_analysis" key, and its expected
+    schema never matched the enricher's real field names.
+    """
+    journal = data.get("journal_entries") or []
+    if not isinstance(journal, list):
+        journal = []
+    entries = [e for e in journal if isinstance(e, dict)]
     som = data.get("state_of_mind") or data.get("som") or {}
+
+    def _mean(field):
+        vals = [v for v in (_safe_float(e, field) for e in entries) if v is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    def _union(field, cap):
+        out = []
+        for e in entries:
+            for v in e.get(field) or []:
+                if v not in out:
+                    out.append(v)
+        return out[:cap]
+
+    sentiments = [e.get("enriched_sentiment") for e in entries if e.get("enriched_sentiment")]
     return {
-        "journal_entry_count": len(journal) if isinstance(journal, list) else (1 if journal else 0),
-        "enriched_mood": _safe_float(ja, "enriched_mood"),
-        "enriched_energy": _safe_float(ja, "enriched_energy"),
-        "enriched_stress": _safe_float(ja, "enriched_stress"),
-        "enriched_sentiment": ja.get("enriched_sentiment"),
-        "enriched_themes": ja.get("enriched_themes", []),
-        "enriched_avoidance_flags": ja.get("enriched_avoidance_flags", []),
-        "enriched_growth_signals": ja.get("enriched_growth_signals", []),
+        "journal_entry_count": len(entries),
+        "enriched_mood": _mean("enriched_mood"),
+        "enriched_energy": _mean("enriched_energy"),
+        "enriched_stress": _mean("enriched_stress"),
+        "enriched_sentiment": sentiments[-1] if sentiments else None,
+        "enriched_themes": _union("enriched_themes", 6),
+        "enriched_avoidance_flags": _union("enriched_avoidance_flags", 4),
+        "enriched_growth_signals": _union("enriched_growth_signals", 4),
         "som_avg_valence": _safe_float(som, "som_avg_valence"),
         "som_check_in_count": _safe_float(som, "som_check_in_count"),
     }
