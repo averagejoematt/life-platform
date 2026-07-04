@@ -96,6 +96,7 @@ from web.site_api_data import (
     handle_discoveries,
     handle_domains,
     handle_experiments,
+    handle_forecast,
     handle_genome_risks,
     handle_glucose,
     handle_habit_registry,
@@ -306,6 +307,7 @@ ROUTES = {
     # Elite review (2026-06-15): surface two compute outputs that were stored
     # daily but never exposed — circadian-compliance score + unified sleep.
     "/api/circadian": handle_circadian,
+    "/api/forecast": handle_forecast,
     "/api/sleep_reconciliation": handle_sleep_reconciliation,
     # ARCH-03: Achievement badges
     "/api/achievements": handle_achievements,

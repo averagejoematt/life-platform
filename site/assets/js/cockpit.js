@@ -439,6 +439,42 @@ async function renderCircadian() {
   sec.hidden = false;
 }
 
+// The model expects (#541): tomorrow's deterministic expectations with 80% ranges,
+// plus yesterday's grade (expected vs actual) and the running coverage stat once
+// forecasts have actually been graded. Correlative framing only — "the model
+// expects", never a promise. Self-hides until the engine has a summary.
+async function renderForecast() {
+  const sec = $("[data-forecast]");
+  if (!sec) return;
+  let d = null;
+  try { d = await getJSON(`${API}/forecast`); } catch (e) { d = null; }
+  const fx = d && d.available && Array.isArray(d.forecasts) ? d.forecasts : [];
+  const NAMES = { recovery_pct: "recovery", sleep_hours: "sleep", weight_lbs: "weight" };
+  const h1 = fx.filter((f) => f.horizon_days === 1 && f.point != null && f.lo != null && f.hi != null);
+  if (!h1.length) { sec.hidden = true; return; }
+  const rows = h1.map((f) => {
+    const unit = f.unit === "%" ? "%" : ` ${f.unit}`;
+    return `<li class="fx-row"><span class="label">${escapeHTML(NAMES[f.metric] || String(f.metric))}</span>` +
+      `<span class="fx-point num">${escapeHTML(String(f.point))}<small>${escapeHTML(unit)}</small></span>` +
+      `<span class="fx-range label">${escapeHTML(String(f.frame || "tomorrow"))} · 80% range ${escapeHTML(String(f.lo))}–${escapeHTML(String(f.hi))}</span></li>`;
+  });
+  bind("fx-rows").innerHTML = rows.join("");
+  const cov = d.coverage;
+  bind("fx-cov").textContent = cov && cov.n_resolved
+    ? ` · range held ${Math.round(cov.coverage_pct)}% of ${cov.n_resolved} graded`
+    : " · ungraded until tomorrow";
+  const res = (d.resolutions_today || []).filter((r) => r.horizon_days === 1 && r.actual != null && r.point != null);
+  const rline = bind("fx-resolved");
+  if (res.length) {
+    rline.textContent = "graded today — " + res.map((r) =>
+      `${NAMES[r.metric] || r.metric}: ${r.actual} actual vs ${r.point} expected${r.covered ? "" : " (outside range)"}`).join(" · ");
+    rline.hidden = false;
+  } else {
+    rline.hidden = true;
+  }
+  sec.hidden = false;
+}
+
 // The weekday name for an ISO date ("2026-06-26" → "Friday"), for "since Friday".
 function _weekdaySince(iso) {
   if (!iso) return "";
@@ -814,6 +850,7 @@ async function load(dateStr) {
     renderPresence();   // fire-and-forget; hides itself unless he's gone quiet / just returned
     renderSinceLastVisit(); // fire-and-forget; only speaks to a genuine returning visitor
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
+    renderForecast();   // fire-and-forget (#541); hides itself until the engine has a summary
     renderReading();    // fire-and-forget; hides itself if no book in hand
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
 

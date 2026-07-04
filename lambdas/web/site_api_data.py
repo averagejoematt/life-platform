@@ -2091,6 +2091,32 @@ def handle_circadian() -> dict:
     )
 
 
+def handle_forecast() -> dict:
+    """
+    GET /api/forecast
+    The forecast engine's daily summary (#541) — deterministic EWMA expectations
+    for recovery / sleep / weight with 80% intervals, today's graded resolutions
+    (expected vs actual), and the running interval-coverage stat. SOURCE#forecast
+    holds frozen FORECAST# rows plus one DATE#<today> summary; we serve the
+    latest summary with internal keys stripped. The anti-causal framing ships in
+    the payload so every consumer renders it: these are expectations from
+    observed patterns, not causal claims. Cache: 900s — recomputed once daily.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}forecast") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    if not items:
+        return _ok({"available": False}, cache_seconds=900)
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
+    data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
+    data["available"] = True
+    data["framing"] = "what the model expects from observed patterns — correlative, not causal"
+    return _ok(data, cache_seconds=900)
+
+
 def handle_sleep_reconciliation() -> dict:
     """
     GET /api/sleep_reconciliation

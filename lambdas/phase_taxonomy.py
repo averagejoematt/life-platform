@@ -95,6 +95,9 @@ SOURCE_CLASS: dict[str, str] = {
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "habit_scores": EXPERIMENT_SCOPED,  # see vice_streaks split note in ADR-077 dec G
     "computed_metrics": EXPERIMENT_SCOPED,
+    "forecast": EXPERIMENT_SCOPED,  # #541: daily EWMA expectations — derived, recomputed every
+    # morning; graded outcomes live in the CROSS_PHASE calibration ledger, so wiping the raw
+    # forecasts at reset loses nothing the scoreboard needs.
     "computed_insights": EXPERIMENT_SCOPED,
     "adaptive_mode": EXPERIMENT_SCOPED,
     "engagement_state": EXPERIMENT_SCOPED,  # presence / quiet-stretch state; resets with the cycle

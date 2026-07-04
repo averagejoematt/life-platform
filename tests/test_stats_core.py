@@ -150,11 +150,13 @@ class TestFisherCI:
         assert stats_core.fisher_ci(0.5, 3) is None
 
     def test_unsupported_confidence_raises(self):
+        # 0.80 joined the supported set with the forecast engine (#541); 0.85 stays out.
         try:
-            stats_core.fisher_ci(0.5, 40, confidence=0.80)
+            stats_core.fisher_ci(0.5, 40, confidence=0.85)
             assert False, "expected ValueError"
         except ValueError:
             pass
+        assert stats_core.fisher_ci(0.5, 40, confidence=0.80) is not None
 
 
 class TestBlockBootstrap:
@@ -241,3 +243,87 @@ class TestBHFDR:
     def test_empty_and_all_none(self):
         assert stats_core.bh_fdr([]) == []
         assert stats_core.bh_fdr([None, None]) == [None, None]
+
+
+class TestEwmaForecast:
+    def _series(self, n=30, seed=7):
+        rng = random.Random(seed)
+        # AR(1)-ish daily series around 65 — recovery-shaped
+        v, x = [], 65.0
+        for _ in range(n):
+            x = 65.0 + 0.5 * (x - 65.0) + rng.gauss(0, 6)
+            v.append(x)
+        return v
+
+    def test_deterministic_repeatable(self):
+        v = self._series()
+        a = stats_core.ewma_forecast(v, horizon=1)
+        b = stats_core.ewma_forecast(list(v), horizon=1)
+        assert a == b
+
+    def test_shape_and_interval_orders(self):
+        v = self._series()
+        fc = stats_core.ewma_forecast(v, horizon=1)
+        assert fc is not None
+        assert fc["lo"] < fc["point"] < fc["hi"]
+        assert 0.05 <= fc["alpha"] <= 0.95
+        assert fc["n"] == len(v)
+        assert fc["confidence"] == 0.80
+
+    def test_interval_widens_with_horizon(self):
+        v = self._series()
+        h1 = stats_core.ewma_forecast(v, horizon=1)
+        h7 = stats_core.ewma_forecast(v, horizon=7)
+        assert h1["point"] == h7["point"]  # SES: flat point forecast
+        assert (h7["hi"] - h7["lo"]) >= (h1["hi"] - h1["lo"])
+
+    def test_constant_series_returns_none(self):
+        # Zero residual variance — an interval would be a lie
+        assert stats_core.ewma_forecast([70.0] * 20, horizon=1) is None
+
+    def test_insufficient_history_returns_none(self):
+        assert stats_core.ewma_forecast([1, 2, 3], horizon=1) is None
+        assert stats_core.ewma_forecast(self._series(8), horizon=1, min_n=10) is None
+
+    def test_none_entries_dropped(self):
+        v = self._series()
+        with_nones = [v[0], None] + v[1:]
+        assert stats_core.ewma_forecast(with_nones, horizon=1) == stats_core.ewma_forecast(v, horizon=1)
+
+    def test_tracks_level_shift(self):
+        # Series that steps from 60 to 80 — forecast should sit near the new level
+        rng = random.Random(3)
+        v = [60 + rng.gauss(0, 1) for _ in range(20)] + [80 + rng.gauss(0, 1) for _ in range(20)]
+        fc = stats_core.ewma_forecast(v, horizon=1)
+        assert fc["point"] > 74
+
+    def test_unsupported_confidence_raises(self):
+        try:
+            stats_core.ewma_forecast(self._series(), confidence=0.5)
+            raise AssertionError("expected ValueError")
+        except ValueError:
+            pass
+
+    def test_bad_horizon_raises(self):
+        try:
+            stats_core.ewma_forecast(self._series(), horizon=0)
+            raise AssertionError("expected ValueError")
+        except ValueError:
+            pass
+
+
+class TestEwmaFit:
+    def test_alpha_grid_deterministic_tie_to_smaller(self):
+        v = [1.0, 2.0, 1.0, 2.0, 1.0, 2.0, 1.0, 2.0]
+        r1 = stats_core.ewma_fit(v)
+        r2 = stats_core.ewma_fit(v)
+        assert r1[1] == r2[1]
+
+    def test_short_series_none(self):
+        assert stats_core.ewma_fit([1.0, 2.0, 3.0]) is None
+
+    def test_explicit_alpha_respected(self):
+        v = [10.0, 12.0, 11.0, 13.0, 12.0]
+        level, alpha, residuals = stats_core.ewma_fit(v, alpha=0.5)
+        assert alpha == 0.5
+        assert len(residuals) == len(v) - 1

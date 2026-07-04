@@ -95,14 +95,20 @@
     "lambdas/compute/daily_metrics_compute_lambda.py": {
       "function": "daily-metrics-compute"
     },
-    "lambdas/compute/episode_detect_lambda.py": {
-      "function": "episode-detect"
-    },
     "lambdas/compute/dashboard_refresh_lambda.py": {
       "function": "dashboard-refresh"
     },
+    "lambdas/compute/episode_detect_lambda.py": {
+      "function": "episode-detect"
+    },
     "lambdas/compute/failure_pattern_compute_lambda.py": {
       "function": "failure-pattern-compute"
+    },
+    "lambdas/compute/forecast_engine_lambda.py": {
+      "function": "forecast-engine",
+      "handler": "compute.forecast_engine_lambda.lambda_handler",
+      "note": "#541: deterministic EWMA next-day/next-7-day expectations. 9:50 AM PT daily. Writes SOURCE#forecast + calibration resolutions.",
+      "stack": "LifePlatformCompute"
     },
     "lambdas/compute/hypothesis_engine_lambda.py": {
       "function": "hypothesis-engine"
@@ -119,8 +125,8 @@
     "lambdas/emails/anomaly_detector_lambda.py": {
       "function": "anomaly-detector"
     },
-    "lambdas/emails/partner_email_lambda.py": {
-      "function": "partner-weekly-email"
+    "lambdas/emails/between_chronicle_lambda.py": {
+      "function": "between-chronicle"
     },
     "lambdas/emails/chronicle_approve_lambda.py": {
       "function": "chronicle-approve"
@@ -157,6 +163,9 @@
     },
     "lambdas/emails/nutrition_review_lambda.py": {
       "function": "nutrition-review"
+    },
+    "lambdas/emails/partner_email_lambda.py": {
+      "function": "partner-weekly-email"
     },
     "lambdas/emails/wednesday_chronicle_lambda.py": {
       "function": "wednesday-chronicle"
@@ -239,14 +248,17 @@
     "lambdas/intelligence/journal_analyzer_lambda.py": {
       "function": "journal-analyzer"
     },
+    "lambdas/operational/ai_quality_canary_lambda.py": {
+      "function": "life-platform-ai-quality-canary"
+    },
     "lambdas/operational/alert_digest_lambda.py": {
       "function": "life-platform-alert-digest"
     },
-    "lambdas/operational/traffic_digest_lambda.py": {
-      "function": "life-platform-traffic-digest"
-    },
     "lambdas/operational/canary_lambda.py": {
       "function": "life-platform-canary"
+    },
+    "lambdas/operational/coherence_sentinel_lambda.py": {
+      "function": "life-platform-coherence-sentinel"
     },
     "lambdas/operational/cost_governor_lambda.py": {
       "function": "life-platform-cost-governor"
@@ -256,12 +268,6 @@
     },
     "lambdas/operational/data_reconciliation_lambda.py": {
       "function": "life-platform-data-reconciliation"
-    },
-    "lambdas/operational/coherence_sentinel_lambda.py": {
-      "function": "life-platform-coherence-sentinel"
-    },
-    "lambdas/operational/ai_quality_canary_lambda.py": {
-      "function": "life-platform-ai-quality-canary"
     },
     "lambdas/operational/delete_user_data_lambda.py": {
       "function": "life-platform-delete-user-data"
@@ -289,6 +295,9 @@
     "lambdas/operational/remediation_dispatcher_lambda.py": {
       "function": "life-platform-remediation-dispatcher"
     },
+    "lambdas/operational/traffic_digest_lambda.py": {
+      "function": "life-platform-traffic-digest"
+    },
     "lambdas/reading/cover_pipeline_lambda.py": {
       "function": "reading-cover-pipeline"
     },
@@ -315,9 +324,6 @@
     },
     "lambdas/web/subscriber_onboarding_lambda.py": {
       "function": "subscriber-onboarding"
-    },
-    "lambdas/emails/between_chronicle_lambda.py": {
-      "function": "between-chronicle"
     }
   },
   "lambdas/emails/chronicle_podcast_lambda.py": "chronicle-podcast",

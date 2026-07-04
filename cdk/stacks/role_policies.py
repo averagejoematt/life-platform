@@ -548,6 +548,12 @@ def compute_daily_metrics() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True)
 
 
+def compute_forecast_engine() -> list[iam.PolicyStatement]:
+    """#541 forecast engine: DDB read (whoop/withings history + own partition) + write
+    (SOURCE#forecast rows + CROSS_PHASE calibration resolutions), KMS. Pure Python — no AI."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_episode_detect() -> list[iam.PolicyStatement]:
     """BENCH-1: episode-detect — DDB read (withings/strava/hevy full history) + write
     (weight_episodes / training_reference computed sources), KMS. No AI, no S3."""

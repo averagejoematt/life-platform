@@ -178,6 +178,15 @@
           <ul class="lv-rows" data-bind="lv-rows"></ul>
         </section>
 
+        <!-- The model expects (#541): deterministic EWMA expectations with 80% ranges,
+             graded daily into the calibration ledger. Correlative framing by design —
+             "what the model expects", never a promise. Self-hides without a summary. -->
+        <section class="forecast" data-forecast hidden aria-label="What the model expects">
+          <p class="cap label">the model expects<span class="fx-cov" data-bind="fx-cov"></span></p>
+          <ul class="fx-rows" data-bind="fx-rows"></ul>
+          <p class="fx-resolved label" data-bind="fx-resolved" hidden></p>
+        </section>
+
         <section class="circadian" data-circadian hidden aria-label="Tonight's sleep forecast">
           <p class="cap label">tonight's forecast<span class="circ-cat" data-bind="circ-cat"></span></p>
           <div class="circ-gauge">
