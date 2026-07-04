@@ -1,6 +1,6 @@
 # Handover — 2026-07-04 The Honesty Pair (ADR-104): believable gamification + grounded generation
 
-**One theme, two workstreams, one PR — the platform must not say things the data doesn't support.** Built in worktree `honesty-pair`; all code + tests + docs done; **deploys are staged, NOT run** (numbered ask pending Matthew).
+**One theme, two workstreams, one PR — the platform must not say things the data doesn't support.** Built in worktree `honesty-pair`; PR #451 merged. **ALL DEPLOYS RUN + LIVE-VERIFIED same session (Matthew: "you do all deploys this session, i approve")**: layer v96 published + fleet-uniform (postflight 🟢), config v1.2.0 in S3, site-api verified on /api/character, site synced + invalidated, **history recomputed genesis→2026-07-02 (19×200s, engine v1.2.0 confirmed in DDB)**. Live: /api/character serves drivers/coverage/holds; the page renders why-lines + HELD chips + the quiet-stretch beat; board_ask live-probed refusing to invent RHR/HRV numbers. Only remaining: re-run scripts/grounding_shadow_sweep.py after the next daily coach cycle vs the 11/112 baseline.
 
 ## Workstream B — the character sheet tells the truth (engine v1.2.0)
 
@@ -29,9 +29,9 @@
 ## Verification state
 
 - Full suite: **2,623 passed**; only 5 pre-existing failures remain (`test_coaches_api` ×4 + `test_i16_recent_ingest_records_exist` — both fail identically on the untouched checkout; i16 is likely the quiet stretch itself). black + ruff + mypy green; evidence.js node-checked; character page render-QA'd with mocked API (why-lines, held marker, quiet beat all render).
-- **NOT yet done (needs deploy authorization):** layer rebuild/publish (v95→v96) + fleet, compute/ops CDK deploys, site-api script deploy, S3 config upload, site sync, **history recompute from genesis** (`deploy/restart_character_rebuild.py --apply`), post-deploy shadow-sweep re-measure, live visual-QA.
+- **Deploys: ALL RUN + verified this session** (see the executed plan below). Live proof: DDB DATE#2026-07-02 record carries engine_version 1.2.0 + coverage_hold/absent_behaviors; `/api/character` serves the provenance fields; the live page renders them; postflight 🟢 fleet-uniform v96; board_ask adversarial probe served an in-voice no-invented-numbers answer. Outstanding: the post-cycle shadow-sweep re-measure only.
 
-## Deploy plan (the numbered ask, in order — Matthew runs/authorizes)
+## Deploy plan (EXECUTED 2026-07-04, this session — kept for the record)
 
 1. `bash deploy/build_layer.sh` → `cd cdk && npx cdk deploy LifePlatformCore` (publishes layer v96 with grounded_generation/canonical_facts/grounding_guard + character_engine v1.2.0) → bump `SHARED_LAYER_VERSION` in `cdk/stacks/constants.py` → deploy consumer stacks per CONVENTIONS §1 (Compute, Email, Operational — Operational also ships the Sentinel + site-api-ai bundle).
 2. `aws s3 cp config/character_sheet.json s3://matthew-life-platform/config/matthew/character_sheet.json` (engine config v1.2.0).
