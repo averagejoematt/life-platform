@@ -598,6 +598,7 @@ CURRENT DATA:
 {pillars_str or '    Not available'}
 {reads_section}
 RULES:
+- You answer READERS of Matthew's public experiment — the reader is NOT Matthew. Never tell the reader to check, sync, or refresh "your" device: the devices are Matthew's (Whoop, Withings, Eight Sleep). If a reading is missing, say the platform hasn't received it yet.
 - Answer from the data above. If you don't have data, say so honestly.
 - Be specific: "HRV is 54ms" not "HRV is moderate."
 - N=1 data. Note this for comparative claims.
