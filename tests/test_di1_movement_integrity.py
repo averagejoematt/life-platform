@@ -163,20 +163,36 @@ def test_tsb_nonzero_from_hevy_when_strava_off():
     assert tsb < 0, f"four recent hard sessions → ATL>CTL → negative TSB, got {tsb}"
 
     basis = dmc.tsb_load_basis([], hevy_60d, today)
-    assert basis["confidence"] == "hevy_fallback", basis
+    assert basis["confidence"] == "duration_proxy", basis  # #490: renamed from hevy_fallback
     assert basis["hevy_fallback_days"] == 4 and basis["strava_days"] == 0, basis
 
 
 @pytest.mark.skipif(not _DMC_OK, reason="daily_metrics_compute_lambda unavailable")
-def test_tsb_strava_authoritative_when_present():
-    """When Strava has kJ for a day, it wins over the Hevy proxy (basis = strava/mixed)."""
+def test_tsb_strava_and_hevy_are_additive_same_day():
+    """#490: a powered Strava ride and a Hevy lift on the same day BOTH count —
+    the old rule silently dropped the lift whenever Strava had any kJ."""
     today = date(2026, 6, 20)
-    strava_60d = [{"date": "2026-06-18", "activities": [{"kilojoules": 1800}]}]
-    hevy_60d = [_hevy("2026-06-18", 17, 108)]  # same day — Strava must win
+    strava_60d = [{"date": "2026-06-18", "activities": [{"kilojoules": 1800, "type": "Ride"}]}]
+    hevy_60d = [_hevy("2026-06-18", 17, 108)]
 
     basis = dmc.tsb_load_basis(strava_60d, hevy_60d, today)
-    assert basis["strava_days"] == 1 and basis["hevy_fallback_days"] == 0, basis
-    assert basis["confidence"] == "strava", basis
+    assert basis["strava_kj_days"] == 1 and basis["hevy_fallback_days"] == 1, basis
+    assert basis["confidence"] == "mixed", basis
+    assert basis["unit"] == "tss_proxy", basis
+
+
+@pytest.mark.skipif(not _DMC_OK, reason="daily_metrics_compute_lambda unavailable")
+def test_tsb_strava_weighttraining_echo_not_double_counted():
+    """#490: a Strava WeightTraining echo of a Hevy lift is skipped — the same
+    session must not count twice under the duration proxy."""
+    today = date(2026, 6, 20)
+    strava_60d = [{"date": "2026-06-18", "activities": [{"type": "WeightTraining", "kilojoules": None, "moving_time_seconds": 108 * 60}]}]
+    hevy_60d = [_hevy("2026-06-18", 17, 108)]
+
+    load, basis = dmc._daily_training_load(strava_60d, hevy_60d, today)
+    # 108 min at the lift rate (50/h) = 90 points — once, not twice.
+    assert abs(load["2026-06-18"] - 90.0) < 0.5, load
+    assert basis["strava_duration_days"] == 0, basis
 
 
 # ==============================================================================

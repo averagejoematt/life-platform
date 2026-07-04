@@ -84,6 +84,10 @@ MODULES=(
     # (it lives in lambdas/intelligence/).
     grounded_generation.py
     canonical_facts.py
+    # #490 (2026-07-04): one TSS-like training-load scale + Banister core — imported
+    # by daily-metrics-compute, dashboard-refresh, daily-brief, monday-compass,
+    # digest_utils, and (lazily) the MCP tools.
+    training_load.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"

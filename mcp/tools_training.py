@@ -98,10 +98,10 @@ def tool_get_training_load(args):
         form = "neutral"
         if tsb > 5:
             form = "fresh — good for key sessions or race"
+        elif tsb < -25:  # #490: most-negative first — the old order made this unreachable
+            form = "very fatigued — recovery priority"
         elif tsb < -10:
             form = "fatigued — accumulated training stress is high"
-        elif tsb < -25:
-            form = "very fatigued — recovery priority"
 
         result_rows.append(
             {

@@ -32,7 +32,6 @@ v1.1.0 — 2026-03-09: Sick day support — grade='sick', streaks preserved
 """
 
 import logging
-import math
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -40,6 +39,7 @@ from decimal import Decimal
 
 import boto3
 import scoring_engine
+import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 import weight_trend  # shared weekly-rate + projection (layer module)
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -256,102 +256,30 @@ def dedup_activities(activities):
 # ==============================================================================
 # TSB COMPUTATION
 # ==============================================================================
-
-
-# DI-1.2: coarse resistance/conditioning load proxy (kJ-equivalent per active minute).
-# NOT calorimetry and NOT a new scoring model (the work order's explicit scope bar) — a
-# duration-scaled stand-in so TSB stays nonzero when Strava (the kJ source) is paused (402)
-# or stale. Strava kilojoules stay authoritative whenever present; this only fills days
-# Strava recorded no load for. Correlational use only.
-HEVY_LOAD_KJ_PER_MIN = 25.0
-
-
-def _hevy_day_load_kj(hevy_records):
-    """kJ-equivalent load for one day's Hevy workout records (duration-scaled proxy)."""
-    total_min = sum(float(r.get("duration_sec") or 0) for r in hevy_records) / 60.0
-    return round(total_min * HEVY_LOAD_KJ_PER_MIN, 1)
+# #490 (C-5/C-6): the load model lives in the shared layer's training_load —
+# TSS-like points (100 ≈ 1 h at threshold), walks count via a moving-time
+# fallback, and the Hevy proxy is calibrated to the same scale the form bands
+# downstream assume. The wrappers keep this module's public names stable.
 
 
 def _daily_training_load(strava_60d, hevy_60d, today):
-    """Per-day training load (kJ) for the 60-day Banister window, plus a basis summary.
-
-    Strava kilojoules are authoritative. On days Strava recorded no load (paused /
-    stale / a Hevy-only session), fall back to the Hevy duration proxy so a real
-    training day is never scored as zero load. Returns (load_by_day, basis_dict).
-    """
-    strava_kj = {}
-    for r in strava_60d or []:
-        d = str(r.get("date", ""))
-        if d:
-            strava_kj[d] = sum(float(a.get("kilojoules") or 0) for a in r.get("activities", []))
-    hevy_by_day = {}
-    for r in hevy_60d or []:
-        d = str(r.get("date", ""))
-        if d:
-            hevy_by_day.setdefault(d, []).append(r)
-    load = {}
-    strava_days = hevy_fallback_days = 0
-    for d in set(strava_kj) | set(hevy_by_day):
-        s = strava_kj.get(d, 0.0)
-        if s > 0:
-            load[d] = s
-            strava_days += 1
-        elif d in hevy_by_day:
-            load[d] = _hevy_day_load_kj(hevy_by_day[d])
-            hevy_fallback_days += 1
-    if strava_days and hevy_fallback_days:
-        confidence = "mixed"
-    elif hevy_fallback_days:
-        confidence = "hevy_fallback"
-    elif strava_days:
-        confidence = "strava"
-    else:
-        confidence = "none"
-    basis = {
-        "strava_days": strava_days,
-        "hevy_fallback_days": hevy_fallback_days,
-        "confidence": confidence,
-    }
-    return load, basis
+    return training_load.daily_training_load(strava_60d, hevy_60d, today)
 
 
 def compute_tsb(strava_60d, today, hevy_60d=None):
-    """Banister model: Training Stress Balance = CTL − ATL over 60-day window.
-
-    DI-1.2 Hevy-aware: when Strava has no kJ for a day (e.g. Strava paused), a
-    duration-scaled Hevy load proxy fills it so training days aren't scored as zero
-    fitness/fatigue. Back-compat — called with two args (no hevy_60d) it behaves
-    exactly as before.
-    """
+    """Banister Training Stress Balance = CTL − ATL over the 60-day window."""
     _ctl, _atl, tsb = compute_ctl_atl_tsb(strava_60d, today, hevy_60d)
     return tsb
 
 
 def compute_ctl_atl_tsb(strava_60d, today, hevy_60d=None):
-    """Banister CTL (42d fitness), ATL (7d fatigue), and TSB = CTL − ATL.
-
-    Returns all three so consumers stop reverse-engineering CTL/ATL from TSB with
-    magic offsets (the bug that produced an impossible fitness of -955). CTL/ATL are
-    exponentially-weighted loads and are mathematically non-negative — clamped here so
-    a degenerate input can never surface a negative fitness/fatigue to a reader.
-    """
-    load_by_day, _ = _daily_training_load(strava_60d, hevy_60d, today)
-    ctl = atl = 0.0
-    cd = math.exp(-1 / 42)
-    ad = math.exp(-1 / 7)
-    for i in range(59, -1, -1):
-        day = (today - timedelta(days=i)).isoformat()
-        load = load_by_day.get(day, 0)
-        ctl = ctl * cd + load * (1 - cd)
-        atl = atl * ad + load * (1 - ad)
-    ctl = max(0.0, round(ctl, 1))
-    atl = max(0.0, round(atl, 1))
-    return ctl, atl, round(ctl - atl, 1)
+    """Banister CTL (42d fitness), ATL (7d fatigue), and TSB = CTL − ATL."""
+    return training_load.compute_ctl_atl_tsb(strava_60d, today, hevy_60d)
 
 
 def tsb_load_basis(strava_60d, hevy_60d, today):
-    """Confidence/basis summary for the TSB load inputs (DI-1.2). Pure; no I/O."""
-    _, basis = _daily_training_load(strava_60d, hevy_60d, today)
+    """Provenance/basis summary for the TSB load inputs. Pure; no I/O."""
+    _, basis = training_load.daily_training_load(strava_60d, hevy_60d, today)
     return basis
 
 

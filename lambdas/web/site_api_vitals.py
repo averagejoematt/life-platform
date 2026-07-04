@@ -1469,7 +1469,11 @@ def _latest_readiness() -> dict | None:
     # by daily-metrics-compute). The old fallback borrowed the day-grade
     # component set — a different model — so when the breakdown is absent
     # (pre-#492 records) we serve none rather than the wrong ones.
-    label_map = {"recovery": "recovery", "sleep": "sleep", "hrv_trend": "HRV trend", "tsb": "training balance"}
+    # #490/M-3: the TSB component names its provenance — the load behind it is a
+    # duration proxy unless the basis says power-backed.
+    _tsb_conf = str((rec.get("tsb_load_basis") or {}).get("confidence") or "")
+    _tsb_label = "training balance" + (" (duration-proxy)" if _tsb_conf and _tsb_conf != "power" else "")
+    label_map = {"recovery": "recovery", "sleep": "sleep", "hrv_trend": "HRV trend", "tsb": _tsb_label}
     components = [
         {"key": c.get("key"), "label": label_map.get(c.get("key"), c.get("key")), "score": round(float(c["score"]), 1)}
         for c in (rec.get("readiness_components") or [])
@@ -1479,6 +1483,7 @@ def _latest_readiness() -> dict | None:
         "score": round(float(rec["readiness_score"]), 1),
         "band": rec.get("readiness_colour"),  # green / yellow / red
         "components": components,
+        "tsb_basis": _tsb_conf or None,
         "as_of": (rec.get("sk", "") or "").replace("DATE#", "") or rec.get("date"),
     }
 
