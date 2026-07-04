@@ -186,28 +186,31 @@ def call_anthropic_api(
                 raise
 
 
-def call_anthropic_raw(req: urllib.request.Request, timeout: int = 55) -> dict[str, Any]:
-    """Retry wrapper — historically took a pre-built urllib Request to
-    api.anthropic.com (weekly-digest pattern).
+def call_anthropic_raw(req: Union[dict[str, Any], urllib.request.Request], timeout: int = 55) -> dict[str, Any]:
+    """Retry wrapper around bedrock_client.invoke() for a raw Messages body.
 
-    ADR-062 (2026-05-27): now routes to Bedrock. Backward-compatible — callers
-    still pass a urllib.request.Request; we extract its JSON body (req.data)
-    and forward to bedrock_client.invoke(). The body is the Anthropic Messages
-    dict (model/messages/max_tokens/system), which is exactly what Bedrock
-    needs. Returns the full parsed JSON response (same shape), so existing
-    callers that read resp["content"][0]["text"] are unchanged.
+    Preferred call shape (#505/J-2): pass the Anthropic Messages dict directly
+    (model/messages/max_tokens/system) — no urllib Request, no API key, no
+    headers. Legacy shape still accepted: a pre-built urllib.request.Request
+    whose .data is that JSON body (the pre-ADR-062 api.anthropic.com pattern);
+    its URL/headers are ignored (Bedrock auth is IAM). Returns the full parsed
+    JSON response, so callers that read resp["content"][0]["text"] are
+    unchanged.
 
-    Prompt caching: preserved if the caller's body has cache_control blocks in
-    its system message (the wire format is identical on Bedrock).
+    Prompt caching: preserved if the body has cache_control blocks in its
+    system message (the wire format is identical on Bedrock).
     """
     import botocore.exceptions as _bce
     from bedrock_client import invoke as _bedrock_invoke
 
-    # Extract the Anthropic Messages body the caller built into the Request.
-    raw = req.data
-    if isinstance(raw, (bytes, bytearray)):
-        raw = raw.decode("utf-8")
-    body = json.loads(raw) if raw else {}
+    if isinstance(req, dict):
+        body = req
+    else:
+        # Legacy: extract the Messages body the caller built into the Request.
+        raw = req.data
+        if isinstance(raw, (bytes, bytearray)):
+            raw = raw.decode("utf-8")
+        body = json.loads(raw) if raw else {}
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:

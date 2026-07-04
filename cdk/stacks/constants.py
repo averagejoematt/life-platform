@@ -36,7 +36,8 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
 # v101: #482 public phase_for_date; #481 loud secret-writeback; #480 validator spec truth
 # v103: #490 training_load.py — one TSS-like load scale for every Banister consumer
-SHARED_LAYER_VERSION = 103
+# v104: #505 retry_utils.call_anthropic_raw accepts a plain Messages dict (journal v2)
+SHARED_LAYER_VERSION = 104
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 

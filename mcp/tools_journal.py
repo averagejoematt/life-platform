@@ -165,6 +165,8 @@ def tool_search_journal(args):
                 str(item.get("enriched_exercise_context", "")),
                 " ".join(item.get("enriched_values_lived", [])),
                 " ".join(item.get("enriched_cognitive_patterns", [])),
+                " ".join(item.get("enriched_entities", []) or []),  # #505 v2
+                " ".join(item.get("enriched_behaviors", []) or []),  # #505 v2
             ]
         ).lower()
 
@@ -337,6 +339,9 @@ def tool_get_journal_insights(args):
     values_all = []
     gratitude_all = []
     pain_all = []
+    entities_all = []  # #505 v2
+    behaviors_all = []  # #505 v2
+    causal_hints_all = []  # #505 v2: {date, cause, effect, quote}
 
     mood_scores = []
     energy_scores = []
@@ -360,6 +365,11 @@ def tool_get_journal_insights(args):
         values_all.extend(item.get("enriched_values_lived", []))
         gratitude_all.extend(item.get("enriched_gratitude", []))
         pain_all.extend(item.get("enriched_pain", []))
+        entities_all.extend(item.get("enriched_entities", []))
+        behaviors_all.extend(item.get("enriched_behaviors", []))
+        for hint in item.get("enriched_causal_hints", []) or []:
+            if isinstance(hint, dict):
+                causal_hints_all.append({"date": date, **{k: hint.get(k) for k in ("cause", "effect", "quote")}})
 
         mood = item.get("enriched_mood")
         if mood:
@@ -441,6 +451,11 @@ def tool_get_journal_insights(args):
         "pain_flags": rank_items(pain_all, 5),
         "alcohol_days": alcohol_days,
         "notable_quotes": quotes[-5:],  # Last 5 quotes
+        # #505 v2: extraction trio — entities/behaviors ranked, causal hints verbatim
+        # (each quote survived the enrichment-side grounding gate).
+        "top_entities": rank_items(entities_all),
+        "top_behaviors": rank_items(behaviors_all),
+        "causal_hints": causal_hints_all[-10:],
     }
 
     return result

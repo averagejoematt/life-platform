@@ -22,8 +22,6 @@ v1.0.0 — 2026-03-31
 import json
 import logging
 import os
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -36,28 +34,14 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 CACHE_PK = f"{USER_PREFIX}journal_analysis"
-AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/ai-keys")
 AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
+
+# J-5 (#505): word floor shared with journal_enrichment_lambda — kept in lockstep
+# deliberately (both skip entries too short to yield real signal).
+MIN_TEXT_WORDS = 20
 
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
-
-_api_key_cache = None
-
-
-def _get_api_key():
-    global _api_key_cache
-    if _api_key_cache:
-        return _api_key_cache
-    sm = boto3.client("secretsmanager", region_name="us-west-2")
-    resp = sm.get_secret_value(SecretId=AI_SECRET_NAME)
-    secret = resp["SecretString"]
-    try:
-        parsed = json.loads(secret)
-        _api_key_cache = parsed.get("anthropic_api_key", secret)
-    except (json.JSONDecodeError, TypeError):
-        _api_key_cache = secret
-    return _api_key_cache
 
 
 # J-8 (#504): cache writes must carry a phase attribute — an unstamped record
@@ -88,8 +72,6 @@ def lambda_handler(event, context):
         skipped_short = 0
         errors = 0
 
-        api_key = _get_api_key()
-
         for entry in entries:
             sk = entry.get("sk", "")
             # Extract date from SK: DATE#YYYY-MM-DD#journal#...
@@ -114,7 +96,7 @@ def lambda_handler(event, context):
             )
             word_count = len(content.split()) if content else 0
 
-            if word_count < 20:
+            if word_count < MIN_TEXT_WORDS:
                 skipped_short += 1
                 continue
 
@@ -144,28 +126,19 @@ Journal entry:
 {content[:2000]}"""
 
             try:
-                req_body = json.dumps(
+                # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
+                # #505/J-2: plain Messages body — the urllib Request + live ai-keys
+                # fetch were dead scaffolding (Bedrock auth is IAM).
+                from retry_utils import call_anthropic_raw
+
+                result = call_anthropic_raw(
                     {
                         "model": AI_MODEL,
                         "max_tokens": 300,
                         "messages": [{"role": "user", "content": prompt}],
-                    }
-                )
-
-                req = urllib.request.Request(
-                    "https://api.anthropic.com/v1/messages",
-                    data=req_body.encode(),
-                    headers={
-                        "Content-Type": "application/json",
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
                     },
+                    timeout=30,
                 )
-
-                # Phase 3.4 (2026-05-16): retry via retry_utils (4 attempts, 5/15/45s).
-                from retry_utils import call_anthropic_raw
-
-                result = call_anthropic_raw(req, timeout=30)
 
                 text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
                 if not text:

@@ -159,7 +159,10 @@ def gather_context():
                 "enriched_mood",
                 "enriched_energy",
                 "enriched_primary_defense",
-                "enriched_defense_context",
+                # #505 v2: behaviors + author-asserted causal hints replace the
+                # retired defense_context as the challenge-mining gold.
+                "enriched_behaviors",
+                "enriched_causal_hints",
             ]:
                 val = entry.get(field)
                 if val:
