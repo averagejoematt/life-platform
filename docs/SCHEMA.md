@@ -1440,7 +1440,7 @@ Queried by MCP tools: `get_habit_tier_report`, `get_vice_streak_history`.
 **pk:** `USER#matthew#SOURCE#character_sheet`
 **sk:** `DATE#YYYY-MM-DD`
 
-One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing.
+One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing. Engine v1.2.0 (ADR-104) adds behavioral-absence semantics (an unlogged behavior scores 0, a missing sensor reading stays neutral), the coverage gate (thin-data days can't move levels), the raw-day gate on level-ups, graduated step bands, and per-pillar drivers provenance.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1480,7 +1480,10 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `data_coverage` | number | Ratio of available to max component weight (0.0–1.0). v1.1.0+ |
 | `streak_above` | number | Consecutive days target_level > current_level |
 | `streak_below` | number | Consecutive days target_level < current_level |
-| `components` | map | Per-component scores: `{"component_name": {"score": N, "weight": W}, "_confidence": N, "_data_coverage": N}` |
+| `coverage_hold` | bool | ADR-104 (v1.2.0+): day was below `level_change_min_coverage` — no leveling signal, levels frozen both directions |
+| `absent_behaviors` | list | ADR-104 (v1.2.0+): behavioral components with no data this day (scored 0 at full weight — "didn't happen") |
+| `drivers` | map | ADR-104 (v1.2.0+): engine-computed provenance `{top, dragging, absent, no_data}` (component-name lists) — feeds the page's per-pillar "why" line |
+| `components` | map | Per-component scores: `{"component_name": {"score": N, "weight": W[, "absent": true]}, "_confidence": N, "_data_coverage": N, "_absent_behaviors": [...]}` |
 
 Config: `s3://matthew-life-platform/config/character_sheet.json`  
 Queried by MCP tools: `get_character_sheet`, `get_pillar_detail`, `get_level_history`.

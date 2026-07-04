@@ -163,6 +163,11 @@ try:
 except ImportError:  # pragma: no cover — flat sys.path (tests)
     from grounding_guard import hard_canonical_contradictions as _hard_canonical_contradictions  # noqa: F401
 
+# ADR-104: the shared grounded-generation harness — the regen-once keep-if-improved
+# flow moved there (one implementation for every surface), plus the allow-list
+# number gate that catches fabricated trends ("from 58 to 64" with no 58 anywhere).
+import grounded_generation as _gg
+
 
 def _latest_date(items):
     """Newest DATE# present in a list of records (by sk), or None."""
@@ -832,32 +837,12 @@ def _build_shared_system_prompt():
     # Phase-3 AUTHORITATIVE FACTS — the single shared snapshot every coach must cite from.
     # Prevents the cross-coach number drift the truth audit found (protein 140/170/190,
     # recovery 30-vs-86): if you mention one of these metrics, use THIS number, verbatim.
+    # ADR-104: rendered by grounded_generation.authoritative_facts_block — the one
+    # wording every surface injects (this block's original text moved there verbatim).
     try:
-        _facts = _load_canonical_facts()
-        fact_lines = []
-        if _facts.get("protein_g_avg") is not None:
-            fact_lines.append(
-                f"  - Protein INTAKE averages {_facts['protein_g_avg']:g} g/day "
-                f"(target {int(_facts.get('protein_g_target') or 190)} g, floor {int(_facts.get('protein_g_floor') or 170)} g). "
-                f"His actual intake is ~{_facts['protein_g_avg']:g} g — never state intake as the target or floor."
-            )
-        if _facts.get("recovery_pct") is not None:
-            fact_lines.append(f"  - Latest Whoop recovery: {_facts['recovery_pct']:g}%")
-        if _facts.get("hrv_ms") is not None:
-            fact_lines.append(f"  - Latest HRV: {_facts['hrv_ms']:g} ms (HRV is in MILLISECONDS, never bpm)")
-        if _facts.get("rhr_bpm") is not None:
-            fact_lines.append(f"  - Latest resting HR: {_facts['rhr_bpm']:g} bpm")
-        if _facts.get("latest_weight") is not None:
-            fact_lines.append(f"  - Latest weight: {_facts['latest_weight']:g} lb")
-        if fact_lines:
-            parts.append(
-                "AUTHORITATIVE FACTS (cite these EXACT numbers; do not invent, round away, or "
-                "substitute a target/floor for an actual value):\n" + "\n".join(fact_lines) + "\n"
-                "HARD RULE for resting HR, HRV, and recovery: state ONLY the exact value above. "
-                "Do NOT invent a trend, a range, a multi-day figure, or a 'climbed/dropped from X to Y' "
-                "for these — you do not have that history. If you have no specific number for a claim, "
-                "describe the pattern qualitatively instead of inventing a figure."
-            )
+        _facts_block = _gg.authoritative_facts_block(_load_canonical_facts())
+        if _facts_block:
+            parts.append(_facts_block)
     except Exception as _fe:
         logger.warning("Authoritative facts injection failed: %s", _fe)
 
@@ -1116,29 +1101,27 @@ def generate_and_cache(expert_key, shared_system=None):
         except Exception as _ge2:
             logger.warning("grounding backstop failed for %s: %s", expert_key, _ge2)
 
-    # Phase-4 SELF-CORRECTION: log-only wasn't enough — coaches kept serving a wrong RHR
-    # (53 vs the canonical 64) that the Coherence Sentinel caught daily. When a stable
-    # canonical metric is hard-contradicted, regenerate the narrative ONCE with the exact
-    # correction, and keep it only if the contradiction is gone (never make it worse).
-    # Self-contained (Compute lambda); reuses the Mode-B correction call shape.
+    # Phase-4 SELF-CORRECTION (ADR-104: via the shared grounded_generation harness).
+    # Log-only wasn't enough — coaches kept serving a wrong RHR (53 vs the canonical
+    # 64) that the Coherence Sentinel caught daily. Findings = hard canonical
+    # contradictions PLUS the allow-list number gate (any number not present in the
+    # prompt/system/facts is a fabrication — catches invented trend endpoints).
+    # One corrective rewrite, kept only if strictly better (never regress).
     if analysis_text:
         try:
-            _contras = _hard_canonical_contradictions(analysis_text, _load_canonical_facts())
-            if _contras:
-                logger.warning("[grounding] %s hard contradiction(s): %s", expert_key, [c["detail"] for c in _contras])
-                _fix_lines = ["CORRECTION REQUIRED — your draft states numbers that contradict the authoritative facts:\n"]
-                for _i, _c in enumerate(_contras, 1):
-                    _fix_lines.append(f"{_i}. {_c['detail']}. Use {_c['canonical']:g}, or omit the metric — never invent one.")
-                _fix_lines.append(
-                    "\nRewrite the analysis with these corrected. Keep your voice and length; " "do not mention that a correction was made."
-                )
-                _fix_prompt = prompt + "\n\n" + "\n".join(_fix_lines)
+            _facts = _load_canonical_facts()
+            _allowed = _gg.allowed_numbers(prompt, shared_system, _facts)
+
+            def _findings_fn(_t):
+                return _gg.grounding_findings(_t, facts=_facts, allowed=_allowed)
+
+            def _regen(_correction):
                 from retry_utils import call_anthropic_raw
 
                 _fix_req = urllib.request.Request(
                     "https://api.anthropic.com/v1/messages",
                     data=json.dumps(
-                        {"model": AI_MODEL, "max_tokens": 1200, "messages": [{"role": "user", "content": _fix_prompt}]}
+                        {"model": AI_MODEL, "max_tokens": 1200, "messages": [{"role": "user", "content": prompt + "\n\n" + _correction}]}
                     ).encode(),
                     headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
                 )
@@ -1146,20 +1129,20 @@ def generate_and_cache(expert_key, shared_system=None):
                 _fixed = "".join(b["text"] for b in _fix_res.get("content", []) if b.get("type") == "text")
                 if "KEY RECOMMENDATION:" in _fixed:
                     _fixed = _fixed.rsplit("KEY RECOMMENDATION:", 1)[0].rstrip()
-                # Keep ONLY if the rewrite actually removed contradictions (never regress).
-                if _fixed.strip() and len(_hard_canonical_contradictions(_fixed, _load_canonical_facts())) < len(_contras):
-                    analysis_text = _fixed
-                    table.update_item(
-                        Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"},
-                        UpdateExpression="SET analysis = :a",
-                        ExpressionAttributeValues={":a": analysis_text},
-                    )
-                    logger.info(
-                        "[grounding] %s self-corrected: %d→%d contradiction(s)",
-                        expert_key,
-                        len(_contras),
-                        len(_hard_canonical_contradictions(analysis_text, _load_canonical_facts())),
-                    )
+                return _fixed
+
+            _pre = _findings_fn(analysis_text)
+            if _pre:
+                logger.warning("[grounding] %s finding(s): %s", expert_key, [f["detail"] for f in _pre][:6])
+            _new_text, _left, _corrected = _gg.regen_once(analysis_text, _findings_fn, _regen)
+            if _corrected:
+                analysis_text = _new_text
+                table.update_item(
+                    Key={"pk": CACHE_PK, "sk": f"EXPERT#{expert_key}"},
+                    UpdateExpression="SET analysis = :a",
+                    ExpressionAttributeValues={":a": analysis_text},
+                )
+                logger.info("[grounding] %s self-corrected: %d→%d finding(s)", expert_key, len(_pre), len(_left))
         except Exception as _sc:
             logger.warning("grounding self-correction failed for %s: %s", expert_key, _sc)
 

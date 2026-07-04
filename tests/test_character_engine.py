@@ -32,15 +32,17 @@ from character_engine import (
     _compute_xp,
     _in_range_score,
     _weighted_pillar_score,
+    compute_character_sheet,
     compute_ema_level_score,
     evaluate_level_changes,
+    pillar_drivers,
 )
 
 # ── Version ──
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.1.0"
+    assert ENGINE_VERSION == "1.2.0"
 
 
 # ── F-01: Confidence scoring ──
@@ -315,3 +317,264 @@ def test_xp_buffer_depleted_allows_level_down():
     # xp_buffer = 10 % 100 = 10 < 20 threshold -> allow
     result = evaluate_level_changes("sleep", 5.0, prev, FULL_CONFIG)
     assert result["level"] == 9  # Level down
+
+
+# ── ADR-104: behavioral absence scores 0, not neutral ──
+
+
+def test_behavioral_absent_scores_zero():
+    """An unlogged behavior is a miss (0 at full weight), not dropped-to-neutral."""
+    scores = {"journal_consistency": None, "stress_management": 60}
+    config = {
+        "journal_consistency": {"weight": 0.5, "behavioral": True},
+        "stress_management": {"weight": 0.5},
+    }
+    score, details = _weighted_pillar_score(scores, config)
+    # Both components count: (0*0.5 + 60*0.5) / 1.0 = 30, full coverage, no blend
+    assert score == 30.0
+    assert details["_data_coverage"] == 1.0
+    assert details["_absent_behaviors"] == ["journal_consistency"]
+    assert details["journal_consistency"] == {"score": 0.0, "weight": 0.5, "absent": True}
+
+
+def test_measured_absent_still_neutral_blended():
+    """A missing device reading keeps the confidence blend — a gap is not a failure."""
+    scores = {"efficiency": None, "duration_vs_target": 80}
+    config = {"efficiency": {"weight": 0.5}, "duration_vs_target": {"weight": 0.5}}
+    score, details = _weighted_pillar_score(scores, config)
+    assert details["_absent_behaviors"] == []
+    assert 50 < score < 80  # blended toward neutral, unchanged v1.1 semantics
+
+
+def test_fully_absent_behavioral_pillar_scores_low_not_neutral():
+    """The level-13 bug: a pillar of unlogged behaviors must read ~0, not ~50."""
+    scores = {"a": None, "b": None, "c": None}
+    config = {
+        "a": {"weight": 0.4, "behavioral": True},
+        "b": {"weight": 0.3, "behavioral": True},
+        "c": {"weight": 0.3, "behavioral": True},
+    }
+    score, details = _weighted_pillar_score(scores, config)
+    assert score == 0.0
+    assert details["_data_coverage"] == 1.0  # absence IS information here
+
+
+# ── ADR-104: coverage gate — no-signal days can't move levels ──
+
+
+def test_low_coverage_day_cannot_level_up():
+    """Neutral-blended thin-data days must not climb (the lockstep-13 driver)."""
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("relationships", 50.0, prev, FULL_CONFIG, data_coverage=0.15)
+    assert result["level"] == 5
+    assert result["coverage_hold"] is True
+    assert result["streak_above"] == 2  # held, not incremented
+
+
+def test_low_coverage_day_cannot_level_down():
+    """No information must not crash a pillar either — unknown ≠ failure."""
+    prev = {"level": 10, "tier": "Foundation", "streak_above": 0, "streak_below": 4, "xp_total": 10}
+    result = evaluate_level_changes("relationships", 2.0, prev, FULL_CONFIG, data_coverage=0.1)
+    assert result["level"] == 10
+    assert result["streak_below"] == 4  # held
+
+
+def test_good_coverage_day_levels_normally():
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("sleep", 10.0, prev, FULL_CONFIG, data_coverage=0.9)
+    assert result["level"] == 6
+    assert result["coverage_hold"] is False
+
+
+def test_no_coverage_arg_keeps_legacy_behavior():
+    """Callers that don't pass coverage (e.g. old stored paths) are unaffected."""
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("sleep", 10.0, prev, FULL_CONFIG)
+    assert result["level"] == 6
+
+
+# ── ADR-104: drivers provenance ──
+
+
+def test_raw_gate_blocks_up_on_ema_momentum():
+    """EMA still above the level, but today scored 0 — no climb credit."""
+    prev = {"level": 8, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("movement", 26.0, prev, FULL_CONFIG, data_coverage=1.0, raw_score=0.0)
+    assert result["level"] == 8
+    assert result["streak_above"] == 2  # held — the day didn't earn it
+
+
+def test_raw_gate_allows_up_when_day_performed():
+    prev = {"level": 8, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("movement", 26.0, prev, FULL_CONFIG, data_coverage=1.0, raw_score=64.0)
+    assert result["level"] > 8
+
+
+def test_step_bands_scale_with_gap():
+    """A huge honest gap converges faster than a small one (no more lockstep pace)."""
+    bands_cfg = {
+        "leveling": dict(FULL_CONFIG["leveling"], level_step_bands=[{"min_delta": 25, "step": 3}, {"min_delta": 10, "step": 2}]),
+        "tiers": FULL_CONFIG["tiers"],
+    }
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    big_gap = evaluate_level_changes("sleep", 80.0, prev, bands_cfg, raw_score=85.0)
+    small_gap = evaluate_level_changes("sleep", 12.0, prev, bands_cfg, raw_score=85.0)
+    assert big_gap["level"] == 8  # +3
+    assert small_gap["level"] == 6  # +1
+
+
+def test_pillar_drivers_summary():
+    details = {
+        "t0_habit_compliance": {"score": 0.0, "weight": 0.3, "absent": True},
+        "journal_consistency": {"score": 0.0, "weight": 0.15, "absent": True},
+        "stress_management": {"score": 72.0, "weight": 0.15},
+        "vice_control": {"score": 25.0, "weight": 0.1},
+        "state_of_mind_valence": {"score": None, "weight": 0.15},
+        "_confidence": 0.9,
+        "_data_coverage": 0.85,
+        "_absent_behaviors": ["t0_habit_compliance", "journal_consistency"],
+    }
+    d = pillar_drivers(details)
+    assert d["top"] == ["stress_management"]
+    assert d["dragging"] == ["vice_control"]
+    assert d["absent"] == ["t0_habit_compliance", "journal_consistency"]
+    assert d["no_data"] == ["state_of_mind_valence"]
+
+
+# ── ADR-104: the reported scenario, end-to-end ──
+# 20 days: wearables flow (sleep data present), but zero journaling all cycle
+# and habits/workouts stop after day 13. Mind must lag sleep; movement must
+# sink after the stop; nothing may climb in lockstep on neutral defaults.
+
+
+def _scenario_config():
+    return {
+        "experiment_start": "2026-06-14",
+        "pillars": {
+            "sleep": {
+                "weight": 0.2,
+                "components": {
+                    "duration_vs_target": {"weight": 0.5, "target_hours": 7.5},
+                    "efficiency": {"weight": 0.5},
+                },
+            },
+            "movement": {
+                "weight": 0.18,
+                "components": {
+                    "training_frequency": {"weight": 0.5, "target_sessions_week": 5, "behavioral": True},
+                    "zone2_adequacy": {"weight": 0.5, "target_minutes": 150, "behavioral": True},
+                },
+            },
+            "nutrition": {
+                "weight": 0.18,
+                "components": {
+                    "calorie_adherence": {"weight": 0.5, "behavioral": True},
+                    "protein_total": {"weight": 0.5, "target_grams": 190, "behavioral": True},
+                },
+            },
+            "metabolic": {"weight": 0.12, "components": {"resting_heart_rate": {"weight": 1.0}}},
+            "mind": {
+                "weight": 0.15,
+                "components": {
+                    "t0_habit_compliance": {"weight": 0.45, "behavioral": True},
+                    "journal_consistency": {"weight": 0.3, "behavioral": True},
+                    "stress_management": {"weight": 0.25},
+                },
+            },
+            "relationships": {
+                "weight": 0.07,
+                "components": {"social_interaction_frequency": {"weight": 1.0}},
+            },
+            "consistency": {"weight": 0.1, "components": {"data_completeness": {"weight": 1.0}}},
+        },
+        "leveling": {
+            "ema_lambda": 0.85,
+            "ema_window_days": 21,
+            "level_change_min_coverage": 0.5,
+            "level_step_threshold": 10,
+            "level_step_bands": [{"min_delta": 25, "step": 3}, {"min_delta": 10, "step": 2}],
+            "xp_per_level": 100,
+            "daily_xp_decay": 2,
+            "xp_buffer_threshold": 20,
+            "tier_streak_overrides": {"Foundation": {"up": 3, "down": 5, "tier_boundary_up": 5, "tier_boundary_down": 7}},
+        },
+        "tiers": [
+            {"name": "Foundation", "min_level": 1, "max_level": 20},
+            {"name": "Momentum", "min_level": 21, "max_level": 100},
+        ],
+        "xp_bands": [
+            {"min_raw_score": 80, "xp": 3},
+            {"min_raw_score": 60, "xp": 2},
+            {"min_raw_score": 40, "xp": 1},
+            {"min_raw_score": 20, "xp": 0},
+            {"min_raw_score": 0, "xp": -1},
+        ],
+        "cross_pillar_effects": [],
+        "baseline": {"start_weight_lbs": 314.52, "goal_weight_lbs": 185, "weight_phase": "loss"},
+    }
+
+
+def _scenario_day(day_index):
+    """Data for day N of the scenario (0-based). Good sleep every day; workouts
+    and nutrition logging stop at day 13; journaling/habits never happen."""
+    trained = day_index < 13
+    data = {
+        "date": f"2026-06-{14 + day_index:02d}" if day_index < 17 else f"2026-07-{day_index - 16:02d}",
+        "sleep": {"sleep_duration_hours": 7.4, "sleep_performance": 88},
+        "whoop": {"recovery_score": 62, "resting_heart_rate": 58},
+        "strava_7d": ([{"activities": [{"sport_type": "ride", "zone2_minutes": 35}]}] * 4) if trained else [],
+        "macrofactor": ({"calories": 2400, "calorie_target": 2500, "protein": 185} if trained else None),
+        "habit_scores": None,
+        "journal_14d_count": 0,
+    }
+    return data
+
+
+def test_reported_scenario_mind_lags_and_movement_sinks():
+    config = _scenario_config()
+    prev_state = None
+    histories = {p: [] for p in config["pillars"]}
+    for day in range(20):
+        record = compute_character_sheet(_scenario_day(day), prev_state, histories, config)
+        for p in config["pillars"]:
+            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+        prev_state = record
+
+    sleep_p = record["pillar_sleep"]
+    mind_p = record["pillar_mind"]
+    move_p = record["pillar_movement"]
+
+    # Mind never journaled / logged habits: raw is stress-only ≈ 15, far below sleep
+    assert mind_p["raw_score"] < 30 < sleep_p["raw_score"]
+    # Habit logging vanished entirely (record absent → behavioral zero, flagged);
+    # journaling shows as a scored 0/100 (the 14d count always exists) — both honest.
+    assert mind_p["absent_behaviors"] == ["t0_habit_compliance"]
+    assert mind_p["components"]["journal_consistency"]["score"] == 0.0
+    # Movement collapsed after workouts stopped on day 13
+    assert move_p["raw_score"] == 0.0
+    # Levels no longer march in lockstep: mind trails sleep, movement fell behind
+    assert mind_p["level"] < sleep_p["level"]
+    assert move_p["level"] < sleep_p["level"]
+    # And the sheet differentiates: pillar levels spread, not one shared number
+    levels = [record[f"pillar_{p}"]["level"] for p in config["pillars"]]
+    assert max(levels) - min(levels) >= 6
+    # Overall level sits below the best pillar — it's a weighted floor of a mixed story
+    assert record["character_level"] < sleep_p["level"]
+
+
+def test_reported_scenario_down_levels_after_stop():
+    """A pillar that earned levels then went dark must give some back."""
+    config = _scenario_config()
+    prev_state = None
+    histories = {p: [] for p in config["pillars"]}
+    peak_move_level = 1
+    for day in range(35):  # extend past the stop to let the EMA + shield drain
+        record = compute_character_sheet(_scenario_day(day), prev_state, histories, config)
+        for p in config["pillars"]:
+            histories[p].append(record[f"pillar_{p}"]["raw_score"])
+        if day == 12:
+            peak_move_level = record["pillar_movement"]["level"]
+        prev_state = record
+
+    assert peak_move_level > 1  # it climbed while training was real
+    assert record["pillar_movement"]["level"] < peak_move_level  # and gave levels back

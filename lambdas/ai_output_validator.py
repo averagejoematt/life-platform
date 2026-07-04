@@ -186,6 +186,55 @@ _CORRELATION_AS_CAUSATION = [
 
 # ── Core validator ─────────────────────────────────────────────────────────────
 
+# ADR-104: the hallucinated-metrics check (check 12) requires health_context, and
+# in practice only ONE of the ~13 call sites passed it — the ±25% numeric check
+# was a silent no-op everywhere else. When no context is supplied, auto-load the
+# canonical facts (same authoritative record the coaches are grounded on).
+# Fail-soft + cached: any error (no creds in CI, missing table, missing helper)
+# yields {} and the validator behaves exactly as before.
+_AUTO_CTX_CACHE = {"ctx": None, "ts": 0.0}
+_AUTO_CTX_TTL_S = 300.0
+
+
+def _autoload_health_context() -> dict:
+    import os as _os
+    import time as _time
+
+    if _os.environ.get("AI_VALIDATOR_AUTOLOAD", "on") == "off":
+        return {}  # kill-switch — unit tests / hermetic runs opt out (no DDB read)
+    if _AUTO_CTX_CACHE["ctx"] is not None and (_time.time() - _AUTO_CTX_CACHE["ts"]) < _AUTO_CTX_TTL_S:
+        return _AUTO_CTX_CACHE["ctx"]
+    ctx: dict = {}
+    try:
+
+        import boto3 as _boto3
+        from boto3.dynamodb.conditions import Key as _Key
+        from canonical_facts import build_canonical_facts as _bcf
+
+        _tbl = _boto3.resource("dynamodb", region_name=_os.environ.get("AWS_REGION_OVERRIDE", "us-west-2")).Table(
+            _os.environ.get("TABLE_NAME", "life-platform")
+        )
+        _items = _tbl.query(
+            KeyConditionExpression=_Key("pk").eq(f"USER#{_os.environ.get('USER_ID', 'matthew')}#SOURCE#computed_metrics"),
+            ScanIndexForward=False,
+            Limit=1,
+        ).get("Items", [])
+        if _items:
+            _f = _bcf(_items[0])
+            ctx = {
+                "recovery_score": _f.get("recovery_pct"),
+                "hrv": _f.get("hrv_ms"),
+                "resting_heart_rate": _f.get("rhr_bpm"),
+                "latest_weight": _f.get("latest_weight"),
+            }
+            ctx = {k: v for k, v in ctx.items() if v is not None}
+    except Exception as _e:  # noqa: BLE001 — auto-context is strictly best-effort
+        logger.info("[ai_validator] health_context autoload unavailable (%s)", type(_e).__name__)
+        ctx = {}
+    _AUTO_CTX_CACHE["ctx"] = ctx
+    _AUTO_CTX_CACHE["ts"] = _time.time()
+    return ctx
+
 
 def validate_ai_output(
     text: Optional[str],
@@ -208,7 +257,10 @@ def validate_ai_output(
     Returns:
         AIValidationResult with .sanitized_text ready to use.
     """
-    ctx = health_context or {}
+    # ADR-104: no caller context → auto-load canonical facts (fail-soft {}).
+    # An explicitly passed dict (even empty) is respected untouched.
+    ctx = health_context if health_context is not None else _autoload_health_context()
+    ctx = ctx or {}
     result = AIValidationResult(
         original_text=text or "",
         output_type=output_type,

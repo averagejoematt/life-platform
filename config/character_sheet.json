@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "version": "1.1.1",
-    "description": "Character Sheet v1.1.1: progressive difficulty, confidence scoring, XP-as-buffer, per-pillar EMA. Baseline re-anchored to 2026-05-18 (ADR-058).",
-    "last_updated": "2026-06-14",
+    "version": "1.2.0",
+    "description": "Character Sheet v1.2.0 (ADR-104): behavioral components score 0 when absent (an unlogged habit is a miss, a device gap is not), and days below the coverage floor carry no leveling signal. Progressive difficulty, confidence scoring, XP-as-buffer, per-pillar EMA retained.",
+    "last_updated": "2026-07-03",
     "review_ref": "docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md"
   },
   "baseline": {
@@ -48,11 +48,13 @@
       "components": {
         "training_frequency": {
           "weight": 0.2,
-          "target_sessions_week": 5
+          "target_sessions_week": 5,
+          "behavioral": true
         },
         "zone2_adequacy": {
           "weight": 0.25,
-          "target_minutes": 150
+          "target_minutes": 150,
+          "behavioral": true
         },
         "training_load_balance": {
           "weight": 0.2
@@ -62,7 +64,8 @@
         },
         "movement_diversity": {
           "weight": 0.1,
-          "target_types": 4
+          "target_types": 4,
+          "behavioral": true
         },
         "daily_steps": {
           "weight": 0.1,
@@ -77,19 +80,23 @@
       "components": {
         "calorie_adherence": {
           "weight": 0.2,
-          "tolerance_pct": 0.1
+          "tolerance_pct": 0.1,
+          "behavioral": true
         },
         "protein_total": {
           "weight": 0.2,
-          "target_grams": 190
+          "target_grams": 190,
+          "behavioral": true
         },
         "protein_distribution": {
           "weight": 0.1,
           "threshold_grams": 30,
-          "target_meals": 4
+          "target_meals": 4,
+          "behavioral": true
         },
         "consistency": {
-          "weight": 0.1
+          "weight": 0.1,
+          "behavioral": true
         },
         "body_composition_progress": {
           "weight": 0.4
@@ -128,13 +135,16 @@
       "owner": "Coach Maya Rodriguez",
       "components": {
         "t0_habit_compliance": {
-          "weight": 0.3
+          "weight": 0.3,
+          "behavioral": true
         },
         "t1_habit_compliance": {
-          "weight": 0.15
+          "weight": 0.15,
+          "behavioral": true
         },
         "journal_consistency": {
-          "weight": 0.15
+          "weight": 0.15,
+          "behavioral": true
         },
         "state_of_mind_valence": {
           "weight": 0.15
@@ -190,11 +200,22 @@
   "leveling": {
     "ema_lambda": 0.85,
     "ema_window_days": 21,
+    "level_change_min_coverage": 0.5,
     "level_up_streak_days": 5,
     "level_down_streak_days": 7,
     "tier_up_streak_days": 7,
     "tier_down_streak_days": 10,
     "level_step_threshold": 10,
+    "level_step_bands": [
+      {
+        "min_delta": 25,
+        "step": 3
+      },
+      {
+        "min_delta": 10,
+        "step": 2
+      }
+    ],
     "xp_per_level": 100,
     "daily_xp_decay": 2,
     "xp_buffer_threshold": 20,

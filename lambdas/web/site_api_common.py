@@ -108,7 +108,7 @@ PLATFORM_STATS = {
     "lambdas": 86,
     "cdk_stacks": 8,
     "alarms": 56,
-    "adrs": 91,
+    "adrs": 92,
     "monthly_cost": "~$60",  # real steady-state (~$29 AI + CloudWatch/Secrets/CE); the old
     # "$19" was stale and read as less than AI-alone MTD ($24) on the inference page — a visible
     # contradiction. ~$60 total keeps AI < total and matches the actual run-rate (still « $75 cap).
@@ -116,7 +116,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 15,
     "site_pages": 77,
-    "test_count": 1371,
+    "test_count": 1400,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,

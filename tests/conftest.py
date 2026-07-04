@@ -26,3 +26,7 @@ for _sp in ("ingestion", "compute", "coach", "emails", "web", "operational", "in
     _path = os.path.join(_LAMBDAS, _sp)
     if os.path.isdir(_path):
         sys.path.insert(0, _path)
+
+# ADR-104: keep the unit suite hermetic — ai_output_validator's health_context
+# autoload would otherwise perform a real DynamoDB read when local creds exist.
+os.environ.setdefault("AI_VALIDATOR_AUTOLOAD", "off")
