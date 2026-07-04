@@ -111,6 +111,7 @@ from web.site_api_data import (
     handle_platform_stats,
     handle_presence,
     handle_protocols,
+    handle_scenarios,
     handle_sleep_correlations,
     handle_sleep_detail,
     handle_sleep_reconciliation,
@@ -308,6 +309,7 @@ ROUTES = {
     # daily but never exposed — circadian-compliance score + unified sleep.
     "/api/circadian": handle_circadian,
     "/api/forecast": handle_forecast,
+    "/api/scenarios": handle_scenarios,
     "/api/sleep_reconciliation": handle_sleep_reconciliation,
     # ARCH-03: Achievement badges
     "/api/achievements": handle_achievements,

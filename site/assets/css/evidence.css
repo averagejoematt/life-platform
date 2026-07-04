@@ -364,6 +364,27 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .mi-in { max-width: 220px; }
 .mi-out { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); min-height: 18px; }
 
+/* Scenario explorer (#550) — lever chips + what-followed distribution bands.
+   The band reads left-to-right in metric units: box = middle half of similar
+   days, heavy tick = their median, thin tick = all other days' average. */
+.scn-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-4) 0; }
+.scn-chip {
+  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted);
+  background: none; border: 1px solid var(--rule); border-radius: 999px;
+  padding: var(--sp-1) var(--sp-3); cursor: pointer;
+}
+.scn-chip:hover { color: var(--ink); border-color: var(--ink-faint); }
+.scn-chip.is-on { color: var(--ember); border-color: var(--ember); }
+.scn-rows { display: grid; gap: var(--sp-5); margin-top: var(--sp-4); max-width: var(--measure); }
+.scn-rowhead { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.scn-med { font-family: var(--font-mono); font-size: var(--fs-data); color: var(--ink); }
+.scn-band { display: block; width: 100%; max-width: 340px; height: 26px; margin-top: var(--sp-2); }
+.scn-axis { stroke: var(--rule); stroke-width: 1; }
+.scn-iqr { fill: color-mix(in oklch, var(--ember) 30%, transparent); }
+.scn-medline { stroke: var(--ember); stroke-width: 2.5; }
+.scn-base { stroke: var(--ink-faint); stroke-width: 1.5; }
+.scn-meta { margin-top: var(--sp-1); color: var(--ink-faint); }
+
 /* v5 render-QA: wide data tables (e.g. inference "by model", 5 numeric cols) overflowed
    the 390px viewport with values clipped off-screen. Let any readout table scroll
    horizontally inside its own box on small screens instead of clipping. */

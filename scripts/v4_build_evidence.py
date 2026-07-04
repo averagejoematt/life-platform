@@ -289,6 +289,16 @@ REGISTRY = [
         "/legacy/predictions/",
     ),
     (
+        "scenarios",
+        "Scenario explorer",
+        "Pick a kind of day — see the distribution of what historically followed. Correlative by design.",
+        "Credibility & the machine",
+        "data",
+        "/api/scenarios",
+        None,
+        None,
+    ),
+    (
         "benchmarks",
         "Benchmarks",
         "Where the numbers sit vs age-band and centenarian targets.",
@@ -466,6 +476,7 @@ _REGROUP = {
     # appears TWICE (the /data/ live sheet + the /method/ editorial explainer, whose
     # tuple carries "How it holds up" inline). A regroup entry would clobber both.
     "predictions": "How it holds up",
+    "scenarios": "How it holds up",
     "benchmarks": "How it holds up",
     "biology": "How it holds up",
     "wrong": "How it holds up",
