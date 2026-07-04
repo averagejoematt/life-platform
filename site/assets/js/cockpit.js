@@ -17,6 +17,7 @@
 import { sparkline } from "/assets/js/charts.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
+import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 
 const API = "/api";
 
@@ -619,10 +620,12 @@ async function renderWeek() {
       return `<li class="wk-row"><span class="label">${escapeHTML(d)}</span>${sparkline(p.sparkline)}<span class="wk-val num">${escapeHTML(String(p.value))}<small> ${escapeHTML(p.unit || "")}</small></span>${delta}<span class="wk-note">${escapeHTML(p.delta_label || "")}</span></li>`;
     });
 
+  // #404: the week's recap permalink (minted daily by the moments sweep).
+  const wk = ((await momentsIndex()) || {}).week;
   bind("weekrows").innerHTML = (rows.length
     ? rows.join("")
     : `<li class="tl-empty">No week data yet — instruments fill in as the record deepens.</li>`)
-    + `<li class="wk-explain">${explainMount("observatory_week")}</li>`;
+    + `<li class="wk-explain">${explainMount("observatory_week")}${wk && wk.current ? shareMount(wk.current, "The week so far — one measured life") : ""}</li>`;
   bind("verdict").textContent = rows.length
     ? `Seven days, ${rows.length} of ${WEEK_DOMAINS.length} instruments reporting — deltas read against the week before.`
     : "The week view fills in as the record deepens.";

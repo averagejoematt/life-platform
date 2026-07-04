@@ -20,6 +20,7 @@
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
+import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -570,6 +571,7 @@ const _STATUS_LABEL = { confirmed: "confirmed", refuted: "refuted", pending: "st
 async function renderScorecard(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Tallying the board's calls…</span></p>`;
   const data = (await tryJSON("/api/predictions")) || {};
+  const momentUrl = _momentUrlFor(await momentsIndex()); // #404 share permalinks
   const o = data.overall || {};
   const byc = data.by_coach || {};
   const preds = data.predictions || [];
@@ -611,7 +613,7 @@ async function renderScorecard(read, id) {
     // Recent decided calls (the real signal once they exist).
     const decidedCalls = preds.filter((p) => p.status === "confirmed" || p.status === "refuted").slice(0, 8);
     if (decidedCalls.length) {
-      h += `<p class="dx-kicker label sc-sub">recently graded</p>` + decidedCalls.map(_scCallHTML).join("");
+      h += `<p class="dx-kicker label sc-sub">recently graded</p>` + decidedCalls.map((p) => _scCallHTML(p, momentUrl(p))).join("");
     }
     read.innerHTML = h;
     read.querySelectorAll(".sc-coachbtn").forEach((b) => b.addEventListener("click", () => selectEntry(BYKEY.scorecard, b.dataset.coach)));
@@ -633,19 +635,27 @@ async function renderScorecard(read, id) {
     `</div>`;
   if (!decidedC) h += `<p class="dx-prose sc-note">${esc(name)} has ${c.total || 0} calls on the board; none have resolved yet. Each grades after its window closes.</p>`;
   const show = mine.slice(0, 14);
-  if (show.length) h += `<p class="dx-kicker label sc-sub">the calls</p>` + show.map(_scCallHTML).join("");
+  if (show.length) h += `<p class="dx-kicker label sc-sub">the calls</p>` + show.map((p) => _scCallHTML(p, momentUrl(p))).join("");
   h += `<p class="bc-datalink label"><a href="/coaching/scorecard/#all">← the whole board</a></p>`;
   read.innerHTML = h;
   read.querySelectorAll("[data-coach]").forEach((b) => b.addEventListener("click", () => selectEntry(BYKEY.scorecard, b.dataset.coach)));
   enhanceCoachNames(read);
 }
-function _scCallHTML(p) {
+function _scCallHTML(p, shareUrl) {
   const st = p.status || "pending";
   return `<div class="sc-call sc-${esc(st)}"><div class="sc-call-top"><span class="sc-call-st label">${esc(_STATUS_LABEL[st] || st)}</span>` +
     `${p.metric ? `<span class="sc-call-m label">${esc(p.metric)}</span>` : ""}` +
     `${p.date ? `<span class="sc-call-d label">${esc(p.date)}</span>` : ""}</div>` +
     `<p class="sc-call-claim">${esc(p.text || "")}</p>` +
-    `${p.outcome_notes ? `<p class="sc-call-why label">${esc(p.outcome_notes)}</p>` : ""}</div>`;
+    `${p.outcome_notes ? `<p class="sc-call-why label">${esc(p.outcome_notes)}</p>` : ""}` +
+    `${shareUrl ? shareMount(shareUrl, p.text || "a graded prediction") : ""}</div>`;
+}
+// #404: a graded call's permalink, from the moments index (built by the daily
+// sweep). Key mirrors og_moments._prediction_key — plain composite, no hashing.
+function _momentUrlFor(mi) {
+  const map = {};
+  for (const m of (mi && mi.predictions) || []) map[m.key] = m.url;
+  return (p) => map[`${p.coach_id}|${p.date}|${String(p.text || "").slice(0, 60)}`];
 }
 
 // A single board-answered reader question (PG-ENG-2 static feed).
@@ -656,10 +666,15 @@ async function renderAnswer(read, id) {
   const resp = (a.responses && a.responses.length)
     ? a.responses.map((r) => `<div class="voice machine"><span class="who">${esc(r.name || r.coach || "The board")}</span><p class="what">${esc(r.text)}</p></div>`).join("")
     : (a.answer ? `<div class="voice machine"><span class="who">The board</span><p class="what">${esc(a.answer)}</p></div>` : `<p class="dx-prose">An answer is on the way.</p>`);
+  // #404: the answer's permalink (a static moment shell with its own share
+  // card) — button appears only once the daily sweep has minted it.
+  const mi = await momentsIndex();
+  const momentUrl = ((mi && mi.qa) || {})[String(id)];
   read.innerHTML =
     `<p class="dx-kicker label">a reader asked${a.answered_at ? ` · ${esc(a.answered_at)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(a.question)}</h2>` +
-    (a.note ? `<p class="dx-prose">${esc(a.note)}</p>` : "") + resp;
+    (a.note ? `<p class="dx-prose">${esc(a.note)}</p>` : "") + resp +
+    (momentUrl ? `<p class="qa-share">${shareMount(momentUrl, a.question)}</p>` : "");
   enhanceCoachNames(read);
 }
 

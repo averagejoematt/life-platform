@@ -1650,17 +1650,18 @@ def operational_ai_quality_canary() -> list[iam.PolicyStatement]:
 
 
 def operational_og_image_generator() -> list[iam.PolicyStatement]:
-    """OG image generator: reads public_stats.json, writes PNG images to S3, invalidates CloudFront."""
+    """OG image generator: reads public_stats.json (+ the published Q&A feed for
+    #404 moment permalinks), writes PNG cards + moment shells, invalidates CloudFront."""
     return [
         iam.PolicyStatement(
             sid="S3Read",
             actions=["s3:GetObject"],
-            resources=_s3("generated/public_stats.json"),
+            resources=_s3("generated/public_stats.json", "generated/board_answers/answers.json"),
         ),
         iam.PolicyStatement(
             sid="S3Write",
             actions=["s3:PutObject"],
-            resources=_s3("generated/assets/images/*"),
+            resources=_s3("generated/assets/images/*", "generated/moments/*"),
         ),
         iam.PolicyStatement(
             sid="CloudFrontInvalidation",
