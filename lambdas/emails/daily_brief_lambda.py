@@ -159,11 +159,11 @@ except ImportError:
     logger.setLevel(_log.INFO)
 
 import ai_calls
-import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 
 # -- Extracted module imports ---------------------------------------------------
 import html_builder
 import output_writers
+import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
