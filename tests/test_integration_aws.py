@@ -331,6 +331,16 @@ def test_i4_dynamodb_table_healthy():
     except Exception as e:
         pytest.fail(f"I4 FAIL: Could not check PITR status: {e}")
 
+    # Check required GSIs are present (#371: managed-where ledger assertion).
+    # GSI1 (reading due-date sparse) and GSI2 (reading overview) are out-of-IaC
+    # per ADR-097; they must survive a CDK full deploy since the table is imported.
+    gsi_names = {g.get("IndexName") for g in desc.get("GlobalSecondaryIndexes", [])}
+    for required_gsi in ("GSI1", "GSI2"):
+        assert required_gsi in gsi_names, (
+            f"I4 FAIL: Required GSI '{required_gsi}' is missing from DynamoDB table '{TABLE_NAME}'. "
+            f"Present GSIs: {gsi_names}. Check docs/MANAGED_WHERE_LEDGER.md for recovery steps."
+        )
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # I5 — Critical secrets exist in Secrets Manager
@@ -1280,6 +1290,59 @@ def test_i21_ddb_profile_matches_constants():
             f"constants.py EXPERIMENT_BASELINE_WEIGHT_LBS={EXPERIMENT_BASELINE_WEIGHT_LBS}. "
             f"Run deploy/restart_pipeline.py to reconcile."
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# I22 — Live site /version.json SHA is an ancestor of origin/main (#369)
+# Guards against main and live silently diverging after a squash-merge.
+# A SHA on main (or an ancestor of main) is benign — main is just ahead of
+# the deployed site. A SHA NOT in main's history is a real divergence.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.integration
+def test_i22_site_version_sha_on_main():
+    """I22: Live site /version.json build SHA must be an ancestor of origin/main."""
+    import subprocess
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen("https://averagejoematt.com/version.json", timeout=10) as r:
+            version_data = json.loads(r.read())
+    except Exception as e:
+        pytest.skip(f"I22 SKIP: Could not fetch /version.json ({e}) — network may be unavailable in this environment")
+
+    live_sha = version_data.get("build", "").strip()
+    if not live_sha:
+        pytest.fail("I22 FAIL: /version.json has no 'build' field — sync_site_to_s3.sh may not have been run")
+
+    # Fetch origin/main to get the latest
+    try:
+        subprocess.run(["git", "fetch", "origin", "main", "--quiet"], check=True, capture_output=True, cwd=ROOT)
+    except Exception:
+        pass  # non-fatal; use cached refs
+
+    # Check if live_sha is a valid commit in the git history
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", live_sha, "origin/main"],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    if result.returncode == 128:
+        # SHA not found at all — not even in history
+        pytest.fail(
+            f"I22 FAIL: Live site SHA {live_sha!r} is not in git history. "
+            "This could mean the site was deployed from a branch that was never merged, "
+            "or from a different repo clone. Deploy from origin/main to fix."
+        )
+    elif result.returncode != 0:
+        # returncode 1 means SHA exists but is NOT an ancestor (diverged forward — unusual)
+        pytest.fail(
+            f"I22 FAIL: Live site SHA {live_sha!r} exists in git but is not an ancestor "
+            "of origin/main — site may have diverged from the main branch. "
+            "Run 'bash deploy/sync_site_to_s3.sh' from origin/main checkout to fix."
+        )
+    # returncode 0 = SHA is an ancestor (or equal) — benign
 
 
 # ══════════════════════════════════════════════════════════════════════════════
