@@ -32,6 +32,20 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/510"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-no-silent-failures",
+      "date": "2026-07-04",
+      "title": "No data source gets to die quietly anymore",
+      "shipped": "Five reliability fixes in one batch. The three data pipes that lived outside the standard framework — workout tracker, journal, and food-log inbox — now report a heartbeat on every run, so the dashboard can finally tell 'he didn't log' from 'the pipe broke three weeks ago' (the failure mode that once hid a 44-day outage). A workout-API failure now raises loudly instead of returning a polite fake success. A food-log export in an unrecognized format now archives the file and alarms instead of silently discarding it after marking it processed — the exact trap behind a 22-day data gap in May. And two alarms that cried wolf were fixed at the root: a task-tracker staleness check that false-fired 14 hours a day, and an activity reconciler that flagged evening walks as missing because it compared UTC windows against local-date storage.",
+      "gotcha": "The fleet-wide auth-health alarm claimed to cover every source, but the framework's copy of the circuit-breaker never emitted the metric — only two of ten sources actually reported. The comment describing the coverage was aspiration, not fact. Proving the fix honest took a live fire drill: swap in a broken API key, force a cold start, watch the failure register, restore, watch it reset.",
+      "honest_miss": "The drill stopped one failure short of actually paging — firing the real alarm would have held an urgent page red for six hours on a synthetic cause, so the alarm's own trigger threshold remains exercised only in tests. And the verification turned up a fresh misfire: the daily health check has been probing a credential that never existed, red every day since May. Filed, not yet fixed.",
+      "prs": [
+        {
+          "label": "PR #516",
+          "url": "https://github.com/averagejoematt/life-platform/pull/516"
+        }
+      ]
     }
   ]
 }
