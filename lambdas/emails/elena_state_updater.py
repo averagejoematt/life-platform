@@ -94,9 +94,12 @@ table = dynamodb.Table(TABLE_NAME)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _get_item(pk, sk):
+def _get_item(pk, sk, consistent=False):
+    """consistent=True for the installment read — the publish paths invoke this
+    lambda milliseconds after flipping status to published, and an eventually-
+    consistent read could still see the draft and skip the week."""
     try:
-        return table.get_item(Key={"pk": pk, "sk": sk}).get("Item")
+        return table.get_item(Key={"pk": pk, "sk": sk}, ConsistentRead=consistent).get("Item")
     except Exception as e:
         logger.warning("get_item(%s, %s) failed: %s", pk, sk, e)
         return None
@@ -463,7 +466,7 @@ def lambda_handler(event, context):
         except ImportError:
             pass
 
-        installment = _get_item(CHRONICLE_PK, f"DATE#{date_str}")
+        installment = _get_item(CHRONICLE_PK, f"DATE#{date_str}", consistent=True)
         if not installment:
             return {"statusCode": 404, "error": f"no chronicle record for {date_str}"}
         if installment.get("status") != "published":
