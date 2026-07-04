@@ -78,6 +78,24 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/523"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-one-mind-per-coach",
+      "date": "2026-07-04",
+      "title": "One mind per coach — and the narrator finally gets a notebook",
+      "shipped": "Each AI coach used to be three disconnected people: a rich daily-brief self, a one-line public-board self, and a separate observatory self. Now all three write from the same voice spec, the public board loads the coach's real compressed memory, and every board answer is written back into that coach's own memory — so a coach can reference what it told a reader last week instead of contradicting itself. Elena Voss, the journalist who writes the weekly chronicle, got a persistent notebook too: open story threads, promises to readers that come due as hard obligations three weeks later, running motifs, and an editorial stance that can only claim to have changed when it can show receipts.",
+      "gotcha": "The first two live tests failed — and the failure was the honest-numbers gate doing its job. The richer voice pushes coaches to state numeric confidence (\"I'd put this at 70%\") and cite sleep-stage figures, and the fail-closed gate correctly killed any number not present in the data, replacing good answers with refusals. The fix was a truce, not a retreat: confidence gets expressed in words on the public board, and a flagged answer now gets one corrective rewrite before falling back to the refusal. Also found: the weekly memory compressor had a hand-copied name table that had drifted to a retired cast — records were being bylined to coaches who no longer exist.",
+      "honest_miss": "The observatory pipeline still keeps its own persona dict for framing — the voice now matches, but true one-pipeline unification is future work. And \"grounded\" still means \"no invented figures\", not \"true\": one passing answer invented an 11-day history that slipped through the small-number allowance the gate deliberately permits. The coaches share a mind now; they don't yet share a fact-checker.",
+      "prs": [
+        {
+          "label": "PR #556",
+          "url": "https://github.com/averagejoematt/life-platform/pull/556"
+        },
+        {
+          "label": "PR #559",
+          "url": "https://github.com/averagejoematt/life-platform/pull/559"
+        }
+      ]
     }
   ]
 }

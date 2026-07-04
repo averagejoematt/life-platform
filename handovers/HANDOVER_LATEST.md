@@ -1,94 +1,97 @@
-# HANDOVER — the Now-remainder batch: #473/#474/#477/#480/#481/#482/#497 + #518 — 2026-07-04 (session 7)
+# HANDOVER — one mind per coach (#531) + Elena Voss gets a mind (#537) — 2026-07-04 (session 8)
 
-**The data-source health review's Now milestone is PAID DOWN TO ZERO.** The last
-seven `area:data` Now stories + the #518 health-check misfire shipped in one batch:
-PRs **#523** (the batch) + **#524** (layer **v101** pin). All eight issues
-auto-closed; `gh issue list --label area:data --milestone Now --state open` returns
-**empty**. Two of the seven were decision stories — both decided and recorded:
-**#474 retire** (ADR-103 ledger row), **#497 disable** (ADR-074 updated).
+The first two **intelligence-roadmap believability flagships** (epics #526/#527) are
+MERGED + DEPLOYED + LIVE-DRILLED: PRs **#556** (the batch), **#557** (layer **v102**
+pin), **#558/#559/#560** (live-drill fixes). Issues #531 and #537 auto-closed.
+The #530 rigor chain (stats_core #529 + ADR-105 write-first) was deliberately left
+for a dedicated session.
 
 ---
 
-## What shipped (PR #523, 22 new tests in `test_now_remainder_batch.py`)
+## What shipped
 
-- **#477 (E-2)** — habitify `refresh_trailing_days=1`: yesterday gets one
-  post-midnight rewrite, so past-day `in_progress` resolves failed and
-  late-evening checks land. **Live-verified on real data:** yesterday's record
-  sat frozen at `pending_count=61` (the 23:05 UTC write); one invoke after
-  deploy → `pending_count=0`, honestly finalized.
-- **#480 (E-5/A-7)** — the supplement bridge now MERGES around manual
-  `log_supplement` entries (bridge owns only `source=habitify_bridge` rows);
-  validator specs repointed to written names (whoop `sleep_quality_score`,
-  eightsleep `hr_avg`, todoist `completed/active/overdue_count`, supplements
-  `supplements` list); whoop `#WORKOUT#` sub-records route to their own
-  `whoop_workout` mini-schema (ends ~1,500 false warnings/fortnight).
-- **#481 (A-1/A-9)** — eightsleep's 401-path re-login now persists the fresh
-  token (`save_secret`'s first call site). **Live drill:** run 1 hit 401 →
-  "fresh token persisted"; forced cold start; run 2 → **no 401** — the
-  18-password-grants/day loop is dead. Framework secret writeback retries once
-  and ERRORs "re-auth likely needed" on double failure (a lost Whoop writeback
-  strands the rotated refresh token — never again a shrugged-off warning).
-- **#482 (X-6)** — `ingestion_framework.phase_for_date()` is public; every
-  standalone writer stamps phase: HAE (`if_not_exists` in the merge update),
-  notion, macrofactor, food_delivery, measurements. PHASE_TAXONOMY.md §8 notes
-  the closure. Live-proven by the measurements drill record (`phase=experiment`).
-- **#473 (B-4/X-12)** — measurements re-armed end-to-end: S3 notification
-  (merged into the bucket config — NEVER clobber it; backup in the session
-  scratchpad) + CDK invoke permission; multi-row CSVs ingest every session;
-  `session_number` = date rank (re-import-stable, replaces COUNT+1 drift).
-  **Live drill:** uploaded a synthetic CSV → trigger fired → record landed with
-  `session_number=2`, `phase=experiment`, derived ratios; drill record deleted
-  after (the S3 drill file `imports/measurements/2026-07-04-drill.csv` remains —
-  bucket policy explicit-denies DeleteObject on `imports/*`; it's inert).
-- **#474 (D-5) — DECIDED: RETIRE** the apple_health XML path (ADR-103 ledger
-  row added). The lambda was a latent full-replace clobber of HAE-merged
-  records and its S3 trigger never existed. `apple-health-ingestion` function +
-  role deleted from CDK and live (verified ResourceNotFound);
-  `backfill/archive/backfill_apple_health.py` hard-guarded
-  (`I_UNDERSTAND_THIS_CLOBBERS_HAE_RECORDS=yes` to override); `backfill.command`
-  menu entry removed; `ci/lambda_map.json` + test lists pruned.
-- **#497 (C-2) — DECIDED: DISABLE** the garmin cron (ADR-074 status updated).
-  It fired 4×/day into a throttle it lost to on 06-16 (~73 consecutive
-  failures), each hit prolonging the lockout. Live: `aws events list-rules`
-  shows no Garmin rules. Revive = manual re-auth + restore `schedule=` in
-  ingestion_stack (documented in both ADR-074 and the CDK comment).
-- **#518** — REQUIRED_SECRETS audited against `list-secrets`: the never-existed
-  `life-platform/dropbox` removed (red daily since 05-25), todoist + hevy
-  added. **Live: pipeline-health-check now `passed:17 failed:0 paused:0` — the
-  first fully-green run since May 25.**
+### #531 — one mind per coach (PR #556)
+- **`lambdas/persona_core.py`** (NEW, shared layer v102): one compact, byte-stable
+  rendering of the `config/coaches/*.json` voice-spec fields. Deterministic per
+  spec → prompt-cache safe. Fail-soft loaders (S3 → local → "").
+- **board_ask** (`web/site_api_ai_lambda.py`): per-coach system block now carries
+  the voice core; user turn adds `COMPRESSED#latest` memory + the coach's own
+  recent board answers; every answer **written back** to
+  `COACH#{id}/INTERACTION#{date}#{qhash}` (content-addressed, post-gate,
+  fail-soft). IAM: new PutItem statement, LeadingKeys `COACH#*`, **PutItem only**
+  — `tests/test_site_api_write_scope.py` extended (AI-lambda LeadingKeys coverage
+  + call-site canary=1 + PutItem-only guard).
+- **coach-history-summarizer**: folds newest 10 `INTERACTION#` into the weekly
+  compression (`MAX_INTERACTIONS_IN_PROMPT`); **bug fixed** — the hardcoded
+  `COACH_META` had drifted to the RETIRED cast, so every `COMPRESSED#`/`STANCE#`
+  record carried a wrong byline; names now come from `persona_registry`.
+- **ai-expert-analyzer**: `build_prompt()` renders the same persona core
+  (`{expert_key}_coach`); docstring documents the shared persona layer.
 
-## Deploy (all live 2026-07-04 ~16:45 UTC, session-scoped merge+deploy approval)
+### #537 — Elena Voss gets a mind (PR #556)
+- **`elena-state-updater`** (NEW lambda, Email stack, no schedule): post-PUBLISH
+  Haiku extraction into `PERSONA#elena` — `THREAD#` (open/resolved, aged by week),
+  `CALLBACK#` promise ledger (due week N+3 default, clamped 1–6; **invented slugs
+  are deterministic no-ops**), `MOTIF#state` (merged, counted), `STANCE#{date}` +
+  `STANCE#latest` with **receipts** (`_sanitize_stance` discipline: no prior
+  stance or no receipts ⇒ no evolution claim; raw-vitals ⇒ `grounding_flag`
+  consumers skip). ConsistentRead on the installment (publish→invoke race).
+- **wednesday-chronicle**: prompt gains `=== YOUR NOTEBOOK ===` (stance, threads
+  with 3-week staleness aging, **PROMISES DUE as obligations**, motifs) + the
+  installment body joins the **ADR-104 grounded-generation gate** (keep-best
+  regen-once — it previously skipped the gate).
+- Publish paths invoke the updater (approve click + stale-draft sweep +
+  direct-publish); the PREVIEW draft path never touches her memory.
+- **between-chronicle** email opens with her stance line (deterministic read,
+  garnish never content); **coach-panel-podcast** host prompt reads stance + 2
+  open threads.
 
-CONVENTIONS §1: build → Core published **v101** → pin merged (#524) → Ingestion
-(diff read: Garmin schedule-rule destroy + AppleHealthIngestion function/role
-destroy + Measurements S3 permission add — all intended), Compute, Email, Mcp,
-Operational. Monitoring: zero diff. Bucket notification updated via
-`put-bucket-notification-configuration` with the MERGED config (4 lambda configs).
-No site/web changes in this batch — no site-api deploy or site sync needed.
+## Deploy (all live 2026-07-04 ~18:15 UTC, session-scoped merge+deploy approval)
+
+CONVENTIONS §1: build → Core published **v102** → pin merged (#557) → Email
+(new lambda + roles), Operational (site-api-ai write scope ×3 as fixes landed),
+Compute, Ingestion, Mcp, Web (layer bumps). Monitoring: zero diff. Verified the
+deployed zip contents (not just the 200) per the asset-staging reflex.
+
+## Live drills (all passed)
+
+- **board_ask ×4**: drills 1–2 exposed a real interaction bug (below), drills
+  3–4 returned complete, in-voice, grounded answers (Dr. Park's systems-rhythm,
+  Webb's no-nonsense) that visibly reference compressed-memory concerns. All 4
+  landed as `INTERACTION#` records with honest `grounded` flags (2 true/2 false).
+- **elena-state-updater** invoked on the Week-3 chronicle (`2026-06-30`):
+  4 threads + 2 callbacks (due wk 4) + 4 motifs + first stance (evolution
+  correctly blanked, no grounding flag). `_elena_notebook_block(4)` rendered
+  against live DDB shows both promises as **due now** for next Wednesday.
 
 ## Gotchas for the next session
 
-- **Bucket notifications are replace-not-merge**: always `get` → append → `put`
-  the whole config (backup saved first). They live OUTSIDE CDK.
-- `ci/lambda_map.json` + `test_lambda_handlers`/`test_wiring_coverage`/
-  `test_ddb_patterns` lists must be pruned when deleting a lambda; the doc-sync
-  hook re-counts lambdas (87→86) in PLATFORM_FACTS.
-- `imports/*` has an explicit DeleteObject deny for matthew-admin (same class
-  as raw/ config/ uploads/ generated/) — drill artifacts there are permanent.
-- black rewraps a >140-char `X = N  # comment` into `X = (\n N #...\n)` — put
-  the comment on its own line for constants the CI greps.
+- **Voice specs fight the fail-closed gate** (#558/#559): the voice core pushes
+  numeric confidence ("I'd put this at 70%") and architecture figures; the
+  ADR-104 gate rightly kills numbers absent from input. Fixes: an ON-THIS-SURFACE
+  bridge rule (confidence in WORDS; the facts block is deliberately coarse) +
+  board_ask now gets **regen-once** before the refusal (same as the brief).
+  Remember this pattern for every new persona×gate surface.
+- **300 max_tokens truncated voice-core answers mid-sentence** (#560): now 450 +
+  "land the final sentence" guidance.
+- `cdk deploy` reporting "no changes" in ~6s after a merge usually means the
+  deploy you thought failed actually succeeded earlier — verify by downloading
+  the live zip and grepping, not by re-deploying repeatedly.
+- New-lambda checklist confirmed: `ci/lambda_map.json` (function entry AND
+  `shared_layer.modules` for a new layer module), `test_layer_version_consistency`
+  (LV4 build-script↔map sync), `test_ddb_key_contracts` KNOWN_OPTIONAL for
+  seeded-later records, doc-sync re-counts (86→87).
 
-## Open / next
+## Open / next / watch
 
-- **The area:data Now milestone is EMPTY.** Next-tier data work lives on the
-  Next/Later milestones (journal remainder J-2/J-6/X-7/E-6 in epic #464, whoop
-  webhooks A-8, unified-sleep A-2 fix-or-retire, TDEE chain B-1, etc.).
-- Watch (carried): `slo-source-freshness` 7-day OK window from 07-04;
-  #477's habitify AC includes honest percentages going forward — historical
-  pending-frozen days (any date < 07-03 with pending_count > 0) self-heal only
-  if re-invoked with `date_override`; they're annotated as unrecoverable-honest
-  otherwise (Habitify's API journal is the same data either way).
-- Eight Sleep: expect `Eight Sleep 401 — re-logging in` to appear ~once per
-  token lifetime now instead of every run — worth a 7-day log check (#481's AC).
-- 6 pre-existing env-dependent local test failures unchanged (coaches_api ×4,
-  hevy_compiler_isolation, integration_aws) — green in CI.
+- **Sunday 07-06**: first summarizer run that folds `INTERACTION#` — check the
+  compressed states mention the board Q&A (and stance engine unaffected).
+- **Wednesday 07-09 chronicle**: first notebook-fed installment — verify the two
+  due promises get paid off or extended in-text, then that the post-publish
+  extraction marks them `paid`.
+- Next unblocked in epic #526: **#532** (commitments), **#533** (interaction
+  memory — partially seeded by #531's INTERACTION# records), #534, #536.
+- The rigor chain (**ADR-105 → #529 stats_core → #530 hypothesis v2**) wants its
+  own session.
+- 5 pre-existing env-dependent local test failures unchanged (coaches_api ×4,
+  hevy_compiler_isolation) — green in CI.
