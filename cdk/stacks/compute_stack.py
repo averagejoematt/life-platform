@@ -206,6 +206,23 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # #550: scenario explorer — nightly what-followed conditional distributions
+        # (stats_core matching + block-bootstrap CIs, effective-n gate). Pure Python,
+        # no AI. 12:10 UTC (~5:10 AM PT): after the overnight ingest, hours before
+        # anyone reads /method/scenarios/.
+        create_platform_lambda(
+            self,
+            "ScenarioExplorer",
+            function_name="scenario-explorer",
+            handler="compute.scenario_explorer_lambda.lambda_handler",
+            source_file="lambdas/compute/scenario_explorer_lambda.py",
+            schedule="cron(10 12 * * ? *)",  # fixed UTC, no DST drift
+            timeout_seconds=120,
+            memory_mb=512,
+            custom_policies=rp.compute_scenario_explorer(),
+            **shared,
+        )
+
         # #109 (2026-05-30): second daily run at 5 PM PT (00:00 UTC) so
         # workouts logged after the 9:40 AM PT compute (e.g. Hevy sessions
         # logged mid-morning) surface on averagejoematt.com + coach insights

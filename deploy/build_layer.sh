@@ -40,6 +40,9 @@ MODULES=(
     # #539 (2026-07-04): n-of-1 pre-registration design validation + paired analysis.
     # Imported by mcp/tools_lifestyle (create/end_experiment).
     experiment_design.py
+    # #498 (2026-07-04): the partition-census registry — data_export derives its
+    # export list from it; restart tooling reads it from the repo.
+    phase_taxonomy.py
     # email_framework.py removed V2 (2026-05-19) — zero importers, 7 email
     # Lambdas too divergent for a single framework.
     # Phase 3.6 (2026-05-16): standalone auth-failure circuit breaker

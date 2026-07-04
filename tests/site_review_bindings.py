@@ -88,6 +88,7 @@ _EVIDENCE_INTENT = {
     "pipeline": "does the data even arrive — source freshness, nothing hidden",
     "intelligence": "what the machine has discovered — FDR-corrected correlations",
     "predictions": "calls on the record — falsifiable, scored later",
+    "scenarios": "what tends to follow days like the one you pick — correlative by design",
     "benchmarks": "him vs age-band and centenarian targets",
 }
 

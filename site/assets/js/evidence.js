@@ -1860,6 +1860,62 @@ function renderMirror(d) {
 }
 
 
+// Scenario explorer (#550) — pick a kind of day, see the distribution of what
+// historically FOLLOWED similar days. The anti-causal framing is the feature:
+// what followed, never what it causes. All math is precomputed nightly
+// (stats_core matching + block-bootstrap CIs); thin cells never arrive — the
+// compute's effective-n gate hides them at the source.
+let _scnState = { data: null, pick: null };
+function _scnRow(metric, c) {
+  const lo = Math.min(c.p25, c.comparison_mean), hi = Math.max(c.p75, c.comparison_mean);
+  const span = (hi - lo) || 1, min = lo - span * 0.3, max = hi + span * 0.3;
+  const W = 220, x = (v) => Math.max(0, Math.min(W, ((v - min) / (max - min)) * W));
+  const ci = c.diff_ci95
+    ? ` · vs other days ${c.diff > 0 ? "+" : ""}${fmt(c.diff)} [95% CI ${fmt(c.diff_ci95[0])}, ${fmt(c.diff_ci95[1])}]${c.ci_excludes_zero ? "" : " — could be nothing"}`
+    : "";
+  return `<div class="scn-row"><div class="scn-rowhead"><span class="label">${esc(c.label || metric)}</span>` +
+    `<span class="scn-med num">${fmt(c.median)}${esc(c.unit || "")}</span>` +
+    `<span class="label">median next day · n = ${fmt(c.n)} similar days (effective ${fmt(c.n_eff)})</span></div>` +
+    `<svg viewBox="0 0 ${W} 22" class="scn-band" role="img" aria-label="${esc(c.label || metric)}: middle half ${fmt(c.p25)} to ${fmt(c.p75)}">` +
+    `<line x1="0" x2="${W}" y1="11" y2="11" class="scn-axis"/>` +
+    `<rect x="${x(c.p25).toFixed(1)}" y="6" width="${Math.max(2, x(c.p75) - x(c.p25)).toFixed(1)}" height="10" rx="2" class="scn-iqr"/>` +
+    `<line x1="${x(c.median).toFixed(1)}" x2="${x(c.median).toFixed(1)}" y1="3" y2="19" class="scn-medline"/>` +
+    `<line x1="${x(c.comparison_mean).toFixed(1)}" x2="${x(c.comparison_mean).toFixed(1)}" y1="6" y2="16" class="scn-base"/>` +
+    `</svg><p class="scn-meta label">box = middle half of similar days · thin mark = other days' average (${fmt(c.comparison_mean)}${esc(c.unit || "")})${ci}</p></div>`;
+}
+function _scnBody(lever, d) {
+  const cells = Object.entries((lever && lever.outcomes) || {});
+  const head = figs([fig(lever.n_matched_days, "similar days"), fig(d.window_days || 180, "day window")]);
+  if (!cells.length) {
+    return head + empty(`Only ${fmt(lever.n_matched_days)} matching days in the window — not enough to show an honest distribution yet.`);
+  }
+  return head + `<div class="scn-rows">${cells.map(([m, c]) => _scnRow(m, c)).join("")}</div>`;
+}
+function renderScenarios(d) {
+  if (!d || !d.available || !Array.isArray(d.levers) || !d.levers.length) {
+    return empty("The scenario engine hasn't published a run yet — check back tomorrow.");
+  }
+  _scnState.data = d;
+  if (!_scnState.pick || !d.levers.some((l) => l.slug === _scnState.pick)) {
+    _scnState.pick = (d.levers.find((l) => Object.keys(l.outcomes || {}).length) || d.levers[0]).slug;
+  }
+  const chips = d.levers.map((l) =>
+    `<button class="scn-chip${l.slug === _scnState.pick ? " is-on" : ""}" data-scn="${esc(l.slug)}">${esc(l.label)}</button>`).join("");
+  const lever = d.levers.find((l) => l.slug === _scnState.pick);
+  setTimeout(() => {
+    document.querySelectorAll(".scn-chip").forEach((btn) => btn.addEventListener("click", () => {
+      _scnState.pick = btn.dataset.scn;
+      const host = document.querySelector("[data-readout]");
+      if (host) host.innerHTML = renderScenarios(_scnState.data);
+    }));
+  }, 0);
+  return `<div class="rd-obs"><p class="dx-kicker label">what tends to follow</p>` +
+    `<p class="rd-primary">Pick a kind of day. These are the distributions of what historically <em>followed</em> similar days — what followed, not what it causes.</p></div>` +
+    `<div class="scn-chips">${chips}</div>${_scnBody(lever, d)}` +
+    note(`Correlative only — “similar days” share one feature, not a life. Cells with an effective n under ${fmt(d.min_effective_n || 8)} are hidden, not padded${d.cells_hidden_thin ? ` (${fmt(d.cells_hidden_thin)} hidden today)` : ""}.`);
+}
+
+
 // The Wrong Page — the AI's misses, uncurated.
 function renderWrong(d) {
   const v = d.validator || {}, pr = d.predictions || {};
@@ -2830,7 +2886,7 @@ function wireCharacter() {
 }
 
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks, character: renderCharacter };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks, character: renderCharacter, scenarios: renderScenarios };
 const WIRE = {
   ask: () => {
     const mount = document.querySelector("[data-ask-mount]");

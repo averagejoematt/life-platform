@@ -41,7 +41,9 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # v106: #541 stats_core.ewma_fit/ewma_forecast (+0.80 z) + ai_calls forecast block
 # v107: #539 experiment_design.py — n-of-1 pre-registration + paired analysis
 # v108: #506 ai_calls journal-signals preamble line (journal Phase 2)
-SHARED_LAYER_VERSION = 108
+# v109: #498/#550 phase_taxonomy joins the layer (data_export derives from it);
+#        weather/supplements/dropbox facet entries in source_registry
+SHARED_LAYER_VERSION = 109
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 

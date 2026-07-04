@@ -2122,6 +2122,30 @@ def handle_forecast() -> dict:
     return _ok(data, cache_seconds=900)
 
 
+def handle_scenarios() -> dict:
+    """
+    GET /api/scenarios
+    The scenario explorer's nightly precompute (#550) — for each curated lever
+    ("slept 7.5h+", "20+ zone-2 minutes", …), the distribution of what FOLLOWED
+    similar days (next-day recovery/sleep/HRV/mood/energy) with block-bootstrap
+    CIs and honest n / n_eff labels; thin cells are pre-hidden by the compute's
+    effective-n gate. Anti-causal framing ships in the payload. Read-only;
+    cache 3600s — recomputed nightly.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}scenarios") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    if not items:
+        return _ok({"available": False}, cache_seconds=3600)
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
+    data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
+    data["available"] = True
+    return _ok(data, cache_seconds=3600)
+
+
 def handle_sleep_reconciliation() -> dict:
     """
     GET /api/sleep_reconciliation

@@ -113,6 +113,12 @@
     "lambdas/compute/hypothesis_engine_lambda.py": {
       "function": "hypothesis-engine"
     },
+    "lambdas/compute/scenario_explorer_lambda.py": {
+      "function": "scenario-explorer",
+      "handler": "compute.scenario_explorer_lambda.lambda_handler",
+      "note": "#550: nightly what-followed conditional distributions. 12:10 UTC. Writes SOURCE#scenarios.",
+      "stack": "LifePlatformCompute"
+    },
     "lambdas/compute/sleep_reconciler_lambda.py": {
       "function": "sleep-reconciler"
     },
@@ -394,6 +400,7 @@
       "lambdas/persona_core.py",
       "lambdas/persona_registry.py",
       "lambdas/phase_filter.py",
+      "lambdas/phase_taxonomy.py",
       "lambdas/platform_logger.py",
       "lambdas/privacy_guard.py",
       "lambdas/rate_limiter.py",

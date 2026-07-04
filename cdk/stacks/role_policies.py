@@ -548,6 +548,12 @@ def compute_daily_metrics() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True)
 
 
+def compute_scenario_explorer() -> list[iam.PolicyStatement]:
+    """#550 scenario explorer: DDB read (9 source partitions via the hypothesis
+    engine's gather) + write (SOURCE#scenarios), KMS. Pure Python — no AI."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_forecast_engine() -> list[iam.PolicyStatement]:
     """#541 forecast engine: DDB read (whoop/withings history + own partition) + write
     (SOURCE#forecast rows + CROSS_PHASE calibration resolutions), KMS. Pure Python — no AI."""

@@ -60,6 +60,7 @@ METHOD_TOPICS = [
     "pipeline",
     "intelligence",
     "predictions",
+    "scenarios",
     "benchmarks",
 ]
 

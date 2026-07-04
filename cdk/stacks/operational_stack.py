@@ -344,6 +344,10 @@ class OperationalStack(Stack):
                 "MCP_SECRET_NAME": "life-platform/mcp-api-key",
             },
             custom_policies=rp.operational_qa_smoke(),
+            # #498: qa tiers derive from source_registry (shared layer). Without the
+            # layer, CI's single-file hot deploy strips the bundled copy and the
+            # import dies (broke the 2026-07-04 smoke run).
+            shared_layer=shared_utils_layer,
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -385,6 +389,8 @@ class OperationalStack(Stack):
             memory_mb=512,
             alarm_name="life-platform-data-export-errors",
             custom_policies=rp.operational_data_export(),
+            # #498: export census derives from phase_taxonomy (shared layer as of v109).
+            shared_layer=shared_utils_layer,
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -428,6 +434,8 @@ class OperationalStack(Stack):
             memory_mb=256,
             environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
             custom_policies=rp.operational_data_reconciliation(),
+            # #498: expected-days derive from source_registry (shared layer).
+            shared_layer=shared_utils_layer,
             table=local_table,
             bucket=local_bucket,
             dlq=None,
