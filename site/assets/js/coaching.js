@@ -577,7 +577,11 @@ async function renderScorecard(read, id) {
       `<div class="sc-tile"><span class="sc-n">${o.pending || 0}</span><span class="sc-l label">still open</span></div>` +
       `</div>`;
     if (!decided) {
-      h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far; none have resolved yet — each one grades only after its 2–4 week window closes${o.inconclusive ? `, and ${o.inconclusive} came back with no clear signal` : ""}. The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
+      const pending = preds.filter((p) => p.status === "pending" && p.date);
+      pending.sort((a, b) => (a.date < b.date ? -1 : 1));
+      const nearest = pending[0];
+      const countdown = nearest ? ` First verdict expected around <strong>${esc(nearest.date)}</strong>.` : "";
+      h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
     }
     // Per-coach rows.
     const rows = Object.keys(byc).filter((c) => byc[c].total).sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0));

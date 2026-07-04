@@ -286,6 +286,17 @@ class MonitoringStack(Stack):
             "OverallAlarm",
             days=7,
         )
+        # REL-01 extension (#372): cost-governor heartbeat. The governor is the sole
+        # writer of the budget tier that gates every AI feature; if it starts erroring
+        # the platform silently reads a frozen tier while spend continues. It runs 3×/day
+        # (every 8h) and emits LifePlatform/Budget::BudgetTier on each run. Missing for
+        # 2 straight days → ALARM (same pattern as the four watchdog heartbeats above).
+        _heartbeat_alarm(
+            "CostGovernorHeartbeat",
+            "cost-governor-heartbeat",
+            "LifePlatform/Budget",
+            "BudgetTier",
+        )
 
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
