@@ -1,0 +1,17 @@
+{
+  "updated_at": "2026-07-04",
+  "beats": [
+    {
+      "id": "2026-07-04-honesty-pair",
+      "date": "2026-07-04",
+      "title": "Levels that can go down",
+      "shipped": "The character sheet stopped lying. Unlogged behavior now scores zero instead of a neutral 50, thin-data days hold a pillar's level instead of climbing it, and a level-up needs the day's own raw score to support it — so after three weeks the pillars finally differ (sleep 19, mind 17, nutrition 1) instead of marching up in lockstep at 13. Each pillar now shows why: its top driver, what's dragging, and what's simply absent. Alongside it, every AI narrative surface gained a deterministic number gate — any number the model outputs must exist in the data it was given, or the answer regenerates once and then fails closed rather than serving an invented figure.",
+      "gotcha": "The engine was still reading pre-2024 Whoop field names, so sleep — the single best-instrumented pillar — had been permanently stuck below the data-coverage floor and silently frozen. The believability bug and a real data bug were hiding behind the same symptom.",
+      "honest_miss": "Before the gate, a shadow sweep of 112 stored coach narratives found 11 hard contradictions with the canonical facts (~10%). The gate kills invented numbers, but embellishment that uses no numbers at all is still open — that fabrication rate gets re-measured against the same baseline after a few daily coach cycles.",
+      "prs": [
+        { "label": "PR #451", "url": "https://github.com/averagejoematt/life-platform/pull/451" },
+        { "label": "PR #452", "url": "https://github.com/averagejoematt/life-platform/pull/452" }
+      ]
+    }
+  ]
+}
