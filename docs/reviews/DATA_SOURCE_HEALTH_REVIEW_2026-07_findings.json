@@ -1,0 +1,2682 @@
+{
+  "generated": "2026-07-04",
+  "review": "DATA_SOURCE_HEALTH_REVIEW_2026-07",
+  "repo_state": "origin/main@40cbbc4a",
+  "funnel": {
+    "raw": 71,
+    "merged_duplicates": 5,
+    "distinct": 66,
+    "confirmed": 66,
+    "adjusted": 7,
+    "dropped": 0,
+    "refuted_subclaims": [
+      "baseline pre-seed #5 (ADR-062 deviation = dead scaffolding)",
+      "D-5 trigger-live (no S3 notification exists)",
+      "X-5 pages-daily (checker samples outside window)",
+      "D-1 live impact (BP arrives combined-format)"
+    ]
+  },
+  "findings": [
+    {
+      "id": "A-1",
+      "title": "Eight Sleep does a full email+password login on every run",
+      "type": "gap",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Framework writeback persists the stale token before fetch_day; the 401-path re-login token is never persisted (save_secret has zero call sites). 18 password grants/day against an unofficial API is a lockout risk.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/eightsleep_lambda.py:647,665-669,202",
+          "quote": "authenticate only re-logins if token absent; 401 handler token never saved"
+        },
+        {
+          "kind": "probe",
+          "ref": "logs 7d",
+          "quote": "126 x \"Eight Sleep 401 - re-logging in\""
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-1",
+        "verdict": "confirmed",
+        "reason": "Verifier re-counted 126 relogins and 126 stale-token writebacks; writeback precedes fetch_day."
+      },
+      "verifier_note": "Verifier re-counted 126 relogins and 126 stale-token writebacks; writeback precedes fetch_day.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-2",
+      "title": "Unified-sleep staging merge is dead - reconciler reads fields that don't exist (merges M-1)",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Reconciler reads rem_percentage/slow_wave_sleep_percentage/hrv_score/toss_and_turns; real fields are rem_sleep_hours/hrv_avg/toss_turn_count; apple record has no sleep fields. Stored unified record = whoop + one Eight Sleep score.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/compute/sleep_reconciler_lambda.py:130-142,178-182",
+          "quote": "field-name mismatches vs live records"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB sleep_unified since genesis",
+          "quote": "0/25 records carry any staging field"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-2",
+        "verdict": "confirmed",
+        "reason": "Verifier re-probed all three source items and the stored unified item; blast-radius statement verbatim true."
+      },
+      "verifier_note": "Verifier re-probed all three source items and the stored unified item; blast-radius statement verbatim true.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-3",
+      "title": "Unified sleep structurally 1-2 nights behind; public sleep page 'night of' header takes its date from it (merges M-2)",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "DEFAULT_LOOKBACK=1 with range(1,2) reconciles yesterday only - today's already-ingested wake date is never processed and failed days never re-reconcile; evidence.js prefers uni.night_of for the header.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/compute/sleep_reconciler_lambda.py:253-254; site/assets/js/evidence.js:55,1043",
+          "quote": "lookback excludes today; header prefers unified date"
+        },
+        {
+          "kind": "probe",
+          "ref": "live 07-04",
+          "quote": "night_of=2026-07-01 while sleep_detail as_of=2026-07-03"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-3",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED: lag confirmed (understated - 2 nights pre-14:00 UTC); mechanism corrected to lookback-excludes-today."
+      },
+      "verifier_note": "ADJUSTED: lag confirmed (understated - 2 nights pre-14:00 UTC); mechanism corrected to lookback-excludes-today.",
+      "related_open_ids": [],
+      "adjusted": "mechanism corrected; severity stands",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-4",
+      "title": "Eight Sleep temperature pipeline dead - intervals endpoint 404s every run; no temp field in >=4 months",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "~125 lines of fetch run hourly and swallow a 404; MCP env analysis, site bed-temp charts, and the evidence environment section render permanently empty.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/eightsleep_lambda.py:400-525",
+          "quote": "/v2/users/{id}/intervals fetch, silent 404"
+        },
+        {
+          "kind": "probe",
+          "ref": "logs 7d + DDB Mar-Jun",
+          "quote": "135 x 'Intervals endpoint error: HTTP 404'; no bed_temp_* anywhere"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-4",
+        "verdict": "confirmed",
+        "reason": "Verifier re-counted 135 404s; >=4 months without temp fields."
+      },
+      "verifier_note": "Verifier re-counted 135 404s; >=4 months without temp fields.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-5",
+      "title": "hypothesis_engine reads two nonexistent fields - total-sleep and bed-temp hypotheses impossible",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Reads total_in_bed_time_hrs (real: sleep_duration_hours) and avg_bed_temp_f (real: bed_temp_f, dead anyway per A-4); rows drop None so columns never populate.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/compute/hypothesis_engine_lambda.py:293,344",
+          "quote": "wrong field names"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-5",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed verbatim."
+      },
+      "verifier_note": "Verifier confirmed verbatim.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-6",
+      "title": "Whoop 7-day sleep-onset consistency window diluted by workout sub-records",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Limit=6 descending page over a partition interleaving DATE#d#WORKOUT#id sub-records; on training weeks the 7-day StdDev computes over as few as 2 nights.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/whoop_lambda.py:284-289",
+          "quote": "sk < DATE#d, Limit=6"
+        },
+        {
+          "kind": "probe",
+          "ref": "query replay",
+          "quote": "5 of 6 items were WORKOUT sub-records"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-6",
+        "verdict": "confirmed",
+        "reason": "Verifier replayed the exact query."
+      },
+      "verifier_note": "Verifier replayed the exact query.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-7",
+      "title": "ingestion_validator field-name drift no-ops whoop/eightsleep checks and floods warnings on workouts",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Validator checks sleep_score / heart_rate_avg; stored fields are sleep_quality_score / hr_avg; every WORKOUT sub-record trips at_least_one_of.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion_validator.py:113,120,226",
+          "quote": "dead check keys"
+        },
+        {
+          "kind": "probe",
+          "ref": "logs 14d",
+          "quote": "1,518 sub-record warnings"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-7",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed and quantified 1,518 warnings."
+      },
+      "verifier_note": "Verifier confirmed and quantified 1,518 warnings.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-8",
+      "title": "Whoop v2 webhooks exist and are unused - hourly polling re-fetches 3 days x 4 endpoints",
+      "type": "opportunity",
+      "severity": "P3",
+      "effort": "L",
+      "confidence": "med",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Polling is deliberate and working; webhooks would close the late-sync class and serve #415.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/whoop_lambda.py:346-357,412-421",
+          "quote": "4 endpoints x trailing 3 days hourly"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-8",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed no webhook receiver exists in repo; opportunity framing correct."
+      },
+      "verifier_note": "Verifier confirmed no webhook receiver exists in repo; opportunity framing correct.",
+      "related_open_ids": [
+        "#415"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "A-9",
+      "title": "Failed Whoop secret writeback logged 'non-fatal' but strands the rotated refresh token",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "sleep-recovery",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Whoop rotates the single-use refresh token every run; the framework writeback is the sole persist path; a lost write means next-run 400 -> 24h breaker -> manual re-auth.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion_framework.py:549; lambdas/ingestion/whoop_lambda.py:321-341",
+          "quote": "warning-level writeback failure vs rotating token"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "A-9",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed the retry loop only rescues the rotation race, not a lost writeback."
+      },
+      "verifier_note": "Verifier confirmed the retry loop only rescues the rotation race, not a lost writeback.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "sleep-recovery",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-1",
+      "title": "MacroFactor TDEE/deficit chain dead end-to-end - three generations of field names, zero live matches",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Writer emits expenditure_kcal (4 records ever); readers want tdee/expenditure/tdee_kcal/maintenance_calories; observatory silently falls back to a hardcoded formula; hypothesis_engine:309 writes TDEE into a weight_lbs column.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/web/site_api_observatory.py:269,712-719; lambdas/compute/daily_insight_compute_lambda.py:1099; lambdas/compute/hypothesis_engine_lambda.py:309",
+          "quote": "reader field names never written"
+        },
+        {
+          "kind": "probe",
+          "ref": "live /api/nutrition_overview + DDB",
+          "quote": "tdee=None avg_deficit=None; 0/124 records carry reader-side names"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-1",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed all writers/readers; fallback formula is Mifflin-St Jeor mislabeled Harris-Benedict."
+      },
+      "verifier_note": "Verifier confirmed all writers/readers; fallback formula is Mifflin-St Jeor mislabeled Harris-Benedict.",
+      "related_open_ids": [
+        "#388",
+        "ADR-061"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-2",
+      "title": "Daily brief + weekly digest strength detail read the dead macrofactor_workouts partition - Hevy never plumbed in",
+      "type": "gap",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Partition dead since 2026-03-07 (workout CSV export stopped at Hevy go-live); zero hevy references in either email while monthly_digest has the working pattern; strength rows silently omitted ~4 months.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/emails/daily_brief_lambda.py:379; lambdas/emails/weekly_digest_lambda.py:839-880,1509",
+          "quote": "reads dead partition; no hevy refs"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB",
+          "quote": "macrofactor_workouts latest DATE#2026-03-07; hevy live through 06-25"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-2",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED wording: sections silently omitted, not rendered-empty; substance confirmed."
+      },
+      "verifier_note": "ADJUSTED wording: sections silently omitted, not rendered-empty; substance confirmed.",
+      "related_open_ids": [
+        "ADR-060"
+      ],
+      "adjusted": "wording corrected",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-3",
+      "title": "Character-sheet body-fat component reads fields that never existed - metabolic pillar structurally blended toward 50",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Reads body_fat_pct/fat_mass_pct; 0/1198 withings records carry them (scale weight-only since 2021); component holds 0.25 of pillar weight -> permanent <=~3-point pull toward 50 on the public sheet.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/character_engine.py:488-491; config/character_sheet.json:111-113",
+          "quote": "unearnable 0.25-weight component"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB",
+          "quote": "0/1198 records with any fat field"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-3",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED: core confirmed; _compute_body_comp_deltas early-returns (dead code, not wasted query); impact <=~3 points -> P3."
+      },
+      "verifier_note": "ADJUSTED: core confirmed; _compute_body_comp_deltas early-returns (dead code, not wasted query); impact <=~3 points -> P3.",
+      "related_open_ids": [
+        "#421"
+      ],
+      "adjusted": "P2->P3",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-4",
+      "title": "Measurements ingestion orphaned - no S3 trigger, no invoke permission, no invoker anywhere",
+      "type": "gap",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Bucket notifications cover 3 lambdas, none measurements; lambda policy absent; no MCP/script/rule invoker; imports/measurements/ doesn't exist; ADR-044 (Active) describes a trigger that isn't there.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "aws s3api get-bucket-notification-configuration + lambda get-policy",
+          "quote": "no measurements config; ResourceNotFoundException"
+        },
+        {
+          "kind": "doc",
+          "ref": "docs/DECISIONS.md ADR-044",
+          "quote": "claims S3 trigger Active"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-4",
+        "verdict": "confirmed",
+        "reason": "Verifier independently reproduced all probes; CDK comment shows semi-intentional manual state = ADR-vs-deployed drift."
+      },
+      "verifier_note": "Verifier independently reproduced all probes; CDK comment shows semi-intentional manual state = ADR-vs-deployed drift.",
+      "related_open_ids": [
+        "ADR-044"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-5",
+      "title": "Unknown-format MacroFactor CSV is a silent 200-skip after the file is already marked processed",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Unknown headers return 200 with no archive/metric/error; dropbox has already hash-marked and moved the file; FormatDrift metric has no alarm and detects a different class; behavioral classification keeps it off paging.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/macrofactor_lambda.py:626-628; lambdas/ingestion/dropbox_poll_lambda.py:577-586",
+          "quote": "silent skip after processed-mark"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-5",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed; refutation hunt failed."
+      },
+      "verifier_note": "Verifier confirmed; refutation hunt failed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-6",
+      "title": "food_delivery re-import corrupts aggregates on any partial or re-ordered CSV",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Positional TXN keys orphan; MONTH/YEAR/STREAK recomputed from only the uploaded file's rows; clean_days assumes full-year coverage. Rises to P2 when the Monarch feed reuses this lambda.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/food_delivery_lambda.py:77,96-201",
+          "quote": "file-scoped aggregate rewrite"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed end-to-end."
+      },
+      "verifier_note": "Verifier confirmed end-to-end.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-7",
+      "title": "MacroFactor daily cron is a no-op - 365 dead invocations/year masquerading as coverage",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "cron(0 16) fires with no payload; handler requires Records/bucket+key and returns a clean 400 in ~2ms - which also means the error alarm can never fire on it.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "cdk/stacks/ingestion_stack.py:361-374; lambdas/ingestion/macrofactor_lambda.py:591-598",
+          "quote": "plain target, handler 400s"
+        },
+        {
+          "kind": "probe",
+          "ref": "logs",
+          "quote": "daily ~2ms REPORT lines"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-7",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed incl. the alarm nuance."
+      },
+      "verifier_note": "Verifier confirmed incl. the alarm nuance.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "B-9",
+      "title": "Withings hourly posture re-fetches every missing day and rotates the OAuth token every run",
+      "type": "opportunity",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "body-nutrition",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "During a weigh-in gap: ~144 getmeas + ~18 rotations/day for a <=1x/day behavioral event; per-day loop is a framework artifact (API accepts ranges); each rotation risks stranding the token chain.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "logs",
+          "quote": "'[GAP-FILL] Found 8 missing dates' + token refresh on every hourly run"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "B-9",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed; ~180 calls/day calibrated, capped by lookback=7."
+      },
+      "verifier_note": "Verifier confirmed; ~180 calls/day calibrated, capped by lookback=7.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "body-nutrition",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-1",
+      "title": "Live ingest-reconciliation-strava ALARM is a reconciler false positive at the local/UTC day boundary - store is complete",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "API activities pulled by UTC instant, stored ones by local-date SK range; an evening-PT walk at the window edge is inside the API set but outside the SK range. The alarmed activity is stored. June's spikes were a real gap (since fixed).",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/strava_lambda.py:394,448-454",
+          "quote": "UTC window vs local-date SK fetch"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB + reconciler log",
+          "quote": "walk 18978915387 stored DATE#2026-06-18 (UTC 06-19); log flags it missing"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-1",
+        "verdict": "confirmed",
+        "reason": "Verifier re-derived the mechanism end-to-end; all post-06-29 warnings are this class."
+      },
+      "verifier_note": "Verifier re-derived the mechanism end-to-end; all post-06-29 warnings are this class.",
+      "related_open_ids": [
+        "#415"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-2",
+      "title": "Garmin cron ENABLED 4x/day into a known throttle contradicts the declared ADR-074 pause",
+      "type": "posture",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Registry paused, alarms removed, freshness excludes it - but the rule fires 4x/day; ~73 consecutive throttle failures since 06-16; the code's own note says re-hitting prolongs the throttle. Pick: documented 1x/day probe or disabled rule.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "aws events + INGEST_HEALTH#garmin",
+          "quote": "rule ENABLED cron(0 0,6,14,22); consecutive_failures~73, err=throttle"
+        },
+        {
+          "kind": "doc",
+          "ref": "docs/DECISIONS.md ADR-074",
+          "quote": "Leave Garmin paused"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-2",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed (71 fails at probe time); breaker TTL 3h < inter-run gap so every run hits the endpoint."
+      },
+      "verifier_note": "Verifier confirmed (71 fails at probe time); breaker TTL 3h < inter-run gap so every run hits the endpoint.",
+      "related_open_ids": [
+        "ADR-074"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-3",
+      "title": "DECLARED_PAUSED_SOURCES={'strava'} suppresses real-outage detection for a live-cron source",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Excludes strava from UnhealthySourceCount + boot probe; MCP freshness resolves 'paused' for a behavioral lapse; the training coach is told 'NOT live ingest paths' - false since the 06-20 re-enable. Layer module: CONVENTIONS s1 sequence.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/source_state.py:27; lambdas/operational/pipeline_health_check_lambda.py:246-249,353-362; lambdas/intelligence/ai_expert_analyzer_lambda.py:576-582",
+          "quote": "three runtime consumers"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-3",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed; the stale declaration would now mask a real Strava outage."
+      },
+      "verifier_note": "Verifier confirmed; the stale declaration would now mask a real Strava outage.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-4",
+      "title": "Movement honesty guard can't distinguish behavioral rest from pipe breakage",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "assessable = strava_live only; any non-live state withholds the under-training verdict exactly when warranted. The disambiguating INGEST_HEALTH sentinel exists unused.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/intelligence_common.py:1276-1281",
+          "quote": "assessability ignores sentinel health"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-4",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed and live-manifest now: 8 rest days with 'Do NOT call this under-training' in the coach prompt."
+      },
+      "verifier_note": "Verifier confirmed and live-manifest now: 8 rest days with 'Do NOT call this under-training' in the coach prompt.",
+      "related_open_ids": [
+        "ADR-104"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-5",
+      "title": "TSB form bands assume TSS scale on kilojoule loads - component permanently saturated; full rest reads as maximal fatigue",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Live ctl=471 atl=558 tsb=-87.4; readiness clamp(60+tsb*2) pins 0; character _in_range_score(-10,25) floors 0 on the public sheet; tools_health same calibration.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/compute/daily_metrics_compute_lambda.py:384-387; lambdas/character_engine.py:356; mcp/tools_health.py:355",
+          "quote": "TSS-scale bands"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB computed_metrics DATE#2026-07-03",
+          "quote": "ctl=471.0 atl=558.4 tsb=-87.4"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-5",
+        "verdict": "confirmed",
+        "reason": "Verifier re-derived all three bands from the live record to the decimal."
+      },
+      "verifier_note": "Verifier re-derived all three bands from the live record to the decimal.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-6",
+      "title": "Walks contribute zero training load - 'Strava kJ authoritative' is nominal; TSB models lifting only",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "kilojoules populates only for power devices; walks carry None and the s>0 gate skips them; live tsb_load_basis.strava_days=0 over 60d while the site calls walking 'the primary engine'.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/compute/daily_metrics_compute_lambda.py:286,296",
+          "quote": "s>0 gate"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB",
+          "quote": "both 06-18 activities kilojoules None incl WeightTraining"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed; site copy verbatim."
+      },
+      "verifier_note": "Verifier confirmed; site copy verbatim.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-7",
+      "title": "Hevy delete/edit lifecycle half-built: tombstones never consumed; start-time edit orphans the old record (merges X-4)",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "DELETE#WORKOUT markers have zero readers; deleted workouts keep counting forever; date-embedded SK duplicates on cross-date edits; MAX_PAGES cap advances the cursor silently when truncated.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/hevy_backfill_lambda.py:87-104,124-177; lambdas/hevy_common.py:287",
+          "quote": "write-only tombstones; positional sk"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-7",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed all three legs."
+      },
+      "verifier_note": "Verifier confirmed all three legs.",
+      "related_open_ids": [
+        "#412",
+        "#415"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "C-8",
+      "title": "Hevy records keyed by UTC date, not local - evening lifts will land on the wrong platform day",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "training",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "UTC keying vs Strava's start_date_local; a >=17:00-PT lift and its Strava echo land on different days, corrupting training_dates joins and #412. Latent: observed lifts are morning.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/hevy_common.py:252 vs lambdas/ingestion/strava_lambda.py:283",
+          "quote": "UTC vs local keying"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "C-8",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [
+        "#412"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "training",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-1",
+      "title": "BP separate-format loop breaks unconditionally on the first metric (latent - live BP arrives combined-format)",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The closing break is indented at loop level, not inside the if - the loop always exits after metrics[0]; contrast the correct combined loop.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/health_auto_export_lambda.py:1528-1562 vs 1487-1525",
+          "quote": "break at loop level"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-1",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED: control flow confirmed byte-exact; live raw payloads show BP arrives combined-format so the broken fallback is dead-in-practice -> P3 latent."
+      },
+      "verifier_note": "ADJUSTED: control flow confirmed byte-exact; live raw payloads show BP arrives combined-format so the broken fallback is dead-in-practice -> P3 latent.",
+      "related_open_ids": [],
+      "adjusted": "P2->P3",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-2",
+      "title": "character_engine CGM TIR branch reads a field nothing writes",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Reads glucose_time_in_range_pct; only blood_glucose_time_in_range_pct is written; the avg-glucose fallback fires so the component degrades rather than nulls. Same dead read in nutrition_review_lambda.py:369.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/character_engine.py:495 vs lambdas/ingestion/health_auto_export_lambda.py:274",
+          "quote": "unprefixed name"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-2",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed + found the identical dead read in nutrition_review_lambda."
+      },
+      "verifier_note": "Verifier confirmed + found the identical dead read in nutrition_review_lambda.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-3",
+      "title": "cgm_source misclassifies UTC-truncated Stelo days as 'manual'; glucose aggregates are payload-scoped",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The n>=20 heuristic is evaluated per UTC-day payload slice; live artifact 2026-05-22: 17 five-minute-interval Stelo readings labeled manual. Aggregates recompute from the current payload only (currently consistent, unguarded).",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "raw/matthew/cgm_readings/2026/05/22.json + DDB",
+          "quote": "17 readings at 5-min cadence; cgm_source=manual"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-3",
+        "verdict": "confirmed",
+        "reason": "Verifier reproduced the artifact from raw S3."
+      },
+      "verifier_note": "Verifier reproduced the artifact from raw S3.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-4",
+      "title": "Datatype-level darkness invisible: CGM/BP/SoM/workouts dark for weeks-months while apple_health reads 'fresh'",
+      "type": "gap",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Last data: CGM 05-23, BP 04-10, SoM 04-02, workouts 06-20; any trickle keeps the partition alive; field-completeness covers steps/active_calories only; registry calls the source behavioral:False though sensor wear is a behavior.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/emails/freshness_checker_lambda.py:221; lambdas/source_registry.py:94",
+          "quote": "steps-only completeness; 'passive' classification"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB/S3 last-seen per datatype",
+          "quote": "CGM 2026-05-23, BP 2026-04-10, SoM 2026-04-02, workouts 2026-06-20"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-4",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed (workouts date corrected to 06-20)."
+      },
+      "verifier_note": "Verifier confirmed (workouts date corrected to 06-20).",
+      "related_open_ids": [
+        "#421"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-5",
+      "title": "XML import path is a latent clobber that can't do its stated backfill job - and its S3 trigger doesn't exist",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Full-replace put_item on records HAE merge-enriches; unguarded all-source sums; cutoff=partition-latest-14d kills history recovery. Verification found no bucket notification for uploads/apple-health/ - disarmed except the manual backfill script.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/apple_health_lambda.py:403,427-431",
+          "quote": "put_item + moving cutoff"
+        },
+        {
+          "kind": "probe",
+          "ref": "aws s3api get-bucket-notification-configuration",
+          "quote": "no rule for uploads/apple-health/"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-5",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED: code confirmed, 'trigger live' refuted -> P3; decide retire vs merge-write."
+      },
+      "verifier_note": "ADJUSTED: code confirmed, 'trigger live' refuted -> P3; decide retire vs merge-write.",
+      "related_open_ids": [
+        "ADR-103"
+      ],
+      "adjusted": "P2->P3; trigger refuted",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-6",
+      "title": "State of Mind: five live consumers, one day of data ever",
+      "type": "posture",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "raw/matthew/state_of_mind/ contains exactly one 221-byte file (2026-04-02); ~200 lines of normalization + consumer wiring no-op for 3 months. Decide: restart the automation or ledger retire-candidate.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "aws s3 ls raw/matthew/state_of_mind/ --recursive",
+          "quote": "one object: 2026/04/02.json, 221 B"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [
+        "ADR-103",
+        "#422"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-7",
+      "title": "Webhook edge is console-managed and ADR-057's WAF rationale is false",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "API a76xwxt2wa exists only as a hardcoded ARN; wafv2 list-web-acls is empty and WAFv2 cannot attach to HTTP APIs, while ADR-057 P1.2 says 'WAF protects HAE webhook'. Static never-rotated bearer + ?key= fallback.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "cdk/stacks/ingestion_stack.py:478; lambdas/ingestion/health_auto_export_lambda.py:1373-1376",
+          "quote": "hardcoded ARN; query-string auth"
+        },
+        {
+          "kind": "probe",
+          "ref": "aws wafv2 list-web-acls --scope REGIONAL",
+          "quote": "WebACLs: []"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-7",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed all six sub-claims."
+      },
+      "verifier_note": "Verifier confirmed all six sub-claims.",
+      "related_open_ids": [
+        "ADR-057"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-8",
+      "title": "DI-1.6 degraded alert repeat-fires with no cooldown - 36 sends in 72h",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "SNS publish on every run while degraded, no last-sent state; the guard works but a dozen identical emails/day trains the reader to ignore the one signal D-4 needs.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/emails/freshness_checker_lambda.py:653-667",
+          "quote": "no cooldown"
+        },
+        {
+          "kind": "probe",
+          "ref": "CloudWatch 72h",
+          "quote": "36 AppleHealthActivityDegraded emissions = 36 sends"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-8",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed and strengthened: cron is 1x/day so ~33 invocations came from other invokers."
+      },
+      "verifier_note": "Verifier confirmed and strengthened: cron is 1x/day so ~33 invocations came from other invokers.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "D-9",
+      "title": "units field ignored for every non-glucose metric",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "apple-health",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Only glucose converts units; water hardcodes fl-oz->mL, weight assumes lbs, distance miles; no validation gate on the webhook path. A unit toggle would silently scale stored values.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/health_auto_export_lambda.py:238-240,746-752",
+          "quote": "glucose-only unit awareness"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "D-9",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "apple-health",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "E-1",
+      "title": "Todoist overdue/due-today filters silently return the entire active list; active_count page-capped at 200",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "inputs",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The filter param sent to GET /api/v1/tasks has no effect - 38 of 270 'overdue' tasks have due:null and the overdue/due_today ID sets are identical; single-page active fetch caps at 200. Every record since >=05-10 poisoned; decision-fatigue rule permanently true; same bug in mcp/tools_todoist.py.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/todoist_lambda.py:100-126; mcp/tools_todoist.py:63-73",
+          "quote": "filter param + single page"
+        },
+        {
+          "kind": "probe",
+          "ref": "raw/todoist/2026/07/2026-07-02.json + DDB",
+          "quote": "38/270 'overdue' have due:null; overdue==due_today identical sets; active==200"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "E-1",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed via raw archive; the alert still gates on habits_breached."
+      },
+      "verifier_note": "Verifier confirmed via raw archive; the alert still gates on habits_breached.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "inputs",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "E-2",
+      "title": "Habitify past-day records freeze with unresolved 'pending' - a 48% day stored as 100% forever",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "inputs",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Last write of UTC-day D is 23:05 UTC; in_progress resolves 'pending' when date>=today and the record is never rewritten (no refresh_trailing_days). Stored 06-20: completion_pct=1.0 vs strict=0.4833. Late-evening checks never ingested. Fix: refresh_trailing_days=1.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/habitify_lambda.py:220,262-266,361",
+          "quote": "pending resolution + false comment"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB DATE#2026-06-20",
+          "quote": "completion_pct=1, completion_pct_strict=0.4833, pending_count=31, ingested 23:05:21Z"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "E-2",
+        "verdict": "confirmed",
+        "reason": "Verifier: live DDB matches to the digit; the code comment premise is provably false."
+      },
+      "verifier_note": "Verifier: live DDB matches to the digit; the code comment premise is provably false.",
+      "related_open_ids": [
+        "#422"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "inputs",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "E-3",
+      "title": "slo-source-freshness adjudicated: June red was pre-#392 misclassification (fixed); residual is Todoist's freshness arithmetic",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "inputs",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Metric history: red from 06-27 under the old hand-rolled behavioral set; 4->1 within hours of the #392 deploy. Residual: Todoist max healthy age 62h vs 48h threshold -> request-time surfaces show 'stale (infra)' 14h/day. Classification is correct; fix stale_hours:72.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "CloudWatch StaleSourceCount 10d + git show",
+          "quote": "4->1 drop at 07-04T05:00; old BEHAVIORAL_SOURCES = {measurements, food_delivery, hevy}"
+        },
+        {
+          "kind": "code",
+          "ref": "lambdas/source_registry.py:97-107; lambdas/emails/freshness_checker_lambda.py:298-307",
+          "quote": "48h override; age from record-date midnight"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "E-3",
+        "verdict": "confirmed",
+        "reason": "Verifier reproduced the metric history and the 82/93 zero-completion count; see X-5 for the paging nuance."
+      },
+      "verifier_note": "Verifier reproduced the metric history and the 82/93 zero-completion count; see X-5 for the paging nuance.",
+      "related_open_ids": [
+        "#392"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "inputs",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "E-4",
+      "title": "Weather absent from source_registry entirely - no freshness monitoring on any surface, no gap backfill",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "inputs",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Never in the checker (git-history verified), not on the public board or MCP; enable_gap_detection=False leaves permanent holes after a >2-day outage. Real consumers: daily brief, chronicle.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/source_registry.py (no weather key); lambdas/ingestion/weather_lambda.py:40",
+          "quote": "absent + gap detection off"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "E-4",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed via git log -S: weather never in the checker."
+      },
+      "verifier_note": "Verifier confirmed via git log -S: weather never in the checker.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "inputs",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "E-5",
+      "title": "Two supplement writers with colliding semantics; validator specs match no writer",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "inputs",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Habitify bridge full-overwrites SOURCE#supplements hourly; MCP log_supplement appends to the same key - a same-day manual log is destroyed on the next bridge write. Supplements and todoist validator specs type fields no writer produces.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/habitify_lambda.py:334-345; mcp/tools_lifestyle.py:465-467; lambdas/ingestion_validator.py:266-298",
+          "quote": "put_item vs list_append; dead specs"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "E-5",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed with the same-day/past-day nuance."
+      },
+      "verifier_note": "Verifier confirmed with the same-day/past-day nuance.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "inputs",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "E-6",
+      "title": "Notion ingestion: edits >2 days old never sync, deletions never reconcile, positional #seq orphans, 3-way doc drift",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "inputs",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Query filters on Date/created_time only - last_edited_time never consulted; deletion leaves stale re-numbered records; docstring/CDK-comment/reality disagree on schedule and secret.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/notion_lambda.py:16,25,60,231-266,529-533",
+          "quote": "filter + positional seq + doc drift"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "E-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed all legs."
+      },
+      "verifier_note": "Verifier confirmed all legs.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "inputs",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-1",
+      "title": "Hevy ingestion failure is invisible end-to-end - including a dead alarm that fakes coverage",
+      "type": "gap",
+      "severity": "P1",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Four layers fail at once: errors return a 500 body from a successful invocation (no Errors metric/DLQ); no sentinel; per-lambda error alarms removed; the consec-failures alarm watches a metric hevy never emits with NOT_BREACHING treat-missing. A dead API key = silent forever on the primary strength source. Fix: emit the ER-01 sentinel from hevy_backfill + raise on error.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/hevy_backfill_lambda.py:186-200; cdk/stacks/monitoring_stack.py:363-374,518",
+          "quote": "return-500 + never-firing alarm"
+        },
+        {
+          "kind": "probe",
+          "ref": "aws cloudwatch list-metrics IngestLiveness",
+          "quote": "ConsecutiveFailures exists for exactly the 8 framework sources - no hevy"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-1",
+        "verdict": "confirmed",
+        "reason": "Verifier re-verified all four legs; the monitoring file's own comment admits non-emitters 'simply never fire'."
+      },
+      "verifier_note": "Verifier re-verified all four legs; the monitoring file's own comment admits non-emitters 'simply never fire'.",
+      "related_open_ids": [
+        "ADR-060"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-2",
+      "title": "pipeline_health_check 'covers' notion + dropbox but they can never leave 'unknown'",
+      "type": "gap",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Both listed in ACTIVE_API_SOURCES; neither writes a sentinel; a missing sentinel returns non-alerting 'unknown' forever - the silently-de-scheduled case is undetectable.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/operational/pipeline_health_check_lambda.py:69-80; lambdas/ingest_health.py:192-212",
+          "quote": "coverage claim vs unknown status"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB USER#system",
+          "quote": "exactly 8 INGEST_HEALTH# sentinels"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-2",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-3",
+      "title": "HAE webhook writes CGM/BP/steps unvalidated while the near-dead XML path carries the validation",
+      "type": "gap",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Zero validate_item references in the 1,640-line webhook lambda; blood_glucose_avg critical bounds enforced only on the manual XML path; the field-patch update_item needs a field-level validator variant.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/health_auto_export_lambda.py (no validate_item); lambdas/ingestion/apple_health_lambda.py:389-401",
+          "quote": "validation on the wrong path"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-3",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed (XML path 'rare/manual', not removed)."
+      },
+      "verifier_note": "Verifier confirmed (XML path 'rare/manual', not removed).",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-5",
+      "title": "Todoist freshness math false-stales request-time surfaces 14h/day - but the paging alarm samples outside the window",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The E-3 arithmetic is real, but the scheduled checker runs 16:45 UTC where the freshest record is 40.75h old - steady-state paging never fires; damage is the public board + MCP false-'stale (infra)' + off-schedule runs. CLAUDE.md 'Todoist at 2x daily' is doc drift (actual 1x).",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "cdk/stacks/operational_stack.py (cron 45 16); lambdas/emails/freshness_checker_lambda.py:299-303",
+          "quote": "sample time vs stale window"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-5",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED: 'structurally pages daily' refuted; surfaces claim stands -> P3."
+      },
+      "verifier_note": "ADJUSTED: 'structurally pages daily' refuted; surfaces claim stands -> P3.",
+      "related_open_ids": [],
+      "adjusted": "P2->P3",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-6",
+      "title": "Phase tagging is framework+hevy only - six standalone writers depend on the manual sweep",
+      "type": "risk",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "No phase writes in HAE/notion/macrofactor/apple_health/food_delivery/measurements; phase_filter passes attribute_not_exists so an untagged backfill surfaces pre-genesis data as current until the next manual sweep.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion_framework.py:410-413; lambdas/phase_filter.py:20",
+          "quote": "framework-only stamping; permissive filter"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed (live notion items carry phase only because the 06-08 reset sweep stamped them)."
+      },
+      "verifier_note": "Verifier confirmed (live notion items carry phase only because the 06-08 reset sweep stamped them).",
+      "related_open_ids": [
+        "ADR-058",
+        "ADR-077"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-7",
+      "title": "Notion journal has no raw archive - DDB is the only copy of irreplaceable text",
+      "type": "risk",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "No S3 write in notion_lambda; no raw/notion/ prefix exists. Least-observed source (monitored:False, no sentinel) and least-recoverable - and J-1 shows even the DDB copy gets clobbered.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/notion_lambda.py (no put_object)",
+          "quote": "no archive"
+        },
+        {
+          "kind": "probe",
+          "ref": "aws s3 ls",
+          "quote": "no raw/notion/ or raw/matthew/notion/"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-7",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-8",
+      "title": "Default UpdateSecret on every ingestion role over-privileges the shared ingestion-keys bundle",
+      "type": "risk",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "role_policies grants GetSecretValue AND UpdateSecret by default; four lambdas share the ingestion-keys bundle, so each read-only-token consumer holds write access to four sources' credentials. Make UpdateSecret opt-in; consider splitting the internet-facing HAE bearer out.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/... cdk/stacks/role_policies.py:134-142,192,296,378,421",
+          "quote": "default write access to the shared bundle"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-8",
+        "verdict": "confirmed",
+        "reason": "ADJUSTED: the bundling is a documented COST-B decision; narrowed to the default-UpdateSecret over-privilege."
+      },
+      "verifier_note": "ADJUSTED: the bundling is a documented COST-B decision; narrowed to the default-UpdateSecret over-privilege.",
+      "related_open_ids": [],
+      "adjusted": "narrowed",
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-9",
+      "title": "Raw S3 zone is three-generation fractured - replay requires per-source archaeology",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Legacy raw/{source}/, live raw/matthew/{source}/, and a raw/matthew/matthew/(matthew/) artifact coexist; todoist/weather lack the user segment; hevy is flat UUID-keyed; the CLAUDE.md convention matches nothing. Make source_registry describe each raw layout; don't mass-move.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "aws s3 ls",
+          "quote": "triple-nested raw/matthew/matthew/; raw/todoist/ and raw/weather/ without user segment"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-9",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed via live S3 probes."
+      },
+      "verifier_note": "Verifier confirmed via live S3 probes.",
+      "related_open_ids": [
+        "#392",
+        "ADR-046"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-10",
+      "title": "Registry adoption stopped at the freshness surfaces - 8+ hand-rolled source enumerations remain, two already wrong",
+      "type": "opportunity",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "pipeline_health_check, source_state (C-3), data_reconciliation, data_export (ships dead macrofactor_workouts), qa_smoke (Strava 'paused (API 402)' - wrong), mcp/config, site data_sources.json ('single source of truth', missing hevy, March copy), validator _SCHEMAS, the monitoring alarm tuple. Extend the registry's facets and derive; generate data_sources.json at build time.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/operational/qa_smoke_lambda.py:129-145; site/data/data_sources.json; lambdas/operational/data_export_lambda.py:54",
+          "quote": "two drifted instances"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-10",
+        "verdict": "confirmed",
+        "reason": "Verifier spot-checks all reproduced."
+      },
+      "verifier_note": "Verifier spot-checks all reproduced.",
+      "related_open_ids": [
+        "#392"
+      ],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-11",
+      "title": "One retry policy, four implementations; one non-idempotent retry",
+      "type": "opportunity",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Inline duplicates in whoop/todoist; bare urlopen in weather and hevy_common.hevy_get (feeding X-1's dark failure path); hevy_write_client retries POST/PUT routine mutations (duplicate-creation window).",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/hevy_common.py:130-143; lambdas/hevy_write_client.py:108-110; lambdas/ingestion/weather_lambda.py:69",
+          "quote": "bare urlopen + non-idempotent retry"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-11",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-12",
+      "title": "Manual-CSV paths have zero framework benefits and two correctness warts (merges B-8)",
+      "type": "risk",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "food_delivery rewrites lifetime streak stats from only the uploaded file's rows; measurements session_number=COUNT+1 (non-monotonic on re-import) and parses only rows[0] of a multi-session CSV.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/food_delivery_lambda.py:132-173; lambdas/ingestion/measurements_ingestion_lambda.py:73,196-203",
+          "quote": "file-scoped streaks; positional session numbers"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-12",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "X-13",
+      "title": "Monitoring-stack comment overstates IngestAuthHealthy coverage",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "integration-architecture",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The comment claims coverage of notion + the SIMP-2 framework sources, but the framework's inlined breaker never emits LifePlatform/OAuth; only auth_breaker (notion/dropbox) and Garmin's custom path do.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "cdk/stacks/monitoring_stack.py:388-391",
+          "quote": "coverage claim"
+        },
+        {
+          "kind": "probe",
+          "ref": "live LifePlatform/OAuth dimensions",
+          "quote": "dimensionless + Source=garmin only"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "X-13",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed via live namespace dimensions."
+      },
+      "verifier_note": "Verifier confirmed via live namespace dimensions.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "owner (instrument reliability)",
+        "pillar": "integration-architecture",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-3",
+      "title": "TSB is 100% proxy-derived and its stored provenance has zero consumers",
+      "type": "honesty",
+      "severity": "P2",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "Live tsb_load_basis={strava_days:0, hevy_fallback_days:9, confidence:hevy_fallback}; the Strava-kJ leg never fires and the 25kJ/min proxy runs ~2x real scale; nothing reads tsb_load_basis while a coach prompt injects 'Training fatigue (TSB -87)' and MCP labels it live_banister_model. Surface confidence wherever TSB renders.",
+      "evidence": [
+        {
+          "kind": "probe",
+          "ref": "DDB computed_metrics DATE#2026-07-03",
+          "quote": "tsb_load_basis confidence=hevy_fallback; tsb=-87.4"
+        },
+        {
+          "kind": "code",
+          "ref": "lambdas/ai_context.py:668-673; mcp/tools_health.py:366",
+          "quote": "unqualified injections"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-3",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed - live record, no-kJ probe, zero-consumer grep all reproduced."
+      },
+      "verifier_note": "Verifier confirmed - live record, no-kJ probe, zero-consumer grep all reproduced.",
+      "related_open_ids": [
+        "#412",
+        "#388"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-4",
+      "title": "Cockpit pairs the readiness score with components that are not its inputs",
+      "type": "honesty",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "readiness_score (recovery/sleep/hrv_trend/tsb) is returned beside the day-grade component set (movement, habits_mvp); live: score 60 with components 64/88/0/0 that don't produce it. Store and serve readiness_components.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/web/site_api_vitals.py:1456-1479 vs lambdas/compute/daily_metrics_compute_lambda.py:362-397",
+          "quote": "score vs wrong components"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-4",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-5",
+      "title": "Site labels an 8-day-old weight 'today' and its day-delta 'yesterday'; the API's staleness stamps have no v4 consumer",
+      "type": "honesty",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "/api/vitals honestly serves weight_as_of; evidence.js labels it 'today' on /data/results and the 06-25->06-26 pair 'yesterday' on /data/physical; page_freshness is consumed only by the legacy nav; /api/last_sync omits withings. Date-condition the labels.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "site/assets/js/evidence.js:158-161,1735",
+          "quote": "'today'/'yesterday' hard labels"
+        },
+        {
+          "kind": "probe",
+          "ref": "live /api/vitals",
+          "quote": "weight_as_of: 2026-06-26 (8 days old)"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-5",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed live."
+      },
+      "verifier_note": "Verifier confirmed live.",
+      "related_open_ids": [
+        "#421",
+        "ADR-104"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-6",
+      "title": "Apple weight fallback inspects only the single latest apple_health item - engages same-day only",
+      "type": "bug",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The latest item is a steps record without weight_lbs, so 1,184 historical apple weight records are invisible; the character sheet runs a third, different resolution. Shared latest_weight() layer helper is the fix.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/web/site_api_vitals.py:115-121; lambdas/compute/character_sheet_lambda.py:215-227",
+          "quote": "single-item fallback; third behavior"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-7",
+      "title": "Device agreement structurally null since ~06-16 with no 'why'; MCP registry advertises wrong weights",
+      "type": "doc-drift",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "device_agreement=None whenever Garmin is absent, no reason field; registry claims 35%/10% vs code's 40%/5%. Return {status: unavailable, reason: garmin paused (ADR-074)} and sync the description.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "mcp/tools_health.py:405-406,390; mcp/registry.py:1057-1063",
+          "quote": "silent null + wrong weights"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-7",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [
+        "ADR-074"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-8",
+      "title": "Honesty gates don't cover merged/derived values - TSB reaches coach prompts ungated (merges J-7)",
+      "type": "gap",
+      "severity": "P3",
+      "effort": "M",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "grounding_guard scope is RHR/recovery/HRV only; coherence_invariants adds only latest_weight; nothing gates TSB, unified-sleep values, or journal-attributed claims (chronicle uses prompt-level suppression). Add tsb to the sentinel facts minimum.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/intelligence/grounding_guard.py:16-19; lambdas/coherence_invariants.py:156-174",
+          "quote": "narrow scopes"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-8",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed (weight exclusion documented-deliberate; the derived-value gap stands)."
+      },
+      "verifier_note": "Verifier confirmed (weight exclusion documented-deliberate; the derived-value gap stands).",
+      "related_open_ids": [
+        "ADR-104",
+        "#390"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "M-9",
+      "title": "/api/sleep_detail splices a different night's Whoop recovery into 'last night'",
+      "type": "honesty",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "merge-honesty",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "When the latest Eight Sleep night lacks matching Whoop recovery, the handler substitutes the most recent night that has it; the UI renders night-A hours + night-B recovery under one dated header with no per-field date.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/web/site_api_data.py:1876-1884",
+          "quote": "cross-night substitution"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "M-9",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed incl. live payload."
+      },
+      "verifier_note": "Verifier confirmed incl. live payload.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "merge-honesty",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-1",
+      "title": "The entire journal enrichment layer's output no longer exists in the store - every consumer silently degrades",
+      "type": "data-loss",
+      "severity": "P1",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "0/50 journal items carry enriched_at or any of the 23 enrichment fields. notion_lambda.write_entries full-item put_item clobbers the enricher's update_item output on re-ingestion; the 2-day enrichment window never heals history (14 runs found 0 entries). ~20 consumer sites read None; journal<->wearable correlation is structurally impossible. Fix: full_sync+force backfill (cents) + enrichment-preserving writes + edit-aware re-enrichment.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/notion_lambda.py:548,575; lambdas/ingestion/journal_enrichment_lambda.py:472-475,497",
+          "quote": "put_item clobber + 2-day window + skip-if-enriched"
+        },
+        {
+          "kind": "probe",
+          "ref": "DDB notion partition",
+          "quote": "0/50 items with enriched_at; 4,225-char entry unenriched"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-1",
+        "verdict": "confirmed",
+        "reason": "Verifier re-probed 0/50; structural data-loss confirmed regardless of whether the historical wipe was clobber or reset."
+      },
+      "verifier_note": "Verifier re-probed 0/50; structural data-loss confirmed regardless of whether the historical wipe was clobber or reset.",
+      "related_open_ids": [
+        "#422"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-2",
+      "title": "The 'direct api.anthropic.com' scaffolding is dead code, not a live ADR-062 deviation; the analyzer still does a real, pointless secret fetch",
+      "type": "dead-code",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "call_anthropic_raw forwards every call to bedrock_client.invoke() - the Anthropic URL is never dialed (refutes baseline pre-seed #5). journal_analyzer._get_api_key still fetches life-platform/ai-keys for real; retiring that secret would fail the nightly run for nothing.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/retry_utils.py:189-216; lambdas/intelligence/journal_analyzer_lambda.py:48-60,88",
+          "quote": "Bedrock routing + live dead fetch"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-2",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed both halves."
+      },
+      "verifier_note": "Verifier confirmed both halves.",
+      "related_open_ids": [
+        "ADR-062"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-3",
+      "title": "Three consumers read enriched field names the producer never writes",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "tools_journal sentiment-trajectory reads enriched_mood_score/energy_score/stress_score/ownership_score (never written - the tool can never produce output); wednesday_chronicle reads enriched_avoidance_flag (singular) + enriched_ownership_level. J-1 masks this today.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "mcp/tools_journal.py:660-666; lambdas/emails/wednesday_chronicle_lambda.py:589-590 vs lambdas/ingestion/journal_enrichment_lambda.py:353-373",
+          "quote": "reader names vs writer field_mapping"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-3",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed; raw-field fallbacks also absent so the skip is total."
+      },
+      "verifier_note": "Verifier confirmed; raw-field fallbacks also absent so the skip is total.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-4",
+      "title": "Mind coach's journal signals are double-dead: unpopulated data key AND wrong schema",
+      "type": "bug",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "_build_mind_data reads data['journal_analysis'] - no caller populates that key - and expects enriched_* fields while the analyzer cache carries dominant_theme/sentiment_score. Point it at journal_entries (already fetched by the brief).",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ai_context.py:975-987; lambdas/emails/daily_brief_lambda.py:361-395",
+          "quote": "unwired key + wrong schema"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-4",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed both legs (grep: zero assignments of the key)."
+      },
+      "verifier_note": "Verifier confirmed both legs (grep: zero assignments of the key).",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-5",
+      "title": "Baseline discrepancy #7 explained: analyzer 20-WORD floor vs enricher 20-CHAR floor",
+      "type": "info",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "The 2026-05-25 entries are 40 chars (~7 words): below the analyzer's floor, above the enricher's; the analyzer itself is healthy (clean post-reset rebuild 06-09). Align the two floors deliberately.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/intelligence/journal_analyzer_lambda.py:112-115; lambdas/ingestion/journal_enrichment_lambda.py:60",
+          "quote": "two 'too short' definitions"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-5",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed."
+      },
+      "verifier_note": "Verifier confirmed.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-6",
+      "title": "~5 of 23 enriched fields have no meaningful consumer; the second Haiku pass and its prompt caching are both waste",
+      "type": "dead-weight",
+      "severity": "P3",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "enriched_emotional_depth: zero consumers; enriched_defense_context: one prompt echo; the defense pass is a second Bedrock call where one merged schema would do; both cache_control blocks sit on ~151/~193-token prompts - below the ~2048 cache floor, caching is a no-op.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/ingestion/journal_enrichment_lambda.py:127-151,239-243",
+          "quote": "second pass + dead fields"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-6",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed with token measurements."
+      },
+      "verifier_note": "Verifier confirmed with token measurements.",
+      "related_open_ids": [],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    },
+    {
+      "id": "J-8",
+      "title": "/api/journal_analysis will publicly serve per-day journal one-liners the moment journaling resumes",
+      "type": "privacy",
+      "severity": "P2",
+      "effort": "S",
+      "confidence": "high",
+      "lens": "journal",
+      "domain": "data-sources",
+      "status": "NEW",
+      "detail": "handle_journal_analysis returns Haiku's one_line_summary per day; publicly routed and live-reachable; the analyzer writes no phase attribute so records pass the phase filter. Empty today only because the cache predates genesis. Drop the field from the public payload or ADR the exposure.",
+      "evidence": [
+        {
+          "kind": "code",
+          "ref": "lambdas/web/site_api_observatory.py:1760-1771; lambdas/web/site_api_lambda.py:344; lambdas/intelligence/journal_analyzer_lambda.py:184",
+          "quote": "public route + phaseless writes"
+        },
+        {
+          "kind": "probe",
+          "ref": "live curl",
+          "quote": "200, empty daily_themes (cache predates genesis)"
+        }
+      ],
+      "gates": {
+        "test185": "pass",
+        "build_cap": "pass",
+        "privacy": "pass",
+        "honesty_moat": "pass"
+      },
+      "verdict": {
+        "finding_id": "J-8",
+        "verdict": "confirmed",
+        "reason": "Verifier confirmed end-to-end."
+      },
+      "verifier_note": "Verifier confirmed end-to-end.",
+      "related_open_ids": [
+        "ADR-104"
+      ],
+      "destination_impact": {
+        "audience": "readers + owner (public honesty surface)",
+        "pillar": "journal",
+        "hypothesis": "trustworthy-instrument: every surfaced number is real, current, and provenance-honest"
+      }
+    }
+  ]
+}
