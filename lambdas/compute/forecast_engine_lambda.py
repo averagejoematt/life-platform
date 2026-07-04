@@ -65,9 +65,16 @@ COVERAGE_WINDOW_DAYS = 90
 # What we forecast. `frame` is the human phrasing for an h=1 target (the coach/
 # cockpit surfaces reuse it); weight is morning-weigh-in so "tomorrow morning".
 METRICS = [
-    {"metric": "recovery_pct", "source": "whoop", "field": "recovery_score", "unit": "%", "frame_h1": "tomorrow"},
-    {"metric": "sleep_hours", "source": "whoop", "field": "sleep_duration_hours", "unit": "h", "frame_h1": "tonight"},
-    {"metric": "weight_lbs", "source": "withings", "field": "weight_lbs", "unit": "lb", "frame_h1": "tomorrow morning"},
+    {"metric": "recovery_pct", "source": "whoop", "field": "recovery_score", "unit": "%", "frame_h1": "tomorrow", "bounds": (0.0, 100.0)},
+    {
+        "metric": "sleep_hours",
+        "source": "whoop",
+        "field": "sleep_duration_hours",
+        "unit": "h",
+        "frame_h1": "tonight",
+        "bounds": (0.0, 14.0),
+    },
+    {"metric": "weight_lbs", "source": "withings", "field": "weight_lbs", "unit": "lb", "frame_h1": "tomorrow morning", "bounds": None},
 ]
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
@@ -139,8 +146,20 @@ def query_forecast_rows(sk_lo, sk_hi):
 
 
 def build_forecast_item(metric_cfg, fc, issued_date, target_date):
-    """One frozen FORECAST# row from an ewma_forecast result. Pure builder (tested)."""
+    """One frozen FORECAST# row from an ewma_forecast result. Pure builder (tested).
+
+    Interval endpoints are clamped to the metric's physical bounds — a 106% recovery
+    ceiling is a statistical artifact, not an expectation, and publishing it reads as
+    dishonest. Actuals live inside the bounds too, so clamping never changes whether
+    an interval covers its outcome."""
     h = fc["horizon"]
+    point, lo, hi = fc["point"], fc["lo"], fc["hi"]
+    bounds = metric_cfg.get("bounds")
+    if bounds:
+        b_lo, b_hi = bounds
+        point = max(b_lo, min(b_hi, point))
+        lo = max(b_lo, min(b_hi, lo))
+        hi = max(b_lo, min(b_hi, hi))
     return {
         "pk": FORECAST_PK,
         "sk": f"FORECAST#{target_date}#{metric_cfg['metric']}#h{h}",
@@ -153,9 +172,9 @@ def build_forecast_item(metric_cfg, fc, issued_date, target_date):
         "horizon_days": h,
         "issued_date": issued_date,
         "target_date": target_date,
-        "point": round(fc["point"], 1),
-        "lo": round(fc["lo"], 1),
-        "hi": round(fc["hi"], 1),
+        "point": round(point, 1),
+        "lo": round(lo, 1),
+        "hi": round(hi, 1),
         "confidence": CONFIDENCE,
         "alpha": round(fc["alpha"], 2),
         "n_history": fc["n"],
