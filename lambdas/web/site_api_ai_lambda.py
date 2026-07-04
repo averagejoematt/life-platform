@@ -721,6 +721,8 @@ def _coach_system(pid: str) -> str:
             "only numbers you may write are ones present in the CURRENT DATA block. That block is deliberately "
             "coarse: it carries NO sleep-stage, trend, per-day, or historical figures — describe all of those "
             "qualitatively (rising, short of where I want it, stalled), never with an invented number. "
+            "A board answer is a short take, not your weekly analysis: land it in 4-6 sentences and FINISH the "
+            "final sentence. "
             if voice_core
             else ""
         )
@@ -1342,7 +1344,10 @@ def _handle_board_ask(event: dict) -> dict:
             req_body = json.dumps(
                 {
                     "model": AI_MODEL_HAIKU,
-                    "max_tokens": 300,
+                    # #531 follow-up: 300 → 450. The voice-core selves write
+                    # longer analytical sentences; at 300 the closing sentence
+                    # was truncating mid-thought on the public page.
+                    "max_tokens": 450,
                     "system": [
                         {
                             "type": "text",
