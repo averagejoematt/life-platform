@@ -341,4 +341,16 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"[WARN] CloudFront invalidation failed (non-fatal): {e}")
 
-    return {"statusCode": 200, "body": f"Generated {len(generated)}/{len(PAGES)} OG images"}
+    # #404: permalinked shareable moments (weekly recap · board answers · graded
+    # predictions) — shells + per-moment cards under generated/moments/. Fail-soft:
+    # a moments error never blocks the daily page cards.
+    moments_n = 0
+    try:
+        from web.og_moments import sweep_moments
+
+        idx = sweep_moments(s3, stats)
+        moments_n = (1 if idx.get("week") else 0) + len(idx.get("qa") or {}) + len(idx.get("predictions") or [])
+    except Exception as e:
+        print(f"[WARN] moments sweep failed (non-fatal): {e}")
+
+    return {"statusCode": 200, "body": f"Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s)"}

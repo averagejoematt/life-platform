@@ -17,6 +17,7 @@ import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpi
 import { badgeMark, sigil, tierEmblem } from "/assets/js/sigils.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
+import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
@@ -1028,7 +1029,8 @@ function sleepCorrelationBoard(cards) {
   };
   return sec("Cross-source signal board — the correlation that tells you when NOT to trust it",
     `<div class="cb-grid">${cards.map(card).join("")}</div>` +
-    `<p class="rd-meta label">Every card shows its n, the overlapping weeks, and a confidence tag. Under 2 weeks of overlap it's <strong>direction only</strong> — no Pearson, no chip. Thin pairs are flagged likely-noise. The self-skepticism is the feature, not a bug.</p>`);
+    `<p class="rd-meta label">Every card shows its n, the overlapping weeks, and a confidence tag. Under 2 weeks of overlap it's <strong>direction only</strong> — no Pearson, no chip. Thin pairs are flagged likely-noise. The self-skepticism is the feature, not a bug.</p>` +
+    explainMount("sleep_correlations"));
 }
 async function renderSleep(d) {
   const s = d.sleep_detail || {};

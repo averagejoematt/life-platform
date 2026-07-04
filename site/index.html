@@ -71,6 +71,11 @@
         <p class="hero-proof" data-bind="hero-proof" hidden></p>
         <p class="hero-quiet" data-bind="hero-quiet" hidden></p>
         <h1 class="hero-h">An honest documentary of an <em>ordinary</em> life, rebuilt with AI.</h1>
+        <!-- #407: the loop, taught before the fold — the four doors in one glance,
+             directly under the claim. The full diagram below keeps the roles. -->
+        <p class="hero-loop label" aria-label="The feedback loop: the data feeds the coaching, the coaching shapes the protocols, the protocols move the data, the story narrates it">
+          <a href="/data/">the data</a><span class="hl-arrow" aria-hidden="true">→</span><a href="/coaching/">the coaching</a><span class="hl-arrow" aria-hidden="true">→</span><a href="/protocols/">the protocols</a><span class="hl-arrow" aria-hidden="true">→</span><a href="/story/">the story</a><span class="hl-loop" aria-hidden="true">↻</span>
+        </p>
         <p class="hero-elena" data-bind="elena">No million-dollar lab. Just the wearables already on his body, and a model that reads the numbers back to him every morning.</p>
         <p class="hero-sub">Every metric. Every setback. The down weeks shown, not hidden — because that's what makes an experiment of one believable.</p>
         <p class="hero-for">For anyone who's tired of transformation theater and wants to watch a <em>real one</em> happen — slowly, honestly, in public.</p>
@@ -83,8 +88,11 @@
           <g data-nodes></g>
         </svg>
         <figcaption id="constellation-desc" class="label">
-          The seven pillars, sized by where they stand and joined by how they move each other.
-          Ember = climbing. <strong>Tap a pillar to open its evidence.</strong>
+          <!-- #407: the numbers get a scale — a low score reads "early", not "alarming". -->
+          <span class="const-legend" aria-hidden="true"><i class="cl-dot cl-sm"></i>low<i class="cl-dot cl-lg"></i>high</span>
+          The seven pillars, each scored <strong>out of 100</strong> — node size tracks the score,
+          so a small node is a low score (a young experiment starts low), not a broken one.
+          Joined by how they move each other. Ember = climbing. <strong>Tap a pillar to open its evidence.</strong>
         </figcaption>
       </figure>
     </div>
@@ -148,6 +156,24 @@
       <p class="beat-note" data-bind="projected"></p>
       <div data-bind="weightchart"></div>
       <p class="beat-deeper"><a href="/method/results/" class="cta">The full results &amp; body composition →</a></p>
+    </section>
+
+    <!-- #413: "where would you land" — the reader becomes a participant for one
+         number, without the site learning anything. PURELY client-side: the input
+         never leaves this page (no fetch, no storage — verifiable as zero network
+         writes); the comparison uses only Matthew's already-public numbers. -->
+    <section class="beat beat-mirror" aria-label="Where would you land">
+      <p class="beat-kicker label">try it on · your one number</p>
+      <h2 class="beat-h">Where would you land?</h2>
+      <p class="beat-note">Type one of your own numbers and see where it sits next to Matthew's real band.
+        <strong>Nothing you type leaves this page</strong> — no request, no cookie, no storage.
+        And this is one subject's data (N=1), not a benchmark or health advice.</p>
+      <form class="mirror-form" data-mirror novalidate hidden>
+        <select class="mirror-metric" name="metric" aria-label="Which number to compare"></select>
+        <input class="mirror-in num" name="value" type="number" inputmode="decimal" step="any" min="0" aria-label="Your number">
+        <button class="mirror-btn" type="submit">place me</button>
+      </form>
+      <div class="mirror-out" data-mirror-out aria-live="polite"></div>
     </section>
 
     <!-- The Third Wall: machine says / how Matthew actually felt -->

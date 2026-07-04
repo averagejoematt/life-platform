@@ -721,3 +721,31 @@ body { overflow-x: hidden; }
 .sc-refuted .sc-call-st { color: var(--ember); }
 .sc-call-m { font-family: var(--font-mono); color: var(--ink-faint); }
 @media (max-width: 560px) { .sc-tiles { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── #407: the loop teaser above the fold + the constellation scale ───────── */
+.hero-loop { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); color: var(--ink-faint); }
+.hero-loop a { color: var(--ink-muted); text-decoration: none; border-bottom: 1px solid var(--rule); padding-bottom: 1px; transition: color var(--dur-fast), border-color var(--dur-fast); }
+.hero-loop a:hover { color: var(--ember); border-color: var(--ember-line); }
+.hl-arrow, .hl-loop { color: var(--ink-faint); }
+.const-legend { display: inline-flex; align-items: center; gap: var(--sp-1); margin-right: var(--sp-2); color: var(--ink-faint); white-space: nowrap; }
+.cl-dot { display: inline-block; border-radius: 50%; background: var(--ink-faint); }
+.cl-dot.cl-sm { width: 5px; height: 5px; }
+.cl-dot.cl-lg { width: 11px; height: 11px; margin-left: var(--sp-2); }
+
+/* ── #413 "where would you land" — the client-only mirror ─────────────────── */
+.beat-mirror .beat-note strong { color: var(--ink); }
+.mirror-form { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-5); align-items: stretch; }
+.mirror-metric, .mirror-in { background: var(--surface); color: var(--ink); border: var(--border-hair); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-2) var(--sp-3); }
+.mirror-in { width: 9ch; }
+.mirror-btn { cursor: pointer; background: var(--ember); color: var(--page); border: 0; border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em; padding: 0 var(--sp-4); }
+.mirror-out { margin-top: var(--sp-5); max-width: var(--measure); }
+.mirror-strip { position: relative; height: 44px; border-bottom: 1px solid var(--rule); margin-bottom: var(--sp-6); }
+.ms-mark { position: absolute; bottom: -5px; transform: translateX(-50%); text-align: center; }
+.ms-mark i { display: block; width: 9px; height: 9px; border-radius: 50%; background: var(--ink-faint); margin: 0 auto 4px; }
+.ms-mark .label { color: var(--ink-faint); white-space: nowrap; }
+.ms-mark.ms-you i { background: var(--ember); width: 11px; height: 11px; }
+.ms-mark.ms-you .label { color: var(--ember); }
+.mirror-read { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); }
+.mirror-note { margin-top: var(--sp-2); color: var(--ink-faint); }

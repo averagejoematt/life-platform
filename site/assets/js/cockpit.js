@@ -16,6 +16,8 @@
 
 import { sparkline } from "/assets/js/charts.js";
 import { domainIcon } from "/assets/js/icons.js";
+import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
+import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 
 const API = "/api";
 
@@ -618,9 +620,12 @@ async function renderWeek() {
       return `<li class="wk-row"><span class="label">${escapeHTML(d)}</span>${sparkline(p.sparkline)}<span class="wk-val num">${escapeHTML(String(p.value))}<small> ${escapeHTML(p.unit || "")}</small></span>${delta}<span class="wk-note">${escapeHTML(p.delta_label || "")}</span></li>`;
     });
 
-  bind("weekrows").innerHTML = rows.length
+  // #404: the week's recap permalink (minted daily by the moments sweep).
+  const wk = ((await momentsIndex()) || {}).week;
+  bind("weekrows").innerHTML = (rows.length
     ? rows.join("")
-    : `<li class="tl-empty">No week data yet — instruments fill in as the record deepens.</li>`;
+    : `<li class="tl-empty">No week data yet — instruments fill in as the record deepens.</li>`)
+    + `<li class="wk-explain">${explainMount("observatory_week")}${wk && wk.current ? shareMount(wk.current, "The week so far — one measured life") : ""}</li>`;
   bind("verdict").textContent = rows.length
     ? `Seven days, ${rows.length} of ${WEEK_DOMAINS.length} instruments reporting — deltas read against the week before.`
     : "The week view fills in as the record deepens.";
@@ -655,7 +660,7 @@ async function renderMonth() {
     const txt = u.interpretation || `${u.metric_a || ""} ↔ ${u.metric_b || ""}`;
     return `<div class="mo-unlock"><span class="mo-unlock-k label">newly unlocked</span> ${escapeHTML(txt)}${r}</div>`;
   });
-  bind("month-unlocks").innerHTML = urows.join("");
+  bind("month-unlocks").innerHTML = urows.join("") + explainMount("what_changed");
 
   if (wc && wc.honest_null) {
     bind("verdict").textContent = "A steady month — no metric crossed its monthly threshold and no new correlation reached significance. Calm is data too.";
@@ -913,3 +918,52 @@ load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) ? _deepDate : undefined)
     foot.appendChild(s);
   } catch (e) {}
 })();
+
+/* ── #406: the sync strip — "measured, live" made checkable ─────────────────
+   REAL ingestion write times from /api/last_sync (ingested_at stamps, never
+   the day-granular DATE key). The "ago" text ticks client-side every 30s;
+   the data re-fetches every 5 minutes. The pulse dot glows ONLY when a pipe
+   wrote within the earned-glow window (nothing is animated to imply data
+   that isn't there); stale states render truthfully ("9h ago"). */
+const SYNC_FRESH_MIN = 45; // earned-glow window
+let _sync = null;
+let _syncSkewMs = 0;
+
+function _agoText(iso) {
+  const ms = Date.now() + _syncSkewMs - Date.parse(iso);
+  if (!Number.isFinite(ms)) return "";
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
+function renderSyncLine() {
+  const el = bind("syncline");
+  if (!el) return;
+  const srcs = ((_sync && _sync.sources) || []).filter((s) => s.last_write);
+  if (!srcs.length) { el.hidden = true; return; }
+  const freshestId = _sync.freshest && _sync.freshest.id;
+  el.innerHTML = srcs.map((s) => {
+    const mins = (Date.now() + _syncSkewMs - Date.parse(s.last_write)) / 60000;
+    const fresh = Number.isFinite(mins) && mins <= SYNC_FRESH_MIN;
+    const star = s.id === freshestId ? ` <span class="sync-freshest">← freshest</span>` : "";
+    return `<span class="sync-src"><span class="sync-dot${fresh ? " is-fresh" : ""}" aria-hidden="true"></span>` +
+      `${escapeHTML(s.label)} <span class="sync-ago num">${escapeHTML(_agoText(s.last_write))}</span>${star}</span>`;
+  }).join(`<span class="sync-sep" aria-hidden="true">·</span>`);
+  el.hidden = false;
+}
+
+async function loadSync() {
+  try {
+    const d = await getJSON(`${API}/last_sync`);
+    _sync = d;
+    _syncSkewMs = d && d.server_now ? Date.parse(d.server_now) - Date.now() : 0;
+  } catch (e) { _sync = null; }
+  renderSyncLine();
+}
+loadSync();
+setInterval(renderSyncLine, 30_000); // the "ago" ticks
+setInterval(loadSync, 300_000);      // the data re-checks

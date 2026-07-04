@@ -155,6 +155,14 @@ def cmd_answer(args):
     rec["answered_at"] = datetime.now(timezone.utc).isoformat()
     _put_json(f"{QUEUE_PREFIX}{(rec.get('submitted_at') or '')[:7]}_{rec['id']}.json", rec)
     print("   marked the queued question as answered.")
+
+    # #404: mint the answer's permalink + share card now instead of waiting for
+    # the daily og-image-generator run. Fail-soft — the sweep also runs daily.
+    try:
+        boto3.client("lambda", region_name=REGION).invoke(FunctionName="og-image-generator", InvocationType="Event")
+        print(f"   moment sweep triggered — permalink: https://averagejoematt.com/moments/qa/{rec['id']}/ (live in ~1 min)")
+    except Exception as e:
+        print(f"   (moment sweep not triggered — daily run will mint the permalink: {e})")
     print("   (optional) bust the edge cache:")
     print("   aws cloudfront create-invalidation --distribution-id E3S424OXQZ8NBE --paths '/board_answers/*'")
 

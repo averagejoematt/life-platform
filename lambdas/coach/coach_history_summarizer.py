@@ -91,6 +91,24 @@ MAX_OUTPUT_RECORDS = 20
 # Prediction statuses considered "active"
 ACTIVE_PREDICTION_STATUSES = {"pending", "confirming", "confirmed"}
 
+# ── #410: bounded compression input ─────────────────────────────────────────
+# The compressor used to read EVERY THREAD#/PREDICTION# record in the coach's
+# partition and pour all open/active ones into one Haiku prompt — unbounded
+# per-coach history flowing into a fixed-size context. It already failed once
+# (a coach at 52 threads / 39 predictions truncated mid-compression and served
+# a degraded context for weeks); the max_tokens bump to 4000 was the band-aid.
+# These bounds supersede it: reads are page/limit-capped, the prompt carries
+# the most-recent-N of each class plus an honest rollup line for the rest, and
+# a deterministic char budget guards the whole message. Nothing is archived or
+# deleted — older records stay in DynamoDB, queryable, and the public track
+# record (which reads PREDICTION# independently) is untouched.
+MAX_OPEN_THREADS_IN_PROMPT = 15  # most-recently-referenced first
+MAX_ACTIVE_PREDICTIONS_IN_PROMPT = 15  # newest first (SK embeds the date)
+MAX_PREDICTION_SCAN = 120  # newest PREDICTION# records scanned for active ones
+MAX_QUERY_PAGES = 20  # hard stop on any partition pagination
+MAX_COMPRESSION_INPUT_CHARS = 24_000  # ≈6k tokens — well inside Haiku's budget
+MIN_WINDOW_FLOOR = 5  # the budget guard never shrinks a window below this
+
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "coach-history-summarizer")
@@ -250,11 +268,13 @@ def _put_item(item):
         return False
 
 
-def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None, include_pilot=False):
+def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None, include_pilot=False, max_pages=MAX_QUERY_PAGES):
     """Query DynamoDB for items with SK beginning with a prefix.
 
     ADR-058: applies the default-deny phase filter so tombstoned coach records
     (phase=pilot) are hidden. Pass include_pilot=True to see them.
+    #410: pagination is hard-capped at max_pages so no partition read is ever
+    unbounded — a coach partition growing for years can't balloon this scan.
     """
     from boto3.dynamodb.conditions import Key
 
@@ -270,14 +290,19 @@ def _query_begins_with(pk, sk_prefix, scan_forward=True, limit=None, include_pil
             kwargs["Limit"] = limit
 
         items = []
+        pages = 0
         while True:
             resp = table.query(**kwargs)
             items.extend(resp.get("Items", []))
+            pages += 1
             # If we have a limit and have enough items, stop paginating
             if limit and len(items) >= limit:
                 items = items[:limit]
                 break
             if "LastEvaluatedKey" not in resp:
+                break
+            if max_pages and pages >= max_pages:
+                logger.warning("query_begins_with(%s, %s): page cap %d hit — bounded read (#410)", pk, sk_prefix, max_pages)
                 break
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
@@ -314,23 +339,36 @@ def _gather_coach_state(coach_id):
     )
     logger.info("Fetched %d OUTPUT# records for %s", len(outputs), coach_id)
 
-    # 2. Query all THREAD# records, filter to status=open
+    # 2. Query THREAD# records (page-capped), filter to status=open, then
+    # window to the most-recently-referenced N (#410). Older open threads are
+    # counted for the prompt's rollup line, never silently dropped.
     all_threads = _query_begins_with(coach_pk, "THREAD#")
     open_threads = [t for t in all_threads if t.get("status") == "open"]
+    open_threads.sort(key=lambda t: str(t.get("last_referenced", "")), reverse=True)
+    open_threads_total = len(open_threads)
+    open_threads = open_threads[:MAX_OPEN_THREADS_IN_PROMPT]
     logger.info(
-        "Fetched %d THREAD# records for %s (%d open)",
+        "Fetched %d THREAD# records for %s (%d open, %d in prompt window)",
         len(all_threads),
         coach_id,
+        open_threads_total,
         len(open_threads),
     )
 
-    # 3. Query all PREDICTION# records, filter to active statuses
-    all_predictions = _query_begins_with(coach_pk, "PREDICTION#")
-    active_predictions = [p for p in all_predictions if p.get("status") in ACTIVE_PREDICTION_STATUSES]
+    # 3. Query the NEWEST PREDICTION# records only (#410) — the SK embeds the
+    # creation date (PREDICTION#pred_YYYYMMDD_slug) so a reverse bounded query
+    # is a true recency window; decided/expired records age out of it naturally
+    # while staying in DynamoDB for the track record. Active ones are windowed
+    # to the newest N for the prompt.
+    scanned_predictions = _query_begins_with(coach_pk, "PREDICTION#", scan_forward=False, limit=MAX_PREDICTION_SCAN)
+    active_predictions = [p for p in scanned_predictions if p.get("status") in ACTIVE_PREDICTION_STATUSES]
+    active_predictions_total = len(active_predictions)
+    active_predictions = active_predictions[:MAX_ACTIVE_PREDICTIONS_IN_PROMPT]
     logger.info(
-        "Fetched %d PREDICTION# records for %s (%d active)",
-        len(all_predictions),
+        "Scanned %d newest PREDICTION# records for %s (%d active, %d in prompt window)",
+        len(scanned_predictions),
         coach_id,
+        active_predictions_total,
         len(active_predictions),
     )
 
@@ -347,7 +385,9 @@ def _gather_coach_state(coach_id):
     return {
         "outputs": outputs,
         "open_threads": open_threads,
+        "open_threads_total": open_threads_total,
         "active_predictions": active_predictions,
+        "active_predictions_total": active_predictions_total,
         "confidence_records": confidence_records,
         "relationship_state": relationship_state,
         "voice_state": voice_state,
@@ -463,10 +503,19 @@ def _build_compression_message(coach_id, state):
         parts.append("## Recent Outputs: NONE (new coach, no history)")
         parts.append("")
 
-    # Open threads
+    # Open threads — windowed (#410): the rollup line keeps the omitted count
+    # honest so the compressor knows the window isn't the whole history.
     open_threads = state.get("open_threads", [])
+    open_total = state.get("open_threads_total", len(open_threads))
     if open_threads:
-        parts.append(f"## Open Threads ({len(open_threads)})")
+        if open_total > len(open_threads):
+            parts.append(
+                f"## Open Threads (showing the {len(open_threads)} most-recently-referenced "
+                f"of {open_total} open; {open_total - len(open_threads)} older open threads "
+                f"omitted from this compression — they remain stored and may resurface)"
+            )
+        else:
+            parts.append(f"## Open Threads ({len(open_threads)})")
         for thread in open_threads:
             slug = thread.get("sk", "").replace("THREAD#", "")
             summary = thread.get("summary", "no summary")
@@ -479,10 +528,18 @@ def _build_compression_message(coach_id, state):
         parts.append("## Open Threads: NONE")
         parts.append("")
 
-    # Active predictions
+    # Active predictions — windowed (#410), newest first.
     active_preds = state.get("active_predictions", [])
+    active_total = state.get("active_predictions_total", len(active_preds))
     if active_preds:
-        parts.append(f"## Active Predictions ({len(active_preds)})")
+        if active_total > len(active_preds):
+            parts.append(
+                f"## Active Predictions (showing the {len(active_preds)} newest of "
+                f"{active_total} active; {active_total - len(active_preds)} older active "
+                f"predictions omitted from this compression — the evaluator still grades them)"
+            )
+        else:
+            parts.append(f"## Active Predictions ({len(active_preds)})")
         for pred in active_preds:
             pred_id = pred.get("prediction_id", pred.get("sk", "").replace("PREDICTION#", ""))
             claim = pred.get("claim_natural", "no claim")
@@ -630,6 +687,41 @@ def _build_fallback_compressed_state(coach_id, state):
     }
 
 
+def _build_bounded_compression_message(coach_id, state):
+    """#410: build the compression message inside MAX_COMPRESSION_INPUT_CHARS.
+
+    The windows in _gather_coach_state already bound the normal case; this is
+    the deterministic backstop for pathological record sizes (a thread with a
+    huge summary, oversized voice state). If the message exceeds the budget,
+    the thread/prediction windows are halved (never below MIN_WINDOW_FLOOR)
+    and the message rebuilt — each shrink is logged, and the rollup lines keep
+    the omitted counts honest. Guaranteed to terminate at the floors."""
+    working = dict(state)
+    message = _build_compression_message(coach_id, working)
+    while len(message) > MAX_COMPRESSION_INPUT_CHARS:
+        threads = working.get("open_threads", [])
+        preds = working.get("active_predictions", [])
+        if len(threads) <= MIN_WINDOW_FLOOR and len(preds) <= MIN_WINDOW_FLOOR:
+            logger.warning(
+                "compression input for %s still %d chars at window floor — sending as-is (output budget still holds)",
+                coach_id,
+                len(message),
+            )
+            break
+        working["open_threads"] = threads[: max(MIN_WINDOW_FLOOR, len(threads) // 2)]
+        working["active_predictions"] = preds[: max(MIN_WINDOW_FLOOR, len(preds) // 2)]
+        logger.warning(
+            "compression input for %s over budget (%d > %d chars) — shrinking windows to %d threads / %d predictions (#410)",
+            coach_id,
+            len(message),
+            MAX_COMPRESSION_INPUT_CHARS,
+            len(working["open_threads"]),
+            len(working["active_predictions"]),
+        )
+        message = _build_compression_message(coach_id, working)
+    return message
+
+
 def _compress_coach(coach_id, state):
     """Compress a single coach's history via Haiku LLM call.
 
@@ -639,8 +731,8 @@ def _compress_coach(coach_id, state):
     meta = COACH_META.get(coach_id, {"display_name": coach_id, "domain": "unknown"})
     now_iso = datetime.now(timezone.utc).isoformat()
 
-    # Build the compression prompt
-    user_message = _build_compression_message(coach_id, state)
+    # Build the compression prompt inside the deterministic input budget (#410)
+    user_message = _build_bounded_compression_message(coach_id, state)
 
     try:
         result = _call_haiku(
@@ -654,6 +746,9 @@ def _compress_coach(coach_id, state):
             # context AND blocking the stance engine (which won't ground on a
             # fallback). 4000 gives headroom; you only pay for tokens generated.
             # (Same failure mode + fix as the orchestrator's 2000→6000 bump.)
+            # #410 superseded the growth side of this band-aid: the INPUT is now
+            # bounded (windowed threads/predictions + the char budget above), so
+            # the summary size no longer scales with experiment tenure.
             max_tokens=4000,
             temperature=0.2,
         )

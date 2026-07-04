@@ -42,6 +42,10 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "USER#matthew#SOURCE#panelcast",
         "STATE#current",
     ): "The Panel series_state — seeded on the first published weekly episode; _state_read tolerates absence (returns {})",
+    (
+        "USER#matthew#SOURCE#email_digest",
+        "STATE#between_chronicle",
+    ): "#398 dedup marker — created on the first between-chronicle send; the read tolerates absence (empty marker = send)",
 }
 
 # Module-level constant values used to resolve f-strings statically.

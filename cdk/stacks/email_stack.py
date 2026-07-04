@@ -333,6 +333,30 @@ class EmailStack(Stack):
             **shared,
         )
 
+        # #398: Between-chronicle note — the machine's mid-gap findings for
+        # subscribers, assembled purely from already-computed records (monthly
+        # what-changed, graded predictions, stance shifts). Zero AI inference.
+        # Sends ONLY when there is real, previously-unsent content (content-hash
+        # dedup marker); honors the same EXTERNAL_EMAILS_ENABLED kill switch.
+        # Sunday 17:00 UTC — mid-gap between Wednesday chronicles.
+        create_platform_lambda(
+            self,
+            "BetweenChronicle",
+            function_name="between-chronicle",
+            handler="emails.between_chronicle_lambda.lambda_handler",
+            source_file="lambdas/emails/between_chronicle_lambda.py",
+            schedule="cron(0 17 ? * SUN *)",
+            timeout_seconds=300,
+            memory_mb=256,
+            environment={
+                "SITE_URL": "https://averagejoematt.com",
+                "SEND_RATE_PER_SEC": "14.0",
+                "EXTERNAL_EMAILS_ENABLED": "false",  # same privacy-mode kill switch as the chronicle
+            },
+            custom_policies=rp.email_between_chronicle(),
+            **shared,
+        )
+
         # FEAT-12: Chronicle Approve Lambda — one-click approve/reject for Chronicle drafts.
         # Invoked via Lambda Function URL embedded in the preview email.
         # No EventBridge schedule — triggered only by Matthew clicking the preview email link.
