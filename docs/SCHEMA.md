@@ -1821,28 +1821,59 @@ Served via `GET /api/ai_analysis?expert=<key>` (site API). Displayed on all 4 ob
 
 ---
 
-## Hypotheses Partition (IC-18, v2.89.0)
+## Hypotheses Partition (IC-18; engine v2 per #530/ADR-105)
 
 **pk:** `USER#matthew#SOURCE#hypotheses`  
 **sk:** `HYPOTHESIS#<ISO-timestamp>`
 
-Generated weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT). Cross-domain hypotheses that the other 144 tools don't explicitly monitor. Confirmed hypotheses graduate to permanent checks; refuted ones archive.
+Generated weekly by `hypothesis-engine` Lambda (Sunday 11 AM PT). Engine v2 (2026-07-04): each hypothesis carries a **frozen, pre-registered `test_spec`**; weekly checks are **deterministic** (effect size + moving-block-bootstrap 95% CI via `stats_core`) and the LLM only narrates resolutions. Lifecycle: `pending → confirming → confirmed`, or `refuted`, or `archived` (window expired undecided).
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `hypothesis_id` | string | ISO timestamp (SK suffix) |
-| `date_generated` | string | YYYY-MM-DD |
-| `hypothesis` | string | Hypothesis statement |
+| `hypothesis_id` | string | Slug (e.g. `hyp_protein_deep_sleep`) |
+| `hypothesis` | string | Hypothesis statement (one sentence) |
 | `domains` | list | Pillars involved e.g. `["sleep", "nutrition"]` |
-| `numeric_criteria` | object | Measurable confirmation criteria |
-| `confirmation_checks` | number | Times confirmed so far (need 3 to promote) |
-| `status` | string | `active` / `confirmed` / `refuted` / `expired` |
-| `verdict` | string | AI-generated verdict on current evidence |
-| `expiry_date` | string | Hard expiry (30 days from generation) |
-| `promoted_to` | string | `permanent_check` if promoted (null otherwise) |
-| `generated_at` | string | ISO timestamp |
+| `evidence` | string | Founding evidence (generation-time, cites dates/values) |
+| `confirmation_criteria` | string | Prose criteria (numeric, human-readable) |
+| `test_spec` | map | **FROZEN pre-registration** — `condition_metric`, `condition_op` (`>=`/`<=`/`median_split`), `condition_threshold`, `outcome_metric`, `direction` (`higher`/`lower`), `min_effect`, `lag_days`. Never revised after creation |
+| `pre_registered_at` | string | ISO timestamp the spec was frozen (= created_at) |
+| `engine_version` | number | 2 for v2 records; absent on v1 |
+| `status` | string | `pending` / `confirming` / `confirmed` / `refuted` / `archived` |
+| `deterministic_verdict` | string | Last check's computed verdict: `supported` / `contradicted` / `inconclusive` |
+| `effect_size` | number | mean(outcome on condition days) − mean(comparison days), outcome units |
+| `ci95_low` / `ci95_high` | number | Moving-block-bootstrap 95% CI on the effect |
+| `cohens_d` | number | Standardized effect |
+| `n_condition` / `n_comparison` | number | Days per arm at last check |
+| `days_observed` | number | Qualifying days since pre-registration |
+| `mean_condition` / `mean_comparison` | number | Arm means |
+| `check_count` | number | Times checked |
+| `last_checked` / `last_evidence` | string | Verdict trail (evidence is the deterministic sentence, + optional Haiku narration on resolutions) |
+| `monitoring_window_days` | number | 7-30; confirmation requires the full window observed |
+| `confidence` | string | LLM-stated `low`/`medium`/`high` — graded by the calibration ledger |
+| `created_at` | string | ISO timestamp |
 
-Access via `get_active_hypotheses`, `evaluate_hypothesis` MCP tools.
+Access via `get_hypotheses`, `update_hypothesis_outcome` MCP tools; public at `/api/hypotheses`.
+
+---
+
+## Calibration Partition (#530/ADR-105, 2026-07-04)
+
+**pk:** `USER#matthew#SOURCE#calibration`  
+**sk:** `CALIB#<YYYY-MM-DD>#<hypothesis_id>`
+
+One row per hypothesis **resolution** (confirmed / refuted / expired_undecided), written by the hypothesis engine at resolution time. The engine's long-run scoreboard — answers "do 'high confidence' hypotheses confirm more often?" (consumed by the calibration scoreboard story). Taxonomy class **`CROSS_PHASE`**: survives experiment resets (it measures the platform, not a cycle).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `record_type` | string | `hypothesis_resolution` |
+| `hypothesis_id` / `hypothesis` | string | What resolved |
+| `stated_confidence` | string | The LLM's `low`/`medium`/`high` at creation |
+| `outcome` | string | `confirmed` / `refuted` / `expired_undecided` |
+| `predicted_direction` | string | From the frozen spec |
+| `effect_size`, `ci95_low/high`, `cohens_d` | number | Final measured stats |
+| `n_condition` / `n_comparison` / `days_observed` | number | Final arm sizes |
+| `test_spec` | map | The frozen spec, copied for audit |
+| `pre_registered_at` / `resolved_at` | string | The pre-registration proof pair |
 
 ---
 

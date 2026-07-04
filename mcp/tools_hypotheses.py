@@ -88,24 +88,36 @@ def tool_get_hypotheses(args: dict):
 
     formatted = []
     for h in items:
-        formatted.append(
-            {
-                "sk": h.get("sk", ""),
-                "hypothesis_id": h.get("hypothesis_id", ""),
-                "hypothesis": h.get("hypothesis", ""),
-                "status": h.get("status", "pending"),
-                "domains": h.get("domains", []),
-                "confidence": h.get("confidence", "low"),
-                "evidence": h.get("evidence", ""),
-                "confirmation_criteria": h.get("confirmation_criteria", ""),
-                "actionable_if_confirmed": h.get("actionable_if_confirmed", ""),
-                "monitoring_window_days": h.get("monitoring_window_days", 21),
-                "check_count": h.get("check_count", 0),
-                "created_at": h.get("created_at", "")[:10],
-                "last_checked": h.get("last_checked", "")[:10],
-                "evidence_log": h.get("evidence_log", []),
-            }
-        )
+        entry = {
+            "sk": h.get("sk", ""),
+            "hypothesis_id": h.get("hypothesis_id", ""),
+            "hypothesis": h.get("hypothesis", ""),
+            "status": h.get("status", "pending"),
+            "domains": h.get("domains", []),
+            "confidence": h.get("confidence", "low"),
+            "evidence": h.get("evidence", ""),
+            "confirmation_criteria": h.get("confirmation_criteria", ""),
+            "actionable_if_confirmed": h.get("actionable_if_confirmed", ""),
+            "monitoring_window_days": h.get("monitoring_window_days", 21),
+            "check_count": h.get("check_count", 0),
+            "created_at": h.get("created_at", "")[:10],
+            "last_checked": h.get("last_checked", "")[:10],
+            "evidence_log": h.get("evidence_log", []),
+        }
+        # #530 (engine v2): the frozen pre-registered spec + the deterministic
+        # test's measured stats. Absent on v1 records (they age out in <=30 days).
+        if h.get("test_spec"):
+            entry["test_spec"] = h["test_spec"]
+            entry["pre_registered_at"] = (h.get("pre_registered_at") or h.get("created_at", ""))[:10]
+        if h.get("deterministic_verdict"):
+            entry["deterministic_verdict"] = h["deterministic_verdict"]
+            entry["effect_size"] = h.get("effect_size")
+            entry["ci95"] = {"low": h.get("ci95_low"), "high": h.get("ci95_high")} if h.get("ci95_low") is not None else None
+            entry["cohens_d"] = h.get("cohens_d")
+            entry["n_condition"] = h.get("n_condition")
+            entry["n_comparison"] = h.get("n_comparison")
+            entry["days_observed"] = h.get("days_observed")
+        formatted.append(entry)
 
     return {
         "total": len(formatted),
@@ -113,7 +125,10 @@ def tool_get_hypotheses(args: dict):
         "hypotheses": formatted,
         "note": (
             "Generated weekly by hypothesis-engine Lambda (Sunday 11 AM PT). "
-            "Lifecycle: pending -> confirming -> confirmed (or refuted). "
+            "Lifecycle: pending -> confirming -> confirmed (or refuted / expired). "
+            "Engine v2 (#530): each hypothesis carries a FROZEN pre-registered test_spec; "
+            "verdicts are deterministic (effect size + block-bootstrap 95% CI via stats_core) "
+            "and the LLM only narrates resolutions. Resolutions feed the SOURCE#calibration ledger. "
             "Confirmed hypotheses flow into AI coaching via platform_memory. "
             "Use update_hypothesis_outcome to record manual observations."
         ),

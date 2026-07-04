@@ -1459,6 +1459,19 @@ def handle_hypotheses() -> dict:
                 # refuted verdicts to cite numbers). Null until the first check lands.
                 "last_checked": it.get("last_checked"),
                 "last_evidence": it.get("last_evidence"),
+                # #530 (engine v2): the FROZEN pre-registered test spec + the
+                # deterministic test's measured stats — the public proof that the
+                # criterion predates the data that graded it (ADR-105). Null on
+                # v1-era records (they age out within 30 days).
+                "test_spec": it.get("test_spec"),
+                "pre_registered_at": it.get("pre_registered_at") or it.get("created_at"),
+                "deterministic_verdict": it.get("deterministic_verdict"),
+                "effect_size": it.get("effect_size"),
+                "ci95_low": it.get("ci95_low"),
+                "ci95_high": it.get("ci95_high"),
+                "n_condition": it.get("n_condition"),
+                "n_comparison": it.get("n_comparison"),
+                "days_observed": it.get("days_observed"),
             }
         )
 
