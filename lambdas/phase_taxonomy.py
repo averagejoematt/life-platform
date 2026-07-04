@@ -87,6 +87,10 @@ SOURCE_CLASS: dict[str, str] = {
     "supplements": CROSS_PHASE,  # ADR-077 dec A: medication-safety — never hide
     "chronicling": CROSS_PHASE,  # ADR-077 dec D: frozen pre-platform "before" archive
     "subscribers": CROSS_PHASE,  # audience identity
+    "calibration": CROSS_PHASE,  # #530/ADR-105: hypothesis-resolution ledger — the engine's
+    # long-run scoreboard ("do high-confidence bets confirm more often?") is a measurement of
+    # the PLATFORM, not of a cycle; wiping it at reset would destroy the only data that can
+    # answer the calibration question. Rows carry pre_registered_at so per-cycle views filter by date.
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "habit_scores": EXPERIMENT_SCOPED,  # see vice_streaks split note in ADR-077 dec G

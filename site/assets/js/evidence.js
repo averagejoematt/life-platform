@@ -1268,14 +1268,29 @@ function hypCard(h) {
   const domains = (h.domains || []).map(esc).join(" ↔ ") || "cross-domain";
   const checks = Math.round(Number(h.check_count) || 0);
   const formed = h.created_at ? String(h.created_at).slice(0, 10) : null;
+  const preReg = h.pre_registered_at ? String(h.pre_registered_at).slice(0, 10) : formed;
   const checked = h.last_checked ? String(h.last_checked).slice(0, 10) : null;
   const decided = status === "confirmed" || status === "refuted";
   const meta = [
     h.confidence && `confidence ${h.confidence}`,
     checks === 0 ? "not yet checked" : `${checks} check${checks === 1 ? "" : "s"}`,
-    formed && `formed ${formed}`,
+    // #530: pre-registration is the honesty claim — the criterion predates the grading data
+    preReg && (h.test_spec ? `pre-registered ${preReg}` : `formed ${preReg}`),
     checked && `last checked ${checked}`,
   ].filter(Boolean).join("  ·  ");
+  // #530 (engine v2): the frozen deterministic criterion + the measured effect.
+  // Rendered from the spec fields only — nothing invented client-side.
+  let spec = "";
+  if (h.test_spec && h.test_spec.condition_metric) {
+    const s = h.test_spec;
+    const cond = s.condition_op === "median_split" ? `${s.condition_metric} above its median` : `${s.condition_metric} ${s.condition_op} ${s.condition_threshold}`;
+    const lag = Math.round(Number(s.lag_days) || 0);
+    spec = `<p class="rd-line"><span class="label">frozen test</span> ${esc(s.outcome_metric)} ${esc(s.direction || "")}${lag ? ` ${lag}d after` : " on"} ${esc(cond)} days</p>`;
+  }
+  let measured = "";
+  if (h.effect_size != null && h.ci95_low != null) {
+    measured = `<p class="rd-line"><span class="label">measured</span> effect ${h.effect_size > 0 ? "+" : ""}${esc(h.effect_size)} (95% CI ${esc(h.ci95_low)} to ${esc(h.ci95_high)}, n=${esc(h.n_condition ?? "—")}/${esc(h.n_comparison ?? "—")} days)</p>`;
+  }
   const verdict = h.last_evidence
     ? `<p class="rd-why hyp-verdict"><span class="label">${decided ? "the verdict" : "latest check"} — </span>${esc(h.last_evidence)}</p>`
     : "";
@@ -1283,7 +1298,7 @@ function hypCard(h) {
     ? `<details class="hyp-ev"><summary class="label">the data behind it</summary><p class="rd-why">${esc(h.evidence)}</p></details>`
     : "";
   return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${domains}</h3><span class="${badgeCls}">${esc(status)}</span></header>` +
-    `<p class="rd-why">${esc(h.hypothesis || "")}</p>${verdict}${founding}<p class="rd-meta label">${esc(meta)}</p></article>`;
+    `<p class="rd-why">${esc(h.hypothesis || "")}</p>${spec}${measured}${verdict}${founding}<p class="rd-meta label">${esc(meta)}</p></article>`;
 }
 async function renderDiscoveries(d) {
   // Real discoveries first: ai_findings = FDR-significant correlations computed from

@@ -1,32 +1,53 @@
 """
 hypothesis_engine_lambda.py — IC-18: Cross-Domain Hypothesis Engine
-v1.2.0 — AI-4 + IC-19 D3B: Conti intervention framing, experiment cross-reference, experiment suggestions
+v2.0.0 — #530/ADR-105: the math arrives — deterministic test specs, effect sizes,
+pre-registration, calibration. (v1.2.0 was AI-4 + IC-19 D3B.)
 
-Scientific method applied to personal health data. Runs weekly (Sunday 11 AM PT)
-after the Weekly Digest, surfacing non-obvious cross-domain correlations that the
-existing 144 tools don't explicitly monitor.
+Scientific method applied to personal health data — now with the method. Runs
+weekly (Sunday 11 AM PT) after the Weekly Digest, surfacing non-obvious
+cross-domain relationships the existing tools don't explicitly monitor.
+
+The v2 contract (ADR-105 rule 3 — deterministic before narrative):
+  - At CREATION the LLM must emit a machine-checkable `test_spec` (condition
+    metric/op/threshold, outcome metric, direction, min effect, lag) alongside
+    the prose. The spec is validated deterministically and FROZEN — that is the
+    pre-registration. Hypotheses without a parseable spec are rejected.
+  - At CHECK time the verdict is pure Python: split days into condition vs
+    comparison arms per the frozen spec, compute the effect size + a
+    moving-block-bootstrap 95% CI (stats_core), and decide supported /
+    contradicted / inconclusive from the CI. No LLM sees the data.
+  - Haiku only NARRATES resolutions (fail-soft to the deterministic evidence
+    string) — the weekly per-hypothesis Haiku verdict calls are gone, so v2 is
+    a net AI-cost reduction.
+  - Every resolution (confirmed / refuted / expired-undecided) writes a row to
+    the CALIBRATION ledger so "do 'high confidence' hypotheses confirm more
+    often?" is answerable (consumed by the calibration scoreboard story).
 
 Workflow:
-  1. Pull 14 days of all-pillar data from DynamoDB
-  2. Load existing pending hypotheses (to check for confirmation/refutation)
-  3. Run Claude Sonnet: generate 3-5 new cross-domain hypotheses
-  4. Check pending hypotheses against current data
-  5. Write results to DDB SOURCE#hypotheses partition
+  1. Pull 30 days of all-pillar data from DynamoDB (checks need the full window;
+     generation sees the last 14 days)
+  2. Load existing pending hypotheses; evaluate each frozen test_spec
+     deterministically; resolve/advance statuses; write calibration rows
+  3. Generate 3-5 new hypotheses (each with a frozen test_spec) if room exists
+  4. Write results to DDB SOURCE#hypotheses partition
 
 Hypothesis lifecycle:
-  pending → confirming → confirmed → archived
-  pending → refuted    → archived
+  pending → confirming → confirmed          (supported + full window observed)
+  pending/confirming → refuted              (CI excludes 0 in the WRONG direction)
+  pending/confirming → archived (undecided) (window expired without a verdict)
 
 DDB pattern:
-  pk = USER#matthew#SOURCE#hypotheses
-  sk = HYPOTHESIS#<ISO-timestamp>
+  pk = USER#matthew#SOURCE#hypotheses    sk = HYPOTHESIS#<ISO-timestamp>
+  pk = USER#matthew#SOURCE#calibration   sk = CALIB#<date>#<hypothesis_id>
 
 Downstream consumers:
-  - daily-insight-compute Lambda can pull 'pending' hypotheses and monitor for evidence
   - Digest Lambdas inject confirming/refuting observations via IC-16 progressive context
   - MCP tools: get_hypotheses, update_hypothesis_outcome
+  - /api/hypotheses (evidence page "What the machine suspects" — shows the
+    pre-registered spec + measured effect)
 
-Cost: ~$0.05/week (one Sonnet call + DDB reads/writes)
+Cost: ~$0.05/week (one generation call + DDB reads/writes; check path is free
+except a small narration call when something resolves)
 """
 
 import json
@@ -40,6 +61,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import stats_core  # shared layer (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -75,6 +97,7 @@ AI_MODEL = os.environ.get("AI_MODEL", "claude-haiku-4-5-20251001")
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 HYPOTHESES_PK = f"USER#{USER_ID}#SOURCE#hypotheses"
+CALIBRATION_PK = f"USER#{USER_ID}#SOURCE#calibration"  # #530: resolution ledger (cross_phase)
 MAX_NEW_HYPOTHESES = 5
 MAX_PENDING_HYPOTHESES = 20  # don't accumulate stale hypotheses
 
@@ -83,6 +106,8 @@ MIN_DATA_DAYS = 10  # require >= 10 days with sufficient metrics before generati
 MIN_METRICS_PER_DAY = 5  # a day needs >= 5 non-null metrics to count as "complete"
 HARD_EXPIRY_DAYS = 30  # archive any hypothesis older than 30 days regardless of status
 MIN_SAMPLE_DAYS_FOR_CHECK = 7  # require >= 7 data days since creation before evaluating
+LOOKBACK_DAYS = 30  # #530: checks evaluate the full monitoring window (generation sees the last GENERATION_DAYS)
+GENERATION_DAYS = 14
 REQUIRED_HYPOTHESIS_FIELDS = {
     "hypothesis_id",
     "hypothesis",
@@ -92,10 +117,52 @@ REQUIRED_HYPOTHESIS_FIELDS = {
     "monitoring_window_days",
     "confidence",
     "actionable_if_confirmed",
+    "test_spec",  # #530: no pre-registered spec, no hypothesis
 }
 VALID_CONFIDENCE_LEVELS = {"low", "medium", "high"}
 # Pattern: confirmation criteria should contain at least one number (threshold/percentage)
 NUMERIC_PATTERN = re.compile(r"\d+\.?\d*\s*(%|days?|hours?|minutes?|ms|points?|g|kg|lbs?|cal|kcal|bpm|mg)")
+
+# ── #530: the deterministic test-spec contract ────────────────────────────────
+# The metric vocabulary is exactly what build_data_narrative() emits — a spec can
+# only reference values the check path can actually compute. Keep the two in sync.
+SPEC_METRICS = frozenset(
+    {
+        "recovery",
+        "hrv",
+        "rhr",
+        "sleep_score",
+        "sleep_efficiency",
+        "deep_sleep_hrs",
+        "rem_hrs",
+        "total_sleep_hrs",
+        "stress",
+        "body_battery",
+        "steps_garmin",
+        "calories",
+        "protein_g",
+        "carbs_g",
+        "fat_g",
+        "weight_lbs",
+        "steps",
+        "active_cal",
+        "mindful_min",
+        "glucose_avg",
+        "walking_speed",
+        "workout",
+        "training_load",
+        "zone2_min",
+        "mood",
+        "energy",
+        "journal_stress",
+        "sleep_onset_min",
+        "bed_temp_f",
+    }
+)
+VALID_SPEC_OPS = frozenset({">=", "<=", "median_split"})
+VALID_SPEC_DIRECTIONS = frozenset({"higher", "lower"})
+MIN_DAYS_PER_ARM = 5  # each arm needs 5+ days (also stats_core's bootstrap floor)
+MAX_LAG_DAYS = 3
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -158,10 +225,11 @@ def fetch_profile():
     return _shared_fetch_profile(table, USER_ID)
 
 
-def gather_data():
-    """Fetch 14 days of multi-source data for hypothesis generation."""
+def gather_data(days=LOOKBACK_DAYS):
+    """Fetch multi-source data. #530: 30 days — deterministic checks evaluate the
+    hypothesis's full monitoring window; generation only sees the last GENERATION_DAYS."""
     end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    start_date = (datetime.now(timezone.utc) - timedelta(days=13)).strftime("%Y-%m-%d")
+    start_date = (datetime.now(timezone.utc) - timedelta(days=days - 1)).strftime("%Y-%m-%d")
 
     sources = ["whoop", "garmin", "macrofactor", "apple_health", "withings", "strava", "notion", "habitify", "eightsleep"]
 
@@ -210,6 +278,9 @@ def store_hypothesis(hypothesis: dict):
         "sk": sk,
         "status": "pending",
         "created_at": now.isoformat(),
+        # #530: the spec is FROZEN as of this write — checks read it, never revise it
+        "pre_registered_at": now.isoformat(),
+        "engine_version": 2,
         "check_count": 0,
         **{k: v for k, v in hypothesis.items() if v is not None},
     }
@@ -235,8 +306,24 @@ def store_hypothesis(hypothesis: dict):
     logger.info(f"Stored hypothesis: {hypothesis.get('hypothesis_id', sk)}")
 
 
-def update_hypothesis_status(sk: str, status: str, evidence_note: str = ""):
-    """Update hypothesis status and increment check_count."""
+# #530: the deterministic-check stat fields persisted onto the HYPOTHESIS# record
+# each check (read by MCP get_hypotheses, /api/hypotheses, and the digests).
+_CHECK_STAT_FIELDS = (
+    "effect_size",
+    "ci95_low",
+    "ci95_high",
+    "cohens_d",
+    "n_condition",
+    "n_comparison",
+    "days_observed",
+    "mean_condition",
+    "mean_comparison",
+)
+
+
+def update_hypothesis_status(sk: str, status: str, evidence_note: str = "", stats: dict = None):
+    """Update hypothesis status, increment check_count, and (#530) persist the
+    deterministic test's effect size / CI / arm counts + verdict."""
     now = datetime.now(timezone.utc).isoformat()
     try:
         update_expr = "SET #s = :s, last_checked = :now, check_count = if_not_exists(check_count, :zero) + :one"
@@ -251,6 +338,16 @@ def update_hypothesis_status(sk: str, status: str, evidence_note: str = ""):
         if evidence_note:
             update_expr += ", last_evidence = :ev"
             expr_vals[":ev"] = evidence_note
+
+        if stats:
+            update_expr += ", deterministic_verdict = :dv"
+            expr_vals[":dv"] = stats.get("verdict", "inconclusive")
+            for field in _CHECK_STAT_FIELDS:
+                val = stats.get(field)
+                if val is None:
+                    continue
+                update_expr += f", {field} = :{field}"
+                expr_vals[f":{field}"] = Decimal(str(val)) if isinstance(val, (int, float)) else val
 
         table.update_item(
             Key={"pk": HYPOTHESES_PK, "sk": sk},
@@ -388,6 +485,11 @@ def validate_hypothesis(hyp, existing_texts=None):
     if not NUMERIC_PATTERN.search(criteria):
         issues.append("confirmation_criteria must contain numeric threshold with units")
 
+    # #530: the machine-checkable test spec IS the pre-registration — no spec, no hypothesis
+    spec_ok, spec_issues = validate_test_spec(hyp.get("test_spec"))
+    if not spec_ok:
+        issues.append(f"test_spec invalid: {'; '.join(spec_issues)}")
+
     # Monitoring window
     window = hyp.get("monitoring_window_days", 0)
     try:
@@ -439,67 +541,287 @@ def enforce_hard_expiry(all_hypotheses):
     return updates
 
 
-# ── IC-19 D3B: Load active N=1 experiments for hypothesis cross-reference ──
-def load_active_experiments():
-    """Query active N=1 experiments from DynamoDB.
+# (IC-19 D3B's load_active_experiments was deleted in v2 — it existed only to
+# feed extra context into the Haiku check prompt, and the check is now
+# deterministic. The experiment cross-reference lives on in tools_challenges'
+# hypothesis_graduate flow.)
 
-    Used to cross-reference hypothesis evidence: if an active experiment is testing
-    something related to a pending hypothesis, that is additive confirmation evidence
-    (Chen: check ATL/CTL context; Henning: small N, keep claims modest).
 
-    Returns list of experiment dicts (id, name, hypothesis, start_date).
+def validate_test_spec(spec):
+    """#530: Validate a machine-checkable test spec. Returns (is_valid, issues).
+
+    A valid spec is the pre-registration contract: condition metric/op/threshold,
+    outcome metric, expected direction, optional minimum effect (outcome units),
+    optional lag. Both metrics must come from the build_data_narrative vocabulary
+    or the check path could never evaluate it.
     """
-    EXPERIMENTS_PK = f"USER#{USER_ID}#SOURCE#experiments"
+    issues = []
+    if not isinstance(spec, dict):
+        return False, ["test_spec must be an object"]
+
+    cond_m = spec.get("condition_metric")
+    out_m = spec.get("outcome_metric")
+    if cond_m not in SPEC_METRICS:
+        issues.append(f"condition_metric '{cond_m}' not in the measurable vocabulary")
+    if out_m not in SPEC_METRICS:
+        issues.append(f"outcome_metric '{out_m}' not in the measurable vocabulary")
+    if cond_m and cond_m == out_m:
+        issues.append("condition_metric and outcome_metric must differ")
+
+    op = spec.get("condition_op")
+    if op not in VALID_SPEC_OPS:
+        issues.append(f"condition_op must be one of {sorted(VALID_SPEC_OPS)}, got '{op}'")
+    if op in (">=", "<="):
+        try:
+            float(spec.get("condition_threshold"))
+        except (TypeError, ValueError):
+            issues.append(f"condition_threshold must be numeric for op '{op}'")
+
+    if spec.get("direction") not in VALID_SPEC_DIRECTIONS:
+        issues.append(f"direction must be one of {sorted(VALID_SPEC_DIRECTIONS)}")
+
+    min_effect = spec.get("min_effect", 0)
     try:
-        from boto3.dynamodb.conditions import Key
+        if float(min_effect) < 0:
+            issues.append("min_effect must be >= 0")
+    except (TypeError, ValueError):
+        issues.append(f"min_effect must be numeric, got {min_effect!r}")
 
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(EXPERIMENTS_PK) & Key("sk").begins_with("EXP#"),
-                }
-            )
-        )
-        items = []
-        for item in resp.get("Items", []):
-            status = item.get("status", "")
-            if status == "active":
-                items.append(
-                    {
-                        "experiment_id": item.get("experiment_id", ""),
-                        "name": str(item.get("name", "")),
-                        "hypothesis": str(item.get("hypothesis", "")),
-                        "start_date": str(item.get("start_date", "")),
-                    }
-                )
-        return items
-    except Exception as e:
-        logger.warning(f"load_active_experiments failed (non-fatal): {e}")
-        return []
+    lag = spec.get("lag_days", 0)
+    try:
+        if not (0 <= int(lag) <= MAX_LAG_DAYS):
+            issues.append(f"lag_days must be 0-{MAX_LAG_DAYS}, got {lag}")
+    except (TypeError, ValueError):
+        issues.append(f"lag_days must be an integer, got {lag!r}")
+
+    return len(issues) == 0, issues
 
 
-def validate_check_verdict(result):
-    """AI-4: Validate the check verdict from Haiku.
+def evaluate_test_spec(spec, daily_rows, since_date):
+    """#530: THE deterministic hypothesis test (ADR-105 rule 3) — pure Python, no LLM.
 
-    Returns (is_valid, verdict, evidence).
+    Splits condition-days from comparison-days per the frozen spec (threshold or
+    median split), pairs each condition day's outcome at the spec's lag, then
+    computes the effect size (mean difference, outcome units) with a moving-block
+    bootstrap 95% CI and Cohen's d via stats_core.
+
+    Verdict:
+      supported     — CI excludes 0 in the predicted direction AND |effect| >= min_effect
+      contradicted  — CI excludes 0 in the OPPOSITE direction
+      inconclusive  — arms too thin or CI straddles 0
+
+    Returns a stats dict (always includes verdict + arm counts; effect/CI fields
+    are None when uncomputable).
     """
-    if not isinstance(result, dict):
-        return False, "insufficient", "Invalid response structure"
+    lag = int(spec.get("lag_days", 0) or 0)
+    op = spec.get("condition_op", "median_split")
+    direction = spec.get("direction", "higher")
+    min_effect = float(spec.get("min_effect", 0) or 0)
 
-    verdict = result.get("verdict", "").lower().strip()
-    evidence = result.get("evidence", "")
+    by_date = {r["date"]: r for r in daily_rows if r.get("date")}
+    pairs = []  # (condition_value, outcome_value) per qualifying day
+    for d in sorted(by_date):
+        if d < since_date:
+            continue
+        cv = by_date[d].get(spec.get("condition_metric"))
+        if cv is None:
+            continue
+        if lag:
+            try:
+                od = (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=lag)).strftime("%Y-%m-%d")
+            except ValueError:
+                continue
+        else:
+            od = d
+        ov = by_date.get(od, {}).get(spec.get("outcome_metric"))
+        if ov is None:
+            continue
+        try:
+            pairs.append((float(cv), float(ov)))
+        except (TypeError, ValueError):
+            continue
 
-    if verdict not in ("confirming", "refuted", "insufficient"):
-        return False, "insufficient", f"Invalid verdict: {verdict}"
+    result = {
+        "verdict": "inconclusive",
+        "days_observed": len(pairs),
+        "n_condition": 0,
+        "n_comparison": 0,
+        "mean_condition": None,
+        "mean_comparison": None,
+        "effect_size": None,
+        "ci95_low": None,
+        "ci95_high": None,
+        "cohens_d": None,
+    }
+    if len(pairs) < 2 * MIN_DAYS_PER_ARM:
+        return result
 
-    if not evidence or len(evidence) < 10:
-        return False, "insufficient", "Evidence too brief"
+    cond_values = [cv for cv, _ in pairs]
+    if op == "median_split":
+        threshold = sorted(cond_values)[len(cond_values) // 2]
+        in_condition = [cv > threshold for cv, _ in pairs]
+    elif op == ">=":
+        threshold = float(spec.get("condition_threshold"))
+        in_condition = [cv >= threshold for cv, _ in pairs]
+    else:  # "<="
+        threshold = float(spec.get("condition_threshold"))
+        in_condition = [cv <= threshold for cv, _ in pairs]
 
-    # AI-4: Require evidence to cite at least one number for confirming/refuted verdicts
-    if verdict in ("confirming", "refuted") and not re.search(r"\d", evidence):
-        return False, "insufficient", "Evidence must cite specific values for confirming/refuted verdicts"
+    condition_arm = [ov for (_, ov), hit in zip(pairs, in_condition) if hit]
+    comparison_arm = [ov for (_, ov), hit in zip(pairs, in_condition) if not hit]
+    result["n_condition"] = len(condition_arm)
+    result["n_comparison"] = len(comparison_arm)
+    if len(condition_arm) < MIN_DAYS_PER_ARM or len(comparison_arm) < MIN_DAYS_PER_ARM:
+        return result
 
-    return True, verdict, evidence
+    mean_c = sum(condition_arm) / len(condition_arm)
+    mean_o = sum(comparison_arm) / len(comparison_arm)
+    effect = mean_c - mean_o
+    ci = stats_core.bootstrap_mean_diff_ci(comparison_arm, condition_arm)
+    d_val = stats_core.cohens_d(comparison_arm, condition_arm)
+    result.update(
+        {
+            "mean_condition": round(mean_c, 3),
+            "mean_comparison": round(mean_o, 3),
+            "effect_size": round(effect, 3),
+            "cohens_d": round(d_val, 3) if d_val is not None else None,
+        }
+    )
+    if ci is None:
+        return result
+    lo, hi = ci
+    result["ci95_low"] = round(lo, 3)
+    result["ci95_high"] = round(hi, 3)
+
+    predicted_positive = direction == "higher"
+    excludes_zero_predicted = (lo > 0) if predicted_positive else (hi < 0)
+    excludes_zero_opposite = (hi < 0) if predicted_positive else (lo > 0)
+    if excludes_zero_predicted and abs(effect) >= min_effect:
+        result["verdict"] = "supported"
+    elif excludes_zero_opposite:
+        result["verdict"] = "contradicted"
+    return result
+
+
+def deterministic_evidence(spec, stats):
+    """Human-readable evidence sentence built ONLY from the computed stats —
+    this is what gets stored (and what Haiku may narrate, never replace)."""
+    cond_m = spec.get("condition_metric", "?")
+    out_m = spec.get("outcome_metric", "?")
+    op = spec.get("condition_op", "median_split")
+    cond_desc = f"{cond_m} {op} {spec.get('condition_threshold')}" if op in (">=", "<=") else f"high-{cond_m} (above median)"
+    lag = int(spec.get("lag_days", 0) or 0)
+    lag_note = f" {lag}d later" if lag else ""
+    if stats.get("effect_size") is None:
+        return (
+            f"Deterministic test inconclusive: {stats.get('n_condition', 0)} {cond_desc} days vs "
+            f"{stats.get('n_comparison', 0)} comparison days over {stats.get('days_observed', 0)} observed "
+            f"(need {MIN_DAYS_PER_ARM}+ per arm)."
+        )
+    line = (
+        f"Deterministic test: {out_m}{lag_note} averaged {stats['mean_condition']} on {stats['n_condition']} "
+        f"{cond_desc} days vs {stats['mean_comparison']} on {stats['n_comparison']} comparison days — "
+        f"effect {stats['effect_size']:+g}"
+    )
+    if stats.get("ci95_low") is not None:
+        line += f" (95% CI [{stats['ci95_low']:g}, {stats['ci95_high']:g}]"
+        if stats.get("cohens_d") is not None:
+            line += f", d={stats['cohens_d']:g}"
+        line += ")"
+    return line + f" → {stats['verdict']}."
+
+
+def build_calibration_item(hyp, stats, outcome, resolved_at):
+    """#530: One calibration-ledger row per resolution — the raw material for
+    'do high-confidence hypotheses confirm more often?'. Pure builder (tested);
+    the writer is a thin put_item. CROSS_PHASE: the engine's long-run scoreboard
+    survives experiment resets (see phase_taxonomy)."""
+    hyp_id = hyp.get("hypothesis_id") or hyp.get("sk", "").replace("HYPOTHESIS#", "")
+    return {
+        "pk": CALIBRATION_PK,
+        "sk": f"CALIB#{resolved_at[:10]}#{hyp_id}",
+        "record_type": "hypothesis_resolution",
+        "hypothesis_id": hyp_id,
+        "hypothesis": hyp.get("hypothesis", ""),
+        "stated_confidence": hyp.get("confidence", "low"),
+        "outcome": outcome,  # confirmed | refuted | expired_undecided
+        "predicted_direction": (hyp.get("test_spec") or {}).get("direction"),
+        "effect_size": stats.get("effect_size"),
+        "ci95_low": stats.get("ci95_low"),
+        "ci95_high": stats.get("ci95_high"),
+        "cohens_d": stats.get("cohens_d"),
+        "n_condition": stats.get("n_condition"),
+        "n_comparison": stats.get("n_comparison"),
+        "days_observed": stats.get("days_observed"),
+        "test_spec": hyp.get("test_spec"),
+        "pre_registered_at": hyp.get("created_at", ""),
+        "resolved_at": resolved_at,
+    }
+
+
+def write_calibration_row(hyp, stats, outcome):
+    """Persist one resolution to the calibration ledger (fail-soft)."""
+    try:
+        item = build_calibration_item(hyp, stats, outcome, datetime.now(timezone.utc).isoformat())
+        item = {k: v for k, v in item.items() if v is not None}
+
+        def to_decimal(obj):
+            if isinstance(obj, float):
+                return Decimal(str(obj))
+            if isinstance(obj, dict):
+                return {k: to_decimal(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [to_decimal(v) for v in obj]
+            return obj
+
+        try:
+            from compute_metadata import tag_record
+
+            item = tag_record(item, source_id="calibration")
+        except ImportError:
+            pass
+        table.put_item(Item=to_decimal(item))
+        logger.info(f"[#530] Calibration row written: {item['sk']} outcome={outcome}")
+    except Exception as e:
+        logger.warning(f"write_calibration_row failed (non-fatal): {e}")
+
+
+def narrate_resolution(hyp, det_evidence, new_status, api_key):
+    """#530: Haiku narrates a resolution the deterministic test already decided
+    (ADR-104 pattern). Fail-soft: any error returns '' and the stored evidence
+    stays the deterministic sentence. Only called on resolutions, so v2's check
+    path costs ~nothing in normal weeks."""
+    if not api_key:
+        return ""
+    prompt = (
+        f"A pre-registered health hypothesis just resolved as {new_status.upper()}.\n"
+        f"Hypothesis: {hyp.get('hypothesis', '')}\n"
+        f"Deterministic result (already computed — the decision is made): {det_evidence}\n\n"
+        "Write ONE plain-language sentence explaining what happened for a general reader. "
+        "Use ONLY numbers that appear in the result above; do not invent, extrapolate, or add any. "
+        "Respond with the sentence only."
+    )
+    payload = json.dumps({"model": AI_MODEL_HAIKU, "max_tokens": 150, "messages": [{"role": "user", "content": prompt}]}).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        method="POST",
+    )
+    try:
+        from retry_utils import call_anthropic_raw
+
+        resp = call_anthropic_raw(req)
+        text = resp["content"][0]["text"].strip()
+        if _HAS_AI_VALIDATOR and text:
+            val = validate_ai_output(text, AIOutputType.GENERIC)
+            if val.blocked:
+                logger.warning("[#530] narration blocked: %s", val.block_reason)
+                return ""
+        return text
+    except Exception as e:
+        logger.info(f"[#530] narration skipped (non-fatal): {e}")
+        return ""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -537,6 +859,12 @@ STRICT REQUIREMENTS (hypotheses that fail these are rejected):
 - confidence must be "low", "medium", or "high" based on how many data points support it
 - monitoring_window_days must be 7-30 (not shorter, not longer)
 - evidence must cite specific dates or values from the data provided
+- test_spec is MANDATORY and is the PRE-REGISTERED deterministic test: the platform will
+  split days into condition vs comparison arms per this exact spec, compute the effect size
+  with a bootstrap confidence interval, and confirm/refute WITHOUT any further AI judgment.
+  The spec is FROZEN at creation — it cannot be revised later. Both metrics MUST come from
+  the metric vocabulary in the user message (the exact keys of the data rows). Pick the
+  test you would stake the hypothesis on.
 
 FRAMING RULE — NEGATIVE PSYCHOLOGICAL VARIABLES (Conti):
 Hypotheses about stress, anxiety, low mood, emotional depletion, or other negative psychological
@@ -580,6 +908,9 @@ Generate {MAX_NEW_HYPOTHESES} cross-domain hypotheses. Each should be:
 - Grounded in a specific pattern you can see in this data
 - Falsifiable with 2-4 weeks of continued observation
 
+METRIC VOCABULARY for test_spec (the ONLY valid condition_metric / outcome_metric values):
+{", ".join(sorted(SPEC_METRICS))}
+
 Return ONLY this JSON structure:
 {{
   "hypotheses": [
@@ -589,6 +920,15 @@ Return ONLY this JSON structure:
       "domains": ["domain1", "domain2"],
       "evidence": "What you saw in this data that suggested it (2-3 sentences, CITE SPECIFIC DATES AND VALUES)",
       "confirmation_criteria": "What would confirm this over 2-4 weeks — MUST include specific numeric thresholds (e.g., 'deep sleep % increases by 5+ points on days following protein >150g')",
+      "test_spec": {{
+        "condition_metric": "<metric from the vocabulary — the day-splitter>",
+        "condition_op": ">=|<=|median_split",
+        "condition_threshold": 150,
+        "outcome_metric": "<different metric from the vocabulary — what should move>",
+        "direction": "higher|lower",
+        "min_effect": 0.5,
+        "lag_days": 0
+      }},
       "effect_size_observed": "The magnitude of the pattern you observed (e.g., '12% higher deep sleep on high-protein days')",
       "monitoring_window_days": 21,
       "confidence": "low|medium|high",
@@ -596,7 +936,13 @@ Return ONLY this JSON structure:
       "actionable_if_confirmed": "What Matthew could change if this is confirmed (1 sentence)"
     }}
   ]
-}}"""
+}}
+
+test_spec field notes:
+- condition_op "median_split" needs no condition_threshold (days above the observed median form the condition arm)
+- direction is the expected move of outcome_metric ON condition days vs comparison days
+- min_effect is in outcome_metric's own units (use 0 if any direction-consistent effect counts)
+- lag_days 0-3: outcome measured this many days AFTER the condition day"""
 
     payload = json.dumps(
         {
@@ -652,18 +998,21 @@ Return ONLY this JSON structure:
 
 
 def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
-    """For each pending hypothesis, check if recent data is confirming or refuting it.
+    """#530: Evaluate each pending hypothesis DETERMINISTICALLY against its frozen
+    test_spec (ADR-105 rule 3). The LLM never sees the data and never decides.
 
-    AI-4 changes:
-    - Uses MIN_SAMPLE_DAYS_FOR_CHECK (7 days) instead of hardcoded 3
-    - Validates Haiku check response structure
-    - Hard expiry enforced separately (in handler)
+    Status transitions (all from the deterministic verdict):
+      contradicted                          → refuted (resolution)
+      supported + full window observed      → confirmed (resolution)
+      supported (window still open)         → confirming
+      inconclusive + window expired         → archived / expired_undecided (resolution)
+      inconclusive (window still open)      → status unchanged, stats recorded
 
-    IC-19 D3B changes:
-    - Loads active N=1 experiments and cross-references against each hypothesis
-    - Injects matching experiment context into the check prompt (additive evidence)
+    v1 legacy hypotheses (no test_spec) are never LLM-checked anymore; they age
+    out via the 30-day hard expiry (self-draining — the engine runs weekly).
 
-    Returns list of (sk, new_status, evidence_note) tuples.
+    Returns list of (hyp, new_status, evidence_note, stats, resolution_outcome)
+    tuples; resolution_outcome is None unless this check resolves the hypothesis.
     """
     if not pending_hypotheses or not daily_rows:
         return []
@@ -671,18 +1020,17 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
     updates = []
     now = datetime.now(timezone.utc).date()
 
-    # IC-19 D3B: Load active experiments once for the whole batch
-    active_experiments = load_active_experiments()
-
     for hyp in pending_hypotheses:
         sk = hyp.get("sk", "")
-        hypothesis_text = hyp.get("hypothesis", "")
-        confirmation_criteria = hyp.get("confirmation_criteria", "")
         created_at = hyp.get("created_at", "")
-        check_count = hyp.get("check_count", 0)
         monitoring_window = hyp.get("monitoring_window_days", 21)
 
-        if not sk or not hypothesis_text:
+        if not sk or not hyp.get("hypothesis"):
+            continue
+
+        spec = hyp.get("test_spec")
+        if not spec:
+            logger.info(f"[#530] {sk[:40]} is a v1 hypothesis (no test_spec) — left to hard expiry, never LLM-checked")
             continue
 
         # AI-4: Skip if hypothesis is less than MIN_SAMPLE_DAYS_FOR_CHECK old
@@ -696,111 +1044,33 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
             logger.info(f"[AI-4] Skipping check for {sk[:40]} — only {days_old}d old (need {MIN_SAMPLE_DAYS_FOR_CHECK})")
             continue
 
-        # Archive if monitoring window expired and checked enough times
-        if days_old > monitoring_window and check_count >= 3:
-            updates.append((sk, "archived", f"Monitoring window of {monitoring_window} days expired after {check_count} checks"))
-            continue
+        stats = evaluate_test_spec(spec, daily_rows, created_at[:10])
+        verdict = stats["verdict"]
+        window_done = days_old >= monitoring_window
 
-        relevant_data = [r for r in daily_rows if r.get("date", "") >= created_at[:10]]
-        if len(relevant_data) < MIN_SAMPLE_DAYS_FOR_CHECK:
-            logger.info(f"[AI-4] Insufficient data for check: {len(relevant_data)} days (need {MIN_SAMPLE_DAYS_FOR_CHECK})")
-            continue
+        resolution = None
+        if verdict == "contradicted":
+            new_status, resolution = "refuted", "refuted"
+        elif verdict == "supported" and window_done:
+            new_status, resolution = "confirmed", "confirmed"
+        elif verdict == "supported":
+            new_status = "confirming"
+        elif days_old > monitoring_window:
+            new_status, resolution = "archived", "expired_undecided"
+        else:
+            new_status = hyp.get("status", "pending")
 
-        # IC-19 D3B: If an active experiment's hypothesis overlaps with this one,
-        # include it as additional context (Raj: early exit if no experiments to check)
-        exp_context = ""
-        if active_experiments:
-            hyp_lower = hypothesis_text.lower()
-            related = [
-                e
-                for e in active_experiments
-                if any(kw in hyp_lower for kw in e["name"].lower().split()[:4] if len(kw) > 4)
-                or any(kw in hyp_lower for kw in e["hypothesis"].lower().split()[:6] if len(kw) > 4)
-            ]
-            if related:
-                exp_lines = [f"  [{e['experiment_id']}] {e['name']}: {e['hypothesis']!r} (since {e['start_date']})" for e in related]
-                exp_context = (
-                    "\n\nACTIVE EXPERIMENTS (cross-reference as additional evidence — "
-                    "Henning: small N, keep claims correlative not causal):\n" + "\n".join(exp_lines) + "\n"
-                )
-
-        check_prompt = f"""Hypothesis: {hypothesis_text}
-
-Confirmation criteria: {confirmation_criteria}
-
-Recent data ({len(relevant_data)} days since hypothesis was created):{exp_context}
-{json.dumps(relevant_data[-7:], indent=2)}
-
-Based on this data, evaluate the hypothesis STRICTLY:
-- CONFIRMING: data shows a clear pattern consistent with the hypothesis, with observable effect sizes matching the criteria
-- REFUTED: data clearly contradicts the hypothesis or shows no pattern after sufficient observation
-- INSUFFICIENT: not enough relevant data points, or pattern is ambiguous
-
-Be conservative: default to INSUFFICIENT unless the evidence is clear. Cite specific values.
-
-Respond ONLY with JSON: {{"verdict": "confirming|refuted|insufficient", "evidence": "2-3 sentences citing specific data points and effect sizes"}}"""
-
-        payload = json.dumps(
-            {
-                "model": AI_MODEL_HAIKU,
-                "max_tokens": 200,
-                "messages": [{"role": "user", "content": check_prompt}],
-            }
-        ).encode()
-
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "anthropic-beta": "prompt-caching-2024-07-31",
-            },
-            method="POST",
-        )
-
-        try:
-            # ADR-062 (2026-05-27): Bedrock via retry_utils.call_anthropic_raw.
-            from retry_utils import call_anthropic_raw
-
-            resp = call_anthropic_raw(req)
-            raw = resp["content"][0]["text"].strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
-            if raw.endswith("```"):
-                raw = raw[:-3]
-            result = json.loads(raw.strip())
-
-            # AI-4: Validate check verdict
-            is_valid, verdict, evidence = validate_check_verdict(result)
-            if not is_valid:
-                logger.warning(f"[AI-4] Invalid check verdict for {sk[:40]}: {result}")
-                verdict = "insufficient"
-
-            # AI-3: Validate evidence text before storing
-            if _HAS_AI_VALIDATOR and evidence:
-                ev_result = validate_ai_output(evidence, AIOutputType.GENERIC)
-                if ev_result.blocked:
-                    logger.warning("[AI-3] check evidence blocked for %s: %s", sk[:40], ev_result.block_reason)
-                    evidence = ev_result.safe_fallback or "Evidence unavailable — output blocked by validator."
-                elif ev_result.warnings:
-                    logger.warning("[AI-3] check evidence warnings for %s: %s", sk[:40], ev_result.warnings)
-
-            if verdict == "refuted":
-                new_status = "refuted"
-            elif verdict == "confirming":
-                # AI-4: Require 3 confirming checks (was 2) for promotion to confirmed
-                new_status = "confirmed" if check_count >= 3 else "confirming"
-            else:
-                new_status = hyp.get("status", "pending")
-
-            updates.append((sk, new_status, evidence))
-            logger.info(f"[AI-4] Hypothesis check: {verdict} -> {new_status} (checks: {check_count + 1})")
+        evidence = deterministic_evidence(spec, stats)
+        if resolution:
+            narration = narrate_resolution(hyp, evidence, new_status, api_key)
+            if narration:
+                evidence = f"{evidence} {narration}"
             time.sleep(0.5)
 
-        except Exception as e:
-            logger.warning(f"Hypothesis check failed for {sk[:40]}: {e}")
+        updates.append((hyp, new_status, evidence, stats, resolution))
+        logger.info(
+            f"[#530] Deterministic check: {verdict} -> {new_status} (observed {stats['days_observed']}d, window {monitoring_window}d)"
+        )
 
     return updates
 
@@ -823,7 +1093,15 @@ def write_hypothesis_context_to_memory(active_hypotheses):
         if confirmed:
             lines.append("CONFIRMED HYPOTHESES (incorporate into coaching as established patterns):")
             for h in confirmed[:3]:
-                lines.append(f"  [CONFIRMED] {h['hypothesis']}")
+                # #530: carry the deterministic effect + CI so coaching narrates
+                # measured numbers, never a vibe (ADR-104/105)
+                stat_note = ""
+                if h.get("effect_size") is not None and h.get("ci95_low") is not None:
+                    stat_note = (
+                        f" (measured effect {h['effect_size']:+g}, 95% CI [{h['ci95_low']:g}, {h['ci95_high']:g}], "
+                        f"n={int(h.get('n_condition', 0))}/{int(h.get('n_comparison', 0))} days)"
+                    )
+                lines.append(f"  [CONFIRMED] {h['hypothesis']}{stat_note}")
                 # IC-19 D3B: Suggest formalising confirmed hypotheses as N=1 experiments
                 # (Conti: if the confirmed hypothesis involves a negative psychological variable,
                 # frame the experiment suggestion as an intervention opportunity, not a label)
@@ -840,7 +1118,9 @@ def write_hypothesis_context_to_memory(active_hypotheses):
                 lines.append(f"  [WATCHING: {domains}] {h['hypothesis']}")
                 criteria = h.get("confirmation_criteria", "")
                 if criteria:
-                    lines.append(f"     Criteria: {criteria[:120]}")
+                    pre_reg = (h.get("pre_registered_at") or h.get("created_at") or "")[:10]
+                    tag = f" (pre-registered {pre_reg})" if pre_reg else ""
+                    lines.append(f"     Criteria{tag}: {criteria[:120]}")
 
         if not lines:
             return
@@ -875,7 +1155,7 @@ def write_hypothesis_context_to_memory(active_hypotheses):
 
 def lambda_handler(event, context):
     try:
-        logger.info("IC-18: Hypothesis Engine v1.2.0 (AI-4 + IC-19 D3B) starting...")
+        logger.info("IC-18: Hypothesis Engine v2.0.0 (#530: deterministic specs + calibration) starting...")
 
         api_key = get_anthropic_key()
 
@@ -911,14 +1191,19 @@ def lambda_handler(event, context):
             pending_hypotheses = [h for h in all_hypotheses if h.get("status") in ("pending", "confirming")]
             pending_count = len(pending_hypotheses)
 
-        # 3. Check pending hypotheses against new data
+        # 3. Check pending hypotheses against new data — deterministic (#530).
+        # Resolutions also write a calibration-ledger row (ADR-105 rule 2).
         updates_made = 0
+        resolutions = 0
         if pending_hypotheses:
             updates = check_pending_hypotheses(pending_hypotheses, daily_rows, api_key)
-            for sk, new_status, evidence_note in updates:
-                update_hypothesis_status(sk, new_status, evidence_note)
+            for hyp, new_status, evidence_note, stats, resolution in updates:
+                update_hypothesis_status(hyp.get("sk", ""), new_status, evidence_note, stats=stats)
                 updates_made += 1
-            logger.info(f"Hypothesis checks: {updates_made} updated")
+                if resolution:
+                    write_calibration_row(hyp, stats, resolution)
+                    resolutions += 1
+            logger.info(f"Hypothesis checks: {updates_made} updated, {resolutions} resolved -> calibration ledger")
 
         # 4. Generate new hypotheses if room exists AND data is sufficient
         new_hypotheses_stored = 0
@@ -930,7 +1215,8 @@ def lambda_handler(event, context):
             n_to_generate = min(MAX_NEW_HYPOTHESES, slots_available)
             logger.info(f"Generating {n_to_generate} new hypotheses ({slots_available} slots)")
 
-            result = generate_hypotheses(daily_rows, all_hypotheses, api_key, profile=profile)
+            # #530: generation sees only the recent window; checks used the full 30d
+            result = generate_hypotheses(daily_rows[-GENERATION_DAYS:], all_hypotheses, api_key, profile=profile)
 
             if result and "hypotheses" in result:
                 existing_texts = [h.get("hypothesis", "")[:100] for h in all_hypotheses]
@@ -971,6 +1257,7 @@ def lambda_handler(event, context):
             "expired_by_hard_limit": expired_count,
             "hypotheses_checked": len(pending_hypotheses),
             "hypotheses_updated": updates_made,
+            "resolutions_to_calibration": resolutions,
             "total_active": len(active),
             "data_complete_days": complete_days,
             "data_sufficient": is_sufficient,
