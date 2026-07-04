@@ -1783,7 +1783,7 @@ def tool_get_lactate_threshold_estimate(args):
     eligible.sort(key=lambda x: x["date"])
     n = len(eligible)
     ce_vals = [s["cardiac_efficiency"] for s in eligible]
-    slope, intercept, r = _linear_regression(list(range(n)), ce_vals)
+    slope, intercept, r = _linear_regression(list(zip(range(n), ce_vals)))
 
     third = max(1, n // 3)
     early_avg = sum(ce_vals[:third]) / third
@@ -1912,7 +1912,7 @@ def tool_get_exercise_efficiency_trend(args):
         sessions.sort(key=lambda x: x["date"])
         n = len(sessions)
         ce_vals = [s["cardiac_efficiency"] for s in sessions]
-        slope, intercept, r = _linear_regression(list(range(n)), ce_vals)
+        slope, intercept, r = _linear_regression(list(zip(range(n), ce_vals)))
 
         third = max(1, n // 3)
         early_avg = sum(ce_vals[:third]) / third
