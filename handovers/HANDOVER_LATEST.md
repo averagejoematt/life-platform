@@ -16,9 +16,9 @@
 - **Two "S3-triggered" ingesters have no trigger:** measurements (B-4 — the next tape-measure upload silently does nothing) and the apple_health XML path (D-5 — which is lucky, since it's also a latent clobber).
 - **Privacy-forward:** J-8 — `/api/journal_analysis` will publicly serve per-day journal one-line summaries the moment journaling resumes (phaseless cache records pass the phase filter). Decide before Phase 2 of the roadmap.
 
-## What happens next (Session 2 of the review→backlog pipeline, GATED)
+## Session 2 — GREEN-LIT + FILED (same day)
 
-1. Matthew reads the review. 2. On green-light: score the 66 findings per ADR-099 (gates → `(Impact×Confidence)/Effort` → terciles), file epics+stories (`area:data`, privacy-passed bodies), write the manifest. Consider authoring `scripts/file_backlog_from_manifest.py` — the missing automation link from the last batch (issues were filed ad-hoc). 3. The journal roadmap Phase 1 (backfill + clobber-proofing + dead-consumer fixes) is the single highest-value S-effort cluster and could ship as its own early batch.
+Matthew green-lit; the batch is live: **7 epics #459–#465 + 43 stories #466–#508** (21 Now / 11 Next / 11 Later; all 66 findings mapped; every body privacy-passed and score-lined). Manifest: `docs/reviews/DSR_BACKLOG_MANIFEST_2026-07.json`. Filed by the **new reusable filer `scripts/file_backlog_from_manifest.py`** (idempotent: re-runs skip existing keys; three passes — epics, stories-with-epic-links, epic task-lists) — the automation link the #337–#423 batch lacked. Seed the next fix session from `gh issue list --label area:data --milestone Now --state open`; the journal Phase-1 cluster (#502 backfill/clobber-proof, #503 dead consumers, #504 one-liner leak) is the best first batch — small, high-value, and unblocks the roadmap.
 
 ## Notes for the fixer
 
