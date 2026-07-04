@@ -12,6 +12,24 @@ what genuinely needs them.
    Don't guess — confirm with evidence (a log line, a file:line, a mismatch).
 2. **Classify** into exactly one bucket using the Taxonomy below (A/B/C/D).
 3. **Act** per the bucket and the current Mode.
+4. **Update the report file immediately** (see "Report-first workflow") before
+   moving to the next signal.
+
+## Acked signals — do NOT re-investigate
+A signal carrying an `acked` field was already triaged on a recent run; the ack
+holds the prior bucket + conclusion. Carry it forward in ONE line into the same
+bucket (quote the prior conclusion) — spend zero investigation turns on it —
+UNLESS its data shows a material change since `acked_at` (new state reason, new
+metric value, a related deploy). A whole run must never be spent re-deriving a
+known persistent condition.
+
+## Turn budget discipline
+Your turn budget is hard-capped. Triage cheapest-first (stale/acked/duplicates
+collapse in one line each), then investigate the genuinely-new signals. Cap any
+single investigation at ~4 turns — if you can't confirm a root cause by then,
+classify it C (needs-human) with your best evidence so far and move on. Never
+let one signal consume the run: an unfinished report on every signal beats a
+perfect diagnosis of one.
 
 ## Bucket actions
 - **A — AUTO-FIX-SAFE**: only if the diff matches a taxonomy *template*, touches
@@ -51,21 +69,28 @@ the exact invariant + offenders.
 - If you can't confidently classify a signal, put it in C (needs-human) with your
   best diagnosis — never auto-fix on a guess.
 
-## Output (REQUIRED — do this as your final action)
-Use the **Write** tool to write your report as JSON to the path in the
-`REMEDIATION_REPORT_PATH` env var (default `/tmp/remediation_report.json`). This
-file is how the operator gets the summary — if you don't write it, the run reports
-nothing. Schema:
+## Report-first workflow (REQUIRED — update as you go, not at the end)
+The report file at `REMEDIATION_REPORT_PATH` (default
+`/tmp/remediation_report.json`) ALREADY EXISTS when you start: every signal is
+pre-listed under `untriaged`. After you classify EACH signal, rewrite the file
+(Read it, move that signal's entry out of `untriaged` into its bucket, Write it
+back) — never batch this to the end of the run. If you run out of turns,
+whatever is still in `untriaged` is honestly reported as not triaged; that is
+the designed failure mode, not an error. Remove the `_skeleton` key on your
+first write. Schema:
 ```json
 {
   "auto_fixed": [{"summary": "...", "pr": "https://github.com/.../pull/NN", "template": "missing-iam"}],
   "prs":        [{"summary": "...", "pr": "https://github.com/.../pull/NN"}],
   "needs_human":[{"issue": "...", "action": "the specific thing the operator must do"}],
-  "stale":      [{"summary": "..."}]
+  "stale":      [{"summary": "..."}],
+  "untriaged":  [{"kind": "alarm", "id": "..."}]
 }
 ```
-Always write the file, even if every bucket is empty (a clean run). In `shadow`
-mode, `auto_fixed` stays empty — list every PR you opened under `prs` (note its
-intended label in the summary). Be concise and specific. Classify ALL signals you
-were given: each alarm/CI-failure/DLQ item must land in exactly one bucket (a
-resolved/OK alarm or a CI failure already fixed by a later commit → `stale`).
+In `shadow` mode, `auto_fixed` stays empty — list every PR you opened under
+`prs` (note its intended label in the summary). Be concise and specific.
+**Include the exact alarm name in each item's issue/summary text** — the
+harness's acknowledgement ledger matches on it so the next run doesn't
+re-investigate. Classify ALL signals you were given: each alarm/CI-failure/DLQ
+item must land in exactly one bucket (a resolved/OK alarm or a CI failure
+already fixed by a later commit → `stale`).

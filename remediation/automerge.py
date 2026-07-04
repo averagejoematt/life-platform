@@ -55,19 +55,27 @@ MAX_PER_DAY = 3
 # Specific change templates that are safe to auto-merge (the classes fixed this week).
 # A file must match one of these prefixes to be eligible — narrow on purpose.
 ALLOWLIST = (
-    "cdk/stacks/role_policies.py",                 # missing-IAM grant
-    "ci/lambda_map.json",                          # deploy-map drift / unmapped Lambda
-    "cdk/stacks/monitoring_stack.py",              # alarm recalibration / stale-clear
+    "cdk/stacks/role_policies.py",  # missing-IAM grant
+    "ci/lambda_map.json",  # deploy-map drift / unmapped Lambda
+    "cdk/stacks/monitoring_stack.py",  # alarm recalibration / stale-clear
     "lambdas/emails/freshness_checker_lambda.py",  # source list / SOURCE_STALE_HOURS
-    "lambdas/operational/qa_smoke_lambda.py",      # QA-smoke check tweaks
-    "tests/",                                       # accompanying test updates
+    "lambdas/operational/qa_smoke_lambda.py",  # QA-smoke check tweaks
+    "tests/",  # accompanying test updates
 )
 
 # Never auto-merge — these need a human even if the diff looks small.
 DENYLIST_SUBSTR = (
-    "bedrock_client", "budget_guard", "secret", "credential", "auth",
-    "deploy/", "setup_github_oidc", "setup_remediation_role",
-    ".github/workflows/", "cdk/app.py", "cdk/stacks/core_stack.py",
+    "bedrock_client",
+    "budget_guard",
+    "secret",
+    "credential",
+    "auth",
+    "deploy/",
+    "setup_github_oidc",
+    "setup_remediation_role",
+    ".github/workflows/",
+    "cdk/app.py",
+    "cdk/stacks/core_stack.py",
     "remediation/",
 )
 
@@ -92,8 +100,14 @@ def _gh(args, check=True):
 
 
 def _decision(pr, action, reason, infra=False):
-    return {"pr": pr.get("number"), "title": pr.get("title", ""),
-            "url": pr.get("url", ""), "action": action, "reason": reason, "infra": infra}
+    return {
+        "pr": pr.get("number"),
+        "title": pr.get("title", ""),
+        "url": pr.get("url", ""),
+        "action": action,
+        "reason": reason,
+        "infra": infra,
+    }
 
 
 def eligible(files):
@@ -135,12 +149,15 @@ def checks_pass(branch):
 
     ok = True
     # Hard syntax/error lint (mirrors ci-cd.yml Lint job's fail-loud select).
-    ok &= run(["flake8", "lambdas/", "mcp/", "cdk/", "--select=E9,F63,F7,F82",
-               "--show-source"], "flake8 E9/F")
+    ok &= run(["flake8", "lambdas/", "mcp/", "cdk/", "--select=E9,F63,F7,F82", "--show-source"], "flake8 E9/F")
     # The offline consistency suite most relevant to auto-fix-safe classes.
-    for tf in ("tests/test_role_policies.py", "tests/test_lambda_handlers.py",
-               "tests/test_layer_version_consistency.py",
-               "tests/test_iam_secrets_consistency.py", "tests/test_shared_modules.py"):
+    for tf in (
+        "tests/test_role_policies.py",
+        "tests/test_lambda_handlers.py",
+        "tests/test_layer_version_consistency.py",
+        "tests/test_iam_secrets_consistency.py",
+        "tests/test_shared_modules.py",
+    ):
         if os.path.exists(os.path.join(ROOT, tf)):
             ok &= run(["python3", "-m", "pytest", tf, "-q", "--tb=line"], tf)
     return ok, log
@@ -158,20 +175,19 @@ def merges_today():
 
 def audit(decision):
     suffix = "merged" if decision["action"] == "merged" else "held"
-    key = (f"remediation-log/automerge/{datetime.now(timezone.utc):%Y/%m/%d}/"
-           f"pr{decision['pr']}-{datetime.now(timezone.utc):%H%M%S}.{suffix}.json")
+    key = (
+        f"remediation-log/automerge/{datetime.now(timezone.utc):%Y/%m/%d}/"
+        f"pr{decision['pr']}-{datetime.now(timezone.utc):%H%M%S}.{suffix}.json"
+    )
     try:
-        _s3.put_object(Bucket=LOG_BUCKET, Key=key,
-                       Body=json.dumps(decision, indent=2, default=str),
-                       ContentType="application/json")
+        _s3.put_object(Bucket=LOG_BUCKET, Key=key, Body=json.dumps(decision, indent=2, default=str), ContentType="application/json")
     except Exception as e:
         print(f"[warn] audit: {e}")
 
 
 def process():
     decisions = []
-    raw = _gh(["pr", "list", "--state", "open", "--label", LABEL,
-               "--json", "number,title,url,headRefName,files"])
+    raw = _gh(["pr", "list", "--state", "open", "--label", LABEL, "--json", "number,title,url,headRefName,files"])
     prs = json.loads(raw or "[]")
     print(f"[gate] {len(prs)} open {LABEL} PR(s)")
     budget = checked_today = 0
@@ -181,36 +197,49 @@ def process():
         ok, reason = eligible(files)
         if not ok:
             d = _decision(pr, "held", f"ineligible — {reason}")
-            decisions.append(d); audit(d)
-            _gh(["pr", "comment", str(n), "--body",
-                 f"🤖 auto-merge gate held this PR: {reason}. Left for human review."], check=False)
+            decisions.append(d)
+            audit(d)
+            _gh(["pr", "comment", str(n), "--body", f"🤖 auto-merge gate held this PR: {reason}. Left for human review."], check=False)
             continue
         if merges_today() + budget >= MAX_PER_DAY:
             d = _decision(pr, "held", f"daily merge cap ({MAX_PER_DAY}) reached")
-            decisions.append(d); audit(d)
+            decisions.append(d)
+            audit(d)
             continue
         passed, clog = checks_pass(pr["headRefName"])
         if not passed:
             d = _decision(pr, "held", "checks failed: " + "; ".join(clog[:6]))
-            decisions.append(d); audit(d)
-            _gh(["pr", "comment", str(n), "--body",
-                 "🤖 auto-merge gate held this PR: lint/tests failed.\n\n```\n"
-                 + "\n".join(clog[:12]) + "\n```"], check=False)
+            decisions.append(d)
+            audit(d)
+            _gh(
+                [
+                    "pr",
+                    "comment",
+                    str(n),
+                    "--body",
+                    "🤖 auto-merge gate held this PR: lint/tests failed.\n\n```\n" + "\n".join(clog[:12]) + "\n```",
+                ],
+                check=False,
+            )
             continue
         infra = any(f["path"].startswith("cdk/") for f in files)
         try:
             _gh(["pr", "merge", str(n), "--squash", "--delete-branch"])
         except Exception as e:
             d = _decision(pr, "held", f"merge failed: {e}")
-            decisions.append(d); audit(d)
+            decisions.append(d)
+            audit(d)
             continue
         budget += 1
-        d = _decision(pr, "merged",
-                      "auto-merged (allowlist + lint/tests green)"
-                      + ("; ⚠️ touches cdk/ — needs `cdk deploy` to apply" if infra
-                         else "; CI will hot-deploy after production approval"),
-                      infra=infra)
-        decisions.append(d); audit(d)
+        d = _decision(
+            pr,
+            "merged",
+            "auto-merged (allowlist + lint/tests green)"
+            + ("; ⚠️ touches cdk/ — needs `cdk deploy` to apply" if infra else "; CI will hot-deploy after production approval"),
+            infra=infra,
+        )
+        decisions.append(d)
+        audit(d)
         print(f"[gate] merged PR #{n} (infra={infra})")
     return decisions
 
@@ -228,38 +257,43 @@ def update_report_and_email(decisions, mode):
     # Move merged PRs out of "prs awaiting you" → "auto-fixed".
     report["prs"] = [p for p in report.get("prs", []) if p.get("pr") not in merged_urls]
     for d in merged:
-        report.setdefault("auto_fixed", []).append(
-            {"summary": d["title"] + (" [needs cdk deploy]" if d["infra"] else ""),
-             "pr": d["url"]})
+        report.setdefault("auto_fixed", []).append({"summary": d["title"] + (" [needs cdk deploy]" if d["infra"] else ""), "pr": d["url"]})
 
     def block(title, items, fmt):
-        return (f"<h3>{title}</h3><ul>" + "".join(f"<li>{fmt(i)}</li>" for i in items)
-                + "</ul>") if items else ""
+        return (f"<h3>{title}</h3><ul>" + "".join(f"<li>{fmt(i)}</li>" for i in items) + "</ul>") if items else ""
 
     af = report.get("auto_fixed", [])
     prs = report.get("prs", [])
     nh = report.get("needs_human", [])
     stale = report.get("stale", [])
+    unt = report.get("untriaged", [])  # #396: signals the agent's turn budget didn't reach
     needs_deploy = [d for d in merged if d["infra"]]
     subj = f"🤖 Remediation [auto]: {len(merged)} merged, {len(prs)} PRs, {len(nh)} need you"
+    if unt:
+        subj += f", {len(unt)} untriaged"
     html = (
         f"<p><b>Mode:</b> {mode} · {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}</p>"
-        + (f"<p>⚠️ <b>{len(needs_deploy)} merged change(s) touch infra and need a manual "
-           "<code>cdk deploy</code> to apply.</b></p>" if needs_deploy else "")
+        + (
+            f"<p>⚠️ <b>{len(needs_deploy)} merged change(s) touch infra and need a manual " "<code>cdk deploy</code> to apply.</b></p>"
+            if needs_deploy
+            else ""
+        )
         + block("✅ Auto-merged", af, lambda i: f"{i.get('summary','')} — {i.get('pr','')}")
         + block("🔀 PRs awaiting you", prs, lambda i: f"{i.get('summary','')} — {i.get('pr','')}")
-        + block("⏸️ Held by gate (left for review)", held,
-                lambda d: f"PR #{d['pr']} {d['title']} — {d['reason']}")
+        + block("⏸️ Held by gate (left for review)", held, lambda d: f"PR #{d['pr']} {d['title']} — {d['reason']}")
         + block("👤 Needs you", nh, lambda i: f"<b>{i.get('issue','')}</b>: {i.get('action','')}")
-        + block("· Stale / ignored", stale, lambda i: str(i.get('summary', i)))
+        + block("· Stale / ignored", stale, lambda i: str(i.get("summary", i)))
+        + block("⏳ Not triaged this run", unt, lambda i: f"{i.get('kind','')}: {i.get('id','')}")
         # Weekly drift sentinel status — always rendered so a clean week is explicitly
         # clean (never silent about infra drift). AC4 of #394.
         + drift_report.status_html(drift_report.read_latest(_s3, LOG_BUCKET))
     )
     try:
-        _ses.send_email(FromEmailAddress=SENDER, Destination={"ToAddresses": [RECIPIENT]},
-                        Content={"Simple": {"Subject": {"Data": subj[:99]},
-                                            "Body": {"Html": {"Data": html}}}})
+        _ses.send_email(
+            FromEmailAddress=SENDER,
+            Destination={"ToAddresses": [RECIPIENT]},
+            Content={"Simple": {"Subject": {"Data": subj[:99]}, "Body": {"Html": {"Data": html}}}},
+        )
         print(f"[gate] report emailed: {subj}")
     except Exception as e:
         print(f"[warn] SES: {e}")
