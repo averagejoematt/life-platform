@@ -104,7 +104,12 @@ class McpStack(Stack):
             timeout_seconds=300,
             memory_mb=768,  # R5: power-tuned — 768 MB is cost-optimal (AWS Lambda Power Tuning v4.4.0)
             tracing=_lambda.Tracing.ACTIVE,  # R13-XR: X-Ray active tracing
-            environment={"DEPLOY_VERSION": "2.74.0"},
+            environment={
+                "DEPLOY_VERSION": "2.74.0",
+                # COST-05: MCP lambda serves interactive Claude Desktop sessions — dev context,
+                # not scheduled production. Attributable separately from prod AI spend in CW.
+                "INVOCATION_CONTEXT": "dev",
+            },
             custom_policies=rp.mcp_server(),
             table=local_table,
             bucket=local_bucket,
