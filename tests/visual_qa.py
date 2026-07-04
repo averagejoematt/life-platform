@@ -531,6 +531,22 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
             shots.append({"kind": "mobile", "path": mob})
 
         # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
+        # A 429 is throttle noise, not a broken endpoint: the sweep's parallel
+        # page loads can exceed site-api's reserved concurrency (20) — observed
+        # flaking the gating CI job on a different endpoint each run (2026-07-04).
+        # Re-probe each API 429 once, sequentially, after the page settles: a
+        # <400 re-probe downgrades to a warning; a persistent 429 still fails.
+        _kept = []
+        for s, u in failed_responses:
+            if s == 429 and "/api/" in u:
+                try:
+                    if page.request.get(u, timeout=10000).status < 400:
+                        warnings.append(f"429 throttle recovered on re-probe: {u.replace(SITE_URL, '')[:90]}")
+                        continue
+                except Exception:
+                    pass
+            _kept.append((s, u))
+        failed_responses = _kept
         api_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" in u})
         other_fails = sorted({f"{s} {u.replace(SITE_URL, '')[:90]}" for s, u in failed_responses if "/api/" not in u})
         if api_fails:
