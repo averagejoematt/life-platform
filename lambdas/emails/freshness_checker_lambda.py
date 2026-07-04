@@ -37,53 +37,15 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 sns = boto3.client("sns", region_name=REGION)
 cw = boto3.client("cloudwatch", region_name=REGION)
 
-SOURCES = {
-    "whoop": "Whoop recovery/sleep",
-    "withings": "Withings weight/body comp",
-    "strava": "Strava activities",  # RE-ENABLED 2026-06-20 (402 cleared; Garmin auto-upload feeds it)
-    "todoist": "Todoist tasks",
-    "apple_health": "Apple Health",
-    "eightsleep": "Eight Sleep",
-    # Re-enabled 2026-06-19 (meal-grouping): diary export flows again (per-food
-    # timestamps). Staleness threshold is lenient (manual-ish upload); the
-    # format-drift check below is the real guard against a silent summary-format revert.
-    "macrofactor": "MacroFactor nutrition",
-    # "garmin":        "Garmin biometrics",  # PAUSED 2026-06-03 — Garmin's 2026 anti-automation
-    #   crackdown 429-blocks server-side OAuth2 refresh from datacenter IPs (374 throttles vs 2
-    #   successes / 14d). Unwinnable headless; re-auth only buys ~1 run. Revive = uncomment +
-    #   re-auth from a residential IP (or if Garmin's official Health API is ever approved).
-    "habitify": "Habitify habits",
-    "food_delivery": "Food delivery behavioral signal",
-    "measurements": "Tape measure check-ins",
-    # 2026-07-02: hevy was never listed — the public pipeline board mirrors this dict,
-    # so /data/training rendered Hevy sets while the pipeline page omitted the source.
-    # Behavioral (manual lift logging): a rest week reads as a lapse, not an outage.
-    "hevy": "Hevy strength sets",
-    # google_calendar retired v3.7.46 — see ADR-030 in DECISIONS.md
-}
+# #392: source identity, per-source thresholds, and the behavioral-vs-infra
+# classification all derive from the ONE canonical registry. The dicts below
+# used to be hand-mirrored here + site_api_data + tools_labs and drifted —
+# withings/strava read as infrastructure, so a quiet logging stretch paged.
+# Per-source rationale (thresholds, pause reasons) lives in source_registry.py.
+from source_registry import behavioral_source_keys, checker_sources, stale_hours_overrides
 
-# R18-F04: Per-source stale threshold overrides (hours). Sources not listed use STALE_HOURS default.
-# food_delivery: manual CSV import (uploads/food_delivery/). The old 90-day
-# threshold let a dead source read "fresh" for a full quarter — it masked a
-# 77-day gap (2026-03-13 triage). Lowered to 14 days: a behavioral signal this
-# central shouldn't go unmonitored for more than two weeks. (Slated for
-# replacement by the automated Monarch delivery feed — see DESIGN_BRIEF.)
-SOURCE_STALE_HOURS = {
-    "food_delivery": 14 * 24,  # 14 days (was 90 — masking defect)
-    "measurements": 60 * 24,  # 60 days — one missed session before alert
-    # 2026-05-29: weigh-ins are sporadic (often ~weekly), so the 48h default
-    # false-fired "stale" constantly. A missed week before alerting.
-    "withings": 7 * 24,  # 7 days
-    # todoist records are dated by completed DAY and the freshest record is always
-    # "yesterday" (today's completions aren't known until the day ends), so a 24h
-    # default false-fires every afternoon. 48h still catches a genuine 2-day outage.
-    "todoist": 48,
-    # macrofactor is a manual-ish S3 CSV upload (not every day) — lenient threshold
-    # avoids false-stale; the dedicated format-drift check is the real guard.
-    "macrofactor": 96,  # 4 days
-    # hevy is manual lift logging — a rest week must not read as an outage.
-    "hevy": 7 * 24,
-}
+SOURCES = checker_sources()
+SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)
 
 # ── DI-1.6: Apple Health activity-integrity guard ──────────────────────────
 # The HAE silent-413 blind spot: the per-sample steps payload exceeds the HTTP-API
@@ -195,14 +157,26 @@ def check_apple_health_activity(table, now, sick_suppress):
     return msg, metrics
 
 
-# S-06: Sources whose staleness means "no manual entry logged yet" rather than a
+# S-06/#392: Sources whose staleness means "no entry logged yet" rather than a
 # broken pipeline. They still appear in the freshness report/email, but do NOT
 # count toward StaleSourceCount — the metric the slo-source-freshness alarm
-# watches — so only infra/OAuth/API breakage (actionable) pages. Device-synced
-# (whoop/withings/eightsleep) and API/webhook (todoist/apple_health/habitify)
-# sources stay infra. Zero new metrics/alarms: this only redefines what the
-# existing StaleSourceCount counts.
-BEHAVIORAL_SOURCES = {"measurements", "food_delivery", "hevy"}
+# watches — so only infra/OAuth/API breakage (actionable) pages. The set derives
+# from the canonical registry; the original hand-rolled set missed withings,
+# strava, and macrofactor, so a quiet stretch held the alarm red for days.
+BEHAVIORAL_SOURCES = behavioral_source_keys()
+
+
+def count_infra_stale(stale_sources) -> int:
+    """How many stale sources should PAGE — infrastructure staleness only.
+
+    stale_sources: list of (source_label, detail) as built by lambda_handler.
+    Behavioral lapses (weigh-ins, workouts, food logs…) are excluded: they are
+    reported honestly in the email/board but must never train the operator to
+    ignore the alarm that exists to catch silent pipeline death (#392).
+    """
+    behavioral_labels = {SOURCES[k] for k in BEHAVIORAL_SOURCES if k in SOURCES}
+    return sum(1 for name, _ in stale_sources if name not in behavioral_labels)
+
 
 # DI-2b: interior-gap detection. The staleness check above only sees the latest
 # date per source (the high-water mark), so a hole *behind* it is invisible — a
@@ -375,13 +349,17 @@ def lambda_handler(event, context):
             )
         else:
             # Actionable remediation hint, keyed off which stale sources are present.
+            # #392: behavioral sources get the "no entry logged" hint (a stale
+            # withings is a skipped weigh-in, not an expired token); OAuth hints
+            # only for infra sources that actually auth via OAuth.
             _stale_keys = {n for n, _ in stale_sources}
+            _behavioral_hint_labels = {SOURCES[k] for k in BEHAVIORAL_SOURCES if k in SOURCES}
             _oauth_stale = {
                 lbl
                 for lbl in _stale_keys
-                if lbl in (SOURCES.get("garmin"), SOURCES.get("whoop"), SOURCES.get("withings"), SOURCES.get("eightsleep"))
+                if lbl in (SOURCES.get("whoop"), SOURCES.get("eightsleep")) and lbl not in _behavioral_hint_labels
             }
-            _input_stale = {lbl for lbl in _stale_keys if lbl in (SOURCES.get("measurements"), SOURCES.get("food_delivery"))}
+            _input_stale = {lbl for lbl in _stale_keys if lbl in _behavioral_hint_labels}
             hints = []
             if _oauth_stale:
                 hints.append(
@@ -505,11 +483,10 @@ def lambda_handler(event, context):
     # OBS-3: Emit SLO metrics to CloudWatch
     try:
         fresh_count = len(SOURCES) - len(stale_sources)
-        # S-06: StaleSourceCount counts only infra/pipeline staleness (actionable —
+        # S-06/#392: StaleSourceCount counts only infra/pipeline staleness (actionable —
         # OAuth/API/webhook breakage), not behavioral input lapses. Behavioral
         # sources remain in stale_sources for the email report but don't trip the SLO.
-        _behavioral_labels = {SOURCES[k] for k in BEHAVIORAL_SOURCES if k in SOURCES}
-        infra_stale_count = sum(1 for name, _ in stale_sources if name not in _behavioral_labels)
+        infra_stale_count = count_infra_stale(stale_sources)
         cw.put_metric_data(
             Namespace="LifePlatform/Freshness",
             MetricData=[

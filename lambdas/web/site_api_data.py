@@ -23,6 +23,12 @@ from decimal import Decimal  # noqa: F401
 import boto3
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
+from source_registry import (  # #392: canonical source classification (shared layer)
+    DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
+    public_board_sources,
+    public_paused_sources,
+    stale_hours_overrides,
+)
 
 from web.site_api_common import (
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -118,49 +124,15 @@ def handle_platform_stats() -> dict:
 
 
 # ── Source freshness (public pipeline-status feed) ──────────────────────────
-# Mirrors lambdas/emails/freshness_checker_lambda.py (SOURCES / SOURCE_STALE_HOURS /
-# BEHAVIORAL_SOURCES / paused list). KEEP IN SYNC if sources are added/paused there.
-# Active = ingested into DATE# records; paused = intentionally off (shown, never "stale").
-_FRESHNESS_SOURCES = {
-    "whoop": {"label": "Whoop", "desc": "Recovery, sleep, HRV", "category": "Wearables"},
-    "withings": {"label": "Withings", "desc": "Weight & body composition", "category": "Wearables"},
-    "eightsleep": {"label": "Eight Sleep", "desc": "Sleep stages, HR, HRV", "category": "Wearables"},
-    "apple_health": {"label": "Apple Health", "desc": "Steps & active energy", "category": "Wearables"},
-    # 483ecb11 removed strava/macrofactor from the paused list but never re-added them
-    # here — so the board showed a 9-source pipeline while /data/training rendered
-    # Strava walks + Hevy sets and /data/nutrition rendered MacroFactor days.
-    "strava": {"label": "Strava", "desc": "Activities & walks", "category": "Wearables"},
-    "hevy": {"label": "Hevy", "desc": "Strength sets — logged when he lifts", "category": "Manual logs", "behavioral": True},
-    "habitify": {"label": "Habitify", "desc": "Daily habit completions", "category": "Inputs"},
-    "todoist": {"label": "Todoist", "desc": "Tasks completed", "category": "Inputs"},
-    "macrofactor": {
-        "label": "MacroFactor",
-        "desc": "Nutrition log — manual end-of-day upload, ~24h behind by design",
-        "category": "Manual logs",
-        "behavioral": True,
-    },
-    "measurements": {"label": "Tape measure", "desc": "Body measurements", "category": "Manual logs", "behavioral": True},
-    "food_delivery": {"label": "Food delivery", "desc": "Delivery behavioral signal", "category": "Manual logs", "behavioral": True},
-}
-# Per-source stale thresholds in hours (default 48). Mirrors SOURCE_STALE_HOURS.
-# (food_delivery was 90d here vs the checker's 14d — the mirror had drifted.)
-_FRESHNESS_STALE_HOURS = {
-    "withings": 7 * 24,
-    "todoist": 48,
-    "measurements": 60 * 24,
-    "food_delivery": 14 * 24,
-    "macrofactor": 96,
-    "hevy": 7 * 24,
-}
-_FRESHNESS_DEFAULT_STALE_HOURS = 48
-# Intentionally paused — reported as status "paused", never counted stale (ADR-074 etc.).
-# Only Garmin is genuinely paused. Strava came back (DI-2 walk-ingestion fix, 2026-06-21)
-# and MacroFactor flows via the Dropbox export path (Tier 2) — both were stale-"paused" here
-# and contradicted the data page, which a skeptic catches immediately. They now report live
-# freshness from their real latest DATE# like any other source.
-_FRESHNESS_PAUSED = {
-    "garmin": {"label": "Garmin", "desc": "Biometrics — paused (vendor anti-automation, ADR-074)", "category": "Wearables"},
-}
+# #392: the board derives from the ONE canonical registry (source_registry.py,
+# shared-layer module) instead of hand-mirroring freshness_checker_lambda under
+# a "KEEP IN SYNC" comment — the mirrors had drifted (withings/strava read as
+# infrastructure; food_delivery thresholds disagreed). Per-source rationale
+# lives in the registry. Behavioral staleness stays honestly visible here —
+# only what pages the operator changed.
+_FRESHNESS_SOURCES = public_board_sources()
+_FRESHNESS_STALE_HOURS = stale_hours_overrides(_FRESHNESS_SOURCES)
+_FRESHNESS_PAUSED = public_paused_sources()
 
 
 def _latest_date_str(source: str) -> str | None:

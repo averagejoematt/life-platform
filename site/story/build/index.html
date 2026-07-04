@@ -1,54 +1,20 @@
-#!/usr/bin/env python3
-"""
-v4_build_dispatches.py — generate "The Story" hub: the writing sub-pages (/story/).
-
-"The Story" is the writing/context — the chronicle, AI lab notes, journal,
-timeline, and about — distinct from the real-time data (Cockpit/Evidence) and
-from the separate cinematic landing at "/". Emits an app shell at
-site/story/index.html AND a per-section shell at site/story/<section>/index.html
-(same app, pre-selected section) so the sub-page URLs and old-URL redirects
-resolve on static hosting. The section list is defined in assets/js/dispatches.js;
-the shell only embeds window.__DISPATCH_START__. Reuses the dx-* styles from
-story.css.
-
-Read-only; writes only under site/story/. Run from repo root:
-    python3 scripts/v4_build_dispatches.py
-"""
-from __future__ import annotations
-
-from pathlib import Path
-
-OUT = Path("site/story")
-
-# key, label, one-line description (for the per-section <meta>/<title>)
-SECTIONS = [
-    ("chronicle", "Chronicle", "The weekly chronicle, written by Elena Voss."),
-    # "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20).
-    ("panel", "Podcast", "A weekly two-host show — Elena and a rotating coach review the week."),
-    ("journal", "In my own words", "The daily journal, first-person."),
-    ("timeline", "Timeline", "Level-ups and milestones — the journey so far."),
-    # #380: engineering exhaust, distilled — merged + deployed work only.
-    ("build", "Build log", "Engineering dispatches — what shipped, the gotcha, the honest miss."),
-    ("about", "About", "The experiment, in context."),
-]
-
-SHELL = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>{title}</title>
-  <meta name="description" content="{desc}">
-  <link rel="canonical" href="https://averagejoematt.com/story/{canon}">
+  <title>Build log — The Story — averagejoematt</title>
+  <meta name="description" content="Engineering dispatches — what shipped, the gotcha, the honest miss.">
+  <link rel="canonical" href="https://averagejoematt.com/story/build/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
-  <meta property="og:url" content="https://averagejoematt.com/story/{canon}">
-  <meta property="og:title" content="{title}">
-  <meta property="og:description" content="{desc}">
+  <meta property="og:url" content="https://averagejoematt.com/story/build/">
+  <meta property="og:title" content="Build log — The Story — averagejoematt">
+  <meta property="og:description" content="Engineering dispatches — what shipped, the gotcha, the honest miss.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{title}">
-  <meta name="twitter:description" content="{desc}">
+  <meta name="twitter:title" content="Build log — The Story — averagejoematt">
+  <meta name="twitter:description" content="Engineering dispatches — what shipped, the gotcha, the honest miss.">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
@@ -57,7 +23,7 @@ SHELL = """<!DOCTYPE html>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <script>if("serviceWorker" in navigator){{window.addEventListener("load",function(){{navigator.serviceWorker.register("/sw.js").catch(function(){{}});}});}}</script>
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life — read aloud (podcast)" href="/podcast/feed.xml">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life — The Panel (podcast)" href="/panelcast/feed.xml">
@@ -67,8 +33,8 @@ SHELL = """<!DOCTYPE html>
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
-  <script>(function(){{try{{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}}catch(e){{}}}})();</script>
-  <script>(function(){{try{{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){{document.documentElement.classList.remove("mo");}},2600);}}catch(e){{}}}})();</script>
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <script>(function(){try{if(!("IntersectionObserver" in window))return;if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;document.documentElement.classList.add("mo");window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>
 </head>
 <body class="dx-page">
   <a class="skip" href="#dx">Skip to the story</a>
@@ -111,35 +77,8 @@ SHELL = """<!DOCTYPE html>
     </nav>
     <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
   </footer>
-  <script>window.__DISPATCH_START__ = "{start}";</script>
+  <script>window.__DISPATCH_START__ = "build";</script>
   <script src="/assets/js/motion.js" defer></script>
   <script type="module" src="/assets/js/dispatches.js"></script>
 </body>
 </html>
-"""
-
-
-def write(path: Path, html_text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(html_text, encoding="utf-8")
-
-
-def main() -> None:
-    # hub (defaults to chronicle)
-    write(
-        OUT / "index.html",
-        SHELL.format(
-            title="The Story — averagejoematt",
-            desc="The chronicle, the journal, the timeline, and the context behind the experiment.",
-            canon="",
-            start="chronicle",
-        ),
-    )
-    # per-section sub-pages
-    for key, label, desc in SECTIONS:
-        write(OUT / key / "index.html", SHELL.format(title=f"{label} — The Story — averagejoematt", desc=desc, canon=f"{key}/", start=key))
-    print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
-
-
-if __name__ == "__main__":
-    main()

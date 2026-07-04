@@ -27,6 +27,10 @@ const SECTIONS = [
   { key: "panel", label: "Podcast", icon: "podcast", kicker: "Elena + a coach review the week", kind: "podcast", url: "/panelcast/episodes.json" },
   { key: "journal", label: "In my own words", kicker: "Matt's own blog", kind: "posts", url: "/journal/blog.json" },
   { key: "timeline", label: "Timeline", kicker: "level-ups & milestones", kind: "timeline", url: "/api/journey_timeline" },
+  // #380 — the engineering exhaust, distilled. Each beat is written at session
+  // close from the handover (docs/content/BUILD_DISPATCH_CHECKLIST.md), commits
+  // with the code, and narrates ONLY merged + deployed work — never plans.
+  { key: "build", label: "Build log", kicker: "what the machine shipped — merged work only", kind: "build", url: "/story/build/beats.json" },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
 ];
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
@@ -105,6 +109,7 @@ function entriesFor(s, data) {
   if (s.kind === "coaches") return [{ id: "team", title: "My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.headline_stat || c.domain || "" })));
   if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, guest_id: e.guest_id, guest_name: e.guest_name, excerpt: e.excerpt, image_url: e.image_url || "", image_credit: e.image_credit || "" }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
+  if (s.kind === "build") return (data.beats || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((b) => ({ id: b.id || b.date, title: b.title || b.date, date: b.date }));
   if (s.kind === "posts") {
     const ps = data.posts || data.entries || (Array.isArray(data) ? data : []);
     // Genesis-anchored labels (truth-audit Phase 4b): installments before the genesis
@@ -473,6 +478,24 @@ async function renderRead(s, id) {
           : `<p class="dx-prose">No field note recorded for this week yet.</p>`);
     } catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this field note just now.</p>`; }
     enhanceCoachNames(read);  // CC-04: coach-name popovers in lab notes
+    return;
+  }
+  if (s.kind === "build") {
+    // #380 — one beat: what shipped · the gotcha · the honest miss. All three
+    // sections are the format; a beat missing one simply omits it.
+    const data = await secFetch(s);
+    const b = ((data && data.beats) || []).find((x) => String(x.id || x.date) === String(id));
+    if (!b) { read.innerHTML = `<p class="dx-prose">That beat isn't here.</p>`; return; }
+    const sec = (label, text) => (text ? `<p class="dx-kicker label">${esc(label)}</p><p class="dx-prose">${esc(text)}</p>` : "");
+    const prs = (b.prs || []).map((p) => `<a href="${esc(p.url)}" rel="noopener">${esc(p.label || p.url)}</a>`).join(" · ");
+    read.innerHTML =
+      `<p class="dx-kicker label">build log · ${esc(b.date || "")} · merged &amp; deployed work only</p>` +
+      `<h2 class="dx-title">${esc(b.title || "")}</h2>` +
+      sec("what shipped", b.shipped) +
+      sec("the gotcha", b.gotcha) +
+      sec("the honest miss", b.honest_miss) +
+      (prs ? `<p class="dx-disclosure label">the receipts: ${prs}</p>` : "") +
+      `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>`;
     return;
   }
   // posts (chronicle / journal)

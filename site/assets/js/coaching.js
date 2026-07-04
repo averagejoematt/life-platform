@@ -31,7 +31,7 @@ const SECTIONS = [
   { key: "lab-notes", label: "AI lab notes", kicker: "the AI's read ↔ how it felt", kind: "fieldnotes", url: "/api/field_notes" },
   // Reader Q&A — ask a question (form) AND read the ones the board has answered
   // (PG-ENG-2 static feed published by scripts/publish_board_answer.py; empty-but-honest).
-  { key: "qa", label: "Ask the Board", kicker: "your question — answered in lab notes", kind: "qa", url: "/board_answers/answers.json" },
+  { key: "qa", label: "Ask the Board", kicker: "you asked — the board answered", kind: "qa", url: "/board_answers/answers.json" },
 ];
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 // Coaches whose 7-day domain data is available via /api/observatory_week.
@@ -467,7 +467,18 @@ function renderAskBoard(read) {
     `<div class="cv-panel" data-cv-panel aria-live="polite"></div>` +
     `<p class="dx-disclosure label">Rate-limited (5/hour) and budget-guarded. Prefer a considered, human-reviewed answer? ` +
     `<button type="button" class="dx-readfull" data-cv-queue>Send it to the weekly Reader Q&amp;A →</button></p>` +
+    `<p class="dx-prose" data-qa-feedstate></p>` +
     `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>`;
+  // #397: the honest state of the answered-questions feed — real count when the
+  // loop has closed before, an honest "none yet" (never seeded fakes) when not.
+  tryJSON("/board_answers/answers.json").then((d) => {
+    const el = read.querySelector("[data-qa-feedstate]");
+    if (!el) return;
+    const n = ((d && d.answers) || []).length;
+    el.textContent = n
+      ? `${n} reader question${n === 1 ? "" : "s"} answered so far — they're in the list on the left, dated, next to the board's take.`
+      : "No reader questions answered yet — ask one. Answered questions appear here publicly, dated, alongside the board's take.";
+  });
   const form = read.querySelector(".askboard-form");
   const out = read.querySelector(".askboard-out");
   const panel = read.querySelector("[data-cv-panel]");

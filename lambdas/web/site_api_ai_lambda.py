@@ -29,6 +29,7 @@ import privacy_guard  # deterministic real-name + vice scrub (layer module)
 from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
+from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
 from web.site_api_common import _scrub_blocked_terms as _scrub_blocked_terms_base  # canonical shared helpers (#368)
 
@@ -46,6 +47,11 @@ S3_REGION = os.environ.get("S3_REGION", "us-west-2")
 AI_SECRET_NAME = os.environ.get("AI_SECRET_NAME", "life-platform/site-api-ai-key")
 # R17-11: env-overridable model string — avoids silent deprecation failures
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+
+# #387: the prompt's source count derives from the canonical registry — the
+# old hardcoded literal (nineteen) had drifted from the real pipeline board.
+_LIVE_SOURCE_COUNT = len(public_board_sources())
+_PAUSED_SOURCE_COUNT = len(public_paused_sources())
 
 # ── AWS clients (module-level for warm container reuse) ────
 dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
@@ -364,7 +370,183 @@ def _ask_fetch_context() -> dict:
     except Exception:
         ctx["start_weight"] = EXPERIMENT_BASELINE_WEIGHT_LBS
         ctx["goal_weight"] = 185
+    ctx["reads"] = _ask_fetch_computed_reads()
     return ctx
+
+
+def _ask_fetch_computed_reads() -> dict:
+    """#387: the drivers/trends/correlations the platform ALREADY computes,
+    assembled server-side so the model narrates Python's work instead of
+    confessing it only has a handful of latest numbers (or worse, asking the
+    reader to supply Matthew's data). Every block is fail-soft — a missing
+    compute just omits that read; ask still answers from the vitals."""
+    reads: dict = {}
+
+    # Canonical daily facts (computed_metrics → the same numbers coaches ground
+    # on): weight trend rate + the protein trio the vitals block doesn't carry.
+    try:
+        from canonical_facts import build_canonical_facts
+
+        facts = build_canonical_facts(_latest_item("computed_metrics") or {})
+        if facts.get("weekly_rate_lbs") is not None:
+            reads["weekly_rate_lbs"] = facts["weekly_rate_lbs"]
+        if facts.get("protein_g_avg") is not None:
+            reads["protein"] = {
+                "avg_7d_g": facts["protein_g_avg"],
+                "target_g": facts.get("protein_g_target"),
+                "floor_g": facts.get("protein_g_floor"),
+            }
+    except Exception as e:
+        logger.warning(f"[ask reads] canonical facts skipped: {e}")
+
+    # Daily insight drivers (computed_insights): momentum + which metrics are
+    # moving which way + habit strengths/weaknesses.
+    try:
+        ins = _latest_item("computed_insights") or {}
+        if ins.get("momentum_signal"):
+            reads["momentum"] = str(ins["momentum_signal"])[:300]
+        for src_key, out_key in (("improving_metrics", "improving"), ("declining_metrics", "declining")):
+            raw = ins.get(src_key)
+            vals = json.loads(raw) if isinstance(raw, str) else raw
+            if vals:
+                reads[out_key] = [str(v)[:80] for v in vals][:4]
+        if ins.get("strongest_habits"):
+            reads["strongest_habits"] = [str(h)[:60] for h in ins["strongest_habits"]][:3]
+        if ins.get("weakest_habits"):
+            reads["weakest_habits"] = [str(h)[:60] for h in ins["weakest_habits"]][:3]
+    except Exception as e:
+        logger.warning(f"[ask reads] computed_insights skipped: {e}")
+
+    # Adaptive-mode read (the platform's own morning verdict + its reasons —
+    # this is the precomputed answer to "what drove today?").
+    try:
+        am = _latest_item("adaptive_mode") or {}
+        if am.get("mode_label"):
+            factors = am.get("factors") or {}
+            reads["adaptive_mode"] = {
+                "label": str(am["mode_label"])[:60],
+                "score": am.get("engagement_score"),
+                "factors": {str(k)[:30]: str(v)[:120] for k, v in factors.items() if v},
+            }
+    except Exception as e:
+        logger.warning(f"[ask reads] adaptive_mode skipped: {e}")
+
+    # Monthly motion (what_changed SNAPSHOT#current — trailing-30d vs prior-30d,
+    # written weekly; real deltas only, honest_null on a flat month).
+    try:
+        wc = table.get_item(Key={"pk": f"{USER_PREFIX}what_changed", "sk": "SNAPSHOT#current"}).get("Item")
+        wc = _decimal_to_float(wc or {})
+        deltas = []
+        for d in (wc.get("deltas") or [])[:6]:
+            deltas.append(
+                {
+                    "label": d.get("label") or d.get("metric"),
+                    "this_month_avg": d.get("this_month_avg"),
+                    "prior_month_avg": d.get("prior_month_avg"),
+                    "delta": d.get("delta"),
+                    "unit": d.get("unit") or "",
+                    "direction": d.get("direction"),
+                }
+            )
+        if deltas:
+            reads["month_deltas"] = deltas
+    except Exception as e:
+        logger.warning(f"[ask reads] what_changed skipped: {e}")
+
+    # FDR-significant correlations (weekly_correlations) — the statistically
+    # defensible pattern set, strongest first.
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}weekly_correlations"),
+                    "ScanIndexForward": False,
+                    "Limit": 4,
+                }
+            )
+        )
+        pairs: dict = {}
+        for item in _decimal_to_float(resp.get("Items", [])):
+            corrs = item.get("correlations", {})
+            if not isinstance(corrs, dict):
+                continue
+            for label, data in corrs.items():
+                if not isinstance(data, dict) or not data.get("fdr_significant") or label in pairs:
+                    continue
+                pairs[label] = {
+                    "a": str(data.get("metric_a", ""))[:40],
+                    "b": str(data.get("metric_b", ""))[:40],
+                    "r": round(float(data.get("pearson_r", 0) or 0), 2),
+                    "n_days": int(data.get("n_days", 0) or 0),
+                }
+        if pairs:
+            reads["correlations"] = sorted(pairs.values(), key=lambda p: -abs(p["r"]))[:5]
+    except Exception as e:
+        logger.warning(f"[ask reads] correlations skipped: {e}")
+
+    # Presence (engagement_state — same public allowlist as /api/presence, so a
+    # quiet stretch is narrated honestly instead of read as missing data).
+    try:
+        pres = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item")
+        pres = _decimal_to_float(pres or {})
+        if pres.get("presence_class"):
+            reads["presence"] = {
+                "class": str(pres["presence_class"])[:20],
+                "gap_days": pres.get("gap_days"),
+                "passive_still_flowing": bool(pres.get("passive_still_flowing")),
+            }
+    except Exception as e:
+        logger.warning(f"[ask reads] presence skipped: {e}")
+
+    return reads
+
+
+def _ask_reads_block(reads: dict) -> str:
+    """Render the computed reads for the prompt — compact, values verbatim."""
+    if not reads:
+        return ""
+    lines = []
+    am = reads.get("adaptive_mode")
+    if am:
+        score = f" ({am['score']:.0f}/100)" if isinstance(am.get("score"), (int, float)) else ""
+        lines.append(f"  Today's computed mode: {am['label']}{score}")
+        for k, v in (am.get("factors") or {}).items():
+            lines.append(f"    - {k}: {v}")
+    if reads.get("momentum"):
+        lines.append(f"  Momentum read: {reads['momentum']}")
+    if reads.get("improving"):
+        lines.append(f"  Improving (7d): {', '.join(reads['improving'])}")
+    if reads.get("declining"):
+        lines.append(f"  Declining (7d): {', '.join(reads['declining'])}")
+    if reads.get("strongest_habits"):
+        lines.append(f"  Strongest habits: {', '.join(reads['strongest_habits'])}")
+    if reads.get("weakest_habits"):
+        lines.append(f"  Weakest habits: {', '.join(reads['weakest_habits'])}")
+    if reads.get("weekly_rate_lbs") is not None:
+        lines.append(f"  Weight trend: {reads['weekly_rate_lbs']:+.1f} lbs/week (computed)")
+    pr = reads.get("protein")
+    if pr:
+        seg = f"  Protein: {pr['avg_7d_g']:.0f}g 7-day avg intake"
+        if pr.get("target_g") is not None:
+            seg += f" (target {pr['target_g']:.0f}g"
+            seg += f", floor {pr['floor_g']:.0f}g)" if pr.get("floor_g") is not None else ")"
+        lines.append(seg)
+    for d in reads.get("month_deltas", []):
+        lines.append(
+            f"  30-day motion: {d['label']} {d['this_month_avg']} vs {d['prior_month_avg']} prior "
+            f"({d['delta']:+g} {d['unit']}, {d['direction']})".rstrip()
+        )
+    for c in reads.get("correlations", []):
+        direction = "higher" if c["r"] > 0 else "lower"
+        lines.append(
+            f"  Correlation (FDR-significant): higher {c['a']} tracks with {direction} {c['b']} (r={c['r']:+.2f}, n={c['n_days']} days)"
+        )
+    p = reads.get("presence")
+    if p and p["class"] not in ("present", ""):
+        gap = f" — {p['gap_days']:.0f} days since the last manual log" if isinstance(p.get("gap_days"), (int, float)) else ""
+        passive = "; passive devices still flowing" if p.get("passive_still_flowing") else ""
+        lines.append(f"  Presence: quiet stretch ({p['class']}){gap}{passive}")
+    return "\n".join(lines)
 
 
 # WR-40: Question safety filter — block sensitive query categories
@@ -396,7 +578,13 @@ def _ask_build_prompt(ctx: dict) -> str:
         pillars_str = "\n".join(
             f"    {n}: level {p['level']:.0f}, score {p['raw_score']:.1f}, tier {p['tier']}" for n, p in ctx["pillars"].items()
         )
-    return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking 19 data sources.
+    # #387: hand the model what Python already worked out — drivers, trends,
+    # significant correlations, presence — so "what drove it?" gets the
+    # platform's computed read instead of "I can't tell you".
+    reads_block = _ask_reads_block(ctx.get("reads") or {})
+    reads_section = f"\nCOMPUTED READS (precomputed by the platform's analysis pipeline):\n{reads_block}\n" if reads_block else ""
+    return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking \
+{_LIVE_SOURCE_COUNT} live data sources ({_PAUSED_SOURCE_COUNT} paused).
 
 CURRENT DATA:
   Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', EXPERIMENT_BASELINE_WEIGHT_LBS)}, goal {ctx.get('goal_weight', 185)})
@@ -408,11 +596,13 @@ CURRENT DATA:
   T0 habit streak: {ctx.get('tier0_streak', '?')} days
   Pillars:
 {pillars_str or '    Not available'}
-
+{reads_section}
 RULES:
 - Answer from the data above. If you don't have data, say so honestly.
 - Be specific: "HRV is 54ms" not "HRV is moderate."
 - N=1 data. Note this for comparative claims.
+- NO ARITHMETIC: you narrate precomputed values — never sum, average, project, or derive a number yourself. Every number you cite must appear verbatim in the data above.
+- "What drove X?" questions: answer from the COMPUTED READS (mode factors, momentum, improving/declining metrics, correlations) with correlative framing and a small-sample caveat. If no computed read covers the question, say the platform hasn't computed a driver read for that yet. NEVER ask the reader to supply or track Matthew's data — the platform already tracks it; readers don't have it.
 - CORRELATIVE ONLY, NEVER CAUSAL: say "X tracks with Y" or "X coincided with Y," never "X causes/caused Y" or "X will improve Y." Patterns are leads, not proof.
 - LABEL CONFIDENCE HONESTLY: flag thin evidence ("preliminary — only a few weeks of data," "small sample, low confidence") and never present a pattern as established. When the experiment was recently re-anchored, the data is early by design — say so.
 - Never give medical advice. Say "the data shows X" not "you should do Y."
@@ -489,7 +679,7 @@ def _coach_system(pid: str) -> str:
         # WHERE YOU ARE (#356): the situational preamble every persona shares.
         "WHERE YOU ARE: this is the public board of averagejoematt.com — Matthew's real, ongoing N=1 living "
         "documentary. The platform ALREADY continuously tracks his sleep (three devices), training, nutrition, "
-        "glucose, labs, recovery, HRV and habits from ~19 sources; the CURRENT DATA block below is his REAL "
+        f"glucose, labs, recovery, HRV and habits from {_LIVE_SOURCE_COUNT} live sources; the CURRENT DATA block below is his REAL "
         "tracked data. You are answering a READER's question about that public experiment, from your discipline "
         "only — you are NOT in a private consult. Therefore: never ask the reader to supply Matthew's data, and "
         "never prescribe that he 'start tracking' something the platform already measures — speak to what the "

@@ -828,29 +828,17 @@ def tool_get_freshness_status(args):
     """
     from datetime import date as _date
 
+    # #392: derive from the canonical registry (shared layer) instead of a third
+    # hand-rolled mirror — this one had drifted worst (food_delivery still 90d,
+    # the pre-triage masking value; hevy missing entirely).
+    from source_registry import DEFAULT_STALE_HOURS, mcp_sources, stale_hours_overrides
+
     # DI-1.1: legible source-state (live/paused/rate_limited/stale) so a deliberately-off
     # source (Strava) or a rate-limited one (Garmin) is never mistaken for silent breakage.
     from source_state import has_rate_limit_marker, resolve_source_state
 
-    SOURCES = {
-        "whoop": "Whoop recovery/sleep",
-        "withings": "Withings weight/body comp",
-        "strava": "Strava activities",
-        "todoist": "Todoist tasks",
-        "apple_health": "Apple Health",
-        "eightsleep": "Eight Sleep",
-        "macrofactor": "MacroFactor nutrition",
-        "garmin": "Garmin biometrics",
-        "habitify": "Habitify habits",
-        "food_delivery": "Food delivery behavioral signal",
-        "measurements": "Tape measure check-ins",
-        "notion": "Notion journal",
-    }
-    SOURCE_STALE_HOURS = {
-        "food_delivery": 90 * 24,
-        "measurements": 60 * 24,
-    }
-    DEFAULT_STALE_HOURS = 48
+    SOURCES = mcp_sources()
+    SOURCE_STALE_HOURS = stale_hours_overrides(SOURCES)
 
     requested = args.get("sources") if args else None
     if requested:

@@ -28,10 +28,14 @@ read live from S3 via CloudFront — but run an invalidation if you want it inst
 """
 import argparse
 import json
+import os
 import sys
 from datetime import date, datetime, timezone
 
 import boto3
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
+import privacy_guard  # noqa: E402 — fail-closed publish gate (#397)
 
 BUCKET = "matthew-life-platform"
 REGION = "us-west-2"
@@ -39,6 +43,20 @@ QUEUE_PREFIX = "generated/board_questions/"
 FEED_KEY = "generated/board_answers/answers.json"
 
 s3 = boto3.client("s3", region_name=REGION)
+
+
+def assert_entry_publishable(entry: dict) -> dict:
+    """#397 fail-closed content/privacy gate: every string that will appear on the
+    public feed (question, note, answer, each persona response + name) must pass
+    privacy_guard.assert_clean — banned vices/real names block the publish with
+    the violation list instead of reaching the site. Returns the entry unchanged."""
+    privacy_guard.assert_clean(entry.get("question", ""), context="question")
+    privacy_guard.assert_clean(entry.get("note", "") or "", context="note")
+    privacy_guard.assert_clean(entry.get("answer", "") or "", context="answer")
+    for i, r in enumerate(entry.get("responses") or []):
+        privacy_guard.assert_clean(str(r.get("name", "")), context=f"responses[{i}].name")
+        privacy_guard.assert_clean(str(r.get("text", "")), context=f"responses[{i}].text")
+    return entry
 
 
 def _list_questions():
@@ -122,6 +140,10 @@ def cmd_answer(args):
     }
     if args.note:
         entry["note"] = args.note
+    try:
+        assert_entry_publishable(entry)
+    except privacy_guard.PrivacyViolation as pv:
+        sys.exit(f"❌ BLOCKED — this entry would leak banned content, not publishing: {pv}")
     feed["answers"].append(entry)
     _put_json(FEED_KEY, feed)
     print(f"✅ published answer for {rec['id']} → s3://{BUCKET}/{FEED_KEY} ({len(feed['answers'])} total)")
