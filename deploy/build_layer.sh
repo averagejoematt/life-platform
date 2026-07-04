@@ -58,6 +58,9 @@ MODULES=(
     routine_title.py
     # ADR-068 (2026-05-31): per-exercise factual history cues
     exercise_history.py
+    # #531 (2026-07-04): shared coach persona core — one voice-spec rendering
+    # for the board (site-api-ai), the observatory experts, and future surfaces.
+    persona_core.py
     # 2026-06-01: vacation fund tracker ($1/workout-mile) — shared by MCP, site-api, daily-brief
     vacation_fund.py
     # CC-00 (2026-06-13): canonical persona registry — resolved by engine + site-api

@@ -137,6 +137,9 @@
     "lambdas/emails/daily_brief_lambda.py": {
       "function": "daily-brief"
     },
+    "lambdas/emails/elena_state_updater.py": {
+      "function": "elena-state-updater"
+    },
     "lambdas/emails/evening_nudge_lambda.py": {
       "function": "evening-nudge"
     },
@@ -401,7 +404,8 @@
       "lambdas/training_notes.py",
       "lambdas/training_notes_llm.py",
       "lambdas/grounded_generation.py",
-      "lambdas/canonical_facts.py"
+      "lambdas/canonical_facts.py",
+      "lambdas/persona_core.py"
     ]
   },
   "skip_deploy": {

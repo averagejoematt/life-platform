@@ -10,7 +10,9 @@ Endpoints:
   POST /api/ask       — AI Q&A with health data context (5 anon / 20 subscriber per hour)
   POST /api/board_ask — 6-persona board panel answers (5 per IP per hour)
 
-IAM: Read-only DynamoDB + S3 config + Secrets Manager (site-api-ai-key). No writes.
+IAM: Read DynamoDB + S3 config + Secrets Manager (site-api-ai-key). Writes are
+scoped by LeadingKeys to RATE#* (rate-limit counters) and COACH#* (#531: the
+board_ask episodic write-back — a coach's public answers enter its own memory).
 """
 
 import base64 as _b64
@@ -58,6 +60,17 @@ dynamodb = boto3.resource("dynamodb", region_name=DDB_REGION)
 table = dynamodb.Table(TABLE_NAME)
 _cw = boto3.client("cloudwatch", region_name=DDB_REGION)
 _LAMBDA_NAME = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "life-platform-site-api-ai")
+
+# #531: voice specs live in S3 config/coaches/ — lazy client, role has config/* read.
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+_s3 = None
+
+
+def _s3_client():
+    global _s3
+    if _s3 is None:
+        _s3 = boto3.client("s3", region_name=S3_REGION)
+    return _s3
 
 
 def _emit_token_metrics(usage: dict, endpoint: str) -> None:
@@ -667,18 +680,37 @@ LEGACY_PERSONA_MAP = {
 }
 
 
+def _coach_voice_core(pid: str) -> str:
+    """#531: the shared persona core — the SAME voice-spec fields the daily-brief
+    self writes from (config/coaches/{pid}.json via persona_core), compacted.
+    Deterministic per spec, so the system block stays byte-stable for the prompt
+    cache. "" fail-soft: a missing spec keeps the roster-only block (pre-#531)."""
+    try:
+        import persona_core
+
+        return persona_core.persona_block(pid, s3_client=_s3_client(), bucket=S3_BUCKET)
+    except Exception as e:
+        logger.warning(f"[board_ask] voice core unavailable for {pid} (fail-soft): {e}")
+        return ""
+
+
 def _coach_system(pid: str) -> str:
-    """The persona system block — identity + WHERE-you-are context + the absolute
-    grounding rules. Stable per coach so the ephemeral prompt cache keeps its 90%
-    discount; the volatile facts ride in the user message instead. (#356: a shared
-    situational preamble so personas hold character under meta-pressure and stop
-    asking the reader for data the platform already collects.)"""
+    """The persona system block — identity + voice core (#531) + WHERE-you-are
+    context + the absolute grounding rules. Stable per coach so the ephemeral
+    prompt cache keeps its 90% discount; the volatile facts ride in the user
+    message instead. (#356: a shared situational preamble so personas hold
+    character under meta-pressure and stop asking the reader for data the
+    platform already collects.)"""
     c = COACH_ROSTER[pid]
+    voice_core = _coach_voice_core(pid)
     return (
         f"You are {c['name']}, the {c['title']} coach — an AI coach persona on averagejoematt.com, "
         f"one of the eight-coach board that reads Matthew's real health data daily. Your lens: {c['lens']}. "
+        # #531: one mind per coach — the board self writes from the same voice
+        # spec as the daily-brief self. (Blank when the spec can't be loaded.)
+        + (f"\n{voice_core}\n" if voice_core else "")
         # WHERE YOU ARE (#356): the situational preamble every persona shares.
-        "WHERE YOU ARE: this is the public board of averagejoematt.com — Matthew's real, ongoing N=1 living "
+        + "WHERE YOU ARE: this is the public board of averagejoematt.com — Matthew's real, ongoing N=1 living "
         "documentary. The platform ALREADY continuously tracks his sleep (three devices), training, nutrition, "
         f"glucose, labs, recovery, HRV and habits from {_LIVE_SOURCE_COUNT} live sources; the CURRENT DATA block below is his REAL "
         "tracked data. You are answering a READER's question about that public experiment, from your discipline "
@@ -739,6 +771,73 @@ def _coach_stance_bits(pid: str) -> str:
         return " ".join(bits)
     except Exception:
         return ""
+
+
+def _coach_memory_bits(pid: str) -> str:
+    """#531: the coach's compressed memory (COMPRESSED#latest, maintained weekly
+    by the history summarizer) — the same state the daily-brief self reasons
+    from. Summary + top concerns, bounded. Empty pre-data / on any error."""
+    try:
+        item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "COMPRESSED#latest"}).get("Item") or {}
+        item = _decimal_to_float(item)
+        bits = []
+        if item.get("summary"):
+            bits.append(str(item["summary"])[:500])
+        concerns = [str(x)[:120] for x in (item.get("key_concerns") or [])[:3]]
+        if concerns:
+            bits.append("Current concerns: " + "; ".join(concerns))
+        return " ".join(bits)
+    except Exception:
+        return ""
+
+
+def _coach_recent_interactions(pid: str, limit: int = 2) -> str:
+    """#531: the coach's newest public-board answers (episodic memory) — so a
+    coach can reference what it already told readers instead of contradicting
+    itself. Empty pre-data / on any error."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"COACH#{pid}") & Key("sk").begins_with("INTERACTION#"),
+            ScanIndexForward=False,
+            Limit=limit,
+        )
+        lines = []
+        for it in resp.get("Items", []):
+            q = str(it.get("question") or "")[:160]
+            a = str(it.get("answer") or "")[:240]
+            sk_parts = str(it.get("sk") or "").split("#")
+            d = sk_parts[1] if len(sk_parts) > 1 else ""
+            if q and a:
+                lines.append(f"[{d}] A reader asked: {q} — you answered: {a}")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _write_board_interaction(pid: str, question: str, answer: str, grounded: bool) -> None:
+    """#531: episodic write-back — a public board answer enters the coach's OWN
+    memory (PK=COACH#{pid}, SK=INTERACTION#{date}#{qhash}) so the weekly
+    summarizer folds it into COMPRESSED#latest and future outputs can reference
+    it. Content is already scrubbed (privacy_guard + blocked terms). The qhash
+    is content-addressed, so a repeated question overwrites rather than piles
+    up. Fail-soft: a write failure never affects the reader's response."""
+    try:
+        now = datetime.now(timezone.utc)
+        qid = hashlib.sha256(question.encode()).hexdigest()[:8]
+        table.put_item(
+            Item={
+                "pk": f"COACH#{pid}",
+                "sk": f"INTERACTION#{now.strftime('%Y-%m-%d')}#{qid}",
+                "interaction_type": "board_qa",
+                "channel": "public_board",
+                "question": question[:500],
+                "answer": answer[:1200],
+                "grounded": grounded,
+                "created_at": now.isoformat(),
+            }
+        )
+    except Exception as e:
+        logger.warning(f"[board_ask] interaction write-back failed for {pid} (non-fatal): {e}")
 
 
 # ── Lambda Handler ─────────────────────────────────────────
@@ -1206,10 +1305,22 @@ def _handle_board_ask(event: dict) -> dict:
     for pid in personas:
         p = COACH_ROSTER[pid]
         try:
+            # #531: one mind per coach — the board self loads the same memory the
+            # daily-brief self reasons from (stance + compressed state), plus its
+            # own recent board answers (episodic). All volatile → user turn, so
+            # the persona system block stays byte-stable for the prompt cache.
             stance = _coach_stance_bits(pid)
+            memory = _coach_memory_bits(pid)
+            episodic = _coach_recent_interactions(pid)
             user_msg = (
                 f"CURRENT DATA (authoritative — cite only these numbers): {facts}\n"
                 + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
+                + (f"YOUR MEMORY (the compressed history your weekly summarizer maintains): {memory}\n" if memory else "")
+                + (
+                    f"YOUR RECENT BOARD ANSWERS (reference them when relevant — never silently contradict them):\n{episodic}\n"
+                    if episodic
+                    else ""
+                )
                 + f"READER QUESTION: {question}"
             )
             _sys_txt = _coach_system(pid)
@@ -1245,12 +1356,14 @@ def _handle_board_ask(event: dict) -> dict:
             # states must exist in its system context, the facts, its stance,
             # or the question. Ungrounded → an honest in-voice refusal, never
             # a fabricated figure served to a reader.
+            _grounded = True
             try:
                 import grounded_generation as _gg
 
                 _gf = _gg.grounding_findings(_txt, allowed=_gg.allowed_numbers(_sys_txt, user_msg))
                 if _gf:
                     logger.warning(f"[board_ask] {pid} ungrounded: {[f['detail'] for f in _gf][:3]}")
+                    _grounded = False
                     _txt = (
                         "I'd want to answer that with numbers I can actually stand behind, and I can't "
                         "ground them in today's record — ask me about something the current data covers."
@@ -1259,6 +1372,9 @@ def _handle_board_ask(event: dict) -> dict:
                 pass  # helper not bundled — serve as before
             except Exception as _gg_e:
                 logger.warning(f"[board_ask] {pid} grounding gate error (fail-open): {_gg_e}")
+
+            # #531: the answer enters the coach's own memory (fail-soft).
+            _write_board_interaction(pid, question, _txt, grounded=_grounded)
 
             responses[pid] = _txt
         except Exception as e:

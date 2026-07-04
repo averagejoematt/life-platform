@@ -46,6 +46,14 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "USER#matthew#SOURCE#email_digest",
         "STATE#between_chronicle",
     ): "#398 dedup marker — created on the first between-chronicle send; the read tolerates absence (empty marker = send)",
+    (
+        "PERSONA#elena",
+        "STANCE#latest",
+    ): "#537 Elena's editorial stance — seeded by elena-state-updater on the first post-publish extraction; every reader fail-softs to ''",
+    (
+        "PERSONA#elena",
+        "MOTIF#state",
+    ): "#537 Elena's running motifs — seeded on the first post-publish extraction; readers tolerate absence",
 }
 
 # Module-level constant values used to resolve f-strings statically.
