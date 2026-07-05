@@ -42,18 +42,18 @@ I built #590 in the **shared primary working directory** while a **concurrent se
 ## Live PRs at close (Matthew's to resolve)
 - **#703** `feat/408-pr-render-accuracy-gate` — a concurrent agent's #408 (the version that briefly rode onto main; complete, compiles).
 - **#704** `feat/408-pr-render-gate` — my background agent's #408 (different approach, self-tested pass-on-clean/fail-on-seeded).
-- **These two are competing #408 implementations — pick one, close the other.** Both "Fixes #408".
-- #705 (#589) — merged+deployed by the concurrent session. #706 (#590), #707 (revert) — mine, merged.
+- **RESOLVED after my revert:** the concurrent session (which owns #408) merged **#703** to `origin/main` (`a29313ba`) and closed the duplicate **#704**. So #408 legitimately landed via its own reviewed PR — my #707 revert removed only the *accidentally-squashed* copy, and #703 re-applied it properly. **No action needed on #408.**
+- #705 (#589) — merged+deployed by the concurrent session. #706 (#590), #707 (revert) — mine, merged. #703 (#408) — concurrent session, merged.
 
 ## State at close
-- `main` clean == `origin/main` (`99ee566a`). Worktrees pruned to 2 (main + pre-existing `docs/uplevel-handover`).
+- `main` == `origin/main` (`a29313ba`: #590 → revert #707 → #408 #703 merge → this docs-close). Worktrees pruned to 2 (main + pre-existing `docs/uplevel-handover`).
 - **Motion epic #575 COMPLETE (5/5):** #577 #578 #588 #591 (prior session) + #590 (this).
-- Site smoke 67/67, `/api/pillar_coupling` live.
+- Site smoke 67/67, `/api/pillar_coupling` live. #408 done.
 - **GitHub Pages still enabled + public** (carried across many sessions, unactioned).
+- NB: a **concurrent session was closing at the same time** — it also touched `MEMORY.md`, the roadmap memory, and may write its own CLAUDE.md status block. If the live status block reads #408-focused rather than #590, that's the concurrent close landing after this one; both are accurate.
 
 ## Next session
-1. **Resolve the two #408 PRs (#703 vs #704)** — pick one, close the other, merge the winner. (Matthew's call, in flight.)
-2. **#409** batch-price the content AI — **touches `bedrock_client`/`ai_calls` = LAYER modules → layer bump + full consumer redeploy.** Attended.
-3. **#395** MCP prune (attended/destructive) · **#687** OIDC trust-tighten (watched live CI).
-4. Backlog: `gh issue list --label type:story --milestone Now --state open` (Now is at zero; Next has #583 chart-contract-v2-batch-2, which extends the same `data-cpts`/motion.js path #590 touched — do it aware of that).
-5. Housekeeping: GitHub Pages enable/disable decision.
+1. **#409** batch-price the content AI — **touches `bedrock_client`/`ai_calls` = LAYER modules → layer bump + full consumer redeploy.** Attended.
+2. **#395** MCP prune (attended/destructive) · **#687** OIDC trust-tighten (watched live CI).
+3. Backlog: `gh issue list --label type:story --milestone Now --state open` (Now is at zero; Next has #583 chart-contract-v2-batch-2, which extends the same `data-cpts`/motion.js path #590 touched — do it aware of that).
+4. Housekeeping: GitHub Pages enable/disable decision.
