@@ -83,6 +83,9 @@ def test_archive_writes_per_page_s3_key(monkeypatch):
         puts["Key"] = Key
         puts["Body"] = Body
 
+    # Pin the module global explicitly — it's frozen at import time from env, so full-suite
+    # ordering (another test imports notion_lambda first) could otherwise leave it as anything.
+    monkeypatch.setattr(nl, "S3_BUCKET", "matthew-life-platform")
     monkeypatch.setattr(nl.s3_client, "put_object", _fake_put)
     page = {"id": "abcd1234-ef56-7890-1234-56789abcdef0", "created_time": "2026-07-01T12:00:00Z"}
     item = {"body_text": "today I lifted heavy and slept well", "raw_text": "[journal]\n..."}
