@@ -1060,9 +1060,10 @@ load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) ? _deepDate : undefined)
    REAL ingestion write times from /api/last_sync (ingested_at stamps, never
    the day-granular DATE key). The "ago" text ticks client-side every 30s;
    the data re-fetches every 5 minutes. The pulse dot glows ONLY when a pipe
-   wrote within the earned-glow window (nothing is animated to imply data
+   wrote within ITS OWN registry-derived freshness window (#589 — data-fresh-ts
+   + data-fresh-window hand off to motion.js's shared wireFreshness() primitive,
+   replacing the old flat 45-minute guess; nothing is animated to imply data
    that isn't there); stale states render truthfully ("9h ago"). */
-const SYNC_FRESH_MIN = 45; // earned-glow window
 let _sync = null;
 let _syncSkewMs = 0;
 
@@ -1084,10 +1085,9 @@ function renderSyncLine() {
   if (!srcs.length) { el.hidden = true; return; }
   const freshestId = _sync.freshest && _sync.freshest.id;
   el.innerHTML = srcs.map((s) => {
-    const mins = (Date.now() + _syncSkewMs - Date.parse(s.last_write)) / 60000;
-    const fresh = Number.isFinite(mins) && mins <= SYNC_FRESH_MIN;
+    const windowS = Number.isFinite(Number(s.stale_hours)) ? Math.round(Number(s.stale_hours) * 3600) : "";
     const star = s.id === freshestId ? ` <span class="sync-freshest">← freshest</span>` : "";
-    return `<span class="sync-src"><span class="sync-dot${fresh ? " is-fresh" : ""}" aria-hidden="true"></span>` +
+    return `<span class="sync-src"><span class="sync-dot fr-dot" data-fresh-ts="${escapeHTML(s.last_write)}" data-fresh-window="${windowS}" aria-hidden="true"></span>` +
       `${escapeHTML(s.label)} <span class="sync-ago num">${escapeHTML(_agoText(s.last_write))}</span>${star}</span>`;
   }).join(`<span class="sync-sep" aria-hidden="true">·</span>`);
   el.hidden = false;

@@ -17,6 +17,49 @@
 (function () {
   var root = document.documentElement;
 
+  // ── Freshness pulse (#589) — a NEW, self-contained primitive kept beside (not
+  //    merged into) the data-cpts chart-wiring below: the epic's no-fake-liveness
+  //    rule made reusable. Any element carrying data-fresh-ts (an ISO instant) +
+  //    data-fresh-window (its OWN freshness window in seconds, sourced from
+  //    source_registry.py via /api/source_freshness or /api/last_sync — never a
+  //    guessed constant) gets .fr-live ONLY while now − ts is inside that window.
+  //    Runs regardless of the reduced-motion branch below: the fresh/stale STATE
+  //    must update either way (color/text), only the CSS keyframe itself is
+  //    reduced-motion-gated (tokens.css §12c). Re-checks on an interval since a
+  //    page can sit open long enough for a window to close on its own, and via
+  //    MutationObserver so SPA-injected markup (the cockpit sync line rebuilds
+  //    its DOM on every poll) is picked up automatically. FRESH_WINDOW_OK below
+  //    is deliberately fenced with sentinel comments — a unit test extracts and
+  //    exercises this exact predicate, never a re-implementation of it.
+  // FRESH_WINDOW_OK_START
+  function freshWindowOk(tsIso, windowSeconds, nowMs) {
+    var ts = Date.parse(tsIso);
+    var win = parseFloat(windowSeconds);
+    if (!isFinite(ts) || !isFinite(win) || win <= 0) return false;
+    var now = typeof nowMs === "number" ? nowMs : Date.now();
+    var age = now - ts;
+    return age >= -60000 && age <= win * 1000; // −60s clock-skew grace; a future ts is never "live"
+  }
+  // FRESH_WINDOW_OK_END
+  window.__freshWindowOk = freshWindowOk; // exposed so the unit test drives the exact DOM predicate
+
+  function wireFreshness(scope) {
+    if (!scope || !scope.querySelectorAll) return;
+    var els = (scope.matches && scope.matches("[data-fresh-ts]")) ? [scope] : [];
+    els = els.concat(Array.prototype.slice.call(scope.querySelectorAll("[data-fresh-ts]")));
+    els.forEach(function (el) {
+      var ok = freshWindowOk(el.getAttribute("data-fresh-ts"), el.getAttribute("data-fresh-window"));
+      el.classList.toggle("fr-live", ok);
+    });
+  }
+  wireFreshness(document);
+  try {
+    new MutationObserver(function (muts) {
+      muts.forEach(function (m) { Array.prototype.forEach.call(m.addedNodes, function (n) { if (n.nodeType === 1) wireFreshness(n); }); });
+    }).observe(document.body, { childList: true, subtree: true });
+  } catch (e) {}
+  setInterval(function () { wireFreshness(document); }, 60000);
+
   // ── Interactive charts (ALWAYS on — interaction, not motion, so it runs even
   //    under prefers-reduced-motion). Any chart element that embeds data-cpts
   //    (normalized 0–1 coords + a label per point) gets a focus dot + tooltip —

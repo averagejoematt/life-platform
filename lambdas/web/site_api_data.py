@@ -180,16 +180,19 @@ def handle_source_freshness() -> dict:
 
     for sid, meta in _FRESHNESS_SOURCES.items():
         last_update = None
+        last_update_ts = None
         age_hours = None
+        stale_hours = None
         status = "stale"
         try:
             date_str = _latest_date_str(sid)
             if date_str:
                 last_update = date_str
                 last_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                last_update_ts = last_dt.isoformat()
                 age_hours = round((now - last_dt).total_seconds() / 3600, 1)
-                threshold = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
-                if age_hours <= threshold:
+                stale_hours = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
+                if age_hours <= stale_hours:
                     status = "fresh"
                 elif meta.get("behavioral"):
                     status = "behavioral-stale"
@@ -206,6 +209,11 @@ def handle_source_freshness() -> dict:
             "desc": meta["desc"],
             "category": meta["category"],
             "last_update": last_update,
+            # #589: the real instant + this source's OWN registry-derived window, so the
+            # front-end's freshness pulse is tied to an actual timestamp — never a fixed
+            # decorative loop. Only present when a real last-write date exists.
+            "last_update_ts": last_update_ts,
+            "stale_hours": stale_hours,
             "age_hours": age_hours,
             "status": status,
             "is_behavioral": bool(meta.get("behavioral")),
@@ -257,10 +265,12 @@ _SYNC_SOURCES = {"whoop": "Whoop", "eightsleep": "Eight Sleep", "apple_health": 
 def handle_last_sync() -> dict:
     """GET /api/last_sync — per passive source, the real last ingestion write.
 
-    Returns {sources: [{id, label, last_write}], freshest, server_now}. The
-    client computes and ticks the "ago" display (server_now closes clock skew).
-    A source with no write stamp is reported with last_write null — shown
-    honestly or omitted by the front-end, never faked."""
+    Returns {sources: [{id, label, last_write, stale_hours}], freshest, server_now}.
+    The client computes and ticks the "ago" display (server_now closes clock skew).
+    stale_hours (#589) is the SAME source_registry-derived window /api/source_freshness
+    uses — so the cockpit sync line's pulse is tied to each source's real freshness
+    window, not a flat guess. A source with no write stamp is reported with last_write
+    null — shown honestly or omitted by the front-end, never faked."""
     now_iso = datetime.now(timezone.utc).isoformat()
     sources = []
     for sid, label in _SYNC_SOURCES.items():
@@ -280,7 +290,8 @@ def handle_last_sync() -> dict:
                     last_write = ts
         except Exception as e:
             logger.warning("last_sync: %s failed: %s", sid, e)
-        sources.append({"id": sid, "label": label, "last_write": last_write})
+        stale_hours = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
+        sources.append({"id": sid, "label": label, "last_write": last_write, "stale_hours": stale_hours})
     with_writes = [s for s in sources if s["last_write"]]
     freshest = max(with_writes, key=lambda s: s["last_write"]) if with_writes else None
     return _ok({"sources": sources, "freshest": freshest, "server_now": now_iso}, cache_seconds=60)

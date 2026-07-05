@@ -2,8 +2,9 @@
 
 Pins: /api/last_sync reads ingested_at / webhook_ingested_at stamps (never the
 day-granular DATE key), covers only the passive pipes, reports a missing stamp
-as null instead of inventing one, and the front-end's glow is gated on the
-earned-fresh window with truthful stale text.
+as null instead of inventing one, and the front-end's glow is gated on each
+source's OWN registry-derived freshness window (#589 — data-fresh-ts/-window,
+via motion.js's shared wireFreshness() primitive) with truthful stale text.
 """
 
 import json
@@ -53,6 +54,9 @@ def test_last_sync_reads_real_write_stamps(monkeypatch):
     assert by_id["apple_health"]["last_write"] == "2026-07-04T05:30:00+00:00"
     assert body["freshest"]["id"] == "apple_health"
     assert body["server_now"]  # the client's skew anchor
+    # #589: each source carries its OWN registry-derived window — never a flat guess —
+    # so the front-end pulse primitive can be driven honestly per source.
+    assert all(isinstance(s["stale_hours"], (int, float)) for s in body["sources"])
 
 
 def test_missing_stamp_is_null_never_invented(monkeypatch):
@@ -75,10 +79,15 @@ def test_sync_strip_sources_pinned():
 
 def test_frontend_ticks_and_earns_the_glow():
     assert "setInterval(renderSyncLine, 30_000)" in COCKPIT_JS  # the ago ticks client-side
-    assert "SYNC_FRESH_MIN" in COCKPIT_JS and "is-fresh" in COCKPIT_JS
+    # #589: the glow is now the shared data-fresh-ts/-window primitive (motion.js's
+    # wireFreshness()), not a flat client-side minute guess — each source earns its
+    # own glow from ITS OWN registry-derived window.
+    assert "data-fresh-ts=" in COCKPIT_JS and "data-fresh-window=" in COCKPIT_JS
+    assert "s.stale_hours" in COCKPIT_JS
+    assert "SYNC_FRESH_MIN" not in COCKPIT_JS and "is-fresh" not in COCKPIT_JS
     assert "d.server_now ? Date.parse(d.server_now) - Date.now()" in COCKPIT_JS  # skew-corrected, not naive
     # Stale states render truthfully (h/d formats exist, nothing hides them).
     assert "`${h}h ago`" in COCKPIT_JS and "d ago" in COCKPIT_JS
-    # The pulse animation is gated on the fresh class only — no decorative glow.
-    assert ".sync-dot.is-fresh" in COCKPIT_CSS
-    assert COCKPIT_CSS.count("syncPulse") == 2  # defined once, applied once (on is-fresh)
+    # The old bespoke pulse mechanism is retired in favor of the shared .fr-dot primitive.
+    assert ".sync-dot.is-fresh" not in COCKPIT_CSS and "syncPulse" not in COCKPIT_CSS
+    assert "fr-dot" in COCKPIT_JS

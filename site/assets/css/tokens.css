@@ -1175,6 +1175,27 @@ a.vg-lit:hover { background: var(--ember-wash); }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+   12c. FRESHNESS PULSE (#589) — the epic's no-fake-liveness rule made a reusable
+   primitive: the ONLY motion on a "live" signal is motion tied to a REAL
+   timestamp. Any element carrying data-fresh-ts (an ISO instant) + data-fresh-
+   window (seconds — the SOURCE'S OWN freshness window, sourced from
+   source_registry.py via /api/source_freshness or /api/last_sync, never a
+   guessed constant) gets .fr-live from motion.js's wireFreshness() ONLY while
+   now − ts is inside that window. Past the window nothing here applies — the
+   element just carries whatever page-level "stale" treatment it already has
+   (e.g. the existing .provenance .pv-stale below), motionless. Reduced-motion:
+   .fr-live still sets color, the keyframe itself never runs — state reads
+   through color/text alone, exactly like every other stale rendering.
+   ════════════════════════════════════════════════════════════════════════════ */
+.fr-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--ink-faint); margin-right: 4px; vertical-align: 1px; }
+[data-fresh-ts].fr-live { color: var(--ember); }
+.fr-dot.fr-live, .fr-live .fr-dot { background: var(--ember); }
+@media (prefers-reduced-motion: no-preference) {
+  [data-fresh-ts].fr-live { animation: fr-pulse 2.6s var(--ease-inout) infinite; }
+  @keyframes fr-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--ember) 45%, transparent); } 50% { box-shadow: 0 0 0 4px transparent; } }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
    13. ICONOGRAPHY — the line-icon set (icons.js + /assets/icons/icons.svg) and the
    generative coach sigils (sigils.js). Stroke-based, currentColor, no fills/gloss —
    an instrument set, never decoration. Icons inherit their host element's `color`.
