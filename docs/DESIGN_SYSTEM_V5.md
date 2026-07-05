@@ -158,7 +158,8 @@ swing was kept deliberately restrained.
 Added in the visual uplevel (PRs #260–#262). The point is **durability**: this is not a one-off
 re-skin. New content, pages, and coaches must keep the theme by **reusing these modules** — most of
 it is self-perpetuating by construction. Honours the same `earned glow / no gloss` rule: every mark
-encodes identity, never decoration. All of it is code-drawn SVG (no raster, no AI image gen).
+encodes identity, never decoration. All of it is code-drawn SVG — raster only as build-time
+derivatives of checked-in vectors; AI image gen only under the §8.7 commissioning rule (ADR-106).
 
 ### 8.1 The line-icon set — `site/assets/icons/icons.svg` + `site/assets/js/icons.js`
 A stroke-based `<symbol>` sprite (`currentColor`, `viewBox 0 0 24 24`). Use it everywhere a domain,
@@ -226,3 +227,26 @@ metabolic → `i-glucose`, relationships → `i-people`, consistency → `i-habi
 sleep → `i-sleep`, nutrition → `i-nutrition`; the sheet itself → `i-character` (figure-in-ring).
 The hero composes the three proven primitives — the weight-driven silhouette (`dfBody`), the
 7-segment pillar ring (`charts.js pillarRing`), the tier emblem — all drawn from real data.
+
+### 8.7 Coach portraits — commissioned engraved identity (ADR-106)
+
+The one sanctioned exception to "no AI image gen", drawn exactly (full argument in ADR-106; the
+procedure in `docs/design/PORTRAIT_RUNBOOK.md`):
+
+- **AI image generation is a one-time commissioning tool only**, for openly-fictional personas
+  (ADR-040 cast) only. It produces *reference candidates* during a commissioning session — a
+  generated raster is never a shipped artifact, never checked into `site/`, never regenerated at
+  build/runtime. Hand-authored vectors (no AI step at all) are equally sanctioned and preferred.
+- **The shipped artifact is a code-drawn layered-SVG recipe** (`config/portraits/<persona_id>.json`,
+  fixed layer ids, schema-validated): stroke-only contours on `currentColor`, one accent layer on
+  `var(--coach)`, engraved-bust vocabulary per the runbook's style bible. Rendered by
+  `portraits.js portrait(c)` with the **`portrait(c) || sigil(c)` fallback chain** — an
+  uncommissioned coach renders exactly as today, forever.
+- **Human curation is mandatory**: Matthew approves a **contact sheet** (batch side-by-side,
+  light + dark, 40/56/96 px) before anything ships. Kill criterion: 2 failed revision rounds →
+  that coach stays sigil-only. Provenance (`_meta`: model/prompt/date/sign-off) required in every
+  recipe; a reverse-image sanity check (no resemblance to a findable real person) per round.
+- **SS-11 and the PG-14 photoreal NO-GO stay fully in force.** Portraits never ride the
+  editorial-image pipeline; photoreal rendering of anyone stays NO-GO.
+- **Disclosure is structural**: `aria-label="Illustrated portrait of <name>, a fictional AI
+  persona"`; team/about surfaces carry the one-line disclosure sentence (runbook §6).

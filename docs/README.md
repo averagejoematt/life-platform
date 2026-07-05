@@ -55,6 +55,7 @@ top and stop when you have what you need.
 |---|---|
 | [A11Y_BASELINE.md](A11Y_BASELINE.md) | Accessibility baseline (pre-v4) |
 | [BOARDS.md](BOARDS.md) | The three AI persona boards |
+| [design/PORTRAIT_RUNBOOK.md](design/PORTRAIT_RUNBOOK.md) | Coach-portrait style bible + commissioning gate (ADR-106) |
 
 ## History & append-only logs
 | [CHANGELOG.md](CHANGELOG.md) | What shipped, version by version |
