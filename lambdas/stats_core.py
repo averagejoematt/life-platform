@@ -544,6 +544,37 @@ def ewma_forecast(xs, horizon=1, alpha=None, confidence=0.80, min_n=10):
     }
 
 
+def ewma_series(daily_values_chrono, decay_days, seed=0.0):
+    """Exponentially-weighted moving average with a time-constant of decay_days.
+
+    The single sanctioned EWMA implementation (ADR-105 — one tested home for the
+    platform's math). alpha = 1 - exp(-1/decay_days), applied over a chronologically-
+    ordered [(label, value), ...] series. Returns [(label, ewa), ...] UNROUNDED —
+    callers own presentation rounding.
+
+    `seed` is the initial level (default 0.0, matching the original helper). A caller can
+    warm-start it (e.g. the mean of the first days) to remove start-of-series bias when
+    the leading window would otherwise anchor the average at zero — EWMA-ACWR uses this so
+    a 28-day chronic average isn't dragged down by the seed over a short lookback.
+
+    This mirrors the formula that lived in `mcp/helpers.py:compute_ewa` (the platform's
+    original EWMA helper, which now delegates here); EWMA-ACWR (#543) re-uses it so
+    acute/chronic training load is a smoothly-decaying weighted average rather than a
+    flat rolling mean — recent days count more, and a single missed/huge day doesn't
+    step-change the ratio the way a rolling window's drop-off does. Deterministic:
+    same input always yields the same series (no I/O, no randomness).
+    """
+    if decay_days <= 0:
+        raise ValueError("decay_days must be > 0")
+    alpha = 1.0 - math.exp(-1.0 / decay_days)
+    ewa = float(seed)
+    out = []
+    for label, val in daily_values_chrono:
+        ewa = alpha * float(val) + (1.0 - alpha) * ewa
+        out.append((label, ewa))
+    return out
+
+
 def bh_fdr(pvals):
     """Benjamini-Hochberg adjusted p-values, input order preserved.
 

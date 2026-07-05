@@ -59,6 +59,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 import stats_core  # shared layer (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -180,10 +181,14 @@ def fetch_memory_records(category, days=30):
 # ==============================================================================
 
 
-def compute_momentum(grade_records_14d, yesterday_str):
+def compute_momentum(grade_records_14d, yesterday_str, baselines=None):
     """Compare this week vs last week average grade.
 
     Returns: (signal, this_week_avg, prev_week_avg, trend_pct)
+
+    #543/ADR-105 rule 4: the improving/declining cutoffs come from percentile bands of
+    Matthew's OWN week-over-week grade swings (personal_baselines), not a hand-set +-5%.
+    Floor-guarded — falls back to +-5% until his distribution has enough observations.
     """
     week_boundary = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
 
@@ -207,12 +212,7 @@ def compute_momentum(grade_records_14d, yesterday_str):
         return "stable", this_avg, None, None
 
     trend_pct = round((this_avg - prev_avg) / max(prev_avg, 1) * 100, 1)
-    if trend_pct > 5:
-        signal = "improving"
-    elif trend_pct < -5:
-        signal = "declining"
-    else:
-        signal = "stable"
+    signal, _band_src = personal_baselines.grade_trend_signal(trend_pct, baselines)
 
     return signal, this_avg, prev_avg, trend_pct
 
@@ -2068,7 +2068,9 @@ def lambda_handler(event, context):
     logger.info(f"Loaded: {len(computed_7d)} computed_metrics, {len(habit_7d)} habit_scores, {len(grade_14d)} day_grade records")
 
     # ── 2. Momentum ──
-    momentum_signal, this_week_avg, prev_week_avg, trend_pct = compute_momentum(grade_14d, yesterday_str)
+    # #543: personal-variance bands for the momentum cutoffs (floor-guarded; {} → +-5%).
+    baselines = personal_baselines.load_baselines(table, USER_PREFIX)
+    momentum_signal, this_week_avg, prev_week_avg, trend_pct = compute_momentum(grade_14d, yesterday_str, baselines)
     logger.info(f"Momentum: {momentum_signal} (this_week={this_week_avg or 0:.1f}, prev_week={prev_week_avg}, trend={trend_pct}%)")
 
     # ── 3. Metric trends ──

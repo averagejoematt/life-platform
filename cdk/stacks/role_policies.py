@@ -758,6 +758,12 @@ def compute_acwr() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True)
 
 
+def compute_personal_baselines() -> list[iam.PolicyStatement]:
+    """Personal baselines compute (#543): reads ~365d of computed_metrics from DDB, writes
+    one SOURCE#personal_baselines snapshot. Deterministic, no LLM — DDB read/write only."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_failure_pattern() -> list[iam.PolicyStatement]:
     """Failure pattern compute (IC-4): reads DDB metrics, uses ai-keys for pattern analysis, writes to DDB."""
     return _compute_base(

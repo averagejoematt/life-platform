@@ -96,13 +96,10 @@ def compute_daily_load_score(day_record):
 
 
 def compute_ewa(daily_values_chrono, decay_days):
-    alpha = 1.0 - math.exp(-1.0 / decay_days)
-    ewa = 0.0
-    result = []
-    for date_str, val in daily_values_chrono:
-        ewa = alpha * val + (1 - alpha) * ewa
-        result.append((date_str, round(ewa, 2)))
-    return result
+    # #543: delegate to the single sanctioned EWMA (stats_core.ewma_series, ADR-105)
+    # so this helper and EWMA-ACWR share one implementation. Historical contract kept:
+    # rounds each smoothed value to 2 decimals.
+    return [(date_str, round(ewa, 2)) for date_str, ewa in stats_core.ewma_series(daily_values_chrono, decay_days)]
 
 
 def pearson_r(xs, ys):
