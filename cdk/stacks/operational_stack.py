@@ -129,6 +129,9 @@ class OperationalStack(Stack):
                 # The Lambda comment says "set from deploy script" but no
                 # such script exists. Wired here now.
                 "DLQ_URL": f"https://sqs.{REGION}.amazonaws.com/{ACCT}/life-platform-ingestion-dlq",
+                # ADR-115/#402: escalation pages the operator on the existing
+                # urgent SNS topic when a message crosses the failure threshold.
+                "ALERTS_TOPIC_ARN": f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts",
             },
             custom_policies=rp.operational_dlq_consumer(),
             table=local_table,

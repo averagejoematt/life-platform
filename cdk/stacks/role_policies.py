@@ -1438,7 +1438,8 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
 
 def operational_dlq_consumer() -> list[iam.PolicyStatement]:
     """DLQ consumer: reads the DLQ, re-drives transient failures to the source
-    Lambda, archives permanent failures to S3, sends an SES summary."""
+    Lambda, tracks retries in a durable DDB ledger, archives + escalates
+    permanent/repeated failures (S3 + SNS page + SES summary). ADR-115 / #402."""
     return [
         iam.PolicyStatement(
             sid="SQS",
@@ -1454,6 +1455,26 @@ def operational_dlq_consumer() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        # Durable retry ledger (ADR-115): the SYSTEM#dlq-ledger partition survives
+        # the delete→re-invoke→re-land cycle so failure counts accumulate. Scoped
+        # to the single table; no GSI (composite-key access only).
+        iam.PolicyStatement(
+            sid="DlqLedger",
+            actions=["dynamodb:GetItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+        ),
+        # The table is CMK-encrypted — writes need data-key access on the DDB CMK.
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        # Escalation page: reuse the existing urgent operator topic (ADR-050/115).
+        iam.PolicyStatement(
+            sid="EscalationPage",
+            actions=["sns:Publish"],
+            resources=[f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"],
         ),
         # Archive permanent failures for post-mortem (was AccessDenied — 2026-05-28).
         iam.PolicyStatement(
