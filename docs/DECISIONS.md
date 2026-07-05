@@ -3033,6 +3033,8 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 
 **Consequences.** ~10% of coach-generation cycles now cost one extra Sonnet regeneration call (bounded, one retry) instead of zero; a small fraction of those will still hold (no publish that cycle) rather than ship a flagged-but-live narrative — acceptable per the daily brief's existing "AI sections are optional, brief works without them" design. `coach-quality-gate`'s own scoring logic is unchanged (it remains a pure, reusable scorer); only the caller's handling of its verdict changed. The "reads only, no DDB writes" gap in the gate's own docstring is noted but not closed here (out of scope for N-06; the CloudWatch metric is sufficient operator visibility for this promotion) — a future story could add a persisted `QUALITY#` trail if per-output history becomes valuable beyond the CloudWatch metric + log line.
 
+---
+
 ## ADR-109: The honesty gates cover DERIVED/proxy values too — TSB first, via the scheduled scan not the tight guard (M-8)
 
 **Date:** 2026-07-05 · **Status:** Accepted · **Story:** #493 (epic #462) · **Extends:** ADR-104 (grounded-generation gate), ADR-105 (deterministic computation before any LLM verdict)
@@ -3049,3 +3051,31 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 **Why not extend the tight guard to derived values.** The tight guard's whole justification (its docstring) is that it is precision-tuned for *measured* physiological numbers where a hard contradiction is unambiguous and a false positive costs only a rewrite. A proxy estimate fails both premises. Extending it would import estimate-vs-estimate false positives into the highest-cost correction path.
 
 **Consequences.** The coach-context TSB line is now covered by a deterministic check (satisfying ADR-105's deterministic-before-LLM rule) that runs in the daily Coherence Sentinel. The pattern generalizes: the *next* derived value to gate (candidates: CTL/ATL fitness/fatigue, ACWR, readiness score, day-grade sub-scores — all merged/derived and currently ungated the same way TSB was) follows the same recipe — add a bound pattern + an absolute-or-fractional tolerance to `_FACT_PATTERNS`, supply the fact to the Sentinel, leave the tight guard alone. This ADR is the written-down general rule so that decision is a lookup, not a re-litigation. Scope discipline: only TSB is gated in this change (#493); the other candidates are noted here for follow-up, not implemented.
+
+---
+
+## ADR-112: Board follow-up sessions — short-lived, server-side, opaque-token, no-PII (#546)
+
+**Date:** 2026-07-05 · **Status:** Accepted · **Story:** #546 (epic #526) · **Amends:** the single-turn note in ADR-036 (the AI-endpoint split)
+
+**Context.** `/api/board_ask` was single-turn: each reader question fanned out to the coach roster and returned, with no thread. The only follow-up memory anywhere was `/api/ask`'s 3-pair history, which is **client-held and untrusted** — the replayed assistant turns are attacker-controlled, so they can seed only weakly (they're re-safety-gated on every call, ADR-104). No genuine persona conversation could develop: a coach couldn't say "as I told you earlier," because it had no server-authoritative record of what it told the reader.
+
+**Decision.** Add short-lived, server-side sessions to `/api/board_ask`, on the same public unauthenticated endpoint (a request carrying a `session_token` is a follow-up; the frontend posts both to one route).
+
+**The session record (single-table, fits the no-GSI model):**
+- **PK** `BOARDSESS#{token}`, **SK** `SESSION` — one item per thread.
+- **token** = `secrets.token_urlsafe(24)` — opaque, unguessable, never sequential or derived from any request field; the token itself carries **no PII**.
+- **Attributes:** `ip_hash` (the same 16-char hash already collected for rate limiting — the only quasi-identifier, and not PII), `followup_count` (Decimal, atomic), `threads` (map: coach_id → list of `{q, a}` turns), `created_at`, and `ttl` (Decimal epoch, **≤ 1h**). No email, no raw IP, no reader identity.
+- **TTL** on the `ttl` attribute (DDB auto-purge) **plus** a defensive in-code expiry check in `_load_board_session`, because DDB TTL deletion is lazy.
+
+**Security posture (public endpoint → untrusted input):**
+1. **Opaque tokens only** — shape-gated by a regex *before* any DDB read, so probe/malformed tokens never touch the table.
+2. **IP-bound** — a follow-up must present the originating `ip_hash`; a leaked token can't be replayed from another network.
+3. **≤ 3 follow-ups per session** — checked before any model spend, then re-enforced atomically in the `UpdateItem` `ConditionExpression` (`followup_count < :cap`) so a burst can't double-spend past the cap.
+4. **Per-IP `board_ask` rate limit still applies to every follow-up** (each costs a Bedrock call) — the cost ceiling is unchanged; worst case ≈ the existing per-IP allowance.
+5. **Injection-hardening of the replayed transcript** — although the transcript is server-stored (stronger than `/api/ask`'s client history), it is treated as untrusted on replay: each stored question is re-tag-stripped and re-run through the WR-40 safety filter, each stored answer is re-scrubbed (`privacy_guard` + blocked-terms), and the new follow-up question is tag-stripped, length-capped, and safety-gated. The persona system block's existing identity-deflection + absolute-grounding rules (ADR-104) carry unchanged.
+6. **Grounded gate stays fail-closed per turn** — the follow-up answer runs the same ADR-104 deterministic numeric gate (one corrective rewrite, else an honest in-voice refusal). Prior *grounded* answers seed the allow-list so referencing an earlier legitimate number isn't re-flagged as fabrication.
+
+**IAM.** `role_policies.site_api_ai()` gains a `BOARDSESS#*`-scoped `PutItem`+`UpdateItem` statement (LeadingKeys) — the public role can touch only session records, never any other partition. Budget tier-2 pause is unchanged (checked before either path spends).
+
+**Consequences.** A reader can now hold a genuine 3-turn thread with one coach who remembers the exchange, and moderated transcripts become publishable "office hours" content (the epic-#526 payoff). Cost is bounded by the pre-existing per-IP rate limit plus the ≤3 cap; the worst case is ~4× a single question's ceiling, explicitly capped. The session store is the first `BOARDSESS#*` partition and the second DDB-TTL user on the table (after `CACHE#matthew`). Deploy is via `deploy_site_api.sh` (the full `web/` dir — site-api is script-managed, not CDK).
