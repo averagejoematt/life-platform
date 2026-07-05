@@ -15,7 +15,7 @@
   the full static portrait (eyes-open visible via inline attrs, not JS).
 */
 import { fnv1a, mulberry32, seedOf } from "/assets/js/sigils.js";
-import { PORTRAITS } from "/assets/js/portrait_data.js";
+import { PORTRAITS, ALIASES } from "/assets/js/portrait_data.js";
 
 const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -117,6 +117,7 @@ export function renderPortrait(recipe, coach, { title, cls = "", size } = {}) {
   caller's `|| sigil(coach)` keeps today's rendering, pixel-identical.
 */
 export function portrait(coach, opts = {}) {
-  const recipe = PORTRAITS[seedOf(coach)];
+  const key = seedOf(coach);
+  const recipe = PORTRAITS[key] || PORTRAITS[ALIASES[key]];
   return recipe ? renderPortrait(recipe, coach, opts) : null;
 }

@@ -67,12 +67,17 @@ def test_unsigned_recipes_are_not_bundled():
 
 def test_bundle_only_contains_signed_config_recipes():
     content, skipped = build()
-    payload = json.loads(content.split("export const PORTRAITS = ", 1)[1].rstrip().rstrip(";"))
+    portraits_js = content.split("export const PORTRAITS = ", 1)[1].split(";\nexport const ALIASES", 1)[0]
+    payload = json.loads(portraits_js)
+    aliases = json.loads(content.split("export const ALIASES = ", 1)[1].rstrip().rstrip(";"))
     recipes = load_recipes()
     assert set(payload) == {pid for pid, r in recipes.items() if is_signed(r)}
     assert set(skipped) == {pid for pid, r in recipes.items() if not is_signed(r)}
     for pid in payload:
         assert pid not in skipped
+    # every alias points at a bundled recipe and shadows no canonical id
+    for alias, target in aliases.items():
+        assert target in payload and alias not in payload
 
 
 def _broken(mutate):
