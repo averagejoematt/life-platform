@@ -2035,6 +2035,7 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `THREAD#{date}` | Daily analysis thread (one per generation cycle) | coach-narrative-orchestrator |
 | `LEARNING#{date}` | What the coach learned from this cycle | coach-state-updater |
 | `PREDICTION#{date}` | Forward predictions with confidence | coach-narrative-orchestrator |
+| `COMMITMENT#{id}` | Recommendations the coach must revisit; graded kept/broken (#532) | coach-state-updater (write) / coach-prediction-evaluator (grade) |
 | `VOICE#state` | Persistent voice calibration state | coach-state-updater |
 | `RELATIONSHIP#state` | Coach-user relationship state (rapport, trust, context) | coach-state-updater |
 | `CONFIDENCE#{subdomain}` | Per-subdomain confidence scores | coach-state-updater |

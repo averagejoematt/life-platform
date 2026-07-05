@@ -430,6 +430,22 @@ def _gather_all_state(coach_id):
     if not active_predictions:
         logger.info("No active predictions for %s", coach_id)
 
+    # 9b. Commitments (#532) — the concrete actions this coach pushed. Due/overdue
+    # pending ones get injected so the coach MUST revisit its own advice; recently
+    # resolved kept/broken ones frame follow-through. Bounded read (most recent 50).
+    _today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    all_commitments = _query_begins_with(coach_pk, "COMMITMENT#", scan_forward=False, limit=50)
+    due_commitments = [c for c in all_commitments if c.get("status") == "pending" and str(c.get("due_date") or "9999") <= _today_str]
+    resolved_commitments = [c for c in all_commitments if c.get("status") in ("kept", "broken")][:5]
+    # Follow-through tally — the coach's own kept/broken record (feeds the track record).
+    commitment_record = {"kept": 0, "broken": 0, "unresolved": 0}
+    for c in all_commitments:
+        st = c.get("status")
+        if st in commitment_record:
+            commitment_record[st] += 1
+    if not due_commitments:
+        logger.info("No due commitments for %s", coach_id)
+
     # 10. Current stance — the coach-opinion engine's evolving read of Matthew
     # (coach_history_summarizer writes STANCE#latest). Absent pre-data; when
     # present it leads the generation framing over the static goal block.
@@ -458,6 +474,9 @@ def _gather_all_state(coach_id):
         "voice_state": voice_state,
         "open_threads": open_threads,
         "active_predictions": active_predictions,
+        "due_commitments": due_commitments,
+        "resolved_commitments": resolved_commitments,
+        "commitment_record": commitment_record,
         "current_stance": current_stance,
         "site_protocols": site_protocols,
         "engagement_signal": engagement_signal,
@@ -713,6 +732,47 @@ def _build_user_message(state, coach_id, today):
     else:
         parts.append("No active predictions — coach has not yet made formal predictions.")
     parts.append("")
+
+    # Commitments to revisit (#532): the recommendations THIS coach pushed that are now
+    # due. Following through on your own advice — "did the 9:30 wind-down I pushed happen?
+    # the data says no" — is the single strongest 'real coach' signal. A due commitment
+    # with a graded outcome MUST be addressed; a due one still pending MUST be asked about.
+    due = state.get("due_commitments") or []
+    resolved = state.get("resolved_commitments") or []
+    if due or resolved:
+        parts.append("## Commitments To Revisit (your own past recommendations, now due)")
+        if due:
+            parts.append("These are DUE — you asked Matthew to do these; revisit each one explicitly this cycle:")
+            parts.append(
+                json.dumps(
+                    [
+                        {
+                            "commitment": c.get("commitment_natural"),
+                            "made_on": c.get("created_date"),
+                            "machine_checkable": bool(c.get("action_check")),
+                        }
+                        for c in due
+                    ],
+                    indent=2,
+                    default=str,
+                )
+            )
+        if resolved:
+            parts.append("Recently graded (own the outcome — a kept call earns trust, a broken one earns candor):")
+            parts.append(
+                json.dumps(
+                    [{"commitment": c.get("commitment_natural"), "outcome": c.get("status")} for c in resolved],
+                    indent=2,
+                    default=str,
+                )
+            )
+        _cr = state.get("commitment_record") or {}
+        if any(_cr.values()):
+            parts.append(
+                "Follow-through record so far — "
+                f"kept: {_cr.get('kept', 0)}, broken: {_cr.get('broken', 0)}, unresolved: {_cr.get('unresolved', 0)}."
+            )
+        parts.append("")
 
     # Coach memory (2026-06-13): the coach's own resolved track record, so it
     # can reference past calls — and acknowledge misses — in its own voice.
