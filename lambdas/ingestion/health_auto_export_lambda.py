@@ -115,6 +115,30 @@ except ImportError:
     logger = logging.getLogger("health-auto-export")
     logger.setLevel(logging.INFO)
 
+# #483/X-3: field validation for the update_item MERGE path. Fail-soft — HAE bundles
+# ingestion_validator via its CDK asset (from_asset("../lambdas")), but if an older
+# build lacks validate_fields we skip validation rather than break ingestion.
+try:
+    from ingestion_validator import validate_fields
+except ImportError:
+    validate_fields = None
+
+
+def _merge_is_valid(fields, date_str):
+    """Gate an apple_health update_item merge on the shared validator (#483/X-3).
+    Returns False only on a CRITICAL hard-bound violation (e.g. an implausible glucose
+    average) — the caller then skips that merge, and the ERROR log trips the error alarm.
+    Range/type warnings are logged by the validator but do not block. Fail-open when the
+    validator is unavailable."""
+    if validate_fields is None or not fields:
+        return True
+    result = validate_fields("apple_health", fields, date_str=date_str)
+    if result.errors:
+        logger.error("[HAE] skipping merge for %s — critical validation errors: %s", date_str, result.errors)
+        return False
+    return True
+
+
 # ── Config ─────────────────────────────────────────────────────────────────────
 S3_BUCKET = os.environ["S3_BUCKET"]
 DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "life-platform")
@@ -216,6 +240,33 @@ def parse_timestamp(date_str):
 
 # ── Blood Glucose Processing ──────────────────────────────────────────────────
 
+CGM_MAX_MEDIAN_GAP_MIN = 10  # median inter-reading gap ≤ this ⇒ continuous monitor (#483/D-3)
+
+
+def _classify_cgm_source(readings, n):
+    """Continuous monitor vs manual fingerstick by median inter-reading GAP (#483/D-3).
+
+    The old ``n >= 20`` count heuristic mislabeled UTC-truncated partial Stelo days
+    (which carry <20 readings) as 'manual'. Cadence is the reliable tell — Stelo streams
+    every ~5 min, fingersticks are hours apart. Falls back to the count heuristic only
+    when too few readings to time a median gap.
+    """
+    times = []
+    for r in readings:
+        t = r.get("time")
+        if not t:
+            continue
+        try:
+            times.append(datetime.strptime(t, "%Y-%m-%d %H:%M:%S %z"))
+        except (ValueError, TypeError):
+            continue
+    if len(times) >= 3:
+        times.sort()
+        gaps = sorted((times[i + 1] - times[i]).total_seconds() / 60 for i in range(len(times) - 1))
+        median_gap = gaps[len(gaps) // 2]
+        return "dexcom_stelo" if median_gap <= CGM_MAX_MEDIAN_GAP_MIN else "manual"
+    return "dexcom_stelo" if n >= 20 else "manual"
+
 
 def process_blood_glucose(metric_data, units):
     """
@@ -260,10 +311,8 @@ def process_blood_glucose(metric_data, units):
         below_70 = sum(1 for v in values if v < 70)
         above_140 = sum(1 for v in values if v > 140)
 
-        # Determine if CGM vs manual based on reading frequency
-        # CGM: 5-min intervals = ~288/day; manual: 1-10/day
-        # 20+ readings/day = CGM (288/day at 5-min intervals); <20 likely manual fingerstick
-        cgm_source = "dexcom_stelo" if n >= 20 else "manual"
+        # CGM vs manual by sampling cadence, robust to UTC-truncated partial days (#483/D-3)
+        cgm_source = _classify_cgm_source(readings, n)
 
         daily_agg[date] = {
             "blood_glucose_avg": round(avg, 1),
@@ -579,6 +628,21 @@ SKIP_METRICS = {
 _DEDUP_FIELDS = {"water_intake_raw", "caffeine_mg"}
 
 
+def _water_ml_factor(units):
+    """mL per reported water unit (#483/D-9). Historical payloads report fl-oz, which the
+    old code hard-assumed; honor mL/L when tagged so a mL-reporting app isn't ×29.5735'd."""
+    u = (units or "").lower().replace(" ", "").replace("_", "")
+    if u in ("ml", "milliliter", "milliliters", "millilitre", "millilitres"):
+        return 1.0
+    if u in ("l", "liter", "liters", "litre", "litres"):
+        return 1000.0
+    if u in ("floz", "flozus", "fluidounce", "fluidounces", "oz", "ounce", "ounces"):
+        return 29.5735
+    if u:
+        logger.warning(f"[HAE] unexpected water units {units!r}; assuming fl-oz")
+    return 29.5735  # historical default
+
+
 def process_generic_metrics(metrics):
     """Process non-grouped metrics into daily aggregates with source filtering AND
     source-priority deduplication (v1.7.0 — TD-15/16).
@@ -606,6 +670,7 @@ def process_generic_metrics(metrics):
     skipped_sot = []
     unmatched = []
     filtered_counts = {}  # metric → {kept, dropped} (Tier 2 source filter)
+    field_units = {}  # field → raw units string from the payload (#483/D-9)
 
     for metric in metrics:
         name = metric.get("name", "")
@@ -624,6 +689,10 @@ def process_generic_metrics(metrics):
         field = config["field"]
         agg = config["agg"]
         tier = config["tier"]
+
+        units_str = (metric.get("units") or "").strip()
+        if units_str:
+            field_units[field] = units_str  # #483/D-9: remember the reported unit for this field
 
         # Per-date per-source accumulators for THIS metric.
         # day_per_source[date][source] = {"sum": float, "vals": [floats], "ts": {ts: qty}}
@@ -741,15 +810,38 @@ def process_generic_metrics(metrics):
         if ac is not None and bc is not None:
             fields["total_calories_burned"] = round(ac + bc, 2)
 
-        # Water: convert fl_oz_us → mL (1 fl oz = 29.5735 mL)
-        # oz is derived from ml after dedup, not tracked independently
+        # Water → mL, honoring the reported unit rather than assuming fl-oz (#483/D-9).
+        # oz is derived from ml after dedup, not tracked independently.
         water_raw = fields.pop("water_intake_raw", None)
         if water_raw is not None:
-            fields["water_intake_ml"] = round(water_raw * 29.5735)
+            factor = _water_ml_factor(field_units.get("water_intake_raw"))
+            fields["water_intake_ml"] = round(water_raw * factor)
             # Carry dedup timestamps from water_intake_raw → water_intake_ml
             if date in daily_timestamps and "water_intake_raw" in daily_timestamps[date]:
                 raw_ts = daily_timestamps[date].pop("water_intake_raw")
-                daily_timestamps[date]["water_intake_ml"] = {ts: round(qty * 29.5735) for ts, qty in raw_ts.items()}
+                daily_timestamps[date]["water_intake_ml"] = {ts: round(qty * factor) for ts, qty in raw_ts.items()}
+
+        # Weight is stored as lbs (HAE is a Withings fallback). Convert kg if so tagged (#483/D-9).
+        w = fields.get("weight_lbs")
+        if w is not None:
+            wu = (field_units.get("weight_lbs") or "").lower().strip()
+            if wu in ("kg", "kilogram", "kilograms"):
+                fields["weight_lbs"] = round(w * 2.20462, 2)
+            elif wu and wu not in ("lb", "lbs", "pound", "pounds"):
+                logger.warning(f"[HAE] unexpected weight units {wu!r} for {date}; assuming lbs")
+
+        # Distances are stored as miles. Convert km/m if so tagged; warn on anything else (#483/D-9).
+        for dfield in [f for f in fields if f.endswith("_miles")]:
+            dv = fields.get(dfield)
+            if dv is None:
+                continue
+            du = (field_units.get(dfield) or "").lower().strip()
+            if du in ("km", "kilometer", "kilometers"):
+                fields[dfield] = round(dv * 0.621371, 4)
+            elif du in ("m", "meter", "meters"):
+                fields[dfield] = round(dv * 0.000621371, 4)
+            elif du and du not in ("mi", "mile", "miles"):
+                logger.warning(f"[HAE] unexpected distance units {du!r} for {dfield} {date}; assuming miles")
 
     # ── Logging ──
     if matched:
@@ -786,6 +878,12 @@ def merge_day_to_dynamo(date_str, fields, reading_timestamps=None, monotonic_gua
       backfill passes False to SET the recomputed-from-raw value authoritatively.
     """
     if not fields:
+        return
+
+    # #483/X-3: validate the merge fragment before it touches DynamoDB. Every HAE write
+    # (CGM, BP, steps, water, workouts) flows through here, so this is the single gate
+    # the issue asks for. A CRITICAL hard-bound violation drops the whole day's merge.
+    if not _merge_is_valid(fields, date_str):
         return
 
     # ── GREATEST-on-write for monotonic activity totals ──
@@ -1570,7 +1668,8 @@ def lambda_handler(event, context):
                     merge_day_to_dynamo(date_str, {"blood_pressure_readings_count": len(readings)})
                 if bp_readings_new:
                     logger.info(f"Blood Pressure: {bp_readings_new} new readings saved to S3")
-            break
+                break  # #483/D-1: break only after the systolic metric is found+processed
+                # (was one level out → broke on the first metric regardless of name)
 
     # ── Process workouts (v1.6.0) ──
     workout_days = 0
