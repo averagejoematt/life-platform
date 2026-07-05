@@ -510,6 +510,58 @@ const BOARD_PERSONAS = {
 };
 const BOARD_TRIO = ["training_coach", "nutrition_coach", "sleep_coach"];
 
+// #546: a per-card follow-up thread with ONE coach. The server holds the
+// transcript (opaque session token, IP-bound, TTL ≤ 1h, ≤3 follow-ups), so the
+// coach can genuinely reference what it already said. Every failure state stays
+// honest: rate-limited (429), thread complete (429 + followups_remaining:0),
+// budget-paused. Reduced-motion needs nothing special here — it's a plain form.
+function attachFollowup(card, pid, sessionToken, getLeft, setLeft) {
+  if (getLeft() <= 0 || card.querySelector(".cv-followup")) return;
+  const wrap = document.createElement("form");
+  wrap.className = "cv-followup";
+  wrap.setAttribute("novalidate", "");
+  wrap.innerHTML =
+    `<input class="cv-fu-in" name="fq" maxlength="500" placeholder="Ask ${esc(BOARD_PERSONAS[pid].name.replace(/^Dr\.\s*/, "Dr. "))} a follow-up…" aria-label="Follow-up question for ${esc(BOARD_PERSONAS[pid].name)}">` +
+    `<button class="cv-fu-btn" type="submit">Ask</button>` +
+    `<span class="cv-fu-note label" role="status" aria-live="polite">${getLeft()} follow-up${getLeft() === 1 ? "" : "s"} left</span>`;
+  card.appendChild(wrap);
+  const input = wrap.querySelector(".cv-fu-in");
+  const note = wrap.querySelector(".cv-fu-note");
+  wrap.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (q.length < 5) { note.textContent = "A little more detail — at least 5 characters."; return; }
+    const btn = wrap.querySelector(".cv-fu-btn");
+    btn.disabled = true; input.disabled = true; note.textContent = "thinking…";
+    try {
+      const res = await fetch("/api/board_ask", { method: "POST", headers: { "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ session_token: sessionToken, persona: pid, question: q }) });
+      const d = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        note.textContent = (d && d.followups_remaining === 0) ? "That's the end of this thread — convene the board again for a fresh one." : "The board's hourly limit is reached — give it a bit.";
+        setLeft(0); return;
+      }
+      if (d && d.paused) { note.textContent = "The board is paused for the rest of the month to stay within budget."; return; }
+      if (d && d.response) {
+        const el = card.querySelector(".cv-text");
+        el.innerHTML += `<span class="cv-fu-q">${esc(q)}</span>` + esc(String(d.response)).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        const left = Number.isFinite(d.followups_remaining) ? d.followups_remaining : Math.max(0, getLeft() - 1);
+        setLeft(left);
+        input.value = "";
+        if (left <= 0) { wrap.remove(); }
+        else { input.disabled = false; note.textContent = `${left} follow-up${left === 1 ? "" : "s"} left`; }
+      } else {
+        note.textContent = "Couldn't get a follow-up just now — try again in a moment.";
+        input.disabled = false;
+      }
+    } catch (err) {
+      note.textContent = "Network hiccup — try again in a moment.";
+      input.disabled = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 function renderAskBoard(read) {
   read.innerHTML =
     `<p class="dx-kicker label">convene the board</p><h2 class="dx-title">Put a question to the AI board.</h2>` +
@@ -578,6 +630,11 @@ function renderAskBoard(read) {
       } else if (d && d.paused) {
         panel.innerHTML = `<p class="cv-note">${esc(d.answer || "The board is paused for the rest of the month to stay within budget — it's back on the 1st.")}</p>`;
       } else if (d && d.responses && Object.keys(d.responses).length) {
+        // #546: the server mints a short-lived session so a reader can follow up
+        // with the SAME coach; the token is opaque and IP-bound. Each answered
+        // card gets a follow-up affordance (up to 3 per thread).
+        const sessionToken = d.session_token || null;
+        let followupsLeft = Number.isFinite(d.followups_remaining) ? d.followups_remaining : 3;
         personas.forEach((pid, i) => {
           const card = panel.querySelector(`[data-pid="${pid}"]`);
           if (!card) return;
@@ -593,6 +650,7 @@ function renderAskBoard(read) {
             // Personas emit light markdown bold — escape first, then render **…**
             // as <strong> so emphasis reads as emphasis, not raw asterisks.
             el.innerHTML = esc(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+            if (sessionToken) attachFollowup(card, pid, sessionToken, () => followupsLeft, (n) => { followupsLeft = n; });
           }
           el.classList.add("is-answered");
         });

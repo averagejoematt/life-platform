@@ -8,11 +8,15 @@ a traffic spike on AI endpoints cannot starve the data-serving Lambda.
 
 Endpoints:
   POST /api/ask       — AI Q&A with health data context (5 anon / 20 subscriber per hour)
-  POST /api/board_ask — 6-persona board panel answers (5 per IP per hour)
+  POST /api/board_ask — 8-persona board panel answers (5 per IP per hour). Also
+                        serves the #546 follow-up path: a request carrying a
+                        session_token continues a thread with the SAME coach,
+                        replaying the server-stored prior turns as context.
 
 IAM: Read DynamoDB + S3 config + Secrets Manager (site-api-ai-key). Writes are
-scoped by LeadingKeys to RATE#* (rate-limit counters) and COACH#* (#531: the
-board_ask episodic write-back — a coach's public answers enter its own memory).
+scoped by LeadingKeys to RATE#* (rate-limit counters), COACH#* (#531: the
+board_ask episodic write-back — a coach's public answers enter its own memory),
+and BOARDSESS#* (#546: opaque-token, TTL≤1h, no-PII board follow-up sessions).
 """
 
 import base64 as _b64
@@ -22,6 +26,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import time
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -128,6 +133,21 @@ CORS_HEADERS = {
 _ask_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 _board_rate_store: dict = {}  # legacy, only used if DDB rate_limiter fails
 BOARD_RATE_LIMIT = 5  # 5 req/IP/hr — matches WAF rate limit tier; each call makes up to 6 Haiku calls
+
+# ── #546: board follow-up sessions (short-lived, server-side, opaque token) ──
+# A board_ask response mints an opaque session token; a follow-up carrying that
+# token continues the thread with the SAME coach, replaying the server-stored
+# prior turns so the coach can genuinely reference what it already said. The
+# session record holds NO PII — only an IP hash (already collected for rate
+# limiting), the coach transcript, and a DDB TTL. Bounds: TTL ≤ 1h and ≤3
+# follow-ups per session; the per-IP board_ask rate limit still applies to every
+# follow-up (each costs a Bedrock call), so the worst-case bill is capped.
+SESSION_PK_PREFIX = "BOARDSESS#"
+SESSION_TTL_SECONDS = 3600  # ≤ 1 hour — the acceptance ceiling (#546)
+MAX_FOLLOWUPS = 3  # ≤ 3 follow-ups per session (cost + focus bound)
+# token_urlsafe(24) → 32 url-safe chars; the shape gate rejects anything else
+# BEFORE a DDB read (no guessable/sequential ids, no PII in the token itself).
+_SESSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 
 try:
     from rate_limiter import check_rate_limit as _ddb_rate_check
@@ -857,6 +877,103 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
         logger.warning(f"[board_ask] interaction write-back failed for {pid} (non-fatal): {e}")
 
 
+# ── #546: board follow-up sessions ─────────────────────────
+# Security posture (this is a PUBLIC, unauthenticated endpoint):
+#   • token is opaque + unguessable (secrets.token_urlsafe) — never sequential
+#     or derived from any request field; the token itself carries NO PII.
+#   • the record stores only an IP hash (already collected for rate limiting),
+#     the coach transcript, a turn counter, and a DDB TTL — no PII.
+#   • the session is bound to the originating IP hash, so a leaked token cannot
+#     be replayed from another network.
+#   • TTL ≤ 1h (DDB TTL attribute) AND a defensive in-code expiry check, since
+#     DynamoDB TTL deletion is lazy (an expired item can linger briefly).
+#   • the follow-up cap is enforced atomically (a conditional UpdateItem), and
+#     every follow-up still consumes a per-IP board_ask rate-limit token.
+
+
+def _valid_session_token(token: str) -> bool:
+    """True only for the opaque url-safe token shape we mint. Cheap gate run
+    BEFORE any DDB read so malformed/probe tokens never touch the table."""
+    return bool(token) and bool(_SESSION_TOKEN_RE.match(token))
+
+
+def _create_board_session(ip_hash: str, threads: dict) -> str | None:
+    """Mint an opaque session token and persist the opening transcript.
+
+    `threads` maps coach_id → [{"q", "a"}] (one opening turn per coach that
+    actually answered). Returns the token, or None on any write failure (the
+    reader still gets their answers — the session is a best-effort add-on).
+    Decimal for the numeric attributes (boto3 rejects float). No PII is written.
+    """
+    if not threads:
+        return None
+    token = secrets.token_urlsafe(24)
+    now = int(time.time())
+    try:
+        table.put_item(
+            Item={
+                "pk": f"{SESSION_PK_PREFIX}{token}",
+                "sk": "SESSION",
+                "record_type": "board_session",
+                "ip_hash": ip_hash,  # NOT PII — the same 16-char hash used for rate limiting
+                "followup_count": Decimal(0),
+                "threads": {
+                    pid: [{"q": str(t.get("q", ""))[:500], "a": str(t.get("a", ""))[:1200]} for t in (turns or [])]
+                    for pid, turns in threads.items()
+                },
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "ttl": Decimal(now + SESSION_TTL_SECONDS),  # ≤ 1h — DDB TTL auto-purges
+            }
+        )
+        return token
+    except Exception as e:
+        logger.warning(f"[board_ask] session create failed (non-fatal): {e}")
+        return None
+
+
+def _load_board_session(token: str) -> dict | None:
+    """Fetch a session by opaque token. Returns None if absent OR expired —
+    a defensive in-code expiry check backstops DDB's lazy TTL deletion so an
+    expired thread can never be resumed."""
+    try:
+        item = table.get_item(Key={"pk": f"{SESSION_PK_PREFIX}{token}", "sk": "SESSION"}).get("Item")
+        if not item:
+            return None
+        if int(item.get("ttl") or 0) < int(time.time()):
+            return None  # expired but not yet reaped by DDB
+        return _decimal_to_float(item)
+    except Exception as e:
+        logger.warning(f"[board_ask] session load failed: {e}")
+        return None
+
+
+def _append_board_turn(token: str, ip_hash: str, persona: str, question: str, answer: str) -> bool:
+    """Atomically append a follow-up turn and bump the counter, gated on the
+    ≤3 cap AND the originating IP. The ConditionExpression makes the cap a
+    hard, race-safe ceiling (a burst can't double-spend past it). Returns True
+    on write, False if the condition failed (cap reached / IP mismatch) or on
+    error. Does NOT extend the TTL — total session life stays ≤ 1h from mint."""
+    try:
+        table.update_item(
+            Key={"pk": f"{SESSION_PK_PREFIX}{token}", "sk": "SESSION"},
+            UpdateExpression=("ADD followup_count :one " "SET threads.#pid = list_append(if_not_exists(threads.#pid, :empty), :turn)"),
+            ConditionExpression=("attribute_exists(pk) AND followup_count < :cap AND ip_hash = :ip"),
+            ExpressionAttributeNames={"#pid": persona},
+            ExpressionAttributeValues={
+                ":one": Decimal(1),
+                ":cap": Decimal(MAX_FOLLOWUPS),
+                ":empty": [],
+                ":turn": [{"q": str(question)[:500], "a": str(answer)[:1200]}],
+                ":ip": ip_hash,
+            },
+        )
+        return True
+    except Exception as e:
+        # ConditionalCheckFailedException lands here too — cap reached or IP moved.
+        logger.warning(f"[board_ask] follow-up persist skipped for {persona} (non-fatal): {e}")
+        return False
+
+
 # ── Lambda Handler ─────────────────────────────────────────
 
 
@@ -1285,6 +1402,13 @@ def _handle_board_ask(event: dict) -> dict:
     except Exception:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Invalid JSON"})}
 
+    # #546: a request carrying a session_token is a FOLLOW-UP — route it to the
+    # same coach with the thread's prior turns as context. The budget pause and
+    # the per-IP rate-limit token above already applied (a follow-up costs a
+    # Bedrock call too), so the follow-up path inherits both guards.
+    if body.get("session_token"):
+        return _handle_board_followup(body, ip_hash)
+
     question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
     if len(question) < 5:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
@@ -1319,6 +1443,7 @@ def _handle_board_ask(event: dict) -> dict:
     # the persona system block stays byte-stable for the prompt cache.
     facts = _board_facts_block()
     responses = {}
+    threads: dict = {}  # #546: opening transcript per coach that actually answered
     for pid in personas:
         p = COACH_ROSTER[pid]
         try:
@@ -1420,12 +1545,196 @@ def _handle_board_ask(event: dict) -> dict:
             _write_board_interaction(pid, question, _txt, grounded=_grounded)
 
             responses[pid] = _txt
+            # #546: seed a follow-up thread for every coach that gave a real
+            # answer (an unavailable stub carries nothing to build on).
+            if _grounded:
+                threads[pid] = [{"q": question, "a": _txt}]
         except Exception as e:
             logger.error(f"[board_ask] {pid} failed: {e}")
             responses[pid] = f"[{p['name']} is temporarily unavailable]"
 
+    # #546: mint a short-lived session so the reader can follow up with any coach
+    # that answered. Fail-soft — a session-write hiccup never blocks the answers.
+    resp_body = {"responses": responses}
+    session_token = _create_board_session(ip_hash, threads)
+    if session_token:
+        resp_body["session_token"] = session_token
+        resp_body["followups_remaining"] = MAX_FOLLOWUPS
+
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({"responses": responses}),
+        "body": json.dumps(resp_body),
+    }
+
+
+def _handle_board_followup(body: dict, ip_hash: str) -> dict:
+    """POST /api/board_ask {session_token, persona, question} — #546.
+
+    Continues a thread with the SAME coach. The prior turns are replayed from
+    the SERVER-stored session (never client-supplied), so a coach can genuinely
+    reference what it already told the reader ("as I told you earlier"). Every
+    guard the initial path has is preserved and applied per turn: the grounded
+    gate is fail-closed, the replayed transcript is re-scrubbed and re-safety-
+    gated as untrusted input, and the ≤3-follow-up cap + TTL are enforced.
+    """
+    token = str(body.get("session_token") or "")
+    if not _valid_session_token(token):
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Invalid session token"})}
+
+    # Which coach — map legacy ids, reject unknowns BEFORE any DDB read / spend.
+    persona = LEGACY_PERSONA_MAP.get(str(body.get("persona")), str(body.get("persona")))
+    if persona not in COACH_ROSTER:
+        return {
+            "statusCode": 400,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"error": f"Unknown persona id. Valid: {', '.join(COACH_ROSTER)}"}),
+        }
+
+    question = re.sub(r"<[^>]+>", "", (body.get("question") or "").strip())[:500]
+    if len(question) < 5:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Question too short"})}
+
+    # WR-40 safety filter on the follow-up (the new untrusted input surface).
+    is_safe, safety_reason = _ask_question_safe(question)
+    if not is_safe:
+        return {
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+            "body": json.dumps({"response": safety_reason, "persona": persona, "filtered": True}),
+        }
+
+    sess = _load_board_session(token)
+    if not sess:
+        return {
+            "statusCode": 404,
+            "headers": CORS_HEADERS,
+            "body": json.dumps({"error": "Session expired or not found. Ask the board a fresh question."}),
+        }
+    # Bind the token to its originating network — a leaked token can't be replayed.
+    if sess.get("ip_hash") != ip_hash:
+        return {"statusCode": 403, "headers": CORS_HEADERS, "body": json.dumps({"error": "Session does not match this client"})}
+    # ≤3 follow-ups — enforced BEFORE any model spend (the atomic write re-checks it).
+    used = int(sess.get("followup_count") or 0)
+    if used >= MAX_FOLLOWUPS:
+        return {
+            "statusCode": 429,
+            "headers": {**CORS_HEADERS, "Retry-After": "3600"},
+            "body": json.dumps(
+                {"error": "This thread is complete (3 follow-ups). Ask the board a fresh question.", "followups_remaining": 0}
+            ),
+        }
+    prior_turns = (sess.get("threads") or {}).get(persona)
+    if not prior_turns:
+        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "That coach isn't part of this thread"})}
+
+    api_key = _get_anthropic_key()
+    if not api_key:
+        return {"statusCode": 503, "headers": CORS_HEADERS, "body": json.dumps({"error": "AI service unavailable"})}
+
+    # Fresh grounding context (the facts may have moved since the thread opened).
+    facts = _board_facts_block()
+    stance = _coach_stance_bits(persona)
+    memory = _coach_memory_bits(persona)
+    context_block = (
+        f"CURRENT DATA (authoritative — cite only these numbers): {facts}\n"
+        + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
+        + (f"YOUR MEMORY (the compressed history your weekly summarizer maintains): {memory}\n" if memory else "")
+        + "You are continuing a live thread with THIS reader — you may reference what you already told them.\n"
+    )
+
+    # Replay the SERVER-stored transcript as real conversation turns. Treat it as
+    # untrusted: re-strip tags + re-safety-gate each stored question, and re-scrub
+    # each stored answer, so a poisoned record can't inject steering or reintroduce
+    # a blocked term as a fake prior assistant message. Prior (grounded) answers
+    # also seed the allow-list so a legitimate earlier number isn't re-flagged.
+    messages: list = []
+    prior_answers: list = []
+    first = True
+    for turn in prior_turns[: MAX_FOLLOWUPS + 1]:
+        pq = re.sub(r"<[^>]+>", "", str(turn.get("q", "")))[:500].strip()
+        pa = _scrub_blocked_terms(str(turn.get("a", ""))[:1200]).strip()
+        if not (pq and pa) or not _ask_question_safe(pq)[0]:
+            continue
+        user_turn = (context_block + f"READER QUESTION: {pq}") if first else f"READER FOLLOW-UP: {pq}"
+        messages.append({"role": "user", "content": user_turn})
+        messages.append({"role": "assistant", "content": pa})
+        prior_answers.append(pa)
+        first = False
+    # The new follow-up (carries the fresh context block if no prior turn survived).
+    messages.append({"role": "user", "content": (context_block if first else "") + f"READER FOLLOW-UP: {question}"})
+
+    _sys_txt = _coach_system(persona)
+    from bedrock_client import invoke as _bedrock_invoke
+
+    try:
+        result = _bedrock_invoke(
+            {
+                "model": AI_MODEL_HAIKU,
+                "max_tokens": 450,
+                "system": [{"type": "text", "text": _sys_txt, "cache_control": {"type": "ephemeral"}}],
+                "messages": messages,
+            }
+        )
+    except Exception as e:
+        logger.error(f"[board_ask] follow-up {persona} failed: {e}")
+        return {"statusCode": 503, "headers": CORS_HEADERS, "body": json.dumps({"error": "AI service unavailable"})}
+    _emit_token_metrics(result.get("usage", {}), endpoint="api_board_ask")
+    _txt = _scrub_blocked_terms("".join(b["text"] for b in result.get("content", []) if b.get("type") == "text"))
+
+    # ADR-104 grounded gate, per-turn, FAIL-CLOSED (same discipline as the initial
+    # path: one corrective rewrite, else an honest in-voice refusal — never a
+    # fabricated figure). The allow-list spans the system block, every message,
+    # and the prior answers so referencing an earlier number is legitimate.
+    _grounded = True
+    try:
+        import grounded_generation as _gg
+
+        _msg_text = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
+        _allowed = _gg.allowed_numbers(_sys_txt, _msg_text, prior_answers)
+        _gf = _gg.grounding_findings(_txt, allowed=_allowed)
+        if _gf:
+            logger.warning(f"[board_ask] follow-up {persona} ungrounded: {[f['detail'] for f in _gf][:3]}")
+            _grounded = False
+            _refusal = (
+                "I'd want to answer that with numbers I can actually stand behind, and I can't "
+                "ground them in today's record — ask me about something the current data covers."
+            )
+            try:
+                _corr_messages = list(messages)
+                _corr_messages[-1] = {"role": "user", "content": messages[-1]["content"] + "\n\n" + _gg.correction_prompt(_gf)}
+                _retry = _bedrock_invoke(
+                    {
+                        "model": AI_MODEL_HAIKU,
+                        "max_tokens": 450,
+                        "system": [{"type": "text", "text": _sys_txt, "cache_control": {"type": "ephemeral"}}],
+                        "messages": _corr_messages,
+                    }
+                )
+                _emit_token_metrics(_retry.get("usage", {}), endpoint="api_board_ask")
+                _txt2 = _scrub_blocked_terms("".join(b["text"] for b in _retry.get("content", []) if b.get("type") == "text"))
+                if _txt2.strip() and not _gg.grounding_findings(_txt2, allowed=_allowed):
+                    _txt = _txt2
+                    _grounded = True
+                    logger.info(f"[board_ask] follow-up {persona} corrected once — grounded on retry")
+                else:
+                    _txt = _refusal
+            except Exception as _rt_e:
+                logger.warning(f"[board_ask] follow-up {persona} correction retry failed: {_rt_e}")
+                _txt = _refusal
+    except ImportError:
+        pass  # helper not bundled — serve as before
+    except Exception as _gg_e:
+        logger.warning(f"[board_ask] follow-up {persona} grounding gate error (fail-open): {_gg_e}")
+
+    # Persist the turn (atomic append + counter bump, re-checks the cap and IP).
+    persisted = _append_board_turn(token, ip_hash, persona, question, _txt)
+    # The answer also enters the coach's own episodic memory (fail-soft, #531).
+    _write_board_interaction(persona, question, _txt, grounded=_grounded)
+
+    remaining = max(0, MAX_FOLLOWUPS - (used + 1)) if persisted else max(0, MAX_FOLLOWUPS - used)
+    return {
+        "statusCode": 200,
+        "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
+        "body": json.dumps({"persona": persona, "response": _txt, "session_token": token, "followups_remaining": remaining}),
     }
