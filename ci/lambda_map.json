@@ -214,7 +214,11 @@
       "function": "habitify-data-ingestion"
     },
     "lambdas/ingestion/health_auto_export_lambda.py": {
-      "function": "health-auto-export-webhook"
+      "function": "health-auto-export-webhook",
+      "handler": "ingestion.health_auto_export_lambda.lambda_handler",
+      "stack": "LifePlatformIngestion",
+      "cdk_only": true,
+      "_cdk_only_reason": "#483: HAE has NO shared layer and imports bundled siblings (ingestion_framework, ingestion_validator) via its CDK from_asset('../lambdas'). A single-file hot-deploy would strip them -> Runtime.ImportModuleError. Only cdk deploy ships the full bundle."
     },
     "lambdas/ingestion/hevy_backfill_lambda.py": {
       "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly.",

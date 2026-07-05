@@ -182,6 +182,12 @@ _SCHEMAS: dict[str, dict] = {
             "water_intake_ml": (0, 20_000),
             "walking_speed_mph": (0, 10),
             "walking_asymmetry_pct": (0, 100),
+            # #483/X-3: the HAE webhook writes BP via update_item — give it ranges so
+            # validate_fields can flag implausible cuff readings before the merge.
+            "bp_systolic": (50, 300),
+            "bp_diastolic": (30, 200),
+            "blood_pressure_systolic": (50, 300),
+            "blood_pressure_diastolic": (30, 200),
         },
         "critical_range_checks": {
             "blood_glucose_avg": (30, 600),
@@ -528,6 +534,68 @@ def validate_item(source: str, item: dict, date_str: str = "") -> ValidationResu
             date_str,
             result.warnings,
         )
+
+    return result
+
+
+def validate_fields(source: str, fields: dict, date_str: str = "") -> ValidationResult:
+    """Validate a PARTIAL field dict headed for an ``update_item`` MERGE (not a full-item
+    put). Reuses the source's typed_fields / range_checks / critical_range_checks but SKIPS
+    the whole-item checks (required_fields, at_least_one_of, schema_version, date) that a
+    merge fragment cannot satisfy.
+
+    This is the validation entry point for the Apple Health / HAE webhook path (#483/X-3),
+    which writes CGM/BP/steps/water via update_item and previously merged them unvalidated.
+    Check ``result.errors`` before merging: a critical-range violation (e.g. an implausible
+    glucose average) should drop rather than corrupt the day's aggregate.
+
+    Args:
+        source:   Source name whose schema supplies the ranges (e.g. "apple_health").
+        fields:   The partial {field: value} dict about to be merged.
+        date_str: Date string for logging context (YYYY-MM-DD).
+
+    Returns:
+        ValidationResult — ``errors`` (critical, drop) and ``warnings`` (log, keep).
+    """
+    schema = _SCHEMAS.get(source, _DEFAULT_SCHEMA)
+    result = ValidationResult(source=source, date_str=date_str)
+
+    # Type checks (WARNING) — same policy as validate_item, allowing Decimal.
+    for fld, expected_types in schema.get("typed_fields", {}).items():
+        if fields.get(fld) is None:
+            continue
+        valid_types = (expected_types if isinstance(expected_types, tuple) else (expected_types,)) + (_Decimal,)
+        if not isinstance(fields[fld], valid_types):
+            result.warnings.append(
+                f"Type mismatch '{fld}': expected {expected_types}, got {type(fields[fld]).__name__} ({fields[fld]!r:.40})"
+            )
+
+    # Range checks (WARNING).
+    for fld, (lo, hi) in schema.get("range_checks", {}).items():
+        if fields.get(fld) is None:
+            continue
+        try:
+            val = float(fields[fld])
+            if not (lo <= val <= hi):
+                result.warnings.append(f"Value out of expected range '{fld}': {val} (expected {lo}–{hi})")
+        except (TypeError, ValueError):
+            result.warnings.append(f"Cannot parse numeric value for range check '{fld}': {fields[fld]!r:.40}")
+
+    # Critical range checks (CRITICAL — caller should drop the offending field/merge).
+    for fld, (lo, hi) in schema.get("critical_range_checks", {}).items():
+        if fields.get(fld) is None:
+            continue
+        try:
+            val = float(fields[fld])
+            if not (lo <= val <= hi):
+                result.errors.append(f"CRITICAL: value '{fld}' = {val} outside hard bounds ({lo}–{hi})")
+        except (TypeError, ValueError):
+            result.errors.append(f"CRITICAL: cannot parse '{fld}' for hard-bound check: {fields[fld]!r:.40}")
+
+    if result.errors:
+        logger.error("[validator] CRITICAL field-merge failures for %s/%s: %s", source, date_str, result.errors)
+    elif result.warnings:
+        logger.warning("[validator] Field-merge warnings for %s/%s: %s", source, date_str, result.warnings)
 
     return result
 
