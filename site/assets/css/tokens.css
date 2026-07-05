@@ -815,6 +815,35 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .suf-amt { color: var(--ink-faint); margin-left: var(--sp-2); }
 @media (max-width: 560px) { .suf-amt { display: none; } .suf-row { grid-template-columns: minmax(4rem, 6rem) 1fr auto; } }
 
+/* Autonomic 2×2 grid (#414, RQA-06) — the COMPUTED nervous-system view (Flow/Stress/
+   Recovery/Burnout), a plain-HTML 2×2 distinct from the vitals page's strain-vs-recovery
+   SVG. The current cell earns an ember rule; the rest carry their 7-day count. */
+.aqg { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); margin-top: var(--sp-3); }
+.aqg-cell { display: grid; gap: var(--sp-1); padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--ink-faint); border-radius: var(--radius, 8px); background: var(--surface-2, var(--surface)); }
+.aqg-cell.is-current { border-color: var(--ember); box-shadow: inset 0 0 0 1px var(--ember); }
+.aqg-name { font-family: var(--font-mono); font-weight: var(--weight-med); letter-spacing: 0.02em; }
+.aqg-cell.is-current .aqg-name { color: var(--ember); }
+.aqg-n { color: var(--ink-faint); }
+.aqg-here { color: var(--ember); }
+.aq-spark { margin-top: var(--sp-3); }
+.aq-spark .spark { width: 100%; height: 44px; }
+
+/* Zone-2 distribution bars (#414, RQA-07) — where cardio time landed across 5 HR zones.
+   Zone 2 (the longevity zone) is the ember-highlighted row; the rest are muted ink. */
+.zdist { display: flex; flex-direction: column; gap: var(--sp-2); margin-top: var(--sp-3); }
+.zdist-row { display: grid; grid-template-columns: minmax(7rem, 11rem) 1fr auto; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.zdist-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-muted); }
+.zdist-track { position: relative; height: 8px; border-radius: 4px; background: var(--surface-2, var(--surface));
+  border: 1px solid var(--ink-faint); overflow: hidden; }
+.zdist-fill { display: block; height: 100%; background: var(--ink-muted); border-radius: 4px; }
+.zdist-fill.is-z2 { background: var(--ember); }
+.zdist-v { color: var(--ink-faint); white-space: nowrap; font-size: var(--fs-label, 0.78rem); }
+.zsport { list-style: none; padding: 0; margin: var(--sp-3) 0 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.zsport li { display: flex; justify-content: space-between; gap: var(--sp-3); border-bottom: 1px solid var(--ink-faint); padding-bottom: var(--sp-2); }
+.zsport .mono { color: var(--ink-faint); }
+@media (max-width: 560px) { .zdist-row { grid-template-columns: minmax(5.5rem, 8rem) 1fr auto; } }
+
 /* Protein lead (nutrition §2, P0.2) — the failing metric weighted as the headline.
    Ember = attention/warning when under floor (giant figure + ▼ + "under floor"),
    NEVER an ember "win" block for a miss (HARD RULE 3). */
