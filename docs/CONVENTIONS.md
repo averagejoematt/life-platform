@@ -59,6 +59,9 @@ changes.
 Same reflex as §3: **read the diff; if it doesn't show what you shipped, stop.**
 Source: 2026-06-30 audit Tier-0 (`reference_deploy_from_main_not_worktree_branch`).
 
+**This reflex is now enforced, not just documented** — §6 automates exactly this
+check (plus its mirror-image: live code that outran the last `cdk deploy`).
+
 ## 3. Squash-merge drops unpushed commits — verify before merge, `cdk diff` before deploy
 
 A squash captures whatever is on the **remote PR branch** at merge time, not the local
@@ -136,6 +139,43 @@ looks healthy from the outside and can run "green" off a stale S3 artifact.
   downloads each bundled-asset canary's deployed zip and asserts its root modules import.
 
 Source: 2026-06-28 Coherence-Sentinel breakage (`reference_cdk_asset_staging_glitch`).
+
+## 6. Guard the dual deployment planes — checkout freshness + live-code drift (#382)
+
+Some function code intentionally ships via `deploy/deploy_lambda.sh` (a direct
+`update-function-code` push — see §5's "for speed" narrative-lambda note in
+`docs/SITE_UPLEVEL_PLAYBOOK.md`), while the CDK stacks in `cdk/stacks/` still own
+those same functions' full definition. That split bites in **both** directions:
+
+- **Stale checkout (§2/§3's failure mode, now enforced):** deploying a stack from a
+  checkout that's missing `lambdas/`/`cdk/`/`mcp/` commits already on `origin/main`
+  reasserts OLD code over a live fix.
+- **Live code drift (the mirror image):** a function was updated directly via
+  `deploy_lambda.sh` (or a console edit) since the LAST `cdk deploy` of its owning
+  stack. A blind `cdk deploy --all` would push the stack's older asset back over the
+  newer, directly-pushed code.
+
+**The guarded path (use this instead of a bare `cdk deploy`):**
+```bash
+bash deploy/cdk_deploy.sh <StackName> [<StackName> ...] [-- <extra cdk args>]
+```
+This runs `deploy/check_deploy_drift.py` first — a git-only checkout-freshness check
+(mirrors `sync_site_to_s3.sh`'s clobber guard exactly: `git rev-list --count
+HEAD..origin/main -- lambdas/ cdk/ mcp/`) plus, when stack names are given, a
+read-only `detect_stack_drift` scoped to those stacks that flags any
+`AWS::Lambda::Function` whose live `Code` property has diverged from the template —
+then execs the real `npx cdk deploy`. Either check can be overridden for an
+intentional case (same UX as `ALLOW_STALE_SITE=1`): `ALLOW_STALE_DEPLOY_CHECKOUT=1`
+/ `ALLOW_LIVE_LAMBDA_DRIFT=1`, or `--allow-stale-checkout` / `--allow-live-drift`.
+
+Run the guard standalone (no deploy) with `python3 deploy/check_deploy_drift.py
+[StackName ...]`; omit stack names to run the checkout check only (git, offline,
+no AWS creds needed). Both checks are fail-soft on transient errors (offline fetch,
+a `DETECTION_FAILED` drift poll) — they report `unknown`/`error`, never crash or
+false-block on infra flakiness. Tests (a real ephemeral git repo for the checkout
+check, a fake CFN client for the drift check): `tests/test_check_deploy_drift.py`.
+
+Source: #382 (epic #342, "live infra matches code").
 
 ---
 
