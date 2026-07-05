@@ -1135,6 +1135,48 @@ def handle_calibration(event):
         return _ok({"platform": {}, "coaches": [], "hypotheses": {}}, cache_seconds=60)
 
 
+def handle_voice_fidelity(event):
+    """GET /api/voice_fidelity — the blind voice-fidelity scoreboard (#545).
+
+    Monthly, a 3-judge Haiku panel reads a blinded sample of each coach's own real
+    recent output (board answers, brief narratives — no synthetic foils) and guesses
+    which of the 8 operational coaches wrote it. voice_fidelity_harness.py does the
+    actual sampling + panel + deterministic scoring (voice_fidelity_core.score_run);
+    this endpoint only serves the pre-computed, cumulative scoreboard it persists at
+    VOICEFIDELITY#scoreboard/latest — the same "measure the platform's own honesty
+    claim, in public" framing as the calibration scoreboard (#538).
+    """
+    try:
+        item = table.get_item(Key={"pk": "VOICEFIDELITY#scoreboard", "sk": "latest"}).get("Item")
+        board = _decimal_to_float(item) if item else {}
+        return _ok(
+            {
+                "n": board.get("n", 0),
+                "correct": board.get("correct"),
+                "accuracy_pct": board.get("accuracy_pct"),
+                "chance_accuracy_pct": board.get("chance_accuracy_pct"),
+                "candidate_pool_size": board.get("candidate_pool_size"),
+                "coaches": board.get("per_coach", []),
+                "confusion": board.get("confusion", {}),
+                "worst_confused_pair": board.get("worst_confused_pair"),
+                "verdict": board.get("verdict", "insufficient_data"),
+                "run_month": board.get("run_month"),
+                "updated_at": board.get("updated_at"),
+                "disclosure": (
+                    "Self-measured: a 3-judge Haiku panel reads a blinded sample of each coach's own real "
+                    "recent output and guesses which of the 8 coaches wrote it — no attribution shown. "
+                    "Accuracy is scored deterministically against ground truth, never an LLM's opinion of "
+                    '"does this sound right." Chance accuracy at an 8-coach roster is 12.5% — a coach '
+                    "scoring near chance is confusable with the rest of the team, not genuinely distinct."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.error(f"[voice_fidelity] {e}")
+        return _ok({"n": 0, "coaches": [], "confusion": {}, "verdict": "insufficient_data"}, cache_seconds=60)
+
+
 def handle_predictions(event):
     """GET /api/predictions"""
     try:

@@ -82,6 +82,14 @@
       "cdk_only": true,
       "_cdk_only_reason": "Imports persona_registry (bundled sibling, not a layer module). Single-file hot-deploy would strip it."
     },
+    "lambdas/coach/voice_fidelity_harness.py": {
+      "function": "voice-fidelity-harness",
+      "handler": "coach.voice_fidelity_harness.lambda_handler",
+      "note": "#545: monthly blind voice-fidelity harness — 1st of month 15:00 UTC. Writes VOICEFIDELITY# judgments + scoreboard.",
+      "stack": "LifePlatformCompute",
+      "cdk_only": true,
+      "_cdk_only_reason": "Imports persona_registry + voice_fidelity_core (bundled/layer siblings) — single-file hot-deploy risks stripping/staling them before the layer catches up."
+    },
     "lambdas/compute/acwr_compute_lambda.py": {
       "function": "acwr-compute"
     },
@@ -445,7 +453,8 @@
       "lambdas/training_notes_llm.py",
       "lambdas/vacation_fund.py",
       "lambdas/weight_trend.py",
-      "lambdas/calibration_core.py"
+      "lambdas/calibration_core.py",
+      "lambdas/voice_fidelity_core.py"
     ]
   },
   "skip_deploy": {

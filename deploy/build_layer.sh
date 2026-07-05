@@ -16,6 +16,9 @@ MODULES=(
     # #538: the ONE prediction-calibration scorer (Brier + reliability curve).
     # Imported by intelligence_common (compute_credibility), site-api, and MCP.
     calibration_core.py
+    # #545: the ONE blind voice-fidelity scorer (majority-vote + confusion matrix).
+    # Imported by the voice-fidelity-harness Lambda and site-api's /api/voice_fidelity.
+    voice_fidelity_core.py
     retry_utils.py board_loader.py insight_writer.py scoring_engine.py
     character_engine.py output_writers.py ai_calls.py ai_summaries.py ai_context.py html_builder.py
     ai_output_validator.py platform_logger.py ingestion_framework.py
