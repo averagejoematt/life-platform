@@ -1963,6 +1963,7 @@ def tool_get_acwr_status(args):
                 "zone": rec.get("acwr_zone", "unknown"),
                 "alert": bool(rec.get("acwr_alert", False)),
                 "alert_reason": rec.get("acwr_alert_reason"),
+                "method": rec.get("acwr_method", "ewma"),
             }
         )
 
@@ -2015,10 +2016,16 @@ def tool_get_acwr_status(args):
         "alerts_last_7d": alerts_7d,
         "coaching": coaching,
         "history": history,
+        "method": latest.get("method", "ewma"),
         "interpretation": (
-            "ACWR = 7-day avg Whoop strain / 28-day avg Whoop strain. "
-            "Safe zone: 0.8-1.3. Above 1.3: elevated injury risk. Below 0.8: detraining. "
-            "Source: Gabbett et al. (2016), Hulin et al. (2014)."
+            "ACWR = EWMA(7d) Whoop strain / EWMA(28d) Whoop strain (#543 — exponentially-"
+            "weighted, not flat rolling means). Zones (population-derived, Gabbett 2016 / "
+            "Hulin 2014): safe 0.8-1.3, above 1.3 elevated injury risk, below 0.8 detraining."
+        ),
+        "_coupling_caveat": (
+            "ACWR is a coupled ratio — the acute load (numerator) is a mathematical component "
+            "of the chronic load (denominator), so they move together by construction (Lolli "
+            "et al. 2019). A directional recovery signal, not a precise injury predictor."
         ),
         "_proxy_note": (
             "Whoop strain is a cardiac stress measure (heart rate-based), not a mechanical load "

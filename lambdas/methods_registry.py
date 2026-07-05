@@ -251,6 +251,23 @@ REGISTRY = {
         min_n=10,
         used_by="forecast_engine_lambda.py — daily expectations graded into the calibration ledger.",
     ),
+    "ewma_series": _entry(
+        "ewma_series",
+        "EWMA series (exponentially-weighted moving average)",
+        stats_core.ewma_series,
+        "Forecasting",
+        "ewaₜ = α·xₜ + (1-α)·ewaₜ₋₁, with α = 1 - exp(-1/decay_days); optional warm-start seed",
+        "Caller-supplied chronological series; EWMA-ACWR runs it with a 7-day (acute) and "
+        "28-day (chronic) time-constant over the daily Whoop-strain series.",
+        "Recent observations are weighted most, older ones decay smoothly — unlike a flat "
+        "rolling mean, which weights its whole window equally and drops days off a cliff at "
+        "the edge. ACWR = EWMA(acute)/EWMA(chronic) is a COUPLED ratio: the acute load is a "
+        "mathematical component of the chronic load, so they move together by construction "
+        "(Lolli et al. 2019) — a directional signal, not a precise injury predictor. The "
+        "Gabbett zone thresholds it is compared against are population-derived (ADR-105 r4).",
+        "d184d690c287",
+        used_by="acwr_compute_lambda.py (EWMA-ACWR, #543); mcp/helpers.compute_ewa.",
+    ),
     "bh_fdr": _entry(
         "bh_fdr",
         "Benjamini-Hochberg FDR correction",

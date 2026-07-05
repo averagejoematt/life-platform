@@ -2908,6 +2908,7 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 | Personal/Product deliberation boards (BOARDS.md summits) | **Portfolio** | Decision-quality tooling demonstrated in public; no runtime footprint |
 | AI-vision QA (Bedrock semantic screenshots) | **Load-bearing** | Gating CI since 2026-06-05 |
 | Stats/forecast machinery (stats_core, deterministic hypothesis tester, calibration ledger) | **Load-bearing** | Added 2026-07-04 (ADR-105, epic #525) — the credibility moat's enforcement layer for the platform's own science |
+| `personal-baselines` monthly compute + `personal_baselines.py` (percentile bands from own variance) | **Load-bearing** | Added 2026-07-05 (#543, ADR-105 rule 4) — replaces hand-set readiness/momentum cutoffs with bands over Matthew's own distribution; floor-guarded (thin data → today's constants). Retire only if the platform stops making banded verdicts |
 | `/legacy` preserved v3 site | **Portfolio (archive)** | Zero maintenance; never linked; retire only if storage/privacy cost appears |
 | ~105 unused MCP tools + the 64-entry orphan allowlist | **Retire-candidate** | Path: the #398 AUDITED_AT ratchet prune, batches of 10–20 |
 | apple_health XML import path (`apple-health-ingestion` lambda) | **RETIRED 2026-07-04** (#474/D-5) | Latent full-replace clobber of HAE-merged records; its S3 trigger never existed. Lambda + role deleted; `backfill/archive/backfill_apple_health.py` hard-guarded. HAE webhook is the sole apple_health writer; any future XML import must be rewritten onto `merge_day_to_dynamo` |
