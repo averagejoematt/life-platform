@@ -131,8 +131,12 @@ def _ingestion_base(
         )
 
     # Secrets
+    # #499 (X-8): GetSecretValue only by default — a read-only-token Lambda has
+    # no business overwriting its own (or a shared) secret. Write access
+    # (UpdateSecret) is opt-in via extra_secret_actions, granted only to the
+    # handful of sources that genuinely refresh + persist an OAuth token.
     if not no_secret and secret_name:
-        secret_actions = ["secretsmanager:GetSecretValue", "secretsmanager:UpdateSecret"]
+        secret_actions = ["secretsmanager:GetSecretValue"]
         if extra_secret_actions:
             secret_actions = list(set(secret_actions + extra_secret_actions))
         stmts.append(
@@ -170,23 +174,36 @@ def _ingestion_base(
 
 
 def ingestion_whoop() -> list[iam.PolicyStatement]:
+    # #499: Whoop rotates its single-use refresh_token every run; the ONLY
+    # persist path is ingestion_framework's enable_secret_writeback, which
+    # calls secretsmanager.update_secret() (not put_secret_value — verified
+    # against lambdas/ingestion_framework.py:592). UpdateSecret is opt-in and
+    # scoped to this Lambda's own life-platform/whoop secret only.
     return _ingestion_base(
         "whoop",
         secret_name="life-platform/whoop",
-        extra_secret_actions=["secretsmanager:PutSecretValue"],
+        extra_secret_actions=["secretsmanager:UpdateSecret"],
     )
 
 
 def ingestion_garmin() -> list[iam.PolicyStatement]:
+    # #499: garmin_lambda.save_secret() calls secretsmanager.update_secret()
+    # directly (garth session-token writeback) — verified at
+    # lambdas/ingestion/garmin_lambda.py:136. UpdateSecret is opt-in and
+    # scoped to this Lambda's own life-platform/garmin secret only.
     return _ingestion_base(
         "garmin",
         secret_name="life-platform/garmin",
+        extra_secret_actions=["secretsmanager:UpdateSecret"],
         # DeleteItem added for SIMP-2 framework auth-breaker clear_failure path
         ddb_actions=["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:Query", "dynamodb:DeleteItem"],
     )
 
 
 def ingestion_notion() -> list[iam.PolicyStatement]:
+    # #499: Notion uses a static integration token — no refresh, no writeback
+    # (verified: no update_secret/put_secret_value call anywhere in
+    # notion_lambda.py). GetSecretValue-only (the _ingestion_base default).
     return _ingestion_base(
         "notion",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
@@ -195,10 +212,15 @@ def ingestion_notion() -> list[iam.PolicyStatement]:
 
 
 def ingestion_withings() -> list[iam.PolicyStatement]:
+    # #499: OAuth token refresh writes back to the secret via ingestion_framework's
+    # enable_secret_writeback path, which calls secretsmanager.update_secret()
+    # (not put_secret_value — verified against lambdas/ingestion_framework.py:592
+    # and withings_lambda.py:249). UpdateSecret is opt-in and scoped to this
+    # Lambda's own life-platform/withings secret only.
     return _ingestion_base(
         "withings",
         secret_name="life-platform/withings",
-        extra_secret_actions=["secretsmanager:PutSecretValue"],  # OAuth token refresh writes back to secret
+        extra_secret_actions=["secretsmanager:UpdateSecret"],
     )
 
 
@@ -213,10 +235,16 @@ def ingestion_habitify() -> list[iam.PolicyStatement]:
 
 
 def ingestion_strava() -> list[iam.PolicyStatement]:
+    # #499: strava rotates its refresh_token on every refresh; both the
+    # ingestion_framework enable_secret_writeback path AND the lambda's own
+    # _reconcile() writeback call secretsmanager.update_secret() directly
+    # (not put_secret_value — verified against lambdas/ingestion/strava_lambda.py:443
+    # and ingestion_framework.py:592). UpdateSecret is opt-in and scoped to this
+    # Lambda's own life-platform/strava secret only.
     return _ingestion_base(
         "strava",
         secret_name="life-platform/strava",
-        extra_secret_actions=["secretsmanager:PutSecretValue"],  # OAuth token refresh writes back to secret
+        extra_secret_actions=["secretsmanager:UpdateSecret"],
     )
 
 
@@ -291,6 +319,9 @@ def ingestion_journal_enrichment() -> list[iam.PolicyStatement]:
 
 
 def ingestion_todoist() -> list[iam.PolicyStatement]:
+    # #499: Todoist uses a static API token — no refresh, no writeback
+    # (verified: no update_secret/put_secret_value call anywhere in
+    # todoist_lambda.py). GetSecretValue-only (the _ingestion_base default).
     return _ingestion_base(
         "todoist",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
@@ -299,9 +330,15 @@ def ingestion_todoist() -> list[iam.PolicyStatement]:
 
 
 def ingestion_eightsleep() -> list[iam.PolicyStatement]:
+    # #499: eightsleep_lambda.save_secret() calls secretsmanager.update_secret()
+    # directly (OAuth token writeback), and ingestion_framework's
+    # enable_secret_writeback=True path does too — verified at
+    # lambdas/ingestion/eightsleep_lambda.py:203-204. UpdateSecret is opt-in
+    # and scoped to this Lambda's own life-platform/eightsleep secret only.
     return _ingestion_base(
         "eightsleep",
         secret_name="life-platform/eightsleep",
+        extra_secret_actions=["secretsmanager:UpdateSecret"],
     )
 
 
@@ -373,6 +410,9 @@ def ingestion_weather() -> list[iam.PolicyStatement]:
 
 
 def ingestion_dropbox() -> list[iam.PolicyStatement]:
+    # #499: Dropbox uses a static app token — no refresh, no writeback
+    # (verified: no update_secret/put_secret_value call anywhere in
+    # dropbox_lambda.py). GetSecretValue-only (the _ingestion_base default).
     return _ingestion_base(
         "dropbox",
         secret_name="life-platform/ingestion-keys",  # COST-B: bundled 2026-03-10
@@ -393,6 +433,13 @@ def ingestion_hae() -> list[iam.PolicyStatement]:
     Code default reads life-platform/ingestion-keys (health_auto_export_api_key).
     (Note: a dedicated life-platform/webhook-key existed in early 2026 but was
     deleted 2026-03-14 per HANDOVER_v3.7.84; ingestion-keys is now the only path.)
+
+    Already GetSecretValue-only (#499/X-8) — never had UpdateSecret. NOT
+    addressed here: issue #499's second acceptance criterion — moving this
+    internet-facing bearer key out of the shared life-platform/ingestion-keys
+    bundle into its own dedicated secret. That needs an actual new secret
+    provisioned in Secrets Manager plus a code change to read it, which is
+    outside a pure IAM-policy PR; flagged for a follow-up.
     """
     return [
         iam.PolicyStatement(
