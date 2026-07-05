@@ -15,7 +15,11 @@ Read-only; writes only under site/coaching/. Run from repo root:
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
 OUT = Path("site/coaching")
 
@@ -100,11 +104,12 @@ SHELL = """<!DOCTYPE html>
     </nav>
   </header>
   <main id="dx" class="dx-main">
-    <div class="dx-head">
-      <p class="beat-kicker label">the coaching · the AI team reading the data</p>
+    <div class="page-hero">
+      <p class="ph-kicker label">the coaching · the AI team reading the data</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
-      <h1 class="dx-h1">The Coaching</h1>
-      <p class="dx-lede">A board of named AI coaches reads the data and argues about it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>.</p>
+      <h1 class="ph-title">The Coaching</h1>
+      <p class="ph-promise">A board of named AI coaches reads the data and argues about it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>.</p>
+      {ribbon}
       <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
     </div>
     <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
@@ -134,6 +139,10 @@ SHELL = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+# #578 — inline the shared loop-ribbon once (constant for this door) before the
+# per-page .format() calls, so the spine can't drift from the other builders.
+SHELL = SHELL.replace("{ribbon}", loop_ribbon("coaching"))
 
 
 def write(path: Path, html_text: str) -> None:

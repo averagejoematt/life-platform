@@ -18,6 +18,7 @@
   /api/weekly_priority, /api/field_notes) — nothing invented; honest empty-states.
   Reuses dx- and coach- styles from story.css; one type system (coaches speak serif).
 */
+import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
@@ -866,10 +867,6 @@ async function wireMachineryRibbon(tabsEl) {
 }
 window.addEventListener("popstate", (e) => { const sec = (e.state && e.state.sec) || (location.pathname.match(/\/coaching\/([^/]+)\//) || [])[1] || "read"; selectSection(sec, e.state && e.state.id, false); });
 
-function wireTheme() {
-  const b = $(".theme-toggle"); if (!b) return;
-  b.addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = cur === "light" ? "dark" : "light"; try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {} });
-}
-wireTheme();
+initTheme();
 build();
 stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)

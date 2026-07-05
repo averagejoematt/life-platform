@@ -20,7 +20,11 @@ from __future__ import annotations
 
 import html
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
 # slug, title, blurb, group, mode, endpoint, root, legacy
 #   mode: data (fetch+render) · interactive (render+wire, no fetch) ·
@@ -702,6 +706,7 @@ PILLARS = [
         "door": "data",
         "title": "Data",
         "nav_key": "data",
+        "kicker": "the data · what the body &amp; mind report",
         "h1": "The Data",
         "lede": "Every source the platform reads — the body, the mind, and the signals the engine finds across them. Live now and over time. Correlative, read-only, flagged when thin.",
         "groups": ["The body", "Mind & accountability", "The character"],
@@ -712,6 +717,7 @@ PILLARS = [
         "door": "protocols",
         "title": "Protocols",
         "nav_key": "protocols",
+        "kicker": "the protocols · the levers you pull",
         "h1": "The Protocols",
         "lede": "The levers — supplements, experiments, challenges, and the discoveries they chase. What gets changed to move the data, and whether it moved.",
         "groups": ["Protocol & experiments"],
@@ -722,6 +728,7 @@ PILLARS = [
         "door": "method",
         "title": "Method",
         "nav_key": "data",  # footer-tier: no door of its own; nav keeps 5 doors
+        "kicker": "the method · under the hood",
         "h1": "The Method",
         "lede": "Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.",
         "groups": ["How it holds up", "The machine", "The reset log"],
@@ -804,9 +811,11 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   <a class="skip" href="#ev">Skip to the content</a>
   {topbar(pillar["nav_key"], pillar["door"])}
   <main id="ev" class="ev-app">
-    <div class="ev-head">
-      <h1 class="ev-h1">{esc(pillar["h1"])}</h1>
-      <p class="ev-lede">{esc(pillar["lede"])}</p>
+    <div class="page-hero">
+      <p class="ph-kicker label">{pillar["kicker"]}</p>
+      <h1 class="ph-title">{esc(pillar["h1"])}</h1>
+      <p class="ph-promise">{esc(pillar["lede"])}</p>
+      {loop_ribbon(pillar["door"])}
     </div>
     <nav class="ev-tabs" data-tabs aria-label="Sections"></nav>
     <div class="ev-layout">

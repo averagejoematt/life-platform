@@ -14,6 +14,7 @@
   place (View Transitions) — never a navigation away.
 */
 
+import { initTheme } from "/assets/js/theme.js";
 import { sparkline } from "/assets/js/charts.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
@@ -738,17 +739,6 @@ function wireScope() {
   });
 }
 
-function wireTheme() {
-  const btn = $(".theme-toggle");
-  btn.addEventListener("click", () => {
-    const cur = document.documentElement.dataset.theme
-      || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    const next = cur === "light" ? "dark" : "light";
-    withTransition(() => { document.documentElement.dataset.theme = next; });
-    try { localStorage.setItem("ajm-theme", next); } catch (e) {}
-  });
-}
-
 /* ── First-run orientation (PG-02) ───────────────────────────────────────────
    A dismissible "what am I looking at" card for first-time visitors. Shown once
    (localStorage), non-modal, sits above the panel — never blocks the dense view
@@ -934,7 +924,7 @@ function wireScrub() {
 }
 
 wireScope();
-wireTheme();
+initTheme();
 wireFirstRun();
 wireScrub();
 bind("scopeLabel").textContent = "today";

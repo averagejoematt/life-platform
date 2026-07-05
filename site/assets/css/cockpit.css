@@ -27,6 +27,11 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   max-width: var(--container); width: 100%; margin-inline: auto;
 }
 
+/* #578: slim the shared .page-hero on the cockpit — it's the dense daily
+   instrument, so trim the standard hero padding to a thin orientation strip. */
+.cockpit-hero { padding-block: var(--sp-3) var(--sp-2); }
+.cockpit-hero .loop-ribbon { margin-top: var(--sp-2); }
+
 .brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
 .brand-mark {
   width: 11px; height: 11px; border-radius: 2px;

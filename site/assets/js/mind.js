@@ -8,6 +8,8 @@
  * (the server projects them out).
  */
 
+import { initTheme } from "/assets/js/theme.js";
+
 const API = "/api";
 const $ = (sel, root = document) => root.querySelector(sel);
 const bind = (name) => document.querySelector(`[data-bind="${name}"]`);
@@ -202,21 +204,7 @@ async function load() {
   }
 }
 
-/* Theme toggle (mirrors the cockpit's localStorage contract so light/dark persists). */
-function wireTheme() {
-  const btn = document.querySelector(".theme-toggle");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    const cur = document.documentElement.dataset.theme || "dark";
-    const next = cur === "light" ? "dark" : "light";
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("ajm-theme", next);
-    } catch (e) {}
-  });
-}
-
 document.addEventListener("DOMContentLoaded", () => {
-  wireTheme();
+  initTheme();
   load();
 });

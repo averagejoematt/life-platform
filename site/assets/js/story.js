@@ -11,6 +11,7 @@
     /api/character            pillar scores for the constellation
 */
 
+import { initTheme } from "/assets/js/theme.js";
 import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
@@ -380,26 +381,9 @@ async function dxTeaser() {
   read.innerHTML = `<p class="beat-note">The chronicle fills in as the experiment runs — read it in <a href="/story/">Story</a>.</p>`;
 }
 
-/* ── theme ───────────────────────────────────────────────────────────────── */
-function wireTheme() {
-  const btn = $(".theme-toggle");
-  if (!btn) return;
-  btn.addEventListener("click", () => {
-    const cur = document.documentElement.dataset.theme
-      || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    const next = cur === "light" ? "dark" : "light";
-    if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      document.startViewTransition(() => { document.documentElement.dataset.theme = next; });
-    } else {
-      document.documentElement.dataset.theme = next;
-    }
-    try { localStorage.setItem("ajm-theme", next); } catch (e) {}
-  });
-}
-
 /* ── load ────────────────────────────────────────────────────────────────── */
 async function load() {
-  wireTheme();
+  initTheme();
   renderWall();
 
   const [stats, journey, wave, character, weight, presence] = await Promise.allSettled([

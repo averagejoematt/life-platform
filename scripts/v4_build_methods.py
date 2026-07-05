@@ -24,8 +24,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "lambdas"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from methods_registry import SOURCE_MODULES, list_categories, list_stats  # noqa: E402
+from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
 SLUG = "registry"
 CANONICAL = f"/method/{SLUG}/"
@@ -214,6 +216,7 @@ def render(stats: list[dict], categories: list[str]) -> str:
       <p class="ph-kicker label">the method &middot; under the hood</p>
       <h1 class="ph-title">The Methods Registry</h1>
       <p class="ph-promise">Every statistic this platform publishes — its formula, the window it runs over, and what it can't tell you — generated straight from the source modules below, not hand-written. If the code changes, this page is built to go stale until a human re-verifies it (see the fingerprint note).</p>
+      {loop_ribbon("method")}
     </div>
     <div class="mr-wrap">
       <section class="rd-sec" style="margin-top:0">
