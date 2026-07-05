@@ -66,8 +66,8 @@ SOURCE_CLASS: dict[str, str] = {
     "todoist": RAW_TIMESERIES,
     "weather": RAW_TIMESERIES,
     "macrofactor": RAW_TIMESERIES,
-    "macrofactor_workouts": RAW_TIMESERIES,
-    "hevy": RAW_TIMESERIES,
+    "macrofactor_workouts": RAW_TIMESERIES,  # #485: dead ~4mo (no writer) — historical rows kept, still exported
+    "hevy": RAW_TIMESERIES,  # live strength source (hourly, ADR-060) — #485 repointed brief/digest here
     "notion": RAW_TIMESERIES,  # journal entries — user-authored facts
     "food_delivery": RAW_TIMESERIES,  # behavioral archive (incl. longest-ever streak)
     "sick_days": RAW_TIMESERIES,

@@ -23,7 +23,7 @@ Sections (15):
   1.  Day Grade + TL;DR (AI one-liner)
   2.  Yesterday's Scorecard (sleep architecture detail)
   3.  Readiness Signal
-  4.  Training Report (exercise-level detail from MacroFactor workouts)
+  4.  Training Report (exercise-level detail from Hevy, #485)
   5.  Nutrition Report (meal timing in AI prompt)
   6.  Habits Deep-Dive
   7.  CGM Spotlight (UPDATED: fasting proxy, hypo flag, 7-day trend)
@@ -264,6 +264,59 @@ def fetch_range(source, start, end):
         return []
 
 
+def fetch_hevy_workouts(date_str):
+    """Fetch Hevy per-workout records for one date, mapped into the legacy
+    macrofactor_workouts Training Report shape the html_builder renderer expects.
+
+    #485: macrofactor_workouts stopped ingesting ~4 months ago; Hevy is now the
+    live strength source (hourly ingestion, ADR-060). Hevy's schema is one DDB
+    item PER WORKOUT with sk=DATE#{date}#WORKOUT#{id} (possibly several a day),
+    unlike macrofactor_workouts' one-item-per-day daily aggregate — so this uses
+    a begins_with query rather than fetch_date's exact-sk get_item, and folds
+    the per-workout records back into the day-aggregate shape the template renders:
+        {"workouts": [{"workout_name", "exercises": [{"exercise_name", "sets": [...]}]}],
+         "total_volume_lbs", "total_sets"}
+    Hevy sets carry weight_kg (converted to lbs here) and rpe (NOT rir — a
+    different scale, so it's intentionally left unset rather than mislabeled).
+    """
+    try:
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": Key("pk").eq(USER_PREFIX + "hevy") & Key("sk").begins_with("DATE#" + date_str),
+            }
+        )
+        r = table.query(**kwargs)
+        items = [d2f(i) for i in r.get("Items", [])]
+    except Exception:
+        items = []
+    if not items:
+        return None
+
+    workouts = []
+    total_sets = 0
+    total_volume_lbs = 0.0
+    for rec in items:
+        exercises_out = []
+        for ex in rec.get("exercises") or []:
+            sets_out = []
+            for s in ex.get("sets") or []:
+                weight_kg = safe_float(s, "weight_kg")
+                reps = s.get("reps")
+                weight_lbs = round(weight_kg / 0.45359237, 1) if weight_kg is not None else None
+                if weight_lbs is not None and reps is not None:
+                    total_volume_lbs += weight_lbs * float(reps)
+                total_sets += 1
+                sets_out.append({"reps": reps, "weight_lbs": weight_lbs})
+            exercises_out.append({"exercise_name": ex.get("name") or "?", "sets": sets_out})
+        workouts.append({"workout_name": rec.get("title") or "Strength Session", "exercises": exercises_out})
+
+    return {
+        "workouts": workouts,
+        "total_volume_lbs": round(total_volume_lbs, 1),
+        "total_sets": total_sets,
+    }
+
+
 def _normalize_whoop_sleep(item):
     """Map Whoop sleep field names to common schema used by Daily Brief."""
     if not item:
@@ -375,8 +428,9 @@ def gather_daily_data(profile, yesterday):
     measurements = _latest_item("measurements")
     labs_latest = _latest_item("labs")
 
-    # MacroFactor workouts — exercise-level detail (v2.2)
-    mf_workouts = fetch_date("macrofactor_workouts", yesterday)
+    # Strength workout detail — exercise-level (v2.2 MacroFactor; repointed to
+    # Hevy per #485, macrofactor_workouts having gone dark ~4 months ago)
+    mf_workouts = fetch_hevy_workouts(yesterday)
 
     journal_entries = fetch_journal_entries(yesterday)
     journal = extract_journal_signals(journal_entries)
