@@ -302,6 +302,36 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/684"
         }
       ]
+    },
+    {
+      "id": "2026-07-05-cards-that-travel-and-a-net-that-never-fired",
+      "date": "2026-07-05",
+      "title": "Share cards that travel, a safety net that had never fired, and a mood surface quietly reading the wrong table",
+      "shipped": "Thirteen changes landed in one coordinated deploy. The biggest thread: one code-drawn card engine now renders every off-site share card — the character sheet, each week's chronicle, and each coach's portrait — so the platform's ideas can leave the site as an image. A read-only 'meet the agents' feed went up at /story/agents/, rendering what the platform's own watchdogs actually caught, no new AI. On the plumbing side: dead-letter escalation that now counts real repeat failures instead of resetting them, and a CloudWatch cleanup that deleted 18 duplicate alarms (136→118) without dropping a single real failure signal.",
+      "gotcha": "Two bit hard. First, macOS treats Documents and documents as the same folder, so a few parallel build agents quietly wrote into the shared main copy instead of their own isolated one — caught before anything shipped, but a real reminder that 'isolated' has an operating-system asterisk. Second, and worse: the automated rollback that's supposed to revert a bad Lambda deploy had a one-line bug (a missing condition) that meant it had never actually fired. The net was there on paper the whole time and empty in practice.",
+      "honest_miss": "State of Mind — the mood check-ins — turned out to have been broken for months: eight different surfaces were reading an empty database table the ingest never writes to. Fixed now, but nobody noticed because the data was sparse enough that 'empty' looked normal. The real miss is that the fix only makes it *ready*; it flows when I actually start logging again. And two of the CI-safety changes can't be fully proven until a deliberately-broken build runs through the pipeline — the mechanism is in, the drill is pending.",
+      "prs": [
+        {
+          "label": "PR #694",
+          "url": "https://github.com/averagejoematt/life-platform/pull/694"
+        },
+        {
+          "label": "PR #691",
+          "url": "https://github.com/averagejoematt/life-platform/pull/691"
+        },
+        {
+          "label": "PR #686",
+          "url": "https://github.com/averagejoematt/life-platform/pull/686"
+        },
+        {
+          "label": "PR #688",
+          "url": "https://github.com/averagejoematt/life-platform/pull/688"
+        },
+        {
+          "label": "PR #689",
+          "url": "https://github.com/averagejoematt/life-platform/pull/689"
+        }
+      ]
     }
   ]
 }

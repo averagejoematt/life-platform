@@ -1,104 +1,55 @@
-# HANDOVER — the model:opus batch, end to end: 11 issues → merged → layer v113 → deployed + verified — 2026-07-05 (opus session)
+# HANDOVER — opus batch #2: 13 issues → merged → layer v113→v114 → deployed + verified — 2026-07-05
 
-> **This session ran concurrently with the HAE/ingestion session** (which codified the HAE
-> webhook edge into IaC and landed the #500 deploy — see
-> `handovers/HANDOVER_2026-07-05_HAE_IaC_Deploy.md`) and after session 17's model:sonnet
-> batch (`handovers/HANDOVER_2026-07-05_session17_SonnetBatch.md`). All three are now live on
-> the same `main`. This handover covers the opus batch and is the consolidated close state —
-> **all other sessions are closed.**
+> Second model:opus batch of the day. Ran AFTER opus batch #1
+> (`handovers/HANDOVER_2026-07-05_opus_batch1.md`, 11 issues, layer v112→v113) and the HAE
+> session, all of which were closed. A **concurrent session landed #478 (ADR-122) on main**
+> mid-run; merged in. Matthew authorized all edits/merges/deploys up front, answered the 3
+> product forks in-session, and twice said "keep going." Chose to WRAP (not chain a 3rd batch)
+> because batch #3's centerpiece (#409) touches the AI chokepoint = another layer bump best done
+> with fresh context.
 
-Matthew asked to "pay down as many `model:opus` issues as makes sense in one session,
-prioritize value/outcome," while a parallel session worked HAE. Then: **"I authorize you to do
-all deploys and merges this session and everything in auto mode is a yes."**
+## What shipped (13 issues, 10 parallel worktree agents, ADRs 114–121 pre-reserved)
 
----
+**Distribution / share-cards (epics #338/#340)**
+- **#595** the share-card engine — `lambdas/web/card_engine.py`, one code-drawn renderer; `og_image_lambda` re-exports its tokens/primitives so the 12 daily cards stay **byte-identical** (test-pinned). ADR-114.
+- **#420** character card + linkable `/data/character/` (+ `og-character.png`, `share ↗`); computed stats only, proven byte-identical with/without an age field (privacy holds).
+- **#405** per-chronicle share kit — `lambdas/chronicle_share_kit.py`; excerpt + honest-stats line + card URL + canonical URL, surfaced in the approval email + `generated/moments/share-kits/`.
+- **#593** portraits travel — `lambdas/web/og_coach_cards.py` (thin `_Engine` adapter over the engine + shared `web/portrait_raster.render_recipe`), 40 committed portrait PNGs, coach OG cards / email byline PNG / episode-art script. Approved recipes only (ADR-106).
+- **#399** Agent Activity feed — `/story/agents/` + `/api/agent_activity` (`lambdas/web/site_api_agents.py`), read-only render of `coherence-log`/`ai-canary-log`/`remediation-log` artifacts, privacy-gated, honest empty state.
 
-## Triage → 11 shipped, the rest deliberately held
+**Harden / budget (epics #341/#344/#346)**
+- **#402** DLQ escalation — ADR-115. Content-hash stable id `SYSTEM#dlq-ledger`, `ADD attempts :receive_count`, delete-only-after-confirmed-2xx, pages the existing `life-platform-alerts` SNS, time-budget drain replaces the 10-msg cap. Operational CDK + IAM (DDB + kms + sns).
+- **#411** CloudWatch audit — ADR-116. Reconciled 136 live alarms vs 107 CDK; **deleted 18 orphans (136→118)** via `deploy/cloudwatch_retire_orphans.sh --apply`, **adopted 2** into Monitoring IaC. Deliberately KEPT the 48 per-lambda error alarms — only 2/49 lambdas route to a DLQ, so they're the sole failure signal (DLQ-wire-then-retire is the sanctioned follow-up). Audit doc: `docs/reviews/CLOUDWATCH_AUDIT_2026-07.md`.
+- **#416**+**#418** — ADR-117. `@pytest.mark.deploy_critical` (11 files); CI `plan` now `needs: [lint, test-critical]` so an unrelated red no longer blacks out visual QA; site+layer rollback wiring rebuilt for the hashed-asset era. **Latent-bug fix: the Lambda auto-rollback `if` was missing `always()` → it had never fired.** Two ACs ("visual-QA runs on a red suite", "one rollback drill") await a live CI run — flagged in PR #688.
 
-Of 37 open `model:opus` issues, shipped 11 as a coherent slice; held the rest for reasons
-below (all still open).
+**Data honesty**
+- **#508** Whoop-webhook spike — ADR-119, **KEEP POLLING** (id-only payload still needs a live token → worsens the rotation race `ReservedConcurrentExecutions=1` guards; no `cycle` webhook; no vendor DLQ). No prod change. Doc: `docs/reviews/WHOOP_WEBHOOK_SPIKE_2026-07.md`.
+- **#489** Eight Sleep temp — ADR-118, **RETIRED** (v2 intervals 404s 4+ months; retired the fetch + MCP `get_sleep_environment_analysis` tool 144→143 + the /data/sleep env section; trends-payload reactivation lead recorded). Touched layer modules `ai_context`/`coach_stance`.
+- **#507** State of Mind — **KEPT** (owner: "keep, I just need to start doing it"). ADR-121 + ADR-103 ledger flip. **Found a real bug: 8 consumers read an empty `state_of_mind` partition ingestion never writes** — data lands on `apple_health` as `som_*`. Fixed all read-side (character_engine, ai_context, daily brief, chronicle, site_api_data, tools_lifestyle, field-notes, ai-expert), honest empty states preserved, restart runbook added. Touches layer module `character_engine`.
 
-**Shipped (all merged + deployed + verified):**
-- **Instrument-uplevel vertical slice (epic #575):** #581 evidence.js split (3,160→208-line
-  router + 12 per-family `evidence_*.js` modules) · #582 chart interaction contract v2 (15/24
-  charts answer to touch/hover/keyboard) · #551 uncertainty-first visual language (fan charts,
-  CI bands, sample-size dots, confidence grammar — DESIGN_SYSTEM_V5 §7a; every band bound to a
-  real interval, honest no-band fallback) · #584 provenance popovers (registry-fed from #544 so
-  they can't drift; new `provenance_popover.js`, wired via the shared `fig()` helper).
-- **Data honesty & intelligence:** #494 movement rest-vs-breakage (INGEST_HEALTH sentinel) ·
-  #493 TSB honesty gate (ADR-109 — derived/proxy values covered by the scheduled scan, not the
-  tight guard) · #542 changepoint detection (CUSUM, stdlib, `stats_core.detect_changepoints` →
-  daily-insight) · #543 personal-variance thresholds + EWMA-ACWR (ADR-105; **floor-guarded —
-  byte-identical to current constants until ~30 obs accumulate**) · #487 sleep reconciler
-  **RETIRED** (ADR-113; dead merge reading nonexistent fields, mislabelled the public page) ·
-  #414 autonomic quadrant + zone-2 read-only data-door endpoints.
-- **Interactive:** #546 multi-turn board follow-up sessions (ADR-112; opaque-token, DDB TTL≤1h,
-  atomic `followup_count < :cap AND ip_hash = :ip` condition, per-turn fail-closed grounding).
+**Infra**
+- **#401** OIDC — ADR-120, **codify half only** (owner-approved codify-now/tighten-later). Roles + provider → `infra/iam/*.json` + `deploy/verify_oidc_iam.py` (0 drift, **0 live IAM mutation**). Tighten (`repo:*`→main-only) staged in `infra/iam/proposed/` + runbook, tracked as **#687**.
 
-**Held out (still open, deliberate):**
-- **Ingestion-adjacent** (the HAE session's territory): #507, #475, #478, #489, #415, #421,
-  #422, #412, #417, #508.
-- **Deploy-pipeline infra** (don't churn deploy tooling under a concurrent deployer): #416,
-  #418, #401, #408, #411.
-- **#395** MCP registry prune — destructive (removes tools), do attended.
-- **Growth/build-in-public:** #420, #405, #399.
-- **Downstream site-ux epic tail now UNBLOCKED** by this session's #581/#582/#551:
-  #588 (motion v2), #590 (home cinematic), #591 (cockpit presence), #593 (portraits travel),
-  #595 (share-card engine). #593 still needs your ADR-106 portrait sign-off.
-
-## Deployed + live-verified (one coordinated sequence)
-
-- **Shared layer v112 → v113** (build_layer → `cdk deploy LifePlatformCore` publishes → verify
-  → bump `SHARED_LAYER_VERSION` constant → deploy consumers). **Also reconciled the session-17
-  drift** where the constant said 111 but live was already 112.
-- **CDK:** Compute (personal-baselines-compute ADDED w/ `cron(0 8 1 * ? *)`, sleep-reconciler
-  REMOVED, daily-insight updated), Web (BOARDSESS IAM), Operational, Mcp, Email. **Not touched:
-  LifePlatformIngestion** (HAE's) and Monitoring (no changes).
-- **site-api** (`deploy_site_api.sh`, full `web/` dir) — `/api/autonomic_balance`,
-  `/api/zone2`, `/api/methods` all 200; retired `/api/sleep_reconciliation` → 404.
-- **Static site** synced + CloudFront invalidated. **Build hash == HEAD (4e84aba7), smoke
-  67/67, visual QA 33/33** (3 benign warnings incl. the known glucose sparse-data state).
-- **Bonus:** the Mcp redeploy re-bundled from `main` and **fixed a pre-existing prod crash** —
-  the live MCP lambda had been throwing `No module named 'reading'` (integration tests i10/i12
-  green again).
+## Deploy record (one coordinated sequence)
+1. `build_layer.sh` → `rm -rf cdk/cdk.out` → `cdk deploy LifePlatformCore` **published layer v114** → verified live → bumped `SHARED_LAYER_VERSION` 113→114.
+2. Pushed main (closed all 10 PRs + 13 issues). **Push rebased over #478/ADR-122** which a concurrent session had landed.
+3. `cdk deploy` Compute Email Mcp Operational Monitoring **Ingestion** (`--concurrency 3`) — all UPDATE_COMPLETE. Ingestion was **3 layer versions behind (111→114)** since the HAE session never redeployed it; diff was clean `[~]`-only.
+4. `cloudwatch_retire_orphans.sh --apply` (20 deletes: 18 retire + 2 adopt-rename).
+5. `deploy_site_api.sh` (also handled the layer re-attach) → `sync_site_to_s3.sh` (+ CF invalidation).
+6. **Verify:** layer v114 attached · `version.json` build == HEAD `1576e52f` · smoke **67/67** · visual QA **33 pass / 1 FP / 10 transient warns** · MCP healthy (no import crash) · `/api/agent_activity` 200.
 
 ## Gotchas (durable ones saved to memory)
+1. **macOS case-insensitive path twin** (`/Users/.../Documents/...` vs lowercase `documents`) let 3 parallel agents (#401/#399/#489) leak edits into the shared **main** tree, and left main checked out on an agent branch. The pushed PR branch is the source of truth; **preserve stranded main-tree work (an agent with no worktree commits + dirty main files) before cleaning.** → `reference_worktree_case_insensitive_pollution`.
+2. **The pre-commit hook regenerates counter files but only stages ARCHITECTURE.md** — during a stacked-merge run it left `site_api_common.py` dirty and blocked the next merge. Disable the hook for the merge run, regenerate all counts once at the end with `sync_doc_metadata.py --apply`, re-enable.
+3. **DECISIONS.md conflicts on every stacked merge** (each branch appends its ADR to the same region) — union-resolve (keep both, `---` between); regenerate counts at the end. `site_api_common.py` conflicts were count-lines except #411's real `alarms 56→109` fix (take theirs).
+4. A concurrent session can push to main mid-batch (#478) — `git fetch` + merge origin/main in before your push; branch protection here allows a direct admin push (0 required reviews).
 
-1. **Pre-reserving ADR numbers per parallel agent (109–113) prevented the session-17 ADR
-   collision.** Each agent was told its number up front; no two wrote the same one.
-2. **Stale agent worktrees break repo-tree-walk tests.** `test_hevy_compiler_isolation` passed
-   on baseline but failed on merged main — offenders were all `.claude/worktrees/agent-*/`
-   copies, not real source. Prune worktrees before the full-suite-on-main verify.
-   (`reference_stale_worktrees_break_tree_walk_tests` in memory.)
-3. **An agent (#581) ran out of window before committing** — its finished work sat uncommitted
-   in the worktree; orchestrator landed it (PR #674), verified byte-identical. The agent later
-   resumed and opened a duplicate PR #677 — closed as superseded (salvaged one doc fix).
-4. **`test_count`/ADR-ledger/doc-counters conflict on nearly every stacked merge** — mechanical:
-   take either side, `sync_doc_metadata.py --apply`, re-commit. The #389 `--check` gate makes a
-   missed re-sync fail CI, so every busy-session merge needs it.
-5. **cdk diff before deploy caught a layer-downgrade trap** — deploying consumers with the
-   constant still at 111 would have downgraded live lambdas from 112→111. Bump the constant to
-   the freshly-published version BEFORE deploying consumers.
+## State at close
+- `main` clean == `origin/main` (`1576e52f`), all gates green, all 13 issues + PRs closed, worktrees pruned (only main + the pre-existing `uplevel-2026-07-01` remain).
+- **GitHub Pages still enabled + public (carried from prior sessions, unactioned).**
 
-## State at close (all sessions closed)
-
-- `main` clean, build hash == HEAD (4e84aba7), all gates green (doc-drift, black, ruff, flake8,
-  JS parse, hash graph). Full suite: 3532 passed; the only reds are pre-existing live-state
-  integration tests **i3/i9/i14** (a message in the prod DLQ + canary checks — NOT this batch).
-- All 11 issues CLOSED; zero dangling PRs.
-- **Stale `git stash` entries cleared** this session (all were "RECOVERED: not mine" content
-  already landed via merged PRs, plus old pre-2026-07 WIP — all sessions now closed, so safe).
-
-## What's next
-
-- **Site-ux epic tail** (#588/#590/#591/#593/#595) — unblocked by the split + chart contract;
-  #593 portraits-travel needs your ADR-106 sign-off.
-- **#582 follow-on:** 9 of 24 chart renderers still non-interactive (ring/radar/quadrant/heatStrip
-  etc. — bespoke interaction, listed in PR #680).
-- **#584 follow-on:** cockpit score/readiness tiles have no registry entry yet (honest = no
-  popover until added to `methods_registry.py`); the weight-rate ±CI caption is a natural next
-  provenance adopter.
-- **#543:** personal-variance bands are live but floor-guarded — they won't change any verdict
-  until ~30 observations accumulate post-reset; worth re-checking in a month.
-- **Held-out opus queues** above remain for future sessions (ingestion-adjacent = coordinate
-  with HAE; #395 MCP prune = attended; infra/growth).
+## Next session (batch #3 — do fresh)
+- **Cleanly doable:** **#408** (render/accuracy QA left onto site PRs — CI) · **#409** (batch-price the content AI — **touches `bedrock_client`/`ai_calls` = LAYER modules → plan another layer bump + full consumer redeploy**, and a batch-submit/poll path with a real-time deadline fallback) · motion trio **#588** (View Transitions) / **#590** (home cinematic) / **#591** (cockpit presence) — unblocked by batch #1's chart/uncertainty contract.
+- **Need Matthew's input:** instrument-depth **#412/#415/#417/#421/#422/#475** — external endpoints, template↔movement map, or a real week of data; not cleanly closeable solo.
+- **Attended:** **#395** MCP registry prune (destructive — removes tools through the AUDITED_AT ratchet).
+- **Watched CI run:** **#687** OIDC trust-tighten (the risky half of #401).
