@@ -77,7 +77,9 @@ def test_passive_pipes_stay_infra():
     """Worn devices and scheduled API pulls must keep paging on staleness —
     this is the class that once hid a six-week outage."""
     infra = set(checker.SOURCES) - checker.BEHAVIORAL_SOURCES
-    assert infra == {"whoop", "eightsleep", "apple_health", "todoist", "habitify"}
+    # #470: weather joined the freshness surfaces (was registry-resident for
+    # facets only) — a scheduled API pull with no participation, so it pages.
+    assert infra == {"whoop", "eightsleep", "apple_health", "todoist", "habitify", "weather"}
 
 
 def test_no_data_query_error_pages():

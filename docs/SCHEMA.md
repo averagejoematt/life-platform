@@ -1075,7 +1075,7 @@ Note: Daily Brief reads this partition to show today's logged supplements and 7-
 **SOT for:** weather/environment domain (added v2.36.0)
 
 **Data source:** Open-Meteo archive API (free, no auth, WMO-grade data). Two ingestion paths:
-- **Scheduled Lambda** (`weather-data-ingestion`): EventBridge at 5:45 AM PT, fetches yesterday + today
+- **Scheduled Lambda** (`weather-data-ingestion`): EventBridge 2x daily (6am/6pm PT). Gap-aware backfill since #470 (`enable_gap_detection=True`, 7-day lookback) — a multi-day outage self-heals once the cron resumes; `refresh_today=True` keeps re-fetching today so its daily aggregates firm up between the two runs.
 - **MCP on-demand** (`get_weather_correlation`): fetches and caches any missing dates
 
 **Location:** Seattle, WA (47.6062, -122.3321)
