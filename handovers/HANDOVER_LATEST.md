@@ -1,146 +1,104 @@
-# HANDOVER — the model:sonnet Now/Next/Later backlog, end to end: 28 issues → 30 PRs → merged, layer v112, deployed — 2026-07-05 (session 17)
+# HANDOVER — the model:opus batch, end to end: 11 issues → merged → layer v113 → deployed + verified — 2026-07-05 (opus session)
 
-> **This session ran concurrently with session 16** (the opus data-integrity quartet —
-> #484/#483/#476, archived at `handovers/HANDOVER_2026-07-05_session16_DataIntegrityOpusQuartet.md`).
-> Both sessions' work is now live on the same `main`; this handover covers only session 17's
-> work. The two sessions collided repeatedly on `git stash` (see gotcha #1) and on the shared
-> `site_api_common.py` doc-metadata counters, but never on actual logic — every collision was
-> caught and verified before merge.
+> **This session ran concurrently with the HAE/ingestion session** (which codified the HAE
+> webhook edge into IaC and landed the #500 deploy — see
+> `handovers/HANDOVER_2026-07-05_HAE_IaC_Deploy.md`) and after session 17's model:sonnet
+> batch (`handovers/HANDOVER_2026-07-05_session17_SonnetBatch.md`). All three are now live on
+> the same `main`. This handover covers the opus batch and is the consolidated close state —
+> **all other sessions are closed.**
 
-Matthew asked: "Look at all issues assigned to sonnet and complete all that are self-contained
-(don't risk breaking my other agent fixing the opus issues)." After triage, scope widened to
-"everything self-contained, any milestone" (~30 issues), then explicit authorization: **"you
-handle merge and deploy."**
+Matthew asked to "pay down as many `model:opus` issues as makes sense in one session,
+prioritize value/outcome," while a parallel session worked HAE. Then: **"I authorize you to do
+all deploys and merges this session and everything in auto mode is a yes."**
 
 ---
 
-## Triage: 34 `model:sonnet` issues → 28 attempted, 6 held out
+## Triage → 11 shipped, the rest deliberately held
 
-- **#583, #589** — depend on open `model:opus` issues (#582, #588) not yet closed.
-- **#592, #594** — coach full-cast portraits chain; needs Matthew's visual sign-off per
-  ADR-106 ("AI may sketch, only code ships, only Matthew approves"), not autonomous work.
-- **#577, #578** — both required editing `evidence.js`, which opus issue #581 ("split
-  evidence.js") is mid-refactoring. Held out specifically to avoid the collision Matthew
-  asked to avoid. (Session 16 independently reached the same conclusion about #581.)
+Of 37 open `model:opus` issues, shipped 11 as a coherent slice; held the rest for reasons
+below (all still open).
 
-## What shipped — 28 issues, 30 PRs, all merged + deployed + verified
+**Shipped (all merged + deployed + verified):**
+- **Instrument-uplevel vertical slice (epic #575):** #581 evidence.js split (3,160→208-line
+  router + 12 per-family `evidence_*.js` modules) · #582 chart interaction contract v2 (15/24
+  charts answer to touch/hover/keyboard) · #551 uncertainty-first visual language (fan charts,
+  CI bands, sample-size dots, confidence grammar — DESIGN_SYSTEM_V5 §7a; every band bound to a
+  real interval, honest no-band fallback) · #584 provenance popovers (registry-fed from #544 so
+  they can't drift; new `provenance_popover.js`, wired via the shared `fig()` helper).
+- **Data honesty & intelligence:** #494 movement rest-vs-breakage (INGEST_HEALTH sentinel) ·
+  #493 TSB honesty gate (ADR-109 — derived/proxy values covered by the scheduled scan, not the
+  tight guard) · #542 changepoint detection (CUSUM, stdlib, `stats_core.detect_changepoints` →
+  daily-insight) · #543 personal-variance thresholds + EWMA-ACWR (ADR-105; **floor-guarded —
+  byte-identical to current constants until ~30 obs accumulate**) · #487 sleep reconciler
+  **RETIRED** (ADR-113; dead merge reading nonexistent fields, mislabelled the public page) ·
+  #414 autonomic quadrant + zone-2 read-only data-door endpoints.
+- **Interactive:** #546 multi-turn board follow-up sessions (ADR-112; opaque-token, DDB TTL≤1h,
+  atomic `followup_count < :cap AND ip_hash = :ip` condition, per-turn fail-closed grounding).
 
-Each issue got its own agent in an isolated git worktree (parallel fan-out), then merged
-sequentially with conflict resolution against a moving `main` (both my own merges and
-session 16's concurrent ones). Full suite green throughout: **3442 passed, 0 failed** on
-final `main`; `black`/`ruff`/`flake8`/doc-drift-gate all clean against the session-start
-baseline.
+**Held out (still open, deliberate):**
+- **Ingestion-adjacent** (the HAE session's territory): #507, #475, #478, #489, #415, #421,
+  #422, #412, #417, #508.
+- **Deploy-pipeline infra** (don't churn deploy tooling under a concurrent deployer): #416,
+  #418, #401, #408, #411.
+- **#395** MCP registry prune — destructive (removes tools), do attended.
+- **Growth/build-in-public:** #420, #405, #399.
+- **Downstream site-ux epic tail now UNBLOCKED** by this session's #581/#582/#551:
+  #588 (motion v2), #590 (home cinematic), #591 (cockpit presence), #593 (portraits travel),
+  #595 (share-card engine). #593 still needs your ADR-106 portrait sign-off.
 
-**Infra/data (9):** #378 HAE token off query string (superseded by #500, closed — kept only
-its regression tests as PR #665) · #379 sentinel post-reset grace window · #381 hermetic test
-suite (found + fixed 4 latent `test_coaches_api.py` failures masked by local AWS creds) ·
-#382 the dual-deployment-plane guard (`deploy/cdk_deploy.sh` + `check_deploy_drift.py` — used
-for the rest of this very session's deploys) · #470 weather joins `source_registry` · #499
-least-privilege ingestion secrets IAM · #500 HAE webhook edge into CDK (**this is the one
-still not live — see Flags**) · #501 retry convergence onto `http_retry` (found + fixed a
-real duplicate-write risk: Hevy's write client was retrying POST/PUT like GET) · #389
-`sync_doc_metadata.py --check` promoted to a real CI drift gate (now enforced on every push).
+## Deployed + live-verified (one coordinated sequence)
 
-**Site/data-honesty (7):** #383 phase-filter 30-day checkpoint (mechanism only — the actual
-verdict is due 2026-07-14, correctly not fabricated) · #386 homepage hero reorder · #388
-recovery-vs-deficit overlay (backend only; the chart itself needs an `evidence.js` edit the
-agent correctly declined to make) · #400 email dark-mode + h1 pass · #419 coverage floor
-9%→25% + mypy tier-2 on `web/` (also documented as ADR-107) · #479 food-delivery idempotent
-re-import · #485 brief/digest strength sections repointed to Hevy.
+- **Shared layer v112 → v113** (build_layer → `cdk deploy LifePlatformCore` publishes → verify
+  → bump `SHARED_LAYER_VERSION` constant → deploy consumers). **Also reconciled the session-17
+  drift** where the constant said 111 but live was already 112.
+- **CDK:** Compute (personal-baselines-compute ADDED w/ `cron(0 8 1 * ? *)`, sleep-reconciler
+  REMOVED, daily-insight updated), Web (BOARDSESS IAM), Operational, Mcp, Email. **Not touched:
+  LifePlatformIngestion** (HAE's) and Monitoring (no changes).
+- **site-api** (`deploy_site_api.sh`, full `web/` dir) — `/api/autonomic_balance`,
+  `/api/zone2`, `/api/methods` all 200; retired `/api/sleep_reconciliation` → 404.
+- **Static site** synced + CloudFront invalidated. **Build hash == HEAD (4e84aba7), smoke
+  67/67, visual QA 33/33** (3 benign warnings incl. the known glucose sparse-data state).
+- **Bonus:** the Mcp redeploy re-bundled from `main` and **fixed a pre-existing prod crash** —
+  the live MCP lambda had been throwing `No module named 'reading'` (integration tests i10/i12
+  green again).
 
-**A11y/perf (2):** #579 focus-visible + ARIA tabs + popover trap (evidence.js's own tabs
-explicitly deferred, noted in-PR) · #580 LCP/CLS budgets in `visual_qa.py` + font re-subsetting
-(found current CLS is already borderline on data/method pages — flagged as a separate
-follow-up, not fixed here).
+## Gotchas (durable ones saved to memory)
 
-**Coach intelligence (9):** #390 quality gate advisory→blocking (**bigger than it sounds —
-see Flags**, documented as ADR-108) · #533 interaction memory (checked git history first,
-correctly found #531 already covered board-Q&A) · #534 event-driven mid-week stance refresh
-· #536 `RELATIONSHIP#state` gets its deterministic writer · #544 the Methods page (public
-stat registry, unblocks opus #584) · #545 blind voice-fidelity harness · #548 Margaret
-Calloway's chronicle red-pen · #549 journal-mood attunement for the mind coach · #552 "State
-of Matthew" weekly brief · #553 coach memoirs.
+1. **Pre-reserving ADR numbers per parallel agent (109–113) prevented the session-17 ADR
+   collision.** Each agent was told its number up front; no two wrote the same one.
+2. **Stale agent worktrees break repo-tree-walk tests.** `test_hevy_compiler_isolation` passed
+   on baseline but failed on merged main — offenders were all `.claude/worktrees/agent-*/`
+   copies, not real source. Prune worktrees before the full-suite-on-main verify.
+   (`reference_stale_worktrees_break_tree_walk_tests` in memory.)
+3. **An agent (#581) ran out of window before committing** — its finished work sat uncommitted
+   in the worktree; orchestrator landed it (PR #674), verified byte-identical. The agent later
+   resumed and opened a duplicate PR #677 — closed as superseded (salvaged one doc fix).
+4. **`test_count`/ADR-ledger/doc-counters conflict on nearly every stacked merge** — mechanical:
+   take either side, `sync_doc_metadata.py --apply`, re-commit. The #389 `--check` gate makes a
+   missed re-sync fail CI, so every busy-session merge needs it.
+5. **cdk diff before deploy caught a layer-downgrade trap** — deploying consumers with the
+   constant still at 111 would have downgraded live lambdas from 112→111. Bump the constant to
+   the freshly-published version BEFORE deploying consumers.
 
-Plus two fix-forward PRs found only by running the full suite on the final merged state:
-**#668** (2 new Lambda handlers pushed the untyped-handler-count ratchet over its baseline —
-typed them) and **#669** (`ruff` found 4 new import-sort findings — auto-fixed).
+## State at close (all sessions closed)
 
-## Deployed and live-verified
-
-- **Shared layer v111 → v112**, published via `LifePlatformCore`, all consumers confirmed on
-  the new ARN.
-- **CDK stacks:** Compute (3 new Lambdas — State of Matthew, Coach Memoir, Voice-Fidelity
-  Harness), Email, Mcp, Operational. Every stack diffed before deploy; zero unexpected
-  replacements.
-- **site-api** redeployed (`deploy_site_api.sh`) — `/api/methods`, `/api/voice_fidelity`,
-  `/api/state_of_matthew` all invoked directly, all return 200.
-- **Static site** synced + CloudFront invalidated. `curl .../version.json` == `git rev-parse
-  --short HEAD` exactly. `smoke_test_site.sh`: **67/67**. `visual_qa.py`: **33/33** (3 benign
-  warnings — self-recovered 429 throttles, one honest sparse-data state on `/data/glucose/`).
-- **`LifePlatformIngestion` was deliberately NOT deployed.** See Flags — this is the one
-  loose end.
-
-## Gotchas learned (load-bearing)
-
-1. **`git stash` is repo-global, not worktree-scoped — never use it when parallel
-   worktree agents (or a concurrent session) share one `.git` dir.** 6+ of my 28 fan-out
-   agents independently reached for `git stash` and collided with each other and with
-   session 16. Every collision self-recovered (`git fsck --unreachable` finds the dangling
-   commit) and every final PR verified clean, but it was luck, not design. Saved to
-   `feedback_concurrent_session_worktree.md`.
-2. **Two independent PRs writing the "next" ADR number is a real collision.** #419 and #390
-   both wrote `## ADR-107` independently (different content). Caught it during the merge
-   phase, not before — renumbered #390's to ADR-108 by hand (`docs/DECISIONS.md` + the
-   `adrs` count in `PLATFORM_STATS` + the `CLAUDE.md` pointer). Worth a lightweight
-   reservation mechanism if concurrent-session ADR writes become routine.
-3. **The `test_count`/`adrs` doc-metadata counters conflict on almost every merge** when many
-   PRs stack off the same base — expected, mechanical, not a real conflict: take either side,
-   `python3 deploy/sync_doc_metadata.py --apply`, re-commit. #389's new `--check` gate (this
-   session's own work) means a missed re-sync now fails CI outright rather than drifting
-   silently — a real improvement, but it also means every subsequent merge in a busy session
-   needs this step or main goes red.
-4. **A first-time CDK codification of an existing hand-created resource is a replacement, not
-   an adoption.** #500's `HttpApi` construct for the HAE webhook diffs as `(requires
-   replacement)` against the live `a76xwxt2wa` API Gateway — a plain `cdk deploy` would swap
-   in a new URL. `cdk import` is the zero-downtime path; nobody's run it yet for this
-   resource type. This is why `LifePlatformIngestion` is still on hold.
-5. **`create_platform_lambda`'s default `Code.from_asset("../lambdas")` bundles the whole
-   `lambdas/` tree per-function** — so most CDK-managed Lambdas don't strictly need a file to
-   be layer-registered for their own cross-imports to work. The shared layer mainly matters
-   for script-deployed functions (site-api, single-file `deploy_lambda.sh` pushes). Worth
-   knowing before assuming every new root-level `lambdas/*.py` file needs a layer entry.
-
-## Flags for Matthew
-
-- **`LifePlatformIngestion` deploy needs your call.** It bundles #499/#501/#470 (all safe)
-  with #500's HAE API Gateway codification (not safe to blind-deploy — see gotcha #4). Three
-  paths, in order of my recommendation: (1) I attempt a `cdk import` to bind the existing
-  `a76xwxt2wa` API Gateway — zero downtime, but untested for `HttpApi` constructs in this
-  repo; (2) deploy now and you update the HAE iOS app's webhook URL right after — a real gap
-  in CGM/BP/water/State-of-Mind ingestion until you do; (3) leave it as-is until you're ready
-  to do #2 yourself. I didn't pick one — it needs your phone regardless of path.
-- **#390 is a bigger behavior change than its title suggests.** Not a CI-gate flip — the
-  coach-quality gate went from async fire-and-forget to synchronous-with-regenerate-or-hold
-  inside the daily-brief pipeline. It's live now (deployed via the Compute stack). Measured
-  first (206 real verdicts over 30 days) rather than guessed; worth your own read of ADR-108
-  before the next daily brief runs, since a held cycle means that day's brief ships without
-  that coach's narrative.
-- **Housekeeping:** 4 harmless `RECOVERED: not mine` stash entries plus older pre-session
-  stashes are sitting in the repo's shared stash list (`git stash list`) — safe to drop,
-  their content already landed via the real PRs.
-- **#544 (Methods registry) is done** — session 16's handover listed it as "not started";
-  it shipped this session (PR #660), live at `/method/registry/`.
-- **GitHub Pages still enabled+public** — carried forward from sessions 14/15/16, still
-  unactioned.
+- `main` clean, build hash == HEAD (4e84aba7), all gates green (doc-drift, black, ruff, flake8,
+  JS parse, hash graph). Full suite: 3532 passed; the only reds are pre-existing live-state
+  integration tests **i3/i9/i14** (a message in the prod DLQ + canary checks — NOT this batch).
+- All 11 issues CLOSED; zero dangling PRs.
+- **Stale `git stash` entries cleared** this session (all were "RECOVERED: not mine" content
+  already landed via merged PRs, plus old pre-2026-07 WIP — all sessions now closed, so safe).
 
 ## What's next
 
-- **`LifePlatformIngestion` deploy** — your call per Flags above.
-- **`cdk import` for the HAE API Gateway**, if you pick that path — untested territory,
-  worth doing attended.
-- **#581 — split evidence.js** (opus, deferred by both sessions) — the site-ux churn from
-  this session (#579's new `tabs.js`, #580's font/preload changes, #386's homepage edit) has
-  now settled; #581 should be safe to pick up next, still attended, still in a worktree.
-- **#582/#584** (opus, chart interaction contract v2 / provenance popovers) — both were
-  blocked or adjacent to work this session touched; #544 (Methods registry) specifically
-  unblocks #584 now that it's live.
+- **Site-ux epic tail** (#588/#590/#591/#593/#595) — unblocked by the split + chart contract;
+  #593 portraits-travel needs your ADR-106 sign-off.
+- **#582 follow-on:** 9 of 24 chart renderers still non-interactive (ring/radar/quadrant/heatStrip
+  etc. — bespoke interaction, listed in PR #680).
+- **#584 follow-on:** cockpit score/readiness tiles have no registry entry yet (honest = no
+  popover until added to `methods_registry.py`); the weight-rate ±CI caption is a natural next
+  provenance adopter.
+- **#543:** personal-variance bands are live but floor-guarded — they won't change any verdict
+  until ~30 observations accumulate post-reset; worth re-checking in a month.
+- **Held-out opus queues** above remain for future sessions (ingestion-adjacent = coordinate
+  with HAE; #395 MCP prune = attended; infra/growth).

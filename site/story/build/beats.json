@@ -276,6 +276,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/662"
         }
       ]
+    },
+    {
+      "id": "2026-07-05-charts-that-answer-back",
+      "date": "2026-07-05",
+      "title": "The data pages become an instrument — charts answer to touch, numbers show their work",
+      "shipped": "The evidence pages stopped being static readouts. Most series charts now respond when you touch or hover them — a focus dot and a tooltip walk the data, and they're keyboard-navigable too. Trends and projections gained an honest uncertainty layer: the weight forecast shows a goal-date range with a real confidence band instead of a single false-precision date, and correlations show how many overlapping days actually back them. And any stat with a documented method now opens a small popover — source, formula, window, sample size — pulled straight from the code's own method registry, so what you read can't drift from what the code does. Two new data-door views also went live (an autonomic-balance quadrant and a zone-2 cardio breakdown).",
+      "gotcha": "None of it could start until a single 3,000-line file that renders every data page was safely split into a router plus a dozen focused modules — the kind of refactor where one misplaced import silently freezes a page. The safeguard was a before/after harness that rendered all 40 pages against identical live data and diffed them byte-for-byte; 39 matched exactly and the 40th differed only by a random id, which is how we knew the split changed nothing but the file layout.",
+      "honest_miss": "Nine of twenty-four chart types still don't answer to touch — rings, radar, and a few bespoke shapes need their own interaction and were deliberately left. Some stat tiles show no provenance popover at all: that's honest, not broken — a number with no registry entry gets nothing rather than a made-up explanation. And the new 'thresholds from my own variance' work is live but intentionally inert until about a month of data accumulates, so today it reproduces the old fixed cutoffs exactly.",
+      "prs": [
+        {
+          "label": "PR #674",
+          "url": "https://github.com/averagejoematt/life-platform/pull/674"
+        },
+        {
+          "label": "PR #680",
+          "url": "https://github.com/averagejoematt/life-platform/pull/680"
+        },
+        {
+          "label": "PR #683",
+          "url": "https://github.com/averagejoematt/life-platform/pull/683"
+        },
+        {
+          "label": "PR #684",
+          "url": "https://github.com/averagejoematt/life-platform/pull/684"
+        }
+      ]
     }
   ]
 }
