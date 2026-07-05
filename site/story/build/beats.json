@@ -250,6 +250,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/664"
         }
       ]
+    },
+    {
+      "id": "2026-07-05-the-coaches-get-a-real-gate",
+      "date": "2026-07-05",
+      "title": "The coach team's honesty check stops being decorative — and gets a public accountability layer to match",
+      "shipped": "The coach quality check used to score every generated brief and log the result — but nothing ever read the score, so a bad draft published anyway. It now runs before publishing, not after: a failing draft gets one corrected rewrite, and if that still fails, that coach sits out the day's brief entirely rather than ship something known-broken. The threshold wasn't guessed — it came from 206 real production verdicts over 30 days, which showed roughly 1 in 10 drafts fail on real anti-pattern and consistency checks even when the raw score looks fine. Alongside it: a public page listing the exact formula, time window, and known limitations behind every statistic the platform publishes; a self-graded blind test of whether the coaches actually sound different from each other; and a quarterly ritual where each coach writes about its own real prediction track record, good and bad. About two dozen smaller fixes — accessibility, page speed, data-pipe reliability — landed in the same pass.",
+      "gotcha": "Running many independent fixes at once through separate isolated copies of the codebase surfaced an unusual failure: a housekeeping git command that's supposed to be scoped to one copy of the code turned out to be shared across all of them, so two isolated copies briefly grabbed the same in-progress work from each other mid-task. Every instance was caught and cleanly untangled before anything merged, but it's now a hard rule for any future parallel work on this repo.",
+      "honest_miss": "One piece was deliberately left undone: formally adopting a webhook's cloud infrastructure into managed code would have meant swapping its live web address for a new one — breaking incoming health data until the source app on the phone got manually repointed. Rather than accept that gap as a side effect of an otherwise-safe batch of fixes, it's staying on hold until it can be done as its own deliberate, attended step.",
+      "prs": [
+        {
+          "label": "PR #654",
+          "url": "https://github.com/averagejoematt/life-platform/pull/654"
+        },
+        {
+          "label": "PR #659",
+          "url": "https://github.com/averagejoematt/life-platform/pull/659"
+        },
+        {
+          "label": "PR #660",
+          "url": "https://github.com/averagejoematt/life-platform/pull/660"
+        },
+        {
+          "label": "PR #662",
+          "url": "https://github.com/averagejoematt/life-platform/pull/662"
+        }
+      ]
     }
   ]
 }
