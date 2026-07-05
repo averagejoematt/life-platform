@@ -1,90 +1,72 @@
-# HANDOVER — full-cast portraits: enumerated → drawn → gated → APPROVED → LIVE — 2026-07-04 evening (session 13)
+# HANDOVER — fable queue at ZERO; the team view comes back + the beat lands — 2026-07-05 (session 14)
 
-Session opened on the session-12 handover's ⭐ direction (#616, "the same visuals for all of
-the coaches") with Matthew authorizing all PRs and deploys up front. **#616 is CLOSED: every
-public-surface coach now has a signed live portrait or a recorded skip decision.** PRs #618
-(staged candidates + dark wiring + build beat) and #619 (approved recipes + sign-off + lit-up
-bundle) merged + deployed + live-verified; visual QA 33/33 pass. Matthew approved the round-1
-contact sheet with a single word — one gate round, versus the pilot's four.
+Session opened on "work on all fable items in backlog" with Matthew authorizing all merges and
+deploys up front. **The fable backlog is EMPTY** — all 36 `model:fable` issues are CLOSED
+(verified `gh issue list --search "label:model:fable" --state all`); every open story is
+deliberately `model:opus`/`model:sonnet` ("don't spend Fable tokens here" per the label scheme).
+The fable-tier work remaining was the session-13 handover's own Next list; both flagged items
+shipped in **PR #622** (squash `49182230`, merged + deployed + live-verified 8/8).
 
 ---
 
-## What shipped (in ship order)
+## What shipped (PR #622)
 
-### Cast enumeration (the "~19" was really 17 → only 7 needed)
-Explore-agent sweep over `config/personas.json` (canonical registry), board doc, engine, and
-every site JS head call site. Dedup: the "real-expert" ids are aliases of the same characters
-(layne_norton→Webb, peter_attia→Reyes, paul_conti→Reeves, rhonda_patrick→Patel,
-andrew_huberman/the_integrator→Nakamura); there is only ONE Vance (Cora). **17 unique personas;
-10 render as public heads; pilots covered 3; the batch = 7.**
-
-### PR #618 — candidates + dark wiring + the build beat
-- 7 hand-authored recipes staged UNSIGNED in `docs/design/portrait_candidates/2026-07-04/`,
-  each claiming an unclaimed geometric base + one silhouette-carried signature + owned palette:
-  **Webb** square/full beard (`nutrition_coach`) · **Reeves** pear/receding grey mane
-  (`mind_coach`) · **Reyes** long rect/widow's peak + chin-spike goatee (`physical_coach`) ·
-  **Patel** oval/side braid + round glasses (`glucose_coach`) · **Okafor** dome/only-bald +
-  rect glasses (`labs_coach`) · **Brandt** tall/curl-cloud + askew accent tie
-  (`explorer_coach`) · **Marsh** broad trapezoid/flat-top crew + only-mustache (no alias).
-- **3 solo self-review render rounds before Matthew saw anything** (local Playwright render of
-  the sheet → look → fix): silhouette exaggeration, brow-eye merge fix, Reeves de-feminized,
-  Reyes de-muddled. This is likely why the gate took 1 round.
-- Remaining head call sites joined `portrait(c) || sigil(c)` DARK (team-lead block + huddle
-  marks in dispatches.js, convene cards in coaching.js, evidence coach grid + new import in
-  evidence.js) — deployed byte-identical, verified.
-- Build beat for the session-12 portraits story appended to `beats.json` (one beat/session —
-  session 12's slot went to the forecast batch) — live on /story/build/.
-- Recorded decisions on #616 + batch README: **Nakamura** deferred (renders by name only — no
-  head call site exists); **the Chair** sigil-only (runbook §5: meta-role, not a person);
-  **Murthy** no-portrait (real person's name — likeness fails ADR-106 reverse-image, and a
-  non-likeness under the real name is incoherent; rename first if he ever needs a head);
-  **Calloway/Rodriguez** email-only; **Tanaka** interim-sunset; **Cora Vance** inactive.
-
-### The gate → PR #619 — approved, promoted, LIVE
-Contact sheet artifact (silhouette litmus row shuffled + answer key, light/dark at 96/56/40,
-sigil beside each, pilots included for cast-wide comparison):
-https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e — **"approved"**.
-All 7 promoted to `config/portraits/` with `_meta.sign_off` (sheet = that URL);
-`portrait_data.js` = **10 signed recipes**; synced + invalidated. Live-verified: Webb's
-portrait renders on the coaching coach detail **via the engine-id alias** (the #587 gotcha,
-beaten this time), Elena byline intact, zero JS errors. `tests/visual_qa.py --screenshot
---ai-qa`: **33 passed / 0 failed** (7 warnings = pre-existing empty-screenshot transport
-errors to Bedrock on some evidence tabs, not page failures).
+1. **The collective "My Team" read re-mounted (the orphan resolved).** coaching.js's "The Team"
+   section now leads with a "My Team" entry rendering the CC-10 collective read
+   (`/api/coach_team`): Marsh's lead block — **his signed portrait is reachable again** — staff
+   focus, live tensions, and the 8-coach huddle with click-through to each profile. The
+   handover's "re-mount or retire" fork resolved as BOTH: re-mount on the coaching door (its
+   natural home; matches the section's existing lead-entry pattern), retire the orphan.
+2. **A deep-link bug found and fixed along the way:** `/coaching/coaches/` set
+   `__COACHING_START__ = "coaches"` — a key NOT in coaching.js BYKEY, so the page silently fell
+   back to The Read and dropped `#coach` deep links. Podcast guest bylines, old
+   `/story/coaches/` 301s, AND every coach_popover "full page →" link were landing wrong. Now
+   starts at the team section, where entry ids are persona ids, so `#nutrition_coach` resolves.
+3. **dispatches.js retired:** the dead `kind:"coaches"` machinery deleted (renderTeamView,
+   renderCoachPage + 5 HTML helpers, both branches, the unused `sigil` import) — no story-door
+   section has mounted it since v4. Net −107 lines.
+4. **Session-13's build beat distilled** ("The whole cast gets faces — seven portraits, one
+   review round") — appended to beats.json per BUILD_DISPATCH_CHECKLIST.md, narrating PRs
+   #618/#619 with the ear-line gotcha and honest misses (including the then-unreachable Marsh
+   portrait, which this same PR fixed). Content-policy scan PASS. Live on /story/build/.
 
 ## Gotchas learned
-1. **At silhouette scale, the EARS are the widest point of every head** — a signature feature
-   must beat the ear line (Webb's beard had to swallow it) or rise above the crown (Brandt's
-   cloud, Park's bun) to register in the litmus. Interior details (hairlines, glasses) vanish
-   in solid-shape renders.
-2. **Self-review rounds are cheap gate rounds.** Rendering the sheet locally and LOOKING at it
-   (screenshot → Read) caught "they look the same" failures the pilot needed live human rounds
-   for. 3 solo rounds → 1 human round.
-3. **The dispatches.js "My Team" view (CC-10) appears ORPHANED**: `/story/coaches/` 301s to
-   `/coaching/coaches/` (coaching.js), and no shipped /story/ page mounts the `coaches` kind —
-   so the team-lead block + huddle wiring is live-but-unreachable. Marsh's signed portrait
-   lights up whenever that surface returns. Worth a look: either re-mount the team view or
-   retire the dead code.
-4. Duplicate `const` declarations kill an inlined multi-module page silently (sigils.js +
-   portraits.js both define `escAttr`/`r2`) — the sheet builder strips them.
 
-## Flags for Matthew (unactioned — his call)
-- **GitHub Pages is enabled + public on the repo** (legacy Jekyll build of `main` at root →
-  `averagejoematt.github.io/life-platform`, intermittently failing = the red runs in the
-  watch item). An unintended public mirror; disable or bless.
+1. **The site's service worker bypasses Playwright `page.route` mocks.** Local render QA must
+   create the browser context with `service_workers="block"`, or in-page API fetches after the
+   first load silently 404 against the static server while the initial fetches mock fine —
+   a confusing half-working state. (This extends the route-mocked local-QA recipe.)
+2. **Motion.js scroll-reveals make full-page screenshots lie:** below-fold sections sit at
+   opacity 0 until intersected, so a full-page shot shows blank space where content exists.
+   Verify with DOM counts/offsetHeight, or scroll_into_view before shooting.
+
+## Verification
+
+- Local Playwright render QA (route-mocked live-prod fixtures): **11/11 PASS**, including the
+  deep-link case `/coaching/coaches/#nutrition_coach` → Webb's team profile.
+- PR #622 CI green → squash-merged → `deploy/sync_site_to_s3.sh` from main →
+  `version.json == 49182230` → **live verification 8/8 PASS** (My Team leads, Marsh portrait
+  SVG, huddle, deep link, beat on build log, zero page errors). Ship-commit "v4 site gate"
+  completed SUCCESS before close.
 
 ## Watch
-- ~~CI/CD pipeline on e1e30ca2~~ — **completed SUCCESS before session close** (site gate,
-  pages, and the full pipeline all green; nothing to chase).
+
 - **Sun 07-06** (unchanged): journal-seeded hypothesis engine; panelcast v2; inter-coach
   dialogue SKIPS. **Mon 07-07**: data-recon on derived rows.
-- Forecast resolutions accruing since 07-05 (cockpit coverage line at n≥1).
+- Forecast resolutions accruing since 07-05 (cockpit coverage line at n≥1);
+  slo-source-freshness 7-day window from 07-04.
+- **GitHub Pages still enabled + public on the repo** (session-13 flag, unactioned — Matthew's
+  call: disable or bless).
 
 ## Next
-- **This session's build beat is NOT distilled** (one beat/session — the slot carried the
-  session-12 portraits story). The full-cast approval (17-persona enumeration, the ear-line
-  lesson, 1-round gate) is a strong beat for next session.
-- The orphaned team-view surface (gotcha 3) — re-mount or retire.
-- Nakamura's portrait when the tensions/dispute UI gains heads; Cora Vance when the reading
-  surface goes live; Murthy rename decision if he ever needs a head.
-- Uplevel #575 lanes + intelligence #535/#538/#543/#545 untouched; speaking mouth-frames
-  (mouth-a/b) still undriven.
+
+- **Session-14's own beat slot is OPEN** (the shipped beat narrates session 13, per the
+  one-beat-per-session carry pattern). The team-view resurrection + the deep-link fix is a
+  small honest candidate for next session's beat.
+- **Fable-tier backlog: NONE.** A next fable session should either (a) triage fresh fable-tier
+  stories out of the epics (#525–#528 / #575) as they reach Now, or (b) run `/uplevel` for a
+  fresh-eyes flagship slice. The Now milestone (#577–#581) is all sonnet/opus — cheaper
+  sessions by design.
+- Nakamura's portrait when a head surface exists; Murthy rename decision if he ever needs a
+  head; Cora Vance when the reading surface lands; speaking mouth-frames (mouth-a/b) still
+  undriven.
