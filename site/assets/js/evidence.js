@@ -158,7 +158,7 @@ function wireFirstRun() {
   let seen;
   try { seen = localStorage.getItem(INTRO_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
   if (seen) return;
-  const head = $(".ev-head");
+  const head = $(".page-hero");
   if (!head) return;
 
   const intro = document.createElement("aside");

@@ -461,7 +461,7 @@ stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)
 // cockpit's stamp, never writes it). Injected under the header; self-hides.
 (function storySince() {
   try {
-    const head = document.querySelector(".dx-head");
+    const head = document.querySelector(".page-hero");
     if (!head) return;
     const rib = document.createElement("div");
     rib.className = "home-since dx-since";

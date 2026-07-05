@@ -1071,6 +1071,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .loop-ribbon a:hover { color: var(--ink-muted); }
 .loop-ribbon .lr-here { color: var(--ember); border-bottom: 1px solid var(--ember); }
 .loop-ribbon .lr-arrow { color: var(--ember); opacity: 0.55; }
+.loop-ribbon .lr-sep { color: var(--ink-faint); opacity: 0.7; margin-inline-start: calc(-1 * var(--sp-1)); }
 
 /* ── The loop diagram — the full causal-loop card row (Home + About). */
 .loop { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--sp-2); margin: var(--sp-5) 0; }

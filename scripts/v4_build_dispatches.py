@@ -16,7 +16,11 @@ Read-only; writes only under site/story/. Run from repo root:
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
 OUT = Path("site/story")
 
@@ -84,11 +88,12 @@ SHELL = """<!DOCTYPE html>
     </nav>
   </header>
   <main id="dx" class="dx-main">
-    <div class="dx-head">
-      <p class="beat-kicker label">the story · the writing &amp; the context</p>
+    <div class="page-hero">
+      <p class="ph-kicker label">the story · the writing &amp; the context</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
-      <h1 class="dx-h1">The Story</h1>
-      <p class="dx-lede">The chronicle, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>, the AI team in <a href="/coaching/">the coaching</a>; this is the why.</p>
+      <h1 class="ph-title">The Story</h1>
+      <p class="ph-promise">The chronicle, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>, the AI team in <a href="/coaching/">the coaching</a>; this is the why.</p>
+      {ribbon}
     </div>
     <nav class="dx-tabs" data-dx-tabs aria-label="Story sections"></nav>
     <div class="dx-layout">
@@ -117,6 +122,10 @@ SHELL = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+# #578 — inline the shared loop-ribbon once (constant for this door) before the
+# per-page .format() calls, so the spine can't drift from the other builders.
+SHELL = SHELL.replace("{ribbon}", loop_ribbon("story"))
 
 
 def write(path: Path, html_text: str) -> None:
