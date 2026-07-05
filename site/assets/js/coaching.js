@@ -522,7 +522,7 @@ function renderAskBoard(read) {
       personas.map((pid) => {
         const p = BOARD_PERSONAS[pid];
         return `<article class="cv-card" data-pid="${esc(pid)}">` +
-          `<header class="cv-head"><span class="sigil-md">${sigil({ coach_id: pid, name: p.name }, { title: "" })}</span>` +
+          `<header class="cv-head"><span class="sigil-md">${portrait({ coach_id: pid, name: p.name }, { title: "", size: 24 }) || sigil({ coach_id: pid, name: p.name }, { title: "" })}</span>` +
           `<span class="cv-who"><span class="cv-name">${esc(p.name)}</span><span class="cv-title label">${esc(p.title)}</span></span></header>` +
           `<p class="cv-text is-thinking"><span class="shimmer">deliberating…</span></p></article>`;
       }).join("");

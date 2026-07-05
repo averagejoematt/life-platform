@@ -158,6 +158,36 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/602"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-the-coaches-get-faces",
+      "date": "2026-07-04",
+      "title": "The coaches get faces — and an approval gate that won't let an unsigned one ship",
+      "shipped": "Three of the AI coaching staff now have commissioned character portraits: the embedded journalist's byline on the chronicle, and the sleep and training coaches on the coaching page and its popovers. Each portrait is a hand-authored layered SVG recipe — flat-vector character illustration with an owned color palette — rendered by the same deterministic engine that draws the coaching sigils, blink and all. The approval gate is structural, not procedural: a recipe without a recorded human sign-off validates but never bundles into the shipped module, so nothing reaches a live page without explicit approval on a contact sheet. A disclosure line ships wherever portraits render: these are openly fictional AI personas.",
+      "gotcha": "The style spec written before any art existed did not survive contact with the art. The design ADR confidently said 'engraved stroke-only line work'; four review rounds later the approved style was full character illustration — the standard that stuck was borrowed from animated film: a reader should know who is who from silhouette alone. That became a mandatory test — render the whole cast as solid single-color shapes, no faces, and if you can't tell them apart, no amount of facial detail will save it. Separately, the first deploy silently showed zero portraits: the live engine serves coaches under different internal ids than the design docs use, and the fallback chain quietly rendered sigils exactly as designed — correct behavior, invisible failure. An alias map fixed it.",
+      "honest_miss": "Three faces out of a cast of roughly twenty — every other persona on the site still renders a geometric sigil where a portrait should eventually be. The alternate variants (glasses, headband) were drawn, staged, and not used. And the speaking-mouth animation frames exist in every recipe but nothing drives them yet.",
+      "prs": [
+        {
+          "label": "PR #607",
+          "url": "https://github.com/averagejoematt/life-platform/pull/607"
+        },
+        {
+          "label": "PR #608",
+          "url": "https://github.com/averagejoematt/life-platform/pull/608"
+        },
+        {
+          "label": "PR #612",
+          "url": "https://github.com/averagejoematt/life-platform/pull/612"
+        },
+        {
+          "label": "PR #614",
+          "url": "https://github.com/averagejoematt/life-platform/pull/614"
+        },
+        {
+          "label": "PR #615",
+          "url": "https://github.com/averagejoematt/life-platform/pull/615"
+        }
+      ]
     }
   ]
 }

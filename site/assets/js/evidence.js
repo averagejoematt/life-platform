@@ -15,6 +15,7 @@
 
 import { lineChart, barChart, dualWeight, stackedBar, correlationChip, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, dumbbell, weightTrendChart, projectionCone, ring, autonomicHero, autonomicQuadrant, pillarRing, radarChart } from "/assets/js/charts.js";
 import { badgeMark, sigil, tierEmblem } from "/assets/js/sigils.js";
+import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
@@ -1714,7 +1715,7 @@ async function renderBoard(d) {
     ? `<div class="rd-obs"><p class="board-kicker label">the integrator's weekly read · ${esc(wp.coach_name || "")}</p><p class="rd-primary">${esc(wp.text)}</p></div>`
     : `<div class="rd-obs"><p class="rd-primary">The board's weekly read posts after the next briefing.</p></div>`;
   const roster = coaches.length
-    ? `<div class="coach-grid">${coaches.map((c) => `<button class="coach coach-pick" data-coach="${esc(c.coach_id)}" data-name="${esc(c.name)}" data-title="${esc(c.title || "")}" style="--coach:${/^#|rgb/.test(c.color || "") ? c.color : "var(--ember)"}"><span class="coach-badge">${sigil(c, { title: "" })}<span class="sr-only">${esc(c.initials || (c.name || "?").slice(0, 2))}</span></span><div><h3 class="coach-name">${esc(c.name)}</h3><p class="coach-title label">${esc(c.title || "")}</p></div></button>`).join("")}</div>`
+    ? `<div class="coach-grid">${coaches.map((c) => `<button class="coach coach-pick" data-coach="${esc(c.coach_id)}" data-name="${esc(c.name)}" data-title="${esc(c.title || "")}" style="--coach:${/^#|rgb/.test(c.color || "") ? c.color : "var(--ember)"}"><span class="coach-badge">${portrait(c, { title: "", size: 24 }) || sigil(c, { title: "" })}<span class="sr-only">${esc(c.initials || (c.name || "?").slice(0, 2))}</span></span><div><h3 class="coach-name">${esc(c.name)}</h3><p class="coach-title label">${esc(c.title || "")}</p></div></button>`).join("")}</div>`
     : empty("The expert board is being assembled.");
   return chair + disagreements + sec("The experts — pick one to read their take", roster) +
     `<div class="coach-read" data-board-read></div>` +
