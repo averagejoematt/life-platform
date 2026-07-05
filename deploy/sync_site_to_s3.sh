@@ -78,6 +78,34 @@ if ! python3 "$(dirname "$0")/pii_surface_guard.py" "$SITE_DIR"; then
   exit 1
 fi
 
+# #377 — JS parse gate (FAIL-CLOSED). One ES module (evidence.js, ~3k lines) renders
+# all 44 archive pages; it's edited nearly every site session and nothing else validates
+# it, so a one-character typo would break every Data/Protocols/Method page at once.
+# Parses each site JS module (ms each) and aborts the publish on the first failure,
+# naming the file. MUST use `--input-type=module` via stdin: plain `node --check <file>`
+# with auto-detection SILENTLY MISSES real errors in ES-module files (verified — a
+# dangling operator passed file-mode but is caught here). Module mode is a safe superset
+# for the non-module legacy scripts too (all 27 site JS files parse clean). GitHub-hosted
+# runners ship Node, so this runs on the CI path (deploy_site.sh → here); if node is
+# genuinely absent we warn loudly rather than wedge every deploy on a missing toolchain.
+if command -v node >/dev/null 2>&1; then
+  echo "→ JS parse gate (#377)…"
+  _js_fail=0
+  while IFS= read -r _jsf; do
+    if ! node --check --input-type=module <"$_jsf" 2>/tmp/jsparse_err; then
+      echo "❌ JS PARSE ERROR — publish blocked. Offending file:" >&2
+      echo "   ${_jsf#"$SITE_DIR"/}" >&2
+      sed 's/^/     /' /tmp/jsparse_err >&2
+      _js_fail=1
+      break
+    fi
+  done < <(find "$SITE_DIR" -name '*.js' -not -path '*/node_modules/*')
+  [ "$_js_fail" -eq 0 ] || exit 1
+  echo "   ✓ all site JS modules parse clean"
+else
+  echo "⚠️  node not found — JS parse gate SKIPPED (install Node to enable the #377 gate)." >&2
+fi
+
 # Find CloudFront distribution ID for averagejoematt.com
 CF_DIST_ID=$(aws cloudformation describe-stacks \
   --stack-name LifePlatformWeb \
