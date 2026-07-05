@@ -2,6 +2,20 @@
   "updated_at": "2026-07-05",
   "beats": [
     {
+      "id": "2026-07-05-a-pulse-tied-to-a-real-clock",
+      "date": "2026-07-05",
+      "title": "A pulse tied to a real clock, not a decorative loop",
+      "shipped": "A small new rule now governs every 'live' indicator on the site: a thing only pulses while it's demonstrably still fresh, judged against that specific source's own real freshness window — never a fixed decorative animation. It replaced a flat 45-minute guess on the cockpit's sync line (each wearable now earns its own glow on its own real cadence), landed on the /data/ pipeline-status board, and gave a design-system component that had been written up but never actually used — a small 'source · updated Xm ago' byline — its first real page.",
+      "gotcha": "Grepping the whole codebase for that byline component turned up nothing: it had been fully specified in the design docs a couple weeks earlier, with example markup and everything, and simply never got wired to a page. It's a useful reminder that a documented design-system primitive isn't the same as an adopted one — the gap between the two doesn't show up until someone goes looking for the second thing and finds only the first.",
+      "honest_miss": "The design doc's own ambition was 'use it under every readout and chart' — this pass wires up three concrete surfaces, not the whole site, so most stat readouts still don't carry a freshness byline yet. And the pulse's exact feel (speed, glow intensity) hasn't had a second pair of eyes on the live site yet, just the numbers underneath it.",
+      "prs": [
+        {
+          "label": "PR #705",
+          "url": "https://github.com/averagejoematt/life-platform/pull/705"
+        }
+      ]
+    },
+    {
       "id": "2026-07-05-one-continuous-instrument",
       "date": "2026-07-05",
       "title": "The site became one continuous instrument",
