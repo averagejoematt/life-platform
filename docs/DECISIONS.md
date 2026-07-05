@@ -1378,7 +1378,7 @@ Cumulative reduction: **5,560 LOC → 3,177 LOC (−2,383 LOC / −43%)** across
 | **P4.6 HAE handler registry refactor** | 1492 LOC already organized per-data-type. A registry pattern would be cleanup-only with no behavior change. Revisit only if a 6th+ data type is added. |
 | **P8.11 Site-api pagination** | `/api/changes-since` and `/api/observatory_week` already bounded by natural query windows (single-day, single-week). Not a practical risk. Revisit only if a new endpoint surfaces an actually-unbounded query. |
 | **P8.6 Lambda Power Tuning campaign** | Most Lambdas already at 256 MB (minimum effective tier). Only mcp (768) and daily-brief (768) have headroom — but daily-brief sends real emails on invocation, making it unsafe to tune. Realistic savings: $1-3/mo for ~30 min work per safe-to-tune target. Better ROI elsewhere. |
-| **P1.2 Orphaned WAF cleanup** | Audit was wrong. WAF protects HAE webhook, isn't orphaned. Still billing $4.75/mo but it's load-bearing. |
+| **P1.2 Orphaned WAF cleanup** | Audit was wrong. WAF protects HAE webhook, isn't orphaned. Still billing $4.75/mo but it's load-bearing. **(See "Correction (2026-07-05)" below — this claim did not hold up.)** |
 | **P5.2 board_ask shared preamble caching** | Each persona system prompt is ~80 tokens, below Anthropic's ~1024-token cache minimum. `cache_control` annotation shipped (v7.14.0) but is no-op. Plan's $2/mo savings overestimated. |
 | **P6 Multi-user / Cognito (entire phase)** | ~4 FTE-weeks for a single-user personal platform. Revisit only when a second real user is on the horizon. |
 | **P8.13 Cross-region DR** | Overkill for personal platform. Deferred-as-planned. |
@@ -1395,6 +1395,18 @@ Cumulative reduction: **5,560 LOC → 3,177 LOC (−2,383 LOC / −43%)** across
 **Files changed:** Task list updates (TaskUpdate with rationale on tasks #44, #46, #50), `docs/CHANGELOG.md` (v7.19.0, v7.20.0), this ADR.
 
 **Follow-ups:** None. Closure is final pending the specific trigger conditions per item.
+
+**Correction (2026-07-05, #500):** the P1.2 rationale above ("WAF protects HAE webhook") was
+itself wrong, not just the original "orphaned" audit finding it was closing out. WAFv2 cannot
+attach to API Gateway HTTP APIs at all (only REST APIs, ALB, AppSync, and CloudFront) — the HAE
+webhook edge is an HTTP API, so a WAF ACL was never actually in the request path protecting it.
+WAF was removed platform-wide 2026-06 (billing line is gone); the webhook's actual protection is
+(1) the Lambda's own bearer-token check (`health_auto_export_lambda.py`, constant-time compare)
+and (2) the API Gateway stage's throttle settings (`cdk/stacks/ingestion_stack.py`, now codified
+per #500/D-7). Site-facing rate limiting elsewhere on the platform is DynamoDB-backed and
+in-Lambda (`rate_limiter.py`), not WAF-based, per the same 2026-06 removal — see CLAUDE.md's
+"Rate limiting is DynamoDB-backed" convention. This note amends the record rather than rewriting
+the original (wrong) rationale above, per ADR discipline.
 
 ---
 
