@@ -8,6 +8,7 @@
     window.__EVIDENCE_REGISTRY__ = [{slug,title,blurb,group,mode,endpoint,root,legacy,editorial}]
     window.__START_SLUG__ = "<slug>"
 */
+import { initTheme } from "/assets/js/theme.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
 import { esc, getJSON, tryJSON, isBad, sec, empty, note } from "/assets/js/evidence_shared.js";
@@ -142,7 +143,6 @@ function select(slug, push = true) {
 }
 window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || slugFromPath() || (REG[0] && REG[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
 
-function wireTheme() { const b = $(".theme-toggle"); if (!b) return; b.addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = cur === "light" ? "dark" : "light"; try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {} }); }
 
 /* ── First-run orientation — mirrors the Cockpit's PG-02 card ─────────────────
    A dismissible "what am I looking at" card for first-time visitors to the Data
@@ -188,7 +188,7 @@ function wireFirstRun() {
   head.insertAdjacentElement("afterend", intro);
 }
 
-wireTheme();
+initTheme();
 wireFirstRun();
 buildTabs();
 buildSide();

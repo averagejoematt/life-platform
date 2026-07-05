@@ -8,6 +8,7 @@
   Chronicle/journal indexes from posts.json (native excerpts); lab notes fully
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
+import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { instrumentMark } from "/assets/js/sigils.js";
@@ -452,11 +453,7 @@ function build() {
 }
 window.addEventListener("popstate", (e) => { const sec = (e.state && e.state.sec) || (location.pathname.match(/\/story\/([^/]+)\//) || [])[1] || "chronicle"; selectSection(sec, e.state && e.state.id, false); });
 
-function wireTheme() {
-  const b = $(".theme-toggle"); if (!b) return;
-  b.addEventListener("click", () => { const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); document.documentElement.dataset.theme = cur === "light" ? "dark" : "light"; try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {} });
-}
-wireTheme();
+initTheme();
 build();
 stampGenesis();  // cross-site Day-N/Week-N anchor (matches the Home hero)
 
