@@ -159,9 +159,14 @@
  },
  "_meta": {
   "source": "hand-drawn",
-  "prompt": "character-illustration bust (animated-film shape language) — Dr. Marcus Webb, nutritionist; SQUARE construction — vertical cheek walls, wide squared jaw carried by the beard; the identifier: the full chestnut beard joining a short flat crop, the only beard in the cast; thick straight brows, warm grounded smile inside the beard opening; sage-olive henley with an accent neckband (persona: practical, food-focused, builds from what's working)",
+  "prompt": "character-illustration bust (animated-film shape language) \u2014 Dr. Marcus Webb, nutritionist; SQUARE construction \u2014 vertical cheek walls, wide squared jaw carried by the beard; the identifier: the full chestnut beard joining a short flat crop, the only beard in the cast; thick straight brows, warm grounded smile inside the beard opening; sage-olive henley with an accent neckband (persona: practical, food-focused, builds from what's working)",
   "date": "2026-07-04",
-  "traced_by": "claude-fable-5 (hand-authored vector, no raster step — ADR-106 §1 preferred path)"
+  "traced_by": "claude-fable-5 (hand-authored vector, no raster step \u2014 ADR-106 \u00a71 preferred path)",
+  "sign_off": {
+   "by": "Matthew (averagejoematt) \u2014 in-session approval of the full sheet",
+   "date": "2026-07-04",
+   "sheet": "full-cast-2026-07-04 \u2014 https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e"
+  }
  },
  "aliases": [
   "nutrition_coach",

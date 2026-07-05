@@ -158,9 +158,14 @@
  },
  "_meta": {
   "source": "hand-drawn",
-  "prompt": "character-illustration bust (animated-film shape language) — Dr. James Okafor, longevity & preventive medicine; DOME construction — the only bald head in the cast, full smooth crown, deep brown skin, strong squared jaw; the identifier: the clean dome + thin rectangular glasses; measured composed smile; slate-navy v-neck over shirt with an amber pocket square (accent) — the long-view strategist (persona: thinks in decades, measured → sobering)",
+  "prompt": "character-illustration bust (animated-film shape language) \u2014 Dr. James Okafor, longevity & preventive medicine; DOME construction \u2014 the only bald head in the cast, full smooth crown, deep brown skin, strong squared jaw; the identifier: the clean dome + thin rectangular glasses; measured composed smile; slate-navy v-neck over shirt with an amber pocket square (accent) \u2014 the long-view strategist (persona: thinks in decades, measured \u2192 sobering)",
   "date": "2026-07-04",
-  "traced_by": "claude-fable-5 (hand-authored vector, no raster step — ADR-106 §1 preferred path)"
+  "traced_by": "claude-fable-5 (hand-authored vector, no raster step \u2014 ADR-106 \u00a71 preferred path)",
+  "sign_off": {
+   "by": "Matthew (averagejoematt) \u2014 in-session approval of the full sheet",
+   "date": "2026-07-04",
+   "sheet": "full-cast-2026-07-04 \u2014 https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e"
+  }
  },
  "aliases": [
   "labs_coach"

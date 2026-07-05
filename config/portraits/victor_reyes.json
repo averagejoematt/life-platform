@@ -158,9 +158,14 @@
  },
  "_meta": {
   "source": "hand-drawn",
-  "prompt": "character-illustration bust (animated-film shape language) — Dr. Victor Reyes, longevity physician & body-composition specialist; LONG RECTANGLE construction — narrow tall face, flat cheek walls, hollow-cheek accent strokes; the identifier: jet-black hair slicked tight to the skull with a sharp widow's peak + the precise goatee (mustache and chin patch framing a thin mouth); slanted-in angular brows, narrow hooded eyes — precise, slightly intimidating; pale grey clinician's coat, notched lapels, over an amber (accent) shirt",
+  "prompt": "character-illustration bust (animated-film shape language) \u2014 Dr. Victor Reyes, longevity physician & body-composition specialist; LONG RECTANGLE construction \u2014 narrow tall face, flat cheek walls, hollow-cheek accent strokes; the identifier: jet-black hair slicked tight to the skull with a sharp widow's peak + the precise goatee (mustache and chin patch framing a thin mouth); slanted-in angular brows, narrow hooded eyes \u2014 precise, slightly intimidating; pale grey clinician's coat, notched lapels, over an amber (accent) shirt",
   "date": "2026-07-04",
-  "traced_by": "claude-fable-5 (hand-authored vector, no raster step — ADR-106 §1 preferred path)"
+  "traced_by": "claude-fable-5 (hand-authored vector, no raster step \u2014 ADR-106 \u00a71 preferred path)",
+  "sign_off": {
+   "by": "Matthew (averagejoematt) \u2014 in-session approval of the full sheet",
+   "date": "2026-07-04",
+   "sheet": "full-cast-2026-07-04 \u2014 https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e"
+  }
  },
  "aliases": [
   "physical_coach",
