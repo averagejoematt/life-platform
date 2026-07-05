@@ -124,10 +124,23 @@ def test_raw_layouts_document_the_three_generations():
 
 
 def test_freshness_surfaces_unchanged_by_498():
-    """The #498 facet entries (weather/supplements/dropbox, freshness=False) must
-    not leak onto any freshness surface — checker, public board, or MCP view."""
-    for k in ("weather", "supplements", "dropbox"):
+    """The #498 facet entries (supplements/dropbox, freshness=False) must not
+    leak onto any freshness surface — checker, public board, or MCP view."""
+    for k in ("supplements", "dropbox"):
         assert k not in reg.checker_sources()
         assert k not in reg.public_board_sources()
         assert k not in reg.mcp_sources()
         assert k not in reg.behavioral_source_keys()
+
+
+def test_weather_joined_freshness_surfaces_470():
+    """#470: weather was registry-resident for facets only (freshness=False) —
+    a dead weather pipe was invisible everywhere. It now behaves like any other
+    infra source: on the checker's paging surface, the public board, and the
+    MCP view, classified infrastructure (never a behavioral logging lapse)."""
+    assert "weather" in reg.checker_sources()
+    assert "weather" in reg.public_board_sources()
+    assert "weather" in reg.mcp_sources()
+    assert "weather" not in reg.behavioral_source_keys()
+    # default threshold — no bespoke stale_hours override
+    assert "weather" not in reg.stale_hours_overrides()

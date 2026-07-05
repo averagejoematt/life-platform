@@ -69,8 +69,9 @@ DEFAULT_STALE_HOURS = 48
 #
 # #498 facets (X-10 — the hand-rolled enumerations these replace are noted per helper):
 #   freshness      False = on NO freshness surface (checker/board/MCP) — registry-
-#                  resident for the other facets only (weather, supplements,
-#                  dropbox). Default True.
+#                  resident for the other facets only (supplements, dropbox;
+#                  weather joined the freshness surfaces proper in #470).
+#                  Default True.
 #   partition      False = no `USER#…#SOURCE#<key>` DDB partition (dropbox is a
 #                  transport pipe; its tracker lives elsewhere). Default True.
 #   active_api     scheduled API *pull* that must attempt at least daily — the
@@ -317,16 +318,19 @@ SOURCE_REGISTRY = {
         # (raw/matthew/notion/YYYY/MM/DD-<page_id>.json), since a day holds many entries.
         "raw_layout": {"prefix": "raw/matthew/notion", "scheme": "date-tree", "note": "per-page: DD-<page_id>.json"},
     },
-    # ── #498: registry-resident for facets only — freshness: False keeps every
-    #    existing freshness surface (checker / public board / MCP view) unchanged. ──
     "weather": {
         "label": "Weather",
         "checker_label": "Weather",
         "desc": "Seattle daily weather",
         "category": "Inputs",
+        # #470: scheduled API pull, no participation required — infra, so an
+        # outage pages instead of hiding behind a shrugged-off "logging lapse".
+        # Was freshness: False (registry-resident for facets only, like
+        # supplements/dropbox below) — a dead weather pipe was invisible on
+        # every surface (checker/board/MCP). Default 48h threshold comfortably
+        # covers the 2x-daily cron without false-staling.
         "behavioral": False,
         "stale_hours": None,
-        "freshness": False,
         "active_api": True,
         "expected_days": 7,
         "qa_tier": None,
@@ -335,6 +339,8 @@ SOURCE_REGISTRY = {
         "posture": "portfolio",
         "raw_layout": {"prefix": "raw/weather", "scheme": "date-tree", "note": "legacy layout — no user segment (X-9)"},
     },
+    # ── #498: registry-resident for facets only — freshness: False keeps every
+    #    existing freshness surface (checker / public board / MCP view) unchanged. ──
     "supplements": {
         "label": "Supplements",
         "checker_label": "Supplements",

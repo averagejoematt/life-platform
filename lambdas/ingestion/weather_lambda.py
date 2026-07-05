@@ -37,7 +37,15 @@ config = IngestionConfig(
     secret_id=None,  # No auth needed — Open-Meteo is public
     s3_archive_prefix="raw/weather",
     schema_version=1,
-    enable_gap_detection=False,  # Weather runs yesterday+today by default
+    # #470: was enable_gap_detection=False ("runs yesterday+today by default")
+    # — a multi-day outage (deploy break, Open-Meteo downtime) never backfilled,
+    # it just silently skipped the missed days forever. Gap detection makes a
+    # weather-pipe failure self-heal like every other SIMP-2 source once the
+    # cron resumes. refresh_today=True preserves the old same-day-refresh
+    # behavior (today's aggregates firm up between the two daily runs).
+    enable_gap_detection=True,
+    lookback_days=int(os.environ.get("LOOKBACK_DAYS", "7")),
+    refresh_today=True,
 )
 
 _OPEN_METEO_FIELDS = (
