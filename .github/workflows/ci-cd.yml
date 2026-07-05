@@ -112,15 +112,22 @@ jobs:
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
         run: |
           pip install mypy==2.1.0
-          echo "::group::Mypy on the clean-module set (tier-1 core + split AI modules)"
+          echo "::group::Mypy on the clean-module set (tier-1 core + split AI modules + tier-2 web/)"
           # Authoritative list: tests/test_mypy_clean_modules.py::MYPY_CLEAN_MODULES.
           # Tier-1 (budget/auth/inference): secret_cache, retry_utils, phase_filter,
-          # constants, bedrock_client. Blocking — a type regression here fails CI.
+          # constants, bedrock_client. Tier-2 (#419): the small, already-clean
+          # slice of the public serving surface (web/*.py) — see that file's
+          # comment for what's excluded and why. Blocking — a type regression
+          # here fails CI.
           python -m mypy --config-file mypy.ini \
             lambdas/secret_cache.py lambdas/retry_utils.py lambdas/phase_filter.py \
             lambdas/constants.py lambdas/bedrock_client.py lambdas/scoring_engine.py \
             lambdas/character_engine.py lambdas/intelligence_common.py lambdas/ai_calls.py \
-            lambdas/ai_context.py lambdas/ai_summaries.py
+            lambdas/ai_context.py lambdas/ai_summaries.py \
+            lambdas/web/site_api_common.py lambdas/web/site_api_coach.py \
+            lambdas/web/site_api_intelligence.py lambdas/web/site_api_reading.py \
+            lambdas/web/site_api_vitals.py lambdas/web/site_stats_refresh_lambda.py \
+            lambdas/web/og_image_lambda.py lambdas/web/og_moments.py
           echo "::endgroup::"
 
       - name: Syntax check (py_compile)
@@ -332,8 +339,10 @@ jobs:
 
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor. The codebase is integration-tested (handlers
-        # run live; the ~1600 offline tests are mostly structural/contract), so the
-        # offline line-coverage baseline is ~9% — this floor (8%) prevents BACKSLIDING,
+        # run live; the ~3000 offline tests are mostly structural/contract), so the
+        # offline line-coverage baseline is ~28% (#419 ratchet, up from a stale ~9%
+        # comment/8% flag that had drifted apart while hundreds of tests were added
+        # without anyone moving the floor) — this floor (25%) prevents BACKSLIDING,
         # it is not a quality bar. Ratchet up over time (ADR-080).
         # Scope: lambdas/ + mcp/ only (skip tests/, cdk/).
         run: |
@@ -343,7 +352,7 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=9 \
+              --cov-fail-under=25 \
               -q 2>&1 | tail -100
           echo "::endgroup::"
 

@@ -882,15 +882,15 @@ def handle_journey_timeline() -> dict:
         logger.warning("journey_timeline: correlation events failed (non-fatal): %s", e)
 
     # Exclude pre-experiment events and sort chronologically
-    events = [e for e in events if e["date"] >= start_date]
-    events.sort(key=lambda e: e["date"])
+    events = [evt for evt in events if evt["date"] >= start_date]
+    events.sort(key=lambda evt: evt["date"])
     seen_evt: set = set()
     deduped = []
-    for e in events:
-        key = (e["date"], e["title"])
+    for evt in events:
+        key = (evt["date"], evt["title"])
         if key not in seen_evt:
             seen_evt.add(key)
-            deduped.append(e)
+            deduped.append(evt)
 
     # ── 6. DISC-7: Merge behavioral response annotations ──────────────
     try:
@@ -911,10 +911,10 @@ def handle_journey_timeline() -> dict:
             }
         # Attach annotations to matching events
         if ann_lookup:
-            for e in deduped:
-                ek = hashlib.sha256(f"{e['date']}|{e['type']}|{e['title']}".encode()).hexdigest()[:16]
+            for evt in deduped:
+                ek = hashlib.sha256(f"{evt['date']}|{evt['type']}|{evt['title']}".encode()).hexdigest()[:16]
                 if ek in ann_lookup:
-                    e["annotation"] = ann_lookup[ek]
+                    evt["annotation"] = ann_lookup[ek]
     except Exception as _ann_e:
         logger.warning("journey_timeline: annotation merge failed (non-fatal): %s", _ann_e)
 
