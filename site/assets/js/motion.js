@@ -18,59 +18,85 @@
   var root = document.documentElement;
 
   // ── Interactive charts (ALWAYS on — interaction, not motion, so it runs even
-  //    under prefers-reduced-motion). Any chart that embeds data-cpts (normalized
-  //    coords + label per point) gets a focus dot + tooltip. Hit-testing is
-  //    NEAREST-BY-X, not index-ratio: date-positioned charts (weight trend,
-  //    autonomic hero) have irregular x spacing, so round(ratio·(n−1)) picks the
-  //    wrong point there; nearest keeps uniform charts pixel-identical. Pointer
-  //    events cover mouse + pen + touch: touch-action pan-y keeps the page
+  //    under prefers-reduced-motion). Any chart element that embeds data-cpts
+  //    (normalized 0–1 coords + a label per point) gets a focus dot + tooltip —
+  //    SVG plots AND the div-based charts (stacked bars, spines, column stacks,
+  //    row lists) alike, so every series answers when touched (#582). Hit-testing
+  //    is NEAREST-ON-THE-DOMINANT-AXIS: x by default (date-positioned charts have
+  //    irregular x spacing, so round(ratio·(n−1)) picks the wrong point — nearest
+  //    keeps uniform charts pixel-identical), or y when data-cpts-axis="y" (the
+  //    vertically-stacked row lists: sufficiency / dumbbell / landmark bars).
+  //    Pointer events cover mouse + pen + touch: touch-action pan-y keeps the page
   //    scrolling vertically while a horizontal drag scrubs the chart, and a tap
-  //    inspects (lingers briefly — touch has no hover-out). ──
-  function wireChart(svg) {
-    if (svg.__ix) return; svg.__ix = 1;
-    var cpts; try { cpts = JSON.parse(svg.getAttribute("data-cpts")); } catch (e) { return; }
+  //    inspects (lingers briefly — touch has no hover-out). Keyboard rides the
+  //    SAME path: the plot is focusable, arrows/Home/End walk points, Escape
+  //    dismisses (pairs with #579's focus styles). ──
+  function wireChart(el) {
+    if (el.__ix) return; el.__ix = 1;
+    var cpts; try { cpts = JSON.parse(el.getAttribute("data-cpts")); } catch (e) { return; }
     if (!cpts || !cpts.length) return;
-    var fig = svg.closest(".chart"); if (!fig) return;
+    var fig = el.closest(".chart") || el.parentElement; if (!fig) return;
     if (getComputedStyle(fig).position === "static") fig.style.position = "relative";
-    svg.style.touchAction = "pan-y";
+    el.style.touchAction = "pan-y";
+    var yAxis = el.getAttribute("data-cpts-axis") === "y";
     var dot = document.createElement("span"); dot.className = "chart-focus"; dot.hidden = true;
     var tip = document.createElement("span"); tip.className = "chart-tip label"; tip.hidden = true;
     fig.appendChild(dot); fig.appendChild(tip);
-    var hideT = null;
-    function show(clientX) {
-      var r = svg.getBoundingClientRect(), fr = fig.getBoundingClientRect();
-      if (!r.width) return;
-      var ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-      var pt = cpts[0], best = Infinity;
-      for (var i = 0; i < cpts.length; i++) {
-        var d = Math.abs(cpts[i].x - ratio);
-        if (d < best) { best = d; pt = cpts[i]; }
-      }
+    var hideT = null, cur = -1;
+    function place(pt) {
+      var r = el.getBoundingClientRect(), fr = fig.getBoundingClientRect();
+      if (!r.width || !r.height) return;
       var px = (r.left - fr.left) + pt.x * r.width, py = (r.top - fr.top) + pt.y * r.height;
       dot.style.left = px + "px"; dot.style.top = py + "px"; dot.hidden = false;
       tip.textContent = pt.l; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.hidden = false;
       // Cross-highlight hook (uplevel P4): fire-and-forget — a consumer (e.g. the
       // weight silhouette) can follow the focused point; a listener error must
       // never break the chart itself.
-      try { svg.dispatchEvent(new CustomEvent("chart:point", { bubbles: true, detail: { label: pt.l, v: pt.v } })); } catch (e) {}
+      try { el.dispatchEvent(new CustomEvent("chart:point", { bubbles: true, detail: { label: pt.l, v: pt.v } })); } catch (e) {}
+    }
+    function showIndex(i) { if (i < 0 || i >= cpts.length) return; cur = i; place(cpts[i]); }
+    function showAt(clientX, clientY) {
+      var r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      var ratio = yAxis ? Math.max(0, Math.min(1, (clientY - r.top) / r.height))
+                        : Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      var best = Infinity, bi = 0;
+      for (var i = 0; i < cpts.length; i++) {
+        var d = Math.abs((yAxis ? cpts[i].y : cpts[i].x) - ratio);
+        if (d < best) { best = d; bi = i; }
+      }
+      showIndex(bi);
     }
     function hide() { clearTimeout(hideT); dot.hidden = true; tip.hidden = true; }
-    svg.addEventListener("pointermove", function (e) { clearTimeout(hideT); show(e.clientX); });
-    svg.addEventListener("pointerdown", function (e) { clearTimeout(hideT); show(e.clientX); });
-    svg.addEventListener("pointerup", function (e) {
+    el.addEventListener("pointermove", function (e) { clearTimeout(hideT); showAt(e.clientX, e.clientY); });
+    el.addEventListener("pointerdown", function (e) { clearTimeout(hideT); showAt(e.clientX, e.clientY); });
+    el.addEventListener("pointerup", function (e) {
       // tap-to-inspect: linger long enough to read, then tidy up.
       if (e.pointerType !== "mouse") { clearTimeout(hideT); hideT = setTimeout(hide, 2600); }
     });
-    svg.addEventListener("pointerleave", function (e) {
+    el.addEventListener("pointerleave", function (e) {
       // touch fires leave right after up — that would kill the tap linger.
       if (e.pointerType === "mouse") hide();
     });
-    svg.addEventListener("pointercancel", hide); // the scroll took over the gesture
+    el.addEventListener("pointercancel", hide); // the scroll took over the gesture
+    // Keyboard exploration — same code path. Skip decorative (aria-hidden) plots.
+    if (el.getAttribute("aria-hidden") !== "true") {
+      if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
+      el.addEventListener("keydown", function (e) {
+        var k = e.key;
+        if (k === "ArrowRight" || k === "ArrowDown") { clearTimeout(hideT); showIndex(cur < 0 ? 0 : Math.min(cpts.length - 1, cur + 1)); e.preventDefault(); }
+        else if (k === "ArrowLeft" || k === "ArrowUp") { clearTimeout(hideT); showIndex(cur < 0 ? 0 : Math.max(0, cur - 1)); e.preventDefault(); }
+        else if (k === "Home") { clearTimeout(hideT); showIndex(0); e.preventDefault(); }
+        else if (k === "End") { clearTimeout(hideT); showIndex(cpts.length - 1); e.preventDefault(); }
+        else if (k === "Escape") { hide(); cur = -1; }
+      });
+      el.addEventListener("blur", hide);
+    }
   }
   function wireCharts(scope) {
     if (!scope.querySelectorAll) return;
-    Array.prototype.forEach.call(scope.querySelectorAll(".chart svg[data-cpts]"), wireChart);
-    if (scope.matches && scope.matches(".chart svg[data-cpts]")) wireChart(scope);
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-cpts]"), wireChart);
+    if (scope.matches && scope.matches("[data-cpts]")) wireChart(scope);
   }
 
   var reduce;
