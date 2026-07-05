@@ -121,7 +121,6 @@ from web.site_api_data import (
     handle_scenarios,
     handle_sleep_correlations,
     handle_sleep_detail,
-    handle_sleep_reconciliation,
     handle_source_freshness,
     handle_state_of_matthew,
     handle_supplements,
@@ -340,12 +339,12 @@ ROUTES = {
     "/api/sleep_correlations": handle_sleep_correlations,
     "/api/sleep_detail": handle_sleep_detail,
     # Elite review (2026-06-15): surface two compute outputs that were stored
-    # daily but never exposed — circadian-compliance score + unified sleep.
+    # daily but never exposed — circadian-compliance score.
+    # ( /api/sleep_reconciliation RETIRED #487/ADR-113 — dead merge + stale date, no consumers )
     "/api/circadian": handle_circadian,
     "/api/forecast": handle_forecast,
     "/api/scenarios": handle_scenarios,
     "/api/state_of_matthew": handle_state_of_matthew,  # #552 weekly model brief
-    "/api/sleep_reconciliation": handle_sleep_reconciliation,
     # ARCH-03: Achievement badges
     "/api/achievements": handle_achievements,
     # ARCH-02: Combined snapshot — single-call summary for pages that need vitals + journey + character

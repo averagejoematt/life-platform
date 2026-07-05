@@ -143,9 +143,6 @@
       "cdk_only": true,
       "_cdk_only_reason": "Imports the sibling compute/hypothesis_engine_lambda.py (the one day-row assembly, ADR-105) which is NOT a layer module. Single-file hot-deploy strips it -> Runtime.ImportModuleError (bit us 2026-07-04). Only cdk deploy ships the full bundle."
     },
-    "lambdas/compute/sleep_reconciler_lambda.py": {
-      "function": "sleep-reconciler"
-    },
     "lambdas/compute/state_of_matthew_lambda.py": {
       "function": "state-of-matthew",
       "handler": "compute.state_of_matthew_lambda.lambda_handler",
@@ -480,7 +477,6 @@
       "lambdas/insight_writer.py",
       "lambdas/acwr_compute_lambda.py",
       "lambdas/circadian_compliance_lambda.py",
-      "lambdas/sleep_reconciler_lambda.py",
       "lambdas/email_subscriber_lambda.py",
       "lambdas/site_api_ai_lambda.py",
       "lambdas/auth_breaker.py",
@@ -501,12 +497,7 @@
       "lambdas/ingestion_framework.py"
     ]
   },
-  "sleep_reconciler": {
-    "lambdas/sleep_reconciler_lambda.py": {
-      "function": "sleep-reconciler",
-      "handler": "sleep_reconciler_lambda.lambda_handler",
-      "note": "BS-08: Unified Sleep Record \u2014 merges Whoop/Eight Sleep/Apple Health nightly. Runs 7:00 AM PT daily. Writes to sleep_unified partition.",
-      "stack": "LifePlatformCompute"
-    }
+  "_retired_sleep_reconciler": {
+    "_comment": "sleep-reconciler RETIRED 2026-07-05 (#487 / ADR-113). Dead per-field merge (read fields that never existed) + 1\u20132 nights stale, zero compute consumers. Lambda + EventBridge rule + IAM role + /api/sleep_reconciliation removed. LifePlatformCompute needs a deploy to drop the live function."
   }
 }

@@ -94,7 +94,6 @@ python3 -c "import json; d=json.load(open('/tmp/st.json')); assert 'errorType' n
 - weekly-correlation-compute → weekly_correlation_compute_lambda.py
 - dashboard-refresh → dashboard_refresh_lambda.py
 - acwr-compute → acwr_compute_lambda.py
-- sleep-reconciler → sleep_reconciler_lambda.py
 - circadian-compliance → circadian_compliance_lambda.py
 - failure-pattern-compute → failure_pattern_compute_lambda.py
 - challenge-generator → challenge_generator_lambda.py
