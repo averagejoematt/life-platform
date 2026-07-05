@@ -1,116 +1,103 @@
-# HANDOVER — the rigor trio ships: uncertainty, calibration, commitments + data-health + the parse gate — 2026-07-05 (session 15)
+# HANDOVER — the data-integrity opus quartet: TDEE chain + HAE validation + Notion sync (3 of 4 shipped) — 2026-07-05 (session 16)
 
-Session opened on "do all the highest value opus items in the issues list," with Matthew
-authorizing **all merges and deploys** for the session up front, then extending to "do both
-follow-ups and the next tier of opus items that don't have prereqs," then "do all of that so I
-can exit this session." Everything below is **merged to main, deployed, and live-verified.**
+> **⚠️ A CONCURRENT SESSION ran in parallel** and merged much of the Now/Next site-ux +
+> infra backlog to main during this session (visible in git log: **#378, #379, #382,
+> #383, #389, #419, #470, #579, #580** and more — a11y, perf budget, weather-in-registry,
+> the dual-plane guard, the sync_doc drift gate, coverage ratchet). **This handover covers
+> ONLY this session's work (the opus data-integrity quartet).** That other work is real and
+> live but not documented here — read its own wrap / the git log. Our changes were verified
+> to coexist cleanly (all 47 of this session's tests pass on current main).
 
-The unblock that shaped the session: most flagship opus items are gated on sonnet prerequisites
-(#377 parse gate, #544 methods registry) — but **stats_core (#529) was already shipped**, which
-unblocked the three highest-value opus items in the intelligence roadmap. Those shipped first,
-then the two follow-ups, then a self-contained data-health opus item, then the parse-gate prereq.
+Session opened on "read memory + handover, prepare next," then Matthew directed: **"do all
+opus items that don't have prereqs"** and **"you do merge and deploys"** (explicit up-front
+authorization). Four opus items qualified; **three shipped end-to-end, the fourth (#581)
+was deliberately deferred** — see the last section.
 
 ---
 
-## What shipped (8 PRs: #624–#631)
+## What shipped (5 PRs, all merged + deployed + verified)
 
-1. **#532 — Coach commitments & follow-through** (opus, epic #526 rank 4 · PR #625). Every
-   concrete recommendation a coach pushes becomes a tracked `COMMITMENT#` record (Haiku-extracted
-   in `coach_state_updater`, like `PREDICTION#`) with a due window + a deterministic
-   follow-through check. The daily `coach_prediction_evaluator` grades the metric-backed ones
-   kept/broken by reusing the directional evaluator (zero new AI); the orchestrator injects due
-   commitments so a coach must revisit its own advice + a kept/broken tally. `SCHEMA.md` documents
-   `COMMITMENT#`.
+1. **#484 — Resurrect the TDEE/deficit chain** (PR #633 + follow-up #663). The chain was
+   dead from a single field-name mismatch: MacroFactor ingest wrote the adaptive
+   maintenance estimate to `expenditure_kcal`, but every reader looked for
+   `tdee`/`tdee_kcal`/`expenditure` — names nothing wrote — so `tdee`/`deficit` served
+   `null` everywhere. Fixed: ingest now also writes the canonical `tdee_kcal`;
+   `_resolve_mf_tdee()` scans MF records newest-first across all name generations with
+   honest provenance (`macrofactor_adaptive`); `daily_insight` + `hypothesis_engine`
+   readers converged; the dead `weight_lbs = tdee_kcal` proxy deleted. **#663 follow-up:**
+   live MF records currently carry NO `expenditure_kcal`, so added the labeled Mifflin
+   estimate fallback (the acceptance's stated alternative) from the latest Withings weigh-in.
+   **Live-verified:** `/api/nutrition_overview` → `tdee: 3623, source: estimate_mifflin,
+   avg_deficit: 2116`. Deployed via `deploy_site_api.sh` (site-api).
 
-2. **#535 — Uncertainty everywhere it's claimed** (opus, epic #525 rank 7 · PR #624 · layer v110).
-   (a) `weight_trend` rate gets a moving-block-bootstrap CI and the goal date becomes an honest
-   **range**; live on `/api/journey` (`weekly_rate_ci_low` verified populated once site-api hit
-   v111 — see gotcha #1). (b) `_compute_slow_drift` recomputed as an SE-based z on the
-   AR(1)-corrected effective n, gated on effect≥0.5 SD AND p<0.05. (c) the six correlation labeling
-   copies collapsed into one `helpers.correlation_report` — r [CI], effective n, per-tool BH-FDR
-   q-value, and HARMFUL/BENEFICIAL asserted only at `compute_confidence ≥ MEDIUM` (else
-   INCONCLUSIVE). On the current thin post-reset data almost everything correctly reads
-   INCONCLUSIVE — that's the point.
+2. **#483 — HAE webhook validation, units, cgm cadence, BP break** (PR #649). Four fixes to
+   the path that actually delivers CGM/BP/steps: (X-3) `ingestion_validator.validate_fields`
+   gates every merge at the `merge_day_to_dynamo` chokepoint — a critical hard-bound
+   violation drops the day + trips the error alarm; (D-9) unit-aware water/weight/distance
+   conversion; (D-3) `cgm_source` by median inter-reading cadence (≤10 min ⇒ CGM), fixing
+   the UTC-truncated partial-day mislabel (verified against `cgm_readings/2026/05/22.json` —
+   17 readings @ 5-min); (D-1) the stray separate-format BP `break`. **Deployed via
+   `cdk deploy LifePlatformIngestion`** (see gotcha #1). HAE invoke → 200, no ImportError.
 
-3. **#538 — The calibration scoreboard** (opus, epic #528 rank 10 · PR #626 · layer v111). New
-   `stats_core.brier_score`/`brier_skill_score`/`reliability_bins`; new **`calibration_core`** layer
-   module (the ONE scorer — pairs from resolved `PREDICTION#` + the hypothesis `CALIB#` ledger);
-   `compute_credibility` rewired to consume it. Public page **`/method/calibration/`** + `/api/calibration`
-   (per-coach Brier + platform aggregate + reliability curve); the coach track-record MCP tool and
-   `/api/coach_team` huddle carry the same numbers. Empty today (`n:0`) — no forward call has
-   resolved post-reset yet; the empty-state copy says so.
+3. **#476 — Notion journal: sync edits, reconcile deletions, archive raw** (PR #664 +
+   test-fix #666). `last_edited_time` OR-branch so >2-day-old edits re-ingest; stable
+   page-id SKs (not positional `#seq` that re-homed enrichment); `_reconcile_deleted`
+   removes Notion deletions + legacy `#seq` orphans per day; **raw S3 archive**
+   (`raw/matthew/notion/YYYY/MM/DD-<page_id>.json`) so DDB isn't the only copy of the
+   journal text; drift fixes (schedule, secret default, `source_registry` raw_layout).
+   Deployed via single-file `deploy_lambda.sh` (notion has the layer). Invoke → 200, runs
+   clean. **BUT the data-path can't be live-exercised: Notion API is returning 401** (see
+   flags).
 
-4. **Follow-up: `deploy_site_api.sh` durable layer sync** (PR #627). See gotcha #1.
+Shared layer stayed **v111** (no bump). The #483 cdk deploy incidentally reconciled all
+ingestion lambdas from a stale **layer v109 → v111** (pre-existing drift). 28 new tests
+across 3 files; doc `test_count` re-synced through the stacked-PR merges.
 
-5. **Follow-up: build-log beat** (PR #627) — "The platform grades its own predictions, in public,"
-   leading with #538. Live on `/story/build/`. `content_policy_scan.py` PASS.
+## Gotchas learned (load-bearing)
 
-6. **#468 — HAE per-datatype liveness + alert dedup** (opus, Next · PRs #628/#629/#630). **D-4:**
-   every HAE datatype (CGM/BP/SoM/workouts/water/steps) lands in the ONE `apple_health` partition,
-   so a single "fresh" hid a months-dark sensor. The freshness-checker now derives per-datatype
-   last-seen, stores a `DATATYPE_LIVENESS` sentinel, and `/api/source_freshness` surfaces it. **Live
-   result: CGM dark 43 days, BP & State of Mind never seen, Water 14d** — all previously invisible.
-   **D-8:** the DI-1.6 alert that fired **36×/72h** is episode-gated via an `ALERTSTATE#` sentinel
-   (once + daily reminder, quiet on recovery) — verified holding live. Two follow-on fixes: a scoped
-   `dynamodb:PutItem` IAM grant (the checker was read-only — the writes AccessDenied'd on the first
-   run; PR #629, `cdk deploy LifePlatformOperational`) and a ConsistentRead on the dedup sentinel
-   (PR #630).
+1. **HAE has NO shared layer** and bundles its siblings (`ingestion_framework`,
+   `ingestion_validator`) via its CDK `from_asset("../lambdas")`. Its lambda_map entry
+   lacked the `cdk_only` flag → a CI single-file hot-deploy would strip the siblings
+   (`Runtime.ImportModuleError`, the #382 dual-plane hazard). **Marked it `cdk_only` and it
+   now ships via `cdk deploy LifePlatformIngestion`.** Contrast: notion/whoop/garmin DO have
+   the layer attached, so their siblings resolve from `/opt` and single-file deploy is fine.
+2. **The doc-drift `test_count` trap compounds across stacked same-base PRs.** Each of my
+   PRs synced `test_count` off its own base; after each merge advanced main, the next PR's
+   value was stale → a merge-conflict on `site_api_common.py`'s PLATFORM_STATS every time.
+   Fix each time: merge main into the branch, take either side, re-run
+   `sync_doc_metadata.py --apply` (recomputes the true count), push.
+3. **Import-time-frozen module globals make tests order-fragile.** `test_notion_sync_476`
+   asserted `nl.S3_BUCKET == "matthew-life-platform"`, but that global freezes at
+   notion_lambda import time — the full suite imported it earlier with a different env, so
+   it read `'x'` and failed (green in isolation, red in the suite → Deploy skipped, main
+   red). Fix: `monkeypatch.setattr(nl, "S3_BUCKET", ...)` — pin the global, don't trust env.
+4. **CI Deploy is gated behind Unit Tests** — a red test skips Deploy entirely. My #476
+   test failure meant notion never deployed on the merge run; the test-only fix (#666) then
+   didn't include notion in the deploy matrix, so I deployed notion **manually**.
 
-7. **#377 — JS parse gate on site deploys** (Now, epic #341 · PR #631). `sync_site_to_s3.sh` now
-   syntax-checks every site JS module before uploading and aborts naming the file. **Unblocks #581.**
-   Ran live on the wrap deploy (`✓ all site JS modules parse clean`).
+## Flags for Matthew
 
-Layer went **v109 → v110 (#535) → v111 (#538)**; all consumers + site-api + MCP on v111. Platform
-status green throughout; 43 new tests across 6 files, all passing.
+- **Notion API is 401** (expired token — circuit-breaker tripped 07:29, pre-existing, not
+  my change). #476's code is deployed + imports clean, but the archive/reconcile **data-path
+  is unverified live** until you refresh the Notion token (`setup`/secret rotation). Once
+  the token's back, one scheduled run exercises + archives everything.
+- **Two Claudes on one repo.** A concurrent session merged a large slice of Now/Next in
+  parallel. Main was churny (several CI runs cancelled by the rapid cadence). Worth
+  coordinating so sessions don't collide — especially on shared files (both of us touched
+  `source_registry.py` and the status block).
+- **The I22 site-version lag is red** across the lambda-only merges (site `version.json`
+  behind main HEAD) — clears on the next **static-site deploy**, which the concurrent
+  session's site-ux work will trigger. Not a real failure.
+- **GitHub Pages** still enabled+public (carried from session 14/15, unactioned).
 
-## Gotchas learned (the load-bearing ones)
+## What's next
 
-1. **site-api is script-managed (NOT in the Web CDK stack) and `deploy_site_api.sh` never set the
-   layer** — so a `SHARED_LAYER_VERSION` bump silently left site-api on the OLD layer. This made
-   #535's `/api/journey` rate CI read `None` (stale `weight_trend` on v109) and broke #538's
-   `/api/calibration` import (`No module named calibration_core`). **Fix shipped:** `deploy_site_api.sh`
-   now reads `SHARED_LAYER_VERSION` from `cdk/stacks/constants.py` and pins the layer after every
-   code deploy (idempotent). Saved to memory: `reference_site_api_layer_manual_attach`.
-2. **`node --check <file>` SILENTLY MISSES real syntax errors in ES-module files** (a dangling
-   operator passed file-mode). The #377 gate MUST use `node --check --input-type=module` via stdin —
-   that flag is load-bearing, pinned by `test_js_parse_gate_377`.
-3. **CI/CD runs only on `push` to specific paths** (`lambdas/mcp/tests/cdk/ci/config/.github/…`) —
-   **NOT `site/**` or `deploy/**`.** A site-only or deploy-script-only change triggers NO pipeline,
-   so the site must be deployed manually (`deploy/deploy_site.sh`). Also: CI **deploys code only**
-   (deploy_lambda.sh); cdk_only lambdas (site-api, MCP) and shared-LAYER changes need a manual
-   `cdk deploy`. CI's Deploy auto-runs (no manual approval gate).
-4. **The `test_count` doc-drift trap across stacked PRs:** `sync_doc_metadata.py --apply` sets
-   `PLATFORM_STATS.test_count`, but a branch forked before a sibling merged doesn't see the sibling's
-   tests — so after merge the count is short and `test_test_count_matches_suite` reds CI. Re-sync on
-   main after each merge (done every time here).
-5. **The freshness-checker role was read-only** — any new DDB write from it AccessDenies. Scope new
-   writes with a `dynamodb:LeadingKeys` condition (least-privilege) and `cdk deploy LifePlatformOperational`.
-
-## What's next (ranked, with the honest blockers)
-
-- **#544 — Methods page / registry** (sonnet, Next, rank 16). The credibility artifact: a
-  `methods_registry.py` single source → auto-generated `/method/methods/` page + a **CI drift gate**
-  (code-fingerprint pattern of #389) + a "how was this computed?" popover on ≥4 surfaces. Sizeable
-  (comparable to #538). **Unblocks #584** (provenance popovers, opus). Deliberately NOT started this
-  session — too big to finish well at the tail; better clean than half-done.
-- **#581 — Split evidence.js** (opus, Now). Now unblocked by #377. **Do this attended** — it's a
-  byte-identical refactor of a 3,000-line SPOF; too risky to run unsupervised. Then #582 (chart
-  contract) unblocks on top.
-- **Self-contained data-health opus, no owner-decision fork:** #484 (resurrect the TDEE/deficit
-  chain), #483 (HAE field validation). #494 depends on C-3 (strava un-pause). **#487/#507 need YOUR
-  fix-or-retire decision** (ADR-103) before code — don't let an agent decide those unilaterally.
-- **#551** is labelled `model:opus` but its body says `model:sonnet` (mismatch) — it's a dataviz
-  design story that builds on #535's CI data; pairs naturally with #544.
-
-## Watch / flags for Matthew
-
-- **Calibration + weight-range are LIVE but empty** by design — they fill as post-reset predictions
-  resolve and weigh-ins accrue (the goal-date range needs ≥5 weigh-ins; today there are ~4, so the
-  rate CI shows but the projection stays suppressed). Not bugs.
-- **The DI-1.6 "activity degraded" alert opened an episode** during this session (steps lagging +
-  low-step days on the thin post-reset data). It sent once; dedup now holds it. If the underlying
-  activity stream is genuinely fine, the thresholds (`AH_STEPS_LAG_ALERT_DAYS`, `AH_LOW_STEP_FLOOR`)
-  may want tuning — but the spam is fixed regardless.
-- **GitHub Pages** still enabled+public on the repo (carried from session 14, unactioned) — disable or bless.
-- **Sun 07-06 / Mon 07-07 scheduled runs** (hypothesis engine, panelcast, data-recon) are the first
-  to exercise the new commitment-grading + calibration + drift-z paths on real cron cadence.
+- **#581 — Split evidence.js (DEFERRED, do attended).** The 4th opus item. Deferred for two
+  converging reasons: (a) the handover has always said *do it attended* — a byte-identical
+  refactor of a 3,000-line SPOF; (b) the concurrent session is **actively working the same
+  site JS graph** (#579 a11y added `tabs.js`, #580 perf/font, #653) — splitting evidence.js
+  now would collide head-on. **Do it once the site-ux churn settles, ideally in a worktree,
+  with Matthew watching.** Unblocks #582 (chart contract v2).
+- **#544 — Methods registry** (sonnet, Next) still the credibility artifact that unblocks
+  #584. Not started.
+- **Notion token refresh** → then confirm #476's archive lands in S3.
