@@ -3,7 +3,7 @@
   ----------------------------------------------------------------------------
   Anywhere a coach is named in reader prose (chronicle · journal · AI lab notes),
   the FIRST mention per render becomes a chip → popover: persona, one-line voice,
-  and a "full page →" link to /story/coaches/#<id>. Pure enhancement — if the
+  and a "full page →" link to /coaching/coaches/#<id>. Pure enhancement — if the
   roster can't load or no names appear, the text is untouched. The popover is
   appended to <body> (position:absolute), so there's no layout shift (no CLS).
   Keyboard-accessible: chips are real <button>s; Esc closes.

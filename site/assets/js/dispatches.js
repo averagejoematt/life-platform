@@ -10,7 +10,7 @@
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
-import { sigil, instrumentMark } from "/assets/js/sigils.js";
+import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { icon } from "/assets/js/icons.js";
 
@@ -107,7 +107,6 @@ const ABOUT = `
 
 function entriesFor(s, data) {
   if (!data) return [];
-  if (s.kind === "coaches") return [{ id: "team", title: "My Team", date: "the team's read on you" }].concat((data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.headline_stat || c.domain || "" })));
   if (s.kind === "podcast") return (data.episodes || []).map((e) => ({ id: e.week, title: e.title || `Week ${e.week}`, date: e.date, url: e.url, bytes: e.bytes, duration_sec: e.duration_sec, byline: e.byline, guest_id: e.guest_id, guest_name: e.guest_name, excerpt: e.excerpt, image_url: e.image_url || "", image_credit: e.image_credit || "" }));
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "build") return (data.beats || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1)).map((b) => ({ id: b.id || b.date, title: b.title || b.date, date: b.date }));
@@ -133,176 +132,11 @@ function entriesFor(s, data) {
   return [];
 }
 
-// CC-01/02 — a coach's page: stance (lead) · how it's going · report card · voice · relationships.
-// Pure surfacing of /api/coach/{id}; honest empty-states before the data accrues.
-// The coach's evolving, evidence-derived read of Matthew (STANCE#latest), in the
-// normalized shape the API returns for both the live stance and the ladder fallback.
-function coachStanceHTML(st) {
-  if (!st || (!st.headline_read && !(st.stage && st.stage.label))) return "";
-  const list = (arr) => (Array.isArray(arr) ? arr.map(esc).join(" · ") : "");
-  const stage = st.stage || {};
-  let h = `<section class="coach-stance"><p class="dx-kicker label">where I think you are · what I'm focused on</p>`;
-  if (stage.label) h += `<h3 class="cs-headline">${esc(stage.label)}</h3>`;
-  if (st.headline_read) h += `<p class="dx-prose">${esc(st.headline_read)}</p>`;
-  if ((st.focused_on_now || []).length) h += `<p class="cs-care"><span class="label">focused on right now</span> ${list(st.focused_on_now)}</p>`;
-  if ((st.set_aside_for_now || []).length) h += `<p class="cs-careless"><span class="label">set aside for now</span> ${list(st.set_aside_for_now)}</p>`;
-  if (st.how_my_read_changed) h += `<p class="cs-evolve"><span class="label">how my read has changed</span> ${esc(st.how_my_read_changed)}</p>`;
-  if (st.confidence_note) h += `<p class="cs-conf label">${esc(st.confidence_note)}</p>`;
-  if (st.graduation_gate) h += `<p class="cs-gate label">graduates when — ${esc(st.graduation_gate)}</p>`;
-  return h + `</section>`;
-}
-function coachReportHTML(rc) {
-  const tr = (rc && rc.track_record) || {};
-  let h = `<section class="coach-report"><p class="dx-kicker label">report card</p>`;
-  h += `<p class="cr-rate">${tr.hit_rate_pct == null ? "Track record accruing" : esc(tr.hit_rate_pct) + "% hit-rate"} <span class="label">${esc(tr.n_note || "")}</span></p>`;
-  if ((tr.recent || []).length) h += `<ul class="cr-calls">${tr.recent.map((r) => `<li class="cr-${esc(r.status)}"><span class="label">${esc(r.status)}</span> ${esc(r.metric || "")}${r.reason ? " — " + esc(r.reason) : ""}</li>`).join("")}</ul>`;
-  else h += `<p class="dx-prose">No decided predictions yet — hits <em>and</em> misses will both show here as they resolve.</p>`;
-  if (tr.caveat) h += `<p class="cr-caveat label">${esc(tr.caveat)}</p>`;
-  const tl = (rc && rc.tuning_log) || [];
-  if (tl.length) h += `<details class="cr-tuning"><summary class="label">tuning changelog (${tl.length})</summary><ul>${tl.map((e) => `<li><span class="label">${esc(e.date || "")} · ${esc(e.change_type || "")}</span> ${esc(e.summary || "")}</li>`).join("")}</ul></details>`;
-  return h + `</section>`;
-}
-// CC-10 — "My Team": the team's collective read on Matthew right now (lead of /story/coaches/).
-async function renderTeamView(read) {
-  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the team…</span></p>`;
-  let d;
-  try { d = await getJSON("/api/coach_team"); }
-  catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
-  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h2 class="dx-title">My Team</h2>`;
-  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
-  if (d.lead) {
-    const L = d.lead;
-    h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
-    h += `<div class="tl-head" style="--coach:${esc(L.color || "")}">${portrait(L, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(L, { title: "" })}</span>`}<span class="tl-name">${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
-    if (L.short_bio) h += `<p class="dx-prose tl-bio">${esc(L.short_bio)}</p>`;
-    if (L.philosophy) h += `<blockquote class="tl-philosophy">${esc(L.philosophy)}</blockquote>`;
-    if ((L.staff_focus || []).length) h += `<p class="tl-focus label">what he's got the staff focused on: ${L.staff_focus.map(esc).join(" · ")}</p>`;
-    h += `</section>`;
-  }
-  if ((d.team_focus || []).length) {
-    h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for you${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
-    h += `<ul class="tf-list">${d.team_focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></section>`;
-  }
-  h += `<section class="team-tension"><p class="dx-kicker label">where the team disagrees</p>`;
-  if ((d.tensions || []).length) {
-    h += `<ul class="tt-list">${d.tensions.map((t) => `<li><span class="label">${esc((t.coaches || []).map((c) => String(c).replace("_coach", "")).join(" ↔ ") || t.topic || "")}</span> ${esc(t.summary || "")}</li>`).join("")}</ul>`;
-  } else {
-    h += `<p class="dx-prose">No live disagreements right now — the team's aligned (or it's early and the threads haven't formed yet). When they pull in different directions, you'll see the tradeoff here.</p>`;
-  }
-  h += `</section>`;
-  h += `<section class="team-huddle"><p class="dx-kicker label">the huddle — each coach's current read</p><ul class="th-list">`;
-  for (const c of d.huddle || []) {
-    h += `<li class="th-item" data-coach="${esc(c.persona_id)}" style="--coach:${esc(c.color || "")}"><button type="button" class="th-btn"><span class="th-name"><span class="coach-mark">${portrait(c, { title: "", size: 18 }) || sigil(c, { title: "" })}</span>${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
-  }
-  h += `</ul></section>`;
-  read.innerHTML = h;
-  read.querySelectorAll(".th-item").forEach((li) => li.querySelector(".th-btn").addEventListener("click", () => selectEntry(BYKEY["coaches"], li.dataset.coach)));
-}
-
-// CC-07 — the daily journey: each coach's recent outputs as a reverse-chron
-// timeline, grouped Today / This week / Earlier. Honest empty-state when thin.
-function coachJourneyHTML(ro) {
-  if (!(ro && ro.length)) return "";
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dayMs = 86400000;
-  const bucket = (d) => {
-    const t = new Date(String(d) + "T00:00:00");
-    const diff = Math.round((today - t) / dayMs);
-    if (diff <= 0) return "Today";
-    if (diff <= 7) return "This week";
-    return "Earlier";
-  };
-  const groups = {};
-  for (const o of ro) {
-    const b = o.date ? bucket(o.date) : "Earlier";
-    (groups[b] = groups[b] || []).push(o);
-  }
-  let h = `<section class="coach-journey"><p class="dx-kicker label">the daily journey</p>`;
-  for (const label of ["Today", "This week", "Earlier"]) {
-    if (!groups[label]) continue;
-    h += `<p class="cj-band label">${label}</p><ol class="cj-list">`;
-    h += groups[label]
-      .map(
-        (o) =>
-          `<li><span class="cj-date label">${esc(o.date || "")}</span><span class="cj-sum">${esc(o.summary || "")}</span>` +
-          (o.themes && o.themes.length ? `<span class="cj-themes label">${o.themes.slice(0, 3).map(esc).join(" · ")}</span>` : "") +
-          `</li>`
-      )
-      .join("");
-    h += `</ol>`;
-  }
-  return h + `</section>`;
-}
-
-// The character: the fictional background + personality that shapes this coach's
-// prompt — who they are, how they show up, what they believe. Config-sourced.
-function coachCharacterHTML(c) {
-  if (!c || (!(c.principles || []).length && !c.signature_behavior && !c.relationship_to_matthew)) return "";
-  let h = `<section class="coach-char"><p class="dx-kicker label">the character</p>`;
-  if (c.relationship_to_matthew) h += `<p class="dx-prose">${esc(c.relationship_to_matthew)}</p>`;
-  if (c.signature_behavior) h += `<p class="cc-sig"><span class="label">how they show up</span> ${esc(c.signature_behavior)}</p>`;
-  if ((c.principles || []).length) h += `<ul class="cc-principles">${c.principles.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
-  if ((c.tendencies || []).length) h += `<p class="cc-tend label">tendencies: ${c.tendencies.map(esc).join(" · ")}</p>`;
-  if ((c.focus_areas || []).length) h += `<p class="cc-focus label">tracks: ${c.focus_areas.map(esc).join(" · ")}</p>`;
-  const vt = c.voice && (c.voice.tone || c.voice.style) ? [c.voice.tone, c.voice.style].filter(Boolean).join(" — ") : "";
-  if (vt) h += `<p class="cc-voice label">voice: ${esc(vt)}</p>`;
-  if (c.voice && c.voice.catchphrase) h += `<p class="cc-catch">“${esc(c.voice.catchphrase)}”</p>`;
-  if (c.arc) h += `<p class="cc-arc label">their arc: ${esc(c.arc)}</p>`;
-  return h + `</section>`;
-}
-// Live working hypotheses — open threads + pending predictions the coach is betting on now.
-function coachHypothesesHTML(hyps) {
-  if (!(hyps && hyps.length)) return "";
-  return (
-    `<section class="coach-hyp"><p class="dx-kicker label">working hypotheses · live bets</p><ul class="ch-list">` +
-    hyps
-      .map((x) => `<li class="ch-${esc(x.kind || "thread")}"><span class="label">${esc(x.kind || "thread")}</span> ${esc(x.claim)}</li>`)
-      .join("") +
-    `</ul></section>`
-  );
-}
-
-async function renderCoachPage(read, id) {
-  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
-  let d;
-  try { d = await getJSON(`/api/coach/${encodeURIComponent(id)}`); }
-  catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
-  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
-  h += coachCharacterHTML(d.character);
-  if (typeof d.daily === "string" && d.daily.trim()) {
-    h += `<section class="coach-daily"><p class="dx-kicker label">today's reflection</p><p class="cd-text">${esc(d.daily)}</p></section>`;  // CC-08
-  }
-  h += coachStanceHTML(d.stance);
-  h += coachHypothesesHTML(d.working_hypotheses);
-  const ro = d.recent_outputs || [];
-  h += `<section class="coach-progress"><p class="dx-kicker label">how it's going</p>`;
-  h += ro.length
-    ? `<p class="coach-latest"><span class="label">${esc(ro[0].date || "")}</span> ${esc(ro[0].summary || "")}</p>`
-    : `<p class="dx-prose">Tracking begins as data arrives — this coach narrates honest progress against its watches here, down-weeks included.</p>`;
-  h += `</section>`;
-  h += coachReportHTML(d.report_card);
-  const v = d.voice || {};
-  if (typeof v.few_shot_example === "string" && v.few_shot_example.trim()) {
-    h += `<section class="coach-voice"><p class="dx-kicker label">voice signature</p><blockquote class="cv-example">${esc(v.few_shot_example)}</blockquote></section>`;
-  }
-  const rel = d.relationships || {};
-  const edge = (e) => `${esc(String(e.coach || "").replace("_coach", ""))} (${esc(e.weight)})`;
-  if ((rel.leans_on || []).length || (rel.leaned_on_by || []).length) {
-    h += `<section class="coach-rel"><p class="dx-kicker label">on the team</p>`;
-    if ((rel.leans_on || []).length) h += `<p class="cr-edges"><span class="label">leans on</span> ${rel.leans_on.map(edge).join(" · ")}</p>`;
-    if ((rel.leaned_on_by || []).length) h += `<p class="cr-edges"><span class="label">leaned on by</span> ${rel.leaned_on_by.map(edge).join(" · ")}</p>`;
-    h += `</section>`;
-  }
-  h += coachJourneyHTML(ro);  // CC-07: the daily-journey timeline (spec anatomy: last)
-  read.innerHTML = h;
-}
-
+// The CC-01/02/10 coach-page + "My Team" machinery that lived here moved to the
+// coaching door (coaching.js) when /story/coaches/ was retired — see /coaching/team/.
 async function renderRead(s, id) {
   const read = $("[data-dx-read]");
   if (s.kind === "about") { read.innerHTML = ABOUT; return; }
-  if (s.kind === "coaches") { if (String(id) === "team") { await renderTeamView(read); } else { await renderCoachPage(read, id); } return; }
   if (s.kind === "podcast") {
     const data = await secFetch(s);
     const all = entriesFor(s, data);
@@ -317,7 +151,7 @@ async function renderRead(s, id) {
     const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 2097));  // WAV=24kHz·16-bit·mono; else MP3 est
     const mins = Math.max(1, Math.round(secs / 60));
     // Throughline: when the episode names its guest coach, link the byline to that
-    // coach's page (/story/coaches/#<id>) so the show ties back into the team.
+    // coach's team profile (/coaching/coaches/#<id>) so the show ties back into the team.
     const byline = (ent.guest_id && ent.guest_name)
       ? `Elena + <a href="/coaching/coaches/#${esc(ent.guest_id)}">${esc(ent.guest_name)}</a>`
       : esc(ent.byline || "Elena + a coach");
