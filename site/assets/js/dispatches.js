@@ -173,7 +173,7 @@ async function renderTeamView(read) {
   if (d.lead) {
     const L = d.lead;
     h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
-    h += `<div class="tl-head" style="--coach:${esc(L.color || "")}"><span class="sigil-lg">${sigil(L, { title: "" })}</span><span class="tl-name">${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
+    h += `<div class="tl-head" style="--coach:${esc(L.color || "")}">${portrait(L, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(L, { title: "" })}</span>`}<span class="tl-name">${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
     if (L.short_bio) h += `<p class="dx-prose tl-bio">${esc(L.short_bio)}</p>`;
     if (L.philosophy) h += `<blockquote class="tl-philosophy">${esc(L.philosophy)}</blockquote>`;
     if ((L.staff_focus || []).length) h += `<p class="tl-focus label">what he's got the staff focused on: ${L.staff_focus.map(esc).join(" · ")}</p>`;
@@ -192,7 +192,7 @@ async function renderTeamView(read) {
   h += `</section>`;
   h += `<section class="team-huddle"><p class="dx-kicker label">the huddle — each coach's current read</p><ul class="th-list">`;
   for (const c of d.huddle || []) {
-    h += `<li class="th-item" data-coach="${esc(c.persona_id)}" style="--coach:${esc(c.color || "")}"><button type="button" class="th-btn"><span class="th-name"><span class="coach-mark">${sigil(c, { title: "" })}</span>${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
+    h += `<li class="th-item" data-coach="${esc(c.persona_id)}" style="--coach:${esc(c.color || "")}"><button type="button" class="th-btn"><span class="th-name"><span class="coach-mark">${portrait(c, { title: "", size: 18 }) || sigil(c, { title: "" })}</span>${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
   }
   h += `</ul></section>`;
   read.innerHTML = h;
