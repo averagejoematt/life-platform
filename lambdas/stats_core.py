@@ -276,6 +276,188 @@ def cohens_d(baseline, window):
     return (mb - ma) / pooled
 
 
+def _two_sided_z_p(z):
+    """Two-sided normal-approximation p-value for a standardized statistic z.
+
+    The same erf form the drift detector already uses inline — factored here so the
+    changepoint scan and any future caller share one implementation. Underflows to
+    0.0 for large |z| (a clean deterministic step), which is the honest answer.
+    """
+    return 2.0 * (1.0 - 0.5 * (1.0 + math.erf(abs(z) / math.sqrt(2.0))))
+
+
+def _single_changepoint(v, min_segment, min_effect, min_confidence):
+    """Best single changepoint in a contiguous segment, or None.
+
+    CUSUM-style max-statistic scan: for every admissible split k (both sides at
+    least `min_segment` long) we standardize the difference of segment means by the
+    Welch standard error computed on the AUTOCORRELATION-CORRECTED effective n of
+    each side (ADR-105 rule 1 — raw n overstates the evidence on daily physiology).
+    The split maximizing |z| is the candidate; equivalently the extremum of the
+    standardized cumulative sum, hence "CUSUM".
+
+    Honest confidence: |z| is maximized over ~(n - 2*min_segment + 1) candidate
+    positions, so the raw p is optimistically small. We apply a Bonferroni
+    correction over the number of candidates before reporting confidence — the
+    honest guard against declaring a break in pure noise. A changepoint is returned
+    only if it clears BOTH gates: Bonferroni confidence >= min_confidence AND a
+    Cohen's d effect >= min_effect (magnitude floor, so a barely-significant sliver
+    is never dressed up as a regime shift).
+
+    Returns a dict (indices/means/magnitude/effect_size/confidence/n_before/n_after)
+    with `index` = the first point of the AFTER segment, or None.
+    """
+    n = len(v)
+    n_candidates = n - 2 * min_segment + 1
+    if n_candidates < 1:
+        return None
+
+    best = None  # (abs_t, k, mA, mB, varA, varB, nA, nB, dfEff)
+    for k in range(min_segment, n - min_segment + 1):
+        a, b = v[:k], v[k:]
+        na, nb = len(a), len(b)
+        ma = sum(a) / na
+        mb = sum(b) / nb
+        var_a = sum((x - ma) ** 2 for x in a) / (na - 1) if na > 1 else 0.0
+        var_b = sum((x - mb) ** 2 for x in b) / (nb - 1) if nb > 1 else 0.0
+        na_eff = effective_sample_size(a)
+        nb_eff = effective_sample_size(b)
+        se = math.sqrt(var_a / na_eff + var_b / nb_eff)
+        # Fractional Welch-style degrees of freedom on the effective n (edge splits
+        # have few effective points → fat t-tails → the honest penalty against
+        # calling a break off a small, autocorrelated sliver).
+        df_eff = max(1.0, na_eff + nb_eff - 2.0)
+        if se == 0.0:
+            # Both sides perfectly flat. A genuine step (means differ) is a
+            # certain changepoint; identical means is no signal at all.
+            if ma == mb:
+                continue
+            abs_t = float("inf")
+        else:
+            abs_t = abs(mb - ma) / se
+        if best is None or abs_t > best[0]:
+            best = (abs_t, k, ma, mb, var_a, var_b, na, nb, df_eff)
+
+    if best is None:
+        return None
+
+    abs_t, k, ma, mb, var_a, var_b, na, nb, df_eff = best
+    if abs_t == float("inf"):
+        p_raw = 0.0
+    else:
+        # t → normal via the small-df shrink z = t * sqrt(df/(df+2)) (matches
+        # pearson_p_value): accurate for df > 10, conservative below.
+        z = abs_t if df_eff >= 30 else abs_t * math.sqrt(df_eff / (df_eff + 2.0))
+        p_raw = _two_sided_z_p(z)
+    # Bonferroni over the candidate positions scanned — honest confidence.
+    confidence = 1.0 - min(1.0, p_raw * n_candidates)
+
+    pooled = math.sqrt(((na - 1) * var_a + (nb - 1) * var_b) / (na + nb - 2))
+    if pooled == 0.0:
+        effect = float("inf") if ma != mb else 0.0
+    else:
+        effect = (mb - ma) / pooled
+
+    if confidence < min_confidence or abs(effect) < min_effect:
+        return None
+
+    return {
+        "index": k,
+        "before_mean": ma,
+        "after_mean": mb,
+        "magnitude": mb - ma,
+        "effect_size": effect,
+        "confidence": confidence,
+        "n_before": na,
+        "n_after": nb,
+        "direction": "increase" if mb > ma else "decrease",
+    }
+
+
+def detect_changepoints(series, dates=None, min_segment=7, min_effect=1.0, min_confidence=0.99, max_changepoints=3):
+    """Honest changepoint detection over a single time series (stdlib only, ADR-105).
+
+    Finds abrupt LEVEL shifts — "the mean stepped from A to B around this date" —
+    which fixed-window drift comparisons miss when the break falls between window
+    boundaries. Algorithm: CUSUM-style max-statistic single-changepoint test (see
+    `_single_changepoint`) applied recursively via binary segmentation — detect the
+    strongest break, then recurse into the left and right sub-segments — up to
+    `max_changepoints`. Each accepted break must clear a significance gate
+    (Bonferroni-corrected over the scan) AND a magnitude gate, both conservative by
+    default so flat or noisy series yield nothing rather than a spurious shift.
+
+    Args:
+        series: sequence of values (None/non-numeric entries dropped, order kept).
+        dates: optional parallel sequence of ISO date strings; when given, each
+            changepoint carries the approximate `date` at which the level changed.
+            Dropped in lockstep with any non-numeric values so alignment survives.
+        min_segment: minimum points on each side of a break (default 7).
+        min_effect: minimum |Cohen's d| for a break to count (default 1.0 — a full
+            pooled-SD level shift; conservative so only genuine regime changes fire).
+        min_confidence: minimum Bonferroni-corrected confidence (default 0.99).
+        max_changepoints: cap on breaks returned (default 3).
+
+    Returns a dict:
+        {
+          "status": "ok" | "insufficient_data",
+          "n": <clean point count>,
+          "changepoints": [ {index, date?, before_mean, after_mean, magnitude,
+                             effect_size, confidence, n_before, n_after, direction}, ... ],
+          "reason": <present only when insufficient_data>,
+        }
+    Thin data (fewer than 2*min_segment clean points — no admissible split) returns
+    status "insufficient_data" with an empty changepoint list: we never claim a shift
+    we cannot test. All numbers unrounded; callers own presentation rounding.
+    """
+    # Keep dates aligned with values through the None/non-numeric drop.
+    cleaned, cleaned_dates = [], []
+    for i, x in enumerate(series):
+        if x is None:
+            continue
+        try:
+            fx = float(x)
+        except (TypeError, ValueError):
+            continue
+        if math.isnan(fx):
+            continue
+        cleaned.append(fx)
+        if dates is not None and i < len(dates):
+            cleaned_dates.append(dates[i])
+        else:
+            cleaned_dates.append(None)
+
+    n = len(cleaned)
+    if n < 2 * min_segment:
+        return {
+            "status": "insufficient_data",
+            "n": n,
+            "changepoints": [],
+            "reason": f"need >= {2 * min_segment} points to test a changepoint, have {n}",
+        }
+
+    changepoints = []
+    # Binary segmentation: a work-list of (start, end) half-open sub-segments.
+    segments = [(0, n)]
+    while segments and len(changepoints) < max_changepoints:
+        start, end = segments.pop(0)
+        sub = cleaned[start:end]
+        cp = _single_changepoint(sub, min_segment, min_effect, min_confidence)
+        if cp is None:
+            continue
+        abs_index = start + cp["index"]
+        record = dict(cp)
+        record["index"] = abs_index
+        if dates is not None:
+            record["date"] = cleaned_dates[abs_index] if abs_index < len(cleaned_dates) else None
+        changepoints.append(record)
+        # Recurse into both sides (each must still admit a split to yield more).
+        segments.append((start, abs_index))
+        segments.append((abs_index, end))
+
+    changepoints.sort(key=lambda c: c["index"])
+    return {"status": "ok", "n": n, "changepoints": changepoints[:max_changepoints]}
+
+
 def ewma_fit(xs, alpha=None):
     """Fit simple exponential smoothing to a series (None entries dropped, order kept).
 
