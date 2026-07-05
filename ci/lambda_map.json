@@ -408,6 +408,7 @@
       "lambdas/insight_writer.py",
       "lambdas/intelligence_common.py",
       "lambdas/item_size_guard.py",
+      "lambdas/margaret_editor_pass.py",
       "lambdas/meal_grouper.py",
       "lambdas/meal_projection.py",
       "lambdas/meal_templates_seed.py",

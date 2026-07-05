@@ -38,6 +38,12 @@ _CACHE_TTL_S = 300  # 5 min — matches the governor's hourly cadence well enoug
 _FEATURE_CUTOFF = {
     "coach_narrative": 1,
     "ensemble": 1,
+    # chronicle_editor (#548): Margaret Calloway's critique + revision pass over
+    # the chronicle draft. A narrative embellishment, not the flagship content
+    # itself — pauses at the same mild tier as coach_narrative/Elena's state
+    # extraction, well before "chronicle" (cutoff 2) takes the whole installment
+    # down. A paused pass just means Elena's own draft ships unedited.
+    "chronicle_editor": 1,
     # chronicle: was 1 (paused at the mildest budget state, which silently starved
     # the Friday Panel podcast — its only input is the weekly chronicle). Raised to
     # 2 so the flagship weekly Story+podcast survives tier 1, in lockstep with the
