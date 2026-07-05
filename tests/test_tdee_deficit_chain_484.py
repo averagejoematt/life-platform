@@ -21,7 +21,7 @@ os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "test-bucket")
 os.environ.setdefault("USER_ID", "matthew")
 
-from web.site_api_observatory import _resolve_mf_tdee  # noqa: E402
+from web.site_api_observatory import _mifflin_tdee, _resolve_mf_tdee  # noqa: E402
 
 # ── the resolver ──────────────────────────────────────────────────────────────
 
@@ -98,3 +98,19 @@ def test_summary_ingest_omits_tdee_when_no_expenditure():
     item = build_summary_day_items(rows)["2026-07-01"]
     assert "expenditure_kcal" not in item
     assert "tdee_kcal" not in item
+
+
+# ── the labeled Mifflin estimate fallback ─────────────────────────────────────
+
+
+def test_mifflin_estimate_from_weight():
+    # 300 lb → ~136 kg; Mifflin-St Jeor × 1.55 ≈ a plausible TDEE for that mass.
+    est = _mifflin_tdee(300)
+    assert est is not None
+    assert 3000 < est < 4200  # sanity band, not a magic number
+
+
+def test_mifflin_none_on_missing_weight():
+    assert _mifflin_tdee(None) is None
+    assert _mifflin_tdee(0) is None
+    assert _mifflin_tdee("nope") is None

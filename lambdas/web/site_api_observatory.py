@@ -185,6 +185,32 @@ def _resolve_mf_tdee(items):
     return None, None
 
 
+def _mifflin_tdee(weight_lbs):
+    """Profile-derived TDEE estimate: Mifflin-St Jeor × 1.55 activity, from body weight
+    (height 183 cm / age 35 / male are the profile constants). Callers label this
+    'estimate_mifflin' — it is never conflated with MacroFactor's measured adaptive
+    expenditure (#484). Returns None when weight is missing."""
+    try:
+        wkg = float(weight_lbs) * 0.453592
+    except (TypeError, ValueError):
+        return None
+    if wkg <= 0:
+        return None
+    return round((10 * wkg + 6.25 * 182.88 - 5 * 35 + 5) * 1.55)
+
+
+def _latest_weight_lbs(start, today):
+    """Most recent Withings weigh-in (lbs) in the window, or None."""
+    wt = _query_source("withings", start, today)
+    if not wt:
+        return None
+    latest = sorted(wt, key=lambda x: x.get("sk", ""))[-1]
+    try:
+        return float(latest.get("weight_lbs"))
+    except (TypeError, ValueError):
+        return None
+
+
 def handle_nutrition_overview() -> dict:
     """
     GET /api/nutrition_overview
@@ -292,8 +318,15 @@ def handle_nutrition_overview() -> dict:
     cal_7d = [_mf(i, "calories") for i in items_7d if _mf(i, "calories") is not None]
     pro_7d = [_mf(i, "protein_g", "total_protein_g") for i in items_7d if _mf(i, "protein_g", "total_protein_g") is not None]
 
-    # TDEE from the most recent record carrying MacroFactor's adaptive expenditure (#484)
+    # TDEE from the most recent record carrying MacroFactor's adaptive expenditure (#484).
+    # When none is present (no populated Expenditure column uploaded), fall back to a
+    # profile-derived estimate from the latest weigh-in — labeled, so the deficit panel
+    # shows a real (honestly-flagged) number instead of None.
     tdee, tdee_source = _resolve_mf_tdee(items)
+    if tdee is None:
+        est = _mifflin_tdee(_latest_weight_lbs(d30, today))
+        if est:
+            tdee, tdee_source = est, "estimate_mifflin"
     avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
     deficit = round(tdee - avg_cal) if tdee and avg_cal else None
 
@@ -737,15 +770,12 @@ def handle_deficit_sustainability() -> dict:
     cals = [c for c in cals if c]
     avg_cal = round(sum(cals) / len(cals)) if cals else 0
     tdee, tdee_source = _resolve_mf_tdee(mf)
-    if not tdee:  # Fallback: Mifflin-St Jeor from Withings weight — labeled an estimate (#484)
-        wt = _query_source("withings", start, today)
-        if wt:
-            wkg = (_f(sorted(wt, key=lambda x: x.get("sk", ""))[-1].get("weight_lbs")) or 220) * 0.453592
-            tdee = round((10 * wkg + 6.25 * 182.88 - 5 * 35 + 5) * 1.55)
-            tdee_source = "estimate_mifflin"
+    if not tdee:  # Fallback: profile-derived Mifflin estimate from the latest weigh-in (#484)
+        est = _mifflin_tdee(_latest_weight_lbs(start, today))
+        if est:
+            tdee, tdee_source = est, "estimate_mifflin"
         else:
-            tdee = 2400
-            tdee_source = "estimate_default"
+            tdee, tdee_source = 2400, "estimate_default"
     deficit_kcal = round(tdee - avg_cal)
     deficit_pct = round(deficit_kcal / tdee * 100, 1) if tdee else 0
     in_deficit = deficit_kcal > 200
