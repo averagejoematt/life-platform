@@ -18,7 +18,7 @@ Sections:
   2. Scorecard (8 components)
   3. Insight of the Week (AI)
   4. Board of Directors (6 advisors)
-  5. Training (Strava + MacroFactor workouts)
+  5. Training (Strava + Hevy strength, #485 — macrofactor_workouts went dark ~4mo ago)
   6. Training Load — Banister
   7. Recovery & HRV (Whoop)
   8. Sleep & Architecture (Eight Sleep)
@@ -137,6 +137,37 @@ def query_range(source, start_date, end_date):
         for item in resp.get("Items", []):
             date_str = item.get("date") or item["sk"].replace("DATE#", "")
             records[date_str] = d2f(item)
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return records
+
+
+def query_range_list(source, start_date, end_date):
+    """Batch query all records for a source in a date range, returned as a flat
+    list rather than a {date: record} dict.
+
+    Needed for per-workout schemas like Hevy (#485) where: (a) multiple records
+    can legitimately share the same `date` field (two-a-days) — query_range's
+    dict-by-date would silently collapse them to one, and (b) the sk carries a
+    #WORKOUT#<id> suffix, so a record on the exact end_date sorts AFTER the plain
+    "DATE#{end_date}" upper bound and would be excluded; the trailing "~" (0x7E,
+    higher than any character sk uses) fixes that boundary for both this and
+    exact-sk sources (harmless there — "DATE#{end_date}" < "DATE#{end_date}~").
+    """
+    pk = f"USER#{USER_ID}#SOURCE#{source}"
+    records = []
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}~",
+        },
+    }
+    while True:
+        resp = table.query(**with_phase_filter(kwargs))
+        records.extend(d2f(item) for item in resp.get("Items", []))
         if "LastEvaluatedKey" not in resp:
             break
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
@@ -385,24 +416,42 @@ def ex_macrofactor(recs_dict, profile):
     }
 
 
-def ex_macrofactor_workouts(recs_dict):
-    recs = list(recs_dict.values()) if recs_dict else []
+def ex_hevy_workouts(recs):
+    """Strength session summary sourced from Hevy per-workout records (#485 —
+    macrofactor_workouts stopped ingesting ~4 months ago; Hevy is the live,
+    hourly-ingested source per ADR-060).
+
+    `recs` is a FLAT LIST of Hevy DDB records (one item per workout, fetched via
+    query_range_list — NOT the {date: record} dict query_range produces, since
+    Hevy can legitimately have more than one workout on a date). Each record
+    already carries its own exercises/sets, so — unlike the old macrofactor
+    daily-aggregate shape this replaces — there's no nested per-day "workouts"
+    list to unpack; one Hevy record IS one workout.
+    """
     if not recs:
         return None
     workouts = []
-    total_vol = 0
+    total_vol = 0.0
     total_sets = 0
     for r in recs:
-        for w in r.get("workouts", []):
-            wk = {
+        exercises = r.get("exercises") or []
+        vol_lbs = 0.0
+        for ex in exercises:
+            for s in ex.get("sets") or []:
+                weight_kg = safe_float(s, "weight_kg")
+                reps = s.get("reps")
+                total_sets += 1
+                if weight_kg is not None and reps is not None:
+                    vol_lbs += (weight_kg / 0.45359237) * float(reps)
+        workouts.append(
+            {
                 "date": r.get("date", ""),
-                "name": w.get("workout_name", "Workout"),
-                "exercises": len(w.get("exercises", [])),
-                "volume_lbs": round(float(w.get("total_volume_lbs") or 0)),
+                "name": r.get("title") or "Workout",
+                "exercises": len(exercises),
+                "volume_lbs": round(vol_lbs),
             }
-            workouts.append(wk)
-        total_vol += float(r.get("total_volume_lbs") or 0)
-        total_sets += int(r.get("total_sets") or 0)
+        )
+        total_vol += vol_lbs
     if not workouts:
         return None
     return {
@@ -827,7 +876,6 @@ def gather_all():
         "strava",
         "apple_health",
         "macrofactor",
-        "macrofactor_workouts",
         "withings",
         "habitify",
         "todoist",
@@ -842,6 +890,13 @@ def gather_all():
         raw_prior[src] = {d: r for d, r in full.items() if w2_start <= d <= w2_end}
         logger.info(f"  {src}: {len(raw_this[src])} this week, {len(raw_prior[src])} prior")
 
+    # Hevy strength detail (#485) — flat list, NOT query_range's {date: record}
+    # dict, since a day can hold more than one Hevy workout (see ex_hevy_workouts).
+    hevy_full = query_range_list("hevy", w4_start, w1_end)
+    hevy_this = [r for r in hevy_full if w1_start <= (r.get("date") or "") <= w1_end]
+    hevy_prior = [r for r in hevy_full if w2_start <= (r.get("date") or "") <= w2_end]
+    logger.info(f"  hevy: {len(hevy_this)} this week, {len(hevy_prior)} prior")
+
     # Journal entries
     journal_this = query_journal_range(w1_start, w1_end)
     journal_prior = query_journal_range(w2_start, w2_end)
@@ -855,7 +910,7 @@ def gather_all():
         "strava": ex_strava(raw_this["strava"], profile),
         "apple": ex_apple_health(raw_this["apple_health"]),
         "macrofactor": ex_macrofactor(raw_this["macrofactor"], profile),
-        "mf_workouts": ex_macrofactor_workouts(raw_this["macrofactor_workouts"]),
+        "mf_workouts": ex_hevy_workouts(hevy_this),
         "withings": ex_withings(raw_this["withings"]),
         "habitify": ex_habitify(raw_this["habitify"], profile),
         "todoist": ex_todoist(raw_this["todoist"]),
@@ -868,7 +923,7 @@ def gather_all():
         "strava": ex_strava(raw_prior["strava"], profile),
         "apple": ex_apple_health(raw_prior["apple_health"]),
         "macrofactor": ex_macrofactor(raw_prior["macrofactor"], profile),
-        "mf_workouts": ex_macrofactor_workouts(raw_prior["macrofactor_workouts"]),
+        "mf_workouts": ex_hevy_workouts(hevy_prior),
         "withings": ex_withings(raw_prior["withings"]),
         "habitify": ex_habitify(raw_prior["habitify"], profile),
         "todoist": ex_todoist(raw_prior["todoist"]),
@@ -1496,7 +1551,7 @@ def build_html(data, commentary, profile):
             d += f' · {act["mins"]} min'
             tr_rows += row(f'↳ {act["date"]} {act["name"]}', d)
 
-    # Strength (MacroFactor workouts)
+    # Strength (Hevy, #485)
     mfw = t.get("mf_workouts")
     if mfw:
         tr_rows += row(

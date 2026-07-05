@@ -140,7 +140,7 @@ def _render_weekly_digest():
             "strava": m.ex_strava({}, _DIGEST_PROFILE),
             "apple": m.ex_apple_health({}),
             "macrofactor": m.ex_macrofactor({}, _DIGEST_PROFILE),
-            "mf_workouts": m.ex_macrofactor_workouts({}),
+            "mf_workouts": m.ex_hevy_workouts([]),
             "withings": m.ex_withings(withings),
             "habitify": m.ex_habitify({}, _DIGEST_PROFILE),
             "todoist": m.ex_todoist({}),
