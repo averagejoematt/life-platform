@@ -381,3 +381,85 @@ def bh_fdr(pvals):
     for k, (i, _) in enumerate(labeled):
         out[i] = adj[k]
     return out
+
+
+def _clean_forecast_pairs(pairs):
+    """(probability in [0,1], outcome in {0,1}) pairs, dropping malformed entries."""
+    out = []
+    for pr in pairs or []:
+        try:
+            p, y = pr
+            p = float(p)
+            y = int(y)
+        except (TypeError, ValueError):
+            continue
+        if math.isnan(p) or p < 0.0 or p > 1.0 or y not in (0, 1):
+            continue
+        out.append((p, y))
+    return out
+
+
+def brier_score(pairs):
+    """Mean Brier score for probabilistic forecasts (#538/calibration scoreboard).
+
+    pairs: iterable of (stated_probability in [0,1], realized_outcome in {0,1}).
+    Returns mean((p - y)^2) — 0.0 is perfect, 0.25 is the always-say-50% baseline,
+    1.0 is confidently-wrong-every-time. None when there are no valid pairs.
+    Unrounded; the caller owns presentation rounding (matches the module contract).
+    """
+    clean = _clean_forecast_pairs(pairs)
+    if not clean:
+        return None
+    return sum((p - y) ** 2 for p, y in clean) / len(clean)
+
+
+def brier_skill_score(pairs):
+    """Brier skill score vs. the base-rate climatology forecast. None if degenerate.
+
+    1.0 perfect, 0.0 = no better than always predicting the observed base rate,
+    negative = worse than the base rate. The honest "does stated confidence beat
+    just guessing the average?" number.
+    """
+    clean = _clean_forecast_pairs(pairs)
+    if len(clean) < 2:
+        return None
+    base_rate = sum(y for _, y in clean) / len(clean)
+    bs = sum((p - y) ** 2 for p, y in clean) / len(clean)
+    bs_ref = sum((base_rate - y) ** 2 for _, y in clean) / len(clean)
+    if bs_ref == 0:
+        return None  # every outcome identical — skill is undefined
+    return 1.0 - bs / bs_ref
+
+
+def reliability_bins(pairs, n_bins=10):
+    """Calibration-curve bins: for each confidence band, stated vs. observed rate.
+
+    pairs: (probability in [0,1], outcome in {0,1}). Splits [0,1] into n_bins equal
+    bands (the top edge is inclusive on the last bin) and, for the non-empty ones,
+    returns dicts {lo, hi, n, mean_confidence, observed_rate}. mean_confidence is the
+    average stated probability in the bin; observed_rate is the fraction that came
+    true. A well-calibrated forecaster has mean_confidence ≈ observed_rate in every
+    bin. Empty list when no valid pairs. Unrounded.
+    """
+    clean = _clean_forecast_pairs(pairs)
+    if not clean or n_bins < 1:
+        return []
+    buckets = [[] for _ in range(n_bins)]
+    for p, y in clean:
+        idx = min(n_bins - 1, int(p * n_bins))  # p == 1.0 lands in the last bin
+        buckets[idx].append((p, y))
+    out = []
+    for i, b in enumerate(buckets):
+        if not b:
+            continue
+        n = len(b)
+        out.append(
+            {
+                "lo": i / n_bins,
+                "hi": (i + 1) / n_bins,
+                "n": n,
+                "mean_confidence": sum(p for p, _ in b) / n,
+                "observed_rate": sum(y for _, y in b) / n,
+            }
+        )
+    return out

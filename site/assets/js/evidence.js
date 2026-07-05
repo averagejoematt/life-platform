@@ -2263,6 +2263,50 @@ async function renderCorrelations(d) {
   return head + betsLine + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
 }
 // Predictions — the coaches' forward calls, scored against measured outcomes.
+// Calibration scoreboard (#538) — every forecast graded against reality. Platform +
+// per-coach Brier, the reliability curve (stated confidence vs. what came true), and
+// the hypothesis engine's own ledger. The honesty moat, made legible.
+function renderCalibration(d) {
+  const p = (d && d.platform) || {};
+  const coaches = (d && d.coaches) || [];
+  const hyp = (d && d.hypotheses) || {};
+  if (!(p.n > 0))
+    return empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.");
+  const cal = String(p.calibration || "").replace(/_/g, " ");
+  const head = figs([
+    fig(p.n, "graded forecasts"),
+    p.brier != null && fig(fmt(p.brier), "platform Brier"),
+    p.brier_skill != null && fig(fmt(p.brier_skill), "skill vs base-rate"),
+    p.accuracy_pct != null && fig(fmt(p.accuracy_pct) + "%", "hit rate"),
+    p.calibration && p.calibration !== "insufficient_data" && fig(ttl(cal), "calibration"),
+  ]);
+  const bins = p.reliability_bins || [];
+  const relRows = bins
+    .map(
+      (b) =>
+        `<tr><td class="rd-name">${Math.round(b.lo * 100)}–${Math.round(b.hi * 100)}%</td><td class="num">${b.n}</td><td class="num">${Math.round(b.mean_confidence * 100)}%</td><td class="num rd-range">${Math.round(b.observed_rate * 100)}%</td></tr>`,
+    )
+    .join("");
+  const relTbl = bins.length
+    ? sec(
+        "Reliability curve — stated confidence vs. what actually happened",
+        `<table class="rd-tbl"><thead><tr><th>confidence band</th><th>n</th><th>said</th><th>came true</th></tr></thead><tbody>${relRows}</tbody></table>`,
+      )
+    : "";
+  const cRows = coaches
+    .map(
+      (c) =>
+        `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}</td><td class="num">${c.n}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range">${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${c.calibration && c.calibration !== "insufficient_data" ? esc(ttl(String(c.calibration).replace(/_/g, " "))) : "—"}</td></tr>`,
+    )
+    .join("");
+  const board = sec(
+    "The scoreboard — by coach",
+    `<table class="rd-tbl"><thead><tr><th>coach</th><th>graded</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
+  );
+  const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved, Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
+  return head + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.");
+}
+
 function renderPredictions(d) {
   const o = (d && d.overall) || {};
   const list = (d && d.predictions) || [];
@@ -2892,7 +2936,7 @@ function wireCharacter() {
 }
 
 const RENDERERS = {
-  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, benchmarks: renderBenchmarks, character: renderCharacter, scenarios: renderScenarios };
+  vitals: renderPulse, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, scenarios: renderScenarios };
 const WIRE = {
   ask: () => {
     const mount = document.querySelector("[data-ask-mount]");

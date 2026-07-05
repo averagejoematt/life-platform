@@ -289,6 +289,16 @@ REGISTRY = [
         "/legacy/predictions/",
     ),
     (
+        "calibration",
+        "Calibration scoreboard",
+        "Every forecast graded against what actually happened — Brier scores and a reliability curve, per coach and platform-wide. The honesty moat, made public.",
+        "Credibility & the machine",
+        "data",
+        "/api/calibration",
+        None,
+        None,
+    ),
+    (
         "scenarios",
         "Scenario explorer",
         "Pick a kind of day — see the distribution of what historically followed. Correlative by design.",
@@ -476,6 +486,7 @@ _REGROUP = {
     # appears TWICE (the /data/ live sheet + the /method/ editorial explainer, whose
     # tuple carries "How it holds up" inline). A regroup entry would clobber both.
     "predictions": "How it holds up",
+    "calibration": "How it holds up",  # #538: the calibration scoreboard sits with the credibility surfaces
     "scenarios": "How it holds up",
     "benchmarks": "How it holds up",
     "biology": "How it holds up",
