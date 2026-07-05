@@ -91,30 +91,50 @@ def get_completed_tasks(api_token, since, until):
     return all_tasks
 
 
+def _paginate_tasks(api_token, path, base_params):
+    """Fetch every page of a v1 tasks endpoint via cursor pagination.
+
+    The v1 API caps a single page at 200; without following `next_cursor` you
+    silently truncate at the first page (#478). Handles both the `results`
+    (v1 task lists) and `items` (legacy) envelope shapes.
+    """
+    all_tasks, cursor = [], None
+    while True:
+        params = dict(base_params)
+        params["limit"] = 200
+        if cursor:
+            params["cursor"] = cursor
+        result = api_get(path, api_token, params)
+        if isinstance(result, dict):
+            items = result.get("results", result.get("items", []))
+            next_cursor = result.get("next_cursor")
+        else:
+            items = result if isinstance(result, list) else []
+            next_cursor = None
+        if not isinstance(items, list):
+            break
+        all_tasks.extend(items)
+        if not next_cursor or not items:
+            break
+        cursor = next_cursor
+    return all_tasks
+
+
 def get_active_tasks(api_token):
-    """Snapshot of current active tasks."""
-    result = api_get("/tasks", api_token, {"limit": 200})
-    return result.get("items", result.get("results", result)) if isinstance(result, dict) else result
+    """Snapshot of ALL current active tasks (paginated past the 200-page cap, #478)."""
+    return _paginate_tasks(api_token, "/tasks", {})
 
 
 def get_filtered_tasks(api_token, filter_str):
-    """Fetch tasks matching a Todoist filter string (e.g. 'overdue', 'today')."""
+    """Fetch tasks matching a Todoist filter string (e.g. 'overdue', 'today').
+
+    Uses the dedicated server-side filter endpoint GET /tasks/filter?query=...
+    (#478). The plain /tasks endpoint on the v1 API silently IGNORES a `filter`
+    param and returns the entire active list — which is why overdue/due-today
+    counts were previously ≈ the whole task list.
+    """
     try:
-        all_tasks, cursor = [], None
-        while True:
-            params = {"filter": filter_str, "limit": 200}
-            if cursor:
-                params["cursor"] = cursor
-            result = api_get("/tasks", api_token, params)
-            items = result.get("items", result.get("results", result)) if isinstance(result, dict) else result
-            if not isinstance(items, list):
-                break
-            all_tasks.extend(items)
-            next_cursor = result.get("next_cursor") if isinstance(result, dict) else None
-            if not next_cursor or not items:
-                break
-            cursor = next_cursor
-        return all_tasks
+        return _paginate_tasks(api_token, "/tasks/filter", {"query": filter_str})
     except Exception as e:
         logger.warning("filter query %r failed: %s", filter_str, e)
         return []
