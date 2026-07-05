@@ -9,6 +9,7 @@
   Keyboard-accessible: chips are real <button>s; Esc closes.
 */
 import { sigil } from "/assets/js/sigils.js";
+import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 
 // THE single genesis source of truth (P0.1). Genesis = 2026-06-14; Day N = whole days since,
 // +1 so genesis day is Day 1; Week N = floor((dayN-1)/7)+1 (Day 8 = Week 2). EVERY door's
@@ -72,7 +73,7 @@ function hide() {
 function show(chip, c) {
   const p = popEl();
   p.innerHTML =
-    `<p class="cp-name" style="--coach:${esc(c.color || "")}"><span class="coach-mark">${sigil(c, { title: "" })}</span>${esc(c.name)}</p>` +
+    `<p class="cp-name" style="--coach:${esc(c.color || "")}"><span class="coach-mark">${portrait(c, { title: "", size: 18 }) || sigil(c, { title: "" })}</span>${esc(c.name)}</p>` +
     `<p class="cp-role label">${esc(c.board_role || c.domain || "")}</p>` +
     (c.short_bio ? `<p class="cp-bio">${esc(c.short_bio)}</p>` : "") +
     `<a class="cp-link" href="/coaching/coaches/#${esc(c.persona_id)}">full page →</a>`;

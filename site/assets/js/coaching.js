@@ -20,6 +20,7 @@
 */
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
+import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 
 const SECTIONS = [
@@ -282,7 +283,7 @@ async function renderByCoach(read, id) {
     wantsTraining ? tryJSON("/api/training_overview") : Promise.resolve(null),
   ]);
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}"><span class="sigil-lg">${sigil(coach, { title: "" })}</span><div><p class="dx-kicker label">${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2></div></div>`;
+  let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><p class="dx-kicker label">${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2></div></div>`;
 
   // 0) THE STANCE — the coach's evolving, evidence-derived read of Matthew (the
   //    durable "where I think you are", above this week's domain detail).
@@ -403,7 +404,7 @@ async function renderTeamCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the profile…</span></p>`;
   const d = await tryJSON(`/api/coach/${encodeURIComponent(id)}`);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load this profile just now.</p>`; return; }
-  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}"><span class="sigil-lg">${sigil(d, { title: "" })}</span><div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
+  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
   const v = d.voice || {};
