@@ -2,7 +2,7 @@
   evidence_body.js — the body domain: supplements, bloodwork, physical (weight cockpit +
   composition arc) and training. Split out of evidence.js (#581) — no behavior change.
 */
-import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, weightTrendChart, projectionCone } from "/assets/js/charts.js";
+import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, weightTrendChart, projectionCone, ciWhisker } from "/assets/js/charts.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, figs, sec, empty, note, evClass, kvtable } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 
@@ -75,8 +75,20 @@ export function physicalTrendHero(readings, j, goal) {
   const serif = rate != null && rate < 0
     ? `The scale is moving. ${prov ? "Most of an early cut is water — this rate will slow, and the line knows it; trust the smoothed trend over any single morning's dot." : "The smoothed trend is the signal; the daily dots are scale noise — water, food, the time of the weigh-in."} Goal ${fmt(goal)} sits off the bottom of this axis on purpose: anchoring to it would flatten the slope you're actually walking.`
     : `Weight is the daily metronome — the thing that moves every morning. The faint dots are the raw scale; the line is the trend underneath the noise.`;
+  // #551 — the rate as an honest FORECAST: the point slope with its real block-bootstrap
+  // 80% CI drawn as a band. If the band crosses zero the loss isn't statistically nailed
+  // down yet — the honest read the bare number hides. Honest fallback: no CI ⇒ point only.
+  const rateForecast = (rate != null && rate !== 0)
+    ? sec("How fast — the rate, with its honest interval",
+        ciWhisker(rate, ciLo, ciHi, {
+          unit: " lb/wk", label: "trend slope", confidence: j.projection_confidence ?? 0.8,
+          caption: (ciLo != null && ciHi != null)
+            ? `The band is the ${Math.round((Number(j.projection_confidence) || 0.8) * 100)}% CI on the trend slope${(Number(ciLo) < 0 && Number(ciHi) > 0) ? " — it crosses zero, so the loss isn't statistically established yet (direction, not verdict)" : ""}. The point is the best estimate; the band is the honesty.`
+            : "No interval yet — the slope needs a longer run of weigh-ins before a band is honest. The point alone, for now.",
+        }))
+    : "";
   return sec("Weight — the daily metronome",
-    chart + `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
+    chart + `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`) + rateForecast;
 }
 
 // P0.3 — HappyScale-style stat cluster: High / Latest / Low · Yesterday (day-over-day) ·
@@ -394,8 +406,15 @@ export async function renderPhysical(d) {
     const last6 = ws6[ws6.length - 1];
     const rungList = []; for (let w = Math.floor((last6.w - 5) / 10) * 10; w > goal; w -= 10) rungList.push(w);
     parts.push(sec("Projection to 185 — the cone, not a line",
-      projectionCone({ date: last6.d, w: last6.w }, goal, ratePerWeek, { provisional: !!j.rate_provisional, rungs: rungList, label: "Projected weight → 185" }) +
-      `<p class="rd-meta label">A forecast is a cone, never a line. It's wide because the rate is young and water-heavy; it tightens as real weigh-ins accrue. The dated bet above is held honestly — and checked against what actually happens.</p>`));
+      projectionCone({ date: last6.d, w: last6.w }, goal, ratePerWeek, {
+        provisional: !!j.rate_provisional, rungs: rungList, label: "Projected weight → 185",
+        // #551 — the fan edges bind to the REAL block-bootstrap slope CI, and the dated bet
+        // to the backend's OWN goal-date range. Honest fallback (no CI) draws the line only.
+        rateCiLow: j.weekly_rate_ci_low, rateCiHigh: j.weekly_rate_ci_high,
+        goalDateRange: { earliest: j.projected_goal_date_earliest, latest: j.projected_goal_date_latest },
+        confidence: j.projection_confidence,
+      }) +
+      `<p class="rd-meta label">A forecast is a cone, never a line. The band is the real ${j.projection_confidence != null ? Math.round(Number(j.projection_confidence) * 100) + "% " : ""}confidence interval on the loss slope — wide because the rate is young, tightening as weigh-ins accrue. The dated bet is the backend's own goal-date range, held honestly and checked against what actually happens.</p>`));
   }
   parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
   // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
