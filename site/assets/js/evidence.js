@@ -11,6 +11,7 @@
 import { domainIcon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
 import { esc, getJSON, tryJSON, isBad, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { enhanceProvenance } from "/assets/js/provenance_popover.js";
 import { renderSupplements, renderLabs, renderPhysical, renderTraining } from "/assets/js/evidence_body.js";
 import { wireCharacter, renderCharacter } from "/assets/js/evidence_character.js";
 import { wireDataFigure, moveTrendMarker } from "/assets/js/evidence_datafigure.js";
@@ -117,10 +118,10 @@ async function renderCenter() {
   const deeper = main.querySelector("[data-deeper]");
   deeper.innerHTML = "";   // no link-outs to /legacy — everything lives inline in v4 now
   if (t.mode === "editorial") { ro.innerHTML = t.editorial || empty("—"); return; }
-  if (t.mode === "interactive") { ro.innerHTML = (RENDERERS[t.slug] || renderGeneric)({}, t); if (WIRE[t.slug]) WIRE[t.slug](); return; }
+  if (t.mode === "interactive") { ro.innerHTML = (RENDERERS[t.slug] || renderGeneric)({}, t); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro); return; }
   if (t.mode !== "data" || !t.endpoint) { ro.innerHTML = empty(t.archive_note || "This section lives in the archive while it's rebuilt."); return; }
   ro.innerHTML = `<p class="rd-archive"><span class="shimmer">Loading ${esc(t.title)}…</span></p>`;
-  try { const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t); ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); }
+  try { const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t); ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro); }
   catch (e) { ro.innerHTML = empty("This readout couldn't load its data just now. The preserved view is linked below."); }
   // Only pull the viewport to the readout on MOBILE (the nav stacks above the
   // content there). On desktop the readout sits beside the sticky nav, so a smooth

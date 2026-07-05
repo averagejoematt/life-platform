@@ -1325,3 +1325,29 @@ li.wk-explain { list-style: none; }
 .share-btn:hover { color: var(--ember); border-color: var(--ember-line); }
 .share-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 .sc-call .share-btn, .qa-share .share-btn { margin-left: 0; margin-top: var(--sp-3); }
+
+/* ── #584 Provenance popover — "how is this number computed?" on any [data-method]
+   stat tile. Registry-fed by provenance_popover.js from /api/methods; mirrors the
+   coach-name popover chrome. APPENDED at file end to avoid collision with concurrent
+   #551 tokens.css edits (keep both sides on merge). ──────────────────────────── */
+.prov-btn { display: inline-flex; align-items: center; justify-content: center; vertical-align: baseline;
+  margin-left: 0.35em; padding: 0; width: 1.05em; height: 1.05em; line-height: 1; font: inherit; font-size: 0.92em;
+  color: var(--ink-faint); background: none; border: none; cursor: pointer;
+  transition: color var(--dur-fast, 0.15s); }
+.prov-btn:hover { color: var(--ember); }
+.prov-btn:focus-visible { color: var(--ember); outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.prov-pop { position: absolute; z-index: var(--z-overlay, 60); max-width: 320px; padding: var(--sp-3) var(--sp-4);
+  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+.prov-pop .pv-name { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-small); color: var(--ink); }
+.prov-pop .pv-formula { margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-xs);
+  background: var(--surface-sunken); font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink);
+  line-height: var(--lh-relaxed); overflow-x: auto; white-space: pre-wrap; overflow-wrap: break-word; }
+.prov-pop .pv-fields { margin-top: var(--sp-3); display: grid; gap: var(--sp-2); }
+.prov-pop .pv-row dt { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label, 0.06em);
+  text-transform: uppercase; color: var(--ink-faint); }
+.prov-pop .pv-row dd { margin: 2px 0 0; font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); }
+.prov-pop .pv-row dd { word-break: break-word; }
+.prov-pop .pv-link { display: inline-block; margin-top: var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-label);
+  color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.prov-pop .pv-link:hover { border-color: var(--ember); }

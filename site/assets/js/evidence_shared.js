@@ -44,7 +44,10 @@ export const todayPT = () => new Date().toLocaleDateString("en-CA", { timeZone: 
 
 export const dayBefore = (iso) => { const t = Date.parse(String(iso || "").slice(0, 10)); return Number.isFinite(t) ? new Date(t - 86400000).toISOString().slice(0, 10) : ""; };
 
-export const fig = (v, k, extra) => `<div class="fig"><span class="fig-v num">${esc(v)}</span><span class="fig-k label">${esc(k)}</span>${extra ? `<span class="rd-delta">${esc(extra)}</span>` : ""}</div>`;
+// `method` (optional, 4th arg) is a methods-registry key (#544) — when present it tags the
+// tile with data-method so provenance_popover.js can attach a code-drawn "how is this
+// computed?" popover fed straight from /api/methods (never hand-written formula text).
+export const fig = (v, k, extra, method) => `<div class="fig"${method ? ` data-method="${esc(method)}"` : ""}><span class="fig-v num">${esc(v)}</span><span class="fig-k label">${esc(k)}</span>${extra ? `<span class="rd-delta">${esc(extra)}</span>` : ""}</div>`;
 
 export const figs = (a) => `<div class="figs">${a.filter(Boolean).join("")}</div>`;
 

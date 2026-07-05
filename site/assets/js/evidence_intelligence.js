@@ -8,7 +8,7 @@ import { lineChart, dualWeight, nDots } from "/assets/js/charts.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 
-export async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
+export async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
 
 // Post-mortems — what each closed cycle taught, derived live from the record.
 export async function renderPostmortems(d) {
@@ -202,7 +202,7 @@ export async function renderCorrelations(d) {
   // into one honest line instead of tabling a wall of r=0.00 / n=2 rows.
   const tabled = pairs.filter((p) => (p.n ?? 0) >= 5);
   const belowFloor = pairs.length - tabled.length;
-  const head = figs([fig(obj.count ?? pairs.length, "pairs"), sig ? fig(sig, "FDR-significant") : "", hypCount ? fig(hypCount, "open bets") : "", obj.week && fig(obj.week, "week")]);
+  const head = figs([fig(obj.count ?? pairs.length, "pairs", null, "pearson_r"), sig ? fig(sig, "FDR-significant", null, "bh_fdr") : "", hypCount ? fig(hypCount, "open bets") : "", obj.week && fig(obj.week, "week")]);
   const pTxt = (p) => (p.p === 0 ? "&lt;0.001" : p.p == null ? "—" : fmt(p.p, 3));
   // #551 — the n column reads as sample-size DOTS (the confidence grammar): a reader SEES
   // the evidence weight, not just a number. Real overlapping-day n only, never padded.
@@ -224,11 +224,11 @@ export function renderCalibration(d) {
     return empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.");
   const cal = String(p.calibration || "").replace(/_/g, " ");
   const head = figs([
-    fig(p.n, "graded forecasts"),
-    p.brier != null && fig(fmt(p.brier), "platform Brier"),
-    p.brier_skill != null && fig(fmt(p.brier_skill), "skill vs base-rate"),
-    p.accuracy_pct != null && fig(fmt(p.accuracy_pct) + "%", "hit rate"),
-    p.calibration && p.calibration !== "insufficient_data" && fig(ttl(cal), "calibration"),
+    fig(p.n, "graded forecasts", null, "calibration_score_pairs"),
+    p.brier != null && fig(fmt(p.brier), "platform Brier", null, "brier_score"),
+    p.brier_skill != null && fig(fmt(p.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
+    p.accuracy_pct != null && fig(fmt(p.accuracy_pct) + "%", "hit rate", null, "calibration_score_pairs"),
+    p.calibration && p.calibration !== "insufficient_data" && fig(ttl(cal), "calibration", null, "calibration_verdict"),
   ]);
   const bins = p.reliability_bins || [];
   const relRows = bins
