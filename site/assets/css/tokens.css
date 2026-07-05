@@ -1112,8 +1112,11 @@ a.vg-lit:hover { background: var(--ember-wash); }
      per-coach read cards on Coaching's landing tab (+ protocol cards), injected on
      every tab render — opacity-gating them left the flagship AI digest reading as
      DEAD AIR in any non-scrolling context (the heading isn't gated; the cards were).
-     Content over entrance: they paint immediately. */
-  html.mo .hero, html.mo .page-hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat,
+     Content over entrance: they paint immediately.
+     .page-hero was removed too (2026-07-05, #588): it's the always-above-fold
+     orientation banner + the cross-document View-Transition morph target — capturing
+     it mid-fade flashed a blank hero on arrival. It paints instantly. */
+  html.mo .hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat,
   html.mo .loop, html.mo .rd-sec, html.mo .two-voice, html.mo .coach-daily, html.mo .coach-progress,
   html.mo .coach-report, html.mo .coach-stance, html.mo .team-lead, html.mo .team-focus,
   html.mo .team-tension, html.mo .team-huddle, html.mo .supp, html.mo .cap-card,
@@ -1137,6 +1140,38 @@ a.vg-lit:hover { background: var(--ember-wash); }
   .loop > .loop-arrow:nth-child(4) { animation-delay: 0.35s; }
   .loop > .loop-arrow:nth-child(6) { animation-delay: 0.7s; }
   @keyframes mo-flow { 0%, 100% { opacity: 0.4; } 45% { opacity: 1; transform: translateX(2px); } }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   12b. MOTION v2 (#588) — cross-document View Transitions. The site navigates as
+   ONE continuous instrument: the loop-ribbon persists and its ember "you are here"
+   marker slides to the new door while page content cross-fades — the causal loop
+   made continuous, not re-drawn each page. Pure progressive enhancement: a browser
+   without @view-transition just navigates, zero fallback cost. All of it is off
+   under reduced-motion (the swap stays instant; the cross-fade + morph drop).
+   The service worker enables NO navigation preload and returns a clean fetch() for
+   navigations, so it composes with cross-document transitions unchanged.
+   ════════════════════════════════════════════════════════════════════════════ */
+@view-transition { navigation: auto; }
+
+/* Shared elements that persist across a door navigation. Each name is unique per
+   document (one brand, one ribbon per page), which is what a VT name requires. */
+.brand { view-transition-name: site-brand; }
+.loop-ribbon { view-transition-name: loop-ribbon; }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The ember marker settles as the new door arrives — a half-second confirm of
+     "you landed here," on top of the ribbon morph. Opacity only, so it never
+     shifts layout or fights the transition. */
+  .loop-ribbon .lr-here { animation: lr-settle 0.5s var(--ease-out) both; }
+  @keyframes lr-settle { from { opacity: 0.35; } to { opacity: 1; } }
+}
+
+/* Reduced-motion: keep the instant page swap, drop the cross-fade + morph. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

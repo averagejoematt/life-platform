@@ -194,6 +194,24 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   bottom: var(--sp-5); width: var(--spine-tick-w); background: var(--spine-ticks);
 }
 
+/* #588 motion v2 — the measuring-rule "fills" with your progress through the
+   readout. Scroll-driven, so the fill tracks real position, not a timer;
+   @supports-gated + reduced-motion-gated (unsupported / reduced → full static
+   rule, unchanged). */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .spine::after {
+      transform-origin: top;
+      animation: spine-draw linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 65%;
+    }
+    /* starts at a visible base (never a bare rule at the top) and fills to full
+       as you scroll — a measuring rule that tracks your progress. */
+    @keyframes spine-draw { from { transform: scaleY(0.15); } to { transform: scaleY(1); } }
+  }
+}
+
 .panel-body { flex: 1; min-width: 0; padding: var(--sp-6) clamp(1.1rem, 0.6rem + 2vw, 1.9rem) var(--sp-5); }
 
 .cap { margin-bottom: var(--sp-2); }
