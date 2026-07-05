@@ -155,6 +155,18 @@ def _latest_date_str(source: str) -> str | None:
     return str(items[0]["sk"]).replace("DATE#", "")[:10]
 
 
+def _apple_health_datatypes():
+    """Per-datatype HAE liveness the freshness-checker stores (D-4/#468). None if absent."""
+    try:
+        rec = table.get_item(Key={"pk": USER_PREFIX + "apple_health", "sk": "DATATYPE_LIVENESS"}).get("Item")
+        if not rec:
+            return None
+        return _decimal_to_float(rec).get("datatypes")
+    except Exception as e:  # never break the feed for a missing sentinel
+        logger.warning("source_freshness: apple_health datatypes read failed: %s", e)
+        return None
+
+
 def handle_source_freshness() -> dict:
     """GET /api/source_freshness — live pipeline status per data source.
 
@@ -188,18 +200,25 @@ def handle_source_freshness() -> dict:
         except Exception as e:  # never let one source break the feed
             logger.warning("source_freshness: %s failed: %s", sid, e)
             status = "unknown"
-        sources.append(
-            {
-                "id": sid,
-                "label": meta["label"],
-                "desc": meta["desc"],
-                "category": meta["category"],
-                "last_update": last_update,
-                "age_hours": age_hours,
-                "status": status,
-                "is_behavioral": bool(meta.get("behavioral")),
-            }
-        )
+        entry = {
+            "id": sid,
+            "label": meta["label"],
+            "desc": meta["desc"],
+            "category": meta["category"],
+            "last_update": last_update,
+            "age_hours": age_hours,
+            "status": status,
+            "is_behavioral": bool(meta.get("behavioral")),
+        }
+        # D-4 (#468): apple_health is one partition fed by many sensors, so its single
+        # "fresh" hides a months-dark CGM/BP/SoM/workout stream. Surface the per-datatype
+        # liveness the freshness-checker stores so the darkness is visible.
+        if sid == "apple_health":
+            dts = _apple_health_datatypes()
+            if dts:
+                entry["datatypes"] = dts
+                entry["dark_datatypes"] = [d["label"] for d in dts if d.get("dark")]
+        sources.append(entry)
         summary["total"] += 1
         if status == "fresh":
             summary["fresh"] += 1

@@ -61,6 +61,37 @@ AH_LOW_STEP_FLOOR = int(os.environ.get("AH_LOW_STEP_FLOOR", "1000"))  # a comple
 AH_LOW_STEP_ALERT_COUNT = int(os.environ.get("AH_LOW_STEP_ALERT_COUNT", "4"))  # low days (of 7) → alert
 AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 
+# ── D-4 (#468): HAE per-datatype liveness ───────────────────────────────────
+# Every HAE datatype (CGM, BP, State of Mind, workouts, water) lands in the SAME
+# apple_health partition (SOURCE#apple_health / DATE# items) as merged daily fields —
+# there is no per-datatype partition. So partition-level "fresh" hides a sensor that
+# went dark weeks ago while steps/water keep the partition alive. This map lets the
+# checker report last-seen PER datatype by which prefixed field last appeared on which
+# DATE# record. `fields` = any-of presence signals; `stale_days` = behavioral threshold
+# (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
+HAE_DATATYPES = [
+    {"key": "cgm", "label": "CGM (glucose)", "fields": ["blood_glucose_avg", "blood_glucose_readings_count"], "stale_days": 3},
+    {
+        "key": "blood_pressure",
+        "label": "Blood pressure",
+        "fields": ["blood_pressure_systolic", "blood_pressure_diastolic"],
+        "stale_days": 14,
+    },
+    {
+        "key": "state_of_mind",
+        "label": "State of Mind",
+        "fields": ["som_avg_valence", "som_check_in_count", "som_mood_count"],
+        "stale_days": 14,
+    },
+    {"key": "workouts", "label": "Workouts / recovery", "fields": ["recovery_workout_minutes", "breathwork_minutes"], "stale_days": 10},
+    {"key": "water", "label": "Water", "fields": ["water_intake_ml", "water_intake_oz"], "stale_days": 3},
+    {"key": "steps", "label": "Steps / activity", "fields": ["steps"], "stale_days": 2},
+]
+# Longest lookback needed to find a still-present-but-slow datatype (cap the scan).
+HAE_LIVENESS_WINDOW_DAYS = int(os.environ.get("HAE_LIVENESS_WINDOW_DAYS", "45"))
+_HAE_LIVENESS_SK = "DATATYPE_LIVENESS"  # sentinel SK on the apple_health partition (sorts before DATE#)
+_AH_ALERT_STATE_SK = "ALERTSTATE#ah_activity_degraded"  # DI-1.6 episode sentinel
+
 
 def check_apple_health_activity(table, now, sick_suppress):
     """Detect a silent Apple Health activity-stream failure (the HAE 413 blind spot).
@@ -155,6 +186,99 @@ def check_apple_health_activity(table, now, sick_suppress):
         f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
     )
     return msg, metrics
+
+
+def _rec_date(it):
+    """YYYY-MM-DD from an apple_health DATE# item's sk."""
+    return str(it.get("sk", "")).replace("DATE#", "")[:10]
+
+
+def compute_datatype_liveness(records, now, datatypes=None):
+    """Per-HAE-datatype last-seen from apple_health DATE# records (D-4/#468). Pure.
+
+    Each datatype writes prefixed fields into the day's merged apple_health item, so
+    "last seen" for a datatype is the most recent DATE# on which ANY of its fields was
+    present. records: dicts with 'sk' + the datatype fields. Returns a list of
+    {key, label, last_seen (YYYY-MM-DD|None), age_days (int|None), dark (bool), stale_days}.
+    A datatype with nothing in the window is dark with last_seen None.
+    """
+    datatypes = datatypes or HAE_DATATYPES
+    today = now.date()
+    out = []
+    for dt in datatypes:
+        last = None
+        for it in records:
+            if any(it.get(f) is not None for f in dt["fields"]):
+                d = _rec_date(it)
+                if len(d) == 10 and (last is None or d > last):
+                    last = d
+        if last:
+            age = (today - datetime.strptime(last, "%Y-%m-%d").date()).days
+            dark = age > dt["stale_days"]
+        else:
+            age, dark = None, True
+        out.append(
+            {"key": dt["key"], "label": dt["label"], "last_seen": last, "age_days": age, "dark": dark, "stale_days": dt["stale_days"]}
+        )
+    return out
+
+
+def check_apple_health_datatypes(table, now):
+    """Query the apple_health partition and compute per-datatype liveness (D-4/#468)."""
+    pk = f"USER#{USER_ID}#SOURCE#apple_health"
+    fields = sorted({f for dt in HAE_DATATYPES for f in dt["fields"]})
+    # sk + every datatype field. None are DynamoDB reserved words, so no aliasing needed.
+    projection = "sk, " + ", ".join(fields)
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": pk, ":pfx": "DATE#"},
+            ScanIndexForward=False,
+            Limit=HAE_LIVENESS_WINDOW_DAYS + 3,
+            ProjectionExpression=projection,
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("apple_health datatype-liveness query failed (non-fatal): %s", e)
+        return None
+    return compute_datatype_liveness(resp.get("Items", []), now)
+
+
+def alert_episode_decision(state, degraded, now, reminder_hours=24):
+    """Episode-based dedup so a recurring alert fires once + a daily reminder, not N/run (D-8/#468).
+
+    Pure. Returns (should_send, new_state, kind). `state` is the prior sentinel dict (or None);
+    `degraded` is whether the alerting condition is active now.
+      - transition into degraded  -> send, kind="open"
+      - still degraded, last send >= reminder_hours ago -> send, kind="reminder"
+      - still degraded, within the reminder window -> no send, kind="hold"
+      - recovery (was open, now clear) -> no send, close episode, kind="resolved"
+    """
+    state = dict(state or {})
+    now_iso = now.isoformat()
+    was_open = bool(state.get("episode_open"))
+    if not degraded:
+        if was_open:
+            state["episode_open"] = False
+            state["resolved_at"] = now_iso
+        return (False, state, "resolved" if was_open else "quiet")
+    if not was_open:
+        return (
+            True,
+            {"episode_open": True, "first_fired_at": now_iso, "last_sent_at": now_iso, "send_count": 1, "resolved_at": None},
+            "open",
+        )
+    last_sent = state.get("last_sent_at")
+    send = True
+    if last_sent:
+        try:
+            send = (now - datetime.fromisoformat(last_sent)).total_seconds() / 3600.0 >= reminder_hours
+        except (ValueError, TypeError):
+            send = True
+    if send:
+        state["last_sent_at"] = now_iso
+        state["send_count"] = int(state.get("send_count", 0)) + 1
+        return (True, state, "reminder")
+    return (False, state, "hold")
 
 
 # S-06/#392: Sources whose staleness means "no entry logged yet" rather than a
@@ -650,21 +774,56 @@ def lambda_handler(event, context):
     except Exception as _oauth_e:
         logger.error("OAuth/manual token health check failed (non-fatal): %s", _oauth_e)
 
+    # ── D-4 (#468): per-datatype HAE liveness — compute + store so a months-dark
+    # sensor (CGM/BP/SoM/workouts/water) is visible instead of hidden behind a single
+    # "apple_health: fresh". /api/source_freshness reads the stored map.
+    _ah_pk = f"USER#{USER_ID}#SOURCE#apple_health"
+    try:
+        _dt_liveness = check_apple_health_datatypes(table, now)
+        if _dt_liveness is not None:
+            table.put_item(
+                Item={
+                    "pk": _ah_pk,
+                    "sk": _HAE_LIVENESS_SK,
+                    "datatypes": _dt_liveness,
+                    "computed_at": now.isoformat(),
+                    "dark_count": sum(1 for d in _dt_liveness if d["dark"]),
+                }
+            )
+            logger.info("HAE datatype liveness stored: %d dark of %d", sum(1 for d in _dt_liveness if d["dark"]), len(_dt_liveness))
+    except Exception as _dl_e:
+        logger.error("HAE datatype liveness compute/store failed (non-fatal): %s", _dl_e)
+
     # ── DI-1.6: Apple Health activity-integrity guard (the silent-413 blind spot) ──
     ah_degraded = False
     try:
         ah_alert, ah_metrics = check_apple_health_activity(table, now, _sick_suppress)
         ah_degraded = bool(ah_metrics.get("degraded"))
-        if ah_alert:
+        # D-8 (#468): episode-based dedup. The alert used to publish on EVERY run that
+        # found degradation (36 sends in 72h). Now: send once when the episode opens,
+        # then at most one daily reminder, and go quiet on recovery — regardless of how
+        # often the checker is invoked (async retries / SNS fanout can't amplify it).
+        _prior = {}
+        try:
+            _prior = (table.get_item(Key={"pk": _ah_pk, "sk": _AH_ALERT_STATE_SK}).get("Item")) or {}
+        except Exception as _se:
+            logger.warning("alert-state read failed (fail-open to send): %s", _se)
+        _should_send, _new_state, _kind = alert_episode_decision(_prior, ah_degraded, now)
+        try:
+            table.put_item(Item={"pk": _ah_pk, "sk": _AH_ALERT_STATE_SK, **_new_state})
+        except Exception as _we:
+            logger.error("alert-state write failed (non-fatal): %s", _we)
+        if ah_alert and _should_send:
             try:
-                sns.publish(
-                    TopicArn=SNS_ARN,
-                    Subject="⚠️ Life Platform: Apple Health activity-stream gap",
-                    Message=ah_alert,
-                )
-                logger.info("Apple Health activity-integrity alert sent")
+                _subj = "⚠️ Life Platform: Apple Health activity-stream gap"
+                if _kind == "reminder":
+                    _subj += " (ongoing)"
+                sns.publish(TopicArn=SNS_ARN, Subject=_subj, Message=ah_alert)
+                logger.info("Apple Health activity-integrity alert sent (episode=%s)", _kind)
             except Exception as _ae:
                 logger.error("Apple Health activity alert SNS publish failed: %s", _ae)
+        elif ah_alert:
+            logger.info("Apple Health activity degraded but alert held (episode=%s, no re-fire)", _kind)
         try:
             cw.put_metric_data(
                 Namespace="LifePlatform/Freshness",
