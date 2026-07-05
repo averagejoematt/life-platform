@@ -316,7 +316,10 @@ export function sparkline(values, { height = 34 } = {}) {
   const x = (i) => P + (i / (pts.length - 1)) * (W - 2 * P);
   const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
-  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>`;
+  // Interactive hover/tap (#582): decorative aria-hidden, but a touch still surfaces
+  // the value. motion.js reads data-cpts (normalized coords + label per point).
+  const cpts = pts.map((p, i) => ({ x: +(x(i) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), l: (p.d ? _shortDate(p.d) + " · " : "") + (Math.round(p.v * 10) / 10) }));
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" data-cpts="${escAttr(JSON.stringify(cpts))}"><path class="chart-line" d="${line}" vector-effect="non-scaling-stroke"/></svg>`;
 }
 
 // Horizontal 100%-stacked bar — for a composition (e.g. macro split P/C/F). segments:
@@ -326,9 +329,13 @@ export function stackedBar(segments, { label = "", unit = "g" } = {}) {
   const segs = (segments || []).map((s) => ({ l: s.label, v: Number(s.value) || 0, t: s.tone || "ink" })).filter((s) => s.v > 0);
   const total = segs.reduce((a, s) => a + s.v, 0);
   if (!total) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">No data yet.</figcaption></figure>`;
-  const bar = segs.map((s) => `<span class="sbar-seg sbar-${escAttr(s.t)}" style="width:${((s.v / total) * 100).toFixed(1)}%" title="${escAttr(s.l)} ${Math.round(s.v)}${escAttr(unit)}"></span>`).join("");
+  const bar = segs.map((s) => `<span class="sbar-seg sbar-${escAttr(s.t)}" style="width:${((s.v / total) * 100).toFixed(1)}%"></span>`).join("");
   const legend = segs.map((s) => `<span class="sbar-key"><i class="sbar-dot sbar-${escAttr(s.t)}"></i>${escAttr(s.l)} ${Math.round(s.v)}${escAttr(unit)} · ${Math.round((s.v / total) * 100)}%</span>`).join("");
-  return `<figure class="chart"><div class="sbar" role="img" aria-label="${escAttr(label)}">${bar}</div><figcaption class="chart-cap label sbar-legend">${legend}</figcaption></figure>`;
+  // Interactive hover/tap (#582): a point at each segment's centre — nearest-by-x
+  // lands on the segment under the finger. Replaces the native title tooltip.
+  let _acc = 0;
+  const cpts = segs.map((s) => { const cx = _acc + s.v / 2; _acc += s.v; return { x: +(cx / total).toFixed(4), y: 0.5, l: `${s.l} ${Math.round(s.v)}${unit} · ${Math.round((s.v / total) * 100)}%` }; });
+  return `<figure class="chart"><div class="sbar" role="img" aria-label="${escAttr(label)}" data-cpts="${escAttr(JSON.stringify(cpts))}">${bar}</div><figcaption class="chart-cap label sbar-legend">${legend}</figcaption></figure>`;
 }
 
 // Horizontal sufficiency bars 0→100% (intake vs target). Sorted ascending — worst
@@ -356,8 +363,12 @@ export function sufficiencyBars(items, { label = "", emberWorst = 2, warnBelow =
       `<span class="suf-v mono">${Math.round(r.pct)}%${amt}</span></div>`;
   };
   const cap = caveat || "100% = daily target · worst first · intake vs target from logged food, not blood levels.";
+  // Interactive hover/tap (#582): rows stack vertically, so hit-test by y (axis="y").
+  // Dot centres in the focused row; the tooltip carries its exact %/amount.
+  const n = rows.length;
+  const cpts = rows.map((r, i) => ({ x: 0.5, y: +((i + 0.5) / n).toFixed(4), l: `${r.l}: ${Math.round(r.pct)}% of target${(r.actual != null && r.target != null) ? ` (${_w(r.actual)}/${_w(r.target)}${r.unit})` : ""}` }));
   return `<figure class="chart suf">${label ? `<p class="suf-head label">${escAttr(label)}</p>` : ""}` +
-    `<div class="suf-rows">${rows.map(row).join("")}</div>` +
+    `<div class="suf-rows" role="img" aria-label="${escAttr(label || "sufficiency bars")}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-axis="y">${rows.map(row).join("")}</div>` +
     `<figcaption class="chart-cap label">${escAttr(cap)}</figcaption></figure>`;
 }
 
@@ -385,7 +396,13 @@ export function intakeSpine(intake, tdee, { label = "" } = {}) {
     return `<div class="hspine-mark ${align} ${emberMark ? "hspine-intake" : "hspine-tdee"}" style="left:${p.toFixed(1)}%">` +
       `<span class="hspine-lab"><span class="hspine-v mono">${Math.round(val)}</span><span class="hspine-k label">${key}</span></span></div>`;
   };
-  return `<figure class="chart spine-fig"><div class="hspine" role="img" aria-label="${escAttr(aria)}">` +
+  // Interactive hover/tap (#582): a point at each tick — nearest-by-x reads intake
+  // vs maintenance under the finger. y sits on the rule (top:34px of a 58px box).
+  const cpts = [
+    { x: +(pos(inK) / 100).toFixed(4), y: 0.64, l: `intake ${Math.round(inK)} kcal` },
+    { x: +(pos(td) / 100).toFixed(4), y: 0.64, l: `maintenance ${Math.round(td)} kcal` },
+  ];
+  return `<figure class="chart spine-fig"><div class="hspine" role="img" aria-label="${escAttr(aria)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<div class="hspine-rule"></div>` +
     `<div class="hspine-gap ${gapCls}" style="left:${pos(lo).toFixed(1)}%;width:${(pos(hi) - pos(lo)).toFixed(1)}%"></div>` +
     mark(inK, "intake", true) + mark(td, "maintenance", false) +
@@ -411,7 +428,13 @@ export function targetSpine(value, target, { valueLabel = "now", targetLabel = "
     return `<div class="hspine-mark ${align} ${ember ? "hspine-intake" : "hspine-tdee"}" style="left:${p.toFixed(1)}%">` +
       `<span class="hspine-lab${below ? " hspine-lab-below" : ""}"><span class="hspine-v mono">${Math.round(val)}${escAttr(unit)}</span><span class="hspine-k label">${escAttr(key)}</span></span></div>`;
   };
-  return `<figure class="chart spine-fig spine-fig--targets"><div class="hspine" role="img" aria-label="${escAttr(`${Math.round(v)} of ${Math.round(tg)} ${unit} — ${pct} percent of target.`)}">` +
+  // Interactive hover/tap (#582): a point at the value tick and the target tick.
+  // y sits on the rule (top:42px of an 88px targets box).
+  const cpts = [
+    { x: +(pos(v) / 100).toFixed(4), y: 0.52, l: `${valueLabel} ${Math.round(v)}${unit}` },
+    { x: +(pos(tg) / 100).toFixed(4), y: 0.52, l: `${targetLabel} ${Math.round(tg)}${unit}` },
+  ];
+  return `<figure class="chart spine-fig spine-fig--targets"><div class="hspine" role="img" aria-label="${escAttr(`${Math.round(v)} of ${Math.round(tg)} ${unit} — ${pct} percent of target.`)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
     `<div class="hspine-rule"></div>` +
     `<div class="hspine-gap hspine-gap-deficit" style="left:0;width:${pos(v).toFixed(1)}%"></div>` +
     mark(v, valueLabel, true, false) + mark(tg, targetLabel, false, true) +
@@ -458,7 +481,10 @@ export function dumbbell(items, { label = "", aLabel = "A", bLabel = "B", unit =
       `<span class="suf-v mono">${Math.round(r.a)}/${Math.round(r.b)}${escAttr(unit)}<span class="suf-amt">±${Math.round(gap)}</span></span></div>`;
   };
   const legend = `<span class="sbar-key"><i class="sbar-dot db-a"></i>${escAttr(aLabel)}</span><span class="sbar-key"><i class="sbar-dot db-b"></i>${escAttr(bLabel)}</span>`;
-  return `<figure class="chart"><div class="suf-rows">${rows.map(row).join("")}</div>` +
+  // Interactive hover/tap (#582): vertically-stacked rows → hit-test by y (axis="y").
+  const n = rows.length;
+  const cpts = rows.map((r, i) => ({ x: 0.5, y: +((i + 0.5) / n).toFixed(4), l: `${r.label}: ${Math.round(r.a)}/${Math.round(r.b)}${unit} (±${Math.round(Math.abs(r.a - r.b))})` }));
+  return `<figure class="chart"><div class="suf-rows" role="img" aria-label="${escAttr(label || "device agreement")}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-axis="y">${rows.map(row).join("")}</div>` +
     `<figcaption class="chart-cap label sbar-legend">${legend}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
@@ -479,7 +505,10 @@ export function landmarkBars(items, { label = "" } = {}) {
       `<span class="lmk-mrv" style="left:${pos(m.MRV).toFixed(1)}%"></span></span>` +
       `<span class="suf-v mono">${m.sets_per_week}/wk<span class="suf-amt">${escAttr(m.status)}</span></span></div>`;
   };
-  return `<figure class="chart"><div class="suf-rows">${rows.map(row).join("")}</div>` +
+  // Interactive hover/tap (#582): vertically-stacked rows → hit-test by y (axis="y").
+  const n = rows.length;
+  const cpts = rows.map((m, i) => ({ x: 0.5, y: +((i + 0.5) / n).toFixed(4), l: `${m.muscle}: ${m.sets_per_week}/wk — ${m.status}` }));
+  return `<figure class="chart"><div class="suf-rows" role="img" aria-label="${escAttr(label || "per-muscle volume")}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-axis="y">${rows.map(row).join("")}</div>` +
     `<figcaption class="chart-cap label">Sets/week vs the MEV–MAV optimal band (shaded) · MRV tick. ${escAttr(label)}</figcaption></figure>`;
 }
 
@@ -496,12 +525,18 @@ export function stackedDayColumns(days, segments, { label = "", legendUnit = "mi
   const h = (v) => `${((v / max) * 100).toFixed(1)}%`;
   const col = (r) => {
     const segHtml = r.segs.slice().reverse().map((s) => (s.v > 0 ? `<span class="scol-seg seg-${escAttr(s.tone)}" style="height:${h(s.v)}"></span>` : "")).join("");
-    const tip = r.segs.filter((s) => s.v > 0).map((s) => `${s.label} ${Math.round(s.v)}`).join(" · ");
-    return `<div class="scol" title="${escAttr(`${_shortDate(r.d)}: ${tip} ${legendUnit}`)}"><div class="scol-stack">${segHtml}</div>` +
+    return `<div class="scol"><div class="scol-stack">${segHtml}</div>` +
       `<span class="scol-l label">${escAttr(_shortDate(r.d).split(" ")[1] || "")}</span></div>`;
   };
   const legend = segments.map((s) => `<span class="sbar-key"><i class="sbar-dot seg-${escAttr(s.tone)}"></i>${escAttr(s.label)}</span>`).join("");
-  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(label)}">${rows.map(col).join("")}</div>` +
+  // Interactive hover/tap (#582): a point at each column top — nearest-by-x lands on
+  // the day under the finger. Replaces the native title tooltip.
+  const cpts = rows.map((r, i) => ({
+    x: +((i + 0.5) / rows.length).toFixed(4),
+    y: +Math.max(0.03, Math.min(0.97, 1 - r.total / max)).toFixed(4),
+    l: `${_shortDate(r.d)}: ${r.segs.filter((s) => s.v > 0).map((s) => `${s.label} ${Math.round(s.v)}`).join(" · ")} ${legendUnit}`,
+  }));
+  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(label)}" data-cpts="${escAttr(JSON.stringify(cpts))}">${rows.map(col).join("")}</div>` +
     `<figcaption class="chart-cap label sbar-legend">${legend}${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
@@ -546,7 +581,7 @@ export function stackedColumns(days, { label = "", emptyMsg = "" } = {}) {
   const h = (v) => `${((v / max) * 100).toFixed(1)}%`;
   const col = (r) => {
     const day = _shortDate(r.d);
-    return `<div class="scol" title="${escAttr(`${day}: protein ${Math.round(r.p)} · carbs ${Math.round(r.c)} · fat ${Math.round(r.f)} kcal`)}">` +
+    return `<div class="scol">` +
       `<div class="scol-stack">` +
       `<span class="scol-seg sbar-faint" style="height:${h(r.f)}"></span>` +
       `<span class="scol-seg sbar-ink" style="height:${h(r.c)}"></span>` +
@@ -554,7 +589,13 @@ export function stackedColumns(days, { label = "", emptyMsg = "" } = {}) {
       `</div><span class="scol-l label">${escAttr(day)}</span></div>`;
   };
   const legend = `<span class="sbar-key"><i class="sbar-dot sbar-ember"></i>protein</span><span class="sbar-key"><i class="sbar-dot sbar-ink"></i>carbs</span><span class="sbar-key"><i class="sbar-dot sbar-faint"></i>fat</span>`;
-  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(`Per-day macro composition by energy across ${rows.length} days. ${label}`)}">${rows.map(col).join("")}</div>` +
+  // Interactive hover/tap (#582): a point at each column top — nearest-by-x lands on
+  // the day under the finger. Replaces the native title tooltip.
+  const cpts = rows.map((r, i) => {
+    const total = r.p + r.c + r.f;
+    return { x: +((i + 0.5) / rows.length).toFixed(4), y: +Math.max(0.03, Math.min(0.97, 1 - total / max)).toFixed(4), l: `${_shortDate(r.d)}: protein ${Math.round(r.p)} · carbs ${Math.round(r.c)} · fat ${Math.round(r.f)} kcal` };
+  });
+  return `<figure class="chart"><div class="scols" role="img" aria-label="${escAttr(`Per-day macro composition by energy across ${rows.length} days. ${label}`)}" data-cpts="${escAttr(JSON.stringify(cpts))}">${rows.map(col).join("")}</div>` +
     `<figcaption class="chart-cap label sbar-legend">${legend} · by energy (kcal)${label ? ` · ${escAttr(label)}` : ""}</figcaption></figure>`;
 }
 
@@ -581,8 +622,12 @@ export function barChart(items, { valueKey = "value", labelKey = "label", height
   const rows = (items || []).map((it) => ({ l: it[labelKey], v: Number(it[valueKey]) })).filter((r) => Number.isFinite(r.v));
   if (!rows.length) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">No data yet.</figcaption></figure>`;
   const max = Math.max(1, ...rows.map((r) => r.v));
-  const bars = rows.map((r) => `<div class="cbar" title="${escAttr(r.l)}: ${escAttr(Math.round(r.v * 10) / 10)}"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
-  return `<figure class="chart"><div class="cbars" style="--cbar-h:${height}px">${bars}</div>${label ? `<figcaption class="chart-cap label">${escAttr(label)}</figcaption>` : ""}</figure>`;
+  const bars = rows.map((r) => `<div class="cbar"><span class="cbar-fill" style="height:${Math.max(3, (r.v / max) * 100)}%"></span><span class="cbar-l label">${escAttr(r.l)}</span></div>`).join("");
+  // Interactive hover/tap (#582): a point at each bar top — nearest-by-x lands on the
+  // bar under the finger. Replaces the native title tooltip.
+  const n = rows.length;
+  const cpts = rows.map((r, i) => ({ x: +((i + 0.5) / n).toFixed(4), y: +Math.max(0.05, Math.min(0.95, 1 - r.v / max)).toFixed(4), l: `${r.l}: ${Math.round(r.v * 10) / 10}` }));
+  return `<figure class="chart"><div class="cbars" role="img" aria-label="${escAttr(label || "bar chart")}" data-cpts="${escAttr(JSON.stringify(cpts))}" style="--cbar-h:${height}px">${bars}</div>${label ? `<figcaption class="chart-cap label">${escAttr(label)}</figcaption>` : ""}</figure>`;
 }
 
 /* ── The character sheet (§8.6) ──────────────────────────────────────────────
