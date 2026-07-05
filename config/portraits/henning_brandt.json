@@ -178,9 +178,14 @@
  },
  "_meta": {
   "source": "hand-drawn",
-  "prompt": "character-illustration bust (animated-film shape language) — Dr. Henning Brandt, biostatistician; TALL NARROW construction — high forehead, tapered chin; the identifier: the wild sandy curl-cloud rising up and out in lobed bumps, the tallest silhouette in the cast + the askew fuchsia (accent) knit tie; asymmetric brows (one mid-thought raise), the widest eyes and biggest pupils on the board — delighted by a surprising residual; rumpled olive-grey vest over an open collar",
+  "prompt": "character-illustration bust (animated-film shape language) \u2014 Dr. Henning Brandt, biostatistician; TALL NARROW construction \u2014 high forehead, tapered chin; the identifier: the wild sandy curl-cloud rising up and out in lobed bumps, the tallest silhouette in the cast + the askew fuchsia (accent) knit tie; asymmetric brows (one mid-thought raise), the widest eyes and biggest pupils on the board \u2014 delighted by a surprising residual; rumpled olive-grey vest over an open collar",
   "date": "2026-07-04",
-  "traced_by": "claude-fable-5 (hand-authored vector, no raster step — ADR-106 §1 preferred path)"
+  "traced_by": "claude-fable-5 (hand-authored vector, no raster step \u2014 ADR-106 \u00a71 preferred path)",
+  "sign_off": {
+   "by": "Matthew (averagejoematt) \u2014 in-session approval of the full sheet",
+   "date": "2026-07-04",
+   "sheet": "full-cast-2026-07-04 \u2014 https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e"
+  }
  },
  "aliases": [
   "explorer_coach"

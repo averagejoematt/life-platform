@@ -154,9 +154,14 @@
  },
  "_meta": {
   "source": "hand-drawn",
-  "prompt": "character-illustration bust (animated-film shape language) — Dr. Eli Marsh, principal investigator & program lead; BROAD TRAPEZOID construction — the widest face, squared jaw, the widest shoulders in the cast, minimal taper, steady; the identifier: the iron-grey tight crew cut with a flat top + the neat mustache (the only mustache-without-beard); heavy straight brows, calm level eyes; steel-blue oxford, spread collar, center placket (persona: calm generalist, one experiment at a time)",
+  "prompt": "character-illustration bust (animated-film shape language) \u2014 Dr. Eli Marsh, principal investigator & program lead; BROAD TRAPEZOID construction \u2014 the widest face, squared jaw, the widest shoulders in the cast, minimal taper, steady; the identifier: the iron-grey tight crew cut with a flat top + the neat mustache (the only mustache-without-beard); heavy straight brows, calm level eyes; steel-blue oxford, spread collar, center placket (persona: calm generalist, one experiment at a time)",
   "date": "2026-07-04",
-  "traced_by": "claude-fable-5 (hand-authored vector, no raster step — ADR-106 §1 preferred path)"
+  "traced_by": "claude-fable-5 (hand-authored vector, no raster step \u2014 ADR-106 \u00a71 preferred path)",
+  "sign_off": {
+   "by": "Matthew (averagejoematt) \u2014 in-session approval of the full sheet",
+   "date": "2026-07-04",
+   "sheet": "full-cast-2026-07-04 \u2014 https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e"
+  }
  },
  "aliases": []
 }

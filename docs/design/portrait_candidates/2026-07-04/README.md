@@ -1,14 +1,14 @@
-# Full-cast portrait candidates — 2026-07-04 (#616, awaiting the taste gate)
+# Full-cast portrait batch — 2026-07-04 (#616) — APPROVED round 1, promoted
 
-Seven hand-authored candidate recipes for the remaining public-surface coaches —
-schema-valid, ALL UNSIGNED, staged here (not `config/portraits/`) until Matthew's
-contact-sheet decision. Style per the approved #587 standard (character illustration,
-shape language, silhouette litmus). No AI raster step — hand-authored vectors
-(ADR-106 §1 preferred path), 3 self-review render rounds before the gate.
+Seven hand-authored recipes for the remaining public-surface coaches, per the
+approved #587 standard (character illustration, shape language, silhouette litmus).
+No AI raster step — hand-authored vectors (ADR-106 §1 preferred path), 3 self-review
+render rounds before the gate.
 
-Contact sheet: the "full-cast-2026-07-04" artifact (see issue #616). On approval:
-move recipes to `config/portraits/<persona_id>.json`, record `_meta.sign_off`,
-regenerate the bundle, ship, visual-QA. On kill: that coach stays sigil-only.
+**Gate outcome: Matthew APPROVED the full sheet in-session, 2026-07-04, round 1**
+(contact sheet: https://claude.ai/code/artifact/6d473337-c9cf-4b79-8eb6-300878a1340e).
+All 7 recipes promoted to `config/portraits/<persona_id>.json` with `_meta.sign_off`;
+this directory keeps the batch record (briefs live in each recipe's `_meta.prompt`).
 
 ## The batch — geometric bases + signature features (all bases previously unclaimed)
 
