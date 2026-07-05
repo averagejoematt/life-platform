@@ -257,6 +257,43 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   font-size: var(--voice-human-size); line-height: var(--voice-human-lh); color: var(--voice-human-ink);
 }
 
+/* ── #591 presence: the verdict's signed mark + honest write-time ──────────── */
+.vd-mark { display: inline-flex; inline-size: 22px; block-size: 22px; flex: none; vertical-align: -0.42em; margin-inline-end: 0.45em; }
+.vd-mark .ck-mark, .turn-mark .ck-mark, .sc-mark .ck-mark { display: block; inline-size: 100%; block-size: 100%; }
+.vd-stamp { color: var(--ink-faint); }
+
+/* ── #591 the argument underneath — the inter-coach dispute thread (#540) ───── */
+.board-thread { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: var(--border-hair); }
+.thread-cap { color: var(--ink-faint); margin-bottom: var(--sp-3); }
+.thread-cap .mark { color: var(--ember); }
+.thread-when { color: var(--ink-faint); }
+.turn { display: flex; gap: var(--sp-3); padding: var(--sp-2) 0; align-items: flex-start; }
+.turn-mark { display: inline-flex; inline-size: 26px; block-size: 26px; flex: none; margin-top: 0.15rem; }
+.turn-who { color: var(--ink-muted); margin-bottom: 0.15rem; }
+.turn-role { color: var(--ember); margin-inline-start: 0.35em; }
+.turn-line { color: var(--voice-machine-ink); line-height: var(--voice-machine-lh); max-width: var(--measure); }
+/* the reply/rejoinder step in slightly — a conversation, not a list */
+.turn-reply { margin-inline-start: var(--sp-4); }
+.turn-rejoinder { margin-inline-start: calc(var(--sp-4) * 2); }
+
+/* ── #591 where the team stands — stance chips with honest "held since" ─────── */
+.stance-strip { margin-top: var(--sp-4); }
+.stance-cap { color: var(--ink-faint); margin-bottom: var(--sp-2); }
+.stance-list { display: flex; flex-wrap: wrap; gap: var(--sp-2); list-style: none; padding: 0; margin: 0; }
+.stance-chip {
+  display: inline-flex; align-items: center; gap: 0.4em;
+  border: var(--border-hair); border-radius: var(--radius-sm);
+  padding: 0.3rem 0.55rem; font-size: var(--fs-small);
+}
+.sc-mark { display: inline-flex; inline-size: 16px; block-size: 16px; flex: none; }
+.sc-name { color: var(--ink-muted); }
+.sc-stage { color: var(--ink); }
+.sc-held { color: var(--ink-faint); }
+
+@media (prefers-reduced-motion: no-preference) {
+  html.mo .turn { opacity: 0; animation: vdIn 0.55s var(--ease-out) forwards; animation-delay: var(--vd-delay, 0s); }
+}
+
 /* ── The two glance domains (bento) ──────────────────────────────────────── */
 .domains { margin-top: var(--sp-5); display: grid; gap: var(--bento-gap); }
 .domain { border-top: var(--border-hair); padding-top: var(--sp-3); }

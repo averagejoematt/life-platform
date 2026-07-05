@@ -116,6 +116,16 @@
           </div>
         </section>
 
+        <!-- #591: the argument underneath the board's read — the inter-coach dispute
+             (#540), rendered as a thread of sigil/portrait-marked turns. The renderer
+             handles 1..n turns; self-hides until a dispute has aired. -->
+        <div class="board-thread" data-bind="thread" hidden></div>
+
+        <!-- #591: where the team stands right now — each coach's stance + the honest
+             "held since {date}" (stance data is weekly, so never a fake day count).
+             Self-hides until stances exist. -->
+        <div class="stance-strip" data-bind="stances" hidden></div>
+
         <!-- Band: last night → today. Recovery / sleep / HRV / resting-HR are
              wake-date-keyed — they describe LAST NIGHT and set today up (the
              opposite frame from same-day activity). Raw readings come from
