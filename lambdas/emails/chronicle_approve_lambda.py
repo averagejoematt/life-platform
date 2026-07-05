@@ -179,6 +179,27 @@ def _publish_to_s3(item: dict) -> list[str]:
         logger.info("S3: wrote generated/journal/posts.json")
         invalidation_paths.append("/journal/posts.json")
 
+    # #405: the per-chronicle share kit → its stable generated location (served via
+    # the already-routed /moments/* behavior). Built at draft time; written on publish
+    # so it never goes live ahead of the post it links to. Fail-soft.
+    share_kit_json = item.get("draft_share_kit_json", "")
+    if share_kit_json:
+        try:
+            kit = json.loads(share_kit_json) if isinstance(share_kit_json, str) else share_kit_json
+            slug = (str(kit.get("canonical_url", "")).rstrip("/").split("/") or ["post"])[-1] or "post"
+            kit_key = f"generated/moments/share-kits/{slug}/kit.json"
+            s3.put_object(
+                Bucket=S3_BUCKET,
+                Key=kit_key,
+                Body=(share_kit_json if isinstance(share_kit_json, str) else json.dumps(kit)).encode("utf-8"),
+                ContentType="application/json",
+                CacheControl="max-age=300",
+            )
+            logger.info("S3: wrote %s", kit_key)
+            invalidation_paths.append(f"/moments/share-kits/{slug}/kit.json")
+        except Exception as exc:
+            logger.warning("share kit write failed (non-fatal): %s", exc)
+
     return invalidation_paths
 
 
@@ -209,7 +230,8 @@ def _mark_published(date_str: str) -> None:
             UpdateExpression=(
                 "SET #s = :published, approved_at = :now "
                 "REMOVE approval_token, draft_blog_post_html, draft_blog_index_html, "
-                "draft_journal_post_html, draft_journal_posts_json, draft_email_html, draft_recap_json"
+                "draft_journal_post_html, draft_journal_posts_json, draft_email_html, draft_recap_json, "
+                "draft_share_kit_json"
             ),
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={

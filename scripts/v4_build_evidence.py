@@ -767,8 +767,15 @@ FOOTER = (
 )
 
 
+# #420/#595: per-slug OG card. A slug with its own data-driven card (drawn daily by the
+# og-image sweep through the #595 engine) points its social preview at that card instead
+# of the generic home card. Default remains og-home.png.
+OG_CARD_BY_SLUG = {"character": "og-character.png"}
+
+
 def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str:
     reg = json.dumps(registry_json(pillar["groups"]))
+    og_image = f"https://averagejoematt.com/assets/images/{OG_CARD_BY_SLUG.get(start_slug, 'og-home.png')}"
     return f"""<!DOCTYPE html>
 <html lang="en" data-door="{pillar["door"]}">
 <head>
@@ -782,7 +789,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   <meta property="og:url" content="https://averagejoematt.com{canonical}">
   <meta property="og:title" content="{esc(title)}">
   <meta property="og:description" content="{esc(desc)}">
-  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta property="og:image" content="{og_image}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{esc(title)}">
   <meta name="twitter:description" content="{esc(desc)}">

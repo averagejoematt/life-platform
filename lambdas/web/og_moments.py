@@ -261,15 +261,71 @@ def _sweep_predictions(s3):
     return out
 
 
+def _post_slug(url):
+    """/journal/posts/week-05/ -> week-05 (the stable per-post card slug)."""
+    return (str(url or "").strip("/").split("/") or ["post"])[-1] or "post"
+
+
+def _sweep_chronicles(s3):
+    """#405 (via the #595 engine): a per-chronicle honest-stats share card, drawn from
+    generated/journal/posts.json — already-published values only (title, series label,
+    the honest stats line). One 1200×630 card per post at /moments/assets/chronicle-*.png.
+
+    The honest-stats line IS the creative — a week graded 57 with a broken streak is the
+    point, never sanitized. Cards render through card_engine's `chronicle` type so they
+    share the one brand template. Empty/malformed posts produce no card. Fail-soft: any
+    error here never blocks the daily page cards or the other moment classes.
+    """
+    try:
+        raw = s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")["Body"].read()
+        posts = (json.loads(raw) or {}).get("posts", []) or []
+    except Exception as e:
+        print(f"[moments] chronicle sweep skipped (no posts.json): {e}")
+        return []
+
+    from web import card_engine
+
+    out = {}
+    for p in posts:
+        url = (p.get("url") or "").strip()
+        title = (p.get("title") or "").strip()
+        if not url or not title:
+            continue
+        slug = _post_slug(url)
+        card = card_engine.render(
+            "chronicle",
+            {
+                "title": title,
+                "label": p.get("label") or "",
+                "stats_line": (p.get("stats_line") or "").strip(),
+                "date": p.get("date") or "",
+            },
+        )
+        import io
+
+        img_key = f"{MOMENTS_PREFIX}assets/chronicle-{slug}.png"
+        buf = io.BytesIO()
+        card.save(buf, format="PNG", optimize=True)
+        buf.seek(0)
+        _put(s3, img_key, buf.read(), "image/png", cache="max-age=86400")
+        out[url] = f"/moments/assets/chronicle-{slug}.png"
+    print(f"[moments] swept {len(out)} chronicle card(s)")
+    return out
+
+
 def sweep_moments(s3, stats):
-    """Run all three moment classes; write the index the share buttons read."""
+    """Run all moment classes; write the index the share buttons read."""
     index = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "week": _sweep_week_recap(s3, stats),
         "qa": _sweep_board_answers(s3),
         "predictions": _sweep_predictions(s3),
+        "chronicles": _sweep_chronicles(s3),
     }
     _put(s3, f"{MOMENTS_PREFIX}index.json", json.dumps(index).encode("utf-8"), "application/json", cache="max-age=300")
-    n = (1 if index["week"] else 0) + len(index["qa"]) + len(index["predictions"])
-    print(f"[moments] swept {n} moment(s): week={bool(index['week'])} qa={len(index['qa'])} predictions={len(index['predictions'])}")
+    n = (1 if index["week"] else 0) + len(index["qa"]) + len(index["predictions"]) + len(index["chronicles"])
+    print(
+        f"[moments] swept {n} moment(s): week={bool(index['week'])} qa={len(index['qa'])} "
+        f"predictions={len(index['predictions'])} chronicles={len(index['chronicles'])}"
+    )
     return index
