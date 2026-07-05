@@ -127,6 +127,48 @@ def test_persist_writes_latest_and_dated_and_is_fail_soft(monkeypatch):
     sentinel._persist(record)  # no raise
 
 
+def _patch_empty_post_reset_board(monkeypatch, age_days):
+    """A freshly-reset cycle (ADR-077): every cycle-scoped surface is legitimately
+    empty. All the endpoint specs' required keys are present-but-empty containers
+    (never None), so only the non_degenerate gate is in play."""
+    monkeypatch.setattr(sentinel, "_gather_predictions", lambda: [])
+    monkeypatch.setattr(sentinel, "_gather_facts_and_narratives", lambda: ({}, [], []))
+    monkeypatch.setattr(sentinel, "_gather_computed_checks", lambda: [])
+    monkeypatch.setattr(sentinel, "_gather_counts", lambda: [])
+    monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
+    monkeypatch.setattr(sentinel, "_experiment_age_days", lambda: age_days)
+    empty_payload = {
+        "overall": {"total": 0},
+        "predictions": [],
+        "nutrition": {},
+        "coaches": [],
+        "vitals": {},
+    }
+    monkeypatch.setattr(sentinel, "_get_json", lambda path: empty_payload)
+
+
+def test_post_reset_empty_board_reports_ok(monkeypatch):
+    # BUG-05 / #379 — replay: a reset just happened (age=1 day), every public
+    # endpoint is a legitimately empty shell. The sentinel must NOT alarm.
+    _patch_empty_post_reset_board(monkeypatch, age_days=1)
+    findings, _ = sentinel.run_checks()
+    shape_findings = [f for f in findings if f.name.startswith("endpoint_shape:")]
+    assert shape_findings, "expected the default endpoint specs to run"
+    assert all(f.status == sentinel.ci.OK for f in shape_findings)
+    assert sentinel.ci.overall_status(findings) == sentinel.ci.OK
+
+
+def test_same_empty_board_alarms_once_past_the_grace_window(monkeypatch):
+    # Identical degenerate payloads, but well past the reset (age=30 days) — this
+    # is the genuine handle_predictions signature and must still alarm exactly
+    # as before the gate was added.
+    _patch_empty_post_reset_board(monkeypatch, age_days=30)
+    findings, _ = sentinel.run_checks()
+    shape_findings = [f for f in findings if f.name.startswith("endpoint_shape:")]
+    assert any(f.is_alarm for f in shape_findings)
+    assert sentinel.ci.overall_status(findings) == sentinel.ci.ALARM
+
+
 def test_healthy_state_is_ok(monkeypatch):
     monkeypatch.setattr(
         sentinel,

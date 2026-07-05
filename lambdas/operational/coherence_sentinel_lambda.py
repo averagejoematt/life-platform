@@ -250,6 +250,27 @@ def _gather_computed_checks():
     return checks
 
 
+def _experiment_age_days():
+    """Days since EXPERIMENT_START_DATE, or None if genesis is unknown/unparsable
+    (BUG-05, #379). Feeds check_endpoint_shape's post-reset grace window so a
+    board that's legitimately empty in the first days of a new cycle doesn't
+    read as the handle_predictions degenerate-payload outage. Fail-soft: a
+    missing genesis just disables the gate (original ungated behavior)."""
+    try:
+        import constants
+
+        genesis = constants.EXPERIMENT_START_DATE
+    except Exception:  # noqa: BLE001
+        genesis = os.environ.get("EXPERIMENT_START_DATE")
+    if not genesis:
+        return None
+    try:
+        g = datetime.strptime(str(genesis)[:10], "%Y-%m-%d").date()
+        return (datetime.now(timezone.utc).date() - g).days
+    except (ValueError, TypeError):
+        return None
+
+
 def _gather_endpoint_specs():
     """Key endpoints + the non-degenerate shape each must satisfy."""
     return [
@@ -391,12 +412,13 @@ def run_checks():
 
     findings.append(ci.check_computed_coherence(_gather_computed_checks()))
 
+    age_days = _experiment_age_days()
     for name, path, spec in _gather_endpoint_specs():
         payload = _get_json(path)
         if payload is None:
             f = ci.Finding(f"endpoint_shape:{name}", ci.WARN, 1.0, f"{name}: endpoint unreachable")
         else:
-            f = ci.check_endpoint_shape(name, payload, spec)
+            f = ci.check_endpoint_shape(name, payload, spec, experiment_age_days=age_days)
         findings.append(f)
 
     findings.append(ci.check_count_agreement(_gather_counts()))

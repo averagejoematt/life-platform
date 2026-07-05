@@ -152,6 +152,58 @@ class TestEndpointShape:
         assert f.is_alarm
 
 
+class TestEndpointShapePostResetGrace:
+    """BUG-05 / #379: an experiment reset (ADR-077) deliberately wipes cycle-scoped
+    data, so an all-zero/empty payload in the first days of a new cycle is CORRECT,
+    not the handle_predictions degenerate-payload outage. `experiment_age_days`
+    gates ONLY the non_degenerate assertion during that window."""
+
+    PAYLOAD = {"overall": {"total": 0, "confirmed": 0}, "predictions": []}
+    SPEC = {"required": ["overall.total"], "non_degenerate": ["overall.total", "predictions"]}
+
+    def test_day_zero_post_reset_is_ok(self):
+        f = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC, experiment_age_days=0)
+        assert f.status == ci.OK
+        assert "post-reset" in f.detail
+
+    def test_day_one_to_three_post_reset_is_ok(self):
+        for age in (1, 2, 3):
+            f = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC, experiment_age_days=age)
+            assert f.status == ci.OK, f"day {age} should be in the grace window"
+
+    def test_grace_window_boundary(self):
+        # POST_RESET_GRACE_DAYS=5 → ages 0-4 are grace, 5+ are not.
+        f_in = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC, experiment_age_days=ci.POST_RESET_GRACE_DAYS - 1)
+        f_out = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC, experiment_age_days=ci.POST_RESET_GRACE_DAYS)
+        assert f_in.status == ci.OK
+        assert f_out.is_alarm
+
+    def test_genuinely_degenerate_payload_still_alarms_outside_grace_window(self):
+        # Same broken shape, but the cycle is well past the reset — the C-3-style
+        # signature must still trip exactly as before.
+        f = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC, experiment_age_days=30)
+        assert f.is_alarm
+
+    def test_missing_required_key_still_fires_inside_grace_window(self):
+        # The grace window only forgives the non_degenerate check — a genuinely
+        # missing required key is never a "legitimately empty" state.
+        payload = {"by_coach": {}}
+        spec = {"required": ["overall.total"], "non_degenerate": []}
+        f = ci.check_endpoint_shape("predictions", payload, spec, experiment_age_days=1)
+        assert f.is_alarm
+
+    def test_no_experiment_age_falls_back_to_ungated_behavior(self):
+        # experiment_age_days=None (unknown genesis) → original, ungated behavior.
+        f = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC)
+        assert f.is_alarm
+
+    def test_negative_age_does_not_engage_grace(self):
+        # A malformed/future genesis producing a negative age must not be treated
+        # as "day 0" — it's a clock/config anomaly, not a fresh reset.
+        f = ci.check_endpoint_shape("predictions", self.PAYLOAD, self.SPEC, experiment_age_days=-2)
+        assert f.is_alarm
+
+
 class TestCountAgreement:
     def test_arc_7_vs_3_fires(self):
         f = ci.check_count_agreement([{"name": "experiment_arc_weeks", "a": 7, "b": 3}])

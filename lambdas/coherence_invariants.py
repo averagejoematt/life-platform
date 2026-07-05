@@ -249,7 +249,19 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
 #   of a set of aggregate paths are zero/null when they shouldn't be).
 #   spec: {required: [paths], non_degenerate: [paths]} — non_degenerate fires if
 #   EVERY listed path is zero/null/empty.
+#
+#   BUG-05 (#379): a manual experiment reset (ADR-077) deliberately wipes cycle-
+#   scoped data, so for the first few days of a new cycle "everything is zero"
+#   is CORRECT, not a bug — indistinguishable from the handle_predictions outage
+#   by shape alone. `experiment_age_days` (days since EXPERIMENT_START_DATE,
+#   pure — the caller derives it from the clock) gates ONLY the non_degenerate
+#   assertion during that grace window; a genuinely `required` key going missing
+#   is never legitimate, reset or not, so that check always runs at full
+#   strength.
 # ─────────────────────────────────────────────────────────────────────────────
+POST_RESET_GRACE_DAYS = 5
+
+
 def _dig(payload, path):
     cur = payload
     for part in path.split("."):
@@ -264,7 +276,9 @@ def _is_blank(v) -> bool:
     return v is None or v == 0 or v == 0.0 or v == "" or v == [] or v == {}
 
 
-def check_endpoint_shape(name, payload, spec) -> Finding:
+def check_endpoint_shape(name, payload, spec, *, experiment_age_days=None) -> Finding:
+    """`experiment_age_days`: days since EXPERIMENT_START_DATE, or None if the
+    caller couldn't determine it (falls back to the original, ungated behavior)."""
     f = Finding(f"endpoint_shape:{name}", value=0.0)
     problems = []
     if not isinstance(payload, dict):
@@ -275,14 +289,18 @@ def check_endpoint_shape(name, payload, spec) -> Finding:
     for path in spec.get("required", []):
         if _dig(payload, path) is None:
             problems.append(f"missing {path}")
+    in_grace = experiment_age_days is not None and 0 <= experiment_age_days < POST_RESET_GRACE_DAYS
     nd = spec.get("non_degenerate", [])
-    if nd and all(_is_blank(_dig(payload, p)) for p in nd):
+    degenerate = bool(nd) and all(_is_blank(_dig(payload, p)) for p in nd)
+    if degenerate and not in_grace:
         problems.append(f"all of {nd} are blank/zero (degenerate payload)")
     f.value = float(len(problems))
     if problems:
         f.status = ALARM
         f.offenders = problems
         f.detail = f"{name}: " + "; ".join(problems[:4])
+    elif degenerate and in_grace:
+        f.detail = f"{name}: shape ok (post-reset day {experiment_age_days}, empty board expected)"
     else:
         f.detail = f"{name}: shape ok"
     return f
