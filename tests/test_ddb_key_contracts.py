@@ -58,6 +58,11 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "USER#matthew#SOURCE#panelcast",
         "SHOW#memory",
     ): "#547 the show-memory ledger — seeded on the first v2 episode publish; _load_show_memory tolerates absence (empty memory)",
+    (
+        "PERSONA#margaret",
+        "NOTE#latest",
+    ): "#548 Margaret Calloway's last published editor's note — seeded on the first note publish "
+    "(rare by design, <=1/month); _margaret_last_note_date tolerates absence (treated as eligible)",
 }
 
 # Module-level constant values used to resolve f-strings statically.

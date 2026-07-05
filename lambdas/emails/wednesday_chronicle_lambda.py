@@ -44,6 +44,9 @@ S3_BUCKET = os.environ["S3_BUCKET"]
 USER_ID = os.environ.get("USER_ID", "matthew")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
+# #548: Margaret Calloway's red pen — the Haiku model for her critique + revision
+# calls (kept cheap and separate from Elena's Sonnet narrative voice, ADR-063 budget).
+AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
 # FEAT-12: Preview-before-publish workflow.
 # When PREVIEW_MODE=true (default), the Chronicle is stored as a draft in DynamoDB
@@ -2476,6 +2479,137 @@ def _invoke_elena_state_updater(date_str):
         logger.warning(f"[elena-state] invoke failed (non-fatal): {e}")
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #548: MARGARET CALLOWAY'S RED PEN — critique + conditional revision, pre-publish
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Elena's memory partition (#537) — her callback ledger is Margaret's critique
+# input. Margaret's own small partition (published editor's-note history, for
+# the <=1/month gate) follows the same PERSONA#<slug> convention.
+_ELENA_PERSONA_PK = "PERSONA#elena"
+_MARGARET_PERSONA_PK = "PERSONA#margaret"
+
+
+def _due_callback_promises(week_num, limit=5):
+    """#548: promises due THIS WEEK from Elena's ledger (#537, PERSONA#elena
+    CALLBACK# items) — Margaret's critique input ('you owe the reader the
+    follow-up you promised'). Fail-soft []: a lookup failure just means her
+    critique runs without the ledger cross-reference."""
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+
+        resp = table.query(
+            KeyConditionExpression=_Key("pk").eq(_ELENA_PERSONA_PK) & _Key("sk").begins_with("CALLBACK#"),
+            ScanIndexForward=False,
+            Limit=60,
+        )
+        pending = [c for c in resp.get("Items", []) if c.get("status") == "pending"]
+        due = [c for c in pending if int(c.get("due_by_week") or 10**6) <= week_num]
+        return [c["promise"] for c in due[:limit] if c.get("promise")]
+    except Exception as e:
+        logger.warning(f"[margaret] due-callback query failed (fail-soft): {e}")
+        return []
+
+
+def _margaret_last_note_date():
+    """The date of Margaret's last published editor's note (PERSONA#margaret
+    NOTE#latest), or None. Drives the <=1/month deterministic gate."""
+    try:
+        item = table.get_item(Key={"pk": _MARGARET_PERSONA_PK, "sk": "NOTE#latest"}).get("Item")
+        return (item or {}).get("date")
+    except Exception as e:
+        logger.warning(f"[margaret] last-note lookup failed (fail-soft): {e}")
+        return None
+
+
+def _record_margaret_note(date_str, week_num, note):
+    """Persist a published editor's note so the next run's <=1/month gate sees it."""
+    try:
+        item = {
+            "pk": _MARGARET_PERSONA_PK,
+            "sk": f"NOTE#{date_str}",
+            "date": date_str,
+            "week_number": week_num,
+            "note": note,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        table.put_item(Item=item)
+        table.put_item(Item={**item, "sk": "NOTE#latest"})
+    except Exception as e:
+        logger.warning(f"[margaret] failed to record editor's note (non-fatal): {e}")
+
+
+def _margaret_haiku_call(system, user):
+    """One Haiku call (Bedrock via retry_utils) — used for both Margaret's
+    critique and Elena's Haiku-tier revision. Kept to Haiku per the #548
+    +2-calls/week budget (Elena's own Sonnet voice is reserved for the
+    weekly draft itself)."""
+    import retry_utils
+
+    return retry_utils.call_anthropic_api(
+        prompt=user,
+        api_key=get_anthropic_key(),
+        max_tokens=1500,
+        system=system,
+        temperature=0.3,
+        timeout=60,
+        model=AI_MODEL_HAIKU,
+    )
+
+
+def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, allowed_numbers):
+    """#548: Margaret Calloway's red pen. A critique + conditional revision pass
+    over Elena's already-drafted, already-grounded (ADR-104) installment —
+    post-draft, pre-publish. Tier-1 paused (matches coach_narrative — narrative
+    embellishments pause before the flagship chronicle itself, which survives
+    to tier 2). At most 2 Haiku calls total; fail-soft everywhere — any failure
+    (budget pause, bad JSON, a rejected revision) simply returns Elena's draft
+    untouched."""
+    try:
+        from budget_guard import allow as _budget_allow
+
+        if not _budget_allow("chronicle_editor"):
+            logger.info("[margaret] budget tier pauses the editor pass — keeping Elena's draft as-is")
+            return raw_installment
+    except ImportError:
+        pass
+
+    try:
+        import margaret_editor_pass as _mep
+
+        config = board_loader.load_board(s3, S3_BUCKET) if _HAS_BOARD_LOADER else None
+        narrator = _mep.build_narrator(config)
+        due_callbacks = _due_callback_promises(week_num)
+        note_eligible = _mep.editors_note_eligible(_margaret_last_note_date(), date_str)
+
+        result = _mep.run_pass(
+            raw_installment,
+            week_num,
+            due_callbacks,
+            allowed_numbers,
+            note_eligible,
+            narrator,
+            critique_fn=_margaret_haiku_call,
+            # Elena revises in her own voice — elena_prompt IS the system prompt;
+            # the revise callable ignores the (unused) system arg run_pass passes it.
+            revise_fn=lambda _system, user: _margaret_haiku_call(elena_prompt, user),
+        )
+        if result["revised"]:
+            logger.info(f"[margaret] Week {week_num} revised ({result['revision_reason']})")
+        elif result["critique"] is not None:
+            logger.info(f"[margaret] Week {week_num} critique kept as-is ({result['revision_reason']})")
+        if result["editors_note"]:
+            _record_margaret_note(date_str, week_num, result["editors_note"])
+            logger.info(f"[margaret] editor's note published for Week {week_num}")
+        return result["final_text"]
+    except ImportError as e:
+        logger.warning(f"[margaret] edit-pass module unavailable (fail-soft): {e}")
+        return raw_installment
+    except Exception as e:
+        logger.warning(f"[margaret] edit pass failed (fail-soft, keeping Elena's draft): {e}")
+        return raw_installment
+
+
 def lambda_handler(event, context):
     logger.info("Wednesday Chronicle v1.1.0 (Board Centralization) — The Measured Life — starting...")
 
@@ -2623,6 +2757,7 @@ def lambda_handler(event, context):
     # corrective rewrite, kept only if strictly better — the weekly story is
     # human-reviewed (PREVIEW_MODE) + privacy-gated downstream, so a residual
     # finding degrades to the best draft instead of going dark.
+    _allowed = None
     try:
         import grounded_generation as _gg
 
@@ -2638,6 +2773,11 @@ def lambda_handler(event, context):
         pass  # gate module unavailable — serve as before
     except Exception as _gg_e:
         logger.warning(f"[ADR-104] chronicle grounding gate error (fail-open): {_gg_e}")
+
+    # #548: Margaret Calloway's red pen — one critique + conditional revision
+    # pass over Elena's grounded draft, before AI-3 validation / parsing / the
+    # privacy gate (all of which still run on whatever text comes back here).
+    raw_installment = _run_margaret_edit_pass(raw_installment, week_num, data["dates"]["end"], elena_prompt, _allowed)
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and raw_installment:
@@ -2674,8 +2814,9 @@ def lambda_handler(event, context):
     # Convert to HTML
     body_html = markdown_to_html(body_md)
 
-    # Detect Board interview
-    has_board = ">" in body_md  # blockquotes indicate Board interview
+    # Detect Board interview — a blockquote counts UNLESS it's Margaret's editor's
+    # note (#548), which is also rendered as a blockquote but isn't an interview.
+    has_board = any(line.strip().startswith("> ") and "editor's note" not in line.strip().lower() for line in body_md.split("\n"))
 
     # Collect all installments for index pages (including the new one)
     date_str = data["dates"]["end"]
