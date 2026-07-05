@@ -313,7 +313,9 @@ SOURCE_REGISTRY = {
         "method": "API pull (journal database), hourly",
         "metrics": "Journal entries — the subjective layer",
         "posture": "portfolio",
-        "raw_layout": None,
+        # #476/X-7: raw archive added — date-tree with a per-page suffix
+        # (raw/matthew/notion/YYYY/MM/DD-<page_id>.json), since a day holds many entries.
+        "raw_layout": {"prefix": "raw/matthew/notion", "scheme": "date-tree", "note": "per-page: DD-<page_id>.json"},
     },
     # ── #498: registry-resident for facets only — freshness: False keeps every
     #    existing freshness surface (checker / public board / MCP view) unchanged. ──
