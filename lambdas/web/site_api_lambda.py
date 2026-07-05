@@ -54,6 +54,11 @@ from boto3.dynamodb.conditions import Key
 # shared layer
 from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
+from web.site_api_autonomic import (
+    handle_autonomic_balance,
+    handle_zone2_breakdown,
+)
+
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
     handle_ai_analysis,
@@ -296,6 +301,9 @@ def handle_methods() -> dict:
 
 ROUTES = {
     "/api/vitals": handle_vitals,
+    # RQA-06/07 (#414): two computed views ported from the private MCP tools to the data door
+    "/api/autonomic_balance": handle_autonomic_balance,
+    "/api/zone2": handle_zone2_breakdown,
     "/api/reading_shelf": handle_reading_shelf,  # Mind pillar (ADR-097) — public shelf
     "/api/reading_overview": handle_reading_overview,  # Mind pillar — wheel + stats + cockpit line
     "/api/constellation": handle_constellation,  # Mind pillar (Phase E) — the idea-graph signature
