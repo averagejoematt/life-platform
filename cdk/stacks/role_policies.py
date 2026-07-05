@@ -1207,6 +1207,17 @@ def operational_freshness_checker() -> list[iam.PolicyStatement]:
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
+            # #468: the checker writes two sentinel items on the apple_health partition —
+            # DATATYPE_LIVENESS (per-datatype last-seen, surfaced on /api/source_freshness)
+            # and ALERTSTATE#ah_activity_degraded (episode dedup so the DI-1.6 alert stops
+            # re-firing every run). Scoped to that ONE partition via LeadingKeys so the
+            # read-mostly checker can never write arbitrary rows.
+            sid="DynamoDBWriteApHealthSentinels",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={"ForAllValues:StringEquals": {"dynamodb:LeadingKeys": ["USER#matthew#SOURCE#apple_health"]}},
+        ),
+        iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
             resources=[KMS_KEY_ARN],
