@@ -99,6 +99,15 @@ except ImportError:
         return ""
 
 
+# #405: the per-chronicle share kit (email-stack module — text/JSON only, no Pillow/AI).
+try:
+    import chronicle_share_kit
+
+    _HAS_SHARE_KIT = True
+except ImportError:
+    _HAS_SHARE_KIT = False
+
+
 # OBS-1: Structured logger
 try:
     from platform_logger import get_logger
@@ -1477,6 +1486,41 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+_JOURNAL_ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "VIII"}
+
+
+def journal_post_ref(date_str, all_installments, week_num):
+    """The canonical journal-post reference for a chronicle date: (seq, label, url).
+
+    #405: the share kit derives its canonical URL + card slug from the SAME sequential
+    index the post is actually written to (``week-{seq:02d}``) — NOT the genesis-anchored
+    week number (they diverge once pre-genesis prologue installments exist). This mirrors
+    the ``_seq_for`` / ``_series_label`` closures inside ``publish_to_journal``; the two
+    are pinned together by test_chronicle_share_kit so the kit can never point at a card
+    slug the post doesn't live at.
+    """
+    genesis = EXPERIMENT_START_DATE
+    all_dates = sorted(x.get("date", "") for x in all_installments if x.get("date", ""))
+    pre = [d for d in all_dates if d < genesis]
+    if date_str and date_str < genesis:
+        n = pre.index(date_str) + 1 if date_str in pre else 1
+        label = f"Prologue · Part {_JOURNAL_ROMAN.get(n, n)}"
+    elif date_str:
+        try:
+            wk = max(
+                1,
+                ((datetime.strptime(date_str, "%Y-%m-%d").date() - datetime.strptime(genesis, "%Y-%m-%d").date()).days // 7) + 1,
+            )
+        except Exception:
+            wk = int(week_num)
+        label = f"Week {wk}"
+    else:
+        label = f"Week {int(week_num)}"
+    seq = (all_dates.index(date_str) + 1) if date_str in all_dates else int(week_num)
+    url = f"https://averagejoematt.com/journal/posts/week-{seq:02d}/"
+    return seq, label, url
+
+
 def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
 
@@ -2259,6 +2303,7 @@ def store_installment(
     draft_journal_posts_json=None,
     draft_email_html=None,
     draft_recap_json=None,
+    draft_share_kit_json=None,
     weekly_signal_data=None,
     weekly_signal_wins_losses=None,
     weekly_signal_board_quote=None,
@@ -2309,6 +2354,9 @@ def store_installment(
         # only when this week is published (chronicle_approve._commit_recap).
         if draft_recap_json:
             item["draft_recap_json"] = draft_recap_json
+        # #405: the share kit, built at draft time, written to S3 at approve/publish.
+        if draft_share_kit_json:
+            item["draft_share_kit_json"] = draft_share_kit_json
         if weekly_signal_data:
             item["weekly_signal_data"] = json.dumps(weekly_signal_data) if isinstance(weekly_signal_data, dict) else weekly_signal_data
         if weekly_signal_wins_losses:
@@ -2328,11 +2376,14 @@ def store_installment(
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def _send_preview_email(title, week_num, date_str, approval_token, email_html):
+def _send_preview_email(title, week_num, date_str, approval_token, email_html, kit_block=""):
     """Send preview email to RECIPIENT with Approve / Request Changes links.
 
     The approve link goes to APPROVE_LAMBDA_URL with ?date=, token=, action=approve.
     The request_changes link uses action=request_changes.
+
+    #405: `kit_block` is the copy-paste share-kit HTML — surfaced right in this approval
+    email so posting is a 60-second paste (or ignored). It's injected before </body>.
     """
     if not APPROVE_LAMBDA_URL:
         logger.warning("FEAT-12: APPROVE_LAMBDA_URL not set — preview email links will be dead")
@@ -2359,6 +2410,12 @@ def _send_preview_email(title, week_num, date_str, approval_token, email_html):
     preview_email = email_html.replace("<body>", "<body>" + preview_banner, 1)
     if "<body>" not in email_html:
         preview_email = preview_banner + email_html
+    # #405: surface the share kit near the end of the email (after the read).
+    if kit_block:
+        if "</body>" in preview_email:
+            preview_email = preview_email.replace("</body>", kit_block + "</body>", 1)
+        else:
+            preview_email = preview_email + kit_block
 
     subject = f'[PREVIEW] The Measured Life — Week {week_num}: "{title}"'
     try:
@@ -2875,6 +2932,38 @@ def lambda_handler(event, context):
             "body": json.dumps({"status": "privacy_hold", "week": week_num, "violations": [t for _, t in e.violations]}),
         }
 
+    # ── #405: the per-chronicle share kit — machine-made from ALREADY-PUBLISHED fields
+    # only (title, honest stats line, an excerpt of the prose, the canonical post URL).
+    # Text/JSON only (the honest-stats OG card is drawn by the daily og sweep via the
+    # #595 engine). The kit passes the same privacy gate the installment just cleared.
+    share_kit = None
+    share_kit_json = None
+    share_kit_block = ""
+    if _HAS_SHARE_KIT:
+        try:
+            _seq, _label, _canon = journal_post_ref(date_str, all_installments, week_num)
+            share_kit = chronicle_share_kit.build_kit(
+                title=title,
+                stats_line=stats_line,
+                label=_label,
+                date_str=date_str,
+                canonical_url=_canon,
+                excerpt_source=body_md,
+                week_number=week_num,
+            )
+            # Defense-in-depth: the kit only recombines already-gated fields, but re-assert.
+            privacy_guard.assert_clean(share_kit.get("caption", ""), context=f"share kit week {week_num}")
+            share_kit_json = json.dumps(share_kit)
+            share_kit_block = chronicle_share_kit.kit_email_block(share_kit)
+        except privacy_guard.PrivacyViolation as e:
+            logger.error(f"[privacy] share kit blocked week {week_num} — {e}")
+            share_kit = share_kit_json = None
+            share_kit_block = ""
+        except Exception as e:
+            logger.warning(f"[#405] share kit build failed (non-fatal): {e}")
+            share_kit = share_kit_json = None
+            share_kit_block = ""
+
     # ── Phase 3: build Elena's "previously on" recap (grounded in published history
     # + this week being published). Fail-soft: a recap failure never blocks the
     # chronicle. Committed to RECAP#latest at publish time (now if non-preview, at
@@ -2942,9 +3031,10 @@ def lambda_handler(event, context):
             draft_journal_posts_json=journal_posts_json,
             draft_email_html=draft_email_html,
             draft_recap_json=draft_recap_json,
+            draft_share_kit_json=share_kit_json,
         )
 
-        _send_preview_email(title, week_num, date_str, approval_token, draft_email_html)
+        _send_preview_email(title, week_num, date_str, approval_token, draft_email_html, kit_block=share_kit_block)
         logger.info(f"FEAT-12: Draft Week {week_num} stored — awaiting approval")
 
     else:
@@ -2981,7 +3071,23 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"[journal] publish_to_journal failed (non-fatal): {e}")
 
+        # #405: write the share kit to its stable generated location (immediate-publish path).
+        if share_kit and share_kit_json:
+            try:
+                s3.put_object(
+                    Bucket=S3_BUCKET,
+                    Key=chronicle_share_kit.kit_s3_key(share_kit["canonical_url"]),
+                    Body=share_kit_json.encode("utf-8"),
+                    ContentType="application/json",
+                    CacheControl="max-age=300",
+                )
+                logger.info("[#405] share kit written to %s", chronicle_share_kit.kit_s3_key(share_kit["canonical_url"]))
+            except Exception as e:
+                logger.warning(f"[#405] share kit S3 write failed (non-fatal): {e}")
+
         email_html = build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
+        if share_kit_block:
+            email_html = email_html.replace("</body>", share_kit_block + "</body>", 1)
         subject = f'The Measured Life — Week {week_num}: "{title}"'
         ses.send_email(
             FromEmailAddress=SENDER,

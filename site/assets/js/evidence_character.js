@@ -8,6 +8,8 @@ import { badgeMark, tierEmblem } from "/assets/js/sigils.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { esc, tryJSON, has, fmt, ttl, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
 import { dfBody } from "/assets/js/evidence_datafigure.js";
+// #420: one share affordance — the character sheet's own linkable moment travels.
+import { shareMount } from "/assets/js/share.js";
 
 export const CH_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"];
 
@@ -67,6 +69,7 @@ export function chHeroHtml(ch, pillars, jj, wave) {
           ch.xp_total != null && fig(fmt(ch.xp_total), "xp"),
           !ch.time_travel && (wave && wave.day_n) != null && fig(`day ${wave.day_n}`, "of the experiment"),
         ])}
+        <p class="ch-share">${shareMount("/data/character/", `Level ${level} ${tier} — my life as an RPG character sheet, scored nightly from real data`)}</p>
       </div>
     </div>
   </section>`;

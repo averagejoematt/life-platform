@@ -15,7 +15,11 @@ import os
 import time
 
 import boto3
-from PIL import Image, ImageDraw, ImageFont
+
+# #595 (ADR-114): the shared card engine is the single place brand cards are drawn.
+# The daily page cards delegate their chrome to it so every off-site card — daily,
+# moment (og_moments), character (#420), chronicle (#405) — shares one template.
+from web import card_engine
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
@@ -23,69 +27,41 @@ CF_DIST_ID = os.environ.get("CF_DISTRIBUTION_ID", "E3S424OXQZ8NBE")
 
 s3 = boto3.client("s3", region_name=REGION)
 
-# Fonts — bundled as TTF in the deployment package
-FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
-_font_cache = {}
-
-
-def _font(name, size):
-    key = (name, size)
-    if key not in _font_cache:
-        path = os.path.join(FONT_DIR, name)
-        try:
-            _font_cache[key] = ImageFont.truetype(path, size)
-        except Exception:
-            _font_cache[key] = ImageFont.load_default()
-    return _font_cache[key]
-
-
-# Design tokens
-BG = (8, 12, 10)  # #080c0a
-TEXT = (232, 240, 232)  # #e8f0e8
-MUTED = (138, 170, 144)  # #8aaa90
-FAINT = (90, 117, 101)  # #5a7565
-GREEN = (34, 197, 94)  # #22c55e
-BORDER = (14, 26, 18)  # subtle line
-
-FONT_DISPLAY = "bebas-neue-400.ttf"
-FONT_MONO = "space-mono-400.ttf"
-FONT_MONO_BOLD = "space-mono-700.ttf"
-
-W, H = 1200, 630
+# Design tokens + fonts + primitives now live in card_engine. Re-exported here under
+# the historic names so the daily cards below (and og_moments, which imports this
+# module) render byte-identically to before the extraction.
+_font = card_engine.font
+BG = card_engine.BG
+TEXT = card_engine.TEXT
+MUTED = card_engine.MUTED
+FAINT = card_engine.FAINT
+GREEN = card_engine.GREEN
+BORDER = card_engine.BORDER
+FONT_DISPLAY = card_engine.FONT_DISPLAY
+FONT_MONO = card_engine.FONT_MONO
+FONT_MONO_BOLD = card_engine.FONT_MONO_BOLD
+W, H = card_engine.W, card_engine.H
 
 
 def _base_image():
-    img = Image.new("RGB", (W, H), BG)
-    draw = ImageDraw.Draw(img)
-    # Top accent line
-    draw.rectangle([0, 0, W, 3], fill=GREEN)
-    # Bottom bar
-    draw.rectangle([0, H - 40, W, H], fill=(6, 10, 8))
-    return img, draw
+    return card_engine.base_canvas()
 
 
 def _draw_header(draw, page_label):
-    draw.text((48, 28), "averagejoematt.com", fill=MUTED, font=_font(FONT_MONO, 13))
-    draw.text((48, 52), page_label.upper(), fill=GREEN, font=_font(FONT_MONO, 11))
+    card_engine.draw_header(draw, page_label)
 
 
 def _draw_metric(draw, x, y, value, label, color=TEXT):
-    draw.text((x, y), str(value), fill=color, font=_font(FONT_DISPLAY, 56))
-    draw.text((x, y + 60), label, fill=MUTED, font=_font(FONT_MONO, 11))
+    card_engine.draw_metric(draw, x, y, value, label, color=color)
 
 
 def _draw_footer(draw, stats):
     days_in = stats.get("platform", {}).get("days_in", 0)
-    draw.text((48, H - 30), f"Day {days_in}", fill=FAINT, font=_font(FONT_MONO, 11))
-    draw.text((W - 48, H - 30), "updated daily by life-platform", fill=FAINT, font=_font(FONT_MONO, 11), anchor="ra")
+    card_engine.draw_footer(draw, left_text=f"Day {days_in}", right_text="updated daily by life-platform")
 
 
 def _fmt(val, decimals=0, suffix=""):
-    if val is None:
-        return "\u2014"
-    if decimals == 0:
-        return f"{int(round(val))}{suffix}"
-    return f"{round(val, decimals)}{suffix}"
+    return card_engine.fmt(val, decimals, suffix)
 
 
 def build_home(stats):
@@ -164,17 +140,34 @@ def build_training(stats):
     return img
 
 
+def _load_character_stats():
+    """Read the computed character_stats.json (written by character-sheet-compute).
+    Returns {} on any failure so the card falls back gracefully."""
+    try:
+        resp = s3.get_object(Bucket=S3_BUCKET, Key="generated/data/character_stats.json")
+        return json.loads(resp["Body"].read()) or {}
+    except Exception as e:
+        print(f"[WARN] character_stats.json read failed (character card falls back): {e}")
+        return {}
+
+
 def build_character(stats):
+    """#420: the character-sheet card now renders from COMPUTED character stats via the
+    #595 engine — level, tier, XP, days active, per-pillar levels — never a narrated
+    line and never chronological age (ADR-104 + phenoage privacy). Falls back to the
+    platform streak/day figures when character_stats.json isn't available yet."""
+    cstats = _load_character_stats()
+    if cstats.get("character"):
+        return card_engine.render("character", cstats)
+
+    # Fallback (first days / stats not yet computed): the historic minimal card.
     img, draw = _base_image()
     _draw_header(draw, "Character Sheet")
-
     draw.text((48, 100), "THE SCORE", fill=TEXT, font=_font(FONT_DISPLAY, 72))
     draw.text((48, 180), "Gamified health tracking. 7 pillars. Real XP.", fill=MUTED, font=_font(FONT_MONO, 14))
-
     platform = stats.get("platform", {})
     _draw_metric(draw, 48, 260, _fmt(platform.get("tier0_streak"), 0), "TIER-0 STREAK", GREEN)
     _draw_metric(draw, 380, 260, _fmt(platform.get("days_in"), 0), "DAYS IN")
-
     _draw_footer(draw, stats)
     return img
 
@@ -349,7 +342,9 @@ def lambda_handler(event, context):
         from web.og_moments import sweep_moments
 
         idx = sweep_moments(s3, stats)
-        moments_n = (1 if idx.get("week") else 0) + len(idx.get("qa") or {}) + len(idx.get("predictions") or [])
+        moments_n = (
+            (1 if idx.get("week") else 0) + len(idx.get("qa") or {}) + len(idx.get("predictions") or []) + len(idx.get("chronicles") or {})
+        )
     except Exception as e:
         print(f"[WARN] moments sweep failed (non-fatal): {e}")
 
