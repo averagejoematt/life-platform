@@ -51,26 +51,50 @@ async function coachMap() {
 }
 
 let _pop = null;
+let _trigger = null; // the chip that opened the popover — focus returns here on close
+
+// All natively-focusable elements a popover could contain (kept generic since
+// the popover's innerHTML is rebuilt per coach, currently just the "full page →" link).
+const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 function popEl() {
   if (_pop) return _pop;
   _pop = document.createElement("div");
   _pop.className = "coach-pop";
   _pop.setAttribute("role", "dialog");
+  _pop.setAttribute("aria-modal", "false"); // a lightweight disclosure, not a blocking modal
   _pop.hidden = true;
   document.body.appendChild(_pop);
   document.addEventListener("click", (e) => {
     if (!_pop.hidden && !_pop.contains(e.target) && !e.target.classList.contains("coach-chip")) hide();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") hide();
+    if (_pop.hidden) return;
+    if (e.key === "Escape") { hide(); return; }
+    // Focus trap (#579): Tab/Shift+Tab cycles within the popover's focusable elements
+    // instead of escaping into the rest of the page while it's open.
+    if (e.key === "Tab") {
+      const items = Array.from(_pop.querySelectorAll(FOCUSABLE));
+      if (!items.length) { e.preventDefault(); return; }
+      const first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
   });
   window.addEventListener("resize", hide);
   return _pop;
 }
 function hide() {
-  if (_pop) _pop.hidden = true;
+  if (!_pop || _pop.hidden) return;
+  _pop.hidden = true;
+  if (_trigger) {
+    _trigger.setAttribute("aria-expanded", "false");
+    _trigger.focus(); // return focus to the trigger (#579) — never strand it on a removed panel
+    _trigger = null;
+  }
 }
 function show(chip, c) {
+  if (_trigger && _trigger !== chip) _trigger.setAttribute("aria-expanded", "false");
   const p = popEl();
   p.innerHTML =
     `<p class="cp-name" style="--coach:${esc(c.color || "")}"><span class="coach-mark">${portrait(c, { title: "", size: 18 }) || sigil(c, { title: "" })}</span>${esc(c.name)}</p>` +
@@ -78,11 +102,16 @@ function show(chip, c) {
     (c.short_bio ? `<p class="cp-bio">${esc(c.short_bio)}</p>` : "") +
     `<a class="cp-link" href="/coaching/coaches/#${esc(c.persona_id)}">full page →</a>`;
   p.hidden = false;
+  _trigger = chip;
+  chip.setAttribute("aria-expanded", "true");
   const r = chip.getBoundingClientRect();
   const top = window.scrollY + r.bottom + 6;
   const left = Math.min(window.scrollX + r.left, window.scrollX + document.documentElement.clientWidth - p.offsetWidth - 12);
   p.style.top = `${top}px`;
   p.style.left = `${Math.max(8, left)}px`;
+  // Move focus into the popover (dialog pattern) — the link is its one focusable element.
+  const target = p.querySelector(FOCUSABLE);
+  if (target) target.focus();
 }
 
 /**
@@ -129,9 +158,12 @@ export async function enhanceCoachNames(root) {
     chip.className = "coach-chip";
     chip.textContent = hitName;
     chip.setAttribute("aria-label", `${hitName} — coach details`);
+    chip.setAttribute("aria-haspopup", "dialog");
+    chip.setAttribute("aria-expanded", "false");
     chip.addEventListener("click", (e) => {
       e.stopPropagation();
-      show(chip, map[hitName]);
+      if (chip.getAttribute("aria-expanded") === "true") hide();
+      else show(chip, map[hitName]);
     });
     frag.appendChild(chip);
     if (after) frag.appendChild(document.createTextNode(after));
