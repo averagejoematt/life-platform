@@ -15,6 +15,8 @@
 */
 
 import { initTheme } from "/assets/js/theme.js";
+import { sigil } from "/assets/js/sigils.js";
+import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { sparkline } from "/assets/js/charts.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
@@ -99,6 +101,43 @@ function isBad(v) {
   return s === "" || s.toUpperCase() === "N/A" || /^\[.*\]$/.test(s);
 }
 
+/* ── #591 presence helpers — honest marks + timestamps, no fake liveness ──── */
+
+// A speaker's mark: a signed portrait when one exists, else the deterministic
+// sigil (never null). Accepts {coach_id|persona_id|name}.
+function coachMark(c, size = 22) {
+  return portrait(c, { title: "", cls: "ck-mark", size }) || sigil(c, { title: "", cls: "ck-mark" });
+}
+
+const PT = "America/Los_Angeles";
+const _dayPT = (d) => d.toLocaleDateString("en-CA", { timeZone: PT }); // YYYY-MM-DD
+
+// The real authoring time, in Pacific (the site's tz). "this morning/afternoon/
+// evening" ONLY when written today (PT); otherwise the date. Never a live cue.
+function writtenStamp(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString("en-US", { timeZone: PT, hour: "numeric", minute: "2-digit" });
+  if (_dayPT(d) === _dayPT(new Date())) {
+    const h = +d.toLocaleString("en-US", { timeZone: PT, hour: "numeric", hour12: false });
+    const part = h < 12 ? "this morning" : h < 18 ? "this afternoon" : "this evening";
+    return `written ${time} ${part}`;
+  }
+  return `written ${d.toLocaleDateString("en-US", { timeZone: PT, month: "short", day: "numeric" })}`;
+}
+
+// Honest "held since {date}" — stance data is weekly (ADR-104/105), so this is a
+// real date + a coarse "~N weeks", NEVER a fabricated day count.
+function heldSince(iso) {
+  if (!iso) return "";
+  const d = new Date(String(iso).length <= 10 ? `${iso}T12:00:00-07:00` : iso);
+  if (isNaN(d.getTime())) return "";
+  const date = d.toLocaleDateString("en-US", { timeZone: PT, month: "short", day: "numeric" });
+  const weeks = Math.floor((Date.now() - d.getTime()) / (7 * 864e5));
+  return weeks >= 1 ? `held since ${date} · ~${weeks} wk${weeks > 1 ? "s" : ""}` : `held since ${date}`;
+}
+
 function renderVerdict(priority) {
   // uplevel P3 — the verdict was an 11-line static wall of mono text. Same words,
   // staged: attributed to the coach who wrote it (name + title from the payload,
@@ -114,12 +153,82 @@ function renderVerdict(priority) {
   const beats = [];
   const per = Math.ceil(sentences.length / Math.min(3, sentences.length));
   for (let i = 0; i < sentences.length; i += per) beats.push(sentences.slice(i, i + per).join("").trim());
+  // #591: the read is attributed AND time-stamped — a signed mark for the author
+  // and the honest hour it was written. Presence without fake liveness.
+  const stamp = writtenStamp(priority.generated_at);
   const who = priority.coach_name
-    ? `<p class="vd-who label">${escapeHTML(priority.coach_name)}${priority.coach_title ? ` · ${escapeHTML(priority.coach_title)}` : ""}</p>`
+    ? `<p class="vd-who label">` +
+      `<span class="vd-mark" aria-hidden="true">${coachMark({ name: priority.coach_name, coach_id: priority.coach_id }, 22)}</span>` +
+      `${escapeHTML(priority.coach_name)}${priority.coach_title ? ` · ${escapeHTML(priority.coach_title)}` : ""}` +
+      `${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`
     : "";
   v.innerHTML = who + beats.map((b, i) =>
     `<span class="vd-beat" style="--vd-delay:${(i * 0.45).toFixed(2)}s">${i === 0 ? `<span class="mark">&rsaquo;</span> ` : ""}${escapeHTML(b)}</span>`
   ).join(" ");
+}
+
+/* ── #591: the board, made present — the argument underneath the verdict + where
+   each coach stands. Both fed by /api/coach_team; both self-hide until real data
+   exists. The threaded renderer handles 1..n turns, so it's ready for #540 to grow
+   the exchange without a rewrite. ─────────────────────────────────────────────── */
+const _TURN_ROLE = { position: "opens", reply: "replies", rejoinder: "counters" };
+
+function renderThread(team) {
+  const wrap = bind("thread");
+  if (!wrap) return;
+  const d = team && team.dispute;
+  const turns = d && Array.isArray(d.turns) ? d.turns.filter((t) => t && t.line) : [];
+  if (!turns.length) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+  const when = d.created_at ? ` · <span class="thread-when">${escapeHTML(writtenStamp(d.created_at))}</span>` : "";
+  const head =
+    `<p class="thread-cap label"><span class="mark">&rsaquo;</span> the argument underneath` +
+    `${d.topic ? ` — ${escapeHTML(d.topic)}` : ""}${when}</p>`;
+  const body = turns
+    .map((t, i) => {
+      const role = _TURN_ROLE[t.kind] || "";
+      return (
+        `<div class="turn turn-${escapeHTML(t.kind || "position")}" style="--vd-delay:${(i * 0.4).toFixed(2)}s">` +
+        `<span class="turn-mark" aria-hidden="true">${coachMark({ coach_id: t.speaker, name: t.name }, 20)}</span>` +
+        `<div class="turn-body"><p class="turn-who label">${escapeHTML(t.name || "")}` +
+        `${role ? ` <span class="turn-role">${role}</span>` : ""}</p>` +
+        `<p class="turn-line">${escapeHTML(t.line)}</p></div></div>`
+      );
+    })
+    .join("");
+  wrap.innerHTML = head + body;
+  wrap.hidden = false;
+}
+
+function renderStances(team) {
+  const wrap = bind("stances");
+  if (!wrap) return;
+  const huddle = team && Array.isArray(team.huddle) ? team.huddle : [];
+  const chips = huddle
+    .filter((h) => h && h.headline)
+    .map((h) => {
+      const held = heldSince(h.held_since);
+      return (
+        `<li class="stance-chip">` +
+        `<span class="sc-mark" aria-hidden="true">${coachMark({ coach_id: h.persona_id, name: h.name }, 16)}</span>` +
+        `<span class="sc-name label">${escapeHTML(h.name || "")}</span>` +
+        `<span class="sc-stage">${escapeHTML(h.headline)}</span>` +
+        `${held ? `<span class="sc-held label">${escapeHTML(held)}</span>` : ""}</li>`
+      );
+    })
+    .join("");
+  if (!chips) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+  wrap.innerHTML = `<p class="stance-cap label">where the team stands</p><ul class="stance-list">${chips}</ul>`;
+  wrap.hidden = false;
+}
+
+async function renderBoard() {
+  try {
+    const team = await getJSON(`${API}/coach_team`);
+    renderThread(team);
+    renderStances(team);
+  } catch (e) {
+    /* both self-hide — the cockpit never blanks on a missing board */
+  }
 }
 
 /* ── render: the two domains + consistency band ──────────────────────────── */
@@ -599,7 +708,7 @@ async function renderReading() {
 }
 
 /* ── Journey scope: level-up timeline + achievements (gamified layer) ──────── */
-const DAILY_SEL = [".dialogue", "[data-readiness]", ".cap-today", ".domains", ".band", "[data-circadian]"];
+const DAILY_SEL = [".dialogue", ".board-thread", ".stance-strip", "[data-readiness]", ".cap-today", ".domains", ".band", "[data-circadian]"];
 function showJourney(on) {
   DAILY_SEL.forEach((s) => { const el = $(s); if (el) el.style.display = on ? "none" : ""; });
   if (on) bind("boardline").hidden = true;
@@ -837,6 +946,7 @@ async function load(dateStr) {
     const pri = priority.status === "fulfilled" ? priority.value : null;
     renderVerdict(pri);
     renderBoardline(pri);
+    renderBoard();      // #591 fire-and-forget; the inter-coach thread + team stances, self-hiding
     renderPresence();   // fire-and-forget; hides itself unless he's gone quiet / just returned
     renderSinceLastVisit(); // fire-and-forget; only speaks to a genuine returning visitor
     renderCircadian();  // fire-and-forget; hides itself if no forecast available

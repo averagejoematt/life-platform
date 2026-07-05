@@ -346,6 +346,25 @@ def _stance_history(coach_id, limit=8):
     return out[:limit]
 
 
+def _stance_held_since(coach_id, current_stage_label):
+    """The honest 'held since' date for a coach's current stance — the earliest
+    consecutive STANCE# snapshot (walking newest→older) whose stage still matches
+    the current one. STANCE# records are written WEEKLY, so this resolves to a real
+    date / a count of weeks, NEVER a day count (ADR-104/105 — no fabricated
+    day-granularity). Returns an ISO date string or None (no history / fallback
+    ladder), and the front-end formats it as 'held since {date}' / '~N weeks'."""
+    if not current_stage_label:
+        return None
+    held = None
+    for snap in _stance_history(coach_id, limit=12):  # newest first
+        label = (snap.get("stage") or {}).get("label")
+        if label and label == current_stage_label:
+            held = snap.get("as_of")
+        else:
+            break
+    return held
+
+
 def _stance_block(coach_id, weight_lbs):
     """The coach's public read of Matthew, in a single normalized shape both the
     coach page (CC-01) and the My Team view (CC-10) consume.
@@ -574,6 +593,9 @@ def handle_coach_team(event):
                     "graduation_gate": sb.get("graduation_gate"),  # ladder-only; absent on stance
                     "calibration": _cal,
                     "source": sb.get("source"),
+                    # #591: honest stance age — the date this stage was first held
+                    # (weekly resolution; the cockpit renders "held since {date}").
+                    "held_since": _stance_held_since(pid, stage.get("label")),
                 }
             )
         seen = set()
