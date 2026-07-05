@@ -313,7 +313,7 @@ Eight domain-specific AI coaches generate daily analyses through a multi-stage p
 | Ensemble Digest | `coach-ensemble-digest` | Cross-coach synthesis, disagreement detection, influence graph |
 | Prediction Evaluator | `coach-prediction-evaluator` | Scores past predictions, calibrates confidence |
 | History Summarizer | `coach-history-summarizer` | Compresses old threads into COMPRESSED#latest |
-| Quality Gate | `coach-quality-gate` | **WIRED** as of v51 (2026-05-19) — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation. Validates output quality (hallucination, voice drift, repetition) before downstream writes. |
+| Quality Gate | `coach-quality-gate` | **BLOCKING** as of N-06 (#390, 2026-07-05) — invoked synchronously from `ai_calls._run_coach_v2_pipeline` after each COACH-V2 generation. A sub-threshold draft is regenerated once (`_enforce_quality_gate`); still-failing drafts are held (no publish) instead of shipping. Was advisory-only (async, report discarded) v51 (2026-05-19) → N-06; see ADR-107. |
 | Observatory Renderer | `coach-observatory-renderer` | Renders coach analysis for /api/coach_analysis endpoint (replaces ai_expert_analyzer) |
 
 **Pipeline flow:** Computation Engine -> Narrative Orchestrator -> Quality Gate -> State Updater -> (async) Ensemble Digest + Prediction Evaluator + History Summarizer. Results stored to `COACH#` and `ENSEMBLE#` DynamoDB partitions and served via `/api/coach_analysis`.

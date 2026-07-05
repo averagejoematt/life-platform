@@ -1008,6 +1008,133 @@ Respond in EXACTLY this JSON format, no other text:
 # invoking the computation engine Lambda multiple times.
 _comp_results_cache = None
 
+# N-06 (#390): bounded retry cap for the quality-gate regenerate-or-hold loop.
+# One corrective rewrite, then hold — mirrors the established regen_once
+# ("one corrective rewrite, kept only if strictly better") convention used by
+# the grounding gate (ADR-104) elsewhere in this same pipeline.
+_QUALITY_GATE_MAX_REGENERATIONS = 1
+
+
+def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief):
+    """Synchronous (RequestResponse) call to coach-quality-gate.
+
+    N-06 (#390): promoted from the prior fire-and-forget `InvocationType="Event"`
+    call (whose report was discarded — nothing ever acted on it) so the pipeline
+    can actually enforce the verdict. Fails OPEN on any infra error (invoke
+    exception, timeout, malformed payload) — an unreachable gate must never
+    block a draft; it only blocks on an actual sub-threshold verdict from a
+    gate that responded. This mirrors coach_quality_gate.py's own internal
+    fail-open contract (`_build_fallback_report`) for LLM-side failures.
+    """
+    try:
+        resp = lambda_client.invoke(
+            FunctionName="coach-quality-gate",
+            InvocationType="RequestResponse",
+            Payload=json.dumps(
+                {
+                    "coach_id": coach_id,
+                    "output_text": output_text,
+                    "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
+                    "generation_date": _date_cls.today().isoformat(),
+                }
+            ).encode(),
+        )
+        payload = json.loads(resp["Payload"].read())
+        if not isinstance(payload, dict):
+            raise ValueError(f"non-dict quality gate payload: {type(payload)}")
+        payload.setdefault("passed", True)
+        return payload
+    except Exception as e:
+        print(f"[COACH-QUALITY-GATE:{coach_id}] sync invoke failed (fail-open, not blocking): {e}")
+        return {"passed": True, "score": None, "suggestions": [], "_fail_open": True}
+
+
+def _quality_gate_correction_note(report):
+    """Build a corrective-rewrite note from a failing quality gate report.
+
+    Pure function (no I/O) so the regenerate-or-hold loop is unit-testable
+    without a live Bedrock/Lambda call. Mirrors the directness of
+    grounded_generation.correction_prompt.
+    """
+    lines = ["QUALITY GATE FEEDBACK — your previous draft failed review. Fix these specific issues:"]
+    for v in report.get("anti_pattern_violations") or []:
+        phrase = v.get("phrase") if isinstance(v, dict) else v
+        if phrase:
+            lines.append(f'  - Remove/avoid the forbidden phrase: "{phrase}"')
+    for v in report.get("decision_class_violations") or []:
+        if isinstance(v, dict):
+            lines.append(
+                f"  - You exceeded the evidence ceiling (expected max: {v.get('expected_max', 'observational')}); "
+                f"offending text: \"{v.get('excerpt', '')}\""
+            )
+    for flag in report.get("cross_coach_similarity_flags") or []:
+        if isinstance(flag, dict):
+            lines.append(f"  - Too similar to {flag.get('similar_to', 'another coach')}: {flag.get('reason', '')}")
+    for s in report.get("suggestions") or []:
+        if s:
+            lines.append(f"  - {s}")
+    if len(lines) == 1:
+        lines.append("  - Write a more distinctive, on-voice draft that matches your persona.")
+    lines.append("Rewrite the full response addressing all of the above. Do not mention this feedback in the output.")
+    return "\n".join(lines)
+
+
+def _enforce_quality_gate(
+    lambda_client, coach_id, output_text, generation_brief, regenerate_fn, max_regenerations=_QUALITY_GATE_MAX_REGENERATIONS
+):
+    """N-06 (#390): the coach quality gate, promoted from advisory to blocking.
+
+    Regenerate-or-hold: a sub-threshold draft is retried through `regenerate_fn`
+    (the caller's own generation call, given a corrective note) up to
+    `max_regenerations` times. Only a passing draft is returned. If the cap is
+    hit with no passing draft, returns (None, report) — the caller's existing
+    "None = hold, don't publish this cycle" contract (see
+    `_run_coach_v2_pipeline`'s early-return failure paths) keeps a
+    known-failing narrative off the site/brief instead of auto-publishing it
+    with a note.
+
+    Never fails open on an actual sub-threshold verdict from a gate that
+    responded — only on gate infra errors (see `_invoke_quality_gate_sync`).
+    """
+    report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+    attempts = 0
+    while not report.get("passed", True) and attempts < max_regenerations:
+        attempts += 1
+        note = _quality_gate_correction_note(report)
+        try:
+            regenerated = regenerate_fn(note)
+        except Exception as e:
+            print(f"[COACH-QUALITY-GATE:{coach_id}] regeneration attempt {attempts} failed: {e}")
+            break
+        if not (regenerated or "").strip():
+            print(f"[COACH-QUALITY-GATE:{coach_id}] regeneration attempt {attempts} returned empty — keeping prior draft")
+            break
+        output_text = regenerated
+        report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+
+    if not report.get("passed", True):
+        print(
+            f"[COACH-QUALITY-GATE:{coach_id}] HELD after {attempts} regeneration attempt(s) — "
+            f"score={report.get('score')}, not publishing this cycle (N-06)"
+        )
+        try:
+            _cw.put_metric_data(
+                Namespace=_CW_NAMESPACE,
+                MetricData=[
+                    {
+                        "MetricName": "CoachQualityGateHeld",
+                        "Dimensions": [{"Name": "CoachID", "Value": coach_id}],
+                        "Value": 1,
+                        "Unit": "Count",
+                    }
+                ],
+            )
+        except Exception as e:
+            print(f"[COACH-QUALITY-GATE:{coach_id}] CloudWatch held-metric emit failed (non-fatal): {e}")
+        return None, report
+
+    return output_text, report
+
 
 def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
@@ -1261,7 +1388,28 @@ Write your {domain_label} coaching section now."""
             except Exception as _gg_e:
                 print(f"[COACH-V2:{coach_id}] grounding gate failed (non-blocking): {_gg_e}")
 
-        # Step 6: Invoke state updater (async)
+        # Step 6 (N-06, #390): quality gate — promoted from advisory to blocking.
+        # Was fire-and-forget (InvocationType=Event, report discarded — nothing
+        # ever acted on a fail). The 2026-06-05→07-04 CloudWatch re-eval (30d,
+        # 206 real logged verdicts) found the score threshold (60) never fires on
+        # its own (observed min score 62) but the gate's own `passed` verdict
+        # (anti-pattern / decision-class / voice-distinctiveness / cross-coach
+        # findings) fired on 10.2% of outputs — that's the real signal. Blocking
+        # is keyed off `passed`, not a re-tuned score cutoff. See ADR-107.
+        # Runs BEFORE the state updater so a regenerated draft (not a discarded
+        # one) is what gets recorded and published.
+        output, _quality_report = _enforce_quality_gate(
+            lambda_client,
+            coach_id,
+            output,
+            generation_brief,
+            regenerate_fn=lambda _note: call_anthropic(system_prompt + "\n\n" + user_message + "\n\n" + _note, api_key, max_tokens=600),
+        )
+        if output is None:
+            print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
+            return None
+
+        # Step 7: Invoke state updater (async) — records the final, gate-passed text.
         try:
             lambda_client.invoke(
                 FunctionName="coach-state-updater",
@@ -1277,27 +1425,6 @@ Write your {domain_label} coaching section now."""
             )
         except Exception as e:
             print(f"[COACH-V2:{coach_id}] State updater invoke failed (non-blocking): {e}")
-
-        # Step 7 (V2 follow-up, 2026-05-19): Invoke quality gate (async, advisory)
-        # Wires the previously-orphaned coach-quality-gate Lambda. Each coach output
-        # gets scored against its voice spec; results land in DDB under
-        # COACH#{coach_id} / QUALITY#{date}. Non-blocking — never fails this call.
-        # See ADR-057 P5.5 follow-up.
-        try:
-            lambda_client.invoke(
-                FunctionName="coach-quality-gate",
-                InvocationType="Event",
-                Payload=json.dumps(
-                    {
-                        "coach_id": coach_id,
-                        "output_text": output,
-                        "generation_brief": generation_brief if isinstance(generation_brief, dict) else None,
-                        "generation_date": _date_cls.today().isoformat(),
-                    }
-                ).encode(),
-            )
-        except Exception as e:
-            print(f"[COACH-V2:{coach_id}] Quality gate invoke failed (non-blocking): {e}")
 
         return output
 

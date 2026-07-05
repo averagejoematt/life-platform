@@ -223,7 +223,7 @@ daily-brief-schedule                cron(0 17 * * ? *)
 | Daily Metrics Compute | 09:40 AM (16:40 UTC) | daily-metrics-compute (day grade, readiness, streaks, TSB, HRV, weight → `computed_metrics` partition) |
 | Daily Insight Compute | 09:45 AM (16:45 UTC) | daily-insight-compute (IC-8: 7-day habit×outcome correlations, leading indicators, platform_memory pull, structured JSON for Daily Brief AI calls) |
 | Freshness Check | 10:45 AM | life-platform-freshness-checker |
-| Daily Brief | 10:00 AM (17:00 UTC) | daily-brief (v2.62, 18 sections, 4 AI calls; reads char_sheet+adaptive+metrics+insight; async-invokes `coach-quality-gate` per coach generation) |
+| Daily Brief | 10:00 AM (17:00 UTC) | daily-brief (v2.62, 18 sections, 4 AI calls; reads char_sheet+adaptive+metrics+insight; synchronously invokes `coach-quality-gate` per coach generation, blocking as of N-06 #390 — regenerate-or-hold) |
 | **DST note** | — | All crons fixed UTC. Times above are PDT (UTC-7). DST is now active (PDT = UTC-7). |
 | Anomaly Detector | 09:05 AM | anomaly-detector |
 | Nutrition Review | 09:00 AM (Saturday only) | nutrition-review (v1.1, Sonnet, 3-expert panel) |

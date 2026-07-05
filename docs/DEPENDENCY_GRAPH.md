@@ -50,9 +50,9 @@ Runs daily after ingestion completes. **Order matters** — see critical path be
 | `daily_insight_compute` | 10:20 AM | `computed_metrics`, `habit_scores`, `day_grade`, platform_memory, whoop, garmin, macrofactor, apple_health, withings | `computed_insights`, `platform_memory` |
 | `hypothesis_engine` | Sun 12:00 PM | ALL 9 ingestion sources + `hypotheses` (self) | `hypotheses`, `platform_memory` |
 
-### Compute → COACH-V2 hand-off (v51, 2026-05-19)
+### Compute → COACH-V2 hand-off (v51, 2026-05-19; blocking as of N-06, #390, 2026-07-05)
 
-After each COACH-V2 generation, `ai_calls.call_coach_brief_v2` now invokes `coach-quality-gate` **asynchronously** (`InvocationType=Event`) — wiring the previously-orphaned quality gate into the pipeline. The gate validates hallucination, voice drift, and repetition before downstream `coach-state-updater` and `coach-ensemble-digest` write to DDB.
+After each COACH-V2 generation, `ai_calls._run_coach_v2_pipeline` invokes `coach-quality-gate` **synchronously** (`InvocationType=RequestResponse`) via `_enforce_quality_gate` — a sub-threshold draft (anti-pattern, decision-class, voice-distinctiveness, or cross-coach findings) is regenerated once and only a passing draft proceeds to `coach-state-updater`; a still-failing draft is held (function returns `None`, nothing publishes that cycle). Originally wired **asynchronously** (`InvocationType=Event`, report discarded) at v51 — see ADR-107 for the measured re-evaluation that justified the promotion.
 
 ### Schedule Ordering Note
 

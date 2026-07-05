@@ -42,8 +42,9 @@ Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`)
     ▼
 Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
   coach-computation-engine → coach-narrative-orchestrator →
-  8 coach generations → coach-state-updater → coach-ensemble-digest →
-  coach-quality-gate (post-gen) + coach-prediction-evaluator (9 AM PT, daily)
+  8 coach generations → coach-quality-gate (BLOCKING, N-06 #390 — regenerate-or-
+  hold, sync) → coach-state-updater → coach-ensemble-digest →
+  coach-prediction-evaluator (9 AM PT, daily)
     │
     ▼
 7 email Lambdas (daily-brief at 11 AM PT, weekly digests, chronicle, etc.)
@@ -226,7 +227,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 | **Voice spec** | Structural definition of a coach's tone, vocabulary, sentence patterns. |
 | **Computation engine** | Lambda (`coach-computation-engine`) that runs all deterministic math before coach generation. |
 | **Narrative orchestrator** | Lambda (`coach-narrative-orchestrator`) — showrunner that assigns themes and sequences generation. |
-| **Quality gate** | Lambda (`coach-quality-gate`) — invoked async from `ai_calls.call_coach_brief_v2` after each COACH-V2 generation (V2 wiring fix). |
+| **Quality gate** | Lambda (`coach-quality-gate`) — invoked synchronously from `ai_calls._run_coach_v2_pipeline` after each COACH-V2 generation; blocking (regenerate-or-hold) as of N-06 (#390). |
 | **Prediction evaluator** | Lambda (`coach-prediction-evaluator`) — scores past predictions against outcomes daily at 9 AM PT. |
 
 ---

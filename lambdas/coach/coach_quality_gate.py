@@ -1,8 +1,19 @@
 """
 coach_quality_gate.py — Coach Intelligence: Post-Generation Quality Gate
 
-Optional Haiku-based check that validates coach output quality after generation.
-Advisory only — never blocks output, just flags issues for the caller.
+Haiku-based check that validates coach output quality after generation. This
+Lambda is a pure scorer — it always returns a report and never blocks anything
+itself; whether a report's `passed=False` verdict actually blocks publication
+is the caller's decision.
+
+N-06 (#390, 2026-07-05): the daily-brief caller (`ai_calls._run_coach_v2_pipeline`)
+now invokes this Lambda synchronously (RequestResponse, was fire-and-forget
+Event) and enforces the verdict — regenerate once, then hold rather than
+publish a known-failing draft. See ADR-107 for the measured re-evaluation that
+justified the promotion and `ai_calls._enforce_quality_gate` for the
+regenerate-or-hold state machine. This module's own logic (scoring, thresholds,
+fallback-on-LLM-failure) is unchanged — it remains advisory from its own
+point of view; only the caller's handling changed.
 
 Checks:
   1. Anti-pattern violations — output vs voice spec phrase_blacklist & structural_blacklist
@@ -19,6 +30,8 @@ DynamoDB patterns: reads only (no writes)
 S3: config/coaches/{coach_id}.json (voice spec)
 
 v1.0.0 — 2026-04-06 (Coach Intelligence)
+v1.1.0 — 2026-07-05 (N-06, #390): caller-side promotion to blocking; no change to
+         this module's own scoring logic.
 """
 
 import json
@@ -530,9 +543,10 @@ def lambda_handler(event, context):
         similarity checking (if not provided, fetched from DynamoDB)
       - skip_cross_coach: bool — if true, skip cross-coach similarity check
 
-    Returns the quality report dict. The quality gate is advisory — it never
-    blocks output, just flags issues. If passed=false, the caller should
-    consider regenerating or flagging for review.
+    Returns the quality report dict. This Lambda itself never blocks output —
+    it only scores and flags issues. As of N-06 (#390), the daily-brief caller
+    (`ai_calls._enforce_quality_gate`) DOES act on `passed=false`: it retries
+    generation once, and only publishes a passing draft (holds otherwise).
     """
     try:
         coach_id = event.get("coach_id")

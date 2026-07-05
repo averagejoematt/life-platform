@@ -624,10 +624,10 @@ Items that came up during V2 follow-up sessions and aren't yet scheduled.
 - Use `docs/V2_AUDIT_PROMPT.md` for the v3 round
 - Cost: ~1 session of focused agent work
 
-### N-06 — Coach `quality_gate` threshold promotion
-- Currently advisory (logs score, doesn't block); V2 wired it but kept it observational
-- After 30 days of scores accumulating, decide: promote to retry-with-stricter-prompt on score <60? block on score <40?
-- Re-evaluate: 2026-06-19
+### N-06 — Coach `quality_gate` threshold promotion — ✅ RESOLVED 2026-07-05 (#390, ADR-107)
+- **Re-eval evidence (30d, 2026-06-05→07-04, 206 real logged verdicts):** the score threshold (60) never fired on its own — observed min score 62 — but the gate's own `passed` verdict (anti-pattern / decision-class / voice-distinctiveness / cross-coach findings, independent of the score) fired on 10.2% of outputs. That's the real signal; the score cutoff was never the effective bound.
+- **Decision:** promote to blocking, keyed off `passed` (not a re-tuned score cutoff — 60 stays, confirmed by the evidence rather than adjusted). Regenerate-or-hold: one corrective rewrite, then hold (no publish) if still failing — `ai_calls._enforce_quality_gate`, called synchronously (was fire-and-forget) from `_run_coach_v2_pipeline`.
+- Full writeup: ADR-107 (`docs/DECISIONS.md`).
 
 ### N-07 — `compute_metadata` adoption gap-filling
 - V2 P2.6 expanded to 5 more compute Lambdas; `acwr_compute` skipped (uses update_item)
