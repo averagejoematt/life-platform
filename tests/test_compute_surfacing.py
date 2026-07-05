@@ -1,13 +1,18 @@
 """tests/test_compute_surfacing.py — elite review (2026-06-15) surfacing PR.
 
-Two compute outputs were stored daily but never exposed via the site API:
+Compute outputs stored daily but exposed read-only via the site API:
   * circadian-compliance score  (SOURCE#circadian | DATE#)
-  * unified sleep reconciliation (SOURCE#sleep_unified | DATE#)
 
-These tests exercise the new read-only handlers against a faked DynamoDB,
-covering: the populated shape, the empty/no-data path, source_map decoding,
-and internal-key stripping. ER-02 contract spirit — the endpoints' public shape
-is now pinned.
+These tests exercise the read-only handlers against a faked DynamoDB, covering
+the populated shape, the empty/no-data path, and internal-key stripping.
+ER-02 contract spirit — the endpoints' public shape is pinned.
+
+#487/ADR-113 — the unified-sleep reconciliation surface (SOURCE#sleep_unified,
+/api/sleep_reconciliation) was RETIRED: its per-field merge read record fields
+that never existed and its date ran 1–2 nights stale, mislabelling the public
+/data/sleep "night of" header. The header date is now sourced from the LIVE
+/api/sleep_detail as_of_date (the latest Eight Sleep night in the window). The
+tests at the bottom lock in both the retirement and the honest date source.
 """
 
 import os
@@ -77,48 +82,43 @@ def test_circadian_no_data(monkeypatch):
     assert "score" not in body
 
 
-# ── unified sleep reconciliation ──────────────────────────────────────────────
+# ── unified sleep reconciliation — RETIRED (#487/ADR-113) ─────────────────────
 
 
-def test_sleep_reconciliation_decodes_source_map_and_strips_internals(monkeypatch):
-    item = {
-        "pk": "USER#matthew#SOURCE#sleep_unified",
-        "sk": "DATE#2026-06-15",
-        "date": "2026-06-15",
-        "total_duration_hours": Decimal("7.4"),
-        "hrv_ms": Decimal("61"),
-        "recovery_score": Decimal("66"),
-        "sources_present": ["whoop", "eightsleep"],
-        "source_map": '{"hrv_ms": "whoop", "room_temp_c": "eightsleep"}',
-        "reconciled_at": "2026-06-15T16:00:00+00:00",
-        "run_id": "xyz789",
-        "computed_at": "2026-06-15T16:00:00+00:00",
-    }
-    monkeypatch.setattr(common, "table", _FakeTable([item]))
+def test_sleep_reconciliation_handler_is_retired():
+    """The dead unified-sleep surface is gone: no handler, no route. (#487/ADR-113)"""
+    assert not hasattr(data, "handle_sleep_reconciliation"), "handle_sleep_reconciliation should be removed"
 
-    resp = data.handle_sleep_reconciliation()
+    from web import site_api_lambda
+
+    assert "/api/sleep_reconciliation" not in site_api_lambda.ROUTES, "the /api/sleep_reconciliation route must be removed"
+
+
+def test_sleep_detail_night_of_date_sourced_live_not_from_unified(monkeypatch):
+    """#487/ADR-113 date-sourcing lock: the /data/sleep "night of" header derives from
+    handle_sleep_detail's as_of_date — the LATEST live Eight Sleep night in the window —
+    NOT from the retired, chronically-stale sleep_unified record. as_of_date must track
+    the freshest available night."""
+    monkeypatch.setattr(data, "EXPERIMENT_START", "2026-06-01")
+
+    eight = [
+        {"sk": "DATE#2026-07-01", "sleep_score": Decimal("80"), "sleep_efficiency_pct": Decimal("88")},
+        {"sk": "DATE#2026-07-03", "sleep_score": Decimal("82"), "sleep_efficiency_pct": Decimal("90")},  # freshest
+    ]
+    whoop = [
+        {"sk": "DATE#2026-07-03", "recovery_score": Decimal("66"), "hrv": Decimal("55"), "resting_heart_rate": Decimal("50")},
+    ]
+
+    def _fake_query_source(source, *_a, **_k):
+        return {"eightsleep": eight, "whoop": whoop}.get(source, [])
+
+    monkeypatch.setattr(data, "_query_source", _fake_query_source)
+
+    resp = data.handle_sleep_detail()
     assert resp["statusCode"] == 200
     body = __import__("json").loads(resp["body"])
-    assert body["available"] is True
-    assert body["total_duration_hours"] == 7.4
-    assert body["sources_present"] == ["whoop", "eightsleep"]
-    # temporal frame: wake-date-keyed record (2026-06-15) describes the night before
-    assert body["frame"] == "last_night"
-    assert body["night_of"] == "2026-06-14"
-    # source_map decoded from JSON string → dict
-    assert body["source_map"] == {"hrv_ms": "whoop", "room_temp_c": "eightsleep"}
-    # internal keys stripped
-    for k in ("pk", "sk", "run_id", "computed_at"):
-        assert k not in body
-
-
-def test_sleep_reconciliation_no_data(monkeypatch):
-    monkeypatch.setattr(common, "table", _FakeTable([]))
-    resp = data.handle_sleep_reconciliation()
-    assert resp["statusCode"] == 200
-    body = __import__("json").loads(resp["body"])
-    assert body["available"] is False
-    assert "total_duration_hours" not in body
+    # as_of_date is the freshest live Eight Sleep night — the honest source for "night of".
+    assert body["sleep_detail"]["as_of_date"] == "2026-07-03"
 
 
 # ── forecast (#541) ──────────────────────────────────────────────────────────

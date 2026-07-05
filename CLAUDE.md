@@ -14,7 +14,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
-- `docs/ARCHITECTURE.md` — full system design, ~93 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py`), 8 CDK stacks, data flows
+- `docs/ARCHITECTURE.md` — full system design, ~92 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py`), 8 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - **The forward-work backlog is GitHub Issues (ADR-099)** — epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones; seed sessions from `gh issue list --label type:story --milestone Now --state open`; a shipping PR carries `Fixes #N`. `docs/BACKLOG.md` is a frozen archive.

@@ -383,21 +383,11 @@ class ComputeStack(Stack):
             **shared,
         )
 
-        # ══════════════════════════════════════════════════════════════
-        # 10. sleep-reconciler — BS-08 (7:00 AM PT — after ingestion, before daily brief)
-        # ══════════════════════════════════════════════════════════════
-        create_platform_lambda(
-            self,
-            "SleepReconciler",
-            function_name="sleep-reconciler",
-            handler="compute.sleep_reconciler_lambda.lambda_handler",
-            source_file="lambdas/compute/sleep_reconciler_lambda.py",
-            schedule="cron(0 14 * * ? *)",  # 7:00 AM PT daily
-            timeout_seconds=60,
-            memory_mb=256,
-            custom_policies=rp.compute_sleep_reconciler(),
-            **shared,
-        )
+        # 10. sleep-reconciler — RETIRED 2026-07-05 (#487 / ADR-113). The unified-sleep
+        #     per-field merge read record fields that never existed (it stored the Whoop record
+        #     plus one Eight Sleep score, not the promised best-source-per-field merge) and ran
+        #     1–2 nights stale, mislabelling the public /data/sleep "night of" header. Zero
+        #     compute consumers; /api/sleep_detail already carries the same figures, fresher.
 
         # ══════════════════════════════════════════════════════════════
         # 11. circadian-compliance — BS-SL2 (7:00 PM PT — evening nudge window)

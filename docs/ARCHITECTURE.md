@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-07-05 (v8.6.0 — 144 tools, 43-module MCP package, 20 data sources, 93 Lambdas, 9 secrets, 56 alarms, 8 CDK stacks deployed).
+Last updated: 2026-07-05 (v8.6.0 — 144 tools, 43-module MCP package, 20 data sources, 92 Lambdas, 9 secrets, 56 alarms, 8 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared-layer version: see the discovery command in [CONVENTIONS.md](CONVENTIONS.md#facts-that-drift-run-the-command-never-quote-a-number) (don't hand-write it — it drifts). **91 ADRs** (ADR-001 → ADR-103; newest: ADR-101 distribution-before-monetization, ADR-102 single-table-DynamoDB-kept-on-purpose, ADR-103 complexity-posture ledger). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -420,9 +420,9 @@ Target: under $25/month | Current: ~$13/month
     #   nutrition_review, wednesday_chronicle, weekly_plate, monday_compass,
     #   anomaly_detector, evening_nudge, chronicle_email_sender,
     #   subscriber_onboarding)
-    # 12 compute (character_sheet, adaptive_mode, daily_metrics_compute,
+    # 11 compute (character_sheet, adaptive_mode, daily_metrics_compute,
     #   daily_insight_compute, hypothesis_engine, weekly_correlation_compute,
-    #   acwr_compute, sleep_reconciler, circadian_compliance,
+    #   acwr_compute, circadian_compliance,  # sleep_reconciler RETIRED #487/ADR-113
     #   ai_expert_analyzer [deprecated], journal_analyzer, field_notes)
     # 8 coach intelligence (coach_computation_engine, coach_narrative_orchestrator,
     #   coach_state_updater, coach_ensemble_digest, coach_prediction_evaluator,

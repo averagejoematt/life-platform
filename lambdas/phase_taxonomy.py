@@ -73,7 +73,6 @@ SOURCE_CLASS: dict[str, str] = {
     "sick_days": RAW_TIMESERIES,
     "measurements": RAW_TIMESERIES,  # ADR-077 dec B: body fact like weight; GA, not hidden
     "day_grade": RAW_TIMESERIES,  # ADR-077 dec C: keep series for Replay; GA clamps cockpit
-    "sleep_unified": RAW_TIMESERIES,  # reconciled best-estimate of the night, not a verdict
     "state_of_mind": RAW_TIMESERIES,  # affect self-report series
     "mood": RAW_TIMESERIES,
     "travel": RAW_TIMESERIES,
@@ -134,6 +133,9 @@ SOURCE_CLASS: dict[str, str] = {
     "email_log": SYSTEM_STATE,  # ADR-077 dec E: immutable sent-mail archive, GA on read
     "google_calendar": SYSTEM_STATE,  # dead: no writer (ADR-077 finding 7)
     "composite_scores": SYSTEM_STATE,  # dead: ADR-025 removed partition
+    "sleep_unified": SYSTEM_STATE,  # dead: #487/ADR-113 retired the reconciler — no writer, no
+    # reader. Orphan records kept (never wiped/served); classed here so the reset tooling still
+    # traverses them without raising. Was RAW_TIMESERIES when the reconciler wrote it.
 }
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;

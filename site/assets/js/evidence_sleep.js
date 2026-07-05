@@ -4,7 +4,7 @@
 */
 import { lineChart, stackedBar, correlationChip, dualLineChart, sparkline, targetSpine, stackedDayColumns, dumbbell } from "/assets/js/charts.js";
 import { explainMount } from "/assets/js/explain.js";
-import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
 
 // §0 Forecast hero (P0.1) — the circadian-compliance forecast, PROMOTED to lead. A 0→100
 // "tonight's odds" gauge + the four anchors (each with the lever to pull now) + two-voice.
@@ -60,13 +60,15 @@ export function sleepCorrelationBoard(cards) {
 
 export async function renderSleep(d) {
   const s = d.sleep_detail || {};
-  const [circ, uni, nut, corr] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/sleep_reconciliation"), tryJSON("/api/nutrition_overview"), tryJSON("/api/sleep_correlations")]);
+  const [circ, nut, corr] = await Promise.all([tryJSON("/api/circadian"), tryJSON("/api/nutrition_overview"), tryJSON("/api/sleep_correlations")]);
   const parts = [];
   // §0 — the forecast LEADS (prospective, not retrospective).
   const fcHero = circadianForecast(circ);
   if (fcHero) parts.push(fcHero);
-  // §1 — last night, demoted to EVIDENCE beneath the forecast.
-  const lastNightHdr = "Last night — the evidence" + (lastNightDate(s, uni) ? ` · the night of ${lastNightDate(s, uni)}` : "");
+  // §1 — last night, demoted to EVIDENCE beneath the forecast. The "night of" date
+  // is sourced from the LIVE sleep_detail wake date (#487 retired sleep_unified —
+  // its date ran 1–2 nights stale, which mislabelled these fresher figures).
+  const lastNightHdr = "Last night — the evidence" + (lastNightDate(s) ? ` · the night of ${lastNightDate(s)}` : "");
   // #495/M-9: when the API substituted an older night's Whoop recovery (its own
   // night rides in recovery_night_of), caption the splice everywhere those
   // figures render — never night-A hours + night-B recovery under one header.
@@ -144,11 +146,10 @@ export async function renderSleep(d) {
   if (_hasSleep) parts.push(sec("Light exposure (AM/PM) — coming online", `<div class="nut-coming"><p class="rd-archive">Morning and evening light is the master circadian anchor, but it isn't measured directly. An evening screen-time proxy could stand in — flagged honestly as a proxy, not lux. Until then the forecast's wind-down anchor leans on behaviour, not measured light. <span class="confidence conf-low">needs capture · proxy</span></p></div>`));
   // §9 — forecast self-grading (P2.9): does the forecast earn its lead? Placeholder until ~2 weeks.
   if (_hasSleep) parts.push(sec("Forecast self-grading — coming online", `<div class="nut-coming"><p class="rd-archive">The forecast earns the top of the page only if it's right. Did the nights it called high-risk actually score lower? That check needs ~2 weeks of paired forecasts and outcomes before it means anything — until then the forecast leads on its mechanism, not yet its track record. A prediction you don't grade is a horoscope. <span class="confidence conf-low">grades in ~2 weeks</span></p></div>`));
-  // Unified sleep — Whoop + Eight Sleep + Apple merged, best source per field.
-  if (uni && uni.available) {
-    const srcs = (uni.sources_present || []).map(ttl).join(", ");
-    parts.push(sec("Unified sleep — sources reconciled" + (uni.night_of ? ` · the night of ${fmtShort(uni.night_of)}` : ""), figs([uni.total_duration_hours != null && fig(fmt(uni.total_duration_hours, 1), "hours · merged"), uni.recovery_score != null && fig(fmt(uni.recovery_score), "recovery"), uni.hrv_ms != null && fig(fmt(uni.hrv_ms), "hrv ms"), uni.sleep_efficiency_pct != null && fig(fmt(uni.sleep_efficiency_pct) + "%", "efficiency")]) + kvtable({ rem_pct: uni.rem_pct, deep_pct: uni.deep_pct, light_pct: uni.light_pct, awake_pct: uni.awake_pct, respiratory_rate: uni.respiratory_rate, room_temp_c: uni.room_temp_c, bed_temp_c: uni.bed_temp_c }) + (srcs ? `<p class="rd-meta label">merged from ${esc(srcs)} — best source per field</p>` : "")));
-  }
+  // #487: the "Unified sleep — sources reconciled" section was RETIRED. sleep_unified's
+  // per-field merge read fields that never existed (it was relabeled Whoop + one Eight Sleep
+  // score) and ran 1–2 nights stale — a public mislabel with zero compute consumers. The live
+  // /api/sleep_detail above carries the same figures, fresher. See ADR-113.
   if (!parts.length) return empty("No sleep data yet — score, stages, HRV and recovery appear here nightly.");
   return parts.join("") + note("Correlative — tonight's forecast leads; last night and the trend are the evidence it earns its place against.");
 }

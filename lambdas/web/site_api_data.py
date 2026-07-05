@@ -2194,45 +2194,12 @@ def handle_state_of_matthew() -> dict:
     return _ok(data, cache_seconds=3600)
 
 
-def handle_sleep_reconciliation() -> dict:
-    """
-    GET /api/sleep_reconciliation
-    The unified sleep record — sleep_reconciler_lambda merges Whoop + Eight Sleep
-    + Apple Health into one canonical view (best source wins per field; duration
-    from Apple, staging/HRV from Whoop, environment from Eight Sleep) and stores
-    it at SOURCE#sleep_unified | DATE#<today>. Computed daily, never surfaced
-    until now. We return the stored record with internal keys stripped and
-    source_map decoded, so the response auto-tracks any future merged fields.
-    Cache: 900s — recomputed once daily.
-    """
-    item = _latest_item("sleep_unified")
-    if not item:
-        return _ok({"available": False}, cache_seconds=900)
-
-    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle"}
-    data = {k: v for k, v in item.items() if k not in _INTERNAL}
-
-    # source_map is stored JSON-encoded (which field came from which wearable);
-    # decode it back to an object for the front-end "provenance" badges.
-    sm = data.get("source_map")
-    if isinstance(sm, str):
-        try:
-            data["source_map"] = json.loads(sm)
-        except (json.JSONDecodeError, TypeError):
-            data.pop("source_map", None)
-
-    # Temporal frame (additive): the unified record is wake-date-keyed (stored under
-    # the morning it sets up). The sleep it describes happened the night before, so
-    # night_of = the record's date - 1 day. Lets the front-end say "the night of X".
-    data["frame"] = "last_night"
-    _date = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")[:10]
-    try:
-        data["night_of"] = (datetime.strptime(_date[:10], "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-    except Exception:
-        data["night_of"] = None
-
-    data["available"] = True
-    return _ok(data, cache_seconds=900)
+# handle_sleep_reconciliation — RETIRED 2026-07-05 (#487 / ADR-113). The /api/sleep_reconciliation
+# endpoint served SOURCE#sleep_unified, whose per-field merge read record fields that never existed
+# (it was the Whoop record plus one Eight Sleep score, not the promised best-source merge) and whose
+# night_of ran 1–2 nights stale — mislabelling the public /data/sleep "night of" header. Zero compute
+# consumers; /api/sleep_detail carries the same figures, fresher, and is now the sole source of that
+# header date. The orphan sleep_unified DDB partition is left in place (read by nothing).
 
 
 def handle_protocols() -> dict:
