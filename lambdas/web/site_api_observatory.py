@@ -19,6 +19,9 @@ from decimal import Decimal  # noqa: F401 — kept for handlers that convert typ
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 
+import digest_utils  # shared layer — compute_confidence tiering (ADR-105)
+import stats_core  # shared layer (#529): the one sanctioned stats implementation
+
 from web.site_api_common import (
     CORS_HEADERS,
     EXPERIMENT_START,
@@ -211,6 +214,104 @@ def _latest_weight_lbs(start, today):
         return None
 
 
+# ── Recovery vs prior-day deficit overlay (RQA-08, #388) ───────────────────────
+# Pure alignment + confidence-gating function (no I/O — the caller fetches DDB
+# items) so it's unit-testable with fixture data. Per the issue spec this NEVER
+# returns a raw correlation coefficient — at this small a sample size the honest
+# posture is "overlay + descriptive caption only", the same stance the
+# reconciliation chart above takes and the #535 correlation-report gate
+# (mcp/helpers.correlation_report) formalized for the tool tier.
+_RDO_MIN_OVERLAP_DAYS = 14  # matches the reconciliation/_corr_card convention elsewhere on this page
+_RDO_IMPACT_R = 0.15  # same "worth describing at all" floor as mcp/helpers._CORR_IMPACT_R
+
+
+def _recovery_deficit_overlay(deficit_by_date: dict, recovery_by_date: dict, start_date: str, end_date: str) -> dict:
+    """
+    RQA-08 (#388): overlay this morning's recovery score against the PRIOR day's
+    caloric deficit (tdee - calories) — recovery lags the stimulus by one night,
+    so day D's recovery is paired with day D-1's deficit.
+
+    `deficit_by_date` / `recovery_by_date` are {"YYYY-MM-DD": float} maps; a
+    calendar day absent from a map is data-absent, not zero. Walks every
+    calendar day from start_date to end_date inclusive so a day with no
+    MacroFactor upload or no Whoop sync renders as an explicit None in the
+    output — never interpolated or dropped (acceptance criterion: gaps stay
+    gaps). No Pearson r anywhere in the returned payload — only n, a
+    compute_confidence tier, and a correlative (never causal) caption.
+    """
+    try:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return {
+            "days": [],
+            "overlap_days": 0,
+            "min_days": _RDO_MIN_OVERLAP_DAYS,
+            "ready": False,
+            "confidence": "LOW",
+            "caption": None,
+        }
+
+    days = []
+    cur = start
+    while cur <= end:
+        d = cur.strftime("%Y-%m-%d")
+        prior = (cur - timedelta(days=1)).strftime("%Y-%m-%d")
+        days.append(
+            {
+                "date": d,
+                "recovery": recovery_by_date.get(d),
+                "prior_deficit_kcal": deficit_by_date.get(prior),
+            }
+        )
+        cur += timedelta(days=1)
+
+    xs = [row["prior_deficit_kcal"] for row in days if row["prior_deficit_kcal"] is not None and row["recovery"] is not None]
+    ys = [row["recovery"] for row in days if row["prior_deficit_kcal"] is not None and row["recovery"] is not None]
+    n = len(xs)
+    ready = n >= _RDO_MIN_OVERLAP_DAYS
+
+    r = None
+    n_eff = n
+    if n >= 3:
+        r = stats_core.pearson_r(xs, ys, min_n=3)
+        n_eff = stats_core.effective_sample_size(xs, ys)
+
+    conf_level = digest_utils.compute_confidence(n=n, n_eff=n_eff, days_of_data=n).get("level", "LOW")
+
+    if not ready:
+        caption = (
+            f"Recovery vs. yesterday's deficit: {n} overlapping day{'s' if n != 1 else ''} logged so far — the "
+            f"overlay needs {_RDO_MIN_OVERLAP_DAYS}+ before it says anything about how the two move together."
+        )
+    elif conf_level == "LOW" or r is None:
+        caption = (
+            "Both lines are drawing in, but it's still too early to tell whether recovery and the prior day's "
+            "deficit move together — check back as more days land."
+        )
+    elif abs(r) < _RDO_IMPACT_R:
+        caption = "No consistent relationship has shown up yet between recovery and the prior day's deficit at this sample size."
+    elif r < 0:
+        caption = (
+            "Recovery has tended to run lower the morning after a heavier deficit day, and higher after a lighter "
+            "one — correlative, not causal, and still an early read."
+        )
+    else:
+        caption = (
+            "Recovery and the prior day's deficit have tended to move together rather than in opposite directions "
+            "— correlative, not causal, and still an early read."
+        )
+
+    return {
+        "days": days,
+        "overlap_days": n,
+        "min_days": _RDO_MIN_OVERLAP_DAYS,
+        "ready": ready,
+        "confidence": conf_level,
+        "caption": caption,
+    }
+
+
 def handle_nutrition_overview() -> dict:
     """
     GET /api/nutrition_overview
@@ -270,6 +371,14 @@ def handle_nutrition_overview() -> dict:
                 "weekday_vs_weekend": {"weekday": dict(_empty_grp), "weekend": dict(_empty_grp)},
                 "eating_window": None,
                 "periodization": {"training_day": dict(_empty_grp), "rest_day": dict(_empty_grp)},
+                "recovery_deficit_overlay": {
+                    "days": [],
+                    "overlap_days": 0,
+                    "min_days": _RDO_MIN_OVERLAP_DAYS,
+                    "ready": False,
+                    "confidence": "LOW",
+                    "caption": None,
+                },
             },
             cache_seconds=300,
         )
@@ -641,6 +750,24 @@ def handle_nutrition_overview() -> dict:
         reconciliation["actual_loss_lbs"] = _last["actual_loss_lbs"]
         reconciliation["gap_lbs"] = round(_last["projected_loss_lbs"] - _last["actual_loss_lbs"], 2)
 
+    # ── Recovery vs prior-day deficit overlay (RQA-08, #388): does the diet's
+    # aggressiveness and the body's recovery move together? Deficit is keyed by the
+    # SAME day-by-day (tdee - calories) math as the reconciliation chart above;
+    # recovery comes from the Whoop partition. The alignment/confidence machinery
+    # lives in _recovery_deficit_overlay so it's unit-testable without DynamoDB.
+    whoop_items = _query_source("whoop", d30, today)
+    recovery_by_date = {}
+    for w in whoop_items:
+        dd = w.get("date") or w.get("sk", "").replace("DATE#", "")
+        if w.get("recovery_score") is not None:
+            recovery_by_date[dd] = float(w["recovery_score"])
+    deficit_by_date = {}
+    if tdee:
+        for t in trend:
+            if t.get("calories") is not None:
+                deficit_by_date[t["date"]] = tdee - t["calories"]
+    recovery_deficit_overlay = _recovery_deficit_overlay(deficit_by_date, recovery_by_date, d30, today)
+
     # ── Food-delivery off-protocol tell (P2.3, PRIVATE-by-default — flag OFF). With the flag
     # off, the delivery source is never queried and nothing private enters the response.
     food_delivery = None
@@ -717,6 +844,7 @@ def handle_nutrition_overview() -> dict:
             "lean_mass": lean_mass,
             "projection": projection,
             "reconciliation": reconciliation,
+            "recovery_deficit_overlay": recovery_deficit_overlay,
             "food_delivery": food_delivery,
             "blueprint_benchmark": blueprint_benchmark,
             "weekday_vs_weekend": weekday_vs_weekend,
