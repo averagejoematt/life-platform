@@ -1,0 +1,86 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Bedrock",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:*:205930651321:inference-profile/us.anthropic.claude-*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
+      ]
+    },
+    {
+      "Sid": "Diagnose",
+      "Effect": "Allow",
+      "Action": [
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents",
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:DescribeAlarmHistory",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "lambda:GetFunctionConfiguration",
+        "lambda:ListFunctions"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform"
+    },
+    {
+      "Sid": "KMS",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "arn:aws:kms:us-west-2:205930651321:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"
+    },
+    {
+      "Sid": "S3Read",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::matthew-life-platform/*"
+    },
+    {
+      "Sid": "S3Log",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::matthew-life-platform/remediation-log/*"
+    },
+    {
+      "Sid": "SQS",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:GetQueueAttributes"
+      ],
+      "Resource": "arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq"
+    },
+    {
+      "Sid": "SSM",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:us-west-2:205930651321:parameter/life-platform/*"
+    },
+    {
+      "Sid": "SES",
+      "Effect": "Allow",
+      "Action": [
+        "ses:SendEmail",
+        "sesv2:SendEmail"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

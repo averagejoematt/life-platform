@@ -1,0 +1,124 @@
+# `infra/iam/` — the OIDC automation identities, codified (#401 / ADR-120)
+
+This directory is the **reviewable, git-revertible source of truth** for the three
+hand-managed AWS identities that gate all automated access to the cloud:
+
+| Identity | What it gates | Assumed by |
+| --- | --- | --- |
+| `github-actions-deploy-role` | ALL CI/CD deploys (lambda, layer, CDK, site, smoke, visual-QA, rollback, notify) | every job in `.github/workflows/ci-cd.yml` |
+| `github-actions-remediation-role` | the self-healing agent's read-only diagnosis + Bedrock + scoped audit-log writes | `.github/workflows/remediation-agent.yml` |
+| `token.actions.githubusercontent.com` OIDC provider | the GitHub → AWS identity federation both roles trust | AWS STS `AssumeRoleWithWebIdentity` |
+
+Before #401 these existed **only** as live IAM config — no source of truth, no review
+trail, and trusted from `repo:averagejoematt/life-platform:*` (assumable from ANY branch
+of a public repo). Codifying them here is a **no-op to live behaviour** (the checked-in
+JSON reflects live exactly — proven by `deploy/verify_oidc_iam.py`), but it turns every
+future trust change into a reviewable PR with `git revert` as the rollback.
+
+## Files
+
+### Current live state (source of truth — reflects live exactly, today)
+- `github-oidc-provider.json` — the OIDC provider (URL, client-id list, thumbprints)
+- `github-actions-deploy-role.trust.json` — deploy role assume-role (trust) policy
+- `github-actions-deploy-role.permissions.json` — deploy role inline policy `life-platform-cicd-permissions`
+- `github-actions-remediation-role.trust.json` — remediation role assume-role (trust) policy
+- `github-actions-remediation-role.permissions.json` — remediation role inline policy `remediation-permissions`
+
+### Proposed, NOT yet applied (the staged tighten — see the runbook below)
+- `proposed/github-actions-deploy-role.trust.main-only.json`
+- `proposed/github-actions-remediation-role.trust.main-only.json`
+
+## Verify (read-only drift check)
+
+```bash
+python3 deploy/verify_oidc_iam.py            # print report
+python3 deploy/verify_oidc_iam.py --strict   # exit 1 on any drift (CI/sentinel gate)
+```
+
+It calls only `iam:GetRole`, `iam:GetRolePolicy`, `iam:GetOpenIDConnectProvider` — never
+mutates. A CLEAN run means the checked-in JSON matches live; DRIFT means either an
+out-of-band change happened (investigate — these gate all deploys) or a staged change
+here has not been applied yet.
+
+---
+
+## The trust-tighten — STAGED, NOT EXECUTED (the follow-up)
+
+`#401`'s acceptance criteria require the trust subject to be narrowed from repo-wide
+(`repo:...:*`) to **main branch / production environment only**, and that the tighten be
+**validated by watching a real CI run complete end-to-end (plan → deploy → smoke)**. That
+validation is a precondition, so the flip is a **separate, watched, deliberate** step —
+NOT part of the codify PR. It is tracked as its own follow-up issue: **#687**.
+
+### Why the tightened deploy-role subject lists TWO patterns
+
+GitHub's OIDC `sub` claim differs per job:
+- A job that declares `environment: production` presents `repo:OWNER/REPO:environment:production`.
+- A job with no environment presents `repo:OWNER/REPO:ref:refs/heads/<branch>`.
+
+In `ci-cd.yml` **only the `deploy` job** declares `environment: production`; `plan`,
+`smoke-test`, `visual-qa`, `post-deploy-checks`, `rollback-on-smoke-failure`, and
+`notify-failure` present the branch ref (`refs/heads/main`). So the tightened deploy-role
+trust MUST allow BOTH subjects or half the pipeline breaks:
+- `repo:averagejoematt/life-platform:ref:refs/heads/main`
+- `repo:averagejoematt/life-platform:environment:production`
+
+The remediation role is only assumed by scheduled / `workflow_dispatch` runs on the
+default branch (main), with no environment, so its tightened subject is just:
+- `repo:averagejoematt/life-platform:ref:refs/heads/main`
+
+### Runbook — applying the tighten (execute only under a watched CI run)
+
+> Precondition: do this attended, with the ability to roll back immediately. A wrong
+> subject locks the automation out of AWS entirely.
+
+1. **Snapshot the current live trust** (rollback source), for both roles:
+   ```bash
+   aws iam get-role --role-name github-actions-deploy-role \
+     --query Role.AssumeRolePolicyDocument > /tmp/deploy-trust.rollback.json
+   aws iam get-role --role-name github-actions-remediation-role \
+     --query Role.AssumeRolePolicyDocument > /tmp/remediation-trust.rollback.json
+   ```
+   (These already equal the checked-in `*.trust.json` files — `git revert` of the tighten
+   PR is the durable rollback.)
+
+2. **Apply the tightened trust** from the proposed files:
+   ```bash
+   aws iam update-assume-role-policy --role-name github-actions-deploy-role \
+     --policy-document file://infra/iam/proposed/github-actions-deploy-role.trust.main-only.json
+   aws iam update-assume-role-policy --role-name github-actions-remediation-role \
+     --policy-document file://infra/iam/proposed/github-actions-remediation-role.trust.main-only.json
+   ```
+
+3. **Validate with a real CI run** — push a trivial commit to `main` (or `workflow_dispatch`)
+   and WATCH the pipeline complete end-to-end: `lint → test → plan → deploy (approve) →
+   smoke → visual-qa → post-deploy`. Every job must assume the role successfully. A trust
+   mistake surfaces as `Not authorized to perform sts:AssumeRoleWithWebIdentity`.
+
+4. **Confirm a non-main ref is now denied** (access simulation / negative test):
+   ```bash
+   # Expect DENY for a non-main ref subject:
+   aws iam simulate-principal-policy ...   # or open a throwaway branch PR and confirm the
+                                           # OIDC step fails to assume the deploy role.
+   ```
+
+5. **Promote the proposed files to current** — once validated, move
+   `proposed/*.trust.main-only.json` content into the canonical `*.trust.json` files in a
+   follow-up PR so `deploy/verify_oidc_iam.py` stays CLEAN against the new live state.
+
+6. **Rollback (if anything breaks):**
+   ```bash
+   aws iam update-assume-role-policy --role-name github-actions-deploy-role \
+     --policy-document file:///tmp/deploy-trust.rollback.json
+   # …and the remediation role likewise. Then git revert the tighten PR.
+   ```
+
+### Also part of the full tighten (follow-up, not this codify PR)
+- **Split a read-only diagnosis role out of the deploy role** (AC: "a read-only diagnosis
+  role is split from the deploy role"). The deploy role currently also carries the broad
+  read-only diagnosis surface (`IAMReadOnly`, CloudWatch, CloudFormation describe, Bedrock
+  vision-QA). Separating deploy-mutate from read-only-diagnose is a live IAM change and
+  belongs with the watched tighten.
+- **Wire these identities into the weekly drift sentinel (S-E6-01).** `deploy/verify_oidc_iam.py`
+  is the drift detector; add a `--strict` call to it as a step in `deploy/drift_sentinel.py`
+  (or the remediation workflow) so out-of-band trust changes are caught weekly.
