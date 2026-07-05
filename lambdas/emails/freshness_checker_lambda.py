@@ -805,7 +805,10 @@ def lambda_handler(event, context):
         # often the checker is invoked (async retries / SNS fanout can't amplify it).
         _prior = {}
         try:
-            _prior = (table.get_item(Key={"pk": _ah_pk, "sk": _AH_ALERT_STATE_SK}).get("Item")) or {}
+            # ConsistentRead: the dedup verdict depends on the just-written state, so a
+            # stale replica read could re-fire the alert. (Belt-and-suspenders — the cron
+            # is 24h apart in prod, but correctness shouldn't rest on that.)
+            _prior = (table.get_item(Key={"pk": _ah_pk, "sk": _AH_ALERT_STATE_SK}, ConsistentRead=True).get("Item")) or {}
         except Exception as _se:
             logger.warning("alert-state read failed (fail-open to send): %s", _se)
         _should_send, _new_state, _kind = alert_episode_decision(_prior, ah_degraded, now)
