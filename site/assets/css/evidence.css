@@ -158,6 +158,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-tbl .rd-name { font-family: var(--font-sans); color: var(--ink); }
 .rd-unit { color: var(--ink-faint); }
 .rd-range { color: var(--ink-faint); }
+.rd-tbl .provenance { margin-top: 0; font-size: inherit; letter-spacing: normal; text-transform: none; } /* #589: fits the kit's byline inline in a table cell */
 .rd-tbl tr.rd-flag td { background: var(--ember-wash); }
 .rd-flagmark { color: var(--ember); font-weight: var(--weight-med); }
 .rd-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }

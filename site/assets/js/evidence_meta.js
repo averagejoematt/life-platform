@@ -105,12 +105,24 @@ export function renderPipeline(d) {
   const rank = { fresh: 0, "behavioral-stale": 1, stale: 2, unknown: 3, paused: 4 };
   const badge = { fresh: "● flowing", "behavioral-stale": "○ awaiting log", stale: "▲ stale", paused: "⏸ paused", unknown: "– unknown" };
   const flagCls = (s) => (s === "stale" || s === "unknown") ? "rd-flag" : "";
+  // #589: the documented-but-until-now-unadopted .provenance kit (DESIGN_SYSTEM_V5 —
+  // "every number says where it came from and how fresh") gets its first real use here.
+  // The dot pulses ONLY while data-fresh-ts/-window (this source's OWN registry-derived
+  // window, from /api/source_freshness) are inside range; non-fresh statuses fall
+  // through to the existing motionless .pv-stale — never a decorative loop either way.
+  const lastUpdateCell = (s) => {
+    const freshAttrs = (s.last_update_ts && s.stale_hours != null)
+      ? ` data-fresh-ts="${esc(s.last_update_ts)}" data-fresh-window="${Math.round(Number(s.stale_hours) * 3600)}"`
+      : "";
+    return `<p class="provenance${s.status !== "fresh" ? " pv-stale" : ""}"><span class="fr-dot"${freshAttrs} aria-hidden="true"></span>` +
+      `<span class="pv-src">${esc(s.last_update || "—")}</span>${s.age_hours != null ? ` <span class="rd-unit">${Math.round(s.age_hours)}h</span>` : ""}</p>`;
+  };
   const by = {};
   for (const s of src) (by[s.category || "Other"] ||= []).push(s);
   const secs = Object.entries(by).map(([cat, rows]) => sec(cat,
     `<table class="rd-tbl"><thead><tr><th>source</th><th>what it feeds</th><th>last update</th><th>status</th></tr></thead><tbody>${rows
       .slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
-      .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${esc(s.desc || "")}</td><td class="num rd-range">${esc(s.last_update || "—")}${s.age_hours != null ? ` <span class="rd-unit">${Math.round(s.age_hours)}h</span>` : ""}</td><td>${esc(badge[s.status] || s.status)}</td></tr>`).join("")}</tbody></table>`)).join("");
+      .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${esc(s.desc || "")}</td><td class="num rd-range">${lastUpdateCell(s)}</td><td>${esc(badge[s.status] || s.status)}</td></tr>`).join("")}</tbody></table>`)).join("");
   return figs([fig(sm.fresh ?? "—", "flowing"), fig(sm.paused ?? "—", "paused"), fig(sm.total ?? src.length, "live-monitored")]) + secs +
     `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made.</p>`;
 }
