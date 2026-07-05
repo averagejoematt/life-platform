@@ -178,7 +178,7 @@ Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(F
 `journal-enrichment` · `activity-enrichment` · `character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance` · `failure-pattern-compute` · `journal-analyzer` · `field-notes-generate` · `weekly-signal`
 
 ### Coach Intelligence (8)
-`coach-computation-engine` · `coach-narrative-orchestrator` · `coach-quality-gate` (WIRED v51) · `coach-state-updater` · `coach-ensemble-digest` · `coach-prediction-evaluator` · `coach-history-summarizer` · `coach-observatory-renderer` · plus legacy `ai-expert-analyzer` (deprecated, fallback only)
+`coach-computation-engine` · `coach-narrative-orchestrator` · `coach-quality-gate` (BLOCKING N-06 #390) · `coach-state-updater` · `coach-ensemble-digest` · `coach-prediction-evaluator` · `coach-history-summarizer` · `coach-observatory-renderer` · plus legacy `ai-expert-analyzer` (deprecated, fallback only)
 
 ### Email / Digest (11)
 `daily-brief` · `weekly-digest` · `monthly-digest` · `nutrition-review` · `wednesday-chronicle` (EventBridge ENABLED) · `chronicle-email-sender` (EventBridge ENABLED) · `weekly-plate` · `monday-compass` · `anomaly-detector` · `evening-nudge` · `partner-weekly-email`

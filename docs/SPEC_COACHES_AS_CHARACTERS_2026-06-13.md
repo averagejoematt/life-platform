@@ -103,7 +103,7 @@ Recommended sequence: **CC-00 → CC-09 → CC-03 → CC-01(+CC-02) → CC-10 �
 
 ### 3.2 EXISTING — read paths (no schema change)
 - **Right/wrong + hit-rate:** `PREDICTION#` / `LEARNING#` partitions (per coach), via the same logic behind `get_coach_track_record` / `get_predictions`. D-05 validates the loop ~2026-06-17 — pages will be honestly thin before that (show "accruing" empty-states, CC-10).
-- **Effectiveness/quality:** `coach_quality_gate` scores (per output; `PASS_SCORE_THRESHOLD=60`, advisory). Surface the trend, **labelled self-assessment** (ER-05).
+- **Effectiveness/quality:** `coach_quality_gate` scores (per output; `PASS_SCORE_THRESHOLD=60`; blocking as of N-06 #390 — see ADR-107). Surface the trend, **labelled self-assessment** (ER-05).
 - **Recent real outputs / daily journey source:** `COACH#<engine_id>` episodic memory + the daily-brief coach sections; cross-coach summary under `ENSEMBLE#`.
 - **Relationships:** `config/coaches/influence_graph.json` (directed weights).
 - **Voice/personality:** `config/coaches/*.json` (`structural_voice_rules`, `few_shot_examples`, `decision_style`).
