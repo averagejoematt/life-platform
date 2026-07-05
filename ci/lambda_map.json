@@ -105,6 +105,9 @@
     "lambdas/compute/coach_daily_reflection_lambda.py": {
       "function": "coach-daily-reflection"
     },
+    "lambdas/compute/coach_memoir_lambda.py": {
+      "function": "coach-memoir"
+    },
     "lambdas/compute/daily_insight_compute_lambda.py": {
       "function": "daily-insight-compute"
     },

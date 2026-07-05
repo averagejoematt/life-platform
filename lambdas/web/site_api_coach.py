@@ -269,6 +269,15 @@ def _coach_daily(coach_id):
     return r.get("text") if isinstance(r, dict) else None
 
 
+def _coach_memoir(coach_id):
+    """#553: the coach's latest quarterly memoir (generated/coach_memoirs.json),
+    or None pre-first-quarter. Read-only over the batch-written artifact —
+    never inferenced here."""
+    doc = _load_s3_json("generated/coach_memoirs.json", "coach_memoirs")
+    m = (doc.get("memoirs") or {}).get(coach_id)
+    return m if isinstance(m, dict) else None
+
+
 def _recent_outputs(coach_id, limit=25):  # CC-07: depth for the daily-journey timeline
     out = []
     try:
@@ -625,6 +634,7 @@ def handle_coach(event):
                 },
                 "recent_outputs": _recent_outputs(pid),
                 "daily": _coach_daily(pid),
+                "memoir": _coach_memoir(pid),
             },
             cache_seconds=300,
         )
