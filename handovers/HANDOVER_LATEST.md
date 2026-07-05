@@ -1,55 +1,60 @@
-# HANDOVER — opus batch #2: 13 issues → merged → layer v113→v114 → deployed + verified — 2026-07-05
+# HANDOVER — motion epic #575: 4 of 5 shipped (coherence floor → motion v2 → cockpit presence) — 2026-07-05
 
-> Second model:opus batch of the day. Ran AFTER opus batch #1
-> (`handovers/HANDOVER_2026-07-05_opus_batch1.md`, 11 issues, layer v112→v113) and the HAE
-> session, all of which were closed. A **concurrent session landed #478 (ADR-122) on main**
-> mid-run; merged in. Matthew authorized all edits/merges/deploys up front, answered the 3
-> product forks in-session, and twice said "keep going." Chose to WRAP (not chain a 3rd batch)
-> because batch #3's centerpiece (#409) touches the AI chokepoint = another layer bump best done
-> with fresh context.
+> Solo session (no other Claude running). Opened by cleaning the repo, then shipped the
+> motion-epic dependency chain in order, one PR each, taste-gating with Matthew at every
+> gate. **#590 (home cinematic) deferred to a fresh session** by Matthew's call — it's the
+> L-effort, highest-stakes page and opens a data question. Matthew authorized all
+> edits/merges/deploys up front.
 
-## What shipped (13 issues, 10 parallel worktree agents, ADRs 114–121 pre-reserved)
+## Repo cleanup (session open)
+- Working tree was already clean (opus batch #2 wrapped cleanly). `main` was 1 behind origin → fast-forwarded (`#699`, a concurrent-session deploy.md fix).
+- **Local branches 281 → 2.** Pruned 126 `[gone]`-upstream branches, then the rest after confirming **0 open PRs** and that every branch traced to shipped work. Verified `recovered/378-hae-auth-header-only` was fully redundant (main already has the PRIV-02 header-only fix) before deleting. Left: `main` + the pre-existing `docs/uplevel-handover` worktree branch.
 
-**Distribution / share-cards (epics #338/#340)**
-- **#595** the share-card engine — `lambdas/web/card_engine.py`, one code-drawn renderer; `og_image_lambda` re-exports its tokens/primitives so the 12 daily cards stay **byte-identical** (test-pinned). ADR-114.
-- **#420** character card + linkable `/data/character/` (+ `og-character.png`, `share ↗`); computed stats only, proven byte-identical with/without an age field (privacy holds).
-- **#405** per-chronicle share kit — `lambdas/chronicle_share_kit.py`; excerpt + honest-stats line + card URL + canonical URL, surfaced in the approval email + `generated/moments/share-kits/`.
-- **#593** portraits travel — `lambdas/web/og_coach_cards.py` (thin `_Engine` adapter over the engine + shared `web/portrait_raster.render_recipe`), 40 committed portrait PNGs, coach OG cards / email byline PNG / episode-art script. Approved recipes only (ADR-106).
-- **#399** Agent Activity feed — `/story/agents/` + `/api/agent_activity` (`lambdas/web/site_api_agents.py`), read-only render of `coherence-log`/`ai-canary-log`/`remediation-log` artifacts, privacy-gated, honest empty state.
+## What shipped (4 issues, dependency-ordered, one PR each)
 
-**Harden / budget (epics #341/#344/#346)**
-- **#402** DLQ escalation — ADR-115. Content-hash stable id `SYSTEM#dlq-ledger`, `ADD attempts :receive_count`, delete-only-after-confirmed-2xx, pages the existing `life-platform-alerts` SNS, time-budget drain replaces the 10-msg cap. Operational CDK + IAM (DDB + kms + sns).
-- **#411** CloudWatch audit — ADR-116. Reconciled 136 live alarms vs 107 CDK; **deleted 18 orphans (136→118)** via `deploy/cloudwatch_retire_orphans.sh --apply`, **adopted 2** into Monitoring IaC. Deliberately KEPT the 48 per-lambda error alarms — only 2/49 lambdas route to a DLQ, so they're the sole failure signal (DLQ-wire-then-retire is the sanctioned follow-up). Audit doc: `docs/reviews/CLOUDWATCH_AUDIT_2026-07.md`.
-- **#416**+**#418** — ADR-117. `@pytest.mark.deploy_critical` (11 files); CI `plan` now `needs: [lint, test-critical]` so an unrelated red no longer blacks out visual QA; site+layer rollback wiring rebuilt for the hashed-asset era. **Latent-bug fix: the Lambda auto-rollback `if` was missing `always()` → it had never fired.** Two ACs ("visual-QA runs on a red suite", "one rollback drill") await a live CI run — flagged in PR #688.
+**#577 — one theme.js (PR #700, front-end)**
+Six near-identical `wireTheme()` blocks → `site/assets/js/theme.js` (`initTheme()`). Reads/writes `localStorage["ajm-theme"]`, applies `dataset.theme`, wires any `.theme-toggle`, and now keeps `<meta name="theme-color">` honest to an *explicit* theme (shells ship media-split metas that only track OS scheme). View Transition on toggle when supported + reduced-motion off. `mind.js` is orphaned (reading page is served by `evidence.js`) but consolidated too. Pre-paint boot scripts stay.
 
-**Data honesty**
-- **#508** Whoop-webhook spike — ADR-119, **KEEP POLLING** (id-only payload still needs a live token → worsens the rotation race `ReservedConcurrentExecutions=1` guards; no `cycle` webhook; no vendor DLQ). No prod change. Doc: `docs/reviews/WHOOP_WEBHOOK_SPIKE_2026-07.md`.
-- **#489** Eight Sleep temp — ADR-118, **RETIRED** (v2 intervals 404s 4+ months; retired the fetch + MCP `get_sleep_environment_analysis` tool 144→143 + the /data/sleep env section; trends-payload reactivation lead recorded). Touched layer modules `ai_context`/`coach_stance`.
-- **#507** State of Mind — **KEPT** (owner: "keep, I just need to start doing it"). ADR-121 + ADR-103 ledger flip. **Found a real bug: 8 consumers read an empty `state_of_mind` partition ingestion never writes** — data lands on `apple_health` as `som_*`. Fixed all read-side (character_engine, ai_context, daily brief, chronicle, site_api_data, tools_lifestyle, field-notes, ai-expert), honest empty states preserved, restart runbook added. Touches layer module `character_engine`.
+**#578 — the v5 kit on every door (PR #700, front-end)**
+Every door opens with `.page-hero` (ember kicker · serif title · one-line promise) + `.loop-ribbon`: **`Now · Data → Coaching → Protocols → Story ↺`**, current door ember `.lr-here`; Home/Method mark nothing.
+- **`scripts/v4_kit.py`** = the ONE ribbon source (`loop_ribbon(current_door)`), imported by the evidence/coaching/dispatches/methods builders so the spine can't drift (the same duplication #577 killed for the theme).
+- Heads converted `.ev-head`/`.dx-head` → `.page-hero` (pure, not dual-classed — evidence/story CSS would otherwise override the kit). JS anchors that read the old heads followed the rename (`evidence.js` wireFirstRun, `dispatches.js` storySince). Genesis stamp + portrait disclaimer preserved.
+- **Cockpit**: slim `.page-hero` (kicker + ribbon, no promise — the big score is the headline). **Home**: kept its cinematic `.hero-loop`, aligned to include a leading "the now" node (full rework is #590). **Method registry**: gained the ribbon.
+- Taste-gate: `/data/` rendered + approved before the sweep. Ribbon-node model (`Now ·` leading, set apart) was Matthew's pick.
+- **Builders are `.format()`, not f-strings** → the ribbon is inlined once at module load via `SHELL = SHELL.replace("{ribbon}", loop_ribbon(...))` before the per-page format calls (evidence uses a real f-string, so it interpolates `{loop_ribbon(...)}` directly).
 
-**Infra**
-- **#401** OIDC — ADR-120, **codify half only** (owner-approved codify-now/tighten-later). Roles + provider → `infra/iam/*.json` + `deploy/verify_oidc_iam.py` (0 drift, **0 live IAM mutation**). Tighten (`repo:*`→main-only) staged in `infra/iam/proposed/` + runbook, tracked as **#687**.
+**#588 — motion v2: cross-document View Transitions (PR #701, front-end/CSS)**
+`@view-transition { navigation: auto }` in `tokens.css`. `.loop-ribbon` + `.brand` carry a per-document `view-transition-name` → the ribbon **morphs in place** (ember marker slides door→door), brand pinned, content cross-fades. Pure progressive enhancement (unsupported → plain nav, zero fallback cost). Reduced-motion drops the cross-fade/morph to an instant swap. `.lr-here` settles on arrival; cockpit `.spine::after` draws with scroll (`animation-timeline: scroll(root block)`, starts at a visible base). **`.page-hero` pulled OUT of the `html.mo` opacity-reveal** so the morph target isn't captured mid-fade (same "no dead air" reasoning as `.rd-card`). SW: no navigation preload + a clean `fetch()` on `req.mode==='navigate'` → composes unchanged, no SW edit. Taste-gate: `/data/→/coaching/` filmstrip (Chromium 145) + reduced-motion instant-swap both verified.
 
-## Deploy record (one coordinated sequence)
-1. `build_layer.sh` → `rm -rf cdk/cdk.out` → `cdk deploy LifePlatformCore` **published layer v114** → verified live → bumped `SHARED_LAYER_VERSION` 113→114.
-2. Pushed main (closed all 10 PRs + 13 issues). **Push rebased over #478/ADR-122** which a concurrent session had landed.
-3. `cdk deploy` Compute Email Mcp Operational Monitoring **Ingestion** (`--concurrency 3`) — all UPDATE_COMPLETE. Ingestion was **3 layer versions behind (111→114)** since the HAE session never redeployed it; diff was clean `[~]`-only.
-4. `cloudwatch_retire_orphans.sh --apply` (20 deletes: 18 retire + 2 adopt-rename).
-5. `deploy_site_api.sh` (also handled the layer re-attach) → `sync_site_to_s3.sh` (+ CF invalidation).
-6. **Verify:** layer v114 attached · `version.json` build == HEAD `1576e52f` · smoke **67/67** · visual QA **33 pass / 1 FP / 10 transient warns** · MCP healthy (no import crash) · `/api/agent_activity` 200.
+**#591 — cockpit presence pass (PR #702, site-api + front-end)**
+The board read is now *present*, three honest signals, all self-hiding:
+1. **Signed + timestamped verdict** — author sigil/portrait mark + "written 6:02 AM this morning" (from `weekly_priority.generated_at`, UTC→PT, "this morning" gated on today PT). No fake liveness.
+2. **"The argument underneath"** — the #540 inter-coach dispute (`/api/coach_team.dispute.turns[]`) rendered as a THREAD (position→reply→rejoinder, sigil-marked, stepped in). Data-driven over `turns[]` → **handles 1..n turns** (verified with 3-turn and 1-turn fixtures).
+3. **"Where the team stands"** — per-coach stance chips with an **honest** held-duration: **"held since {date} · ~N weeks"**, NEVER a day count (STANCE# is weekly — ADR-104/105). Matthew chose this over the issue's literal "held 6 days". No history → stage alone.
+- One new `/api/coach_team` fetch (fire-and-forget, present-tense; added to `DAILY_SEL` so it hides in week/month/journey).
+- **Server side (the only backend change this session):** `site_api_coach.handle_coach_team` gained a per-coach `held_since` = earliest consecutive same-stage `STANCE#` `as_of` (`_stance_held_since`). Additive; existing consumers unaffected.
+- Live-verified with real data: real 3-turn dispute (Webb↔Reyes on caloric adequacy), 8 stance chips ("held since Jun 29"), "written 7:55 AM this morning".
 
-## Gotchas (durable ones saved to memory)
-1. **macOS case-insensitive path twin** (`/Users/.../Documents/...` vs lowercase `documents`) let 3 parallel agents (#401/#399/#489) leak edits into the shared **main** tree, and left main checked out on an agent branch. The pushed PR branch is the source of truth; **preserve stranded main-tree work (an agent with no worktree commits + dirty main files) before cleaning.** → `reference_worktree_case_insensitive_pollution`.
-2. **The pre-commit hook regenerates counter files but only stages ARCHITECTURE.md** — during a stacked-merge run it left `site_api_common.py` dirty and blocked the next merge. Disable the hook for the merge run, regenerate all counts once at the end with `sync_doc_metadata.py --apply`, re-enable.
-3. **DECISIONS.md conflicts on every stacked merge** (each branch appends its ADR to the same region) — union-resolve (keep both, `---` between); regenerate counts at the end. `site_api_common.py` conflicts were count-lines except #411's real `alarms 56→109` fix (take theirs).
-4. A concurrent session can push to main mid-batch (#478) — `git fetch` + merge origin/main in before your push; branch protection here allows a direct admin push (0 required reviews).
+## Deploy record
+- 3 static-site deploys (`sync_site_to_s3.sh`, content-hashed + self-invalidating): after #578, after #588, after #591. Each: `version.json` build == HEAD, **smoke 67/67**.
+- 1 site-api deploy (`deploy_site_api.sh`) for #591's `held_since` — full `web/` package; layer already v114 so **no re-attach**; `/api/coach_team` confirmed returning `held_since` live.
+- **No layer bump, no CDK, no MCP.** OG/tests untouched.
+
+## Gotchas (minor, for next time)
+- **`sync_site_to_s3.sh` regenerates `site/feed.xml` + `site/rss.xml`** (date-only) → they show dirty after every deploy. `git checkout site/feed.xml site/rss.xml` before the next commit, or they leak into the PR.
+- The pre-commit doc-sync hook ran clean all session ("already in sync") — no counter-file churn this time (single-PR-at-a-time, not a stacked merge).
+- Local render QA harness: serve `site/` over `http.server` (absolute `/assets` paths need a real origin), block service workers, route-mock `**/api/**`. To slow a View Transition for a filmstrip, route-inject `::view-transition-*{animation-duration:1.8s}` onto the `tokens.css` response (non-destructive). Bump the port if a crashed run leaves it bound.
 
 ## State at close
-- `main` clean == `origin/main` (`1576e52f`), all gates green, all 13 issues + PRs closed, worktrees pruned (only main + the pre-existing `uplevel-2026-07-01` remain).
-- **GitHub Pages still enabled + public (carried from prior sessions, unactioned).**
+- `main` clean == `origin/main` (`12df246b`), 2 branches (main + `docs/uplevel-handover`), all 4 issues + PRs closed, smoke 67/67 on the live site.
+- **GitHub Pages still enabled + public** (carried from prior sessions, unactioned).
 
-## Next session (batch #3 — do fresh)
-- **Cleanly doable:** **#408** (render/accuracy QA left onto site PRs — CI) · **#409** (batch-price the content AI — **touches `bedrock_client`/`ai_calls` = LAYER modules → plan another layer bump + full consumer redeploy**, and a batch-submit/poll path with a real-time deadline fallback) · motion trio **#588** (View Transitions) / **#590** (home cinematic) / **#591** (cockpit presence) — unblocked by batch #1's chart/uncertainty contract.
-- **Need Matthew's input:** instrument-depth **#412/#415/#417/#421/#422/#475** — external endpoints, template↔movement map, or a real week of data; not cleanly closeable solo.
-- **Attended:** **#395** MCP registry prune (destructive — removes tools through the AUDITED_AT ratchet).
-- **Watched CI run:** **#687** OIDC trust-tighten (the risky half of #401).
+## Next session — #590 (home cinematic), do it fresh
+The last motion-epic issue and the highest-stakes page ("every screenshot comes from here"). Scope:
+- **Constellation v2**: slow *deterministic* drift seeded like `sigils.js` (same seed → same motion — currently only a simple `mo-breathe` translateY); pillar-node hover → door affordance (icon + label + "enter" cue); **edges weighted by real pillar-correlation data** with thin-data edges honestly faint. Current impl: `site/assets/js/story.js` `drawConstellation()` (lines ~36–106) — hardcoded 7-node `NODES`/`EDGES`, nodes sized by score, `.live` if either endpoint is up.
+- **Waveform** scrub migrated onto the shared `data-cpts` contract (kills the bespoke tooltip in `story.js` ~line 237).
+- Hero counter keeps its ember glow; no new glow. Sequence-check vs #386 (transformation-hook lede).
+- **⭐ Taste-gate: 2–3 constellation options rendered as screenshots for Matthew; winner ships.**
+- **OPEN DATA QUESTION (scope first):** the pillar-pair correlation edge-weight data is **not** in `/api/character` today (`#535` was uncertainty/CIs, not pillar correlations). Grep found `pillar_correlation` refs in `lambdas/character_engine.py` + `site_api_vitals.py` — check whether a real inter-pillar correlation matrix is computed and can be exposed (site-api field) or derived client-side, BEFORE committing to weighted edges. If no honest correlation data exists, weight edges by something real (co-movement of xp_delta?) or keep them uniform + honest.
+
+Then batch-#3 leftovers (from opus batch #2's handover): **#408** shift render/accuracy QA left onto site PRs (CI) · **#409** batch-price the content AI (**touches `bedrock_client`/`ai_calls` = LAYER modules → layer bump + full consumer redeploy**). Attended/destructive: **#395** MCP prune. Watched CI: **#687** OIDC trust-tighten.

@@ -2,6 +2,28 @@
   "updated_at": "2026-07-05",
   "beats": [
     {
+      "id": "2026-07-05-one-continuous-instrument",
+      "date": "2026-07-05",
+      "title": "The site became one continuous instrument",
+      "shipped": "Every page now opens with the same orientation banner and a clickable ribbon of the whole loop — Now, Data, Coaching, Protocols, Story — with the page you're on lit up. Move between them and the ribbon doesn't redraw: it slides, and the pages cross-fade into each other, using a browser feature (cross-document View Transitions) almost no site ships yet. The Cockpit's daily read is now signed and time-stamped (\"written 6:02 AM this morning\"), the coaches' disagreement renders as a real back-and-forth thread, and each coach's stance shows how long they've held it. Under the hood, six copies of the theme-toggle code collapsed into one.",
+      "gotcha": "The morph target — the ribbon and hero — was fading itself in on every page load, so the transition kept snapshotting a half-invisible banner and flashing blank on arrival. The fix was to just let the orientation banner paint instantly instead of animating it in; a persistent element that's supposed to feel continuous shouldn't be dressing itself up each time you land.",
+      "honest_miss": "The stance chips were specced to say \"held 6 days\" — but the underlying data is only written once a week, so a day count would have been invented precision. They say \"held since Jun 14 · ~3 weeks\" instead: a real date, honestly coarse. And the fifth piece — the cinematic Home constellation — was deliberately left for a fresh session rather than rushed at the end of a long one; it's the page every screenshot comes from, and it opens a data question (there's no real pillar-to-pillar correlation to weight its edges with yet) worth answering carefully.",
+      "prs": [
+        {
+          "label": "PR #700",
+          "url": "https://github.com/averagejoematt/life-platform/pull/700"
+        },
+        {
+          "label": "PR #701",
+          "url": "https://github.com/averagejoematt/life-platform/pull/701"
+        },
+        {
+          "label": "PR #702",
+          "url": "https://github.com/averagejoematt/life-platform/pull/702"
+        }
+      ]
+    },
+    {
       "id": "2026-07-05-calibration-scoreboard",
       "date": "2026-07-05",
       "title": "The platform grades its own predictions, in public",
