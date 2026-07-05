@@ -274,3 +274,50 @@ class TestCaptureEverythingExpansion:
         ]
         daily, _, _ = hae.process_generic_metrics(metrics)
         assert daily["2026-05-02"]["vo2max"] == 43.0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PRIV-02 (#378) — auth token accepted via header only, query-param form rejected
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestAuthHeaderOnly:
+    """The `?key=...` query-string fallback was removed (#378): a URL-borne
+    token leaks into API Gateway / CloudFront access logs. Only the
+    `Authorization: Bearer <token>` header is accepted now."""
+
+    def test_query_param_only_token_is_rejected(self):
+        # Old-style request: no Authorization header, token carried in the URL.
+        event = {
+            "headers": {},
+            "queryStringParameters": {"key": "some-valid-looking-token"},
+            "body": "{}",
+        }
+        result = hae.lambda_handler(event, None)
+        assert result["statusCode"] == 401
+        assert "Unauthorized" in result["body"]
+
+    def test_no_auth_at_all_is_rejected(self):
+        event = {"headers": {}, "body": "{}"}
+        result = hae.lambda_handler(event, None)
+        assert result["statusCode"] == 401
+
+    def test_query_param_token_never_reaches_the_expected_key_comparison(self, monkeypatch):
+        # Belt-and-suspenders: even if get_api_key() were somehow made to
+        # return the query-param value, the handler must never read it.
+        # This proves the read path is header-only, not just "header first."
+        calls = {"get_api_key": 0}
+
+        def _boom():
+            calls["get_api_key"] += 1
+            raise AssertionError("get_api_key() should not be reached when no Authorization header is present")
+
+        monkeypatch.setattr(hae, "get_api_key", _boom)
+        event = {
+            "headers": {},
+            "queryStringParameters": {"key": "leaked-token"},
+            "body": "{}",
+        }
+        result = hae.lambda_handler(event, None)
+        assert result["statusCode"] == 401
+        assert calls["get_api_key"] == 0

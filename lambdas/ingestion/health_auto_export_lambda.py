@@ -1377,14 +1377,18 @@ def lambda_handler(event, context):
     logger.info("Health Auto Export webhook received")
 
     # ── Auth ──
+    # PRIV-02 (#378): token is accepted via the Authorization header ONLY. A
+    # query-string `?key=...` fallback used to exist for HAE iOS-app compatibility,
+    # but query strings leak into access logs / CloudFront logs / referrers, making
+    # it a slow-leak surface for the credential guarding a near-real-time health
+    # stream. HAE supports custom request headers on its webhook automations, so
+    # the fallback has been removed rather than merely de-logged. The HAE app's
+    # webhook automation must send `Authorization: Bearer <token>` or the request
+    # is rejected as unauthenticated — see life-platform/health-auto-export in
+    # Secrets Manager for the current token.
     headers = event.get("headers", {})
     auth_header = headers.get("authorization", "")
     token = auth_header.replace("Bearer ", "").strip() if auth_header else ""
-
-    # Also check query string for ?key=... (fallback for apps that can't set headers)
-    query_params = event.get("queryStringParameters") or {}
-    if not token:
-        token = query_params.get("key", "")
 
     if not token:
         logger.warning("hae_auth_failure reason=no_token request_id=%s", context.aws_request_id if context else "local")
