@@ -8,45 +8,50 @@ The one-sentence version: **AI may sketch, only code ships, only Matthew approve
 
 ---
 
-## 1. The style bible — "commissioned engraved identity"
+## 1. The style bible — "commissioned character identity"
 
-The vocabulary extends the instrument language of §8.2 (sigils) to a human mark: an
-**engraving**, not an avatar. Think banknote/scientific-plate line work, not cartoon, not
-photoreal (photoreal is NO-GO, ADR-106 §5).
+> **Amended 2026-07-05 with the pilot approval (#587, rounds 1–4).** The original bible said
+> engraved stroke-only line work; the taste gate steered to **flat-vector character
+> illustration** — animated-TV register, full character colour. The four gate rounds are the
+> provenance: "they look the same" → distinct facial constructions; "less sketch, more
+> animated" → filled duotone; "identifiable like animated-film characters, no name needed" →
+> shape language + owned palettes (this standard). Photoreal remains NO-GO (ADR-106 §5).
 
-**Composition**
-- **Engraved bust, ¾ view** (subject turned ~30° toward the reader, both eyes visible). Never
-  full-frontal (passport-photo dead stare), never profile (loses recognisability at 40 px).
-- **viewBox `0 0 100 120`** (renderer contract, #586). Head centre ≈ (50, 46); **eye-line at
-  y = 46 ± 2**; crown clears y ≥ 8; bust cut runs off the bottom edge between y = 104–120 (no
-  floating heads — the bust cut is part of the engraving idiom).
-- **Signature carried by silhouette, hair, glasses, brow** — the durable identity features that
-  survive 40 px. Never by props overload (no stethoscopes, clipboards, barbells; at most ONE
-  quiet wardrobe cue in the bust layer, e.g. a collar style).
+The bar, verbatim from the gate: **a reader who has followed for a few weeks knows who is who
+without the name next to them.**
 
-**Line**
-- **Stroke-only, no fills** except: pupils (small filled dots) and ≤ 2 accent nodes if the
-  design earns them. Contours `stroke="currentColor"`, `stroke-width 1.7`,
-  `vector-effect="non-scaling-stroke"`, round caps/joins — identical to the sigil line so the
-  two read as one system.
-- **One accent layer** (`hatch`) rides `var(--coach)` — the engraved shading is the persona's
-  identity colour, exactly as the sigil colour channel works (§8.2's sanctioned exception).
-  Everything else is ink.
-- **Line budget: ≤ 48 stroked elements per portrait (target 28–40).** If a trace needs more,
-  simplify the reference — density belongs in the `hatch` layer, not the contours. The budget is
-  what keeps a portrait legible at 40 px and cheap to draw-in animate.
+**Shape language (the recognisability engine)**
+- **Each coach is built on a distinct geometric base** — e.g. Elena oblong, Park circle,
+  Chen wedge. A new portrait must claim a base not already in the cast, or differentiate
+  hard within one.
+- **One hyper-distinctive feature per coach**, carried by silhouette (hair mass, accessory,
+  collar): the slate-streak bob · the pinned top-bun · the swooping ponytail. Never props
+  overload — ONE quiet wardrobe cue (collar style, zip line) at most.
+- **The silhouette litmus is mandatory on every contact sheet:** render the batch as solid
+  single-colour shapes, no faces, no names. If reviewers can't tell who is who, the designs
+  fail before Matthew ever sees a face.
+- **viewBox `0 0 100 120`** (renderer contract, #586). Eye-line ≈ y 45–47; bust runs off the
+  bottom edge (no floating heads).
 
-**Face rules (the uncanny guards)**
-- **No teeth, ever.** Mouths are closed or single-line; `mouth-a`/`mouth-b` variants stay
-  closed-lip shapes (they exist for future speaking states, not grins).
-- **Pupil-size guard:** pupils are filled circles **r 1.4–2.2** at this viewBox. Below 1.4 reads
-  as the hollow engraving stare; above 2.2 reads cartoon. `eyes-open` must include pupils;
-  `eyes-closed` is a single lid line per eye (the blink frame).
-- Eyes are the only place with both a stroke shape and a fill dot — keep them simple: lid line,
-  iris arc optional, pupil dot.
-- No skin-tone rendering exists in this language (it's ink on paper); ethnicity/identity cues
-  come from the persona document's own description via silhouette, hair, and features — drawn
-  respectfully, reviewed at the contact-sheet gate like everything else.
+**Colour (the tone palette — schema `palette` + per-element `tone`, PR #612)**
+- Filled masses carry the character: hair, wardrobe, skin, blush — each a flat hex in the
+  recipe's validated `palette` (`skin/hair/cloth/blush/line`); **`accent` always resolves to
+  the coach identity channel** (`var(--coach)`) and should appear somewhere signature (Elena's
+  streak, Chen's headband/elastic).
+- **Flat colour only** — no gradients, no soft shading (that way lies the photoreal NO-GO).
+  Mid-value hexes that read on both themes; the contact sheet shows light AND dark, always.
+- **Skin tones are in the language** (amended): flat, stylised, derived from the persona
+  document's own identity — drawn respectfully and reviewed at the gate like everything else.
+- Ink contours (`stroke="currentColor"`, 1.7 non-scaling, round caps) stay on top of the fills
+  so portraits still sit in the site's drawn idiom next to the sigils.
+- **Line budget: ≤ 48 stroked elements (target 22–35); fills are free.**
+
+**Face rules (the uncanny guards — unchanged)**
+- **No teeth, ever.** Mouths closed or lip-shapes; `mouth-a`/`mouth-b` stay closed-lip.
+- **Pupil-size guard:** filled circles r 1.4–2.3. `eyes-open` must include pupils;
+  `eyes-closed` is a lid line per eye (the blink frame).
+- Almond lid shapes + a lid-crease stroke read "animated realistic"; avoid full-round
+  passport stares except where the construction calls for it (Park's big open eyes).
 
 **The fixed layer schema** (ids are the renderer contract — all optional except `head`):
 

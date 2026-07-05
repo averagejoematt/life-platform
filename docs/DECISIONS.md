@@ -2923,6 +2923,13 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 
 **Date:** 2026-07-04 · **Status:** Accepted (program); every portrait batch stays behind the contact-sheet gate below · **Extends:** ADR-040 · **Amends:** DESIGN_SYSTEM_V5 §8 (adds §8.7) · **Story:** #585 (epic #576)
 
+> **Amendment 2026-07-05 (pilot approval, #587):** the sanctioned style moved from engraved
+> stroke-only to **flat-vector character illustration** (shape language, per-recipe colour
+> palettes incl. flat skin tones — runbook §1 as amended). §2's "stroke-only contours + one
+> accent layer" reads accordingly: ink contours over validated flat fills, accent = the coach
+> channel. Everything load-bearing here — the AI-gen boundary, provenance, the human gate, the
+> photoreal NO-GO, disclosure — is unchanged.
+
 **Sign-off.** Matthew authorized shipping this ADR in-session 2026-07-04 ("work through all open issues tagged to fable", with merge + deploy permission granted for the session). The hard taste gate — contact-sheet approval before any portrait ships to a live page — remains explicitly and solely his (#587); this ADR does not pre-approve any artwork.
 
 **Context.** The coach cast (ADR-040: openly-fictional advisors, never real public figures) is rendered everywhere by deterministic geometric sigils (§8.2). Three standing rules were written to protect the truthfulness moat, and none of them contemplated stylized persona illustration: DESIGN_SYSTEM_V5 §8 says "no raster, no AI image gen" (written against glossy decoration and version-skewed binary assets); SS-11 rejects people-images fail-closed (written against *photographs of real humans* landing as editorial covers); PG-14 recorded NO-GO on photoreal (written against synthetic photorealism of *Matthew*, an honesty + privacy bar). The portrait program (epic #576) wants engraved, code-animated, openly-fictional bust illustrations for the coaches — which violates none of those rules' *reasons* but reads as violating their *letters*. Without a drawn line, either the program can't start or, worse, it starts and then drifts past the original protections. This ADR draws the line exactly.

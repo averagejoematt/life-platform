@@ -11,6 +11,7 @@
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
+import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { icon } from "/assets/js/icons.js";
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
@@ -267,7 +268,7 @@ async function renderCoachPage(read, id) {
   let d;
   try { d = await getJSON(`/api/coach/${encodeURIComponent(id)}`); }
   catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}"><span class="sigil-lg">${sigil(d, { title: "" })}</span><div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
+  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
   if (typeof d.daily === "string" && d.daily.trim()) {
@@ -526,7 +527,12 @@ async function renderRead(s, id) {
   const prevRail = priors.length
     ? `<aside class="dx-prev"><p class="dx-prev-k label">previously</p><ul class="dx-prev-list">${priors.map((x) => `<li><button type="button" class="dx-prevlink" data-id="${esc(x.id)}"><span class="dx-prev-lbl label">${esc(x.label || ("week " + x.id))}</span><span class="dx-prev-t">${esc(x.title || "")}</span></button></li>`).join("")}</ul></aside>`
     : "";
-  read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? "chronicle · Elena Voss" : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+  // Elena's byline mark (#587): her commissioned portrait beside the chronicle kicker —
+  // portrait-or-nothing here (no sigil existed in this spot before; degrades to plain text).
+  const elenaMark = s.key === "chronicle"
+    ? (portrait({ persona_id: "elena_voss", name: "Elena Voss" }, { size: 26 }) || "")
+    : "";
+  read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     prevRail + `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   read.querySelectorAll(".dx-prevlink").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
