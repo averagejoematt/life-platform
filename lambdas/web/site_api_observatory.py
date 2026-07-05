@@ -158,6 +158,33 @@ def _compute_muscle_volume(hevy_items, num_weeks):
     return out
 
 
+# Canonical expenditure/TDEE resolution (#484). MacroFactor's daily-summary export
+# writes its adaptive maintenance estimate to `expenditure_kcal`; three generations of
+# reader code looked for `tdee`/`tdee_kcal`/`expenditure` — field names nothing ever
+# wrote — so the deficit chain silently served None end-to-end. Resolve across all of
+# them, newest-first (the latest record may predate a populated Expenditure column), and
+# report honest provenance.
+_TDEE_FIELDS = ("expenditure_kcal", "tdee_kcal", "tdee", "expenditure")
+
+
+def _resolve_mf_tdee(items):
+    """Return (tdee_float, source_label) from the most recent MacroFactor record carrying
+    an expenditure/TDEE value, else (None, None). The label 'macrofactor_adaptive' names
+    MacroFactor's adaptive expenditure honestly — it is a measured estimate, not a guess."""
+    for it in reversed(items or []):
+        for field in _TDEE_FIELDS:
+            raw = it.get(field)
+            if raw in (None, ""):
+                continue
+            try:
+                val = float(raw)
+            except (TypeError, ValueError):
+                continue
+            if val > 0:
+                return val, "macrofactor_adaptive"
+    return None, None
+
+
 def handle_nutrition_overview() -> dict:
     """
     GET /api/nutrition_overview
@@ -265,8 +292,8 @@ def handle_nutrition_overview() -> dict:
     cal_7d = [_mf(i, "calories") for i in items_7d if _mf(i, "calories") is not None]
     pro_7d = [_mf(i, "protein_g", "total_protein_g") for i in items_7d if _mf(i, "protein_g", "total_protein_g") is not None]
 
-    # TDEE estimate (if available in latest record)
-    tdee = float(latest.get("tdee") or latest.get("expenditure") or 0) or None
+    # TDEE from the most recent record carrying MacroFactor's adaptive expenditure (#484)
+    tdee, tdee_source = _resolve_mf_tdee(items)
     avg_cal = round(sum(cal_vals) / len(cal_vals)) if cal_vals else None
     deficit = round(tdee - avg_cal) if tdee and avg_cal else None
 
@@ -634,6 +661,7 @@ def handle_nutrition_overview() -> dict:
                 "protein_floor_hit_days": floor_hit_days,
                 "days_logged": len(items),
                 "tdee": round(tdee) if tdee else None,
+                "tdee_source": tdee_source,
                 "avg_deficit": deficit,
                 "cal_7d_avg": round(sum(cal_7d) / len(cal_7d)) if cal_7d else None,
                 "pro_7d_avg": round(sum(pro_7d) / len(pro_7d), 1) if pro_7d else None,
@@ -708,15 +736,16 @@ def handle_deficit_sustainability() -> dict:
     cals = [_f(i.get("total_calories_kcal")) for i in mf]
     cals = [c for c in cals if c]
     avg_cal = round(sum(cals) / len(cals)) if cals else 0
-    latest = mf[-1]
-    tdee = _f(latest.get("tdee")) or _f(latest.get("expenditure"))
-    if not tdee:  # MCP fallback: Harris-Benedict from Withings weight (only if MF lacks TDEE)
+    tdee, tdee_source = _resolve_mf_tdee(mf)
+    if not tdee:  # Fallback: Mifflin-St Jeor from Withings weight — labeled an estimate (#484)
         wt = _query_source("withings", start, today)
         if wt:
             wkg = (_f(sorted(wt, key=lambda x: x.get("sk", ""))[-1].get("weight_lbs")) or 220) * 0.453592
             tdee = round((10 * wkg + 6.25 * 182.88 - 5 * 35 + 5) * 1.55)
+            tdee_source = "estimate_mifflin"
         else:
             tdee = 2400
+            tdee_source = "estimate_default"
     deficit_kcal = round(tdee - avg_cal)
     deficit_pct = round(deficit_kcal / tdee * 100, 1) if tdee else 0
     in_deficit = deficit_kcal > 200
@@ -817,6 +846,7 @@ def handle_deficit_sustainability() -> dict:
                     "in_deficit": in_deficit,
                     "avg_intake_kcal": avg_cal,
                     "tdee": round(tdee),
+                    "tdee_source": tdee_source,
                     "deficit_kcal": deficit_kcal,
                     "deficit_pct": deficit_pct,
                     "label": deficit_label,

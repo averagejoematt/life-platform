@@ -561,6 +561,10 @@ def build_summary_day_items(rows):
             item["trend_weight_lbs"] = round(trend_weight, 2)
         if expenditure is not None and expenditure > 0:
             item["expenditure_kcal"] = round(expenditure, 2)
+            # (#484) Canonical name: readers (daily_insight, ai_context) and the
+            # correlation engine key off `tdee_kcal`. Write it here so the deficit
+            # chain converges forward without a per-reader backfill.
+            item["tdee_kcal"] = round(expenditure, 2)
         if target_cal is not None and target_cal > 0:
             item["target_calories_kcal"] = round(target_cal, 2)
         if target_prot is not None and target_prot > 0:

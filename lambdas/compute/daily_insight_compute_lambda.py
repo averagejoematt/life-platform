@@ -1118,8 +1118,11 @@ def _compute_slow_drift(yesterday_str, profile):
                     # MacroFactor TDEE preferred; fallback to Apple Watch (Webb/Norton)
                     mf_tdee = None
                     aw_tdee = None
-                    for r in mf_recs:
-                        v = safe_float(r, "tdee_kcal") or safe_float(r, "maintenance_calories")
+                    for r in reversed(mf_recs):
+                        # #484: MacroFactor writes its adaptive maintenance to
+                        # `expenditure_kcal`; the legacy tdee_kcal/maintenance_calories
+                        # names were never populated. Read newest-first.
+                        v = safe_float(r, "tdee_kcal") or safe_float(r, "maintenance_calories") or safe_float(r, "expenditure_kcal")
                         if v:
                             mf_tdee = v
                             break
