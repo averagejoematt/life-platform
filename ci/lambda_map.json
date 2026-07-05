@@ -132,6 +132,12 @@
     "lambdas/compute/sleep_reconciler_lambda.py": {
       "function": "sleep-reconciler"
     },
+    "lambdas/compute/state_of_matthew_lambda.py": {
+      "function": "state-of-matthew",
+      "handler": "compute.state_of_matthew_lambda.lambda_handler",
+      "note": "#552: weekly assembly of forecast + hypotheses + coach consensus + calibration into one narrated brief. Sunday 12:30 PM PT. Writes SOURCE#state_of_matthew.",
+      "stack": "LifePlatformCompute"
+    },
     "lambdas/compute/weekly_correlation_compute_lambda.py": {
       "function": "weekly-correlation-compute"
     },

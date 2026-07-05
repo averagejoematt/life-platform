@@ -98,6 +98,9 @@ SOURCE_CLASS: dict[str, str] = {
     "forecast": EXPERIMENT_SCOPED,  # #541: daily EWMA expectations — derived, recomputed every
     # morning; graded outcomes live in the CROSS_PHASE calibration ledger, so wiping the raw
     # forecasts at reset loses nothing the scoreboard needs.
+    "state_of_matthew": EXPERIMENT_SCOPED,  # #552: weekly synthesis of forecast+hypotheses+
+    # coach-consensus+calibration into one narrated brief — derived, recomputed weekly; nothing
+    # it cites is lost by wiping it (the source records it summarizes have their own classes).
     "computed_insights": EXPERIMENT_SCOPED,
     "adaptive_mode": EXPERIMENT_SCOPED,
     "engagement_state": EXPERIMENT_SCOPED,  # presence / quiet-stretch state; resets with the cycle

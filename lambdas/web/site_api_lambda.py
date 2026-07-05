@@ -117,6 +117,7 @@ from web.site_api_data import (
     handle_sleep_detail,
     handle_sleep_reconciliation,
     handle_source_freshness,
+    handle_state_of_matthew,
     handle_supplements,
     handle_survival,
     handle_tools_baseline,
@@ -311,6 +312,7 @@ ROUTES = {
     "/api/circadian": handle_circadian,
     "/api/forecast": handle_forecast,
     "/api/scenarios": handle_scenarios,
+    "/api/state_of_matthew": handle_state_of_matthew,  # #552 weekly model brief
     "/api/sleep_reconciliation": handle_sleep_reconciliation,
     # ARCH-03: Achievement badges
     "/api/achievements": handle_achievements,

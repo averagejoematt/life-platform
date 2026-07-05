@@ -2165,6 +2165,35 @@ def handle_scenarios() -> dict:
     return _ok(data, cache_seconds=3600)
 
 
+def handle_state_of_matthew() -> dict:
+    """
+    GET /api/state_of_matthew
+    The weekly "State of Matthew" model brief (#552) — the deterministic
+    assembly of the forecast engine (#541), the hypothesis engine's live
+    pre-registered bets (#530/ADR-105), the coaching panel's current
+    consensus/disputes, and the calibration scoreboard (#538) into one
+    narrated read-back, computed weekly by state-of-matthew-lambda. Each of
+    the four sections is independently present-or-absent per
+    `sections_available` — a source with genuinely nothing yet (e.g. n=0
+    calibration post-reset) is omitted rather than zero-filled. The one
+    Haiku call that wrote `narrative` never computed a number; every figure
+    traces back to the section it's quoted from. Read-only; cache 3600s —
+    recomputed once a week (Sundays).
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}state_of_matthew") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    if not items:
+        return _ok({"available": False}, cache_seconds=3600)
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
+    data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
+    data["available"] = True
+    return _ok(data, cache_seconds=3600)
+
+
 def handle_sleep_reconciliation() -> dict:
     """
     GET /api/sleep_reconciliation
