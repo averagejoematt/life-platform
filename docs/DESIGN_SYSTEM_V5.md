@@ -238,8 +238,11 @@ procedure in `docs/design/PORTRAIT_RUNBOOK.md`):
   generated raster is never a shipped artifact, never checked into `site/`, never regenerated at
   build/runtime. Hand-authored vectors (no AI step at all) are equally sanctioned and preferred.
 - **The shipped artifact is a code-drawn layered-SVG recipe** (`config/portraits/<persona_id>.json`,
-  fixed layer ids, schema-validated): stroke-only contours on `currentColor`, one accent layer on
-  `var(--coach)`, engraved-bust vocabulary per the runbook's style bible. Rendered by
+  fixed layer ids, schema-validated): flat-vector **character illustration** (amended 2026-07-05
+  with the #587 pilot approval) — ink contours on `currentColor` over validated flat colour fills
+  (per-recipe `palette` + per-element `tone`; skin tones flat and persona-derived), the coach
+  channel as the accent tone, shape language per the runbook's style bible (distinct geometric
+  base + one hyper-distinctive feature + the silhouette litmus). Rendered by
   `portraits.js portrait(c)` with the **`portrait(c) || sigil(c)` fallback chain** — an
   uncommissioned coach renders exactly as today, forever.
 - **Human curation is mandatory**: Matthew approves a **contact sheet** (batch side-by-side,
