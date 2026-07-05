@@ -268,6 +268,114 @@ def _fetch_predictions():
     return predictions
 
 
+def _fetch_commitments():
+    """Fetch pending COMMITMENT# records across all coaches (#532).
+
+    Commitments are the concrete actions a coach pushed the subject to take. The
+    metric-backed ones (action_check set) are graded kept/broken here; the rest
+    are left for the coach to ask about, but expire to 'unresolved' past 2x window.
+    """
+    commitments = []
+    for coach_id in COACH_IDS:
+        try:
+            kwargs = {
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":pk": f"COACH#{coach_id}",
+                    ":prefix": "COMMITMENT#",
+                },
+            }
+            while True:
+                resp = table.query(**with_phase_filter(kwargs))
+                for item in (_decimal_to_float(i) for i in resp.get("Items", [])):
+                    if item.get("status", "") == "pending":
+                        commitments.append(item)
+                if "LastEvaluatedKey" not in resp:
+                    break
+                kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        except Exception as e:
+            logger.warning("Failed to fetch commitments for %s: %s", coach_id, e)
+    logger.info("Total pending commitments fetched: %d", len(commitments))
+    return commitments
+
+
+def _update_commitment_status(commitment, status, reason, today_str):
+    """Write a commitment's follow-through outcome (kept/broken/unresolved)."""
+    try:
+        pk = commitment.get("pk") or f"COACH#{commitment.get('coach_id', '')}"
+        sk = commitment.get("sk") or f"COMMITMENT#{commitment.get('commitment_id', '')}"
+        notes = json.dumps({"reason": reason, "algo_version": ALGO_VERSION})
+        table.update_item(
+            Key={"pk": pk, "sk": sk},
+            UpdateExpression="SET #status = :status, outcome = :outcome, outcome_date = :odate, outcome_notes = :notes",
+            ExpressionAttributeNames={"#status": "status"},
+            ExpressionAttributeValues={":status": status, ":outcome": status, ":odate": today_str, ":notes": notes},
+        )
+        logger.info("Commitment %s -> %s", commitment.get("commitment_id", "?"), status)
+    except Exception as e:
+        logger.error("Failed to update commitment %s: %s", commitment.get("commitment_id", "?"), e)
+
+
+def _evaluate_commitments(commitments, today_str, data_cache):
+    """Grade due commitments' follow-through against the data (#532).
+
+    Metric-backed commitments reuse the directional evaluator: the action_check
+    metric moving in the committed direction is evidence the subject followed
+    through (kept); moving the opposite way is broken; flat/no-data is unresolved
+    once past expiry, else left pending. Metric-less commitments can't be auto-graded
+    — they expire to 'unresolved' past 2x window so the coach stops carrying them.
+    """
+    today = datetime.strptime(today_str, "%Y-%m-%d")
+    stats = {"kept": 0, "broken": 0, "unresolved": 0, "pending": 0}
+    for c in commitments:
+        created_date = c.get("created_date")
+        window_days = int(c.get("window_days") or 7)
+        try:
+            created_dt = datetime.strptime(created_date, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            continue
+        due = created_dt + timedelta(days=window_days)
+        if today < due:
+            stats["pending"] += 1
+            continue  # not due yet
+
+        expired = (today - created_dt).days > window_days * EXPIRY_MULTIPLIER
+        action_check = c.get("action_check")
+        if action_check and action_check.get("metric") and action_check.get("direction"):
+            eval_spec = {"type": "directional", "metric": action_check["metric"], "condition": action_check["direction"]}
+            result = _evaluate_directional({}, eval_spec, data_cache, today_str) or {}
+            r_status = result.get("status", "inconclusive")
+            if r_status == "confirmed":
+                status = "kept"
+            elif r_status == "refuted":
+                status = "broken"
+            elif expired:
+                status = "unresolved"
+            else:
+                stats["pending"] += 1
+                continue
+            _update_commitment_status(c, status, result.get("reason", ""), today_str)
+            stats[status] += 1
+        else:
+            # No machine check — the coach owns following up. Expire stale ones so
+            # they don't accumulate as forever-open.
+            if expired:
+                _update_commitment_status(
+                    c, "unresolved", "No machine-checkable action; window elapsed without coach follow-up.", today_str
+                )
+                stats["unresolved"] += 1
+            else:
+                stats["pending"] += 1
+    logger.info(
+        "Commitment stats: kept=%d broken=%d unresolved=%d pending=%d",
+        stats["kept"],
+        stats["broken"],
+        stats["unresolved"],
+        stats["pending"],
+    )
+    return stats
+
+
 # =============================================================================
 # METRIC RESOLUTION
 # =============================================================================
@@ -944,20 +1052,25 @@ def lambda_handler(event, context):
         # Fetch all evaluable predictions
         predictions = _fetch_predictions()
 
-        if not predictions:
-            logger.info("No evaluable predictions found. Exiting.")
-            return {
-                "statusCode": 200,
-                "date": today_str,
-                "predictions_found": 0,
-                "evaluations": [],
-                "stats": {},
-            }
+        # Run prediction evaluations (commitments are graded below regardless — a coach
+        # can have follow-through to check even on a day with no open predictions).
+        if predictions:
+            evaluations, stats = _evaluate_all(predictions, today_str)
+            logger.info("coach-prediction-evaluator COMPLETE: %d predictions evaluated out of %d found", len(evaluations), len(predictions))
+        else:
+            logger.info("No evaluable predictions found.")
+            evaluations, stats = [], {}
 
-        # Run evaluations
-        evaluations, stats = _evaluate_all(predictions, today_str)
-
-        logger.info("coach-prediction-evaluator COMPLETE: %d predictions evaluated out of %d found", len(evaluations), len(predictions))
+        # #532: grade coach commitments' follow-through in the same lane (shares the
+        # metric cache; deterministic, zero AI). Fail-soft — a commitment error must
+        # never sink the prediction evaluation.
+        commitment_stats = {}
+        try:
+            commitments = _fetch_commitments()
+            if commitments:
+                commitment_stats = _evaluate_commitments(commitments, today_str, {})
+        except Exception as e:
+            logger.error("Commitment evaluation failed (non-fatal): %s", e)
 
         return {
             "statusCode": 200,
@@ -966,6 +1079,7 @@ def lambda_handler(event, context):
             "predictions_found": len(predictions),
             "predictions_evaluated": len(evaluations),
             "stats": stats,
+            "commitment_stats": commitment_stats,
             "evaluations": evaluations,
         }
     except Exception as e:

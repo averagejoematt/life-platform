@@ -21,7 +21,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -497,6 +497,24 @@ EXTRACTION_SYSTEM_PROMPT = (
     "about what the coach is NOT seeing (cross-domain blindspot), write one "
     "sentence in Elena Voss's literary journalist voice. Third person. "
     "If no natural meta-observation exists, return null.\n\n"
+    "11. **commitments_made**: Concrete recommendations the coach is asking the "
+    "SUBJECT to DO — a specific action the coach expects him to follow through on "
+    "(distinct from predictions_made, which are claims about how DATA will move). "
+    "'A 9:30 PM wind-down', 'cut the last coffee to before 2 PM', 'add a protein "
+    "target of 190 g'. Only extract commitments the coach genuinely pushed — not "
+    "hypotheticals or things the coach merely mentioned. Each needs:\n"
+    "   - commitment_natural: the recommended action in natural language\n"
+    "   - action_check: which MEASURABLE metric would show the subject followed "
+    "through — MUST be one of the exact allowlisted keys used for metric_hint "
+    "above (hrv, recovery_score, resting_heart_rate, sleep_duration_hours, "
+    "sleep_score, deep_pct, rem_pct, weight_lbs, total_calories_kcal, "
+    "total_protein_g, steps, blood_glucose_avg, blood_glucose_std_dev, "
+    "body_fat_pct, with optional _7day_avg/_14day_avg/_30day_avg), or null when "
+    "the action can't be machine-checked (the coach must ask him directly).\n"
+    "   - direction: 'up' or 'down' — which way action_check moves if he DID the "
+    "thing (earlier bedtime -> resting_heart_rate 'down'; protein target -> "
+    "total_protein_g 'up'). null if action_check is null.\n"
+    "   - timeframe_hint: when the coach should revisit it (e.g. 'this week').\n\n"
     "## Output Format\n\n"
     "Return ONLY valid JSON with the above fields. No markdown, "
     "no explanation, no preamble."
@@ -535,7 +553,7 @@ def _build_extraction_message(coach_id, output_text, output_type, voice_spec):
     parts.append(
         "Extract all metadata from the coach output above. "
         "Return ONLY valid JSON with fields: themes, structural_fingerprint, "
-        "threads_opened, threads_referenced, predictions_made, "
+        "threads_opened, threads_referenced, predictions_made, commitments_made, "
         "decision_classes_used, anti_pattern_violations."
     )
 
@@ -816,10 +834,89 @@ def _build_default_extraction(output_text):
         "threads_opened": [],
         "threads_referenced": [],
         "predictions_made": [],
+        "commitments_made": [],
         "decision_classes_used": ["observational"],
         "anti_pattern_violations": [],
         "_fallback": True,
     }
+
+
+def _timeframe_to_window_days(timeframe_hint, default=7):
+    """Map a natural timeframe hint to a revisit window in days (commitments, #532)."""
+    import re
+
+    if not timeframe_hint:
+        return default
+    tf = str(timeframe_hint).lower()
+    m = re.search(r"(\d+)", tf)
+    n = int(m.group(1)) if m else None
+    if "week" in tf:
+        return (n or 1) * 7
+    if "month" in tf:
+        return (n or 1) * 30
+    if "day" in tf:
+        return n or default
+    return default
+
+
+def _create_commitment_records(coach_id, generation_date, commitments_made):
+    """Create COMMITMENT# records — recommendations the coach must revisit (#532).
+
+    A commitment is a concrete action the coach pushed the subject to take (distinct
+    from a PREDICTION#, which is a claim about how data will move). Each carries a
+    due window and, where the action maps to an allowlisted metric, a deterministic
+    follow-through check (action_check: {metric, direction}) the evaluator grades as
+    kept/broken. Metric-less commitments stay pending until the coach asks directly.
+    Returns (created_count, checkable_count).
+    """
+    import re
+
+    created = 0
+    checkable = 0
+    for c in commitments_made or []:
+        text = (c.get("commitment_natural") or "").strip()
+        if not text:
+            continue
+        raw_metric = c.get("action_check") or ""
+        metric = _normalize_metric_hint(raw_metric) or "" if raw_metric else ""
+        direction = None
+        action_check = None
+        if metric:
+            direction = _infer_direction(c.get("direction"), text)
+            if direction in ("up", "down"):
+                action_check = {"metric": metric, "direction": direction}
+                checkable += 1
+
+        window_days = _timeframe_to_window_days(c.get("timeframe_hint"))
+        try:
+            due_date = (datetime.strptime(generation_date, "%Y-%m-%d") + timedelta(days=window_days)).strftime("%Y-%m-%d")
+        except (ValueError, TypeError):
+            due_date = None
+
+        slug = re.sub(r"[^a-z0-9]+", "_", text.lower()[:40]).strip("_")
+        commitment_id = f"commit_{generation_date.replace('-', '')}_{slug}"
+
+        record = {
+            "pk": f"COACH#{coach_id}",
+            "sk": f"COMMITMENT#{commitment_id}",
+            "commitment_id": commitment_id,
+            "coach_id": coach_id,
+            "created_date": generation_date,
+            "commitment_natural": text,
+            "action_check": action_check,  # {metric, direction} or None (qualitative)
+            "window_days": window_days,
+            "due_date": due_date,
+            "status": "pending",  # pending -> kept | broken | unresolved
+            "outcome": None,
+            "outcome_date": None,
+            "outcome_notes": None,
+            "surfaced_to_subject": True,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if _put_item(record):
+            created += 1
+            logger.info("Created COMMITMENT# %s for %s (checkable=%s, due=%s)", commitment_id, coach_id, bool(action_check), due_date)
+    return created, checkable
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1008,6 +1105,14 @@ def lambda_handler(event, context):
     # SS-06: surface the write-time gradable share so an extraction regression is
     # visible the same day, not weeks later when windows close (see the helper).
     _emit_prediction_gradability(_gradable_n, _qualitative_n)
+
+    # 7. Create COMMITMENT# records (#532) — the recommendations the coach must
+    # revisit. The evaluator grades the metric-backed ones kept/broken; the
+    # orchestrator injects the due ones so the coach follows through on its own advice.
+    commitments_made = extraction.get("commitments_made", [])
+    if commitments_made:
+        _c_created, _c_checkable = _create_commitment_records(coach_id, generation_date, commitments_made)
+        logger.info("Commitments for %s: %d created (%d machine-checkable)", coach_id, _c_created, _c_checkable)
 
     # Return the trace (with Decimals converted for JSON serialization)
     return _decimal_to_float(trace)
