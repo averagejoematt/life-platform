@@ -207,8 +207,8 @@ billing once its last datapoint ages out of the 15-month retention (no action).
 
 ## 8. Post-change ledger
 
-- Live alarms: 136 → **116** after the script runs (18 retired + 2 renamed-away; 2 new
-  IaC names created by `cdk deploy`; net −18).
+- Live alarms: 136 → **118** after the script runs (20 deleted = 18 retired + 2
+  renamed-away; 2 new IaC names created by `cdk deploy`; net −18).
 - CDK-defined alarms: 107 → **109** (the 2 adopted).
 - Remaining out-of-IaC drift: **9** (the §3c keep-orphans, each justified, flagged for a
   future adopt PR).
