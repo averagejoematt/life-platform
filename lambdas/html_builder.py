@@ -394,13 +394,29 @@ def _brief_header(brief_mode, data, day_grade_score, grade, tldr_guidance, vacat
     """
     out = ""
     # --- Header ---
+    # N-03 (#400): the brief renders on one fixed dark palette by design — it never
+    # had a light layout. Without an explicit color-scheme declaration, some clients
+    # (Outlook.com, certain Gmail apps) apply their own "smart" dark-mode conversion
+    # to messages they assume are light, inverting the already-dark background into
+    # a jarring white flash and washing out contrast. Declaring color-scheme=dark
+    # opts the message out of that reprocessing; the @media fallback re-asserts the
+    # same colors for clients that honor prefers-color-scheme but not the meta tag.
+    # Purely additive — no visible change for a client rendering the mail as authored.
     out = (
         '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>Morning Brief — " + day_label + "</title></head>"
-        "<body style=\"margin:0;padding:0;background:#0f0f23;font-family:'SF Pro Display',"
+        '<meta name="color-scheme" content="dark">'
+        '<meta name="supported-color-schemes" content="dark">'
+        "<title>Morning Brief — " + day_label + "</title>"
+        "<style>:root{color-scheme:dark;supported-color-schemes:dark;}"
+        "@media (prefers-color-scheme: light){"
+        "body.db-root{background:#0f0f23 !important;}"
+        ".db-container{background:#1a1a2e !important;}"
+        "}</style>"
+        "</head>"
+        '<body class="db-root" style="margin:0;padding:0;background:#0f0f23;font-family:\'SF Pro Display\','
         "'Segoe UI',sans-serif;\">"
-        '<div style="max-width:640px;margin:0 auto;background:#1a1a2e;">'
+        '<div class="db-container" style="max-width:640px;margin:0 auto;background:#1a1a2e;">'
     )
 
     # --- Adaptive mode banner (if not standard) ---
@@ -1925,15 +1941,18 @@ def _brief_footer(compute_age_msg, compute_stale, data, date_str):
             + " &mdash; some metrics may be estimated or from a prior run."
         )
         out += "</p></div>"
-    out += '<div style="background:#f8f8fc;padding:10px 24px;border-top:1px solid #e8e8f0;margin-top:12px;">'
+    # N-03 (#400): was a light card (#f8f8fc/#e8e8f0) inside an otherwise all-dark
+    # brief — a white strip at the bottom of every single email. Recolored to match
+    # the rest of the dark palette rather than left as a stray light-mode leftover.
+    out += '<div style="background:#16213e;padding:10px 24px;border-top:1px solid #2d2d5e;margin-top:12px;">'
     out += (
-        '<p style="color:#9ca3af;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; '
+        '<p style="color:#64748b;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; '
         + date_str
         + " &middot; "
         + source_str
         + "</p>"
     )
-    out += '<p style="color:#b0b0b0;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>'
+    out += '<p style="color:#475569;font-size:8px;margin:4px 0 0;text-align:center;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>'
     out += "</div>"
     out += "</div></body></html>"
     return out
