@@ -17,6 +17,9 @@ Inputs (all DynamoDB + S3):
   - Target coach voice state (COACH#sleep_coach / VOICE#state)
   - Target coach open threads (COACH#sleep_coach / THREAD# where status=open)
   - Target coach active predictions (COACH#sleep_coach / PREDICTION# where status in pending/confirming)
+  - Journal mood/connection signal (#549 — USER#matthew#SOURCE#notion journal entries,
+    aggregated from #505's extraction; surfaced only to coaches whose domain covers
+    Matthew's inner state, e.g. mind_coach)
 
 Output:
   - Generation brief JSON (returned + cached to COACH#sleep_coach / BRIEF#{date})
@@ -31,7 +34,7 @@ import logging
 import os
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -91,6 +94,28 @@ COACH_DOMAINS = {
     "labs_coach": {"supplements", "metabolic"},
     "explorer_coach": None,
 }
+
+# #549: journal mood/connection signal is scoped to the coach(es) whose domain covers
+# Matthew's inner state — today that's mind_coach only, but this routes off
+# COACH_DOMAINS (same pattern as _gather_site_protocols) rather than a hardcoded
+# coach-id check, so a future domain add doesn't need a second gate rewritten here.
+_JOURNAL_MOOD_DOMAINS = {"mental", "mind"}
+
+# Below this many scored entries in the window, a trajectory read is too thin to be
+# honest — the signal is omitted entirely rather than asserting a trend off 2 days.
+JOURNAL_MOOD_MIN_ENTRIES = 5
+JOURNAL_MOOD_WINDOW_DAYS = 21
+
+
+def _coach_wants_journal_mood(coach_id: str) -> bool:
+    """True if this coach's domain covers Matthew's inner state (deterministic routing,
+    not inference). explorer_coach (domains=None) is cross-domain — sees everything,
+    matching how _gather_site_protocols treats a None domain set."""
+    domains = COACH_DOMAINS.get(coach_id)
+    if domains is None:
+        return True
+    return bool(domains & _JOURNAL_MOOD_DOMAINS)
+
 
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -464,6 +489,11 @@ def _gather_all_state(coach_id):
     # 'present' ⇒ the coach says nothing about it. Fail-soft, like stance.
     engagement_signal = _get_item(f"USER#{USER_ID}#SOURCE#engagement_state", "STATE#current")
 
+    # 13. Journal-derived mood/connection signal (#549) — deterministic trajectory
+    # from #505's extraction. Gathered once (same 21-day window for every coach);
+    # exposure into the message/brief is gated per-coach at the seam below, not here.
+    journal_mood = _gather_journal_mood_signal()
+
     return {
         "target_compressed": target_compressed,
         "other_compressed": other_compressed,
@@ -480,6 +510,7 @@ def _gather_all_state(coach_id):
         "current_stance": current_stance,
         "site_protocols": site_protocols,
         "engagement_signal": engagement_signal,
+        "journal_mood": journal_mood,
     }
 
 
@@ -542,6 +573,156 @@ def _gather_site_protocols(coach_id):
         out["challenges"] = challenges
     if experiments:
         out["experiments"] = experiments
+    return out
+
+
+def _gather_journal_mood_signal():
+    """#549: journal-derived mood/connection signal — the trajectory and texture
+    behind 'how Matthew feels', built from #505's extraction (enriched_mood/stress/
+    sentiment/social_quality/themes/emotions). Consumes #505's output; does not
+    duplicate its Haiku call — no new AI call here, this is a deterministic read
+    + aggregate of already-enriched journal records.
+
+    Cross-phase by design, like mcp.tools_journal._query_journal — journal is the
+    longitudinal/clinical archive (ADR-058 owner decision 2026-06-06), so a mood
+    trajectory should not silently truncate at a reset boundary.
+
+    Fail-soft (matches the gather contract — a read error must never abort the
+    daily orchestrator run) and returns None when there isn't enough recent
+    journal data to say anything honest about a trajectory.
+    """
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+
+        end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        start = (datetime.now(timezone.utc) - timedelta(days=JOURNAL_MOOD_WINDOW_DAYS)).strftime("%Y-%m-%d")
+        pk = f"USER#{USER_ID}#SOURCE#notion"
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": _Key("pk").eq(pk) & _Key("sk").between(f"DATE#{start}#journal", f"DATE#{end}#journal#~"),
+                "ScanIndexForward": True,
+            },
+            include_pilot=True,
+        )
+        items = []
+        while True:
+            resp = table.query(**kwargs)
+            items.extend(resp.get("Items", []))
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        entries = _decimal_to_float([i for i in items if "#journal#" in i.get("sk", "")])
+    except Exception as e:
+        logger.warning("journal mood gather failed: %s", e)
+        return None
+
+    if not entries:
+        return None
+
+    def _entry_date(e):
+        d = e.get("date")
+        if d:
+            return d
+        sk = e.get("sk", "")
+        return sk.split("DATE#")[1][:10] if "DATE#" in sk else ""
+
+    entries.sort(key=_entry_date)
+
+    moods, stresses = [], []
+    emotions_all, themes_all = [], []
+    social_qualities = []
+    quote, quote_date = None, None
+    for e in entries:
+        mood = e.get("enriched_mood")
+        if mood is not None:
+            moods.append(float(mood))
+        stress = e.get("enriched_stress")
+        if stress is not None:
+            stresses.append(float(stress))
+        emotions_all.extend(e.get("enriched_emotions") or [])
+        themes_all.extend(e.get("enriched_themes") or [])
+        social_quality = e.get("enriched_social_quality")
+        if social_quality:
+            social_qualities.append(social_quality)
+        # Latest notable quote wins — most recent texture, not a historical one.
+        notable = e.get("enriched_notable_quote")
+        if notable:
+            quote, quote_date = notable, _entry_date(e)
+
+    if len(moods) < JOURNAL_MOOD_MIN_ENTRIES and len(stresses) < JOURNAL_MOOD_MIN_ENTRIES:
+        return None
+
+    def _trend(vals):
+        """First-half vs second-half average — same lightweight technique
+        mcp.tools_journal.tool_get_mood_trend uses for its half_delta."""
+        if len(vals) < 4:
+            return {"direction": "insufficient_data", "avg": round(sum(vals) / len(vals), 2) if vals else None, "n": len(vals)}
+        mid = len(vals) // 2
+        first_avg = sum(vals[:mid]) / mid
+        second_avg = sum(vals[mid:]) / (len(vals) - mid)
+        delta = round(second_avg - first_avg, 2)
+        direction = "rising" if delta > 0.3 else "falling" if delta < -0.3 else "stable"
+        return {"direction": direction, "avg": round(sum(vals) / len(vals), 2), "delta": delta, "n": len(vals)}
+
+    def _top(values, n=4):
+        counts: dict = {}
+        for v in values:
+            counts[v] = counts.get(v, 0) + 1
+        return [k for k, _ in sorted(counts.items(), key=lambda x: -x[1])[:n]]
+
+    social_dist: dict = {}
+    for sq in social_qualities:
+        social_dist[sq] = social_dist.get(sq, 0) + 1
+
+    return {
+        "window_days": JOURNAL_MOOD_WINDOW_DAYS,
+        "entries_analyzed": len(entries),
+        "mood_trend": _trend(moods),
+        "stress_trend": _trend(stresses),
+        "dominant_emotions": _top(emotions_all),
+        "dominant_themes": _top(themes_all),
+        "social_quality_distribution": social_dist,
+        "alone_ratio": round(social_dist.get("alone", 0) / len(social_qualities), 2) if social_qualities else None,
+        "notable_quote": quote,
+        "notable_quote_date": quote_date,
+    }
+
+
+def _journal_mood_for_brief(signal):
+    """Trim the journal mood signal to what the brief needs — and privacy-gate the
+    one piece of raw text in it (#549). The brief is stored to DDB (BRIEF#{date})
+    and flows verbatim into the coach's generation prompt, which can reach surfaces
+    beyond this private planning step, so `notable_quote` passes through the same
+    fail-closed vice/real-name gate the chronicle/podcast publish paths use
+    (`privacy_guard.find_violations`) — a hit drops the quote rather than redacting
+    it, since there is no upside to keeping a vice-adjacent fragment in an AI's
+    planning input at all."""
+    if not isinstance(signal, dict):
+        return None
+    out = {
+        "window_days": signal.get("window_days"),
+        "entries_analyzed": signal.get("entries_analyzed"),
+        "mood_trend": signal.get("mood_trend"),
+        "stress_trend": signal.get("stress_trend"),
+        "dominant_emotions": signal.get("dominant_emotions") or [],
+        "dominant_themes": signal.get("dominant_themes") or [],
+    }
+    social_dist = signal.get("social_quality_distribution") or {}
+    if social_dist:
+        out["social_quality_distribution"] = social_dist
+    if signal.get("alone_ratio") is not None:
+        out["alone_ratio"] = signal["alone_ratio"]
+
+    quote = signal.get("notable_quote")
+    if quote:
+        from privacy_guard import find_violations
+
+        if not find_violations(quote):
+            out["notable_quote"] = quote
+            out["notable_quote_date"] = signal.get("notable_quote_date")
+        else:
+            logger.info("journal mood: notable_quote dropped by privacy gate")
+
     return out
 
 
@@ -820,6 +1001,26 @@ def _build_user_message(state, coach_id, today):
         )
         parts.append("")
 
+    # Journal mood/connection signal (#549): deterministic, from #505's extraction —
+    # only surfaced to coach(es) whose domain covers Matthew's inner state, so the
+    # other 7 coaches' prompts (and the cached shared block) never carry it.
+    if _coach_wants_journal_mood(coach_id):
+        journal_mood = _journal_mood_for_brief(state.get("journal_mood"))
+        if journal_mood:
+            parts.append("## Journal Mood Signal (#549 — how Matthew feels, from his own journal)")
+            parts.append(json.dumps(journal_mood, indent=2, default=str))
+            parts.append(
+                "This is deterministic — a trajectory/aggregate computed from #505's journal "
+                "extraction, not your interpretation. Use it to plan how this coach reads Matthew's "
+                "inner state this cycle (mood/stress trajectory, dominant emotions/themes, how "
+                "connected vs. alone he's been) alongside what the behavioral data already shows. "
+                "Never plan a clinical diagnosis. If a notable_quote is present, it already passed "
+                "a privacy check, but it is for THIS coach's private reading only — plan to "
+                "paraphrase the substance rather than quote it verbatim if this content could ever "
+                "reach a public surface."
+            )
+            parts.append("")
+
     parts.append("## Instructions")
     parts.append(
         f"Produce a generation brief for {coach_id}. Return ONLY the JSON object "
@@ -1013,6 +1214,15 @@ def lambda_handler(event, context):
     engagement = _engagement_for_brief(state.get("engagement_signal"))
     if engagement and isinstance(brief.get("generation_brief"), dict):
         brief["generation_brief"]["engagement_signal"] = engagement
+
+    # Inject the journal mood/connection signal DETERMINISTICALLY (same seam, #549) so
+    # it reaches generation on every path including fallback/default — but only for the
+    # coach(es) whose domain covers Matthew's inner state. Omitted for every other coach
+    # and whenever the journal window is too thin to say anything honest.
+    if _coach_wants_journal_mood(coach_id):
+        journal_mood = _journal_mood_for_brief(state.get("journal_mood"))
+        if journal_mood and isinstance(brief.get("generation_brief"), dict):
+            brief["generation_brief"]["journal_mood"] = journal_mood
 
     # Cache the brief for fallback use
     _cache_brief(coach_id, brief, today)
