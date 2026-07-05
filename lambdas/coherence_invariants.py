@@ -165,6 +165,17 @@ _FACT_PATTERNS = {
     ),
     # Weight requires an explicit lb/lbs/pounds unit so a "190 g protein" can't match.
     "latest_weight": ([r"(\d{2,3}(?:\.\d+)?)\s*(?:lbs|lb|pounds)\b"], 0.04),
+    # TSB (training stress balance = CTL−ATL) — a DERIVED, duration-PROXY Banister value,
+    # not a measured vital (M-8 / #493). Covered HERE (the scheduled cross-surface scan,
+    # where a false alarm costs one digest line) but deliberately EXCLUDED from the tight
+    # generation-time grounding_guard (ADR-109): its own "canonical" number is an estimate,
+    # so block-and-regenning a coach against it is inappropriate. TSB is SIGNED and crosses
+    # zero, so its tolerance is ABSOLUTE points (_ABS_TOL), not a fraction of the value — the
+    # fractional band below collapses to ~0 at the zero crossing (false positives) and is
+    # sign-blind — and its plausible range is an ABSOLUTE band (_ABS_PLAUSIBILITY). The
+    # captured number may carry a leading '-'. `tol` here is a placeholder (abs-tol keys
+    # ignore it). Wide by design: only a gross miss is a real contradiction for a proxy.
+    "tsb": ([r"(?:training stress balance|tsb)\b[^.\d]{0,12}?(-?\d{1,3}(?:\.\d+)?)"], 0.0),
 }
 # A cited number only competes as a claim about THAT metric if it's in the metric's
 # plausible range. Without this, "lost 13.8 POUNDS" reads as a current-weight claim
@@ -172,6 +183,13 @@ _FACT_PATTERNS = {
 # band vs the canonical; metrics not listed accept any value (recovery can be 0–100,
 # so a real 30-vs-86 split must still fire). Tuned from the first live run.
 _PLAUSIBILITY = {"latest_weight": (0.6, 1.5)}
+# SIGNED facts (can be negative or ~0, e.g. TSB) need an ABSOLUTE tolerance (metric points)
+# and an ABSOLUTE plausible range — the multiplicative _PLAUSIBILITY / abs(true)*frac forms
+# are meaningless when the canonical value straddles zero. Keyed here, applied in
+# check_facts_agreement. See ADR-109: derived/proxy values are covered by this scheduled
+# scan (wide absolute tolerance), never by the tight generation-time grounding_guard.
+_ABS_TOL = {"tsb": 12.0}  # ±12 TSB points — wide; TSB is a proxy estimate, only a gross miss is a real contradiction
+_ABS_PLAUSIBILITY = {"tsb": (-70.0, 70.0)}  # outside this a cited number isn't a TSB claim (a stray value the regex grabbed)
 
 
 def _cited_for_metric(low_text: str, patterns):
@@ -197,9 +215,10 @@ def _mentions_value(low_text: str, true_val: float) -> bool:
 
 def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
     """`narratives`: list of served text blobs. `facts`: the canonical dict
-    ({recovery_pct, hrv_ms, rhr_bpm, latest_weight}). Flags a cited number that
-    contradicts a fact by > its tolerance, and HRV quoted in bpm. Tuned for
-    PRECISION (a false alarm erodes trust) — the AI semantic pass carries recall."""
+    ({recovery_pct, hrv_ms, rhr_bpm, latest_weight}, plus optional derived `tsb`).
+    Flags a cited number that contradicts a fact by > its tolerance, and HRV quoted
+    in bpm. Tuned for PRECISION (a false alarm erodes trust) — the AI semantic pass
+    carries recall. Derived values (tsb, M-8/#493) get a WIDE absolute tolerance."""
     f = Finding("facts_agreement", value=0.0)
     offenders = []
     labels = surfaces or [f"narrative_{i}" for i in range(len(narratives))]
@@ -214,13 +233,21 @@ def check_facts_agreement(narratives, facts, *, surfaces=None) -> Finding:
             offenders.append(f"{label}: HRV cited in bpm (HRV is milliseconds)")
         for key, (patterns, tol) in _FACT_PATTERNS.items():
             true_val = facts.get(key)
-            if true_val in (None, 0):
+            signed = key in _ABS_TOL
+            # 0 means "no data" for the positive vitals (recovery/hrv/rhr/weight); a SIGNED
+            # metric (TSB) can legitimately be a real 0, so only skip it when truly absent.
+            if true_val is None or (not signed and true_val == 0):
                 continue
             true_val = float(true_val)
-            band = abs(true_val) * tol
-            lo, hi = _PLAUSIBILITY.get(key, (0.0, 1e9))
-            # Only the in-plausible-range citations count as claims about this metric.
-            in_range = [c for c in _cited_for_metric(low, patterns) if lo * true_val <= c <= hi * true_val and c > 0]
+            if signed:
+                band = _ABS_TOL[key]
+                lo, hi = _ABS_PLAUSIBILITY[key]
+                in_range = [c for c in _cited_for_metric(low, patterns) if lo <= c <= hi]
+            else:
+                band = abs(true_val) * tol
+                lo, hi = _PLAUSIBILITY.get(key, (0.0, 1e9))
+                # Only the in-plausible-range citations count as claims about this metric.
+                in_range = [c for c in _cited_for_metric(low, patterns) if lo * true_val <= c <= hi * true_val and c > 0]
             if not in_range:
                 continue
             # If the narrative cites the canonical value ANYWHERE (even inside a trend
