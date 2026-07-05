@@ -1130,9 +1130,12 @@ a.vg-lit:hover { background: var(--ember-wash); }
   .loop-node, .vh-link, .dx-item, .ev-tile, .supp { transition: transform 0.18s var(--ease-out), border-color 0.18s var(--ease-out); }
   .loop-node:hover, .ev-tile:hover { transform: translateY(-2px); }
 
-  /* The pillar constellation breathes (home hero) — barely-there life. */
-  .constellation [data-nodes] > * { animation: mo-breathe 6s var(--ease-inout) infinite; }
-  @keyframes mo-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+  /* The pillar constellation drifts — DETERMINISTIC per-node seeded motion (#590):
+     each node's --dx/--dy/--dur/--ddelay come from a stable hash of the pillar name
+     (story.js driftVars → same seed → same motion, the sigils.js grammar). This whole
+     block is inside prefers-reduced-motion: no-preference, so reduced-motion is static. */
+  .constellation .node { animation: cn-drift var(--dur, 7s) var(--ease-inout) infinite; animation-delay: var(--ddelay, 0s); }
+  @keyframes cn-drift { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(var(--dx, 0), var(--dy, 0)); } }
 
   /* The loop flows — arrows pulse Data → Coaching → Protocols → Story in sequence,
      so the site's core thesis reads as a living cycle, not a static diagram. */

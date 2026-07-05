@@ -86,26 +86,51 @@ body { overflow-x: hidden; }
 .cta-quiet { color: var(--ink-faint); border-color: var(--rule); }
 .cta-quiet:hover { color: var(--ink-muted); }
 
-/* The constellation (relational canvas) */
+/* ── The constellation v2 (#590) — edges are MEASURED co-movement ─────────────
+   Single-accent identity held: positive coupling (move together) is ember + solid,
+   negative (trade off) is muted ink + dashed tension — no new hue, no alarm-red.
+   Width tracks |r| (set inline via stroke-width); significance sets opacity so a
+   thin/non-significant pair stays honestly faint. A pillar with no measured edge
+   (relationships, today) renders .quiet — recessed, the absence stated not faked. */
 .constellation { display: grid; gap: var(--sp-3); }
 .constellation svg { width: 100%; height: auto; aspect-ratio: 1; overflow: visible; }
-.constellation .edge { stroke: var(--rule); stroke-width: 1; fill: none; }
-.constellation .edge.live { stroke: var(--ember-line); stroke-width: 1.5; }
-.constellation .node circle { fill: var(--surface-raised); stroke: var(--ink-faint); stroke-width: 1; transition: r var(--dur) var(--ease-out); }
-/* Earned glow — only the pillars that are UP get the warm halo (design system §12:
+
+.constellation .edge { fill: none; stroke-linecap: round; transition: opacity var(--dur) var(--ease-out); }
+.constellation .edge.pos { stroke: var(--ember-line); }
+.constellation .edge.neg { stroke: var(--ink-faint); }                 /* trade-off: tension, not alarm */
+.constellation .edge.sig { opacity: calc(0.34 + var(--emag, 0.5) * 0.52); }
+.constellation .edge.faint { opacity: calc(0.12 + var(--emag, 0.3) * 0.20); }  /* not significant → always quiet */
+/* An active designed cross-pillar effect (rare) — the engine's own coupling, firing now. */
+.constellation .edge.effect { stroke: var(--ember); opacity: 0.95; filter: drop-shadow(0 0 5px var(--ember-soft)); }
+
+.constellation .node circle { fill: var(--surface-raised); stroke: var(--ink-faint); stroke-width: 1; transition: r var(--dur) var(--ease-out), stroke var(--dur-fast); }
+/* Earned glow — only pillars that are UP get the warm halo (design system §12:
    glow is reserved for "this is up", never decorative). Filters don't affect layout. */
 .constellation .node.up circle { stroke: var(--ember); stroke-width: 1.5; fill: color-mix(in oklch, var(--ember) 18%, var(--surface)); filter: drop-shadow(0 0 8px var(--ember-soft)); }
+/* Uninstrumented pillar (no measured coupling yet) — honestly recessed, dashed. */
+.constellation .node.quiet circle { stroke-dasharray: 3 3; opacity: 0.5; }
+.constellation .node.quiet .nlabel { opacity: 0.55; }
 .constellation .node text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-muted); text-anchor: middle; }
 .constellation .node .score { fill: var(--ink); font-size: 11px; }
-.constellation figcaption { color: var(--ink-faint); max-width: 38ch; }
-/* pillars are links into their Evidence pages */
+.constellation figcaption { color: var(--ink-faint); max-width: 40ch; }
+
+/* Hover/focus DOOR affordance — the pillar icon rises + an "open →" cue, so the
+   node reads as an entrance, not just a dot. Hidden until interaction. */
+.constellation .node .door { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
+.constellation .node .door .door-ico { display: block; color: var(--ember); line-height: 0; }
+.constellation .node .door .door-cue { font-family: var(--font-mono); font-size: 8px; fill: var(--ember); text-anchor: middle; letter-spacing: 0.04em; }
 .constellation a { cursor: pointer; }
-.constellation a .node circle { transition: r var(--dur-fast), stroke var(--dur-fast); }
+.constellation a:hover .node .door, .constellation a:focus-visible .node .door { opacity: 1; }
 .constellation a:hover .node circle, .constellation a:focus-visible .node circle { stroke: var(--ember); stroke-width: 1.5; }
-/* #579 — the node-stroke change alone is too subtle a keyboard-focus signal (small circle,
-   thin stroke); pair it with a real ring around the hit area. */
+.constellation a:hover .node .nlabel { fill: var(--ink); opacity: 1; }
+/* #579 — a real focus ring around the hit area (the thin-stroke change alone is too subtle). */
 .constellation a:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; border-radius: 50%; }
-.constellation a:hover .node text { fill: var(--ink); }
+
+/* inline legend keys in the caption */
+.cn-key { position: relative; padding-left: 1.6em; white-space: nowrap; }
+.cn-key::before { content: ""; position: absolute; left: 0; top: 0.5em; width: 1.2em; height: 0; }
+.cn-key-pos::before { border-top: 2px solid var(--ember); }
+.cn-key-neg::before { border-top: 1.5px dashed var(--ink-faint); }
 
 /* per-beat "go deeper" link into the rest of the site */
 .beat-deeper { margin-top: var(--sp-5); }
@@ -145,17 +170,18 @@ body { overflow-x: hidden; }
 
 /* Waveform — honest down-beats in muted ink, never alarm-red */
 .waveform { margin-top: var(--sp-5); }
-.wave { position: relative; display: flex; align-items: flex-end; gap: 2px; height: clamp(96px, 38vw, 160px); width: 100%; }
+.wave { position: relative; height: clamp(96px, 38vw, 160px); width: 100%; }
+/* #590 — the bars live in a fresh inner node that carries the shared data-cpts contract,
+   so motion.js wires ONE focus dot + tooltip + keyboard path (the bespoke cursor-tooltip is gone). */
+.wave .wave-cpts { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 2px; width: 100%; height: 100%; touch-action: pan-y; }
 .wave .bar { flex: 1; min-width: 2px; border-radius: 1px 1px 0 0; background: var(--ink-faint); transition: height var(--dur-slow) var(--ease-out), filter 0.14s var(--ease-out), transform 0.14s var(--ease-out); transform-origin: bottom; cursor: crosshair; }
 .wave .bar:hover { filter: brightness(1.28); transform: scaleY(1.05); }
 /* Scored bars are anchors into that day's cockpit (/now/?date=) — same box as the
    spans, pointer instead of crosshair, keyboard-visible focus. */
 .wave a.bar { text-decoration: none; cursor: pointer; }
 .wave a.bar:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
-/* cursor-following readout for the interactive waveform */
-.wave-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); white-space: nowrap; pointer-events: none;
-  background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-xs); padding: 2px 8px; color: var(--ink); box-shadow: var(--shadow-soft); z-index: 2; }
-.wave-tip[hidden] { display: none; }
+/* #590: the interactive readout is now the shared .chart-tip / .chart-focus (motion.js),
+   the same tooltip every other chart on the site uses — no bespoke .wave-tip anymore. */
 .wave .bar.up { background: var(--ember); }
 .wave .bar.mid { background: var(--ink-muted); }
 .wave .bar.down { background: var(--ink-faint); opacity: 0.55; box-shadow: inset 0 -2px 0 0 var(--ink-muted); }

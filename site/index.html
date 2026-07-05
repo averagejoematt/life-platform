@@ -92,11 +92,14 @@
           <g data-nodes></g>
         </svg>
         <figcaption id="constellation-desc" class="label">
-          <!-- #407: the numbers get a scale — a low score reads "early", not "alarming". -->
+          <!-- #590: edges are MEASURED co-movement, not a hand-drawn guess. #407: node size = score. -->
           <span class="const-legend" aria-hidden="true"><i class="cl-dot cl-sm"></i>low<i class="cl-dot cl-lg"></i>high</span>
-          The seven pillars, each scored <strong>out of 100</strong> — node size tracks the score,
-          so a small node is a low score (a young experiment starts low), not a broken one.
-          Joined by how they move each other. Ember = climbing. <strong>Tap a pillar to open its evidence.</strong>
+          Seven pillars, each scored <strong>out of 100</strong> — node size tracks the score (small = low, a young
+          experiment starts low, not broken). The lines are <strong>real co-movement</strong><span data-bind="const-window"></span>:
+          a <span class="cn-key cn-key-pos">solid ember line</span> means two pillars <strong>rise and fall together</strong>,
+          a <span class="cn-key cn-key-neg">dashed line</span> means they <strong>trade off</strong>; thin or faint lines are
+          weak or few-day couplings. A pillar with no lines isn't yet coupled in the data.
+          <strong>Tap a pillar to open its evidence.</strong>
         </figcaption>
       </figure>
     </div>
