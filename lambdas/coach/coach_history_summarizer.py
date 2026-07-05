@@ -12,9 +12,10 @@ For each coach:
   4. Read CONFIDENCE# records for all subdomains
   5. Read current RELATIONSHIP#state
   6. Read current VOICE#state
-  7. Query newest INTERACTION# records (#531: public board Q&A write-back)
-  8. Call Haiku to compress into ~500-token summary
-  9. Write to COACH#{coach_id} / COMPRESSED#latest
+  7. Query newest INTERACTION# records (#531: board Q&A; #533: field-note pushback)
+  8. Query newest resolved LEARNING# records (#533: prediction outcomes)
+  9. Call Haiku to compress into ~500-token summary
+  10. Write to COACH#{coach_id} / COMPRESSED#latest
 
 DynamoDB patterns:
   PK=COACH#{coach_id}  SK=OUTPUT#*
@@ -23,7 +24,8 @@ DynamoDB patterns:
   PK=COACH#{coach_id}  SK=CONFIDENCE#*
   PK=COACH#{coach_id}  SK=RELATIONSHIP#state
   PK=COACH#{coach_id}  SK=VOICE#state
-  PK=COACH#{coach_id}  SK=INTERACTION#*  (#531: board Q&A episodic records)
+  PK=COACH#{coach_id}  SK=INTERACTION#*  (#531: board Q&A; #533: field-note pushback, episodic)
+  PK=COACH#{coach_id}  SK=LEARNING#*  (#533: resolved prediction outcomes, read-only fold-in)
   PK=COACH#{coach_id}  SK=COMPRESSED#latest  (output)
 
 Schedule: Weekly (Sunday 6:00 AM PT / 14:00 UTC via EventBridge)
@@ -122,7 +124,14 @@ MAX_COMPRESSION_INPUT_CHARS = 24_000  # ≈6k tokens — well inside Haiku's bud
 MIN_WINDOW_FLOOR = 5  # the budget guard never shrinks a window below this
 # #531: newest public-board Q&A records (INTERACTION#, written by site-api-ai)
 # folded into the weekly compression so board answers enter the coach's memory.
+# #533: the same SK also carries field-note pushback (broadcast by
+# mcp/tools_lifestyle.tool_log_field_note_response) — one shared window covers both.
 MAX_INTERACTIONS_IN_PROMPT = 10
+# #533: newest resolved LEARNING# records (written by coach_prediction_evaluator)
+# folded in read-only — no new write path, this just plumbs an existing record
+# type into the compression the coach already sees, so it can reference specific
+# calls it got right or wrong instead of only unresolved pending predictions.
+MAX_LEARNING_IN_PROMPT = 10
 
 # CloudWatch metrics
 _cw = boto3.client("cloudwatch", region_name=REGION)
@@ -403,6 +412,14 @@ def _gather_coach_state(coach_id):
     interactions = _query_begins_with(coach_pk, "INTERACTION#", scan_forward=False, limit=MAX_INTERACTIONS_IN_PROMPT)
     logger.info("Fetched %d INTERACTION# records for %s (window %d)", len(interactions), coach_id, MAX_INTERACTIONS_IN_PROMPT)
 
+    # 8. #533: newest resolved prediction outcomes (LEARNING#, written by
+    # coach_prediction_evaluator) — read-only fold-in, no new write path. The SK
+    # embeds the evaluation date, so a reverse bounded query is a true recency
+    # window; the public track record (which reads LEARNING# independently) is
+    # untouched.
+    learning_outcomes = _gather_learning(coach_id, limit=MAX_LEARNING_IN_PROMPT)
+    logger.info("Fetched %d LEARNING# records for %s (window %d)", len(learning_outcomes), coach_id, MAX_LEARNING_IN_PROMPT)
+
     return {
         "outputs": outputs,
         "open_threads": open_threads,
@@ -413,6 +430,7 @@ def _gather_coach_state(coach_id):
         "relationship_state": relationship_state,
         "voice_state": voice_state,
         "interactions": interactions,
+        "learning_outcomes": learning_outcomes,
     }
 
 
@@ -436,7 +454,11 @@ COMPRESSION_SYSTEM_PROMPT = (
     "- Standing recommendations that remain active\n"
     "- Key concerns the coach is currently monitoring\n"
     "- Notable public reader interactions (board Q&A) — positions the coach took "
-    "publicly, so future outputs can reference and never contradict them\n\n"
+    "publicly, so future outputs can reference and never contradict them\n"
+    "- Matthew's own pushback on the weekly field notes (agreement/disagreement, disputes) — "
+    "so future outputs can acknowledge where he pushed back\n"
+    "- Resolved prediction outcomes — specific calls confirmed or refuted, so future outputs "
+    "can say 'I was right about X' or 'I was wrong about Y' rather than only listing pending calls\n\n"
     "## What to NOT preserve (saves tokens):\n"
     "- Specific daily data values (e.g., 'HRV was 45 on Tuesday')\n"
     "- Full text of prior outputs\n"
@@ -627,20 +649,52 @@ def _build_compression_message(coach_id, state):
 
     # #531: public-board Q&A (episodic) — what the coach told READERS. Folding
     # these in means a board answer becomes part of the coach's one memory.
+    # #533: the same SK/window also carries field-note pushback (Matthew's
+    # agreement/disagreement with the weekly field notes, broadcast to every
+    # coach since a field note isn't attributable to one domain) — branch on
+    # interaction_type so each renders in its own voice.
     interactions = state.get("interactions", [])
     if interactions:
-        parts.append(f"## Reader Interactions ({len(interactions)} newest public board Q&A)")
+        parts.append(f"## Reader Interactions & Field-Note Pushback ({len(interactions)} newest)")
         for it in interactions:
             sk_parts = str(it.get("sk", "")).split("#")
             date = sk_parts[1] if len(sk_parts) > 1 else "unknown"
-            q = str(it.get("question", ""))[:200]
-            a = str(it.get("answer", ""))[:300]
-            flag = "" if it.get("grounded", True) else " [answered with a grounding refusal]"
-            parts.append(f"  - [{date}]{flag} Q: {q}")
-            parts.append(f"    A: {a}")
+            itype = it.get("interaction_type", "board_qa")
+            if itype == "field_note_pushback":
+                agreement = it.get("agreement") or "unspecified"
+                notes = str(it.get("notes", ""))[:300]
+                disputed = it.get("disputed") or []
+                parts.append(f"  - [{date}] Matthew's field-note response ({it.get('week', '?')}, agreement={agreement}): {notes}")
+                if disputed:
+                    parts.append(f"    Disputed: {'; '.join(str(d) for d in disputed[:3])}")
+            else:
+                q = str(it.get("question", ""))[:200]
+                a = str(it.get("answer", ""))[:300]
+                flag = "" if it.get("grounded", True) else " [answered with a grounding refusal]"
+                parts.append(f"  - [{date}]{flag} A reader asked: {q}")
+                parts.append(f"    You answered: {a}")
         parts.append("")
     else:
-        parts.append("## Reader Interactions: NONE")
+        parts.append("## Reader Interactions & Field-Note Pushback: NONE")
+        parts.append("")
+
+    # #533: resolved prediction outcomes (LEARNING# records) — so the coach can
+    # reference a specific call it got right or wrong, not just list pending
+    # predictions. Read-only fold-in of an already-written record type.
+    learning_outcomes = state.get("learning_outcomes", [])
+    if learning_outcomes:
+        parts.append(f"## Prediction Outcomes ({len(learning_outcomes)} newest resolved)")
+        for rec in learning_outcomes:
+            date = rec.get("date") or str(rec.get("sk", "")).replace("LEARNING#", "").split("#")[0]
+            status = str(rec.get("status", "unknown")).upper()
+            subdomain = rec.get("subdomain", "general")
+            metric = rec.get("metric", "")
+            reason = str(rec.get("reason", ""))[:200]
+            metric_bit = f", {metric}" if metric else ""
+            parts.append(f"  - [{date}] {status} ({subdomain}{metric_bit}): {reason}")
+        parts.append("")
+    else:
+        parts.append("## Prediction Outcomes: NONE")
         parts.append("")
 
     parts.append(
@@ -969,7 +1023,11 @@ def _claims_change(text):
 
 
 def _gather_learning(coach_id, limit=40):
-    """Most-recent resolved LEARNING# verdicts (the coach's scored track record)."""
+    """Most-recent resolved LEARNING# verdicts (the coach's scored track record).
+
+    Shared by the stance engine's grounding (below) and, since #533, the main
+    compression gather (_gather_coach_state) — same records, two callers.
+    """
     return _query_begins_with(f"COACH#{coach_id}", "LEARNING#", scan_forward=False, limit=limit)
 
 

@@ -3492,6 +3492,54 @@ def tool_get_field_notes(args):
     return result
 
 
+def _field_note_week_monday(week: str) -> str:
+    """ISO week (YYYY-WNN) -> its Monday date (YYYY-MM-DD), for a date-sortable SK."""
+    year, week_num = int(week[:4]), int(week[6:])
+    return datetime.fromisocalendar(year, week_num, 1).strftime("%Y-%m-%d")
+
+
+def _write_field_note_interactions(week: str, week_label: str, agreement, notes: str, disputed, added: str) -> None:
+    """#533: broadcast Matthew's field-note pushback into every coach's memory.
+
+    A field note is the platform's single cross-domain voice (field_notes_lambda),
+    not attributable to one of the 8 coaches — it has no per-domain breakdown
+    (`ai_domains` is aspirational, never populated). Rather than guess a mapping,
+    Matthew's agreement/disagreement is written as one episodic INTERACTION#
+    record per operational coach (persona_registry.OPERATIONAL_COACH_IDS), so
+    every coach's weekly compression (coach_history_summarizer) can see it —
+    mirroring the #531 board-Q&A write-back, just broadcast instead of per-coach.
+    Content-addressed on the week (not today's date) so re-logging a response
+    for the same week overwrites rather than piling up. Fail-soft per coach: a
+    write failure never affects the saved field-note response."""
+    try:
+        import persona_registry
+
+        coach_ids = persona_registry.OPERATIONAL_COACH_IDS
+    except Exception as e:
+        logger.warning(f"[field_notes] persona_registry unavailable for interaction write-back (non-fatal): {e}")
+        return
+
+    monday = _field_note_week_monday(week)
+    now = datetime.now(timezone.utc).isoformat()
+    item_base = {
+        "sk": f"INTERACTION#{monday}#fieldnote-{week}",
+        "interaction_type": "field_note_pushback",
+        "channel": "field_notes",
+        "week": week,
+        "week_label": week_label,
+        "agreement": agreement,
+        "notes": notes[:500],
+        "disputed": list(disputed)[:6] if disputed else [],
+        "added": (added or "")[:300],
+        "created_at": now,
+    }
+    for coach_id in coach_ids:
+        try:
+            table.put_item(Item={"pk": f"COACH#{coach_id}", **item_base})
+        except Exception as e:
+            logger.warning(f"[field_notes] interaction write-back failed for {coach_id} (non-fatal): {e}")
+
+
 def tool_log_field_note_response(args):
     """Write Matthew's response to the right page of a Field Notes entry.
 
@@ -3549,6 +3597,16 @@ def tool_log_field_note_response(args):
     )
 
     week_label = existing.get("week_label", week)
+
+    # #533: fold this pushback into every coach's episodic memory. The helper
+    # already fails soft per-coach; this outer guard makes the promise absolute —
+    # the saved field-note response (the actual product feature) must never fail
+    # because of a bug in the write-back path.
+    try:
+        _write_field_note_interactions(week, week_label, agreement, notes, disputed, added)
+    except Exception as e:
+        logger.warning(f"[field_notes] interaction write-back skipped for {week} (non-fatal): {e}")
+
     word_count = len(notes.split())
     ai_preview = (existing.get("ai_present") or "")[:80]
 
