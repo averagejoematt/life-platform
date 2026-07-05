@@ -519,6 +519,41 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .pc-rung { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
 .pc-bet { display: block; margin-top: var(--sp-2); color: var(--ink-muted); font-style: italic; line-height: 1.5; }
 .pc-bet strong { color: var(--ember); font-style: normal; }
+
+/* ── Uncertainty-first visual language (#551) — the confidence grammar ────────────
+   The site's real intervals (block-bootstrap CIs) and real sample sizes rendered as a
+   first-class visual primitive. ONE hue (ember), never red; band opacity + edge treatment
+   carry the message. HIGH = defined + tight, MEDIUM = wider + dashed edge, LOW = no band. */
+:root {
+  --band-fill-hi:  color-mix(in oklch, var(--ember) 14%, transparent);
+  --band-fill-med: color-mix(in oklch, var(--ember) 8%, transparent);
+  --band-edge-hi:  color-mix(in oklch, var(--ember) 52%, transparent);
+  --band-edge-med: color-mix(in oklch, var(--ember) 30%, transparent);
+}
+/* Projection FAN — the widening band is the real slope CI; edge treatment by confidence. */
+.pc-cone.cf-high { fill: var(--band-fill-hi); stroke: var(--band-edge-hi); stroke-width: 0.6; }
+.pc-cone.cf-med  { fill: var(--band-fill-med); stroke: var(--band-edge-med); stroke-width: 0.6; stroke-dasharray: 3 3; }
+.pc-cone.cf-low  { fill: none; stroke: none; }   /* low ⇒ no band drawn at all (honest) */
+/* Sample-size DOTS — n as a dot row; the grammar tints it (many = solid ember, few = faint). */
+.ndots { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
+.ndot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: 0.9; flex: 0 0 auto; }
+.ndots.cf-high { color: var(--ember); }
+.ndots.cf-med  { color: var(--ink-muted); }
+.ndots.cf-low, .ndots--none { color: var(--ink-faint); }
+.ndots-more { font-size: 0.62rem; margin-left: 2px; opacity: 0.8; }
+.ndots-n { font-size: 0.62rem; margin-left: 5px; color: var(--ink-faint); }
+.corr-n { white-space: nowrap; }
+/* CI whisker — a point estimate + its real interval on an auto-scaled rail; faint zero ref. */
+.ciw-fig { margin: var(--sp-2) 0 0; }
+.ciw-wrap { position: relative; height: 40px; margin-top: var(--sp-2); }
+.ciw-rule { position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--rule); }
+.ciw-zero { position: absolute; top: 28%; height: 44%; width: 1px; background: var(--ink-faint); }
+.ciw-band { position: absolute; top: 50%; transform: translateY(-50%); height: 13px; border-radius: 7px; }
+.ciw-band.cf-high { background: var(--band-fill-hi); border: 1px solid var(--band-edge-hi); }
+.ciw-band.cf-med  { background: var(--band-fill-med); border: 1px dashed var(--band-edge-med); }
+.ciw-band.cf-low  { background: none; }
+.ciw-dot { position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--ember); }
+.ciw-dot.cf-low { background: var(--ink-muted); }
 /* P0.7 — BMI, de-emphasized: muted, small, never ember. The caption does the talking. */
 .rd-bmi { margin: var(--sp-2) 0 0; display: flex; align-items: baseline; gap: var(--sp-2); }
 .rd-bmi-v { font-size: var(--fs-h3, 1.5rem); color: var(--ink-muted); }

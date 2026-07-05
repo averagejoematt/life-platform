@@ -148,8 +148,30 @@ goes before the page's main module script. The three builders inject both (evide
 shells); the hand-authored Home + Cockpit have them inline.
 
 ### Headroom (not yet done)
-Only `lineChart` is interactive — `barChart`/`dualLineChart`/rings/scatters are not yet. The identity
-swing was kept deliberately restrained.
+Every SVG/div chart is now interactive (`data-cpts`, #582). The identity swing was kept deliberately restrained.
+
+---
+
+## 7a. The confidence grammar — uncertainty as a first-class visual (ADR-105, #551)
+
+The rigor backend produces **real** intervals (block-bootstrap CIs), **real** sample sizes (overlapping-day `n`), and graded forecasts. Most 2026 health products hide all of it; here it is drawn, honestly — *uncertainty rendered beautifully is the "ahead of its time" look*. Source: three reusable helpers in `charts.js`, tokens in `tokens.css` (the `--band-*` set + the `.cf-*` classes).
+
+**The one grammar, read the same on every chart** (`confLevel(...)` in `charts.js` maps a real input — CI width, `n`, or a `provisional` flag — to a level):
+
+| level | when | visual treatment |
+|---|---|---|
+| **HIGH** | tight CI (≤0.5 of the estimate), or `n ≥ 21`, or stated confidence ≥ 0.8 | a **defined, tight** band (solid ember edge) / a **solid ember** dot row — trust it |
+| **MEDIUM** | wider CI, or `n ≥ 8`, or confidence ≥ 0.5 | a **wider, dashed-edge** band / a **muted** dot row — directional |
+| **LOW** | provisional, very wide, or `n < 8` | **NO band at all** — the point is drawn honestly, never a fabricated spread |
+
+**ONE hue (ember), never red.** Band opacity + edge treatment carry the message; the width *is* the interval.
+
+**The three primitives (all bind to REAL data — the hard rule):**
+- **Fan chart** — `projectionCone(...)`, extended so the widening band's edges are the real block-bootstrap slope CI (`weekly_rate_ci_low/high`) and the dated "bet" is the backend's own goal-date **range** (`projected_goal_date_earliest/latest`), not a point. Open-ended slow bound ⇒ the slow edge holds flat (goal not guaranteed at this trajectory), honestly. *Applied: the weight projection (`/data/physical/`).*
+- **CI band / whisker** — `ciWhisker(value, lo, hi, …)`: a point estimate with its real interval on an auto-scaled rail + a faint **zero reference** so "the interval crosses zero → the direction isn't established" reads at a glance. *Applied: the weekly-rate forecast (`/data/physical/`).*
+- **Sample-size dots** — `nDots(n, …)`: `n` as a row of dots so the reader **sees** the evidence weight, not just a number. Real overlapping-day `n` only, never padded. *Applied: the Discoveries correlations + the intelligence correlation matrix.*
+
+**The honest fallback is the whole point:** where an interval isn't available, draw the **point**, not a guessed band (the LOW treatment). A fabricated spread to look sophisticated is exactly the "AI-template gloss" the earned-glow rule forbids.
 
 ---
 
