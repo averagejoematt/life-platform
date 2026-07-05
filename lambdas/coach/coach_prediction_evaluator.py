@@ -1083,9 +1083,9 @@ def _evaluate_all(predictions, today_str):
 
 STANCE_EVENT_REFRESH_DAILY_CAP = 2  # epic #526 Budget: "Capped Haiku calls (≤2/day platform-wide)"
 
+from ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
 from budget_guard import allow as _budget_allow  # noqa: E402
 from sick_day_checker import check_sick_day  # noqa: E402
-from ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
 
 # physical_coach owns both sick-day onset and weight-milestone crossings (see
 # the docstring above); mind_coach owns vice-streak relapses.

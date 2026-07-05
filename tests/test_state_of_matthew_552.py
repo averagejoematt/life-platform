@@ -32,7 +32,6 @@ import bedrock_client  # noqa: E402
 import budget_guard  # noqa: E402
 import state_of_matthew_lambda as eng  # noqa: E402
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ─────────────────────────────────────────────────────────────────────────────

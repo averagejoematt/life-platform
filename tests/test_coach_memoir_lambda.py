@@ -32,7 +32,6 @@ import persona_registry  # noqa: E402
 from boto3.dynamodb.conditions import AttributeBase  # noqa: E402
 from compute import coach_memoir_lambda as writer  # noqa: E402
 
-
 # ── A real (small) DynamoDB query evaluator, not a stub — the quarter-window
 # math is exactly what this feature depends on, so it needs to be exercised. ──
 
