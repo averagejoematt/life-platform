@@ -184,6 +184,14 @@ PAGE_BINDINGS = [
         "story_intent": "who this is and why — the premise and the promise",
         "endpoints": [],  # editorial
     },
+    {
+        "path": "/story/agents/",
+        "name": "Story · the agents",
+        "door": "story",
+        "narrative_order": 6.5,
+        "story_intent": "the honesty machinery made visible — the watchdog agents policing the platform's own AI, and a weekly readout of what they caught (#399)",
+        "endpoints": [{"url": "/api/agent_activity", "role": "primary", "metrics": []}],
+    },
     # Door 4 "The Coaching" (/coaching/) — promoted out of Story (2026-06-20). narrative_order
     # keeps it story-adjacent (7.x via 71-73 to avoid renumbering the evidence block at 10-22).
     {

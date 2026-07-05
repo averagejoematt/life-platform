@@ -54,6 +54,8 @@ from boto3.dynamodb.conditions import Key
 # shared layer
 from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
+from web.site_api_agents import handle_agent_activity
+
 from web.site_api_autonomic import (
     handle_autonomic_balance,
     handle_zone2_breakdown,
@@ -629,6 +631,12 @@ def lambda_handler(event, context):
     if path == "/api/observatory_week":
         qs = event.get("queryStringParameters") or {}
         return handle_observatory_week(qs)
+
+    # #399: Agents Showcase — roster + dated weekly Agent Activity feed, sourced
+    # purely from existing watchdog artifacts (coherence-log/, ai-canary-log/,
+    # remediation-log/). Read-only, content-filtered. Optional ?week=YYYY-MM-DD.
+    if path == "/api/agent_activity":
+        return handle_agent_activity(event)
 
     # BL-04: Field Notes (GET with optional ?week= query param)
     if path == "/api/field_notes":

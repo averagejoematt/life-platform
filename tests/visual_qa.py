@@ -152,6 +152,11 @@ PAGES = [
         "name": "Story · about",
         "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}],
     },
+    {
+        "path": "/story/agents/",
+        "name": "Story · the agents",
+        "checks": [{"selector": "[data-roster], .agent-card, [data-feed]", "not_empty": True, "desc": "agent roster + feed"}],
+    },
     # NB: "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20);
     # their page defs now live in the PAGES.extend([...]) Coaching block below.
     {
