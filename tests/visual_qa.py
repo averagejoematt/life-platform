@@ -35,6 +35,35 @@ from datetime import datetime, timezone
 
 SITE_URL = "https://averagejoematt.com"
 
+# ── Performance budgets (#580) ─────────────────────────────────────────────────
+# Baselines measured 2026-07-05 against production (headless Chromium, single run,
+# 33 swept pages): LCP 72-1136ms (p90 984ms), CLS 0.059-0.614 (p90 0.570), total
+# JS 119-408KB/page. Budgets below carry headroom over that observed max so CI
+# network jitter doesn't flake the gate, while still catching a real regression.
+# See docs/DESIGN_SYSTEM_V5.md "Performance budget" for the full writeup — update
+# both places if the numbers move.
+LCP_BUDGET_MS = 2500  # ~2.2x the observed baseline max (1136ms)
+CLS_BUDGET = 0.75  # ~1.2x the observed baseline max (0.614); the high current
+# baseline is async data-render shifting layout as "··" placeholders resolve —
+# a known characteristic, not something this issue fixes (see docs note).
+JS_BYTES_SOFT_BUDGET = 550_000  # ~1.35x the observed baseline max (408KB); soft
+# (warning only) — the site's largest page type (data/method/protocols, which
+# share evidence.js) sets the ceiling other page types have plenty of room under.
+
+_PERF_INIT_SCRIPT = """
+window.__perf = {lcp: 0, cls: 0};
+try {
+    new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) { window.__perf.lcp = e.renderTime || e.loadTime || e.startTime; }
+    }).observe({type: 'largest-contentful-paint', buffered: true});
+} catch (e) {}
+try {
+    new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) { if (!e.hadRecentInput) window.__perf.cls += e.value; }
+    }).observe({type: 'layout-shift', buffered: true});
+} catch (e) {}
+"""
+
 # Topics whose readout is expected to include at least one inline-SVG chart.
 # (Others are tables/cards — and even chart topics legitimately show an honest
 # "N readings so far" text instead of a chart when data is sparse, per
@@ -413,16 +442,27 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     can reuse identical capture without forking the gating visual-qa harness.
     """
     page = context.new_page()
+    page.add_init_script(_PERF_INIT_SCRIPT)
     path, name = page_def["path"], page_def["name"]
     issues, warnings, js_errors, failed_responses, shots = [], [], [], [], []
+    perf_result = {"lcp_ms": None, "cls": None, "js_bytes": 0}
+    _js_bytes = [0]  # mutable box (perf_js_bytes) — total JS response bytes for the page
 
     _noncrit = ["favicon", "sub_count", "subscriber_count"]
     page.on("console", lambda m: js_errors.append(m.text) if m.type == "error" and not any(nc in m.text for nc in _noncrit) else None)
     page.on("pageerror", lambda err: js_errors.append(str(err)))
-    page.on(
-        "response",
-        lambda r: (failed_responses.append((r.status, r.url)) if r.status >= 400 and not any(nc in r.url for nc in _noncrit) else None),
-    )
+
+    def _on_response(r):
+        if r.status >= 400 and not any(nc in r.url for nc in _noncrit):
+            failed_responses.append((r.status, r.url))
+        try:
+            ct = r.headers.get("content-type", "")
+            if r.url.endswith(".js") or "javascript" in ct:
+                _js_bytes[0] += len(r.body())
+        except Exception:
+            pass  # opaque/redirected/aborted responses — skip, don't fail the sweep over it
+
+    page.on("response", _on_response)
 
     try:
         nav = _navigate_with_fallback(page, f"{SITE_URL}{path}")
@@ -438,6 +478,26 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                 page.wait_for_selector(wait_for, state="visible", timeout=8000)
             except Exception:
                 issues.append(f"Container '{wait_for}' never became visible")
+
+        # ── performance budget: LCP + CLS (#580) ──
+        # Read before _scroll_and_reveal's synthetic scrolling runs, so this reflects
+        # what a real visitor's browser reports for natural page load — not our own
+        # forced scroll/reveal. A short settle wait lets async data-driven re-renders
+        # (the site's "·· -> real number" pattern) mostly finish, same as how a real
+        # LCP/CLS measurement window works.
+        page.wait_for_timeout(600)
+        try:
+            _perf = page.evaluate("() => window.__perf") or {}
+        except Exception:
+            _perf = {}
+        lcp_ms = _perf.get("lcp") or None
+        cls = _perf.get("cls")
+        perf_result["lcp_ms"] = round(lcp_ms, 1) if lcp_ms else None
+        perf_result["cls"] = round(cls, 4) if cls is not None else None
+        if lcp_ms and lcp_ms > LCP_BUDGET_MS:
+            issues.append(f"LCP {lcp_ms:.0f}ms exceeds budget {LCP_BUDGET_MS}ms")
+        if cls is not None and cls > CLS_BUDGET:
+            issues.append(f"CLS {cls:.3f} exceeds budget {CLS_BUDGET}")
 
         _scroll_and_reveal(page)
 
@@ -562,6 +622,10 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         if str(e) not in ("auth_failed", "nav_failed"):
             issues.append(f"Page load failed: {e}")
 
+    perf_result["js_bytes"] = _js_bytes[0]
+    if _js_bytes[0] > JS_BYTES_SOFT_BUDGET:
+        warnings.append(f"Total JS {_js_bytes[0] // 1024}KB exceeds soft budget {JS_BYTES_SOFT_BUDGET // 1024}KB")
+
     page.close()
     return {
         "page": name,
@@ -570,6 +634,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         "issues": issues,
         "warnings": warnings,
         "screenshots": shots,
+        "perf": perf_result,
     }
 
 
