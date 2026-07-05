@@ -1,0 +1,189 @@
+{
+  "_meta": {
+    "generated_by": "scripts/render_portraits.py",
+    "note": "Signed coach portraits rasterized to ink-on-transparent PNGs (#593, ADR-106). Do not hand-edit.",
+    "url_base": "/assets/portraits/"
+  },
+  "portraits": {
+    "amara_patel": {
+      "files": [
+        "amara_patel-96-ondark.png",
+        "amara_patel-96-onlight.png",
+        "amara_patel-192-ondark.png",
+        "amara_patel-192-onlight.png"
+      ],
+      "hash": "0b502f559b446547",
+      "name": "Dr. Amara Patel",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "elena_voss": {
+      "files": [
+        "elena_voss-96-ondark.png",
+        "elena_voss-96-onlight.png",
+        "elena_voss-192-ondark.png",
+        "elena_voss-192-onlight.png"
+      ],
+      "hash": "54778f22230bfd1d",
+      "name": "Elena Voss",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "eli_marsh": {
+      "files": [
+        "eli_marsh-96-ondark.png",
+        "eli_marsh-96-onlight.png",
+        "eli_marsh-192-ondark.png",
+        "eli_marsh-192-onlight.png"
+      ],
+      "hash": "b105bc369af02ca1",
+      "name": "Dr. Eli Marsh",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "henning_brandt": {
+      "files": [
+        "henning_brandt-96-ondark.png",
+        "henning_brandt-96-onlight.png",
+        "henning_brandt-192-ondark.png",
+        "henning_brandt-192-onlight.png"
+      ],
+      "hash": "4951167ed7847755",
+      "name": "Dr. Henning Brandt",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "james_okafor": {
+      "files": [
+        "james_okafor-96-ondark.png",
+        "james_okafor-96-onlight.png",
+        "james_okafor-192-ondark.png",
+        "james_okafor-192-onlight.png"
+      ],
+      "hash": "589e05484dfc33af",
+      "name": "Dr. James Okafor",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "lisa_park": {
+      "files": [
+        "lisa_park-96-ondark.png",
+        "lisa_park-96-onlight.png",
+        "lisa_park-192-ondark.png",
+        "lisa_park-192-onlight.png"
+      ],
+      "hash": "a03be2da37533cec",
+      "name": "Dr. Lisa Park",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "marcus_webb": {
+      "files": [
+        "marcus_webb-96-ondark.png",
+        "marcus_webb-96-onlight.png",
+        "marcus_webb-192-ondark.png",
+        "marcus_webb-192-onlight.png"
+      ],
+      "hash": "29aaa2d72a61ff9a",
+      "name": "Dr. Marcus Webb",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "nathan_reeves": {
+      "files": [
+        "nathan_reeves-96-ondark.png",
+        "nathan_reeves-96-onlight.png",
+        "nathan_reeves-192-ondark.png",
+        "nathan_reeves-192-onlight.png"
+      ],
+      "hash": "97d091da1e206814",
+      "name": "Dr. Nathan Reeves",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "sarah_chen": {
+      "files": [
+        "sarah_chen-96-ondark.png",
+        "sarah_chen-96-onlight.png",
+        "sarah_chen-192-ondark.png",
+        "sarah_chen-192-onlight.png"
+      ],
+      "hash": "4656297dac255be9",
+      "name": "Dr. Sarah Chen",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    },
+    "victor_reyes": {
+      "files": [
+        "victor_reyes-96-ondark.png",
+        "victor_reyes-96-onlight.png",
+        "victor_reyes-192-ondark.png",
+        "victor_reyes-192-onlight.png"
+      ],
+      "hash": "1069ad7f01b57222",
+      "name": "Dr. Victor Reyes",
+      "sizes": [
+        96,
+        192
+      ],
+      "themes": [
+        "ondark",
+        "onlight"
+      ]
+    }
+  }
+}
