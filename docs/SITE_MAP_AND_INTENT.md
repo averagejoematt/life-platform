@@ -78,6 +78,11 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
   the methodology, the character-level explainer (linked from cockpit + timeline).
 - **Good looks like:** a skeptic comes away trusting the machine *because* it shows its failures.
 - **Files:** `evidence.js`, `v4_build_evidence.py` (EDITORIAL dict for authored pages).
+- **The Methods Registry** (`/method/registry/`, #544) is a deliberately standalone sibling —
+  every stat's formula/window/limitations, generated from `lambdas/methods_registry.py` (also
+  served machine-readably at `/api/methods`). Built by `scripts/v4_build_methods.py`, its own
+  static HTML with no `evidence.js` dependency, so it ships independently of the evidence-engine
+  refactor (#581). Extend the registry (not this page's markup) when a new stat needs documenting.
 
 ### Utility pages
 - `/subscribe/` (+ `/confirm/`) — double-opt-in follow-by-email. `/privacy/` — policy + AI disclaimer. `/404.html`. `/legacy/*` — the preserved v3 site (private rollback, never linked).

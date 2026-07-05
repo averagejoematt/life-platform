@@ -24,7 +24,13 @@ cp "$ROOT"/lambdas/web/*.py /tmp/siteapi/web/
 # resolves at runtime (numeric/retry_utils come from the shared layer).
 cp -r "$ROOT"/lambdas/reading /tmp/siteapi/reading
 rm -rf /tmp/siteapi/reading/__pycache__
-( cd /tmp/siteapi && zip -rq /tmp/siteapi.zip web/ reading/ -x '*__pycache__*' '*.pyc' )
+# #544: methods_registry.py has exactly one Lambda consumer (site-api's /api/methods) —
+# not shared-layer-worthy (the layer is for multi-Lambda-shared modules, ADR/convention
+# matching vacation_fund.py's "shared by MCP, site-api, daily-brief" bar). Stage it as a
+# top-level sibling instead; its own `import calibration_core`/`import stats_core` still
+# resolve fine at runtime because those ARE layer modules already attached to site-api.
+cp "$ROOT"/lambdas/methods_registry.py /tmp/siteapi/methods_registry.py
+( cd /tmp/siteapi && zip -rq /tmp/siteapi.zip web/ reading/ methods_registry.py -x '*__pycache__*' '*.pyc' )
 
 echo "→ Deploying $FN …"
 aws lambda update-function-code --function-name "$FN" \

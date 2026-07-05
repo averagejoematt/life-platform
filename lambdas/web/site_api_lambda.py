@@ -272,6 +272,28 @@ def handle_vacation_fund() -> dict:
         return _error(500, "vacation fund unavailable")
 
 
+def handle_methods() -> dict:
+    """GET /api/methods — the auto-generated statistics registry (#544, ADR-105).
+
+    Pure and deterministic: no DB/S3 reads, just the in-code registry (formula, window,
+    limitations, source module) that also renders the public /method/registry/ page —
+    same source, two surfaces. Long cache TTL since the registry only changes on deploy.
+    """
+    try:
+        from methods_registry import list_categories, list_stats
+
+        return _ok(
+            {
+                "stats": list_stats(),
+                "categories": list_categories(),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.error(f"[site_api] /api/methods failed: {e}")
+        return _error(500, "methods registry unavailable")
+
+
 ROUTES = {
     "/api/vitals": handle_vitals,
     "/api/reading_shelf": handle_reading_shelf,  # Mind pillar (ADR-097) — public shelf
@@ -279,6 +301,7 @@ ROUTES = {
     "/api/constellation": handle_constellation,  # Mind pillar (Phase E) — the idea-graph signature
     "/api/journey": handle_journey,
     "/api/vacation_fund": handle_vacation_fund,
+    "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
     "/api/status": handle_status,
     "/api/status/summary": handle_status_summary,
