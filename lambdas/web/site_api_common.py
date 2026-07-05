@@ -116,7 +116,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 15,
     "site_pages": 77,
-    "test_count": 1912,
+    "test_count": 1920,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
