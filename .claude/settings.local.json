@@ -15,7 +15,14 @@
       "mcp__life-platform__get_deficit_sustainability",
       "mcp__life-platform__get_coach_track_record",
       "Skill(artifact-design)",
-      "Artifact"
+      "Artifact",
+      "WebFetch(domain:developer.whoop.com)",
+      "WebFetch(domain:developer.todoist.com)",
+      "Bash(mv .git/hooks/pre-commit .git/hooks/pre-commit.disabled)",
+      "Bash(git checkout *)",
+      "Bash(python3 deploy/sync_doc_metadata.py --apply)",
+      "Bash(mv .git/hooks/pre-commit.disabled .git/hooks/pre-commit)",
+      "Bash(black lambdas/ mcp/ cdk/ tests/ scripts/ deploy/)"
     ]
   },
   "enableAllProjectMcpServers": true,

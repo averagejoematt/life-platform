@@ -55,7 +55,6 @@ from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
 from web.site_api_agents import handle_agent_activity
-
 from web.site_api_autonomic import (
     handle_autonomic_balance,
     handle_zone2_breakdown,
