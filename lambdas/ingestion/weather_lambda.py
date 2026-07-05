@@ -27,6 +27,11 @@ except ImportError:
 
     logger = logging.getLogger("weather-ingestion")
 
+try:
+    from http_retry import urlopen_with_retry
+except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+    urlopen_with_retry = urllib.request.urlopen
+
 # ── Seattle coordinates ──
 LAT = float(os.environ.get("WEATHER_LAT", "47.6062"))
 LON = float(os.environ.get("WEATHER_LON", "-122.3321"))
@@ -64,7 +69,10 @@ def authenticate(secret_data):
 
 
 def fetch_day(creds, date_str):
-    """Fetch a single day from the Open-Meteo archive API."""
+    """Fetch a single day from the Open-Meteo archive API.
+
+    #501/X-11: on the shared retry policy (3 attempts, 2s/8s backoff on
+    429/5xx and network errors) — was a bare, unretried urlopen."""
     url = (
         f"https://archive-api.open-meteo.com/v1/archive?"
         f"latitude={LAT}&longitude={LON}"
@@ -74,7 +82,7 @@ def fetch_day(creds, date_str):
         f"&precipitation_unit=mm&timezone=America/Los_Angeles"
     )
     req = urllib.request.Request(url, headers={"User-Agent": "life-platform/1.0"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
+    with urlopen_with_retry(req, timeout=15) as resp:
         return json.loads(resp.read().decode())
 
 

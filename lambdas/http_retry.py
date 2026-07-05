@@ -18,6 +18,12 @@ Retry policy:
   - Retryable network errors: URLError (timeout, connection reset)
   - 4xx auth failures (401, 403) raise IMMEDIATELY — no point retrying;
     the auth_breaker pattern handles those
+
+Non-idempotent callers (#501/X-11): pass max_attempts=1 to disable retry
+entirely while still going through this same buffered-response path — e.g. a
+POST/PUT whose 5xx might mean "the write actually landed," where a blind
+retry risks a duplicate create. The 401/403-raises-immediately behavior is
+unchanged either way; only the retry count is capped.
 """
 
 from __future__ import annotations
@@ -58,13 +64,16 @@ class _ResponseWrapper:
         return False
 
 
-def urlopen_with_retry(req, timeout: int = 30):
+def urlopen_with_retry(req, timeout: int = 30, max_attempts: int | None = None):
     """Drop-in replacement for urllib.request.urlopen with retry on transient errors.
 
     Returns a context-manager wrapping a buffered response (so .read() can be
     called inside the `with` block, same as urlopen).
+
+    max_attempts: override the default attempt count (3). Pass 1 to disable
+    retry for non-idempotent requests (see module docstring).
     """
-    max_attempts = len(_BACKOFF_DELAYS) + 1
+    max_attempts = max_attempts if max_attempts is not None else len(_BACKOFF_DELAYS) + 1
     last_exc = None
 
     for attempt in range(1, max_attempts + 1):
@@ -76,7 +85,7 @@ def urlopen_with_retry(req, timeout: int = 30):
         except urllib.error.HTTPError as e:
             last_exc = e
             if e.code in _RETRYABLE_HTTP and attempt < max_attempts:
-                delay = _BACKOFF_DELAYS[attempt - 1]
+                delay = _BACKOFF_DELAYS[min(attempt - 1, len(_BACKOFF_DELAYS) - 1)]
                 _logger.warning("http_retry HTTP %d attempt %d/%d — retry in %ds", e.code, attempt, max_attempts, delay)
                 time.sleep(delay)
                 continue
@@ -85,7 +94,7 @@ def urlopen_with_retry(req, timeout: int = 30):
         except urllib.error.URLError as e:
             last_exc = e
             if attempt < max_attempts:
-                delay = _BACKOFF_DELAYS[attempt - 1]
+                delay = _BACKOFF_DELAYS[min(attempt - 1, len(_BACKOFF_DELAYS) - 1)]
                 _logger.warning("http_retry network error attempt %d/%d — retry in %ds: %s", attempt, max_attempts, delay, e)
                 time.sleep(delay)
                 continue

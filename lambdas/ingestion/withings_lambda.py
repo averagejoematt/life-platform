@@ -188,6 +188,15 @@ def _parse_measurements(raw_body: dict) -> dict:
 # (matches old behavior where one refresh covered the whole gap-fill loop).
 _secret_cache = {"secret": None}
 
+# Per-invocation: one getmeas range call covers the whole lookback window
+# (#501/B-9 — the framework calls fetch_day once per missing date, which used
+# to mean one getmeas call per date: up to lookback_days+1 calls/run, ~144/day
+# during a weigh-in gap on an hourly cron. The API already accepts a date
+# range, so the first fetch_day call this invocation fetches the whole window
+# and buckets it by UTC date; every subsequent fetch_day call in the same
+# gap-fill loop is served from this cache with zero additional API calls).
+_range_cache: dict = {"window": None, "by_date": {}}
+
 
 def authenticate(secret_data: dict) -> dict:
     """Refresh tokens unconditionally on every cold-Lambda invocation.
@@ -195,27 +204,55 @@ def authenticate(secret_data: dict) -> dict:
     enable_secret_writeback=True so the next invocation reads fresh tokens."""
     refreshed = _refresh_access_token(dict(secret_data))
     _secret_cache["secret"] = refreshed
+    _range_cache["window"] = None  # new invocation — force a fresh range fetch
+    _range_cache["by_date"] = {}
     return refreshed
+
+
+def _fetch_range(secret: dict, start_dt: datetime, end_dt: datetime) -> tuple[dict, dict]:
+    """One getmeas call spanning [start_dt, end_dt); buckets measuregrps by UTC
+    date so each date's bucket has the same shape a per-day fetch used to
+    return. Returns (by_date, possibly-updated secret)."""
+    params = {
+        "action": "getmeas",
+        "meastypes": ",".join(str(k) for k in MEAS_TYPES.keys()),
+        "category": "1",
+        "startdate": int(start_dt.timestamp()),
+        "enddate": int(end_dt.timestamp()),
+    }
+    body, updated_secret = _withings_get(secret, WITHINGS_MEAS_URL, params)
+    by_date: dict = {}
+    for grp in body.get("measuregrps", []):
+        date_str = datetime.fromtimestamp(grp["date"], tz=timezone.utc).strftime("%Y-%m-%d")
+        by_date.setdefault(date_str, {"measuregrps": []})["measuregrps"].append(grp)
+    return by_date, updated_secret
 
 
 def fetch_day(credentials: dict, date_str: str) -> dict | None:
     """Fetch raw measurement groups for the given date. Returns None when the day
     has no weigh-in (framework treats that as 'no_data' — correct behavior; Withings
-    silence ≠ error)."""
+    silence ≠ error). Backed by the per-invocation range cache — see _fetch_range."""
     secret = _secret_cache["secret"] or credentials
     target_dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     day_start = datetime(target_dt.year, target_dt.month, target_dt.day, tzinfo=timezone.utc)
     day_end = day_start + timedelta(days=1)
-    params = {
-        "action": "getmeas",
-        "meastypes": ",".join(str(k) for k in MEAS_TYPES.keys()),
-        "category": "1",
-        "startdate": int(day_start.timestamp()),
-        "enddate": int(day_end.timestamp()),
-    }
-    body, updated_secret = _withings_get(secret, WITHINGS_MEAS_URL, params)
-    _secret_cache["secret"] = updated_secret  # keep cache fresh if refresh happened
-    return body if body.get("measuregrps") else None
+
+    window = _range_cache["window"]
+    if window is None or not (window[0] <= day_start < window[1]):
+        # First fetch_day call this invocation, or a date outside the cached
+        # window (e.g. an explicit date_override backfill older than the
+        # lookback) — widen the fetch to cover it and cache the result.
+        lookback_days = int(os.environ.get("LOOKBACK_DAYS", "7"))
+        now = datetime.now(timezone.utc)
+        fetch_start = min(day_start, now - timedelta(days=lookback_days))
+        fetch_end = max(day_end, now + timedelta(days=1))
+        by_date, updated_secret = _fetch_range(secret, fetch_start, fetch_end)
+        _secret_cache["secret"] = updated_secret  # keep cache fresh if refresh happened
+        _range_cache["by_date"] = by_date
+        _range_cache["window"] = (fetch_start, fetch_end)
+
+    body = _range_cache["by_date"].get(date_str)
+    return body if body and body.get("measuregrps") else None
 
 
 def transform(raw: dict, date_str: str) -> list[dict]:

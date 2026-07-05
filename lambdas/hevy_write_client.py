@@ -106,8 +106,14 @@ def _request(
     data = json.dumps(body).encode("utf-8") if body is not None else None
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     _throttle()
+    # #501/X-11: only idempotent GETs get the full retry policy. A retried
+    # POST/PUT after an ambiguous 5xx (Hevy applied the write, response just
+    # never made it back) risks a duplicate-creation window — those mutations
+    # get exactly one attempt, surfacing HevyRetryable immediately on 429/5xx
+    # instead of silently re-sending the write.
+    max_attempts = None if method == "GET" else 1
     try:
-        with urlopen_with_retry(req, timeout=timeout) as resp:
+        with urlopen_with_retry(req, timeout=timeout, max_attempts=max_attempts) as resp:
             raw = resp.read()
             if not raw:
                 return {}
@@ -116,7 +122,8 @@ def _request(
         if e.code in (401, 403):
             raise HevyAuthError(f"Hevy {method} {path} → {e.code}") from e
         if e.code in (429, 500, 502, 503, 504):
-            raise HevyRetryable(f"Hevy {method} {path} → {e.code} (after retries)") from e
+            suffix = "after retries" if max_attempts is None else "not retried — non-idempotent"
+            raise HevyRetryable(f"Hevy {method} {path} → {e.code} ({suffix})") from e
         raise
 
 

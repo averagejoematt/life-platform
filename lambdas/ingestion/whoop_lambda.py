@@ -41,6 +41,11 @@ except ImportError:
     logger = logging.getLogger("whoop")
     logger.setLevel(logging.INFO)
 
+try:
+    from http_retry import urlopen_with_retry
+except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+    urlopen_with_retry = urllib.request.urlopen
+
 from ingestion_framework import IngestionConfig, run_ingestion
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
@@ -111,7 +116,9 @@ def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str
 
 
 def _fetch_endpoint(access_token: str, endpoint: str, start_dt: str, end_dt: str) -> dict:
-    """3-attempt 2s/8s backoff on 429/5xx; auth failures bubble immediately."""
+    """GET on the shared retry policy (#501/X-11 — converged onto http_retry;
+    3-attempt 2s/8s backoff on 429/5xx and network errors). Auth failures
+    (401/403) still bubble immediately — the auth_breaker pattern handles those."""
     params = urllib.parse.urlencode({"start": start_dt, "end": end_dt, "limit": 25})
     url = f"{WHOOP_API_BASE}/{endpoint}?{params}"
     req = urllib.request.Request(
@@ -119,23 +126,8 @@ def _fetch_endpoint(access_token: str, endpoint: str, start_dt: str, end_dt: str
         method="GET",
         headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "User-Agent": "WhoopIngestion/1.0"},
     )
-    backoff = [2, 8]
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                logger.warning("Whoop /%s HTTP %d — retry in %ds", endpoint, e.code, backoff[attempt])
-                time.sleep(backoff[attempt])
-                continue
-            raise
-        except urllib.error.URLError as e:
-            if attempt < 2:
-                logger.warning("Whoop /%s network error: %s — retry in %ds", endpoint, e.reason, backoff[attempt])
-                time.sleep(backoff[attempt])
-                continue
-            raise
+    with urlopen_with_retry(req, timeout=30) as resp:
+        return json.loads(resp.read())
 
 
 # ── Field extractors (DDB-shape preserved from pre-migration) ────────────────
