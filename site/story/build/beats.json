@@ -136,6 +136,28 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/570"
         }
       ]
+    },
+    {
+      "id": "2026-07-04-forecasts-on-the-record",
+      "date": "2026-07-04",
+      "title": "The platform starts betting on tomorrow — and the coaches start arguing on the record",
+      "shipped": "The platform now predicts its own future, in writing. A daily forecast engine issues frozen next-day and next-week expectations for recovery, sleep, and weight — each with an 80% interval — and when the real day arrives, every forecast grades itself into a permanent calibration ledger. Six forecasts a day are issuing; the first grades land tomorrow. Alongside it: a scenario explorer showing what actually followed days like these, with every thin cell hidden rather than dressed up, and the first genuine inter-coach dispute — the nutrition coach challenged the physical coach's recorded claim on caloric adequacy, each answering the other's actual words, and the rejoinder conceded a real point. Seven stories shipped in the batch; these three are the spine.",
+      "gotcha": "The deploy tooling bit three times in one session, the same way: the single-function hot deploy packages only the handler file, so a lambda importing a sibling module outside the shared layer works locally, passes CI, and dies on its first import in production. The nastiest variant: the deploy system's staged artifact in storage was a half-complete zip sitting under a valid content hash, so every deploy reported 'no changes' while the live function was missing modules — the fix was deleting the artifact itself to force a re-upload.",
+      "honest_miss": "The first live forecast run predicted a 106.1% recovery ceiling — mathematically faithful, physically impossible; intervals now clamp to reality, but it shipped for a day. The scenario explorer's honesty is mostly emptiness: of 40 lever-outcome cells, 38 are hidden because 32 days of this experiment cycle can't support them. And the question the forecasts exist to answer — do the 80% intervals actually cover 80%? — is still unanswerable; the ledger only starts accruing grades tomorrow.",
+      "prs": [
+        {
+          "label": "PR #572",
+          "url": "https://github.com/averagejoematt/life-platform/pull/572"
+        },
+        {
+          "label": "PR #599",
+          "url": "https://github.com/averagejoematt/life-platform/pull/599"
+        },
+        {
+          "label": "PR #602",
+          "url": "https://github.com/averagejoematt/life-platform/pull/602"
+        }
+      ]
     }
   ]
 }
