@@ -29,6 +29,10 @@ import os
 import er03_gate
 import pytest
 
+# #416 / ADR-117: deploy-critical lane (AI-output faithfulness gate — er03_gate wiring
+# + anti-fabrication corpus; a reader-facing honesty contract the running system enforces).
+pytestmark = pytest.mark.deploy_critical
+
 _FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "ai_inputs", "faithfulness_cases.json")
 _LAMBDAS = os.path.join(os.path.dirname(__file__), os.pardir, "lambdas")
 

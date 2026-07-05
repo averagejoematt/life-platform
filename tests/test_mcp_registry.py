@@ -26,6 +26,9 @@ import sys
 
 import pytest
 
+# #416 / ADR-117: deploy-critical lane (MCP registry integrity — every tool wired).
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MCP_DIR = os.path.join(ROOT, "mcp")
 REGISTRY_PATH = os.path.join(MCP_DIR, "registry.py")

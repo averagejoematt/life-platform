@@ -115,6 +115,42 @@ env -u AWS_PROFILE -u AWS_SESSION_TOKEN AWS_ACCESS_KEY_ID=FAKEKEY AWS_SECRET_ACC
 (Never set `AWS_PROFILE=` empty — boto3 raises `ProfileNotFound`; always `env -u`.)
 Source: `reference_ci_masking_and_creds`.
 
+### 4a. The deploy-critical test lane — what gates the deploy (#416, ADR-117)
+
+Since ADR-117, `plan` (and therefore `deploy` + the reader-facing visual-QA gate)
+depends on the **`test-critical`** job — a fast, fully-offline pytest subset — **not**
+the exhaustive `test` suite. The full suite still runs on every push (job `test`,
+parallel), still reds main, and still fires `notify-failure`; it just no longer skips
+the deploy chain. The subset is selected by the **`deploy_critical`** pytest marker
+(registered in `pytest.ini`) and run as `pytest -m "deploy_critical and not integration"`.
+
+**Inclusion criterion (apply it deliberately — don't let the lane rot):** a test is
+`deploy_critical` **iff its failure means the deploy artifact or its wiring is broken,
+or a core honesty/safety contract the running system depends on is violated** — i.e. it
+validates the *deploy contract*, not product/data correctness or AI narrative quality.
+
+**In the lane** (module-level `pytestmark = pytest.mark.deploy_critical`):
+
+| File | What it guards |
+|------|----------------|
+| `test_layer_version_consistency.py` | shared-layer module presence + consumer wiring (the offline half; `test_lv6` is `integration`, excluded) |
+| `test_wiring_coverage.py` | every Lambda wires the required safety modules; every MCP tool registered |
+| `test_mcp_registry.py` | MCP registry integrity |
+| `test_role_policies.py` | static IAM policy correctness (KMS/secret scoping, no wildcards) |
+| `test_iam_secrets_consistency.py` | IAM secret ARNs ↔ known-secrets list |
+| `test_secret_references.py` | Lambda secret-name literals (Todoist-style outage guard) |
+| `test_cdk_handler_consistency.py` | CDK handler names match source modules |
+| `test_cdk_s3_paths.py` | CDK S3 path correctness |
+| `test_ddb_patterns.py` | DynamoDB single-table access-pattern rules |
+| `test_lambda_handlers.py` | handler existence / syntax / signature (I1–I6) |
+| `test_ai_output_faithfulness.py` | deterministic AI-output honesty gate (anti-fabrication / er03_gate wiring) |
+
+**Deliberately excluded** (still run in the full suite, still red main, must **not** gate
+deploy): statistical-rigor tests, narrative/AI-quality judgement, doc-drift, and
+content/data-correctness. Adding a file to the lane = add `pytestmark =
+pytest.mark.deploy_critical` **and** a row here; keep the two in sync. Confirm the lane
+after any change: `python3 -m pytest tests/ -m "deploy_critical and not integration" -q`.
+
 ## 5. The CDK asset-staging trap — a 200 invoke is not proof of a good deploy
 
 A `cdk deploy` can publish a `Code.from_asset` Lambda zip that is **missing every
