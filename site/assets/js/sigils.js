@@ -10,7 +10,9 @@
 const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 // FNV-1a (32-bit) — a stable string hash. Deterministic across browsers/runs.
-function fnv1a(str) {
+// Exported (with mulberry32/seedOf) so portraits.js seeds from the SAME identity
+// machinery — one hash vocabulary across sigils and portraits (§8.7).
+export function fnv1a(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
@@ -20,7 +22,7 @@ function fnv1a(str) {
 }
 
 // mulberry32 — a tiny seeded PRNG. Pure function of the seed.
-function mulberry32(seed) {
+export function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
@@ -31,7 +33,7 @@ function mulberry32(seed) {
 }
 
 // The stable seed string for a coach — prefers the most canonical id available.
-function seedOf(coach) {
+export function seedOf(coach) {
   if (!coach) return "coach";
   return String(
     coach.persona_id || coach.coach_id || coach.id || coach.short_id || coach.name || "coach"

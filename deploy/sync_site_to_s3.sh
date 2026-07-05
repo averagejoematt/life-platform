@@ -57,6 +57,9 @@ if [ "${1:-}" != "--dry-run" ]; then
   python3 "$(dirname "$0")/../scripts/v4_build_rss.py" || echo "  ⚠️  rss build skipped (offline?) — keeping existing site/rss.xml"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
+  # #586/ADR-106: portrait_data.js is GENERATED from config/portraits/ (signed recipes
+  # only) — never hand-edit. Validation failure BLOCKS the sync (a bad recipe must not ship).
+  python3 "$(dirname "$0")/../scripts/v4_build_portraits.py"
 fi
 
 BUCKET="matthew-life-platform"

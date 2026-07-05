@@ -1137,6 +1137,36 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .coach-head .dx-kicker { margin: 0; }
 .coach-head .dx-title { margin: 0.1em 0 0; }
 
+/* ── Coach portraits (§8.7 / ADR-106) — engraved layered marks (portraits.js).
+   Contours are INK (currentColor from --ink), the one accent layer (.pt-hatch,
+   the engraved shading) rides var(--coach) — the same sanctioned persona colour
+   channel as the sigils. viewBox 0 0 100 120 → 5:6 aspect. Sizes: base 40px,
+   -md 56px, -lg 96px (the contact-sheet triplet). Fallback chain is the call
+   sites' concern: portrait(c) || sigil(c) — no recipe, no portrait, no change. */
+.portrait { display: block; inline-size: 40px; block-size: 48px; flex: none;
+  color: var(--ink); overflow: visible; }
+.portrait.portrait-md { inline-size: 56px; block-size: 67px; }
+.portrait.portrait-lg { inline-size: 96px; block-size: 115px; }
+.coach-mark .portrait { inline-size: 100%; block-size: 100%; }
+.portrait .pt-frame { opacity: 0.35; }
+.portrait .pt-hatch { color: var(--coach, var(--ember)); opacity: 0.75; }
+/* Portrait motion — all inside the reduced-motion wrapper: draw-in reuses the
+   sigilDraw grammar; the blink period is per-coach (portraits.js seeds
+   --pt-blink from FNV-1a, 4–8s); breath is a 4.5s micro-translate. Fail-open:
+   eyes-closed/mouth variants are hidden by INLINE opacity, so with no CSS (or
+   reduced motion) the portrait is simply... complete and still. */
+@media (prefers-reduced-motion: no-preference) {
+  .portrait .pt-stroke { stroke-dasharray: 1; stroke-dashoffset: 1; animation: sigilDraw 0.9s var(--ease-out) forwards; }
+  .portrait .pt-hatch .pt-stroke { animation-delay: 0.35s; animation-duration: 0.6s; }
+  .portrait .pt-eyes-open { animation: ptBlink var(--pt-blink, 6s) infinite; }
+  .portrait .pt-eyes-closed { animation: ptBlinkInv var(--pt-blink, 6s) infinite; }
+  @keyframes ptBlink { 0%, 95.9% { opacity: 1; } 96%, 99.4% { opacity: 0; } 99.5%, 100% { opacity: 1; } }
+  @keyframes ptBlinkInv { 0%, 95.9% { opacity: 0; } 96%, 99.4% { opacity: 1; } 99.5%, 100% { opacity: 0; } }
+  .portrait .pt-breath { transform-box: fill-box; transform-origin: 50% 65%;
+    animation: ptBreath 4.5s var(--ease-inout, ease-in-out) infinite; }
+  @keyframes ptBreath { 50% { transform: translateY(0.7px); } }
+}
+
 /* ── Pillar identity colors (§8.6) — the character sheet's seven pillars.
    Like --coach, these encode IDENTITY only (ring segments, radar vertices,
    stat-bar fills, heatmap row accents, sparkline strokes) — never buttons,
