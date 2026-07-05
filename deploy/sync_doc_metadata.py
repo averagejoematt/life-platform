@@ -15,6 +15,9 @@ THE SOLUTION:
 USAGE:
   python3 deploy/sync_doc_metadata.py          # dry run (shows diff, writes nothing)
   python3 deploy/sync_doc_metadata.py --apply  # apply changes
+  python3 deploy/sync_doc_metadata.py --check  # CI GATE: like dry run, but exits
+                                                # non-zero if any literal has drifted
+                                                # (writes nothing either way — see #389)
 
 WHAT IT UPDATES:
   - Version + date in all doc headers
@@ -382,6 +385,20 @@ RULES = [
         r"\*\*Last updated:\*\* \d{4}-\d{2}-\d{2} \([^\)]+\)",
         "**Last updated:** {date} ({version} — {tool_count} MCP tools, {data_sources} data sources, {lambda_count} Lambdas, 12 cached tools)",
     ),
+    # ── CLAUDE.md ────────────────────────────────────────────────────────────
+    # The doc every session reads first quotes these two counts inline (not just
+    # in a header) — #389: they rot exactly like the ones below and a stale one
+    # is a fresh session's very first false fact.
+    (
+        "CLAUDE.md",
+        r"~\d+ Lambdas \(CDK-defined",
+        "~{lambda_count} Lambdas (CDK-defined",
+    ),
+    (
+        "CLAUDE.md",
+        r"~\d+ tools across \d+\+ domain modules",
+        "~{tool_count} tools across 30+ domain modules",
+    ),
 ]
 
 
@@ -424,8 +441,19 @@ def process_doc(rel_path: str, dry_run: bool) -> list[str]:
 
 
 def main():
-    dry_run = "--apply" not in sys.argv
-    mode = "DRY RUN (pass --apply to write changes)" if dry_run else "APPLYING CHANGES"
+    is_check = "--check" in sys.argv
+    is_apply = "--apply" in sys.argv
+    if is_check and is_apply:
+        print("error: --check and --apply are mutually exclusive (--check never writes)", file=sys.stderr)
+        sys.exit(2)
+
+    dry_run = not is_apply  # --check writes nothing, exactly like the no-flag dry run
+    if is_check:
+        mode = "CHECK (CI drift gate — asserts docs match discovered values, writes nothing)"
+    elif is_apply:
+        mode = "APPLYING CHANGES"
+    else:
+        mode = "DRY RUN (pass --apply to write changes)"
 
     # Auto-discover counts from source files before applying rules
     facts_copy = dict(PLATFORM_FACTS)
@@ -453,6 +481,7 @@ def main():
     # Get unique docs to process
     docs_to_process = sorted(set(doc for doc, _, _ in RULES))
     total_changes = len([c for c in stats_changes if c.startswith("  ~")])
+    drifted_docs = ["lambdas/web/site_api_common.py"] if any(c.startswith("  ~") for c in stats_changes) else []
 
     for rel_path in docs_to_process:
         changes = process_doc(rel_path, dry_run)
@@ -462,11 +491,24 @@ def main():
                 print(c)
             print()
             total_changes += len(changes)
+            drifted_docs.append(rel_path)
         else:
             print(f"[{rel_path}] — already in sync ✓")
 
     print(f"\n{'='*60}")
-    if total_changes == 0:
+    if is_check:
+        if total_changes == 0:
+            print("  ✅ CHECK PASSED — every literal above matches its discovered value.")
+            print(f"{'='*60}\n")
+            sys.exit(0)
+        else:
+            print(f"  ❌ CHECK FAILED — {total_changes} stale literal(s) across {len(drifted_docs)} file(s):")
+            for d in drifted_docs:
+                print(f"       - {d}")
+            print("  Fix: python3 deploy/sync_doc_metadata.py --apply")
+            print(f"{'='*60}\n")
+            sys.exit(1)
+    elif total_changes == 0:
         print("  ✅ All docs already in sync with PLATFORM_FACTS.")
     elif dry_run:
         print(f"  Found {total_changes} change(s). Run with --apply to write.")

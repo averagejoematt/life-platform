@@ -198,6 +198,14 @@ jobs:
         # Catches personal-content leaks before they reach the public repo.
         run: python3 scripts/content_policy_scan.py
 
+      - name: Doc-drift gate (ENFORCED — #389)
+        # sync_doc_metadata.py --check asserts the literal counts quoted in CLAUDE.md
+        # and docs/*.md (tool/Lambda/module/ADR/test counts, served PLATFORM_STATS)
+        # against what AST/regex discovery finds in the source right now. Writes
+        # nothing; a mismatch means a fact changed (new tool, new Lambda, new ADR,
+        # new test) and nobody reran `sync_doc_metadata.py --apply` before merging.
+        run: python3 deploy/sync_doc_metadata.py --check
+
   # ════════════════════════════════════════════════════════════════
   # Job 2: Unit Tests — run pytest on tests/test_shared_modules.py
   # ════════════════════════════════════════════════════════════════
