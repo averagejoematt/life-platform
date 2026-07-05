@@ -204,12 +204,16 @@ def gather_week_data(start_date, end_date):
             "day_grade": cs.get("day_grade"),
         }
 
-    # Mood (State of Mind)
-    mood_items = _query_day_records("state_of_mind", start_date, end_date)
+    # Mood (State of Mind) — daily aggregates (som_avg_valence / som_check_in_count)
+    # land on the apple_health partition; DDB has no per-reading valence rows
+    # (individual check-ins live in S3), so read the aggregate fields.
+    mood_items = [m for m in _query_day_records("apple_health", start_date, end_date) if m.get("som_avg_valence") is not None]
     if mood_items:
-        valences = [float(m.get("valence", 0)) for m in mood_items if m.get("valence") is not None]
+        valences = [float(m["som_avg_valence"]) for m in mood_items]
+        check_ins = sum(int(float(m.get("som_check_in_count", 1) or 1)) for m in mood_items)
         data["mood"] = {
-            "readings": len(mood_items),
+            "readings": check_ins,
+            "days_with_data": len(mood_items),
             "avg_valence": round(sum(valences) / len(valences), 2) if valences else None,
         }
 

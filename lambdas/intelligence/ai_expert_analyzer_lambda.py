@@ -224,7 +224,9 @@ def gather_data_for_expert(expert_key):
     if expert_key == "mind":
         # Journal analysis + mood + vice streaks
         ja_items = _query_source("journal_analysis", d30, today)
-        som_items = _query_source("state_of_mind", d30, today)
+        # SoM daily aggregates live on the apple_health partition (som_avg_valence),
+        # not a separate state_of_mind partition.
+        som_items = [s for s in _query_source("apple_health", d30, today) if s.get("som_avg_valence") is not None]
         avg_sentiment = 0
         if ja_items:
             scores = [float(i.get("sentiment_score", 0)) for i in ja_items]

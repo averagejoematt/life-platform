@@ -1783,9 +1783,11 @@ def handle_sleep_correlations() -> dict:
     # B2 — mood/journal → sleep (bidirectional). State-of-Mind valence as the mood proxy;
     # empty (n=0 → watching) when mood/journal logging is stale.
     mood = {}
-    for sm in _query_source("state_of_mind", d30, today):
+    # SoM daily valence lands on the apple_health partition as som_avg_valence
+    # (there is no separate state_of_mind partition).
+    for sm in _query_source("apple_health", d30, today):
         dt = sm.get("date") or sm.get("sk", "").replace("DATE#", "")[:10]
-        v = _f(sm.get("valence") or sm.get("mood") or sm.get("mood_valence"))
+        v = _f(sm.get("som_avg_valence"))
         if v is not None and dt:
             mood[dt] = v
     cards.append(

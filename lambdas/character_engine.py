@@ -598,18 +598,24 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
     else:
         scores["journal_consistency"] = None
 
-    # State of Mind valence
+    # State of Mind valence — HAE writes the daily aggregate as som_avg_valence
+    # (-1..+1) on the apple_health record; legacy field names kept as a fallback.
     som = data.get("state_of_mind") or {}
-    valence = _safe_float(som, "valence") or _safe_float(som, "average_valence")
-    if valence is not None:
-        if -5 <= valence <= 5:
-            scores["state_of_mind_valence"] = _clamp(round((valence + 3) / 6 * 100, 1))
-        elif 1 <= valence <= 7:
-            scores["state_of_mind_valence"] = _clamp(round((valence - 1) / 6 * 100, 1))
-        else:
-            scores["state_of_mind_valence"] = _clamp(valence)
+    som_valence = _safe_float(som, "som_avg_valence")
+    if som_valence is not None:
+        # HealthKit valence is -1..+1 → map to 0..100.
+        scores["state_of_mind_valence"] = _clamp(round((som_valence + 1) / 2 * 100, 1))
     else:
-        scores["state_of_mind_valence"] = None
+        valence = _safe_float(som, "valence") or _safe_float(som, "average_valence")
+        if valence is not None:
+            if -5 <= valence <= 5:
+                scores["state_of_mind_valence"] = _clamp(round((valence + 3) / 6 * 100, 1))
+            elif 1 <= valence <= 7:
+                scores["state_of_mind_valence"] = _clamp(round((valence - 1) / 6 * 100, 1))
+            else:
+                scores["state_of_mind_valence"] = _clamp(valence)
+        else:
+            scores["state_of_mind_valence"] = None
 
     # Stress management
     whoop = data.get("whoop") or {}

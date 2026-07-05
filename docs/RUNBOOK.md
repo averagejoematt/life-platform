@@ -243,6 +243,21 @@ daily-brief-schedule                cron(0 17 * * ? *)
 
 **⚠️ Health Auto Export gotcha:** The app must be configured for hourly (not "since last run") sync to reliably include all metric types. With infrequent syncs, payload size grows and the app may silently drop metrics like Dietary Water and Dietary Caffeine, sending only activity data. If water/caffeine stop appearing in webhook logs, check the app's sync interval.
 
+### State of Mind (How We Feel) — restarting the automation (ADR-121, #507)
+
+State of Mind is a **kept** subsystem (ADR-121) whose only blocker is the manual daily-logging habit, not the pipeline. The engine is wired and correct: check-ins flow **How We Feel (or Apple Health "State of Mind") → HealthKit → Health Auto Export → `health-auto-export-webhook` → `raw/matthew/state_of_mind/…` in S3 + `som_*` daily aggregates on the `apple_health` DynamoDB partition** (there is deliberately no separate `state_of_mind` partition — every HAE sub-datatype lands on `apple_health`). All five-plus consumer surfaces (Mind pillar / character sheet, daily brief + coach narrative, Wednesday chronicle, cockpit/observatory mood, MCP `get_mood view=state_of_mind`) read that partition and honestly show "no recent State of Mind data" when it's empty.
+
+**To restart (the one manual step the owner must do):**
+1. **Log moods** in the How We Feel app (or Apple Health → Browse → State of Mind). This is the habit — "just start doing it." Momentary emotions and daily mood both flow.
+2. **Confirm the HAE automation exists and is enabled** (it is a *separate* automation from the metrics one — State of Mind is its own HAE Data Type, not a Health Metric). In Health Auto Export → Automations, there must be a REST API automation with:
+   - **Data Type:** `State of Mind` (create a new automation if only the Health Metrics one exists)
+   - **URL:** the same Lambda Function URL / API Gateway endpoint as the existing metrics automation
+   - **Headers:** the same `Authorization: Bearer …` token
+   - **Export Format:** JSON, Version 2 · **Date Range:** "Since Last Sync" · **hourly** cadence
+3. **Verify a reading landed** (within ~an hour of logging): `aws s3 ls s3://matthew-life-platform/raw/matthew/state_of_mind/ --recursive` should show a file for today, and `get_mood view=state_of_mind` should return a valence trend rather than the "no data" restart message.
+
+The webhook path is **live** (not parked) — it is the same `health-auto-export-webhook` that ingests CGM/BP/water/steps daily, so no infra needs enabling; only the phone-side State-of-Mind automation and the logging habit.
+
 ---
 
 ## Logs-Insights Triage Queries (2026-06-09)

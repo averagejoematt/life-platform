@@ -721,7 +721,9 @@ def tool_get_exposure_correlation(args):
 
     # Get health metrics for the full range
     whoop = query_source("whoop", start, end)
-    som = query_source("state_of_mind", start, end)
+    # SoM daily aggregates (som_avg_valence) land on the apple_health partition —
+    # there is no per-datatype state_of_mind partition (see HAE ingestion / freshness_checker).
+    som = query_source("apple_health", start, end)
 
     whoop_by_date = {i.get("date"): decimal_to_float(i) for i in whoop if i.get("date")}
     som_by_date = {i.get("date"): decimal_to_float(i) for i in som if i.get("date")}

@@ -1758,7 +1758,10 @@ def tool_get_state_of_mind_trend(args):
         ds = d["date"]
         try:
             y, m, day = ds.split("-")
-            key = f"raw/state_of_mind/{y}/{m}/{day}.json"
+            # HAE writes SoM raw check-ins under the user-segmented prefix
+            # (raw/matthew/state_of_mind/…). The old un-segmented path silently
+            # 404'd, dropping the label/association/time-of-day deep analysis.
+            key = f"raw/{USER_ID}/state_of_mind/{y}/{m}/{day}.json"
             resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
             entries = json.loads(resp["Body"].read())
             for e in entries:
