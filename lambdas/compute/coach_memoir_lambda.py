@@ -334,7 +334,7 @@ def _latest_memoir(table, coach_id):
         return None
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     try:
         from budget_guard import allow as _budget_allow
 
