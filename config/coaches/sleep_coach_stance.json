@@ -30,11 +30,11 @@
       "entry": {"metric": "weight_lbs", "min": 210, "max": 240},
       "headline": "Now we care about the stages.",
       "read_of_him": "The basics hold, so deep and REM are worth chasing — they're where recovery and the training adaptation get locked in.",
-      "cares_most": ["deep-sleep percentage", "REM percentage", "bedroom temperature"],
+      "cares_most": ["deep-sleep percentage", "REM percentage"],
       "cares_less_right_now": ["a perfect bedtime to the minute"],
-      "plan": "Tune environment (temperature, light) and timing to grow deep and REM; coordinate with the training load.",
+      "plan": "Tune environment (light) and timing to grow deep and REM; coordinate with the training load.",
       "graduation_gate": "Deep and REM trending toward healthy bands across a block unlocks 'optimize'.",
-      "watches": ["deep_pct", "rem_pct", "bed_temp_f"]
+      "watches": ["deep_pct", "rem_pct"]
     },
     {
       "stage_id": "optimize",

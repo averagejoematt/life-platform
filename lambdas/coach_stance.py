@@ -46,7 +46,7 @@ KNOWN_SIGNALS = {
     "sleep_consistency",
     "deep_pct",
     "rem_pct",
-    "bed_temp_f",
+    # bed_temp_f retired — ADR-118, #489 (Eight Sleep temp pipeline dead)
     # training
     "steps",
     "moving_time_seconds",

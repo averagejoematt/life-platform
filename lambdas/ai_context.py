@@ -925,7 +925,7 @@ def _build_sleep_data(data):
         "hrv": _safe_float(whoop, "hrv") or _safe_float(sleep, "hrv"),
         "recovery_score": _safe_float(whoop, "recovery_score"),
         "resting_heart_rate": _safe_float(whoop, "resting_heart_rate"),
-        "bed_temp_f": _safe_float(eight, "bed_temp_f"),
+        # bed_temp_f retired (ADR-118, #489): Eight Sleep temp pipeline is dead.
         "sleep_start": sleep.get("sleep_start") or whoop.get("sleep_start"),
     }
 

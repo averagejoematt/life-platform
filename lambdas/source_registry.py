@@ -151,7 +151,7 @@ SOURCE_REGISTRY = {
         "expected_days": 7,
         "qa_tier": "optional",
         "method": "API pull, hourly",
-        "metrics": "Sleep stages, bed temperature, HR/HRV",
+        "metrics": "Sleep stages, HR/HRV, restlessness",  # bed temp retired — ADR-118, #489
         "posture": "portfolio",
         "raw_layout": {"prefix": "raw/matthew/eightsleep", "scheme": "date-tree"},
     },

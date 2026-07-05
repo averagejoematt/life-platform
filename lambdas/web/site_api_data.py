@@ -1726,26 +1726,16 @@ def handle_sleep_correlations() -> dict:
             note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
         )
     )
-    # A3 — bed temp → deep sleep (mechanistic). Eight Sleep temp + score series.
+    # Eight Sleep nightly sleep-score series (feeds the A4 last-meal card).
+    # NB: the former "A3 — bed temp → deep sleep" card was retired (ADR-118,
+    # #489) — the Eight Sleep temperature pipeline is dead (dead /v2/intervals
+    # endpoint, no bed_temp_f for 4+ months), so the card only ever rendered empty.
     eight = {}
     for e in _query_source("eightsleep", d30, today):
         dt = e.get("sk", "").replace("DATE#", "")[:10]
         if dt:
-            eight[dt] = {"temp": _f(e.get("bed_temp_f")), "score": _f(e.get("sleep_score"))}
-    bed_temp = {d: v["temp"] for d, v in eight.items() if v["temp"] is not None}
+            eight[dt] = {"score": _f(e.get("sleep_score"))}
     sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
-    cards.append(
-        _corr_card(
-            "A3",
-            "Bed temp → deep sleep",
-            "bed temp",
-            "deep sleep",
-            bed_temp,
-            deep,
-            lag=0,
-            note="Mechanistic — cooler often means more deep sleep, within an optimal band (not monotonic).",
-        )
-    )
     # A4 — last meal time → sleep score. MacroFactor food_log latest time per day.
     last_meal = {}
     for m in _query_source("macrofactor", d30, today):
@@ -1875,7 +1865,7 @@ def handle_sleep_detail() -> dict:
     """
     GET /api/sleep_detail
     Returns: 30-day sleep stats from Eight Sleep + Whoop cross-referenced.
-    Shows sleep score, efficiency, bed temp, quality, and daily trend.
+    Shows sleep score, efficiency, quality, and daily trend.
     Cache: 3600s (1h).
     """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -1920,21 +1910,8 @@ def handle_sleep_detail() -> dict:
     # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
     score_vals = [float(r["sleep_score"]) for r in eight_with_data if r.get("sleep_score")]
     eff_vals = [float(r["sleep_efficiency_pct"]) for r in eight_with_data if r.get("sleep_efficiency_pct")]
-    temp_vals = [float(r["bed_temp_f"]) for r in eight_with_data if r.get("bed_temp_f")]
-
-    # Find best-performing temp range by pairing temp with sleep score
-    temp_score_pairs = [
-        (float(r["bed_temp_f"]), float(r["sleep_score"])) for r in eight_with_data if r.get("bed_temp_f") and r.get("sleep_score")
-    ]
-    optimal_temp = None
-    if len(temp_score_pairs) >= 7:
-        # Group by 2°F buckets, find highest average score bucket
-        buckets = {}
-        for temp, score in temp_score_pairs:
-            bucket = round(temp / 2) * 2  # nearest 2°F
-            buckets.setdefault(bucket, []).append(score)
-        best_bucket = max(buckets, key=lambda b: sum(buckets[b]) / len(buckets[b]))
-        optimal_temp = best_bucket
+    # Bed-temperature surfaces retired (ADR-118, #489) — the Eight Sleep temp
+    # pipeline is dead (dead /v2/intervals endpoint, no bed_temp_f for 4+ months).
 
     def avg(lst):
         return round(sum(lst) / len(lst), 1) if lst else None
@@ -1951,7 +1928,6 @@ def handle_sleep_detail() -> dict:
                 "date": date,
                 "sleep_score": _sane_sleep_score(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score")),
                 "efficiency": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
-                "bed_temp_f": round(float(r["bed_temp_f"]), 1) if r.get("bed_temp_f") else None,
                 "hours": round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
                 "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
                 "deep_sleep_hours": round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,
@@ -2018,7 +1994,6 @@ def handle_sleep_detail() -> dict:
             "sleep_detail": {
                 "sleep_score": round(score_today, 0),
                 "sleep_efficiency": round(float(latest.get("sleep_efficiency_pct", 0)), 1) if latest.get("sleep_efficiency_pct") else None,
-                "bed_temp_f": round(float(latest.get("bed_temp_f", 0)), 1) if latest.get("bed_temp_f") else None,
                 "total_sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
                 "whoop_quality": (
                     round(float(whoop_latest.get("sleep_quality_score", 0)), 0) if whoop_latest.get("sleep_quality_score") else None
@@ -2057,10 +2032,8 @@ def handle_sleep_detail() -> dict:
                     if whoop_by_date
                     else None
                 ),
-                "optimal_temp_f": optimal_temp,
                 "30d_avg_score": avg(score_vals),
                 "30d_avg_efficiency": avg(eff_vals),
-                "30d_avg_temp": avg(temp_vals),
                 "days_tracked": len(eight_with_data),
                 "as_of_date": latest_date,
                 "avg_bedtime": _fmt_hour(avg_bed) if avg_bed is not None else None,

@@ -143,7 +143,7 @@ from mcp.tools_reading import (
     tool_manage_reading,
 )
 from mcp.tools_sick_days import tool_manage_sick_days
-from mcp.tools_sleep import tool_get_sleep_analysis, tool_get_sleep_environment_analysis
+from mcp.tools_sleep import tool_get_sleep_analysis
 from mcp.tools_social import (
     tool_annotate_discovery,
     tool_get_discovery_annotations,
@@ -2914,31 +2914,10 @@ TOOLS = {
             },
         },
     },
-    # ── BS-SL1: Sleep Environment Optimizer ──
-    "get_sleep_environment_analysis": {
-        "fn": tool_get_sleep_environment_analysis,
-        "schema": {
-            "name": "get_sleep_environment_analysis",
-            "description": (
-                "BS-SL1: Cross-reference Eight Sleep bed temperature data with Whoop sleep staging "
-                "to find your personal optimal temperature settings. Groups nights by temperature band, "
-                "compares sleep efficiency, deep %%, REM %%, and HRV across bands. Finds optimal band "
-                "via composite scoring. Includes Pearson correlations between bed temp and each sleep metric. "
-                "Huberman/Walker: core body temperature drop of 1-3°F triggers sleep onset. "
-                "Use for: 'optimal sleep temperature', 'sleep environment', 'Eight Sleep settings', "
-                "'does cooler bed improve my sleep?', 'temperature vs sleep quality', 'sleep optimization'."
-            ),
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD."},
-                    "end_date": {"type": "string", "description": "End date YYYY-MM-DD (default: today)."},
-                    "days": {"type": "integer", "description": "Rolling window in days (default: 90)."},
-                },
-                "required": [],
-            },
-        },
-    },
+    # ── BS-SL1: Sleep Environment Optimizer — RETIRED (ADR-118, #489). The tool
+    #    was entirely a bed-temperature optimizer; the Eight Sleep temperature
+    #    pipeline is dead (dead /v2/intervals endpoint, no temp field 4+ months),
+    #    so the tool could only ever return "Need ≥14 nights of paired data". ──
     # ── BS-MP1: Autonomic Balance Score ──
     "get_autonomic_balance": {
         "fn": tool_get_autonomic_balance,

@@ -492,7 +492,7 @@ def gather_data_for_expert(expert_key):
         score_vals = [float(e["sleep_score"]) for e in eight_items if e.get("sleep_score")]
         deep_pcts = [float(e["deep_pct"]) for e in eight_items if e.get("deep_pct")]
         rem_pcts = [float(e["rem_pct"]) for e in eight_items if e.get("rem_pct")]
-        bed_temps = [float(e["bed_temp_f"]) for e in eight_items if e.get("bed_temp_f")]
+        # bed_temp retired (ADR-118, #489): Eight Sleep temp pipeline is dead.
         sleep_starts = [w.get("sleep_start") for w in whoop_items if w.get("sleep_start")]
         avg = lambda lst: round(sum(lst) / len(lst), 1) if lst else None
         return {
@@ -505,7 +505,6 @@ def gather_data_for_expert(expert_key):
             "avg_hrv": avg(hrv_vals),
             "avg_deep_pct": avg(deep_pcts),
             "avg_rem_pct": avg(rem_pcts),
-            "avg_bed_temp_f": avg(bed_temps),
             "sleep_onset_times": sleep_starts[-7:],
         }
 

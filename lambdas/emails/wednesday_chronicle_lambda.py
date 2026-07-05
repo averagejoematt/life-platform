@@ -493,22 +493,16 @@ def build_data_packet(data):
         packet.append(" | ".join(parts))
     packet.append("")
 
-    # --- Sleep Environment (Eight Sleep — bed temp, room temp, presence) ---
-    packet.append("=== SLEEP ENVIRONMENT (Eight Sleep) ===")
+    # --- Sleep Restlessness (Eight Sleep tosses/turns) ---
+    # Bed/room temperature retired (ADR-118, #489): the Eight Sleep temperature
+    # pipeline is dead (dead /v2/intervals endpoint, no temp field 4+ months).
+    # Tosses/turns is still a live field, so keep it.
+    packet.append("=== SLEEP RESTLESSNESS (Eight Sleep) ===")
     for d in sorted(data["eightsleep"].keys()):
         rec = data["eightsleep"][d]
-        bed_temp = safe_float(rec, "bed_temp_f")
-        room_temp = safe_float(rec, "room_temp_f")
         toss = safe_float(rec, "toss_and_turns") or safe_float(rec, "toss_turn_count")
-        parts = [f"{d}:"]
-        if bed_temp is not None:
-            parts.append(f"Bed {bed_temp:.0f}°F")
-        if room_temp is not None:
-            parts.append(f"Room {room_temp:.0f}°F")
         if toss is not None:
-            parts.append(f"Tosses {toss:.0f}")
-        if len(parts) > 1:
-            packet.append(" | ".join(parts))
+            packet.append(f"{d}: Tosses {toss:.0f}")
     packet.append("")
 
     # --- Training / Strava activities ---

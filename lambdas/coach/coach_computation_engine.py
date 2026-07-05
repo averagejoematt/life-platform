@@ -59,7 +59,7 @@ SOURCE_METRICS = {
     "macrofactor": ["total_calories_kcal", "total_protein_g"],
     "apple_health": ["steps", "blood_glucose_avg", "blood_glucose_std_dev", "som_avg_valence"],
     "strava": ["moving_time_seconds"],
-    "eightsleep": ["sleep_score", "deep_pct", "rem_pct", "bed_temp_f"],
+    "eightsleep": ["sleep_score", "deep_pct", "rem_pct"],  # bed_temp_f retired — ADR-118, #489
     "garmin": ["steps"],
 }
 
@@ -91,7 +91,6 @@ METRIC_DOMAIN = {
     "blood_glucose_std_dev": "nutrition_body_comp",
     "som_avg_valence": "mood",
     "moving_time_seconds": "training",
-    "bed_temp_f": "sleep",
 }
 
 # Coach IDs for prediction scanning. CANONICAL: must equal the operational

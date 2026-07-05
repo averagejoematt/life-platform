@@ -73,7 +73,7 @@
       "id": "eightsleep",
       "name": "Eight Sleep",
       "category": "Wearables",
-      "metrics": "Sleep stages, bed temperature, HR/HRV",
+      "metrics": "Sleep stages, HR/HRV, restlessness",
       "method": "API pull, hourly",
       "posture": "portfolio"
     },
