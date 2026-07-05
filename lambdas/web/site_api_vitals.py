@@ -256,9 +256,16 @@ def handle_journey() -> dict:
                 "remaining_lbs": remaining,
                 "progress_pct": progress_pct,
                 "weekly_rate_lbs": weekly_rate,
+                # #535: every claim carries its uncertainty. The rate is an interval and
+                # the goal date is a range (earliest..latest), not a false-precision point.
+                "weekly_rate_ci_low": _traj.get("weekly_rate_ci_low"),
+                "weekly_rate_ci_high": _traj.get("weekly_rate_ci_high"),
+                "projection_confidence": _traj.get("projection_confidence"),
                 "rate_provisional": rate_provisional,
                 "weighin_span_days": weighin_span_days,
                 "projected_goal_date": projected_goal_date,
+                "projected_goal_date_earliest": _traj.get("projected_goal_date_earliest"),
+                "projected_goal_date_latest": _traj.get("projected_goal_date_latest"),
                 "days_to_goal": days_to_goal,
                 "started_date": EXPERIMENT_START,
                 # The date behind current_weight_lbs/lost_lbs — the front-end pairs the

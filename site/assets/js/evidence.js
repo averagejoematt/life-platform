@@ -138,10 +138,15 @@ function physicalTrendHero(readings, j, goal) {
   const now = j.current_weight_lbs, start = j.start_weight_lbs, lost = j.lost_lbs, rate = j.weekly_rate_lbs, prov = j.rate_provisional;
   const chart = weightTrendChart(readings, { goal, genesis: PHYS_GENESIS, label: "Weight · daily scale vs smoothed trend" });
   const down = lost != null && lost > 0;
+  // #535: the trend rate carries its 80% CI — the band is the honest part.
+  const ciLo = j.weekly_rate_ci_low, ciHi = j.weekly_rate_ci_high;
+  const rateStr = (rate != null && rate !== 0)
+    ? `trend ${fmt(rate)} lb/wk${ciLo != null && ciHi != null ? ` (${fmt(ciLo)}…${fmt(ciHi)})` : ""}${prov ? " · early = water" : ""}`
+    : "";
   const machine = [
     now != null && `now ${fmt(now)} lb`,
     lost != null && `${down ? "down" : "up"} ${fmt(Math.abs(lost))} lb from ${fmt(start)}`,
-    (rate != null && rate !== 0) ? `trend ${fmt(rate)} lb/wk${prov ? " · early = water" : ""}` : "",
+    rateStr,
   ].filter(Boolean).join(" · ");
   const serif = rate != null && rate < 0
     ? `The scale is moving. ${prov ? "Most of an early cut is water — this rate will slow, and the line knows it; trust the smoothed trend over any single morning's dot." : "The smoothed trend is the signal; the daily dots are scale noise — water, food, the time of the weigh-in."} Goal ${fmt(goal)} sits off the bottom of this axis on purpose: anchoring to it would flatten the slope you're actually walking.`
@@ -1783,7 +1788,7 @@ function dataFigure(j) {
   </section>`;
 }
 
-async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), j.projected_goal_date && fig(j.projected_goal_date, "projected goal")]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — not a promise."); }
+async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
 function renderTools(d) { return figs([fig(d.mcp_tools ?? "—", "MCP tools"), fig(d.data_sources ?? "—", "data sources")]) + `<p class="rd-archive">The tools Claude uses to read this data back — spanning sleep, training, nutrition, labs, CGM, the character sheet, the board, correlations and more. They're how a conversation with the data is possible at all.</p>` + note("The interface between the model and the measured life."); }
 // Post-mortems — what each closed cycle taught, derived live from the record.
 async function renderPostmortems(d) {

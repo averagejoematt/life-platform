@@ -43,6 +43,7 @@ v1.1.0 — 2026-03-08 (IC-8: Intent vs Execution Gap)
 
 import json
 import logging
+import math
 import os
 import statistics
 import urllib.error
@@ -51,6 +52,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import stats_core  # shared layer (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -952,10 +954,13 @@ def _compute_slow_drift(yesterday_str, profile):
     severity. Equal 14d/14d windows are more statistically comparable (same N, same
     SE of mean). Min N=14 gate now applies identically to both windows.
 
-    Severity tiers:
-      mild:        0.5-1.0 SD drift  — stored but NOT injected into context block
-      significant: 1.0-1.5 SD        — injected into context block at priority 4
-      severe:      >1.5 SD           — injected at priority 2 (displaces lower signals)
+    Severity tiers (#535/ADR-105 — significance, not raw magnitude):
+      A drift must clear a minimum EFFECT floor (>=0.5 baseline SD) AND be significant.
+      Significance is the SE-based z of the window-mean difference, using the
+      autocorrelation-corrected effective n (raw n overstates autocorrelated daily series):
+      mild:        |z| < 1.96  (p >= 0.05)   — stored but NOT injected into context block
+      significant: 1.96-2.576  (p < 0.05)    — injected into context block at priority 4
+      severe:      |z| >= 2.576 (p < 0.01)   — injected at priority 2 (displaces lower signals)
 
     Minimum data (Henning): N>=14 non-null points in baseline window, else insufficient_data.
 
@@ -967,8 +972,8 @@ def _compute_slow_drift(yesterday_str, profile):
       - Includes recomposition caveat in output (Okafor)
 
     Returns list of drift dicts with keys:
-      metric, source, recent_mean, baseline_mean, drift_sd, severity,
-      baseline_n, note (optional context string)
+      metric, source, recent_mean, baseline_mean, drift_sd (effect size),
+      drift_z + p_value (significance), severity, baseline_n, note (optional context string)
     """
     datetime.now(timezone.utc).date()
     yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
@@ -1022,23 +1027,39 @@ def _compute_slow_drift(yesterday_str, profile):
         if baseline_sd == 0:
             continue
 
-        # Drift = recent_mean - baseline_mean, expressed in baseline SDs
-        # Henning: recent and baseline windows are non-overlapping
+        # Effect size: recent_mean - baseline_mean in baseline SDs (how BIG the shift is).
         drift_sd_val = (recent_mean - baseline_mean) / baseline_sd
+
+        # Significance (#535/ADR-105): the old code tiered severity straight off the
+        # effect size in baseline SDs — that's a magnitude, not a "is this real?" test.
+        # Recompute severity from the SE-based z of the window-mean DIFFERENCE, and use
+        # the autocorrelation-corrected effective n (daily physiology carries day-to-day
+        # memory, so raw n overstates the evidence) so we never cry "severe" off noise.
+        n_eff_recent = stats_core.effective_sample_size(recent_vals)
+        n_eff_baseline = stats_core.effective_sample_size(baseline_vals)
+        var_recent = statistics.variance(recent_vals) if len(recent_vals) > 1 else 0.0
+        var_baseline = statistics.variance(baseline_vals)
+        se_diff = ((var_recent / n_eff_recent) + (var_baseline / n_eff_baseline)) ** 0.5
+        drift_z = (recent_mean - baseline_mean) / se_diff if se_diff > 0 else 0.0
+        # Two-sided normal p-value on the effective-n z.
+        p_value = round(2.0 * (1.0 - 0.5 * (1.0 + math.erf(abs(drift_z) / (2.0**0.5)))), 4)
 
         # Determine severity direction (worse or better?)
         if higher_is_better:
             is_worsening = drift_sd_val < 0
-            abs_drift = abs(drift_sd_val)
         else:
             is_worsening = drift_sd_val > 0
-            abs_drift = abs(drift_sd_val)
+        abs_drift = abs(drift_sd_val)
+        abs_z = abs(drift_z)
 
+        # Gate on BOTH a minimum effect (>=0.5 baseline SD, unchanged floor) AND
+        # significance. Tiers re-derived from the z: p>=0.05 stays "mild" (stored,
+        # never injected — see the L~1135 filter), p<0.05 -> significant, p<0.01 -> severe.
         if abs_drift < 0.5:
-            continue  # noise, skip entirely
-        elif abs_drift < 1.0:
-            severity = "mild"
-        elif abs_drift < 1.5:
+            continue  # effect too small to matter, regardless of how consistent
+        if abs_z < 1.96:
+            severity = "mild"  # not distinguishable from noise at p<0.05 → suppressed downstream
+        elif abs_z < 2.576:
             severity = "significant"
         else:
             severity = "severe"
@@ -1061,7 +1082,9 @@ def _compute_slow_drift(yesterday_str, profile):
                 "source": source,
                 "recent_mean": round(recent_mean, 2),
                 "baseline_mean": round(baseline_mean, 2),
-                "drift_sd": round(drift_sd_val, 2),
+                "drift_sd": round(drift_sd_val, 2),  # effect size (baseline SDs)
+                "drift_z": round(drift_z, 2),  # #535: SE-based z of the mean difference (effective-n corrected)
+                "p_value": p_value,  # #535: two-sided significance behind the severity tier
                 "severity": severity,
                 "worsening": is_worsening,
                 "baseline_n": len(baseline_vals),  # Omar: include for downstream confidence
@@ -1679,7 +1702,7 @@ def build_ai_context_block(
                 f"\U0001f6a8 SLOW DRIFT — SEVERE: {d['metric']} has drifted "
                 f"{abs(d.get('drift_sd', 0)):.1f} SD below baseline over 3 weeks "
                 f"(recent avg: {d.get('recent_mean')} vs baseline: {d.get('baseline_mean')}, "
-                f"N={d.get('baseline_n')} days)."
+                f"N={d.get('baseline_n')} days; difference significant at p={d.get('p_value')})."
             )
             if d.get("note"):
                 line += f" {d['note']}"
@@ -1702,7 +1725,7 @@ def build_ai_context_block(
         for d in significant:
             line = (
                 f"\u26a0\ufe0f SLOW DRIFT: {d['metric']} trending down "
-                f"({abs(d.get('drift_sd', 0)):.1f} SD below 3-week baseline; "
+                f"({abs(d.get('drift_sd', 0)):.1f} SD below 3-week baseline, p={d.get('p_value')}; "
                 f"recent avg {d.get('recent_mean')} vs {d.get('baseline_mean')}, "
                 f"N={d.get('baseline_n')})."
             )

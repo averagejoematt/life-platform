@@ -44,6 +44,7 @@ from mcp.helpers import (
     classify_day_type,
     compute_daily_load_score,
     compute_ewa,
+    correlation_report,
     flatten_strava_activity,
     normalize_whoop_sleep,
     pearson_r,
@@ -231,40 +232,41 @@ def tool_get_caffeine_sleep_correlation(args):
     timed_rows = [r for r in daily_rows if r["last_caffeine_time"] is not None]
 
     timing_correlations = {}
+    _timing_specs = []
     for field, label, direction in SLEEP_METRICS:
         xs = [r["last_caffeine_time"] for r in timed_rows if r[field] is not None]
         ys = [r[field] for r in timed_rows if r[field] is not None]
-        r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
-        if r_val is not None:
-            if direction == "higher_is_better":
-                impact = "HARMFUL" if r_val < -0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            else:
-                impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            timing_correlations[field] = {
-                "label": label,
-                "pearson_r": r_val,
-                "n": len(xs),
-                "impact": impact,
-                "interpretation": (
-                    f"Later caffeine {'strongly ' if abs(r_val) > 0.4 else ''}correlates with "
-                    f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no significant change in'} "
-                    f"{label.lower()}"
-                ),
-            }
+        _timing_specs.append({"key": f"timing:{field}", "field": field, "xs": xs, "ys": ys, "direction": direction, "label": label})
 
     # ── Dose correlations (total caffeine mg vs sleep) ───────────────────────
     dose_correlations = {}
     caff_rows = [r for r in daily_rows if r["total_caffeine_mg"] > 0]
+    _dose_specs = []
     for field, label, direction in SLEEP_METRICS:
         xs = [r["total_caffeine_mg"] for r in caff_rows if r[field] is not None]
         ys = [r[field] for r in caff_rows if r[field] is not None]
-        r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
-        if r_val is not None:
-            if direction == "higher_is_better":
-                impact = "HARMFUL" if r_val < -0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            else:
-                impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            dose_correlations[field] = {"label": label, "pearson_r": r_val, "n": len(xs), "impact": impact}
+        _dose_specs.append({"key": f"dose:{field}", "field": field, "xs": xs, "ys": ys, "direction": direction, "label": label})
+
+    # #535: one honesty-gated pass over every caffeine correlation (per-tool BH-FDR across
+    # timing + dose, confidence-gated HARMFUL/BENEFICIAL, r [CI], effective n, q-value).
+    _caff_report = correlation_report(_timing_specs + _dose_specs)
+    for spec in _timing_specs:
+        c = _caff_report.get(spec["key"])
+        if c is None:
+            continue
+        impact = c["impact"]
+        timing_correlations[spec["field"]] = {
+            **c,
+            "interpretation": (
+                f"Later caffeine {'strongly ' if abs(c['pearson_r']) > 0.4 else ''}correlates with "
+                f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no clear change in'} "
+                f"{c['label'].lower()}" + ("" if impact != "INCONCLUSIVE" else " (not statistically confident — treat as suggestive)")
+            ),
+        }
+    for spec in _dose_specs:
+        c = _caff_report.get(spec["key"])
+        if c is not None:
+            dose_correlations[spec["field"]] = c
 
     # ── Personal cutoff recommendation ───────────────────────────────────────
     recommendation = None
@@ -628,40 +630,43 @@ def tool_get_exercise_sleep_correlation(args):
     timed_rows = [r for r in exercise_days if r["last_end_time"] is not None]
 
     timing_correlations = {}
+    _ex_timing_specs = []
     for field, label, direction in SLEEP_METRICS:
         xs = [r["last_end_time"] for r in timed_rows if r[field] is not None]
         ys = [r[field] for r in timed_rows if r[field] is not None]
-        r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
-        if r_val is not None:
-            if direction == "higher_is_better":
-                impact = "HARMFUL" if r_val < -0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            else:
-                impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            timing_correlations[field] = {
-                "label": label,
-                "pearson_r": r_val,
-                "n": len(xs),
-                "impact": impact,
-                "interpretation": (
-                    f"Later exercise {'strongly ' if abs(r_val) > 0.4 else ''}correlates with "
-                    f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no significant change in'} "
-                    f"{label.lower()}"
-                ),
-            }
+        _ex_timing_specs.append({"key": f"timing:{field}", "field": field, "xs": xs, "ys": ys, "direction": direction, "label": label})
 
     # ── Intensity correlations (avg HR vs sleep, exercise days only) ─────────
     intensity_correlations = {}
     hr_rows = [r for r in exercise_days if r["avg_hr"] is not None]
+    _ex_intensity_specs = []
     for field, label, direction in SLEEP_METRICS:
         xs = [r["avg_hr"] for r in hr_rows if r[field] is not None]
         ys = [r[field] for r in hr_rows if r[field] is not None]
-        r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
-        if r_val is not None:
-            if direction == "higher_is_better":
-                impact = "HARMFUL" if r_val < -0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            else:
-                impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            intensity_correlations[field] = {"label": label, "pearson_r": r_val, "n": len(xs), "impact": impact}
+        _ex_intensity_specs.append(
+            {"key": f"intensity:{field}", "field": field, "xs": xs, "ys": ys, "direction": direction, "label": label}
+        )
+
+    # #535: one honesty-gated pass over every exercise correlation (per-tool BH-FDR across
+    # timing + intensity, confidence-gated impact, r [CI], effective n, q-value).
+    _ex_report = correlation_report(_ex_timing_specs + _ex_intensity_specs)
+    for spec in _ex_timing_specs:
+        c = _ex_report.get(spec["key"])
+        if c is None:
+            continue
+        impact = c["impact"]
+        timing_correlations[spec["field"]] = {
+            **c,
+            "interpretation": (
+                f"Later exercise {'strongly ' if abs(c['pearson_r']) > 0.4 else ''}correlates with "
+                f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no clear change in'} "
+                f"{c['label'].lower()}" + ("" if impact != "INCONCLUSIVE" else " (not statistically confident — treat as suggestive)")
+            ),
+        }
+    for spec in _ex_intensity_specs:
+        c = _ex_report.get(spec["key"])
+        if c is not None:
+            intensity_correlations[spec["field"]] = c
 
     # ── Intensity x Timing interaction (high intensity + late = worst combo?) ─
     intensity_timing = {}
@@ -1385,45 +1390,41 @@ def tool_get_alcohol_sleep_correlation(args):
 
     # ── Dose correlations (total alcohol g vs metrics) ───────────────────────
     dose_correlations = {}
+    _al_dose_specs = []
     for field, label, direction in ALL_METRICS:
         xs = [r["total_alcohol_g"] for r in daily_rows if r[field] is not None]
         ys = [r[field] for r in daily_rows if r[field] is not None]
-        r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
-        if r_val is not None:
-            if direction == "higher_is_better":
-                impact = "HARMFUL" if r_val < -0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            else:
-                impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            dose_correlations[field] = {
-                "label": label,
-                "pearson_r": r_val,
-                "n": len(xs),
-                "impact": impact,
-            }
+        _al_dose_specs.append({"key": f"dose:{field}", "field": field, "xs": xs, "ys": ys, "direction": direction, "label": label})
 
     # ── Timing correlations (last drink time vs sleep, drinking days only) ───
     timing_correlations = {}
     timed_rows = [r for r in daily_rows if r["last_drink_time"] is not None]
+    _al_timing_specs = []
     for field, label, direction in SLEEP_METRICS:
         xs = [r["last_drink_time"] for r in timed_rows if r[field] is not None]
         ys = [r[field] for r in timed_rows if r[field] is not None]
-        r_val = pearson_r(xs, ys) if len(xs) >= 5 else None
-        if r_val is not None:
-            if direction == "higher_is_better":
-                impact = "HARMFUL" if r_val < -0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            else:
-                impact = "HARMFUL" if r_val > 0.15 else "NEUTRAL" if abs(r_val) < 0.15 else "BENEFICIAL"
-            timing_correlations[field] = {
-                "label": label,
-                "pearson_r": r_val,
-                "n": len(xs),
-                "impact": impact,
-                "interpretation": (
-                    f"Later drinking {'strongly ' if abs(r_val) > 0.4 else ''}correlates with "
-                    f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no significant change in'} "
-                    f"{label.lower()}"
-                ),
-            }
+        _al_timing_specs.append({"key": f"timing:{field}", "field": field, "xs": xs, "ys": ys, "direction": direction, "label": label})
+
+    # #535: one honesty-gated pass over every alcohol correlation (per-tool BH-FDR across
+    # dose + timing, confidence-gated impact, r [CI], effective n, q-value).
+    _al_report = correlation_report(_al_dose_specs + _al_timing_specs)
+    for spec in _al_dose_specs:
+        c = _al_report.get(spec["key"])
+        if c is not None:
+            dose_correlations[spec["field"]] = c
+    for spec in _al_timing_specs:
+        c = _al_report.get(spec["key"])
+        if c is None:
+            continue
+        impact = c["impact"]
+        timing_correlations[spec["field"]] = {
+            **c,
+            "interpretation": (
+                f"Later drinking {'strongly ' if abs(c['pearson_r']) > 0.4 else ''}correlates with "
+                f"{'worse' if impact == 'HARMFUL' else 'better' if impact == 'BENEFICIAL' else 'no clear change in'} "
+                f"{c['label'].lower()}" + ("" if impact != "INCONCLUSIVE" else " (not statistically confident — treat as suggestive)")
+            ),
+        }
 
     # ── Drinking vs sober comparison ─────────────────────────────────────────
     drinking_days = [r for r in daily_rows if r["bucket"] != "none"]

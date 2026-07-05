@@ -120,7 +120,16 @@ def authoritative_facts_block(facts: dict) -> str:
     if facts.get("latest_weight") is not None:
         lines.append(f"  - Latest weight: {facts['latest_weight']:g} lb")
     if facts.get("weekly_rate_lbs") is not None:
-        lines.append(f"  - Weekly weight rate: {facts['weekly_rate_lbs']:g} lb/week (signed; negative = losing)")
+        _rate_line = f"  - Weekly weight rate: {facts['weekly_rate_lbs']:g} lb/week (signed; negative = losing)"
+        # #535: the rate carries its interval — narrative must not present it as exact.
+        if facts.get("weekly_rate_ci_low") is not None and facts.get("weekly_rate_ci_high") is not None:
+            _rate_line += f" [80% CI {facts['weekly_rate_ci_low']:g} to {facts['weekly_rate_ci_high']:g}]"
+        lines.append(_rate_line)
+    if facts.get("projected_goal_date_earliest") and facts.get("projected_goal_date_latest"):
+        lines.append(
+            f"  - Projected goal-weight date: a RANGE of {facts['projected_goal_date_earliest']} to "
+            f"{facts['projected_goal_date_latest']} (never a single certain date)"
+        )
     if not lines:
         return ""
     return (

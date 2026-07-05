@@ -511,8 +511,17 @@ def store_computed_metrics(
     if weight_traj:
         item["weekly_rate_lbs"] = _to_dec(weight_traj.get("weekly_rate_lbs"))
         item["rate_provisional"] = bool(weight_traj.get("rate_provisional"))
+        # #535: every claim carries its uncertainty — rate CI + goal-date range.
+        if weight_traj.get("weekly_rate_ci_low") is not None:
+            item["weekly_rate_ci_low"] = _to_dec(weight_traj["weekly_rate_ci_low"])
+            item["weekly_rate_ci_high"] = _to_dec(weight_traj["weekly_rate_ci_high"])
+            item["projection_confidence"] = _to_dec(weight_traj.get("projection_confidence"))
         if weight_traj.get("projected_goal_date"):
             item["projected_goal_date"] = weight_traj["projected_goal_date"]
+        if weight_traj.get("projected_goal_date_earliest"):
+            item["projected_goal_date_earliest"] = weight_traj["projected_goal_date_earliest"]
+        if weight_traj.get("projected_goal_date_latest"):
+            item["projected_goal_date_latest"] = weight_traj["projected_goal_date_latest"]
         if weight_traj.get("days_to_goal") is not None:
             item["days_to_goal"] = _to_dec(weight_traj["days_to_goal"])
 
