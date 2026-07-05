@@ -299,6 +299,16 @@ REGISTRY = [
         None,
     ),
     (
+        "voicefidelity",
+        "Voice-fidelity scoreboard",
+        "Can a blind panel tell the coaches apart? Monthly, a 3-judge Haiku panel guesses which coach wrote a blinded sample of their own real output — scored against ground truth, in public.",
+        "Credibility & the machine",
+        "data",
+        "/api/voice_fidelity",
+        None,
+        None,
+    ),
+    (
         "scenarios",
         "Scenario explorer",
         "Pick a kind of day — see the distribution of what historically followed. Correlative by design.",
@@ -487,6 +497,7 @@ _REGROUP = {
     # tuple carries "How it holds up" inline). A regroup entry would clobber both.
     "predictions": "How it holds up",
     "calibration": "How it holds up",  # #538: the calibration scoreboard sits with the credibility surfaces
+    "voicefidelity": "How it holds up",  # #545: the blind voice-fidelity scoreboard — same credibility framing
     "scenarios": "How it holds up",
     "benchmarks": "How it holds up",
     "biology": "How it holds up",

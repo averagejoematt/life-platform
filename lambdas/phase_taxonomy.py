@@ -165,6 +165,12 @@ _PK_RULES: list = [
     (lambda pk, sk: pk == "ENSEMBLE#dispute", EXPERIMENT_SCOPED),  # #540 inter-coach threads
     (lambda pk, sk: pk == "ENSEMBLE#influence_graph", SYSTEM_STATE),  # static config
     (lambda pk, sk: pk == "NARRATIVE#arc", EXPERIMENT_SCOPED),
+    # #545: the blind voice-fidelity scoreboard measures the COACHING ENGINE's design
+    # (can a blind panel tell coaches apart), not a property of the current experiment
+    # run — same rationale as the CROSS_PHASE "calibration" source (SOURCE_CLASS above):
+    # it's a long-run scoreboard that must survive a reset, even though the OUTPUT#
+    # records it samples FROM (pk COACH#*, above) are themselves experiment-scoped.
+    (lambda pk, sk: pk.startswith("VOICEFIDELITY#"), CROSS_PHASE),
     # Reading / Mind pillar (ADR-097). Durable identity data — a person's library and
     # reading history must survive an experiment reset, so it is CROSS_PHASE (never
     # tagged, never wiped, never phase-filtered). Covers BOOK#<id> and every READING#

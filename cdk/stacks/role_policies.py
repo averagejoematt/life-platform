@@ -757,6 +757,14 @@ def compute_coach_computation() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True, needs_s3_config=True)
 
 
+def compute_voice_fidelity_harness() -> list[iam.PolicyStatement]:
+    """Voice-fidelity harness (#545): reads COACH#{id} OUTPUT# samples + the persona
+    registry (S3 config), runs a Haiku judge panel, writes VOICEFIDELITY# judgments
+    + the scoreboard back to DDB. needs_ai_keys=True also covers Bedrock invoke +
+    the AI cost-metrics PutMetricData grant."""
+    return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)
+
+
 def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
     """Coach narrative orchestrator: reads COACH#/ENSEMBLE#/NARRATIVE# partitions from DDB, reads S3 voice specs, uses ai-keys for Haiku LLM, writes briefs to DDB."""
     return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)

@@ -514,6 +514,30 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # #545: the blind voice-fidelity harness — monthly, samples each coach's own
+        # real recent OUTPUT# text, blinds it, and runs a 3-judge Haiku panel that
+        # guesses authorship. Confusion matrix + per-coach distinguishability persist
+        # cumulatively at VOICEFIDELITY#scoreboard/latest (public via /api/voice_fidelity
+        # -> /method/voice-fidelity/). At most 8 coaches x 2 samples x 3-judge panel =
+        # 48 Haiku calls/month. 1st of the month, 15:00 UTC (8 AM PT, fixed UTC).
+        # Tier>=1 self-pauses (a monthly luxury metric, same cutoff as the dispute above).
+        create_platform_lambda(
+            self,
+            "VoiceFidelityHarness",
+            function_name="voice-fidelity-harness",
+            handler="coach.voice_fidelity_harness.lambda_handler",
+            source_file="lambdas/coach/voice_fidelity_harness.py",
+            schedule="cron(0 15 1 * ? *)",
+            timeout_seconds=600,
+            memory_mb=256,
+            environment={
+                "ANTHROPIC_SECRET": "life-platform/ai-keys",
+                "AI_MODEL_HAIKU": AI_MODEL_HAIKU,
+            },
+            custom_policies=rp.compute_voice_fidelity_harness(),
+            **shared,
+        )
+
         create_platform_lambda(
             self,
             "CoachHistorySummarizer",

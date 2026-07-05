@@ -63,6 +63,11 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "NOTE#latest",
     ): "#548 Margaret Calloway's last published editor's note — seeded on the first note publish "
     "(rare by design, <=1/month); _margaret_last_note_date tolerates absence (treated as eligible)",
+    (
+        "VOICEFIDELITY#scoreboard",
+        "latest",
+    ): "#545 the blind voice-fidelity scoreboard — seeded by voice-fidelity-harness's first monthly run; "
+    "handle_voice_fidelity tolerates absence (empty/insufficient_data response)",
 }
 
 # Module-level constant values used to resolve f-strings statically.

@@ -68,6 +68,7 @@ from web.site_api_coach import (
     handle_panel_ledger,
     handle_predictions,
     handle_recap,
+    handle_voice_fidelity,
     handle_weekly_priority,
 )
 
@@ -807,6 +808,8 @@ def lambda_handler(event, context):
         return handle_predictions(event)
     if path == "/api/calibration":
         return handle_calibration(event)
+    if path == "/api/voice_fidelity":
+        return handle_voice_fidelity(event)
     if path == "/api/coach_timeline":
         return handle_coach_timeline(event)
     if path == "/api/weekly_priority":
