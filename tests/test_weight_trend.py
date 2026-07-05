@@ -46,3 +46,38 @@ def test_too_few_points_is_zero():
     r = wt.weight_trajectory([("2026-06-26", 300.0)], current_weight=300.0, goal_weight=185.0, ref_dt=REF)
     assert r["weekly_rate_lbs"] == 0.0
     assert r["projected_goal_date"] is None
+    # No CI when there aren't enough points to bootstrap.
+    assert r["weekly_rate_ci_low"] is None
+    assert r["weekly_rate_ci_high"] is None
+
+
+def test_rate_ci_present_and_ordered():
+    # 30 days steady loss → block-bootstrap CI present, ordered, and bracketing the point rate.
+    series = _series(1, 30, 314.0, -0.5)
+    ref = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    r = wt.weight_trajectory(series, current_weight=299.0, goal_weight=185.0, ref_dt=ref)
+    lo, hi = r["weekly_rate_ci_low"], r["weekly_rate_ci_high"]
+    assert lo is not None and hi is not None
+    assert lo <= hi
+    assert lo <= r["weekly_rate_lbs"] <= hi
+    assert r["projection_confidence"] == 0.80
+
+
+def test_goal_date_becomes_a_range():
+    # Steady descent → earliest/latest bracket the point projection (both non-null, ordered).
+    series = _series(1, 30, 314.0, -0.5)
+    ref = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    r = wt.weight_trajectory(series, current_weight=299.0, goal_weight=185.0, ref_dt=ref)
+    early, late = r["projected_goal_date_earliest"], r["projected_goal_date_latest"]
+    assert early is not None and late is not None
+    assert early <= r["projected_goal_date"] <= late  # date strings sort chronologically
+
+
+def test_provisional_still_reports_rate_ci_but_no_projection():
+    series = _series(14, 14, 314.0, -1.0)
+    r = wt.weight_trajectory(series, current_weight=300.0, goal_weight=185.0, ref_dt=REF)
+    assert r["rate_provisional"] is True
+    assert r["projected_goal_date_earliest"] is None
+    assert r["projected_goal_date_latest"] is None
+    # A rate CI is still honest to show even while the projection is suppressed.
+    assert r["weekly_rate_ci_low"] is not None

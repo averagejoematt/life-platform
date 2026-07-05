@@ -112,6 +112,90 @@ def pearson_r(xs, ys):
     return round(r, 3) if r is not None else None
 
 
+# Impact thresholds shared across the correlation tools (caffeine/exercise/alcohol).
+# A bare |r| is not evidence of harm — so a HARMFUL/BENEFICIAL verdict is asserted
+# only when the (autocorrelation-corrected, FDR-adjusted) confidence clears MEDIUM.
+_CORR_IMPACT_R = 0.15
+
+
+def correlation_report(specs, min_n=5, confidence=0.90):
+    """Rich, honesty-gated correlations for a whole tool at once (#535/ADR-105).
+
+    Replaces the six copies of `r = pearson_r(...); impact = "HARMFUL" if r < -0.15 …`
+    that ran a bare Pearson at min n=5 and labelled |r|>0.15 HARMFUL with no p, no CI,
+    no multiple-comparison correction. For each spec it computes r, a Fisher CI, the
+    effective sample size (AR(1)-corrected — daily series carry day-to-day memory), and
+    a two-sided p on the effective n; then it applies Benjamini-Hochberg ACROSS the whole
+    batch (per-tool FDR) to get q-values, and gates the verdict: HARMFUL/BENEFICIAL is
+    only asserted when `digest_utils.compute_confidence` (fed n_eff + q) is >= MEDIUM —
+    otherwise the impact is "INCONCLUSIVE" (the r stands, the causal-sounding label doesn't).
+
+    specs: list of dicts, each {key, xs, ys, direction, label}. `direction` is
+      "higher_is_better" or "lower_is_better" (matches the SLEEP_METRICS tuples).
+    Returns {key: {label, pearson_r, ci_low, ci_high, n, n_eff, p_value, q_value,
+      impact, confidence, higher_is_better}} — only for specs with n >= min_n and a
+      computable r (others are omitted, exactly like the old `if r_val is not None`).
+    """
+    try:
+        import digest_utils  # shared layer — compute_confidence tiering (HIGH/MEDIUM/LOW)
+    except Exception:  # pragma: no cover - layer always present in prod
+        digest_utils = None
+
+    staged = []  # (key, spec, r, ci, n, n_eff, p) in input order
+    pvals = []
+    for spec in specs:
+        xs, ys = spec.get("xs") or [], spec.get("ys") or []
+        xs2, ys2 = stats_core.clean_pairs(xs, ys)
+        n = len(xs2)
+        r = pearson_r(xs2, ys2) if n >= min_n else None
+        if r is None:
+            continue
+        n_eff = stats_core.effective_sample_size(xs2, ys2)
+        p = stats_core.pearson_p_value(r, n_eff)
+        ci = stats_core.fisher_ci(r, n_eff, confidence=confidence)
+        staged.append([spec, r, ci, n, n_eff, p])
+        pvals.append(p)
+
+    qvals = stats_core.bh_fdr(pvals)  # per-tool FDR across every correlation in the batch
+    out = {}
+    for (spec, r, ci, n, n_eff, p), q in zip(staged, qvals):
+        higher_is_better = spec.get("direction") == "higher_is_better"
+        # Raw sign-based reading (unchanged thresholds), then confidence-gated.
+        if abs(r) < _CORR_IMPACT_R:
+            raw_impact = "NEUTRAL"
+        elif (r < 0) == higher_is_better:  # down-when-up-is-good, or up-when-down-is-good
+            raw_impact = "HARMFUL"
+        else:
+            raw_impact = "BENEFICIAL"
+
+        conf_level = "LOW"
+        if digest_utils is not None:
+            try:
+                conf_level = digest_utils.compute_confidence(n=n, p_value=q, n_eff=n_eff).get("level", "LOW")
+            except Exception:
+                conf_level = "LOW"
+        # A strong verdict must earn it — MEDIUM+ confidence, else say so plainly.
+        if raw_impact in ("HARMFUL", "BENEFICIAL") and conf_level == "LOW":
+            impact = "INCONCLUSIVE"
+        else:
+            impact = raw_impact
+
+        out[spec["key"]] = {
+            "label": spec.get("label"),
+            "pearson_r": r,
+            "ci_low": round(ci[0], 3) if ci else None,
+            "ci_high": round(ci[1], 3) if ci else None,
+            "n": n,
+            "n_eff": round(n_eff, 1),
+            "p_value": p,
+            "q_value": round(q, 4) if q is not None else None,
+            "impact": impact,
+            "confidence": conf_level,
+            "higher_is_better": higher_is_better,
+        }
+    return out
+
+
 def _linear_regression(points):
     """Simple OLS on list of (x, y) tuples. Returns slope, intercept, r_squared."""
     n = len(points)

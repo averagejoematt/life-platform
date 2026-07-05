@@ -1368,6 +1368,12 @@ def lambda_handler(event, context):
             data["weekly_rate_lbs"] = float(_computed["weekly_rate_lbs"])
         data["rate_provisional"] = bool(_computed.get("rate_provisional"))
         data["projected_goal_date"] = _computed.get("projected_goal_date")  # None when provisional
+        # #535: uncertainty travels with the number — rate CI + goal-date range.
+        if _computed.get("weekly_rate_ci_low") is not None:
+            data["weekly_rate_ci_low"] = float(_computed["weekly_rate_ci_low"])
+            data["weekly_rate_ci_high"] = float(_computed["weekly_rate_ci_high"])
+        data["projected_goal_date_earliest"] = _computed.get("projected_goal_date_earliest")
+        data["projected_goal_date_latest"] = _computed.get("projected_goal_date_latest")
         logger.info("Day Grade (pre-computed): " + str(day_grade_score) + " (" + grade + ")")
     else:
         # Fallback: compute inline and store (pre-computed Lambda not yet run)
@@ -2146,6 +2152,11 @@ def lambda_handler(event, context):
                     # Computed projection (regression-based, suppressed while provisional) —
                     # NOT the stale static profile field that implied 115 lb in 5 weeks.
                     "projected_goal_date": data.get("projected_goal_date"),
+                    # #535: the honest finish line is a range; the rate carries a CI.
+                    "projected_goal_date_earliest": data.get("projected_goal_date_earliest"),
+                    "projected_goal_date_latest": data.get("projected_goal_date_latest"),
+                    "weekly_rate_ci_low": data.get("weekly_rate_ci_low"),
+                    "weekly_rate_ci_high": data.get("weekly_rate_ci_high"),
                     "rate_provisional": bool(data.get("rate_provisional")),
                     "started_date": profile.get("journey_start_date", EXPERIMENT_START_DATE),
                     "current_phase": (get_current_phase(profile, _curr_wt) or {}).get("name", "Ignition") if _curr_wt else None,

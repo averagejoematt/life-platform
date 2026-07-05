@@ -149,8 +149,17 @@ function renderNumbers(journey) {
       hp.hidden = false;
     }
   }
-  if (journey.projected_goal_date) {
-    bind("projected").textContent = `At the current rate, goal lands around ${journey.projected_goal_date}. Correlative projection — not a promise.`;
+  // #535: the honest finish line is a range (earliest..latest), never a false-precision point.
+  const _goalFmt = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    return m ? new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "";
+  };
+  if (journey.projected_goal_date_earliest && journey.projected_goal_date_latest) {
+    bind("projected").textContent =
+      `At the current rate, goal lands between ${_goalFmt(journey.projected_goal_date_earliest)} and ${_goalFmt(journey.projected_goal_date_latest)}. ` +
+      `An 80% range — the interval is the honest part, not a single promised date.`;
+  } else if (journey.projected_goal_date) {
+    bind("projected").textContent = `At the current rate, goal lands around ${_goalFmt(journey.projected_goal_date) || journey.projected_goal_date}. Correlative projection — not a promise.`;
   } else if (journey.rate_provisional) {
     // Lean into the truth instead of projecting off a thin weigh-in record — but derive
     // the copy from the actual week, not a hardcoded "week one" (it fired in week 3).

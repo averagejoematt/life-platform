@@ -107,6 +107,11 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
         "lost_lbs": lost_lbs,
         "progress_pct": progress_pct,
         "projected_goal_date": goal_date,
+        # #535: the honest finish line is a range, and the rate carries a CI.
+        "projected_goal_date_earliest": journey.get("projected_goal_date_earliest") or "",
+        "projected_goal_date_latest": journey.get("projected_goal_date_latest") or "",
+        "weekly_rate_ci_low": journey.get("weekly_rate_ci_low"),
+        "weekly_rate_ci_high": journey.get("weekly_rate_ci_high"),
         "journey_started": JOURNEY_START_DATE,
         "paragraph_is_placeholder": False,
     }

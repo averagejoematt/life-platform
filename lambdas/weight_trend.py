@@ -15,6 +15,26 @@ Early-cut water weight makes a raw rate wildly fast, so the rate is flagged
 
 from datetime import datetime, timedelta, timezone
 
+import stats_core  # shared layer (#529): block-bootstrap CI for the projection slope
+
+
+def _ols_slope(xs, ys):
+    """OLS slope of ys on xs (per-x-unit). None when degenerate.
+
+    The one slope used for both the point rate and the bootstrap replicate stat,
+    so the CI is an interval around the same estimator the headline number reports.
+    """
+    n = len(xs)
+    if n < 2:
+        return None
+    sx, sy = sum(xs), sum(ys)
+    sxy = sum(a * b for a, b in zip(xs, ys))
+    sxx = sum(a * a for a in xs)
+    denom = n * sxx - sx * sx
+    if denom == 0:
+        return None
+    return (n * sxy - sx * sy) / denom
+
 
 def _record_date(item):
     """YYYY-MM-DD for a DDB day record (date attr, else the sk)."""
@@ -75,51 +95,85 @@ def weight_trajectory(
     ref_dt=None,
     window_days=28,
     provisional_days=21,
+    confidence=0.80,
 ):
     """Regression weekly rate + suppressed-when-provisional goal projection.
 
     weight_series: list of (date_str 'YYYY-MM-DD', weight_lbs), any order.
-    Returns a dict: weekly_rate_lbs, slope_per_day, rate_provisional,
-    weighin_span_days, projected_goal_date (None when provisional), days_to_goal.
+
+    Every claim carries its uncertainty (ADR-105/#535): the weekly rate is
+    reported with a moving-block-bootstrap CI on the slope (the block bootstrap
+    preserves the day-to-day memory a plain OLS SE would ignore), and the goal
+    date becomes an honest *range* — earliest from the faster CI bound, latest
+    from the slower. When the slope CI straddles zero the slow end is open-ended
+    (projected_goal_date_latest is None), because at that confidence we can't rule
+    out never reaching goal at the current trajectory.
+
+    Returns a dict: weekly_rate_lbs, weekly_rate_ci_low/high, slope_per_day,
+    rate_provisional, weighin_span_days, projected_goal_date (the point estimate,
+    None when provisional), days_to_goal, projected_goal_date_earliest/latest,
+    projection_confidence.
     """
     ref = ref_dt or datetime.now(timezone.utc)
     cutoff = (ref - timedelta(days=window_days)).strftime("%Y-%m-%d")
     recent = sorted((d, w) for d, w in weight_series if d >= cutoff and w)
 
     weekly_rate, slope_per_day = 0.0, 0.0
+    slope_ci = None  # (lo_per_day, hi_per_day) — lo is the more-negative (faster loss) bound
     if len(recent) >= 4:
         x0 = datetime.strptime(recent[0][0], "%Y-%m-%d")
         x = [(datetime.strptime(d, "%Y-%m-%d") - x0).days for d, _ in recent]
         y = [float(w) for _, w in recent]
-        n = len(x)
-        sx, sy = sum(x), sum(y)
-        sxy = sum(a * b for a, b in zip(x, y))
-        sxx = sum(a * a for a in x)
-        denom = n * sxx - sx * sx
-        slope_per_day = (n * sxy - sx * sy) / denom if denom else 0.0
+        s = _ols_slope(x, y)
+        slope_per_day = s if s is not None else 0.0
         weekly_rate = round(slope_per_day * 7, 2)
+        # Block-bootstrap CI on the slope (n>=5 or None). Preserves autocorrelation.
+        slope_ci = stats_core.moving_block_bootstrap_ci(x, y, stat=_ols_slope, confidence=confidence)
+
+    weekly_rate_ci_low = round(slope_ci[0] * 7, 2) if slope_ci else None
+    weekly_rate_ci_high = round(slope_ci[1] * 7, 2) if slope_ci else None
 
     span = (datetime.strptime(recent[-1][0], "%Y-%m-%d") - datetime.strptime(recent[0][0], "%Y-%m-%d")).days if len(recent) >= 2 else 0
     provisional = span < provisional_days
 
+    def _project(slope):
+        """Date current_weight reaches goal_weight at slope (lbs/day). None if not descending toward goal."""
+        if slope is None or slope >= 0:
+            return None
+        days = (current_weight - goal_weight) / abs(slope)
+        return (ref + timedelta(days=days)).strftime("%Y-%m-%d"), int(days)
+
     projected_goal_date, days_to_goal = None, None
-    if (
+    projected_goal_date_earliest, projected_goal_date_latest = None, None
+    can_project = (
         weekly_rate < 0
         and current_weight is not None
         and goal_weight is not None
         and current_weight > goal_weight
         and not provisional
         and abs(slope_per_day) > 0
-    ):
-        days = (current_weight - goal_weight) / abs(slope_per_day)
-        projected_goal_date = (ref + timedelta(days=days)).strftime("%Y-%m-%d")
-        days_to_goal = int(days)
+    )
+    if can_project:
+        point = _project(slope_per_day)
+        if point:
+            projected_goal_date, days_to_goal = point
+        if slope_ci:
+            # Faster bound (more negative slope) -> earliest date; slower bound -> latest.
+            fast = _project(slope_ci[0])  # slope_ci[0] <= slope_ci[1]
+            slow = _project(slope_ci[1])  # None when the slow bound is >= 0 (open-ended)
+            projected_goal_date_earliest = fast[0] if fast else None
+            projected_goal_date_latest = slow[0] if slow else None
 
     return {
         "weekly_rate_lbs": weekly_rate,
+        "weekly_rate_ci_low": weekly_rate_ci_low,
+        "weekly_rate_ci_high": weekly_rate_ci_high,
         "slope_per_day": slope_per_day,
         "rate_provisional": provisional,
         "weighin_span_days": span,
         "projected_goal_date": projected_goal_date,
         "days_to_goal": days_to_goal,
+        "projected_goal_date_earliest": projected_goal_date_earliest,
+        "projected_goal_date_latest": projected_goal_date_latest,
+        "projection_confidence": confidence,
     }

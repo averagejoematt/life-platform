@@ -32,6 +32,8 @@ FIELD_UNITS = {
     "protein_g_floor": "grams — floor (not intake)",
     "latest_weight": "pounds",
     "weekly_rate_lbs": "pounds per week (signed)",
+    "weekly_rate_ci_low": "pounds per week — low end of the 80% CI on the rate (#535)",
+    "weekly_rate_ci_high": "pounds per week — high end of the 80% CI on the rate (#535)",
 }
 NUMERIC_FIELDS = tuple(FIELD_UNITS)
 
