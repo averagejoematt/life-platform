@@ -3268,3 +3268,24 @@ There was no live fire — the right moment to fix a safety net that cannot curr
 **Constraints honored.** SVG-native / self-hosted only — the engine reads the repo-bundled TTFs and fetches nothing external (strict CSP + no-external-HTTP). Pillow lives only in the web/operational packages (pillow-layer), so the honest-stats CARD is drawn by the daily og sweep (which has Pillow), while the email stack — which has neither Pillow nor a card need — only builds the text kit. Cards remain on the existing OG sweep schedule; generated files stay under the `generated/` prefix (ADR-046), served via the already-routed `/moments/*` CloudFront behavior (no CDK change).
 
 **Consequences.** New off-site card types are now a registry entry + a fixture test, not a new bespoke drawer. The daily cards are unchanged pixel-for-pixel. Risk is contained: the engine imports no shared-layer platform modules, and every card path is fail-soft (a missing `character_stats.json` falls back to the historic minimal character card; a chronicle sweep error never blocks the daily cards).
+
+---
+
+## ADR-122: Todoist filters query the endpoint that actually filters — and the decision-fatigue threshold measures pressing load, not the backlog (E-1, #478)
+
+**Date:** 2026-07-05 · **Status:** Accepted · **Story:** #478 (epic #460, data-source health review 2026-07)
+
+**Context.** The Todoist ingestion Lambda and the MCP Todoist tools were migrated onto the v1 API (`https://api.todoist.com/api/v1`) but kept the REST-v2 habit of passing a `filter` query param to `GET /tasks`. On the v1 API `/tasks` silently **ignores** `filter` and returns the entire active list — so `overdue_count` and `due_today_count` were both ≈ the whole task list, not the filtered subset. Separately, `get_active_tasks` read a single `limit=200` page with no cursor follow, so `active_count` was **page-capped at 200**. Every downstream consumer of the Todoist snapshot (daily-brief decision-fatigue alert, `/data` task-load panels, the `get_decision_fatigue_signal` MCP tool) ran on these poisoned numbers from ~2026-05-10 (the v1 migration) onward.
+
+Measured live 2026-07-05 to confirm the fix and ground the threshold re-eval:
+- **Old (buggy):** active `/tasks?limit=200` (single page) → **200** (a cap, not a count); overdue `/tasks?filter=overdue` (param ignored) → the whole list.
+- **New (fixed):** active paginated → **270**; overdue `/tasks/filter?query=overdue` → **184**; due-today `/tasks/filter?query=today` → **0**.
+
+**Decision.**
+1. **Filter queries use the dedicated server-side endpoint** `GET /api/v1/tasks/filter?query=<filter>` (the required param is `query`, not `filter` — verified against the live 400 `ARGUMENT_MISSING: query`). Both `todoist_lambda.get_filtered_tasks` and `mcp/tools_todoist._list_all_tasks` route filter strings there; the plain `/tasks` path is used only for the unfiltered active snapshot.
+2. **The active fetch paginates** past the 200 page-cap via `next_cursor` (shared `_paginate_tasks` helper in the ingestion Lambda; the MCP `_list_all_tasks` loop already followed the cursor).
+3. **The decision-fatigue threshold measures the decision-pressure set, not the backlog.** `_compute_decision_fatigue_alert` (BS-MP3, `daily_insight_compute_lambda`) fired on `active + overdue`. Fixing the endpoint does **not** by itself rescue that: `active + overdue` (270 + 184 = 454) double-counts (overdue ⊂ active) and is dominated by non-pressing backlog, so it clears any small threshold every single day — the load condition never discriminated. The load quantity is now **`overdue + due_today`** (the tasks past-or-at deadline), on which the default `>15` floor is a live signal again: it fires only when the *pressing* pile is genuinely large **and** T0 habits are slipping (<60%).
+
+**The "15" is provisional, not empirical.** The prior comment claimed "compliance drops above 15 active+overdue" — but that was measured on the poisoned snapshots, so it was never real. Per **ADR-105 rule 4** the durable home is a personal-variance band over Matthew's own overdue distribution (`personal_baselines.py`, floor-guarded at `MIN_N=30`). That is **blocked until ~30 days of clean post-#478 ingestion accrue** — the pre-#478 records are point-in-time unrecoverable and are flagged `snapshot_unreliable=true` (`scripts/flag_todoist_unreliable_snapshots.py`; annotate, don't fake). The absolute `>15` floor (env `DECISION_FATIGUE_THRESHOLD`) holds until then, then migrates to the band — the same floor-guarded pattern #543 used.
+
+**Consequences.** Overdue/due-today counts and the full active count become true for the first time since the v1 migration. The decision-fatigue alert stops firing on a constant and starts tracking the real pile. Historical Todoist metrics before the clean-data cutover stay in place but carry an honesty flag so no forecast or narrative treats them as real. No schema change; ingestion record shape is unchanged.
