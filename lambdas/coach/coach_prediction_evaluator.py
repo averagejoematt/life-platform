@@ -1280,7 +1280,7 @@ def _fire_event_stance_refreshes(events, today_str):
 # =============================================================================
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     """
     Coach Prediction Evaluator entry point.
 
