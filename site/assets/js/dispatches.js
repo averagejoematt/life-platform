@@ -13,6 +13,7 @@ import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P
 import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { icon } from "/assets/js/icons.js";
+import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -426,7 +427,7 @@ function selectEntry(s, id, silent) {
 }
 async function selectSection(key, preId, push = true) {
   const s = BYKEY[key]; if (!s) return;
-  document.querySelectorAll(".dx-tab").forEach((t) => { const on = t.dataset.sec === key; t.classList.toggle("is-active", on); t.setAttribute("aria-pressed", String(on)); });
+  markActiveTab($("[data-dx-tabs]"), $("[data-dx-read]"), key);
   if (push) { try { history.pushState({ sec: key }, "", `/story/${key}/`); } catch (e) {} }
   document.title = `${s.label} — The Story — averagejoematt`;
   const listEl = $("[data-dx-list]");
@@ -442,8 +443,9 @@ async function selectSection(key, preId, push = true) {
 
 function build() {
   const tabsEl = $("[data-dx-tabs]"); if (!tabsEl) return;
-  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}" aria-pressed="false">${s.icon ? icon(s.icon, { cls: "tab-ico" }) : ""}${esc(s.label)}</button>`).join("");
+  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}">${s.icon ? icon(s.icon, { cls: "tab-ico" }) : ""}${esc(s.label)}</button>`).join("");
   tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
+  wireTabList(tabsEl, (key) => selectSection(key));
   const start = (window.__DISPATCH_START__ && BYKEY[window.__DISPATCH_START__]) ? window.__DISPATCH_START__ : "chronicle";
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);

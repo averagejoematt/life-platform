@@ -102,7 +102,9 @@ body { overflow-x: hidden; }
 .constellation a { cursor: pointer; }
 .constellation a .node circle { transition: r var(--dur-fast), stroke var(--dur-fast); }
 .constellation a:hover .node circle, .constellation a:focus-visible .node circle { stroke: var(--ember); stroke-width: 1.5; }
-.constellation a:focus-visible { outline: none; }
+/* #579 — the node-stroke change alone is too subtle a keyboard-focus signal (small circle,
+   thin stroke); pair it with a real ring around the hit area. */
+.constellation a:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; border-radius: 50%; }
 .constellation a:hover .node text { fill: var(--ink); }
 
 /* per-beat "go deeper" link into the rest of the site */

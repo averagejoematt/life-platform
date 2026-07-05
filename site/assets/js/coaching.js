@@ -22,6 +22,7 @@ import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
+import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 
 const SECTIONS = [
   { key: "read", label: "The Read", kicker: "what your board is saying — now", kind: "read" },
@@ -750,7 +751,7 @@ function selectEntry(s, id, silent) {
 }
 async function selectSection(key, preId, push = true) {
   const s = BYKEY[key]; if (!s) return;
-  document.querySelectorAll(".dx-tab").forEach((t) => { const on = t.dataset.sec === key; t.classList.toggle("is-active", on); t.setAttribute("aria-pressed", String(on)); });
+  markActiveTab($("[data-dx-tabs]"), $("[data-dx-read]"), key);
   if (push) { try { history.pushState({ sec: key }, "", `/coaching/${key}/`); } catch (e) {} }
   document.title = `${s.label} — The Coaching — averagejoematt`;
   const listEl = $("[data-dx-list]");
@@ -767,8 +768,9 @@ async function selectSection(key, preId, push = true) {
 
 function build() {
   const tabsEl = $("[data-dx-tabs]"); if (!tabsEl) return;
-  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}" aria-pressed="false">${esc(s.label)}</button>`).join("");
+  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}">${esc(s.label)}</button>`).join("");
   tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
+  wireTabList(tabsEl, (key) => selectSection(key));
   const start = (window.__COACHING_START__ && BYKEY[window.__COACHING_START__]) ? window.__COACHING_START__ : "read";
   const hashId = (location.hash || "").replace("#", "") || undefined;
   selectSection(start, hashId, false);
