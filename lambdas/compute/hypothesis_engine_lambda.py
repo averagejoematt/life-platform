@@ -403,7 +403,8 @@ def build_data_narrative(data):
             row["protein_g"] = safe_float(mf, "total_protein_g")
             row["carbs_g"] = safe_float(mf, "total_carbs_g")
             row["fat_g"] = safe_float(mf, "total_fat_g")
-            row["weight_lbs"] = safe_float(mf, "tdee_kcal")  # TDEE as proxy
+            # (#484) removed: `weight_lbs = tdee_kcal` — a never-populated field written
+            # into the weight column; Withings weight is set authoritatively just below.
 
         # Withings (weight)
         wi = next((i for i in data.get("withings", []) if i.get("date") == date), {})
