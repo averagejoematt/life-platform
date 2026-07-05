@@ -327,3 +327,128 @@ class TestEwmaFit:
         level, alpha, residuals = stats_core.ewma_fit(v, alpha=0.5)
         assert alpha == 0.5
         assert len(residuals) == len(v) - 1
+
+
+# ── Changepoint detection (#542, ADR-105) ────────────────────────────────────
+def _step_series(before_mean, after_mean, n_before, n_after, sd, seed):
+    """Two constant levels with Gaussian noise — a synthetic regime shift at n_before."""
+    rng = random.Random(seed)
+    return [before_mean + rng.gauss(0, sd) for _ in range(n_before)] + [after_mean + rng.gauss(0, sd) for _ in range(n_after)]
+
+
+class TestDetectChangepoints:
+    def test_known_single_breakpoint_recovered(self):
+        # Level drops 60 -> 50 (a ~3-SD shift) exactly at index 25.
+        s = _step_series(60, 50, 25, 25, sd=3, seed=42)
+        result = stats_core.detect_changepoints(s)
+        assert result["status"] == "ok"
+        assert len(result["changepoints"]) >= 1
+        cp = result["changepoints"][0]
+        # Breakpoint recovered within tolerance of the true index (25).
+        assert abs(cp["index"] - 25) <= 3
+        # Magnitude and direction are honest.
+        assert cp["direction"] == "decrease"
+        assert cp["magnitude"] < 0
+        assert abs(cp["magnitude"] - (-10)) < 3
+        assert cp["confidence"] >= 0.99
+        assert cp["n_before"] + cp["n_after"] == len(s)
+
+    def test_known_breakpoint_recovered_across_many_seeds(self):
+        # The recovery must not be a lucky seed: every seed lands within tolerance.
+        for seed in range(25):
+            s = _step_series(60, 50, 30, 30, sd=3, seed=seed)
+            idxs = [c["index"] for c in stats_core.detect_changepoints(s)["changepoints"]]
+            assert any(abs(i - 30) <= 3 for i in idxs), f"seed {seed} missed the breakpoint: {idxs}"
+
+    def test_flat_series_no_breakpoint(self):
+        # Nearly-constant series: no regime shift to find.
+        rng = random.Random(1)
+        s = [50 + rng.gauss(0, 0.5) for _ in range(50)]
+        result = stats_core.detect_changepoints(s)
+        assert result["status"] == "ok"
+        assert result["changepoints"] == []
+
+    def test_perfectly_constant_series_no_breakpoint(self):
+        result = stats_core.detect_changepoints([42.0] * 40)
+        assert result["status"] == "ok"
+        assert result["changepoints"] == []
+
+    def test_noisy_series_no_false_positive(self):
+        # A representative pure-noise series (no true shift) must yield nothing.
+        rng = random.Random(3)
+        s = [rng.gauss(0, 1) for _ in range(45)]
+        assert stats_core.detect_changepoints(s)["changepoints"] == []
+
+    def test_noise_false_positive_rate_is_low(self):
+        # Honest conservatism: across many pure-noise draws the spurious-breakpoint
+        # rate stays low (the whole point of the Bonferroni + effect gates).
+        fp = 0
+        trials = 200
+        for seed in range(trials):
+            rng = random.Random(seed)
+            s = [rng.gauss(0, 1) for _ in range(50)]
+            if stats_core.detect_changepoints(s)["changepoints"]:
+                fp += 1
+        assert fp / trials < 0.05, f"noise false-positive rate too high: {fp}/{trials}"
+
+    def test_thin_series_insufficient_data(self):
+        result = stats_core.detect_changepoints([1, 2, 3, 4, 5])
+        assert result["status"] == "insufficient_data"
+        assert result["changepoints"] == []
+        assert "reason" in result
+        assert result["n"] == 5
+
+    def test_exactly_at_threshold_still_admits_a_split(self):
+        # 2*min_segment points is the minimum testable series (one candidate split).
+        s = _step_series(10, 40, 7, 7, sd=0.5, seed=5)
+        result = stats_core.detect_changepoints(s)
+        assert result["status"] == "ok"  # not insufficient
+
+    def test_dates_carry_through_and_align(self):
+        s = _step_series(60, 50, 25, 25, sd=3, seed=42)
+        dates = [f"2026-06-{d + 1:02d}" if d < 30 else f"2026-07-{d - 29:02d}" for d in range(50)]
+        result = stats_core.detect_changepoints(s, dates=dates)
+        cp = result["changepoints"][0]
+        # The reported date is the one at the recovered index.
+        assert cp["date"] == dates[cp["index"]]
+
+    def test_two_breakpoints_recovered(self):
+        rng = random.Random(7)
+        s = (
+            [40 + rng.gauss(0, 2) for _ in range(20)]
+            + [55 + rng.gauss(0, 2) for _ in range(20)]
+            + [45 + rng.gauss(0, 2) for _ in range(20)]
+        )
+        idxs = [c["index"] for c in stats_core.detect_changepoints(s)["changepoints"]]
+        assert any(abs(i - 20) <= 3 for i in idxs)
+        assert any(abs(i - 40) <= 3 for i in idxs)
+
+    def test_max_changepoints_respected(self):
+        rng = random.Random(11)
+        s = []
+        for block, level in enumerate([10, 40, 10, 40, 10]):
+            s += [level + rng.gauss(0, 1) for _ in range(15)]
+        result = stats_core.detect_changepoints(s, max_changepoints=2)
+        assert len(result["changepoints"]) <= 2
+
+    def test_none_and_nan_entries_dropped(self):
+        s = _step_series(60, 50, 25, 25, sd=3, seed=42)
+        # Inject holes; detection should still recover a breakpoint on the clean data.
+        dirty = list(s)
+        dirty[3] = None
+        dirty[47] = float("nan")
+        result = stats_core.detect_changepoints(dirty)
+        assert result["status"] == "ok"
+        assert result["n"] == len(s) - 2
+        assert len(result["changepoints"]) >= 1
+
+    def test_effect_size_gate_suppresses_small_shift(self):
+        # A tiny 0.2-unit shift on unit noise is below the default 1.0-SD effect floor.
+        s = _step_series(50.0, 50.2, 30, 30, sd=1.0, seed=9)
+        assert stats_core.detect_changepoints(s)["changepoints"] == []
+
+    def test_deterministic(self):
+        s = _step_series(60, 50, 25, 25, sd=3, seed=42)
+        r1 = stats_core.detect_changepoints(s)
+        r2 = stats_core.detect_changepoints(s)
+        assert r1 == r2

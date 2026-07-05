@@ -13,6 +13,7 @@ actually have. Each test replays the review finding it closes:
   #496/C-3  strava un-paused: qa_smoke list corrected (source_state pins live in test_di1)
 """
 
+import glob
 import json
 import os
 import sys
@@ -34,7 +35,9 @@ import daily_metrics_compute_lambda as dmc  # noqa: E402
 import hypothesis_engine_lambda as hyp  # noqa: E402
 import weight_trend  # noqa: E402
 
-EVIDENCE_JS = open(os.path.join(_REPO, "site/assets/js/evidence.js")).read()
+# #581: evidence.js split into a router + per-family evidence_*.js modules — concatenate
+# the whole graph so a moved renderer (e.g. renderPhysical/renderResults) still gets found.
+EVIDENCE_JS = "\n".join(open(p).read() for p in sorted(glob.glob(os.path.join(_REPO, "site/assets/js/evidence*.js"))))
 COCKPIT_JS = open(os.path.join(_REPO, "site/assets/js/cockpit.js")).read()
 
 
