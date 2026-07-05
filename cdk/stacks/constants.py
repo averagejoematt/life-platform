@@ -43,7 +43,9 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 # v108: #506 ai_calls journal-signals preamble line (journal Phase 2)
 # v109: #498/#550 phase_taxonomy joins the layer (data_export derives from it);
 #        weather/supplements/dropbox facet entries in source_registry
-SHARED_LAYER_VERSION = 109
+# v110: #535 uncertainty everywhere — weight_trend rate CI + goal-date range,
+#        grounded_generation carries the rate CI/goal range, site_writer emits them
+SHARED_LAYER_VERSION = 110
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 
