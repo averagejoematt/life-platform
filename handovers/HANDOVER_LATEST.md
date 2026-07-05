@@ -73,8 +73,8 @@ errors to Bedrock on some evidence tabs, not page failures).
   watch item). An unintended public mirror; disable or bless.
 
 ## Watch
-- CI/CD pipeline on e1e30ca2 (the ship commit) was in_progress at wrap — site gate + pages
-  already green; a monitor was armed in-session. If anything reds it's the full test suite.
+- ~~CI/CD pipeline on e1e30ca2~~ — **completed SUCCESS before session close** (site gate,
+  pages, and the full pipeline all green; nothing to chase).
 - **Sun 07-06** (unchanged): journal-seeded hypothesis engine; panelcast v2; inter-coach
   dialogue SKIPS. **Mon 07-07**: data-recon on derived rows.
 - Forecast resolutions accruing since 07-05 (cockpit coverage line at n≥1).
