@@ -22,6 +22,12 @@ Covers:
 
   S3 storage size alarm (1):  OBS-08
     life-platform-s3-bucket-size-high  BucketSizeBytes Max >= 50GB, 86400s
+
+  #411 / ADR-116 (CloudWatch cost audit, 2026-07 — docs/reviews/CLOUDWATCH_AUDIT_2026-07.md):
+    Adopted 2 previously-orphan silent-failure signals into IaC:
+      compute-pipeline-stale            LifePlatform ComputePipelineStaleness Max >= 1, 86400s (digest)
+      hae-webhook-no-invocations-24h    AWS/Lambda Invocations < 1, 86400s, BREACHING (digest)
+    18 redundant/dead orphan alarms retired via deploy/cloudwatch_retire_orphans.sh.
 """
 
 from aws_cdk import (
@@ -685,6 +691,55 @@ class MonitoringStack(Stack):
             GTE,
             to_digest=True,
         )
+
+        # ══════════════════════════════════════════════════════════════
+        # #411 / ADR-116: two UNIQUE silent-failure signals adopted into IaC.
+        # Both existed only as hand-created (CLI-era) orphan alarms — the CloudWatch
+        # cost audit (docs/reviews/CLOUDWATCH_AUDIT_2026-07.md §3b) codifies them here
+        # under IaC-owned names so they are managed + reviewable. The manual originals
+        # (life-platform-compute-pipeline-stale, health-auto-export-no-invocations-24h)
+        # are deleted by deploy/cloudwatch_retire_orphans.sh; new names avoid any
+        # CloudFormation collision at deploy time.
+        # ══════════════════════════════════════════════════════════════
+        # Compute-pipeline staleness: daily_brief emits ComputePipelineStaleness=1
+        # (Source=computed_metrics) when the pre-computed compute artifacts it reads
+        # are stale. The freshness digest watches INGESTION sources; nothing else
+        # watches the COMPUTE pipeline going stale behind the brief. Digest.
+        _alarm(
+            "ComputePipelineStale",
+            "compute-pipeline-stale",
+            "LifePlatform",
+            "ComputePipelineStaleness",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            dims={"Source": "computed_metrics"},
+            to_digest=True,
+        )
+
+        # HAE webhook liveness: the Health Auto Export webhook (CGM/water/BP/State of
+        # Mind) is near-real-time and streams continuously, so <1 invocation in 24h =
+        # a dead webhook. treat_missing=BREACHING (absence IS the failure), matching
+        # panelcast-no-episode-7d. Digest — a quiet webhook is worth surfacing but is
+        # rarely a same-hour page.
+        _hae_silent = cloudwatch.Alarm(
+            self,
+            "HaeWebhookNoInvocations",
+            alarm_name="hae-webhook-no-invocations-24h",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Invocations",
+                dimensions_map={"FunctionName": "health-auto-export-webhook"},
+                period=Duration.seconds(86400),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=LT,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        _hae_silent.add_alarm_action(cw_actions.SnsAction(digest))
 
         # NOTE: OBS-07 email-subscriber alarm lives in web_stack.py (us-east-1).
         # email-subscriber Lambda runs in us-east-1; Lambda metrics are regional.
