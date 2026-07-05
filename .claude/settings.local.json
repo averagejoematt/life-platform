@@ -13,7 +13,9 @@
       "mcp__life-platform__get_hypotheses",
       "mcp__life-platform__get_sleep_analysis",
       "mcp__life-platform__get_deficit_sustainability",
-      "mcp__life-platform__get_coach_track_record"
+      "mcp__life-platform__get_coach_track_record",
+      "Skill(artifact-design)",
+      "Artifact"
     ]
   },
   "enableAllProjectMcpServers": true,
