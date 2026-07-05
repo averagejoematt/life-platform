@@ -150,6 +150,26 @@ class ComputeStack(Stack):
             **shared,
         )
 
+        # #553: quarterly in-voice coach memoirs. Runs on the 1st of each
+        # calendar quarter (Jan/Apr/Jul/Oct) at 15:00 UTC — well after the
+        # daily brief and the prior day's coach-prediction-evaluator have
+        # written the quarter's final LEARNING#/STANCE# records.
+        # Sonnet (narrative tier), budget-tier-1 self-pause via
+        # budget_guard.allow("coach_narrative"), regen-once-per-quarter via a
+        # MEMOIR#{quarter} DDB sentinel, writes generated/coach_memoirs.json.
+        create_platform_lambda(
+            self,
+            "CoachMemoir",
+            function_name="coach-memoir",
+            handler="compute.coach_memoir_lambda.lambda_handler",
+            source_file="lambdas/compute/coach_memoir_lambda.py",
+            schedule="cron(0 15 1 1,4,7,10 ? *)",
+            timeout_seconds=300,
+            memory_mb=256,
+            custom_policies=rp.compute_coach_memoir(),
+            **shared,
+        )
+
         create_platform_lambda(
             self,
             "AnomalyDetector",

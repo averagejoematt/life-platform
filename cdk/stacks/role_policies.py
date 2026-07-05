@@ -625,6 +625,21 @@ def compute_coach_daily_reflection() -> list[iam.PolicyStatement]:
     )
 
 
+def compute_coach_memoir() -> list[iam.PolicyStatement]:
+    """#553 quarterly coach memoir batch: reads COACH#/LEARNING#, PREDICTION#,
+    STANCE# + S3 voice specs, writes MEMOIR# sentinel/records back to the same
+    COACH# partition (needs PutItem, already granted by _compute_base's
+    DynamoDB statement), uses Bedrock (Sonnet, narrative tier) for the
+    first-person retrospective, writes generated/coach_memoirs.json.
+    Budget-tier SSM read is granted to every CDK role by create_platform_lambda."""
+    return _compute_base(
+        needs_kms=True,
+        needs_ai_keys=True,
+        needs_s3_config=True,
+        needs_s3_write=["generated/coach_memoirs.json"],
+    )
+
+
 def compute_daily_insight() -> list[iam.PolicyStatement]:
     """Daily insight compute (IC-2): reads DDB metrics, writes insight records, uses ai-keys for Haiku."""
     return _compute_base(
