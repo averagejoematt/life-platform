@@ -441,6 +441,29 @@ def test_pillar_drivers_summary():
     assert d["no_data"] == ["state_of_mind_valence"]
 
 
+def test_state_of_mind_valence_reads_som_avg_valence():
+    """#507: SoM daily aggregate lands on the apple_health record as som_avg_valence
+    (HealthKit -1..+1). The Mind pillar must read that field (the old code read a
+    non-existent `valence`/`average_valence` key → always None even with real data)
+    and map it to 0..100, while honest absence stays None (ADR-104)."""
+    from character_engine import compute_mind_raw
+
+    cfg = {"pillars": {"mind": {"components": {"state_of_mind_valence": {"weight": 1.0}}}}}
+
+    # Real one-day fixture value (raw/matthew/state_of_mind/2026/04/02.json) → slightly unpleasant.
+    _, details = compute_mind_raw({"state_of_mind": {"som_avg_valence": -0.2965}}, cfg)
+    assert details["state_of_mind_valence"]["score"] == 35.2
+
+    # Full-scale endpoints and neutral midpoint.
+    for valence, expected in [(1.0, 100.0), (-1.0, 0.0), (0.0, 50.0)]:
+        _, d2 = compute_mind_raw({"state_of_mind": {"som_avg_valence": valence}}, cfg)
+        assert d2["state_of_mind_valence"]["score"] == expected
+
+    # Behavioral absence reads as None, never fabricated.
+    _, d3 = compute_mind_raw({"state_of_mind": {}}, cfg)
+    assert d3["state_of_mind_valence"]["score"] is None
+
+
 # ── ADR-104: the reported scenario, end-to-end ──
 # 20 days: wearables flow (sleep data present), but zero journaling all cycle
 # and habits/workouts stop after day 13. Mind must lag sleep; movement must

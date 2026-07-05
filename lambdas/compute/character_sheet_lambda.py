@@ -188,7 +188,9 @@ def assemble_data(yesterday_str):
     data["journal"] = fetch_date("notion", yesterday_str)
     data["journal_entries"] = fetch_journal_entries(yesterday_str)
     data["habit_scores"] = fetch_date("habit_scores", yesterday_str)
-    data["state_of_mind"] = fetch_date("state_of_mind", yesterday_str)
+    # SoM daily aggregates (som_avg_valence) live on the apple_health record, not a
+    # separate state_of_mind partition — reuse the already-fetched apple record.
+    data["state_of_mind"] = data.get("apple") or {}
 
     # ── Rolling windows (batch queries for efficiency) ──
 

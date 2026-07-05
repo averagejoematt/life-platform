@@ -103,13 +103,11 @@ def _check_how_we_feel(date_str: str) -> tuple[bool, str]:
     item = _fetch_date("apple_health", date_str)
     if not item:
         return False, "No Apple Health data today"
-    som = item.get("state_of_mind_count") or item.get("state_of_mind_check_ins")
+    # HAE writes the SoM check-in count as som_check_in_count on the apple_health
+    # record (the older state_of_mind_count/_check_ins names were never produced).
+    som = item.get("som_check_in_count") or item.get("state_of_mind_count") or item.get("state_of_mind_check_ins")
     if som and int(float(som)) > 0:
         return True, f"{int(float(som))} How We Feel check-in(s)"
-    # Also check the dedicated state_of_mind partition
-    som_item = _fetch_date("state_of_mind", date_str)
-    if som_item and som_item.get("check_in_count", 0) > 0:
-        return True, f"{som_item['check_in_count']} How We Feel check-in(s)"
     return False, "No How We Feel check-in today"
 
 

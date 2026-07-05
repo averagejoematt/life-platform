@@ -236,7 +236,9 @@ def gather_chronicle_data():
     habitify = query_range("habitify", start, end)
 
     # --- State of Mind ---
-    state_of_mind = query_range("state_of_mind", start, end)
+    # SoM daily aggregates (som_avg_valence, som_top_labels/associations) live on
+    # the apple_health partition; keep only days that carry a SoM aggregate.
+    state_of_mind = {d: rec for d, rec in query_range("apple_health", start, end).items() if rec.get("som_avg_valence") is not None}
 
     # --- Supplements ---
     supplements = query_range("supplements", start, end)
@@ -623,17 +625,24 @@ def build_data_packet(data):
     packet.append("")
 
     # --- State of Mind ---
+    # Aggregate fields are prefixed som_* on the apple_health record; top labels /
+    # associations are already comma-joined strings, not lists.
     packet.append("=== STATE OF MIND (How We Feel) ===")
-    for d in sorted(data["state_of_mind"].keys()):
+    _som_days = sorted(data["state_of_mind"].keys())
+    if not _som_days:
+        packet.append("No State of Mind check-ins this week.")
+    for d in _som_days:
         rec = data["state_of_mind"][d]
-        valence = safe_float(rec, "valence")
-        labels = rec.get("emotion_labels", [])
-        areas = rec.get("life_areas", [])
-        parts = [f"{d}: valence {valence:.2f}" if valence is not None else f"{d}"]
+        valence = safe_float(rec, "som_avg_valence")
+        if valence is None:
+            continue
+        labels = rec.get("som_top_labels") or ""
+        areas = rec.get("som_top_associations") or ""
+        parts = [f"{d}: valence {valence:.2f}"]
         if labels:
-            parts.append(f"emotions: {', '.join(labels[:3])}")
+            parts.append(f"emotions: {labels}")
         if areas:
-            parts.append(f"areas: {', '.join(areas[:2])}")
+            parts.append(f"areas: {areas}")
         packet.append(" | ".join(parts))
     packet.append("")
 

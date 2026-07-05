@@ -1536,9 +1536,10 @@ def lambda_handler(event, context):
     data["adaptive_mode"] = {"brief_mode": brief_mode, "engagement_score": engagement_score}
     data["weather"] = data.get("weather_yesterday") or {}
     data["supplements_recent"] = data.get("supplements_7d") or []
-    # State of Mind — fetch if available
+    # State of Mind — SoM daily aggregates (som_avg_valence, som_top_associations)
+    # live on the apple_health partition, not a separate state_of_mind partition.
     try:
-        _som_data = fetch_date("state_of_mind", yesterday)
+        _som_data = fetch_date("apple_health", yesterday)
         data["state_of_mind"] = _som_data or {}
     except Exception:
         data["state_of_mind"] = {}
