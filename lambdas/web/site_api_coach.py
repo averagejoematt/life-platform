@@ -24,6 +24,7 @@ from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
 import boto3
+import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 
@@ -545,6 +546,13 @@ def handle_coach_team(event):
             cares = sb.get("focused_on_now") or []
             if cares:
                 focus.append(cares[0])
+            # #538: the same calibration numbers the scoreboard shows — so a coach's
+            # confidence in the huddle is legible next to how well-calibrated it's been.
+            _bare = pid.removesuffix("_coach")
+            _cal = {}
+            if _bare in _CALIB_COACH_NAMES:
+                _summ, _ = _score_coach_calibration(_bare)
+                _cal = {"brier": _summ["brier"], "calibration": _summ["calibration"], "scored_n": _summ["n"]}
             huddle.append(
                 {
                     "persona_id": pid,
@@ -555,6 +563,7 @@ def handle_coach_team(event):
                     "read_of_him": sb.get("headline_read"),
                     "watch": cares[0] if cares else None,
                     "graduation_gate": sb.get("graduation_gate"),  # ladder-only; absent on stance
+                    "calibration": _cal,
                     "source": sb.get("source"),
                 }
             )
@@ -1026,6 +1035,104 @@ def handle_coach_analysis(event):
         return _ok({"coach_id": coach_id, "domain": domain, "analysis": None}, cache_seconds=60)
 
     # Coaching Dashboard (GET — assembled dashboard data)
+
+
+# Shared coach id/name maps for the calibration + predictions surfaces.
+_CALIB_COACH_NAMES = {
+    "sleep": "Dr. Lisa Park",
+    "nutrition": "Dr. Marcus Webb",
+    "training": "Dr. Sarah Chen",
+    "mind": "Dr. Nathan Reeves",
+    "physical": "Dr. Victor Reyes",
+    "glucose": "Dr. Amara Patel",
+    "labs": "Dr. James Okafor",
+    "explorer": "Dr. Henning Brandt",
+}
+_CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
+
+
+def _score_coach_calibration(cid):
+    """Fetch a coach's resolved PREDICTION# records and score them (#538).
+
+    Returns (summary_dict, scorable_pairs) — the pairs are folded into the
+    platform-wide aggregate so per-coach and platform numbers come from one place.
+    """
+    coach_pk = f"COACH#{_CALIB_COACH_ID_MAP[cid]}"
+    records = []
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {  # ADR-058: hide pilot predictions
+                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
+                    "ScanIndexForward": False,
+                    "Limit": 500,
+                }
+            )
+        )
+        records = [_decimal_to_float(r) for r in resp.get("Items", [])]
+    except Exception as _e:
+        logger.warning(f"[calibration] {cid}: {_e}")
+    pairs = calibration_core.pairs_from_prediction_records(records)
+    summary = calibration_core.score_pairs(pairs)
+    return summary, pairs
+
+
+def handle_calibration(event):
+    """GET /api/calibration — the calibration scoreboard (#538).
+
+    Every forecast the platform makes, graded against what actually happened: a Brier
+    score + reliability curve per coach and platform-wide, folding in the hypothesis
+    engine's own calibration ledger. The honesty moat, made public and legible.
+    """
+    try:
+        per_coach = []
+        platform_pairs = []
+        for cid, name in _CALIB_COACH_NAMES.items():
+            summary, pairs = _score_coach_calibration(cid)
+            platform_pairs.extend(pairs)
+            per_coach.append({"coach_id": cid, "coach_name": name, **summary})
+
+        # Hypothesis-engine calibration ledger (word confidences → same [0,1] axis).
+        hyp_rows = []
+        try:
+            hresp = table.query(
+                **with_phase_filter(
+                    {
+                        "KeyConditionExpression": Key("pk").eq(USER_PREFIX + "calibration") & Key("sk").begins_with("CALIB#"),
+                        "ScanIndexForward": False,
+                        "Limit": 500,
+                    }
+                )
+            )
+            hyp_rows = [_decimal_to_float(r) for r in hresp.get("Items", [])]
+        except Exception as _e:
+            logger.warning(f"[calibration] hypothesis ledger: {_e}")
+        hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows)
+        hypotheses = calibration_core.score_pairs(hyp_pairs)
+
+        platform = calibration_core.score_pairs(platform_pairs + hyp_pairs)
+
+        # Rank coaches by Brier (best first); the never-graded fall to the bottom.
+        per_coach.sort(key=lambda c: (c["n"] == 0, c["brier"] if c["brier"] is not None else 1.0))
+
+        return _ok(
+            {
+                "platform": platform,
+                "coaches": per_coach,
+                "hypotheses": hypotheses,
+                "disclosure": (
+                    "Self-graded: every prediction here was resolved against the platform's own data by a "
+                    "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
+                    "always-say-50% baseline, lower is better. A well-calibrated forecaster's stated confidence "
+                    "matches how often it turns out right."
+                ),
+                "as_of": datetime.now(PT).strftime("%Y-%m-%d"),
+            },
+            cache_seconds=300,
+        )
+    except Exception as e:
+        logger.error(f"[calibration] {e}")
+        return _ok({"platform": {}, "coaches": [], "hypotheses": {}}, cache_seconds=60)
 
 
 def handle_predictions(event):

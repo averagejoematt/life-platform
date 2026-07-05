@@ -433,7 +433,8 @@
       "lambdas/training_notes.py",
       "lambdas/training_notes_llm.py",
       "lambdas/vacation_fund.py",
-      "lambdas/weight_trend.py"
+      "lambdas/weight_trend.py",
+      "lambdas/calibration_core.py"
     ]
   },
   "skip_deploy": {

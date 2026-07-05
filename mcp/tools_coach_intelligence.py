@@ -6,6 +6,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from boto3.dynamodb.conditions import Key
 
 from mcp.core import USER_PREFIX, decimal_to_float, table
@@ -195,6 +196,32 @@ def tool_get_coach_track_record(args):
     decided = by_outcome.get("confirmed", 0) + by_outcome.get("refuted", 0)
     hit_rate_pct = round(100 * by_outcome.get("confirmed", 0) / decided, 1) if decided else None
 
+    # Calibration (#538): a hit rate says how OFTEN the coach is right; the Brier score
+    # says how well its stated confidence matches reality. LEARNING# has no confidence,
+    # so score the source PREDICTION# records (which carry it) via the shared scorer.
+    calibration = {}
+    try:
+        pred_resp = table.query(
+            **_apply_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
+                    "ScanIndexForward": False,
+                    "Limit": 500,
+                }
+            )
+        )
+        pred_recs = [decimal_to_float(i) for i in pred_resp.get("Items", [])]
+        _summary = calibration_core.score_pairs(calibration_core.pairs_from_prediction_records(pred_recs))
+        calibration = {
+            "brier": _summary["brier"],
+            "brier_skill": _summary["brier_skill"],
+            "calibration": _summary["calibration"],
+            "reliability_bins": _summary["reliability_bins"],
+            "scored_n": _summary["n"],
+        }
+    except Exception as _cal_ex:
+        logger.warning("track_record calibration for %s failed: %s", cid, _cal_ex)
+
     # Recent evaluations — last 10 by date, with prediction text from the
     # source PREDICTION# record when accessible.
     recent = []
@@ -220,6 +247,7 @@ def tool_get_coach_track_record(args):
         "by_outcome": dict(by_outcome),
         "decided_count": decided,
         "hit_rate_pct": hit_rate_pct,
+        "calibration": calibration,
         "by_subdomain": {k: dict(v) for k, v in by_subdomain.items()},
         "by_metric": {k: dict(v) for k, v in by_metric.items()},
         "recent_evaluations": recent,

@@ -45,7 +45,9 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 #        weather/supplements/dropbox facet entries in source_registry
 # v110: #535 uncertainty everywhere — weight_trend rate CI + goal-date range,
 #        grounded_generation carries the rate CI/goal range, site_writer emits them
-SHARED_LAYER_VERSION = 110
+# v111: #538 calibration scoreboard — stats_core Brier/reliability primitives,
+#        new calibration_core scorer, compute_credibility consumes it
+SHARED_LAYER_VERSION = 111
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 

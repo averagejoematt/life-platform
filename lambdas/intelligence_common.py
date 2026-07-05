@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 
@@ -1556,9 +1557,16 @@ COACH_IDS_ALL = ["sleep", "nutrition", "training", "mind", "physical", "glucose"
 
 
 def compute_credibility(coach_id: str) -> dict:
-    """Compute credibility score for a coach based on prediction track record.
+    """Compute a coach's credibility from its prediction track record (#538).
 
-    Returns: {score, label, accuracy_pct, calibration, predictions_resolved, notable}
+    Now backed by a real Brier score + reliability curve (via the shared
+    `calibration_core` scorer) instead of a bare accuracy-% with a hand-rolled
+    "≥3 high-confidence" check. Same source (the coach thread's resolved
+    predictions), same return contract, plus `brier`/`brier_skill`/`reliability_bins`
+    so every credibility surface reads the same calibration numbers.
+
+    Returns: {score, label, accuracy_pct, calibration, brier, brier_skill,
+    reliability_bins, predictions_total, predictions_resolved, confirmed, refuted, pending}
     """
     entries = read_coach_thread(coach_id, limit=20)
 
@@ -1567,51 +1575,25 @@ def compute_credibility(coach_id: str) -> dict:
         for pred in entry.get("predictions", []):
             all_preds.append(pred)
 
-    resolved = [p for p in all_preds if p.get("status") in ("confirmed", "refuted")]
-    confirmed = [p for p in resolved if p["status"] == "confirmed"]
-    refuted = [p for p in resolved if p["status"] == "refuted"]
+    # One scorer: extract (stated_confidence, outcome) pairs and grade them. The
+    # thread predictions carry word confidences ("high") — calibration_core normalizes
+    # those onto the same [0,1] axis as the coach engine's numeric confidence.
+    pairs = calibration_core.pairs_from_prediction_records(all_preds)
+    summary = calibration_core.score_pairs(pairs)
     pending = [p for p in all_preds if p.get("status") == "pending"]
 
-    total_resolved = len(resolved)
-    accuracy_pct = round(len(confirmed) / total_resolved * 100, 1) if total_resolved > 0 else 0
-
-    # Calibration: do high-confidence predictions actually confirm more?
-    high_conf = [p for p in resolved if p.get("confidence") == "high"]
-    high_conf_right = sum(1 for p in high_conf if p["status"] == "confirmed")
-    if len(high_conf) >= 3:
-        high_accuracy = high_conf_right / len(high_conf)
-        if high_accuracy < 0.5:
-            calibration = "over-confident"
-        elif high_accuracy > 0.8:
-            calibration = "well-calibrated"
-        else:
-            calibration = "developing"
-    else:
-        calibration = "insufficient_data"
-
-    # Label
-    if total_resolved < 5:
-        label = "nascent"
-        score = 30
-    elif accuracy_pct >= 80 and total_resolved >= 15:
-        label = "authoritative"
-        score = 90
-    elif accuracy_pct >= 60 and total_resolved >= 10:
-        label = "reliable"
-        score = 70
-    else:
-        label = "developing"
-        score = 50
-
     return {
-        "score": score,
-        "label": label,
-        "accuracy_pct": accuracy_pct,
-        "calibration": calibration,
+        "score": summary["score"],
+        "label": summary["label"],
+        "accuracy_pct": summary["accuracy_pct"] if summary["accuracy_pct"] is not None else 0,
+        "calibration": summary["calibration"],
+        "brier": summary["brier"],
+        "brier_skill": summary["brier_skill"],
+        "reliability_bins": summary["reliability_bins"],
         "predictions_total": len(all_preds),
-        "predictions_resolved": total_resolved,
-        "confirmed": len(confirmed),
-        "refuted": len(refuted),
+        "predictions_resolved": summary["n"],
+        "confirmed": summary["confirmed"],
+        "refuted": summary["refuted"],
         "pending": len(pending),
     }
 

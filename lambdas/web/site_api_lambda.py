@@ -57,6 +57,7 @@ from phase_filter import with_phase_filter  # noqa: F401 — used by handlers be
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
     handle_ai_analysis,
+    handle_calibration,
     handle_coach,
     handle_coach_analysis,
     handle_coach_team,
@@ -802,6 +803,8 @@ def lambda_handler(event, context):
     # Prediction Ledger (GET with query params)
     if path == "/api/predictions":
         return handle_predictions(event)
+    if path == "/api/calibration":
+        return handle_calibration(event)
     if path == "/api/coach_timeline":
         return handle_coach_timeline(event)
     if path == "/api/weekly_priority":
