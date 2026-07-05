@@ -12,6 +12,7 @@ Lambdas (8+):
   daily-metrics-compute     cron(40 16 * * ? *)   — 9:40 AM PT daily (ADR-052)
   daily-insight-compute     cron(45 16 * * ? *)   — 9:45 AM PT daily (ADR-052)
   hypothesis-engine         cron(0 19 ? * SUN *)  — Sunday 12:00 PM PT
+  state-of-matthew          cron(30 19 ? * SUN *) — Sunday 12:30 PM PT (#552)
   weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
   dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
   challenge-generator       cron(0 22 ? * SUN *)  — Sunday 3:00 PM PT
@@ -288,6 +289,24 @@ class ComputeStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             custom_policies=rp.compute_hypothesis_engine(),
+            **shared,
+        )
+
+        # #552: "State of Matthew" weekly model brief — deterministic assembly of
+        # the forecast engine + hypothesis engine + coach consensus + calibration
+        # scoreboard into one narrated brief (ONE Haiku call/week, ADR-104 gated).
+        # Sunday 19:30 UTC (12:30 PM PT): 30 min after hypothesis-engine (19:00 UTC)
+        # so this week's fresh checks/resolutions are in before the brief reads them.
+        create_platform_lambda(
+            self,
+            "StateOfMatthew",
+            function_name="state-of-matthew",
+            handler="compute.state_of_matthew_lambda.lambda_handler",
+            source_file="lambdas/compute/state_of_matthew_lambda.py",
+            schedule="cron(30 19 ? * SUN *)",
+            timeout_seconds=60,
+            memory_mb=256,
+            custom_policies=rp.compute_state_of_matthew(),
             **shared,
         )
 

@@ -688,6 +688,17 @@ def compute_hypothesis_engine() -> list[iam.PolicyStatement]:
     )
 
 
+def compute_state_of_matthew() -> list[iam.PolicyStatement]:
+    """#552 State of Matthew weekly brief: reads forecast/hypotheses/coach/calibration
+    DDB partitions, uses ai-keys for one weekly Haiku narration call, writes the
+    combined brief back to DDB."""
+    return _compute_base(
+        needs_kms=True,  # writes state_of_matthew records to DDB
+        needs_ai_keys=True,
+        needs_s3_config=True,
+    )
+
+
 # ingestion_google_calendar() removed v3.7.46 — ADR-030 (integration retired)
 
 

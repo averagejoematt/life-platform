@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-05 (v8.6.0 — 144 MCP tools, 20 data sources, 90 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-05 (v8.6.0 — 144 MCP tools, 20 data sources, 91 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -1895,6 +1895,25 @@ Written by `forecast-engine` (16:50 UTC daily): deterministic EWMA expectations
 |----|----------|
 | `FORECAST#<target-date>#<metric>#h<horizon>` | One frozen forecast: `metric`, `source`, `field`, `unit`, `model` (`ewma-v1`), `horizon_days`, `issued_date`, `target_date`, `point`, `lo`, `hi`, `confidence` (0.8), `alpha`, `n_history`; after grading also `actual`, `covered`, `resolved_at` |
 | `DATE#<issued-date>` | Daily summary consumed by `/api/forecast` + the coach prompt block: `forecasts` (today's issues, with `frame`), `resolutions_today` (expected-vs-actual), `coverage` (running interval-coverage overall + per horizon; `null` until something has resolved) |
+
+---
+
+## State of Matthew Partition (#552, 2026-07-05)
+
+**pk:** `USER#matthew#SOURCE#state_of_matthew` (taxonomy class **`EXPERIMENT_SCOPED`** — regenerated
+weekly; nothing it cites is lost by wiping it, since the source records it summarizes have their own
+classes)
+
+Written by `state-of-matthew` (Sunday 19:30 UTC, 30 min after `hypothesis-engine`): the weekly
+executive brief — a deterministic assembly of the forecast engine (#541), the hypothesis engine's
+live pre-registered bets (#530/ADR-105), the coach panel's current consensus/disputes (the
+integrator digest), and the calibration scoreboard (#538), narrated by ONE weekly Haiku call
+(ADR-104 grounded-generation gated — the model narrates, never computes). Read by
+`GET /api/state_of_matthew`.
+
+| sk | Contents |
+|----|----------|
+| `DATE#<issued-date>` | `sections_available` (bool per input — a source with genuinely nothing yet, e.g. calibration n=0 post-reset, is omitted rather than zero-filled), `forecast`/`hypotheses`/`coaches`/`calibration` (each `null` when unavailable), `highlight` (the one deterministically-picked notable item this week, or `null`), `narrative` (the Haiku prose, or a deterministic template if budget-tier-paused/ungrounded), `narrated` (bool — whether Haiku's text passed the grounding gate), `model`, `disclosure` |
 
 ---
 

@@ -44,6 +44,11 @@ _FEATURE_CUTOFF = {
     # extraction, well before "chronicle" (cutoff 2) takes the whole installment
     # down. A paused pass just means Elena's own draft ships unedited.
     "chronicle_editor": 1,
+    # #552: the weekly "State of Matthew" brief's one Haiku narration call — same
+    # cutoff as coach_narrative/ensemble per the issue's explicit budget line
+    # ("+1 Haiku call/week, tier-1 paused"). A pause still produces a full record;
+    # narrate() falls back to a deterministic templated narrative.
+    "state_of_matthew": 1,
     # chronicle: was 1 (paused at the mildest budget state, which silently starved
     # the Friday Panel podcast — its only input is the weekly chronicle). Raised to
     # 2 so the flagship weekly Story+podcast survives tier 1, in lockstep with the
