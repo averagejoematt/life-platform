@@ -190,6 +190,16 @@ def _gather_facts_and_narratives():
                 return None
 
         facts = {k: _f(k) for k in ("recovery_pct", "hrv_ms", "rhr_bpm", "latest_weight")}
+    # M-8 (#493 / ADR-109): TSB is a DERIVED value, deliberately NOT in the canonical_facts
+    # schema (that stays scoped to measured vitals + weight, which the tight grounding_guard
+    # reads and injects into coach prompts). Supply it to the SENTINEL facts directly from
+    # computed_metrics so the scheduled cross-surface scan covers the coach-context TSB line.
+    # The wide absolute tolerance lives in coherence_invariants._ABS_TOL.
+    _tsb = cm.get("tsb")
+    try:
+        facts["tsb"] = round(float(_tsb), 1) if _tsb is not None else None
+    except (TypeError, ValueError):
+        facts["tsb"] = None
     narratives, labels = [], []
     # The served coach essays + the integrator synthesis.
     ai_pk = f"{USER_PREFIX}ai_analysis"
