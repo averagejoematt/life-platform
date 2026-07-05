@@ -7,6 +7,7 @@ prompt enforces narrate-don't-calculate + honest-empty-state rules, and the
 routing (lambda + CloudFront) exists.
 """
 
+import glob
 import json
 import os
 import sys
@@ -16,6 +17,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEB_STACK_SRC = open(os.path.join(_REPO, "cdk/stacks/web_stack.py")).read()
 EXPLAIN_JS = open(os.path.join(_REPO, "site/assets/js/explain.js")).read()
+# #581: evidence.js split into a router + per-family evidence_*.js modules — concatenate
+# the whole graph so a moved renderer (e.g. sleepCorrelationBoard) still gets found.
+EVIDENCE_JS_ALL = "\n".join(open(p).read() for p in sorted(glob.glob(os.path.join(_REPO, "site/assets/js/evidence*.js"))))
 
 
 def _ai():
@@ -120,7 +124,6 @@ def test_frontend_sends_only_the_surface_name():
     assert "JSON.stringify({ surface: mount.dataset.explain })" in EXPLAIN_JS
     # And the mounts exist on the three named dense surfaces.
     cockpit = open(os.path.join(_REPO, "site/assets/js/cockpit.js")).read()
-    evidence = open(os.path.join(_REPO, "site/assets/js/evidence.js")).read()
     assert 'explainMount("observatory_week")' in cockpit
     assert 'explainMount("what_changed")' in cockpit
-    assert 'explainMount("sleep_correlations")' in evidence
+    assert 'explainMount("sleep_correlations")' in EVIDENCE_JS_ALL

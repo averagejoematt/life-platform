@@ -13,8 +13,18 @@ incident (a 17% miss) sails through it by design. This one is the tight local
 guard for generation-time correction, where a false positive only costs one
 corrective rewrite, never an alarm email.
 
-Scope: RHR / recovery / HRV only. NOT weight — loss totals ("13.8 pounds") are
-deltas, not bodyweight, and invite false positives.
+Scope: RHR / recovery / HRV only — the three MEASURED physiological vitals. Two
+kinds of value are deliberately EXCLUDED (both are documented decisions, not gaps):
+  - WEIGHT: loss totals ("13.8 pounds") are deltas, not bodyweight, and invite
+    false positives.
+  - DERIVED / PROXY values, TSB first (M-8 / #493, ADR-109): TSB (training stress
+    balance = CTL−ATL) is a duration-PROXY Banister estimate, not a measurement — its
+    own "canonical" number carries uncertainty, and it is signed and crosses zero, so a
+    tight block-and-regen guard here would false-positive and, worse, correct a coach
+    against a figure that is itself an estimate. Derived values are covered instead by
+    the SCHEDULED cross-surface scan (coherence_invariants.check_facts_agreement, wide
+    ABSOLUTE tolerance) where a false alarm costs a digest line, not a rewrite. This
+    module stays the tight generation-time guard for the measured vitals only.
 
 Spelled-number gap (closed here): every guard used to be digit-based, so
 "recovery of twelve" passed unchecked. `_spelled_to_digits` normalizes

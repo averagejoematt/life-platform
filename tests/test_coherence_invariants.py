@@ -130,6 +130,55 @@ class TestFactsAgreement:
         f = ci.check_facts_agreement(narratives, self.FACTS)
         assert f.status in (ci.WARN, ci.ALARM)
 
+    # ── TSB: derived-value coverage (M-8 / #493 / ADR-109) ──────────────────────
+    # TSB is a signed, duration-proxy Banister value covered by this scheduled scan
+    # (never the tight grounding_guard). Wide ABSOLUTE tolerance (±12 points).
+    def test_tsb_contradiction_fires(self):
+        # Record says deep accumulated fatigue (−22); a coach claiming a fresh +8 is the
+        # M-8 derived-value contradiction that previously reached the brief ungated.
+        facts = {**self.FACTS, "tsb": -22}
+        narratives = ["Your TSB is +8 — fresh legs, go hard today."]
+        f = ci.check_facts_agreement(narratives, facts)
+        assert f.status in (ci.WARN, ci.ALARM)
+        assert any("tsb" in o for o in f.offenders)
+
+    def test_tsb_within_wide_tolerance_ok(self):
+        # −18 vs canonical −22 is a 4-point miss — well inside the wide ±12 band → OK.
+        facts = {**self.FACTS, "tsb": -22}
+        narratives = ["TSB is about -18 — still carrying real fatigue."]
+        f = ci.check_facts_agreement(narratives, facts)
+        assert f.status == ci.OK
+
+    def test_tsb_negative_sign_matters(self):
+        # Canonical −22; coach cites −8 (a much fresher value) → real contradiction.
+        facts = {**self.FACTS, "tsb": -22}
+        narratives = ["Training stress balance at -8 — you're nearly recovered."]
+        f = ci.check_facts_agreement(narratives, facts)
+        assert f.status in (ci.WARN, ci.ALARM)
+
+    def test_tsb_grounded_trend_not_a_contradiction(self):
+        # Cites the canonical −22; the −5 is a historical trend value → grounded, no flag.
+        facts = {**self.FACTS, "tsb": -22}
+        narratives = ["TSB -22 today, down from -5 last week — fatigue is deepening."]
+        f = ci.check_facts_agreement(narratives, facts)
+        assert f.status == ci.OK
+
+    def test_tsb_absent_from_facts_never_fires(self):
+        # No tsb in the facts dict → the tsb pattern must never manufacture an offender.
+        narratives = ["Your TSB is +8, fresh and ready."]
+        f = ci.check_facts_agreement(narratives, self.FACTS)
+        assert not any("tsb" in o for o in f.offenders)
+
+    def test_tsb_zero_is_a_real_value_not_no_data(self):
+        # TSB is signed, so a canonical 0 is a legitimate reading (not "no data"): a coach
+        # citing a deep −25 against a balanced 0 must still fire (regression guard for the
+        # signed-metric skip logic).
+        facts = {**self.FACTS, "tsb": 0}
+        narratives = ["Your TSB sits at -25 — badly overreached."]
+        f = ci.check_facts_agreement(narratives, facts)
+        assert f.status in (ci.WARN, ci.ALARM)
+        assert any("tsb" in o for o in f.offenders)
+
 
 class TestEndpointShape:
     def test_all_zero_predictions_fires(self):

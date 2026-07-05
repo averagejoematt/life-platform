@@ -42,7 +42,7 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 - **Must deliver:** dense, honest, explorable readouts — rings, trends (interactive), correlations —
   each showing *now + over time*, flagged when thin. Live source-freshness.
 - **Good looks like:** elite data journalism a QS skeptic trusts; charts you can hover/scrub.
-- **Files:** `evidence.js` (renderers), `v4_build_evidence.py` (registry/shell), `evidence.css`. **Endpoints:** `/api/pulse`, `/api/sleep_detail`, `/api/training_overview`, `/api/nutrition_overview`, `/api/correlations`, `/api/source_freshness`, etc.
+- **Files:** `evidence.js` (the router — registry dispatch + chrome) + per-family renderer modules `evidence_*.js` (`_shared`, `_body`, `_nutrition`, `_sleep`, `_habits`, `_discovery`, `_meta`, `_intelligence`, `_vitals`, `_reading`, `_character`, `_datafigure`; split in #581), `v4_build_evidence.py` (registry/shell), `evidence.css`. **Endpoints:** `/api/pulse`, `/api/sleep_detail`, `/api/training_overview`, `/api/nutrition_overview`, `/api/correlations`, `/api/source_freshness`, etc.
 
 ### The Coaching — `/coaching/` · the AI brain
 - **Loop role:** AI reads the data and argues about it. **Audience:** everyone — it's the showcase of "AI applied to one life."
@@ -58,7 +58,7 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 - **Must deliver:** each protocol framed causally — *what data it targets*, *which hypothesis/finding
   spawned it*, *the measured effect*. Reader voting/follow/checkin where built.
 - **Good looks like:** it reads as a causal experiment log, not a list of pills.
-- **Files:** `evidence.js`, `v4_build_evidence.py`. **Endpoints:** `/api/supplements`, `/api/experiments`, `/api/challenges`, `/api/discoveries`.
+- **Files:** `evidence.js` (router) + `evidence_discovery.js` (the /protocols/ renderers, split in #581), `v4_build_evidence.py`. **Endpoints:** `/api/supplements`, `/api/experiments`, `/api/challenges`, `/api/discoveries`.
 
 ### The Story — `/story/` · the narration
 - **Loop role:** the human journey narrating the whole loop, week by week. **Audience:** friends/family + returning followers.

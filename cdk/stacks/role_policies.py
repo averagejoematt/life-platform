@@ -2080,6 +2080,20 @@ def site_api_ai() -> list[iam.PolicyStatement]:
                 },
             },
         ),
+        # #546: short-lived board follow-up sessions (opaque token, TTL ≤ 1h, no
+        # PII). PutItem mints a thread; UpdateItem appends a follow-up turn +
+        # bumps the counter under the atomic ≤3 cap. Scoped to the BOARDSESS#*
+        # partition via LeadingKeys so this role can only touch session records.
+        iam.PolicyStatement(
+            sid="DynamoDBBoardSessionWrite",
+            actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["BOARDSESS#*"],
+                },
+            },
+        ),
         iam.PolicyStatement(
             sid="KMS",
             actions=["kms:Decrypt", "kms:GenerateDataKey"],
