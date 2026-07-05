@@ -1463,6 +1463,40 @@ challenges, experiments, chronicle, public site) anchors to it.
   not in scope: notion secret deletion, 62-message DLQ, stale layer versions
   on 6 Lambdas (now resolved as side-effect of v53 deploy).
 
+### §13. Scheduled re-evaluation of the phase filter (added 2026-07-04, #383)
+
+**Gap this closes:** the 2026-07 product review (RESTART-PHASE-FILTER-REEVAL)
+and the backlog scoring both cite "ADR-058 §13" as the place the 30/60/90-day
+phase-filter re-evaluation was promised — but the promise was never actually
+written into this ADR. This section is that missing commitment, recorded
+retroactively while building the checkpoint mechanism (#383).
+
+**Decision.** The read-path filter's default (`phase=pilot` hidden) is not a
+one-time call — how much pre-genesis history should stay hidden from public
+surfaces, coaching, and scoring is an empirical question that gets revisited
+at **30, 60, and 90 days** after `EXPERIMENT_START_DATE`, so the default is
+checked against how the hiding actually played out (where it protected the
+"fresh start" framing vs. where it hid context a coach or reader needed).
+
+**Mechanism.** `deploy/phase_filter_checkpoint.py` computes each checkpoint's
+due date relative to `EXPERIMENT_START_DATE` (so it re-derives correctly
+across any future restart, not a fixed calendar date), and gathers a
+deterministic diagnostic snapshot (every `include_pilot=True` bypass site in
+`lambdas/`+`mcp/`, plus the current EXPERIMENT_SCOPED source list from
+`phase_taxonomy.py`) to ground the review. `status` reports what's due;
+`record` writes the verdict — **keep-as-is / widen-read-paths /
+adjust-taxonomy**, even "no change" — to a durable audit trail
+(`docs/reviews/PHASE_FILTER_CHECKPOINTS.{json,md}`) and refuses to record a
+checkpoint before its due date (`--force` is testing-only). Any verdict that
+widens a read path is implemented through `phase_taxonomy.py` — the single
+classification source (ADR-077) — never as a one-off filter bypass.
+
+**Status:** mechanism shipped 2026-07-04. The current cycle's genesis
+(2026-06-14) puts the 30-day checkpoint at **2026-07-14**, 60-day at
+2026-08-13, 90-day at 2026-09-12. The 30-day review itself is Matthew's
+judgment call on real usage and had not yet happened as of this write-up
+(only 20 days post-genesis) — tracked in the audit trail above, not guessed
+here.
 
 ## ADR-059: Deploy Governance — `restart_pipeline.py` as the Single Safe Entry Point for Multi-Step State Changes
 
