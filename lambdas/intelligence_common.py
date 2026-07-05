@@ -1236,6 +1236,23 @@ def compute_builders_paradox_score(days: int = 7) -> dict:
 _MOVEMENT_LIVE_STATES = {"live", "fresh", "ok", "current", None}
 # Movement sources surfaced in the unavailability note, in priority order.
 _MOVEMENT_NOTE_SOURCES = ("strava", "garmin", "steps")
+# C-4 (#494): INGEST_HEALTH sentinel statuses (ingest_health.evaluate_source_health)
+# that mean the ingestion pipe *ran and completed its fetch without error* — i.e. the
+# source is confirmed live regardless of whether it returned any new records. Only "ok"
+# qualifies: "unknown" (no sentinel yet), "stale" (cron stopped), and "failing" (running
+# but erroring) all leave breakage-vs-rest ambiguous, so they must NOT unlock the verdict.
+_PIPE_HEALTHY_STATUSES = {"ok"}
+
+
+def _pipe_confirmed_live(ingest_health: dict, source: str) -> bool:
+    """True iff `source`'s INGEST_HEALTH sentinel status is a confirmed-live one.
+
+    ingest_health: {source: status} where status is the ingest_health.evaluate_source_health
+    verdict ('ok'|'stale'|'failing'|'unknown'). Missing/None ⇒ not confirmed (conservative).
+    """
+    return (ingest_health or {}).get(source) in _PIPE_HEALTHY_STATUSES
+
+
 # Language the guard withholds when movement isn't assessable.
 _UNDERTRAINING_PATTERN = re.compile(
     r"under[-\s]?train|over[-\s]?rest|sedentary|too (?:few|little) (?:workouts|training|activity|movement)"
@@ -1251,18 +1268,25 @@ def _movement_state_label(state) -> str:
     return str(state).replace("_", "-")
 
 
-def movement_assessability(source_states: dict) -> dict:
+def movement_assessability(source_states: dict, ingest_health: dict | None = None) -> dict:
     """Is the NEAT/aerobic movement picture assessable, given per-source states?
 
     source_states: {"strava": "paused"|"stale"|"live", "garmin": "rate_limited"|...,
-    "steps": "missing"|"live", ...}. Returns {assessable, unavailable, note}.
+    "steps": "missing"|"live", ...}.
+    ingest_health: {source: INGEST_HEALTH status} ('ok'|'stale'|'failing'|'unknown') from
+    ingest_health.evaluate_source_health. Optional — omitted ⇒ the conservative records-only
+    read (a non-live Strava withholds the verdict, as before C-4).
 
-    assessable is False when Strava (the authoritative aerobic/NEAT source, §4a) is
-    not live — steps alone undercount and Garmin is chronically rate-limited, so a
-    Strava outage means aerobic/NEAT volume genuinely can't be read. The note still
-    enumerates every unavailable movement source for transparency. (DI-1.1 will later
-    feed precise 'paused'/'rate_limited' states; until then callers pass freshness-
-    derived 'stale'/'missing' — the guard renders whatever label it's given.)
+    Returns {assessable, assessable_as_rest, unavailable, note, rest_note}.
+
+    C-4 (#494) — behavioral rest vs. pipe breakage. Strava is the authoritative aerobic/NEAT
+    source (§4a); a non-live Strava means no fresh records. That has two very different causes:
+      - the ingestion pipe is DOWN (auth/throttle/cron) — volume genuinely can't be read, and a
+        confident under-training verdict would be a lie ⇒ NOT assessable (withhold).
+      - the pipe is HEALTHY ('ok' sentinel: it ran, fetched, returned an empty set) — that IS
+        genuine behavioral rest, honestly assessable AS REST ⇒ assessable_as_rest, verdict
+        available (framed "no activity logged, pipe confirmed live").
+    Before C-4 both collapsed to "not assessable", gagging the coach through real quiet stretches.
     """
     states = source_states or {}
     unavailable = []
@@ -1271,18 +1295,41 @@ def movement_assessability(source_states: dict) -> dict:
         if st not in _MOVEMENT_LIVE_STATES:
             unavailable.append((src, _movement_state_label(st)))
     strava_live = states.get("strava", "live") in _MOVEMENT_LIVE_STATES
-    assessable = strava_live
+    # No fresh Strava records, but its ingestion pipe is confirmed live → behavioral rest.
+    assessable_as_rest = (not strava_live) and _pipe_confirmed_live(ingest_health, "strava")
+    assessable = strava_live or assessable_as_rest
     note = ""
-    if unavailable:
+    rest_note = ""
+    if assessable_as_rest:
+        if unavailable:
+            pretty = "; ".join(f"{s}: no activity logged" for s, _ in unavailable)
+            rest_note = (
+                f"no movement logged ({pretty}) — ingestion pipe confirmed live (INGEST_HEALTH ok), "
+                "so this is genuine behavioral rest, not a data gap"
+            )
+        else:
+            rest_note = (
+                "no movement logged — ingestion pipe confirmed live (INGEST_HEALTH ok), "
+                "so this is genuine behavioral rest, not a data gap"
+            )
+    elif unavailable:
         pretty = "; ".join(f"{s}: {st}" for s, st in unavailable)
         note = f"movement sources unavailable ({pretty})"
-    return {"assessable": assessable, "unavailable": unavailable, "note": note}
+    return {
+        "assessable": assessable,
+        "assessable_as_rest": assessable_as_rest,
+        "unavailable": unavailable,
+        "note": note,
+        "rest_note": rest_note,
+    }
 
 
 def apply_movement_honesty_guard(position_summary: str, assessability: dict, hevy_present: bool = False, hevy_summary: str = "") -> str:
     """Withhold an under-training/sedentary verdict when movement isn't assessable.
 
-    If the picture IS assessable (Strava live), the text is returned unchanged. If it
+    If the picture IS assessable — Strava live, OR no records but the pipe is confirmed
+    live so it's genuine behavioral rest (assessable_as_rest, C-4/#494) — the text is
+    returned unchanged (the honest under-training/rest verdict is allowed to stand). If it
     is NOT assessable and the summary asserts under-training/sedentary, that verdict is
     replaced with an honest statement that (a) reports the Hevy training that did happen
     and (b) names the unavailable sources + why, withholding the verdict. A summary that

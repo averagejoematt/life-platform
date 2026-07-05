@@ -341,6 +341,70 @@ def test_pipeline_health_counts_strava_again():
 
 
 # ==============================================================================
+# C-4 (#494) — movement guard tells behavioral rest from pipe breakage via INGEST_HEALTH
+# ==============================================================================
+# With C-3 (strava un-paused), a genuine quiet stretch resolves strava → 'stale' (no fresh
+# records). Whether that's honest rest or a broken pipe is decided by the INGEST_HEALTH
+# sentinel: a healthy ('ok') pipe + no records = behavioral rest (verdict available); an
+# unhealthy pipe + no records = ambiguous (verdict withheld).
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_healthy_pipe_no_records_is_assessable_as_rest():
+    """Healthy strava pipe ('ok' sentinel) + no fresh records ('stale' state) ⇒
+    assessable-as-rest: the under-training/rest verdict becomes available and the guard
+    lets it stand, framed honestly ('pipe confirmed live')."""
+    state = {"strava": "stale", "garmin": "rate_limited", "steps": "missing"}
+    assess = ic.movement_assessability(state, {"strava": "ok"})
+    assert assess["assessable"] is True, assess
+    assert assess["assessable_as_rest"] is True, assess
+    # The honest rest note names it as behavioral rest against a confirmed-live pipe.
+    low_note = assess["rest_note"].lower()
+    assert "confirmed live" in low_note and "behavioral rest" in low_note, assess
+
+    # A genuine rest/under-training summary is allowed to stand (verdict NOT withheld).
+    text = "Aerobic volume was low this week — mostly rest days off the bike."
+    assert ic.apply_movement_honesty_guard(text, assess, hevy_present=True) == text
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_unhealthy_pipe_no_records_stays_honest():
+    """Unhealthy strava pipe + no records ⇒ NOT assessable (rest vs. breakage is ambiguous):
+    the guard still withholds the under-training verdict. Every non-'ok' sentinel status
+    ('failing', 'stale', 'unknown', or absent) must stay conservative."""
+    state = {"strava": "stale", "garmin": "rate_limited", "steps": "missing"}
+    for health in ({"strava": "failing"}, {"strava": "stale"}, {"strava": "unknown"}, {}, None):
+        assess = ic.movement_assessability(state, health)
+        assert assess["assessable"] is False, (health, assess)
+        assert assess["assessable_as_rest"] is False, (health, assess)
+        guarded = ic.apply_movement_honesty_guard(
+            "Matthew is under-training — mostly rest days, low stimulus.", assess, hevy_present=True, hevy_summary="3 sessions"
+        )
+        low = guarded.lower()
+        assert "under-train" not in low and "rest day" not in low, (health, guarded)
+        assert "not assessable" in low, (health, guarded)
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_live_records_beats_ingest_health_signal():
+    """Fresh strava records ('live') are assessable regardless of the sentinel — and it's
+    ordinary assessable, NOT assessable_as_rest (there IS data to read)."""
+    state = {"strava": "live", "garmin": "rate_limited", "steps": "live"}
+    for health in ({"strava": "ok"}, {"strava": "failing"}, None):
+        assess = ic.movement_assessability(state, health)
+        assert assess["assessable"] is True and assess["assessable_as_rest"] is False, (health, assess)
+
+
+@pytest.mark.skipif(not _IC_OK, reason="intelligence_common (shared layer) unavailable")
+def test_ingest_health_omitted_is_backward_compatible():
+    """Called with no ingest_health arg (the pre-C-4 signature), the guard is unchanged:
+    a non-live strava withholds the verdict exactly as before."""
+    state = {"strava": "stale", "garmin": "stale", "steps": "missing"}
+    assess = ic.movement_assessability(state)
+    assert assess["assessable"] is False and assess["assessable_as_rest"] is False, assess
+
+
+# ==============================================================================
 # DI-1.4 — Apple-Health step-field completeness (false-clean envelope)
 # ==============================================================================
 
