@@ -228,6 +228,28 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/619"
         }
       ]
+    },
+    {
+      "id": "2026-07-05-the-pipes-get-honest",
+      "date": "2026-07-05",
+      "title": "Three data pipes get more honest",
+      "shipped": "The nutrition page's expenditure panel was quietly serving nothing — a single renamed field meant every reader was looking for a number the importer never wrote. It's reconnected end-to-end, and when the tracker hasn't uploaded a real expenditure figure it now shows a clearly-labeled estimate (from body weight) instead of a blank. Separately, the health-export pipe that carries glucose and blood pressure now validates what it writes (an impossible reading is dropped, not stored), respects the units it's handed instead of assuming, and tells a continuous monitor apart from a fingerstick by reading cadence rather than a raw count — which had been mislabeling partial days. And the journal now syncs edits made to older entries, cleans up entries deleted upstream, and keeps a second copy of every entry's text so the database isn't the only place it lives.",
+      "gotcha": "The health-export function had no shared code layer attached — it carried its own dependencies bundled in. That meant the usual fast, single-file deploy would have silently shipped it without those dependencies and broken it on the next run. The fix was to flag it so it only ever ships through the full infrastructure deploy, and to leave that reason written down next to it so the trap doesn't get re-sprung.",
+      "honest_miss": "The journal's new second-copy archive can't be confirmed working end-to-end yet: the upstream journal API is currently returning an auth error (an expired token), so no entries are flowing through to exercise it. The code is live and loads cleanly — but 'it runs' isn't 'it's verified,' and that's an honest gap until the token is refreshed. A fourth planned piece — a large front-end refactor — was deliberately left for a supervised session rather than rushed.",
+      "prs": [
+        {
+          "label": "PR #633",
+          "url": "https://github.com/averagejoematt/life-platform/pull/633"
+        },
+        {
+          "label": "PR #649",
+          "url": "https://github.com/averagejoematt/life-platform/pull/649"
+        },
+        {
+          "label": "PR #664",
+          "url": "https://github.com/averagejoematt/life-platform/pull/664"
+        }
+      ]
     }
   ]
 }
