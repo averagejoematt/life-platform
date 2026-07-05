@@ -45,10 +45,16 @@ LAYER_IDS = (
 # Line budget (runbook §1): stroked elements only — pupils/filled dots are exempt.
 MAX_STROKED = 48
 
+# Colour tones (character-illustration style, #587 round 4): a filled element may carry
+# `tone`, resolved to the recipe's `palette` hex via CSS custom props. Mirror of
+# portraits.js TONES. `accent` falls back to the coach identity channel.
+TONES = ("skin", "hair", "cloth", "accent", "blush", "line")
+
 # SVG path data, conservatively: commands + numbers + separators. No refs, no scripts.
 _PATH_RE = re.compile(r"^[MmLlHhVvCcSsQqTtAaZz0-9eE\s,.+-]+$")
 _ID_RE = re.compile(r"^[a-z0-9_]+$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def validate_recipe(recipe, persona_id=None):
@@ -79,6 +85,7 @@ def validate_recipe(recipe, persona_id=None):
         errs.append("required layer missing: head")
 
     stroked = 0
+    used_tones = set()
     for lid, elems in layers.items():
         if not isinstance(elems, list) or not elems:
             errs.append(f"layer {lid!r} must be a non-empty list")
@@ -89,13 +96,34 @@ def validate_recipe(recipe, persona_id=None):
                 continue
             if not _PATH_RE.match(el["d"]):
                 errs.append(f"layer {lid!r}[{i}]: 'd' contains non-path characters")
-            extra = set(el) - {"d", "filled"}
+            extra = set(el) - {"d", "filled", "tone"}
             if extra:
                 errs.append(f"layer {lid!r}[{i}]: unknown keys {sorted(extra)}")
-            if not el.get("filled"):
+            tone = el.get("tone")
+            if tone is not None:
+                if tone not in TONES:
+                    errs.append(f"layer {lid!r}[{i}]: unknown tone {tone!r} (allowed: {list(TONES)})")
+                else:
+                    used_tones.add(tone)
+            elif not el.get("filled"):
                 stroked += 1
     if stroked > MAX_STROKED:
         errs.append(f"line budget exceeded: {stroked} stroked elements > {MAX_STROKED} (runbook §1)")
+
+    palette = recipe.get("palette")
+    if palette is not None:
+        if not isinstance(palette, dict):
+            errs.append("palette must be an object of tone -> #rrggbb")
+            palette = {}
+        for k, v in palette.items():
+            if k not in TONES:
+                errs.append(f"palette: unknown tone {k!r} (allowed: {list(TONES)})")
+            elif not isinstance(v, str) or not _HEX_RE.match(v):
+                errs.append(f"palette.{k}: must be #rrggbb, got {v!r}")
+    # every used tone must resolve — from the palette, or (accent only) the coach channel
+    missing = used_tones - set(palette or {}) - {"accent"}
+    if missing:
+        errs.append(f"tones used without palette entries: {sorted(missing)}")
 
     meta = recipe.get("_meta")
     if not isinstance(meta, dict):

@@ -92,6 +92,23 @@ def test_schema_rejects_the_named_failure_modes():
     assert _broken(lambda r: r["layers"].update({"hatch": [{"d": "M0,0 l1,1"}] * (MAX_STROKED + 1)})), "blown line budget must fail"
 
 
+def test_tone_palette_contract():
+    # #587 round 4: character-colour tones. A toned element needs a palette entry
+    # (accent excepted — it falls back to the coach channel); hexes are validated.
+    r = copy.deepcopy(_fixture("test_placeholder_a"))
+    r["layers"]["hair"].append({"d": "M0,0 l1,1 Z", "tone": "hair"})
+    assert any("without palette entries" in e for e in validate_recipe(r, persona_id="test_placeholder_a"))
+    r["palette"] = {"hair": "#4a4a52"}
+    assert validate_recipe(r, persona_id="test_placeholder_a") == []
+    r["layers"]["hair"].append({"d": "M0,0 l1,1 Z", "tone": "accent"})  # accent needs no entry
+    assert validate_recipe(r, persona_id="test_placeholder_a") == []
+    r["palette"]["skin"] = "not-a-hex"
+    assert any("#rrggbb" in e for e in validate_recipe(r, persona_id="test_placeholder_a"))
+    del r["palette"]["skin"]
+    r["layers"]["hair"].append({"d": "M0,0 l1,1", "tone": "chrome"})
+    assert any("unknown tone" in e for e in validate_recipe(r, persona_id="test_placeholder_a"))
+
+
 def test_layer_registry_matches_the_runbook():
     # The fixed 13-layer schema (PORTRAIT_RUNBOOK §1) — renderer + validator share it.
     assert LAYER_IDS == (

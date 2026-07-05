@@ -36,7 +36,12 @@ const HIDDEN_AT_REST = { "eyes-closed": true, "mouth-a": true, "mouth-b": true }
 const STROKE = 'fill="none" stroke="currentColor" stroke-width="1.7" ' +
   'stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"';
 
+// Colour tones a recipe's palette may define (fixed order → deterministic output).
+// `accent` defaults to the coach identity channel when the palette omits it.
+export const TONES = ["skin", "hair", "cloth", "accent", "blush", "line"];
+
 function pathEl(el) {
+  if (el.tone) return `<path d="${escAttr(el.d)}" fill="var(--pt-${escAttr(el.tone)})" stroke="none"/>`;
   if (el.filled) return `<path d="${escAttr(el.d)}" fill="currentColor" stroke="none"/>`;
   return `<path class="pt-stroke" d="${escAttr(el.d)}" ${STROKE} pathLength="1"/>`;
 }
@@ -96,7 +101,14 @@ export function renderPortrait(recipe, coach, { title, cls = "", size } = {}) {
   const a11y = title === ""
     ? 'aria-hidden="true" focusable="false"'
     : `role="img" aria-label="${escAttr(title || `Illustrated portrait of ${name}, a fictional AI persona`)}"`;
-  return `<svg class="portrait${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 100 120" style="--pt-blink:${blink}s" ${a11y}>${body}</svg>`;
+  // Palette → inline custom props, fixed TONES order so output stays byte-deterministic.
+  const pal = recipe.palette || {};
+  let vars = `--pt-blink:${blink}s`;
+  for (const t of TONES) {
+    if (pal[t]) vars += `;--pt-${t}:${escAttr(pal[t])}`;
+    else if (t === "accent") vars += `;--pt-accent:var(--coach, currentColor)`;
+  }
+  return `<svg class="portrait${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 100 120" style="${vars}" ${a11y}>${body}</svg>`;
 }
 
 /*
