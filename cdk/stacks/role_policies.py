@@ -765,6 +765,37 @@ def compute_voice_fidelity_harness() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)
 
 
+def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
+    """Coach prediction evaluator: same DDB/S3 footprint as compute_coach_computation
+    (deterministic, no LLM), PLUS #534's two narrow additions for the event-driven
+    mid-week stance refresh this Lambda now also detects and fires:
+      - ssm:GetParameter on budget-tier — so budget_guard.allow() actually reads the
+        live tier instead of silently fail-opening (the tier=0 default) the way
+        inter_coach_dialogue_lambda's un-granted budget_guard call does today.
+      - lambda:InvokeFunction scoped to coach-history-summarizer ONLY — the async
+        fire-and-forget invoke that starts the mid-week STANCE# refresh.
+    Kept as its own dedicated function (not folded into compute_coach_computation,
+    which coach-observatory-renderer and the computation engine also use) so those
+    two Lambdas don't inherit permissions they don't need.
+    """
+    return _compute_base(
+        needs_kms=True,
+        needs_s3_config=True,
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="BudgetTierRead",
+                actions=["ssm:GetParameter"],
+                resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+            ),
+            iam.PolicyStatement(
+                sid="InvokeStanceRefresh",
+                actions=["lambda:InvokeFunction"],
+                resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-history-summarizer"],
+            ),
+        ],
+    )
+
+
 def compute_coach_orchestrator() -> list[iam.PolicyStatement]:
     """Coach narrative orchestrator: reads COACH#/ENSEMBLE#/NARRATIVE# partitions from DDB, reads S3 voice specs, uses ai-keys for Haiku LLM, writes briefs to DDB."""
     return _compute_base(needs_kms=True, needs_ai_keys=True, needs_s3_config=True)

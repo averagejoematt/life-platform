@@ -154,6 +154,7 @@ EXPIRY_MULTIPLIER = 2
 # ── AWS clients ──────────────────────────────────────────────────────────────
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
+_lambda_client = boto3.client("lambda", region_name=_REGION)  # #534: fires coach-history-summarizer's event refresh
 
 
 # =============================================================================
@@ -1030,6 +1031,251 @@ def _evaluate_all(predictions, today_str):
 
 
 # =============================================================================
+# #534: EVENT-DRIVEN STANCE REFRESH — deterministic significant-event detector
+# =============================================================================
+#
+# Epic #526's "weekly-frozen personality" gap: STANCE# (the coach-opinion) only
+# refreshes on the Sunday batch (coach_history_summarizer.py), so a big Tuesday
+# event changes nothing until the weekend. This runs at the end of the
+# (already daily, already deterministic, already no-LLM) evaluation pass and
+# fires an ASYNC, single-coach STANCE# refresh for the coach whose domain the
+# event actually happened in — never a platform-wide refresh.
+#
+# Four event classes, each deterministic and read from data this run already
+# has in memory or can cheaply read (no LLM, no guessing at "significance" —
+# every trigger below is a hard, already-computed fact):
+#   - prediction_refuted  — one of a coach's own predictions was just graded
+#                            refuted by _evaluate_all above (free — already in
+#                            memory). Coach: the prediction's own coach_id.
+#   - sick_day_onset      — a sick day was logged for today and NOT yesterday
+#                            (onset only, so a multi-day sick spell fires once,
+#                            not once per day of the spell). Coach: physical_coach
+#                            (longevity_medicine / "the long arc" — the closest
+#                            of the 8 to a body-recovery owner; no dedicated
+#                            recovery coach exists to route to instead).
+#   - vice_relapse        — a habit_scores.vice_streaks entry dropped from >0
+#                            to 0 between yesterday and today. Coach: mind_coach
+#                            (behavioral_psychology — "the stories behind the
+#                            streaks" is its own bio line in config/personas.json).
+#   - weight_milestone    — today's resolved weight crossed one of the canonical
+#                            _WEIGHT_MILESTONES thresholds (ai_context.py) that
+#                            yesterday's resolved weight had not yet crossed —
+#                            a strict crossing, not a fuzzy proximity window, so
+#                            it fires exactly once, the day it's actually true.
+#                            Coach: physical_coach (longevity_medicine — the
+#                            milestones are framed as biological/longevity
+#                            events: sleep-apnea risk, cardiovascular age, FFMI).
+#
+# Deliberately NOT covered here: "a PR" (a new personal record), even though
+# the epic names it. The only existing PR computation
+# (mcp/tools_training.py::tool_get_personal_records) is an MCP-package,
+# on-demand, full-history scan (2000-01-01 → today) built on MCP-only helpers
+# (get_profile / parallel_query_sources / get_sot) that aren't available to this
+# bundle without a new cross-package coupling the deploy convention warns
+# against (docs/CONVENTIONS.md — the single-file/bundle sibling-import trap).
+# Rather than invent a cheaper, unvetted approximation, this is left as a named,
+# documented fast-follow (see the PR description) instead of guessing broadly.
+#
+# Budget (matches epic #526's Budget line verbatim): capped Haiku calls, ≤2/day
+# PLATFORM-WIDE (not per-coach) — a mid-week refresh is a nice-to-have, not the
+# product; the $75/mo ceiling and the Sunday batch stay the priority. Same
+# tier-1 cutoff as every other coach narrative (budget_guard "coach_narrative").
+
+STANCE_EVENT_REFRESH_DAILY_CAP = 2  # epic #526 Budget: "Capped Haiku calls (≤2/day platform-wide)"
+
+from budget_guard import allow as _budget_allow  # noqa: E402
+from sick_day_checker import check_sick_day  # noqa: E402
+from ai_context import _WEIGHT_MILESTONES  # noqa: E402 — the one canonical list (see ai_context._build_milestone_context)
+
+# physical_coach owns both sick-day onset and weight-milestone crossings (see
+# the docstring above); mind_coach owns vice-streak relapses.
+_SICK_DAY_COACH = "physical_coach"
+_RELAPSE_COACH = "mind_coach"
+_MILESTONE_COACH = "physical_coach"
+
+
+def _detect_prediction_miss_events(evaluations):
+    """A coach's own prediction was refuted THIS run — the coach's most
+    confident public claims just took a deterministic, real hit. One event per
+    coach even if multiple predictions refuted the same day (the cap is
+    precious; the refresh reasons over the whole track record, not one miss)."""
+    events = {}
+    for e in evaluations or []:
+        if e.get("status") != "refuted":
+            continue
+        coach_id = e.get("coach_id")
+        if not coach_id or coach_id in events:
+            continue
+        claim = e.get("metric") or "a prediction"
+        events[coach_id] = {
+            "type": "prediction_refuted",
+            "detail": f"a prediction about {claim} was just graded refuted ({e.get('reason', '')})".strip(),
+        }
+    return events
+
+
+def _detect_sick_day_event(today_str, yesterday_str):
+    """Sick day ONSET only (today flagged, yesterday not) — a multi-day sick
+    spell must not re-fire the refresh once per day of the spell."""
+    try:
+        today_sick = check_sick_day(table, USER_ID, today_str)
+        if not today_sick:
+            return None
+        yesterday_sick = check_sick_day(table, USER_ID, yesterday_str)
+        if yesterday_sick:
+            return None  # continuation, not onset
+        reason = (today_sick or {}).get("reason") or "logged"
+        return {"type": "sick_day_onset", "detail": f"a sick day was logged today ({reason})"}
+    except Exception as e:
+        logger.warning("[stance-event] sick day check failed (non-fatal): %s", e)
+        return None
+
+
+def _habit_scores_for(date_str):
+    try:
+        resp = table.get_item(Key={"pk": f"{USER_PREFIX}habit_scores", "sk": f"DATE#{date_str}"})
+        return _decimal_to_float(resp.get("Item")) or {}
+    except Exception as e:
+        logger.warning("[stance-event] habit_scores read failed for %s (non-fatal): %s", date_str, e)
+        return {}
+
+
+def _detect_relapse_event(today_str, yesterday_str):
+    """Any vice whose streak dropped from >0 to 0 between yesterday and today."""
+    today_vs = (_habit_scores_for(today_str) or {}).get("vice_streaks") or {}
+    if not isinstance(today_vs, dict) or not today_vs:
+        return None
+    yesterday_vs = (_habit_scores_for(yesterday_str) or {}).get("vice_streaks") or {}
+    if not isinstance(yesterday_vs, dict):
+        return None
+    relapsed = sorted(v for v, streak in today_vs.items() if streak == 0 and (yesterday_vs.get(v) or 0) > 0)
+    if not relapsed:
+        return None
+    return {"type": "vice_relapse", "detail": f"the streak on {', '.join(relapsed)} just reset to 0"}
+
+
+def _crossed_milestones(prior_weight, current_weight):
+    """Milestones whose threshold sits strictly between prior and current
+    weight — a downward crossing only (this is a weight-LOSS journey; a regain
+    isn't the positive 'milestone' _WEIGHT_MILESTONES models)."""
+    if prior_weight is None or current_weight is None or current_weight >= prior_weight:
+        return []
+    return [m for m in _WEIGHT_MILESTONES if current_weight <= m["weight_lbs"] < prior_weight]
+
+
+def _detect_milestone_event(today_str, yesterday_str):
+    """A canonical weight milestone (ai_context._WEIGHT_MILESTONES) crossed
+    strictly between yesterday's and today's resolved weight.
+
+    Each call gets its OWN fresh data_cache — _get_source_data's cache key is
+    `{source}:{lookback_days}` (no end_date component, #534 audit), so sharing
+    one cache dict across the today/yesterday calls would silently serve
+    today's fetch back for the "yesterday" lookup too and the crossing check
+    would never fire. Two isolated one-shot caches sidestep that trap cleanly
+    rather than touching the shared caching helper other evaluators rely on.
+    """
+    try:
+        current = _resolve_metric_value("weight_lbs", {}, today_str)
+        prior = _resolve_metric_value("weight_lbs", {}, yesterday_str)
+        crossed = _crossed_milestones(prior, current)
+        if not crossed:
+            return None
+        deepest = min(crossed, key=lambda m: m["weight_lbs"])  # multiple crossed in one day -> report the furthest
+        return {"type": "weight_milestone", "detail": f"'{deepest['name']}' just crossed — {deepest['significance']}"}
+    except Exception as e:
+        logger.warning("[stance-event] milestone check failed (non-fatal): %s", e)
+        return None
+
+
+def _detect_stance_events(evaluations, today_str, yesterday_str):
+    """Union of all 4 deterministic event classes, deduped to ONE event per
+    coach (first class wins if a coach somehow qualifies for two the same day).
+    Returns {coach_id: {"type": ..., "detail": ...}}."""
+    events = _detect_prediction_miss_events(evaluations)
+
+    sick = _detect_sick_day_event(today_str, yesterday_str)
+    if sick and _SICK_DAY_COACH not in events:
+        events[_SICK_DAY_COACH] = sick
+
+    relapse = _detect_relapse_event(today_str, yesterday_str)
+    if relapse and _RELAPSE_COACH not in events:
+        events[_RELAPSE_COACH] = relapse
+
+    milestone = _detect_milestone_event(today_str, yesterday_str)
+    if milestone and _MILESTONE_COACH not in events:
+        events[_MILESTONE_COACH] = milestone
+
+    return events
+
+
+def _event_refresh_count_today(today_str):
+    """How many event-driven STANCE# refreshes have already landed today,
+    across all 8 coach partitions (cheap — 8 GetItems, no GSI/scan needed).
+    Counts only trigger="event:*" writes, never the weekly Sunday batch, so
+    the two caps stay independent of each other."""
+    count = 0
+    for coach_id in COACH_IDS:
+        try:
+            resp = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": f"STANCE#{today_str}"})
+            item = resp.get("Item")
+            if item and str(item.get("trigger", "")).startswith("event:"):
+                count += 1
+        except Exception as e:
+            logger.warning("[stance-event] cap check read failed for %s (non-fatal): %s", coach_id, e)
+    return count
+
+
+def _fire_event_stance_refreshes(events, today_str):
+    """Budget-gate, cap-enforce, and async-invoke coach-history-summarizer's
+    mid-week single-coach refresh path (#534) for each detected event, up to
+    STANCE_EVENT_REFRESH_DAILY_CAP total across the whole platform per day.
+
+    Fail-soft throughout — a detection or invoke error here must never fail
+    the prediction-evaluation run this is bolted onto.
+    """
+    if not events:
+        return {"detected": 0, "fired": 0, "skipped": "no_events"}
+
+    if not _budget_allow("coach_narrative"):
+        logger.info("[stance-event] budget tier paused coach narratives — skipping all %d event(s)", len(events))
+        return {"detected": len(events), "fired": 0, "skipped": "budget_tier"}
+
+    already_today = _event_refresh_count_today(today_str)
+    remaining = max(0, STANCE_EVENT_REFRESH_DAILY_CAP - already_today)
+    if remaining <= 0:
+        logger.info(
+            "[stance-event] daily cap (%d) already reached (%d done) — skipping %d event(s)",
+            STANCE_EVENT_REFRESH_DAILY_CAP,
+            already_today,
+            len(events),
+        )
+        return {"detected": len(events), "fired": 0, "skipped": "daily_cap_reached", "already_today": already_today}
+
+    fired = []
+    for coach_id, event_context in events.items():
+        if len(fired) >= remaining:
+            break
+        try:
+            _lambda_client.invoke(
+                FunctionName="coach-history-summarizer",
+                InvocationType="Event",  # async, fire-and-forget — never block the evaluator
+                Payload=json.dumps(
+                    {
+                        "mode": "event_stance_refresh",
+                        "coach_id": coach_id,
+                        "trigger_event": event_context,
+                    }
+                ).encode(),
+            )
+            fired.append(coach_id)
+            logger.info("[stance-event] fired mid-week refresh for %s (%s)", coach_id, event_context.get("type"))
+        except Exception as e:
+            logger.warning("[stance-event] invoke failed for %s (non-fatal): %s", coach_id, e)
+
+    return {"detected": len(events), "fired": len(fired), "coaches": fired, "already_today": already_today}
+
+
+# =============================================================================
 # LAMBDA HANDLER
 # =============================================================================
 
@@ -1072,6 +1318,17 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.error("Commitment evaluation failed (non-fatal): %s", e)
 
+        # #534: deterministic significant-event detection -> mid-week STANCE#
+        # refresh for the affected coach only. Fail-soft — a detection/invoke
+        # error here must never sink prediction evaluation.
+        stance_refresh_stats = {}
+        try:
+            yesterday_str = (datetime.strptime(today_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+            stance_events = _detect_stance_events(evaluations, today_str, yesterday_str)
+            stance_refresh_stats = _fire_event_stance_refreshes(stance_events, today_str)
+        except Exception as e:
+            logger.error("Stance-event detection failed (non-fatal): %s", e)
+
         return {
             "statusCode": 200,
             "date": today_str,
@@ -1080,6 +1337,7 @@ def lambda_handler(event, context):
             "predictions_evaluated": len(evaluations),
             "stats": stats,
             "commitment_stats": commitment_stats,
+            "stance_refresh_stats": stance_refresh_stats,
             "evaluations": evaluations,
         }
     except Exception as e:

@@ -594,8 +594,15 @@ class ComputeStack(Stack):
             handler="coach.coach_prediction_evaluator.lambda_handler",
             source_file="lambdas/coach/coach_prediction_evaluator.py",
             schedule="cron(0 16 * * ? *)",  # 9:00 AM PT daily (before daily brief at 11 AM)
-            timeout_seconds=60,
+            # 60s -> 90s (#534): the event-driven stance-refresh detection tacked onto
+            # the end of this run adds a handful of extra GetItem/Query reads (sick
+            # day, habit_scores, weight) plus up to 2 fire-and-forget async Lambda
+            # invokes — cheap, but not free inside the old 60s budget on a slow day.
+            timeout_seconds=90,
             memory_mb=256,
-            custom_policies=rp.compute_coach_computation(),  # same permissions as computation engine
+            # #534: dedicated policy (was compute_coach_computation()) — adds
+            # budget-tier read + a scoped InvokeFunction on coach-history-summarizer
+            # for the mid-week stance-refresh trigger; see role_policies.py.
+            custom_policies=rp.compute_coach_prediction_evaluator(),
             **shared,
         )

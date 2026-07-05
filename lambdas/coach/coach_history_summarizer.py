@@ -185,6 +185,15 @@ def _float_to_decimal(obj):
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from retry_utils import _emit_token_metrics  # noqa: E402,F401
 
+# #534: the STANCE# writer joins ADR-104's grounded-generation gate (the named
+# fast-follow from ADR-104's honest residual — "the STANCE# writer gate is a
+# named fast-follow"). Fails open (gate becomes a no-op) if the shared module
+# is somehow missing from the bundle/layer — never blocks stance generation.
+try:
+    from grounded_generation import allowed_numbers, grounding_findings, regen_once
+except ImportError:  # pragma: no cover — environment-dependent
+    allowed_numbers = grounding_findings = regen_once = None
+
 
 def _emit_failure_metric():
     """Emit API failure metric to CloudWatch (non-fatal)."""
@@ -1124,18 +1133,94 @@ def _sanitize_stance(stance, compressed, prior_stance):
     return stance
 
 
-def _generate_stance(coach_id, compressed, track, prior_stance):
+# #534: prose-bearing fields the ADR-104 gate actually checks. Deliberately
+# excludes as_of/generated_at/coach_id/display_name/domain — those are
+# bookkeeping, not claims, and their timestamps (e.g. "12:34:56") would read as
+# fabricated numbers to a naive whole-dict scan.
+_STANCE_PROSE_FIELDS = (
+    "headline_read",
+    "focused_on_now",
+    "set_aside_for_now",
+    "stage",
+    "how_my_read_changed",
+    "confidence_note",
+    "evidence_basis",
+)
+
+
+def _stance_prose_blob(stance):
+    """JSON blob of only the stance's prose-bearing fields, for the ADR-104 gate."""
+    return json.dumps({k: stance.get(k) for k in _STANCE_PROSE_FIELDS}, default=str)
+
+
+def _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message, result):
+    """#534: the ADR-104 grounded-generation gate joins the STANCE# writer.
+
+    grounding_findings() runs the shared allow-list number check over the
+    stance's PROSE fields only (never bookkeeping timestamps). One corrective
+    regen via the shared regen_once harness — exactly the analyzer/field_notes
+    pattern, reused rather than reinvented. Findings that survive the one
+    regen are returned to the caller, which fail-keep-priors: a stance that
+    still cites an ungrounded number is never written over a good one.
+    """
+    if grounding_findings is None or regen_once is None or allowed_numbers is None:
+        return result, []  # shared module unavailable — fail-open, matches its own design
+
+    allowed = allowed_numbers(user_message)
+    holder = {"latest": result}
+
+    def _findings_fn(text):
+        return grounding_findings(text, facts=None, allowed=allowed)
+
+    def _regen_fn(correction):
+        strict_message = user_message + "\n\n" + correction
+        retry = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=strict_message, max_tokens=1400, temperature=0.2)
+        if not isinstance(retry, dict):
+            return ""
+        for field, default in _STANCE_FIELDS.items():
+            retry.setdefault(field, default() if callable(default) else default)
+        retry["coach_id"] = coach_id
+        retry["display_name"] = meta["display_name"]
+        retry["domain"] = meta["domain"]
+        retry["as_of"] = result.get("as_of")
+        retry["generated_at"] = result.get("generated_at")
+        _sanitize_stance(retry, compressed, prior_stance)
+        holder["latest"] = retry
+        return _stance_prose_blob(retry)
+
+    text = _stance_prose_blob(result)
+    _best_text, findings, corrected = regen_once(text, _findings_fn, _regen_fn)
+    best = holder["latest"] if corrected else result
+    best["grounding_flag"] = _vital_hits(best) > 0
+    return best, findings
+
+
+def _generate_stance(coach_id, compressed, track, prior_stance, event_context=None):
     """Generate one coach's evolving stance via a grounded Haiku call.
 
-    Self-corrects ONCE if raw vitals leak (mirrors ai_expert_analyzer). Returns the
-    stance dict, or None on a hard failure (caller treats a missing stance as
-    fail-soft — the public render keeps the ladder fallback).
+    Self-corrects ONCE if raw vitals leak (mirrors ai_expert_analyzer), then
+    runs the ADR-104 grounded-generation gate (#534). Returns the stance dict
+    (which may carry residual "_adr104_findings" for the caller's fail-keep-
+    prior decision), or None on a hard failure (caller treats a missing stance
+    as fail-soft — the public render keeps the ladder fallback).
+
+    event_context (#534, optional): {"type": ..., "detail": ...} — a
+    deterministic, already-computed description of the significant event that
+    triggered a mid-week refresh (never LLM-generated, never raw numbers) so
+    the model has something concrete to react to without inventing anything.
     """
     meta = _coach_meta(coach_id)
     now_iso = datetime.now(timezone.utc).isoformat()
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     user_message = _build_stance_message(coach_id, compressed, track, prior_stance)
+    if event_context:
+        user_message += (
+            "\n\n## A significant event was just detected in your domain (deterministic, "
+            f"not LLM-generated): {event_context.get('type', 'event')} — {event_context.get('detail', '')}\n"
+            "Only reflect this in 'how_my_read_changed' if it genuinely shifts your read; "
+            "otherwise proceed with your normal analysis."
+        )
     result = _call_haiku(system=STANCE_SYSTEM_PROMPT, user_message=user_message, max_tokens=1400, temperature=0.3)
     if not isinstance(result, dict):
         logger.warning("[stance] LLM returned non-dict for %s — skipping stance this run", coach_id)
@@ -1160,8 +1245,11 @@ def _generate_stance(coach_id, compressed, track, prior_stance):
     result["generated_at"] = now_iso
 
     _sanitize_stance(result, compressed, prior_stance)
-    result["grounding_flag"] = _vital_hits(result) > 0
-    if result["grounding_flag"]:
+
+    # #534: ADR-104 gate — one corrective regen, fail-keep-prior on the caller.
+    result, adr104_findings = _apply_grounding_gate(coach_id, meta, compressed, prior_stance, user_message, result)
+    result["_adr104_findings"] = adr104_findings
+    if result.get("grounding_flag"):
         logger.warning("[stance] %s retains raw-vital citations after correction — flagged", coach_id)
     return result
 
@@ -1176,23 +1264,46 @@ def _write_stance(coach_id, stance):
     return ok_hist and ok_latest
 
 
-def _run_stance(coach_id, compressed, state):
+def _run_stance(coach_id, compressed, state, trigger="weekly", event_context=None):
     """Gather track record + prior stance, generate, and persist. Returns a result
-    dict for the handler summary. Fail-soft — never raises into the compression loop."""
+    dict for the handler summary. Fail-soft — never raises into the compression loop.
+
+    trigger (#534): "weekly" for the Sunday batch, "event:<type>" for a
+    mid-week single-coach refresh — persisted on the STANCE# record so
+    _event_refresh_count_today (coach_prediction_evaluator.py) can enforce the
+    platform-wide daily cap without a new DDB item type.
+    """
     if compressed.get("_fallback"):
         return {"written": False, "reason": "compression_fallback"}
     try:
         track = _summarize_track_record(_gather_learning(coach_id), state.get("confidence_records", []))
         prior_stance = _get_item(f"COACH#{coach_id}", "STANCE#latest")
-        stance = _generate_stance(coach_id, compressed, track, prior_stance)
+        stance = _generate_stance(coach_id, compressed, track, prior_stance, event_context=event_context)
         if not stance:
             return {"written": False, "reason": "generation_failed"}
+
+        adr104_findings = stance.pop("_adr104_findings", [])
+        if adr104_findings:
+            # Fail-keep-prior (#534/ADR-104): never overwrite a grounded stance
+            # (or write a first-ever ungrounded one) with a draft that still
+            # cites a number the platform can't trace to its own data.
+            reason = "adr104_gate_failed_kept_prior" if prior_stance else "adr104_gate_failed_no_prior"
+            logger.warning(
+                "[stance] %s ADR-104 gate still failing after regen (%d finding(s)) — %s",
+                coach_id,
+                len(adr104_findings),
+                "keeping prior stance" if prior_stance else "no prior to keep, skipping write",
+            )
+            return {"written": False, "reason": reason, "adr104_findings": len(adr104_findings)}
+
+        stance["trigger"] = trigger
         written = _write_stance(coach_id, stance)
         return {
             "written": written,
             "stage": (stance.get("stage") or {}).get("label"),
             "evolved": bool(stance.get("how_my_read_changed")),
             "grounding_flag": stance.get("grounding_flag", False),
+            "trigger": trigger,
         }
     except Exception as e:
         logger.error("[stance] generation failed for %s (non-fatal): %s", coach_id, e)
@@ -1204,14 +1315,69 @@ def _run_stance(coach_id, compressed, state):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def _handle_event_stance_refresh(event):
+    """#534: mid-week single-coach STANCE# refresh.
+
+    Invoked ASYNC by coach-prediction-evaluator.py the moment it detects a
+    significant, deterministic event (a refuted prediction, a sick-day onset,
+    a vice relapse, or a weight-milestone crossing) in exactly one coach's
+    domain. Never runs the expensive weekly compression — reads the existing
+    COMPRESSED#latest baseline the Sunday batch already wrote, then runs the
+    SAME _run_stance/_generate_stance path (and the same ADR-104 gate) as the
+    weekly writer, just for the one affected coach.
+
+    Expected event shape:
+      {"mode": "event_stance_refresh", "coach_id": "...", "trigger_event": {"type": ..., "detail": ...}}
+    """
+    coach_id = event.get("coach_id")
+    event_context = event.get("trigger_event") or {}
+
+    if coach_id not in ALL_COACH_IDS:
+        logger.warning("[event-stance] invalid coach_id: %s", coach_id)
+        return {"statusCode": 400, "error": "invalid coach_id"}
+
+    # Budget gate — defense in depth. The caller (coach_prediction_evaluator)
+    # already checked before invoking, but this Lambda runs async and the
+    # tier can move between that check and this run.
+    try:
+        from budget_guard import allow as _budget_allow
+
+        if not _budget_allow("coach_narrative"):
+            logger.info("[event-stance] %s skipped — budget tier paused coach narratives", coach_id)
+            return {"statusCode": 200, "coach_id": coach_id, "skipped": "budget_tier"}
+    except Exception:
+        pass  # fail-open — a budget_guard/SSM blip must not block a rare mid-week refresh
+
+    compressed = _get_item(f"COACH#{coach_id}", "COMPRESSED#latest")
+    if not compressed or compressed.get("_fallback"):
+        logger.info("[event-stance] %s skipped — no usable COMPRESSED#latest baseline yet", coach_id)
+        return {"statusCode": 200, "coach_id": coach_id, "skipped": "no_compressed_baseline"}
+
+    # Cheap fresh reads only — no need for the full weekly _gather_coach_state
+    # (outputs/threads/predictions haven't materially changed mid-week; the
+    # compressed baseline already carries them).
+    state = {"confidence_records": _query_begins_with(f"COACH#{coach_id}", "CONFIDENCE#")}
+
+    event_type = event_context.get("type", "unknown")
+    result = _run_stance(coach_id, compressed, state, trigger=f"event:{event_type}", event_context=event_context)
+    logger.info("[event-stance] %s (%s) -> %s", coach_id, event_type, result)
+    return {"statusCode": 200, "coach_id": coach_id, "event_type": event_type, "result": result}
+
+
 def lambda_handler(event, context):
     """Weekly history compression for coach intelligence system.
 
     Optional event fields:
       - coach_ids: list[str] — specific coaches to compress (defaults to all 8)
+      - mode: "event_stance_refresh" (#534) — routes to the mid-week single-
+        coach stance-only refresh instead of the weekly compression batch;
+        see _handle_event_stance_refresh for its own event shape.
 
     Returns a summary of compression results per coach.
     """
+    if event.get("mode") == "event_stance_refresh":
+        return _handle_event_stance_refresh(event)
+
     try:
         coach_ids = event.get("coach_ids", ALL_COACH_IDS)
         logger.info(
@@ -1259,7 +1425,7 @@ def lambda_handler(event, context):
 
                 # Stance engine (coach-opinion) — evolving evidence-derived read of
                 # Matthew. Fail-soft: a stance error never aborts the compression run.
-                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state)
+                results[coach_id]["stance"] = _run_stance(coach_id, compressed, state, trigger="weekly")
 
             except Exception as e:
                 logger.error("Failed to compress %s: %s", coach_id, e, exc_info=True)
