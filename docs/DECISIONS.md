@@ -3104,3 +3104,22 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 - The orphan `sleep_unified` DDB partition is **left in place** (delete-safe; read by nothing) and **reclassified RAW_TIMESERIES → SYSTEM_STATE** (dead partition) in `phase_taxonomy.py` so the restart tooling still traverses the existing records without raising — same precedent as `google_calendar` / `composite_scores`.
 
 **Consequences.** `/data/sleep` loses a redundant, chronically-mislabelled panel and keeps the fresher `/api/sleep_detail` figures under a correct date. One compute Lambda + rule + IAM role retire (a small cost/attack-surface reduction). No data is destroyed. If a genuinely-merged sleep record is ever wanted, it must be rebuilt against real record shapes with today-inclusive lookback and a compute consumer that justifies it — this ADR is the recorded verdict so that case starts from scratch, deliberately, rather than reviving dead code.
+
+---
+
+## ADR-119: Keep polling Whoop, do not adopt v2 webhooks (A-8, #508)
+
+**Date:** 2026-07-05 · **Status:** Accepted · **Story:** #508 (epic #465, data-source health review 2026-07, finding **A-8** P3) · **Spike:** `docs/reviews/WHOOP_WEBHOOK_SPIKE_2026-07.md` · **Feeds:** #415 (source-reconciliation goal) · **Type:** SPIKE verdict — no production change
+
+**Context.** Whoop ships v2 push webhooks (`workout|sleep|recovery.{updated,deleted}`, HMAC-SHA256 signed, 5-retry-over-~1hr at-least-once delivery — see the spike for the full vendor contract) that this platform does not use. The current posture is an hourly **18×/day** trailing re-fetch (`lambdas/ingestion/whoop_lambda.py`; `cron(0 {INGEST_HOURLY} * * ? *)` + a 9:30 AM PT recovery refresh), fetching 4 endpoints (`recovery`, `activity/sleep`, `cycle`, `activity/workout`) with `refresh_trailing_days=2` so late-arriving per-workout sub-records are healed. A-8 asks whether push should replace poll. The receiver shape a Whoop webhook would need already exists in-repo (`hevy_webhook_lambda.py` FunctionURL + `hevy_common.verify_webhook_signature` + the id-only "fetch canonical, never trust the body" discipline), so feasibility was never the question — desirability is.
+
+**Decision: KEEP POLLING.** Webhooks are *additive* complexity for Whoop, not a replacement, for four reasons that all point the same way:
+
+1. **Webhooks don't remove the fragile part.** The v2 payload is **id-only**; the receiver must still hold a valid OAuth access token to fetch the canonical record. Whoop's hardest edge — refresh-token rotation on every refresh, which is why the ingest lambda pins **`ReservedConcurrentExecutions=1`** and disables async retry (`ingestion_stack.py:82-95`) — is *worsened* by bursty concurrent deliveries, not removed.
+2. **Webhooks can't cover the whole surface.** There is **no `cycle`/strain webhook event** in v2 (only workout/sleep/recovery). Strain would keep polling regardless, so webhooks add a *second* ingestion path rather than replacing the one we have.
+3. **You still need a reconciling poll for reliability.** Whoop drops an event after ~5 retries/~1 hour with no vendor DLQ or replay. The current trailing re-fetch *is* the drop-healing backstop a webhook-primary design would still have to keep — so webhooks sit on top of polling, not instead of it.
+4. **Nothing is forcing the move.** Whoop has no rate-limit breaker; the code documents polling as "safe and cheap." The only prize is latency (hour → seconds) on a source whose freshest signal (recovery) finalizes mid-morning and is consumed by the 11 AM daily brief / nightly compute — a latency win the platform doesn't actually spend.
+
+Per ADR-103's "subtract more than add" posture, adopting webhooks here is added surface area (FunctionURL + IAM role + CDK + signature-verify + `trace_id` dedup + monitoring, all *alongside* the poll that must stay) for latency the platform doesn't consume. That is the wrong trade.
+
+**Consequences.** No production change in this story; the trailing re-fetch remains the single Whoop ingestion path and its drop-healing is treated as the feature, not overhead. This is the recorded input to #415: Whoop stays **poll-reconciled**, not push-reconciled. No follow-up implementation issue is filed (that is only required on ADOPT). Revisit only on a concrete trigger — Whoop introducing rate limits that make 18×/day expensive, a product need for sub-hour recovery latency, or a webhook-native design that also covers `cycle` — at which point this ADR is the starting point that must be overturned deliberately.
