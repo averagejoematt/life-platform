@@ -189,6 +189,32 @@ def _latest_date(items):
     return max(dates) if dates else None
 
 
+def _read_movement_ingest_health(sources=("strava", "garmin")):
+    """C-4 (#494): read the INGEST_HEALTH sentinels for the movement sources and return
+    their infra-liveness status ({source: 'ok'|'stale'|'failing'|'unknown'}).
+
+    This is the signal that lets the honesty guard tell behavioral rest (pipe ran, fetched,
+    returned nothing) from pipe breakage (auth/throttle/cron down). Read-only — the sentinel
+    is *written* by the ingestion framework; we only consult it. Best-effort: any failure
+    yields {} so movement_assessability falls back to the conservative records-only read.
+    """
+    out = {}
+    try:
+        from ingest_health import SYSTEM_PK, evaluate_source_health, ingest_health_sk
+    except Exception as e:  # ingest_health absent from the bundle → conservative fallback
+        logger.warning("ingest_health unavailable; movement guard falls back to records-only: %s", e)
+        return out
+    now = datetime.now(timezone.utc)
+    for src in sources:
+        try:
+            resp = table.get_item(Key={"pk": SYSTEM_PK, "sk": ingest_health_sk(src)})
+            verdict = evaluate_source_health(resp.get("Item"), now=now, source=src)
+            out[src] = verdict.get("status", "unknown")
+        except Exception as e:
+            logger.warning("INGEST_HEALTH read failed for %s: %s", src, e)
+    return out
+
+
 def gather_data_for_expert(expert_key):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     # Clamp lookback to experiment start — data before April 1 is pre-experiment
@@ -325,6 +351,9 @@ def gather_data_for_expert(expert_key):
             "garmin": _garmin_state,
             "steps": "live" if step_vals else "missing",
         }
+        # C-4 (#494): the INGEST_HEALTH sentinel disambiguates behavioral rest (pipe live,
+        # no records → assessable-as-rest) from pipe breakage (not assessable → stay honest).
+        movement_ingest_health = _read_movement_ingest_health()
         hevy_summary = (
             f"{hevy_sessions} Hevy session(s), {hevy_sets} sets, {hevy_min} min over {len(hevy_dates)} day(s)" if hevy_sessions else ""
         )
@@ -345,6 +374,7 @@ def gather_data_for_expert(expert_key):
             "rest_days": rest_days,
             "modality_breakdown": modalities,
             "movement_source_state": source_state,
+            "movement_ingest_health": movement_ingest_health,
             "hevy_summary": hevy_summary,
         }
 
@@ -582,7 +612,7 @@ has already read your last analysis and will notice repetition immediately.
     movement_context = ""
     if expert_key == "training" and _HAS_INTELLIGENCE_COMMON:
         try:
-            _assess = movement_assessability(data.get("movement_source_state"))
+            _assess = movement_assessability(data.get("movement_source_state"), data.get("movement_ingest_health"))
             if not _assess["assessable"]:
                 movement_context = f"""
 MOVEMENT DATA INTEGRITY — READ BEFORE ASSESSING TRAINING:
@@ -592,6 +622,18 @@ signal and is present in the data above — reason about training load from Hevy
 from steps or from the absence of Strava/Garmin. Do NOT call this under-training,
 sedentary, or low-stimulus. State plainly that aerobic/NEAT volume can't be assessed
 until those sources are live, and assess what Hevy shows.
+"""
+            elif _assess.get("assessable_as_rest"):
+                # C-4 (#494): no fresh movement records, but the ingestion pipe is CONFIRMED
+                # LIVE — this is genuine behavioral rest, not a data gap. The verdict is
+                # available; frame it honestly ("no activity logged, pipe confirmed live").
+                movement_context = f"""
+MOVEMENT DATA INTEGRITY — READ BEFORE ASSESSING TRAINING:
+{_assess['rest_note']}. Because the ingestion pipe is confirmed live and returned no
+activity, you MAY honestly characterize this as rest / low aerobic volume — but frame it
+as a behavioral choice ("no activity logged, pipe confirmed live"), NOT as a data gap and
+NOT as an alarm. Hevy (strength) remains the authoritative training-stimulus signal — read
+training load from Hevy first, then note the confirmed-empty aerobic/NEAT picture.
 """
         except Exception as _me:
             logger.warning("movement assessability failed: %s", _me)
@@ -1182,7 +1224,7 @@ def generate_and_cache(expert_key, shared_system=None):
             if expert_key == "training":
                 try:
                     _td = data  # already gathered in generate_and_cache (no re-query)
-                    _assess = movement_assessability(_td.get("movement_source_state"))
+                    _assess = movement_assessability(_td.get("movement_source_state"), _td.get("movement_ingest_health"))
                     thread_data["position_summary"] = apply_movement_honesty_guard(
                         thread_data.get("position_summary", ""),
                         _assess,
