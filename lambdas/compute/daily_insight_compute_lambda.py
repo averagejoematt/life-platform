@@ -88,8 +88,24 @@ table = dynamodb.Table(TABLE_NAME)
 # AI model constant — read from env so model can be updated without redeployment
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 
-# BS-MP3: Decision Fatigue Detector — proactive alert threshold
-# Empirical: Matthew's habit compliance drops above 15 active+overdue Todoist tasks
+# BS-MP3: Decision Fatigue Detector — proactive alert threshold.
+#
+# #478 / ADR-122 re-evaluation: the load quantity is `overdue + due_today` — the
+# tasks actually pressing for a decision today — NOT `active + overdue`. Two reasons
+# the old input was meaningless: (a) it double-counted (overdue ⊂ active), and
+# (b) `active` is the whole backlog (measured ~270 for Matthew, dominated by future-
+# dated / no-date someday tasks that create no acute daily pressure), so
+# `active + overdue` (~450) trivially cleared any small threshold every single day —
+# the load condition never actually discriminated. On the corrected quantity the
+# condition varies with the real overdue pile, so 15 becomes a live floor again.
+#
+# The "15" is a PROVISIONAL heuristic, not an empirical fit. The prior comment claimed
+# "compliance drops above 15 active+overdue" but that was measured on the poisoned
+# pre-#478 snapshots (active page-capped at 200, overdue = whole list), so it was never
+# real. Per ADR-105 rule 4 the durable home is a personal-variance band over Matthew's
+# own overdue distribution (lambdas/personal_baselines.py, floor-guarded at MIN_N=30) —
+# blocked until ~30 days of clean post-#478 ingestion accrue (pre-#478 records are
+# flagged snapshot_unreliable, ADR-122). Until then this absolute floor holds.
 DECISION_FATIGUE_THRESHOLD = int(os.environ.get("DECISION_FATIGUE_THRESHOLD", "15"))
 DECISION_FATIGUE_HABIT_THRESHOLD = float(os.environ.get("DECISION_FATIGUE_HABIT_THRESHOLD", "0.60"))
 
@@ -1525,9 +1541,11 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
     """BS-MP3: Proactive decision fatigue alert.
 
     Fires when BOTH conditions are true simultaneously:
-      1. Active + overdue Todoist tasks > DECISION_FATIGUE_THRESHOLD (default 15)
+      1. Pressing task load (overdue + due-today) > DECISION_FATIGUE_THRESHOLD (default 15)
       2. T0 habit completion < DECISION_FATIGUE_HABIT_THRESHOLD (default 60%) this week
 
+    Load is the decision-pressure set (overdue + due-today), not the full active
+    backlog — see the DECISION_FATIGUE_THRESHOLD note (#478 / ADR-122).
     Reads the most recent Todoist DDB record for task load.
     Returns a (fired: bool, alert_block: str) tuple. Non-fatal.
     """
@@ -1544,20 +1562,26 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
 
         active_count = None
         overdue_count = None
+        due_today_count = 0
         for item in todoist_items:
             # Try various field names written by different ingestion versions
             ac = item.get("active_task_count") or item.get("active_count") or item.get("total_active")
             oc = item.get("overdue_count") or item.get("overdue_task_count") or item.get("overdue")
+            dt = item.get("due_today_count") or item.get("due_today")
             if ac is not None:
                 active_count = int(ac)
                 overdue_count = int(oc or 0)
+                due_today_count = int(dt or 0)
                 break
 
         if active_count is None:
             logger.info("BS-MP3: No Todoist task count found in DDB — skipping decision fatigue check")
             return False, ""
 
-        total_load = active_count + overdue_count
+        # Decision-pressure load: tasks past-due or due today. NOT active+overdue —
+        # the full active backlog is dominated by non-pressing tasks and always huge,
+        # which is what made the old threshold meaningless (#478 / ADR-122).
+        pressing_load = overdue_count + due_today_count
 
         # ── 2. T0 habit completion rate this week ─────────────────────────────
         if not habit_7d:
@@ -1571,13 +1595,15 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
             return False, ""
 
         # ── 3. Evaluate thresholds ────────────────────────────────────────────
-        load_breached = total_load > DECISION_FATIGUE_THRESHOLD
+        load_breached = pressing_load > DECISION_FATIGUE_THRESHOLD
         habits_breached = t0_avg_7d < DECISION_FATIGUE_HABIT_THRESHOLD
         fired = load_breached and habits_breached
 
         logger.info(
-            "BS-MP3: total_load=%d (threshold=%d), t0_avg_7d=%.2f (threshold=%.2f) → fired=%s",
-            total_load,
+            "BS-MP3: pressing_load=%d (overdue=%d + due_today=%d, threshold=%d), " "t0_avg_7d=%.2f (threshold=%.2f) → fired=%s",
+            pressing_load,
+            overdue_count,
+            due_today_count,
             DECISION_FATIGUE_THRESHOLD,
             t0_avg_7d,
             DECISION_FATIGUE_HABIT_THRESHOLD,
@@ -1589,10 +1615,10 @@ def _compute_decision_fatigue_alert(yesterday_str, habit_7d):
 
         # ── 4. Build alert block ──────────────────────────────────────────────
         t0_pct_str = f"{int(t0_avg_7d * 100)}%"
-        overdue_note = f" ({overdue_count} overdue)" if overdue_count > 0 else ""
+        load_note = f" ({overdue_count} overdue + {due_today_count} due today)"
         alert = (
             f"\U0001f9e0 DECISION FATIGUE DETECTED (BS-MP3):\n"
-            f"  Task load: {total_load} active+overdue tasks{overdue_note} "
+            f"  Pressing task load: {pressing_load} tasks{load_note} "
             f"(threshold: >{DECISION_FATIGUE_THRESHOLD})\n"
             f"  T0 habit completion: {t0_pct_str} this week "
             f"(threshold: <{int(DECISION_FATIGUE_HABIT_THRESHOLD * 100)}%)\n"

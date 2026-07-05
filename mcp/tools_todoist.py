@@ -61,18 +61,27 @@ def _todoist_request(method, path, payload=None):
 
 
 def _list_all_tasks(filter_str=None):
-    """Fetch all active tasks (paginated). Optional Todoist filter string."""
+    """Fetch all active tasks (paginated). Optional Todoist filter string.
+
+    A filter query goes to the dedicated server-side endpoint
+    GET /tasks/filter?query=... (#478). The plain /tasks endpoint on the v1 API
+    silently ignores a `filter` param and returns the entire active list, so
+    'overdue'/'today' filters must NOT be passed to /tasks.
+    """
+    if filter_str:
+        base_path, base_params = "/tasks/filter", {"query": filter_str}
+    else:
+        base_path, base_params = "/tasks", {}
     all_tasks = []
     cursor = None
     while True:
-        params = {"limit": 200}
-        if filter_str:
-            params["filter"] = filter_str
+        params = dict(base_params)
+        params["limit"] = 200
         if cursor:
             params["cursor"] = cursor
-        path = "/tasks?" + urllib.parse.urlencode(params)
+        path = base_path + "?" + urllib.parse.urlencode(params)
         result = _todoist_request("GET", path)
-        items = result.get("items", result.get("results", result)) if isinstance(result, dict) else result
+        items = result.get("results", result.get("items", result)) if isinstance(result, dict) else result
         if not isinstance(items, list):
             break
         all_tasks.extend(items)
