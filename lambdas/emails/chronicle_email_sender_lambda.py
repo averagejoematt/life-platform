@@ -54,9 +54,12 @@ SEND_RATE_PER_SEC = float(os.environ.get("SEND_RATE_PER_SEC", "1.0"))
 SUBSCRIBERS_PK = f"USER#{USER_ID}#SOURCE#subscribers"
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 ses = boto3.client("sesv2", region_name=REGION)
+_s3 = boto3.client("s3", region_name=REGION)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -166,6 +169,48 @@ BOARD_MEMBERS = {
     },
     "vivek_murthy": {"name": "Dr. Daniel Murthy", "title": "Social Connection & Loneliness", "color": "#0891b2", "emoji": "\U0001f91d"},
 }
+
+
+# ── #593: engraved coach portraits travel into the email ──────────────────────
+# The signed portraits (config/portraits/*.json → scripts/render_portraits.py) are
+# committed as ink-on-transparent PNGs under site/assets/portraits/ with a manifest.
+# The "Board Speaks" byline shows the portrait when one exists for that coach, else
+# falls back to the emoji glyph (also the <img alt>, so image-blocking clients still
+# show the emoji). Fail-soft: any S3/parse error → emoji everywhere, exactly as before.
+_PORTRAIT_MANIFEST = None  # None = not yet loaded; {} = loaded-but-empty (never retry-storm)
+
+
+def _load_portrait_manifest() -> dict:
+    """Load + index the portrait manifest from S3, once per warm container. Returns a
+    dict {name_lower: persona_id}. Empty on any failure (fail-soft to emoji)."""
+    global _PORTRAIT_MANIFEST
+    if _PORTRAIT_MANIFEST is not None:
+        return _PORTRAIT_MANIFEST
+    index = {}
+    try:
+        body = _s3.get_object(Bucket=S3_BUCKET, Key="site/assets/portraits/manifest.json")["Body"].read()
+        portraits = json.loads(body).get("portraits", {})
+        for pid, rec in portraits.items():
+            name = (rec.get("name") or "").strip().lower()
+            if name:
+                index[name] = pid
+    except Exception as exc:
+        logger.info("portrait manifest unavailable (emoji fallback): %s", exc)
+    _PORTRAIT_MANIFEST = index
+    return index
+
+
+def _coach_portrait_img(member: dict, theme: str = "ondark", px: int = 30) -> str:
+    """Return an <img> tag for the coach's engraved portrait, or "" if none exists.
+    Matches by display name; alt text carries the emoji for image-blocked clients."""
+    pid = _load_portrait_manifest().get((member.get("name") or "").strip().lower())
+    if not pid:
+        return ""
+    emoji = member.get("emoji", "")
+    url = f"{SITE_URL}/assets/portraits/{pid}-96-{theme}.png"
+    return (
+        f'<img src="{url}" width="{px}" height="{px}" alt="{emoji}" ' f'style="vertical-align:middle;border-radius:4px;margin-right:2px;">'
+    )
 
 
 def _extract_chronicle_preview(content_html: str, max_paragraphs: int = 3) -> str:
@@ -298,7 +343,7 @@ def _build_subscriber_email(installment: dict, subscriber: dict) -> tuple[str, s
         "{board_quote}"
       </p>
       <p style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b949e;margin:0;">
-        {member['emoji']} {member['name']} \u2014 {member['title']}
+        {_coach_portrait_img(member) or member['emoji']} {member['name']} \u2014 {member['title']}
       </p>
     </div>
   </div>"""

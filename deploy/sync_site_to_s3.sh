@@ -62,6 +62,10 @@ if [ "${1:-}" != "--dry-run" ]; then
   # #586/ADR-106: portrait_data.js is GENERATED from config/portraits/ (signed recipes
   # only) — never hand-edit. Validation failure BLOCKS the sync (a bad recipe must not ship).
   python3 "$(dirname "$0")/../scripts/v4_build_portraits.py"
+  # #593/ADR-106: the signed portraits also travel off-site as email-ready PNGs under
+  # site/assets/portraits/ (one source of truth with the site SVG). Re-render so a recipe
+  # edit propagates here in the same sync; CI's parity guard fails if this is skipped.
+  python3 "$(dirname "$0")/../scripts/render_portraits.py" || echo "  ⚠️  portrait PNG render skipped — keeping existing site/assets/portraits/"
 fi
 
 BUCKET="matthew-life-platform"

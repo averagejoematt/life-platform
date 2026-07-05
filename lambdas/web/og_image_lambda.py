@@ -353,4 +353,17 @@ def lambda_handler(event, context):
     except Exception as e:
         print(f"[WARN] moments sweep failed (non-fatal): {e}")
 
-    return {"statusCode": 200, "body": f"Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s)"}
+    # #593: per-coach OG share cards — the engraved portraits travel off-site. Fail-soft:
+    # a coach-card error never blocks the daily page/moment cards.
+    coach_n = 0
+    try:
+        from web.og_coach_cards import sweep_coach_cards
+
+        coach_n = len(sweep_coach_cards(s3, S3_BUCKET))
+    except Exception as e:
+        print(f"[WARN] coach card sweep failed (non-fatal): {e}")
+
+    return {
+        "statusCode": 200,
+        "body": f"Generated {len(generated)}/{len(PAGES)} OG images + {moments_n} moment(s) + {coach_n} coach card(s)",
+    }
