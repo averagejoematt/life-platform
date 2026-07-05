@@ -31,8 +31,32 @@ aws lambda update-function-code --function-name "$FN" \
   --zip-file fileb:///tmp/siteapi.zip --region "$REGION" \
   --output text --query 'CodeSha256'
 
-echo "→ Waiting for the update to settle …"
+echo "→ Waiting for the code update to settle …"
 aws lambda wait function-updated --function-name "$FN" --region "$REGION"
+
+# site-api is NOT CDK-managed — nothing else attaches the shared layer to it, so a
+# SHARED_LAYER_VERSION bump would silently leave it on the old layer (this broke #535's
+# /api/journey CI and #538's /api/calibration import). Pin it to the current layer here,
+# reading the ONE source of truth (cdk/stacks/constants.py). See
+# reference_site_api_layer_manual_attach.
+CONSTANTS="$ROOT/cdk/stacks/constants.py"
+LAYER_VER="$(grep -E '^SHARED_LAYER_VERSION *= *[0-9]+' "$CONSTANTS" | grep -oE '[0-9]+' | head -1)"
+ACCT="$(grep -E '^ACCT *= *' "$CONSTANTS" | grep -oE '[0-9]{6,}' | head -1)"
+if [ -n "$LAYER_VER" ] && [ -n "$ACCT" ]; then
+  LAYER_ARN="arn:aws:lambda:${REGION}:${ACCT}:layer:life-platform-shared-utils:${LAYER_VER}"
+  CUR_ARN="$(aws lambda get-function-configuration --function-name "$FN" --region "$REGION" \
+    --query 'Layers[0].Arn' --output text 2>/dev/null || echo '')"
+  if [ "$CUR_ARN" != "$LAYER_ARN" ]; then
+    echo "→ Attaching shared layer v${LAYER_VER} (was: ${CUR_ARN##*:}) …"
+    aws lambda update-function-configuration --function-name "$FN" --region "$REGION" \
+      --layers "$LAYER_ARN" --output text --query 'LastModified' >/dev/null
+    aws lambda wait function-updated --function-name "$FN" --region "$REGION"
+  else
+    echo "→ Shared layer already v${LAYER_VER} — no change."
+  fi
+else
+  echo "⚠️  Could not parse SHARED_LAYER_VERSION/ACCT from $CONSTANTS — layer NOT synced. Attach manually."
+fi
 
 echo "→ Verifying handler import via $VERIFY_PATH …"
 aws lambda invoke --function-name "$FN" --region "$REGION" --cli-binary-format raw-in-base64-out \
