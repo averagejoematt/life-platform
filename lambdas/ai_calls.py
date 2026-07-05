@@ -1136,6 +1136,40 @@ def _enforce_quality_gate(
     return output_text, report
 
 
+def _build_journal_mood_prompt_block(journal_mood, voice_spec):
+    """#549: render the journal mood/connection signal (if present in the generation
+    brief) into a system-prompt block, plus any coach-specific low-sentiment tone
+    rules from that coach's own voice spec (`low_sentiment_protocol.rules`, e.g.
+    config/coaches/mind_coach.json).
+
+    Pure function — no AWS, no new AI call. `journal_mood` is only present in the
+    brief for the coach(es) the orchestrator routes it to (mind_coach today, via
+    COACH_DOMAINS in coach_narrative_orchestrator.py); for every other coach this
+    returns "" and the block is a no-op in their prompt.
+    """
+    if not journal_mood:
+        return ""
+    low_sentiment_rules = (voice_spec.get("low_sentiment_protocol") or {}).get("rules") or []
+    block = (
+        "\n\nJOURNAL MOOD SIGNAL: The generation brief includes `journal_mood` — Matthew's own "
+        "recent journal-derived emotional signal (mood/stress trajectory, dominant emotions/"
+        "themes, connection quality), computed deterministically from his journal entries, not "
+        "your interpretation. This is the material that lets you read how he FEELS, not just "
+        "what he did. Weave it into your narrative in your own voice. Rules that keep you honest:\n"
+        "- Never diagnose or use a clinical label ('depression', 'anxiety', etc.) — describe what "
+        "you observe, never name a condition.\n"
+        "- A `notable_quote`, if present, already passed a grounding and privacy check — you may "
+        "reference it, but never invent or extend it beyond the verbatim text given.\n"
+        "- On any surface that could ever be public, never quote his raw journal words verbatim — "
+        "paraphrase the substance, keep the specific words private.\n"
+        "- Treat a low or falling mood/stress trajectory as something to sit with, not a problem "
+        "to solve in one paragraph — no three-step action plan for a hard emotional stretch."
+    )
+    if low_sentiment_rules:
+        block += "\n" + "\n".join(f"- {r}" for r in low_sentiment_rules)
+    return block
+
+
 def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
     Generic Coach Intelligence pipeline for any coach.
@@ -1208,6 +1242,12 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
         anti_patterns = voice_spec.get("anti_pattern_detection", {})
         brief = generation_brief.get("generation_brief", generation_brief)
         voice_guidance = brief.get("voice_guidance", {})
+
+        # #549: journal mood/connection signal — only present in the brief for the
+        # coach(es) the orchestrator routes it to (mind_coach today); this block is a
+        # no-op for every other coach's prompt. No new AI call — this enriches the
+        # existing generation call's context with #505's journal extraction.
+        _journal_mood_block = _build_journal_mood_prompt_block(brief.get("journal_mood"), voice_spec)
 
         # ADR-104: canonical facts — this render previously injected only the
         # hard-coded goals, so coaches had no authoritative vitals to cite and
@@ -1315,6 +1355,7 @@ ENGAGEMENT / PRESENCE: If the generation brief includes `engagement_signal`, Mat
 - If `planned_pause` is true, this looks like a deliberate break (`planned_pause_reason`) — frame it as a planned pause, not falling off.
 - If `returned` is true, he's BACK after `resumed_after_days` days. Acknowledge the return warmly, note any real `weight_delta_over_gap_lbs` plainly (regain is data, not a verdict), and be SUPPORTIVE about re-engaging — never punitive. The point is to help him restart, not to shame the lapse.
 - An absent SAME-DAY log is by-design lag (manual sources arrive end-of-day), never a gap — the signal already accounts for this, so trust `gap_days`.
+{_journal_mood_block}
 
 DATA INTERPRETATION RULES:
 - If an activity count or log is ZERO, that means Matthew hasn't done that activity — say "no training logged this week" NOT "provide your training data"
