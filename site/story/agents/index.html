@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" data-door="story">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The agents — The Story — averagejoematt</title>
+  <meta name="description" content="Meet the watchdog agents that police this platform's own AI — and a weekly readout of what they actually caught.">
+  <link rel="canonical" href="https://averagejoematt.com/story/agents/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com/story/agents/">
+  <meta property="og:title" content="The agents — The Story — averagejoematt">
+  <meta property="og:description" content="Meet the watchdog agents that police this platform's own AI — and a weekly readout of what they actually caught.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The agents — The Story — averagejoematt">
+  <meta name="twitter:description" content="The honesty machinery made visible — a weekly feed of what the platform's automation caught.">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Measured Life">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <style>
+    .agents-main{max-width:var(--container);margin:0 auto;padding:0 var(--gutter) var(--sp-10)}
+    .agents-head{max-width:var(--measure);margin:0 auto var(--sp-8);text-align:center}
+    .agents-head h1{font-family:var(--font-serif);font-size:var(--fs-h1);line-height:var(--lh-tight);margin:.2em 0 .3em}
+    .agents-head .agents-lede{color:var(--ink-muted);font-size:var(--fs-body-lg);line-height:var(--lh-relaxed)}
+    .section-label{font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);margin:var(--sp-8) 0 var(--sp-4)}
+
+    /* Roster */
+    .roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--bento-gap,16px)}
+    .agent-card{border:1px solid var(--border-hair);border-radius:var(--radius);padding:var(--sp-4);background:var(--body-tint,transparent);display:flex;flex-direction:column;gap:var(--sp-2)}
+    .agent-card .ac-top{display:flex;align-items:center;gap:var(--sp-3)}
+    .agent-sigil{flex:0 0 auto;width:38px;height:38px;color:var(--accent)}
+    .agent-card h3{font-family:var(--font-serif);font-size:var(--fs-h3);margin:0;line-height:var(--lh-snug)}
+    .agent-card .ac-role{color:var(--ink);font-size:var(--fs-body);margin:0}
+    .agent-card .ac-detail{color:var(--ink-muted);font-size:var(--fs-small);line-height:var(--lh-relaxed);margin:0}
+    .agent-card .ac-foot{margin-top:auto;display:flex;justify-content:space-between;align-items:baseline;gap:var(--sp-2);border-top:1px solid var(--border-hair);padding-top:var(--sp-2)}
+    .agent-card .ac-tally{font-family:var(--font-mono);font-size:var(--fs-small);color:var(--ink-dim)}
+    .agent-card .ac-tally strong{color:var(--ink);font-weight:600}
+    .agent-card .ac-src{font-family:var(--font-mono);font-size:calc(var(--fs-label));color:var(--ink-faint)}
+
+    /* Week nav */
+    .week-nav{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);margin:var(--sp-4) 0}
+    .week-nav button{font-family:var(--font-mono);font-size:var(--fs-small);color:var(--ink);background:transparent;border:1px solid var(--border-hair);border-radius:var(--radius-sm);padding:.4em .8em;cursor:pointer}
+    .week-nav button:disabled{opacity:.35;cursor:default}
+    .week-nav .week-range{font-family:var(--font-serif);font-size:var(--fs-body-lg)}
+
+    /* Feed */
+    .feed{list-style:none;margin:0;padding:0;border-top:1px solid var(--border-hair)}
+    .feed-day{margin-top:var(--sp-4)}
+    .feed-day-label{font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-dim);padding:var(--sp-2) 0}
+    .event{display:flex;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--border-hair)}
+    .event .dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;margin-top:.45em;background:var(--ink-faint)}
+    .event[data-status="alarm"] .dot{background:var(--alert)}
+    .event[data-status="warn"] .dot{background:var(--ember,var(--signal))}
+    .event[data-status="ok"] .dot{background:var(--signal)}
+    .event .ev-body{flex:1 1 auto;min-width:0}
+    .event .ev-agent{font-family:var(--font-mono);font-size:var(--fs-label);text-transform:uppercase;letter-spacing:.06em;color:var(--ink-dim)}
+    .event .ev-head{font-size:var(--fs-body);color:var(--ink);margin:.15em 0 0;line-height:var(--lh-snug)}
+    .event .ev-details{margin:.35em 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.2em}
+    .event .ev-details li{font-family:var(--font-mono);font-size:var(--fs-small);color:var(--ink-muted);word-break:break-word;overflow-wrap:anywhere}
+    .feed-empty,.agents-loading{color:var(--ink-muted);font-size:var(--fs-body);padding:var(--sp-6) 0;text-align:center}
+    .agents-note{color:var(--ink-faint);font-size:var(--fs-small);line-height:var(--lh-relaxed);max-width:var(--measure);margin:var(--sp-8) auto 0;text-align:center}
+  </style>
+</head>
+<body class="dx-page">
+  <a class="skip" href="#agents">Skip to the agents</a>
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
+    <nav class="doors" aria-label="Doors">
+      <a href="/now/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+      <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
+      <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
+      <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
+      <a href="/story/" aria-current="page" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
+      <a href="/subscribe/" class="nav-follow" aria-label="Follow the experiment">follow</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+    </nav>
+  </header>
+  <main id="agents" class="agents-main">
+    <div class="agents-head">
+      <p class="beat-kicker label">the story · the honesty machinery, made visible</p>
+      <h1>The agents</h1>
+      <p class="agents-lede">A crew of automated watchdogs runs this platform every day — checking that its own AI stays grounded, that the numbers still agree, and that what broke overnight gets triaged. This page is nothing new: it renders the dated records those agents already write. A system, showing itself being policed.</p>
+    </div>
+
+    <p class="section-label">The roster</p>
+    <div class="roster" data-roster aria-live="polite"></div>
+
+    <p class="section-label">This week's activity</p>
+    <div class="week-nav">
+      <button type="button" data-week-prev>&larr; earlier week</button>
+      <span class="week-range" data-week-range>&nbsp;</span>
+      <button type="button" data-week-next>later week &rarr;</button>
+    </div>
+    <div data-feed><p class="agents-loading">Loading the week&hellip;</p></div>
+
+    <p class="agents-note">Every line above is lifted from an artifact the platform wrote on its own — the coherence log, the AI-quality canary log, the remediation audit log — and passed through the same privacy and content filters the public Q&amp;A uses before it&rsquo;s shown here. No new inference; nothing invented.</p>
+  </main>
+  <footer class="site-foot">
+    <nav class="site-foot-cols" aria-label="Site map">
+      <div class="sf-col"><p class="sf-h label">The Story</p>
+        <a href="/story/chronicle/">Chronicle</a><a href="/story/build/">Build log</a><a href="/story/agents/">The agents</a><a href="/story/journal/">In my own words</a><a href="/story/about/">About</a></div>
+      <div class="sf-col"><p class="sf-h label">The Coaching</p>
+        <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
+      <div class="sf-col"><p class="sf-h label">The Data</p>
+        <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
+      <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
+        <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/privacy/">Privacy</a></div>
+    </nav>
+    <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">&larr; home</a></p>
+  </footer>
+  <script src="/assets/js/motion.js" defer></script>
+  <script type="module" src="/assets/js/agents.js"></script>
+</body>
+</html>
