@@ -253,3 +253,55 @@ procedure in `docs/design/PORTRAIT_RUNBOOK.md`):
   editorial-image pipeline; photoreal rendering of anyone stays NO-GO.
 - **Disclosure is structural**: `aria-label="Illustrated portrait of <name>, a fictional AI
   persona"`; team/about surfaces carry the one-line disclosure sentence (runbook §6).
+
+## 9. Performance budget — LCP/CLS/JS-bytes (#580)
+
+The craft floor the later motion/cinematic phases build on top of: `tests/visual_qa.py` (the
+gating CI job, ADR-076) now asserts a per-page performance budget alongside its render checks, so
+a future change cannot quietly regress load quality. Numbers below were measured against
+production on 2026-07-05 (headless Chromium, `PerformanceObserver` for LCP/CLS, response-body
+byte-counting for JS) across the full 33-page sweep — re-derive them (`LCP_BUDGET_MS`,
+`CLS_BUDGET`, `JS_BYTES_SOFT_BUDGET` at the top of `tests/visual_qa.py`) if the site's shape
+changes enough that the headroom stops making sense, and update this section to match.
+
+| Metric | Observed baseline (33 pages) | Enforced budget | Gate |
+|---|---|---|---|
+| LCP | 72ms – 1136ms (p90 984ms) | **2500ms** | hard fail (`issues`) |
+| CLS | 0.059 – 0.614 (p90 0.570) | **0.75** | hard fail (`issues`) |
+| Total JS / page | 119KB – 408KB | **550KB** | soft (`warnings` only) |
+
+Budgets carry headroom over the observed max (LCP ~2.2x, CLS ~1.2x, JS ~1.35x) so ordinary
+CI-runner network jitter doesn't flake the gate — the point is catching a real regression (a
+newly-added render-blocking script, a runaway layout shift from a new widget), not chasing a
+"good" Core Web Vitals score. **The current CLS baseline is already high** (0.5-0.6 on most
+`/data/`, `/method/`, `/coaching/` pages) — the known cause is this site's async
+data-render pattern (`··` placeholders resolving to real numbers/charts after the API responds),
+not a font or layout bug. Lowering it is real future work, not something this issue fixes; the
+budget here exists to stop it from getting *worse*, not to certify it's good today.
+
+**Font subsetting.** `scripts/v4_vendor_fonts.py` now keeps only the Google Fonts **latin**
+subset (the site is English-only; a browser's `unicode-range` selection never fetched the
+vietnamese/latin-ext/cyrillic/cyrillic-ext blocks anyway, so this is a build/deploy-hygiene cut,
+not a runtime-fetch one) — 18 vendored woff2 files → 5, 456KB → ~194KB under
+`site/assets/fonts/v4/`, and `fonts.css` drops from 26 `@font-face` rules to 10. The weight/style
+axis was already tight: the triad is used at weight 400/500 only (`--weight-reg`/`--weight-med`
+are the only numeric-weight custom properties in `tokens.css`) with italic scoped to Fraunces
+alone (the "human voice" token) — nothing on that axis was vendored-but-unused.
+
+**Preload audit.** Every page preloaded the same three woff2 files, including Fraunces at
+**italic** 400. An empirical LCP-element audit (Chrome's `LargestContentfulPaint.element`,
+swept across all 33 pages) found the opposite is true almost everywhere: `.hero-h`, `.tier`,
+`.page-hero .ph-title`, `.ev-h1`, `.dx-h1` — the actual LCP candidate on Home, Cockpit, and most
+hub pages — are all **normal**-style Fraunces at weight 500; italic is reserved for secondary
+quote/aside text that's essentially never the largest paint. The preload now points at the
+normal-400-latin file instead (same swap across `site/**/index.html` and the three page-builder
+scripts' `FONTS` constant). One page — `/method/benchmarks/`'s honest "no readouts yet" empty
+state — currently LCPs on italic text; that's a transient sparse-data condition, not the page's
+steady-state shape, so it wasn't used to justify keeping italic preloaded everywhere. Per-page-type
+preload differentiation (drop Instrument Sans where it's not needed, etc.) was investigated but
+**not** adopted: the audit showed Instrument Sans is actually the single most common LCP font
+across the sweep (the dominant lede-paragraph style on `/data/`, `/method/`, `/protocols/`,
+`/story/`, and `/coaching/` topic pages) and every one of the three families is the real LCP
+element on at least one common page type — on a data-driven site where the LCP element can shift
+day to day with what's populated, preloading all three uniformly is the robust choice; the
+italic→normal swap was the one unconditional, evidence-backed fix.
