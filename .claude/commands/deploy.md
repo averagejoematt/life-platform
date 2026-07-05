@@ -39,13 +39,31 @@ bash deploy/deploy_and_verify.sh <function-name> lambdas/<source-file>
 ```
 
 **Special case — `life-platform-mcp`:**
-Do NOT use deploy_lambda.sh. Instead:
+Do NOT use deploy_lambda.sh. The bundle must mirror the CDK `_mcp_staging` in
+`cdk/stacks/mcp_stack.py` EXACTLY: `mcp_server.py` + the `mcp/` package **+ the
+`lambdas/reading/` package staged as top-level `reading/`** (ADR-097 Phase B —
+`mcp/tools_reading.py` does `from reading import ...`). Omitting `reading/` ships a
+zip that boots with `Runtime.ImportModuleError: No module named 'reading'` (re-broke
+prod 2026-07-05). `numeric`/`retry_utils` that `reading` needs come from the shared
+layer, so no layer bump. `mcp_bridge.py` is NOT in the CDK asset — leave it out.
 ```bash
-ZIP=/tmp/mcp_deploy.zip
-rm -f $ZIP
-zip -j $ZIP mcp_server.py mcp_bridge.py
-zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
+STAGE=/tmp/mcp_stage; rm -rf $STAGE && mkdir -p $STAGE
+cp mcp_server.py $STAGE/
+cp -r mcp $STAGE/mcp
+cp -r lambdas/reading $STAGE/reading
+find $STAGE -name '__pycache__' -type d -exec rm -rf {} + ; find $STAGE -name '*.pyc' -delete
+ZIP=/tmp/mcp_deploy.zip; rm -f $ZIP
+(cd $STAGE && zip -rq $ZIP .)
 aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
+```
+Then verify it BOOTS (a raw update-function-code saves no rollback artifact, so a bad
+bundle has no one-command recovery — you must re-bundle correctly):
+```bash
+sleep 7
+aws lambda invoke --function-name life-platform-mcp --region us-west-2 --cli-binary-format raw-in-base64-out \
+  --payload '{"method":"tools/list","params":{}}' /tmp/mcp.json >/dev/null
+python3 -c "import json; d=json.load(open('/tmp/mcp.json')); assert 'errorType' not in d, d; print('mcp OK', d.get('statusCode'))"
+# statusCode 401 (auth gate) is EXPECTED and healthy — it means the module imported and the handler ran.
 ```
 
 **Special case — `life-platform-site-api` (MULTI-MODULE — do NOT single-file deploy):**
