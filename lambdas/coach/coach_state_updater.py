@@ -10,6 +10,7 @@ decision classes, anti-pattern violations), then writes results to DynamoDB:
   - New THREAD# records for threads opened
   - Updated THREAD# records for threads referenced (bump reference_count)
   - TRACE# reasoning trace record (returned to caller)
+  - RELATIONSHIP#state update — deterministic rapport arc, no LLM (#536)
 
 Phase 2 target: sleep_coach (Dr. Lisa Park).
 
@@ -26,6 +27,7 @@ from decimal import Decimal
 
 import boto3
 from phase_filter import with_phase_filter  # ADR-058
+from relationship_engine import compute_relationship_update  # #536
 
 # Structured logger
 try:
@@ -919,6 +921,98 @@ def _create_commitment_records(coach_id, generation_date, commitments_made):
     return created, checkable
 
 
+def _gather_relationship_signals(coach_id, since_date):
+    """Query episodic records newer than `since_date` (YYYY-MM-DD, the previous
+    RELATIONSHIP#state's last_interaction_date) for the #536 rapport writer:
+    newly-graded COMMITMENT#/PREDICTION# outcomes and new board INTERACTION#s.
+
+    Deterministic and fail-soft — a query error yields a zero signal for that
+    category rather than blocking the run. `since_date` of None (first-ever
+    cycle for this coach) returns all-zero signals; there's nothing to diff against.
+    """
+    signals = {
+        "kept_commitments": 0,
+        "broken_commitments": 0,
+        "confirmed_predictions": 0,
+        "refuted_predictions": 0,
+        "board_interactions": 0,
+    }
+    if not since_date:
+        return signals
+
+    coach_pk = f"COACH#{coach_id}"
+
+    try:
+        for c in _query_begins_with(coach_pk, "COMMITMENT#"):
+            outcome_date = c.get("outcome_date")
+            if not outcome_date or outcome_date <= since_date:
+                continue
+            status = c.get("status")
+            if status == "kept":
+                signals["kept_commitments"] += 1
+            elif status == "broken":
+                signals["broken_commitments"] += 1
+    except Exception as e:
+        logger.warning("Relationship signal gather (commitments) failed for %s: %s", coach_id, e)
+
+    try:
+        for p in _query_begins_with(coach_pk, "PREDICTION#"):
+            outcome_date = p.get("outcome_date")
+            if not outcome_date or outcome_date <= since_date:
+                continue
+            status = p.get("status")
+            if status == "confirmed":
+                signals["confirmed_predictions"] += 1
+            elif status == "refuted":
+                signals["refuted_predictions"] += 1
+    except Exception as e:
+        logger.warning("Relationship signal gather (predictions) failed for %s: %s", coach_id, e)
+
+    try:
+        for i in _query_begins_with(coach_pk, "INTERACTION#"):
+            created_date = str(i.get("created_at") or "")[:10]
+            if created_date and created_date > since_date:
+                signals["board_interactions"] += 1
+    except Exception as e:
+        logger.warning("Relationship signal gather (interactions) failed for %s: %s", coach_id, e)
+
+    return signals
+
+
+def _update_relationship_state(coach_id, generation_date):
+    """Deterministically update RELATIONSHIP#state (#536) — no LLM involved.
+
+    Reads the current record + episodic signals already written elsewhere
+    (COMMITMENT#/PREDICTION# grading, INTERACTION# board Q&A), applies the
+    rule-based rapport/phase update in relationship_engine.py, and writes the
+    record read by coach_history_summarizer.py and coach_observatory_renderer.py.
+    """
+    coach_pk = f"COACH#{coach_id}"
+    current = _get_item(coach_pk, "RELATIONSHIP#state")
+    since_date = (current or {}).get("last_interaction_date")
+    signals = _gather_relationship_signals(coach_id, since_date)
+
+    updated = compute_relationship_update(
+        current,
+        coach_id,
+        generation_date,
+        signals,
+        datetime.now(timezone.utc).isoformat(),
+    )
+    updated["pk"] = coach_pk
+    updated["sk"] = "RELATIONSHIP#state"
+
+    if _put_item(updated):
+        logger.info(
+            "Updated RELATIONSHIP#state for %s — phase=%s rapport=%.3f interactions=%d",
+            coach_id,
+            updated["journey_phase"],
+            updated["rapport_level"],
+            updated["interaction_count"],
+        )
+    return updated
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1113,6 +1207,14 @@ def lambda_handler(event, context):
     if commitments_made:
         _c_created, _c_checkable = _create_commitment_records(coach_id, generation_date, commitments_made)
         logger.info("Commitments for %s: %d created (%d machine-checkable)", coach_id, _c_created, _c_checkable)
+
+    # 8. Deterministically update RELATIONSHIP#state (#536) — rule-based rapport
+    # arc read by coach_history_summarizer.py and coach_observatory_renderer.py.
+    # Non-fatal: a failure here must never block the rest of the state update.
+    try:
+        _update_relationship_state(coach_id, generation_date)
+    except Exception as e:
+        logger.warning("RELATIONSHIP#state update failed for %s (non-fatal): %s", coach_id, e)
 
     # Return the trace (with Decimals converted for JSON serialization)
     return _decimal_to_float(trace)

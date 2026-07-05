@@ -2037,7 +2037,7 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `PREDICTION#{date}` | Forward predictions with confidence | coach-narrative-orchestrator |
 | `COMMITMENT#{id}` | Recommendations the coach must revisit; graded kept/broken (#532) | coach-state-updater (write) / coach-prediction-evaluator (grade) |
 | `VOICE#state` | Persistent voice calibration state | coach-state-updater |
-| `RELATIONSHIP#state` | Coach-user relationship state (rapport, trust, context) | coach-state-updater |
+| `RELATIONSHIP#state` | Coach-user relationship state (rapport, trust, context) | coach-state-updater (deterministic, #536) |
 | `CONFIDENCE#{subdomain}` | Per-subdomain confidence scores | coach-state-updater |
 | `COMPRESSED#latest` | Compressed history summary (old threads rolled up) | coach-history-summarizer |
 
@@ -2076,16 +2076,25 @@ Where `coach_id` is one of: `sleep_coach`, `nutrition_coach`, `training_coach`, 
 | `vocabulary_preferences` | list | Preferred/avoided terms |
 | `updated_at` | string | ISO timestamp |
 
-**RELATIONSHIP#state fields:**
+**RELATIONSHIP#state fields (#536 — deterministic writer, no LLM):**
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `coach_id` | string | Coach identifier |
-| `rapport_level` | number | 0.0-1.0 relationship strength |
-| `interaction_count` | number | Total generation cycles |
-| `trust_signals` | list | Evidence of prediction accuracy |
-| `context_summary` | string | Compressed relationship context |
+| `rapport_level` | number | 0.05-1.0 relationship strength |
+| `interaction_count` | number | Cumulative engagement events (generation cycles + board Q&A + graded commitments) |
+| `journey_phase` | string | `clinical` \| `familiar` \| `invested` — rule-based phase from rapport/interaction_count/tenure_days |
+| `phase_history` | list | Append-only log of phase transitions (`{phase, date, rapport_level, interaction_count}`), capped at 20 — makes the arc auditable |
+| `first_interaction_date` | string | YYYY-MM-DD of the coach's first generation cycle |
+| `last_interaction_date` | string | YYYY-MM-DD this record was last updated (the signal-diff cursor) |
+| `tenure_days` | number | Days between `first_interaction_date` and `last_interaction_date` |
+| `trust_signals` | list | Rolling log of recent evidence strings (kept/broken commitments, confirmed/refuted predictions, board Q&A), capped at 8 |
+| `context_summary` | string | One-line deterministic summary of phase/rapport/tenure |
 | `updated_at` | string | ISO timestamp |
+
+Written by `coach_state_updater.py` (`_update_relationship_state`) after every coach
+generation cycle, using the pure rule engine in `lambdas/relationship_engine.py`.
+Signals are diffed against `last_interaction_date` so repeat runs never double-count.
 
 **CONFIDENCE#{subdomain} fields:**
 
