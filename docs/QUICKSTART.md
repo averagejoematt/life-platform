@@ -98,6 +98,8 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 - **`deploy_lambda.sh`** — zips a single Lambda source, uploads via `aws lambda update-function-code`. Fast (~10s). Use for code-only changes.
 - **`cdk deploy`** — synthesizes CloudFormation, diffs against AWS, deploys all resources in a stack. Slower (~60–120s). Use when IAM, env vars, schedules, or new resources change.
 
+**Prefer the guarded path over a bare `cdk deploy`:** `bash deploy/cdk_deploy.sh <StackName>` (see `docs/CONVENTIONS.md` §6) blocks a deploy from a stale checkout, and flags any function whose live code has drifted from the stack via a direct `deploy_lambda.sh` push since the last `cdk deploy` — either of which a blind `cdk deploy --all` would silently clobber (#382).
+
 ### Deploy a single Lambda — worked example
 
 ```bash
