@@ -16,7 +16,8 @@ import { lineChart } from "/assets/js/charts.js";
 import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
 import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — returnability, reader-keyed
-import { instrumentMark } from "/assets/js/sigils.js"; // visual P2 — the marginal instrument mark
+import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // visual P2 + #590 seeded drift
+import { domainIcon } from "/assets/js/icons.js"; // #590 — pillar icon for the hover door affordance
 
 const $ = (s, r = document) => r.querySelector(s);
 const bind = (n, r = document) => r.querySelector(`[data-bind="${n}"]`);
@@ -33,7 +34,15 @@ function esc(s) {
 }
 const trend = (d) => (d == null ? "flat" : d > 0.05 ? "up" : d < -0.05 ? "down" : "flat");
 
-/* ── the relational constellation ────────────────────────────────────────── */
+/* ── the relational constellation (v2, #590) ─────────────────────────────────
+   Edges are NO LONGER a hand-drawn topological guess — they are the REAL
+   trailing-window co-movement between pillars (/api/pillar_coupling: masked-day
+   Pearson r + n). Positive coupling reads as "move together" (ember), negative
+   as "trade off" (cool), width tracks |r|, and non-significant or thin pairs
+   stay honestly faint; a pillar with no measured coupling (relationships is a
+   flat placeholder today) simply has no edges — the absence is the honest signal.
+   Nodes drift on a DETERMINISTIC seeded orbit (same seed → same motion, the
+   sigils.js vocabulary) and open a door on hover. ADR-104/105: nothing invented. */
 const NODES = {
   sleep:        { x: 180, y: 58,  label: "Sleep" },
   movement:     { x: 292, y: 118, label: "Move" },
@@ -43,60 +52,118 @@ const NODES = {
   relationships:{ x: 68,  y: 118, label: "People" },
   consistency:  { x: 180, y: 185, label: "Hold" },
 };
-// Each pillar in the hero links into its deeper Data page (the story → sub-pages).
+// Each pillar links into its deeper Data page (the story → sub-pages).
 const NODE_LINK = {
   sleep: "/data/sleep/", movement: "/data/training/", nutrition: "/data/nutrition/",
   metabolic: "/data/glucose/", mind: "/data/reading/", relationships: "/data/mind/",
   consistency: "/data/habits/",
 };
-// How the pillars pull on each other (the synthesis, drawn).
-const EDGES = [
-  ["sleep", "movement"], ["sleep", "mind"], ["movement", "metabolic"],
-  ["nutrition", "metabolic"], ["nutrition", "mind"], ["mind", "relationships"],
-  ["consistency", "sleep"], ["consistency", "movement"], ["consistency", "nutrition"],
-  ["consistency", "metabolic"], ["consistency", "mind"], ["consistency", "relationships"],
-];
+// Icon key per pillar for the hover door affordance (domainIcon maps to icons.js).
+const NODE_ICON = {
+  sleep: "sleep", movement: "training", nutrition: "nutrition", metabolic: "glucose",
+  mind: "mind", relationships: "people", consistency: "habits",
+};
 
-function drawConstellation(pillars) {
+// Deterministic per-node drift: seed from the pillar name (fnv1a → mulberry32), so the
+// motion is byte-stable across reloads/browsers — the same seed-not-random rule as sigils.
+function driftVars(name) {
+  const rnd = mulberry32(fnv1a("constellation:" + name));
+  const dx = (rnd() * 2 - 1) * 3.2;          // ±3.2px lateral
+  const dy = (rnd() * 2 - 1) * 3.2;          // ±3.2px vertical
+  const dur = 6 + rnd() * 4;                 // 6–10s, per-node
+  const delay = -rnd() * dur;                // desync the phase
+  return `--dx:${dx.toFixed(2)}px;--dy:${dy.toFixed(2)}px;--dur:${dur.toFixed(2)}s;--ddelay:${delay.toFixed(2)}s`;
+}
+
+// Source pillars implied by an active cross-pillar effect's condition string (the
+// condition names the source; targets name the sink). "_all"/all_pillars → global.
+function effectSources(cond) {
+  const c = String(cond || "").toLowerCase();
+  if (c.includes("all_pillars")) return Object.keys(NODES);
+  return Object.keys(NODES).filter((p) => c.includes(p));
+}
+
+function drawConstellation(pillars, coupling, activeEffects) {
   const svg = $(".constellation svg");
   if (!svg) return;
   const edgeG = svg.querySelector("[data-edges]");
   const nodeG = svg.querySelector("[data-nodes]");
+  edgeG.replaceChildren();
+  nodeG.replaceChildren();
   const byName = {};
   for (const p of pillars) byName[p.name] = p;
 
-  for (const [a, b] of EDGES) {
-    const na = NODES[a], nb = NODES[b];
+  // ── EDGES = measured co-movement ──
+  const edges = Array.isArray(coupling && coupling.edges) ? coupling.edges : [];
+  const coupledPillars = new Set();
+  // Which edges are lit RIGHT NOW by an active designed effect (source→target).
+  const effectPairs = new Set();
+  for (const e of activeEffects || []) {
+    const srcs = effectSources(e.condition);
+    for (const tgt of Object.keys(e.targets || {})) {
+      const t = tgt === "_all" ? Object.keys(NODES) : [tgt];
+      for (const s of srcs) for (const tt of t) if (s !== tt) effectPairs.add([s, tt].sort().join("~"));
+    }
+  }
+  for (const e of edges) {
+    const na = NODES[e.a], nb = NODES[e.b];
     if (!na || !nb) continue;
+    coupledPillars.add(e.a); coupledPillars.add(e.b);
+    const mag = Math.min(1, Math.abs(e.r));
     const line = document.createElementNS(SVGNS, "line");
     line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
     line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
-    const live = trend(byName[a]?.xp_delta) === "up" || trend(byName[b]?.xp_delta) === "up";
-    line.setAttribute("class", "edge" + (live ? " live" : ""));
-    if (a === "consistency") line.setAttribute("stroke-dasharray", "2 4");
+    const sign = e.r >= 0 ? "pos" : "neg";
+    const strength = e.significant ? "sig" : "faint";
+    const active = effectPairs.has([e.a, e.b].sort().join("~"));
+    line.setAttribute("class", `edge ${sign} ${strength}${active ? " effect" : ""}`);
+    line.setAttribute("stroke-width", (0.8 + mag * 3.2).toFixed(2));
+    line.style.setProperty("--emag", mag.toFixed(3));
+    if (sign === "neg") line.setAttribute("stroke-dasharray", "5 4"); // trade-off reads dashed
+    const rel = e.r >= 0 ? "move together" : "trade off";
+    const t = document.createElementNS(SVGNS, "title");
+    t.textContent = `${NODES[e.a].label} ↔ ${NODES[e.b].label}: r=${e.r > 0 ? "+" : ""}${e.r} over ${e.n} days` +
+      `${e.significant ? "" : " (not significant)"} — they ${rel}`;
+    line.appendChild(t);
     edgeG.appendChild(line);
   }
 
+  // ── NODES = the pillars themselves ──
   for (const [name, pos] of Object.entries(NODES)) {
     const p = byName[name] || {};
-    const score = Math.round(p.raw_score ?? 12);
+    const score = Math.round(p.raw_score ?? 0);
     const r = 14 + Math.min(26, score / 4);   // size by where it stands
+    const up = trend(p.xp_delta) === "up";
+    const instrumented = coupledPillars.has(name);
     const g = document.createElementNS(SVGNS, "g");
-    g.setAttribute("class", "node" + (trend(p.xp_delta) === "up" ? " up" : ""));
+    g.setAttribute("class", "node" + (up ? " up" : "") + (instrumented ? "" : " quiet"));
+    g.setAttribute("style", driftVars(name));
     const c = document.createElementNS(SVGNS, "circle");
     c.setAttribute("cx", pos.x); c.setAttribute("cy", pos.y); c.setAttribute("r", r);
     const tScore = document.createElementNS(SVGNS, "text");
     tScore.setAttribute("class", "score"); tScore.setAttribute("x", pos.x); tScore.setAttribute("y", pos.y + 4);
     tScore.textContent = score || "";
     const tLab = document.createElementNS(SVGNS, "text");
-    tLab.setAttribute("x", pos.x); tLab.setAttribute("y", pos.y + r + 12);
+    tLab.setAttribute("class", "nlabel"); tLab.setAttribute("x", pos.x); tLab.setAttribute("y", pos.y + r + 12);
     tLab.textContent = pos.label;
-    g.append(c, tScore, tLab);
+    // Hover/focus door affordance: pillar icon + "open →" cue, revealed on interaction.
+    const door = document.createElementNS(SVGNS, "g");
+    door.setAttribute("class", "door");
+    const fo = document.createElementNS(SVGNS, "foreignObject");
+    fo.setAttribute("x", pos.x - 9); fo.setAttribute("y", pos.y - r - 22); fo.setAttribute("width", 18); fo.setAttribute("height", 18);
+    const ico = document.createElement("span");
+    ico.className = "door-ico"; ico.innerHTML = domainIcon(NODE_ICON[name] || "vitals", { size: "16px" });
+    fo.appendChild(ico);
+    const cue = document.createElementNS(SVGNS, "text");
+    cue.setAttribute("class", "door-cue"); cue.setAttribute("x", pos.x); cue.setAttribute("y", pos.y + r + 24);
+    cue.textContent = "open →";
+    door.append(fo, cue);
+    g.append(c, tScore, tLab, door);
     const href = NODE_LINK[name];
     if (href) {
       const a = document.createElementNS(SVGNS, "a");
       a.setAttribute("href", href);
-      a.setAttribute("aria-label", `${pos.label} — open the data`);
+      a.setAttribute("aria-label", `${pos.label} — score ${score} of 100, open its data`);
       a.appendChild(g);
       nodeG.appendChild(a);
     } else {
@@ -217,7 +284,9 @@ function renderWave(days) {
   // time-travel view that already exists one URL away). The signature honesty
   // artifact stops being inert: tap a dip, read that morning. No-data days stay
   // plain spans — there's no sheet to open.
-  wrap.replaceChildren(...days.map((d) => {
+  const n = days.length;
+  const cpts = [];  // #590 — the SHARED interaction contract (motion.js draws the focus dot + tip)
+  const bars = days.map((d, i) => {
     const pos = d.score ? (d.score - lo) / span : null;
     const linkable = !!d.date && d.score != null;
     const bar = document.createElement(linkable ? "a" : "span");
@@ -225,7 +294,12 @@ function renderWave(days) {
     const h = d.score ? 14 + (pos || 0) * 86 : 6;
     bar.style.height = `${h}%`;
     bar.title = `${d.date || ""}: ${d.score ?? "no data"}`; // a11y / no-JS fallback
-    bar.dataset.tip = `${d.date || ""} · ${d.score == null ? "no data" : "score " + d.score + " — tap to open that day"}`;
+    cpts.push({
+      x: n > 1 ? (i + 0.5) / n : 0.5,
+      y: 1 - h / 100,  // the bar's top, in normalized figure coords
+      l: `${d.date || ""} · ${d.score == null ? "no data" : "score " + d.score + " — tap to open that day"}`,
+      v: d.score == null ? null : d.score,
+    });
     if (linkable) {
       bar.href = `/now/?date=${encodeURIComponent(d.date)}`;
       bar.setAttribute("aria-label", `${d.date} · score ${d.score} — open that day's cockpit`);
@@ -233,19 +307,15 @@ function renderWave(days) {
       bar.setAttribute("aria-hidden", "true");
     }
     return bar;
-  }));
-  // Styled, cursor-following tooltip — the waveform becomes a thing you explore.
-  let tip = wrap.querySelector(".wave-tip");
-  if (!tip) { tip = document.createElement("span"); tip.className = "wave-tip label"; tip.hidden = true; wrap.appendChild(tip); }
-  wrap.onmousemove = (e) => {
-    const bar = e.target.closest && e.target.closest(".bar");
-    if (!bar || !bar.dataset.tip) { tip.hidden = true; return; }
-    tip.textContent = bar.dataset.tip;
-    tip.hidden = false;
-    const wr = wrap.getBoundingClientRect();
-    tip.style.left = `${Math.max(0, Math.min(wr.width, e.clientX - wr.left))}px`;
-  };
-  wrap.onmouseleave = () => { tip.hidden = true; };
+  });
+  // A FRESH inner node carries the data-cpts contract + the flex bar row; motion.js's
+  // MutationObserver wires the shared focus dot + tooltip + keyboard exploration on it
+  // (the bespoke cursor-tooltip is gone — one interaction system across the whole site, #590/#582).
+  const inner = document.createElement("div");
+  inner.className = "wave-cpts";
+  inner.setAttribute("data-cpts", JSON.stringify(cpts));
+  inner.append(...bars);
+  wrap.replaceChildren(inner);
 }
 
 /* ── the Third Wall ──────────────────────────────────────────────────────── */
@@ -386,13 +456,14 @@ async function load() {
   initTheme();
   renderWall();
 
-  const [stats, journey, wave, character, weight, presence] = await Promise.allSettled([
+  const [stats, journey, wave, character, weight, presence, coupling] = await Promise.allSettled([
     getJSON("/public_stats.json"),
     getJSON("/api/journey"),
     getJSON("/api/journey_waveform"),
     getJSON("/api/character"),
     getJSON("/api/weight_progress"),
     getJSON("/api/presence"),
+    getJSON("/api/pillar_coupling"),  // #590 — measured pillar co-movement for the constellation edges
   ]);
 
   const statsV = stats.status === "fulfilled" ? stats.value : null;
@@ -429,7 +500,15 @@ async function load() {
 
   const charV = character.status === "fulfilled" ? character.value : null;
   const pillars = (charV && (charV.pillars || (charV.character && charV.character.pillars))) || [];
-  drawConstellation(pillars.length ? pillars : Object.keys(NODES).map((name) => ({ name, raw_score: 12, xp_delta: 0 })));
+  const activeEffects = (charV && charV.character && charV.character.active_effects) || [];
+  const couplingV = coupling.status === "fulfilled" ? coupling.value : null;
+  drawConstellation(
+    pillars.length ? pillars : Object.keys(NODES).map((name) => ({ name, raw_score: 0, xp_delta: 0 })),
+    couplingV,
+    activeEffects,
+  );
+  const cw = bind("const-window");
+  if (cw && couplingV && couplingV.window_days) cw.textContent = ` over the last ${couplingV.window_days} days`;
 }
 
 load();

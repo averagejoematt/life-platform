@@ -125,6 +125,7 @@ from web.site_api_data import (
     handle_source_freshness,
     handle_state_of_matthew,
     handle_supplements,
+    handle_pillar_coupling,
     handle_survival,
     handle_tools_baseline,
     handle_vice_streaks,
@@ -328,6 +329,7 @@ ROUTES = {
     "/api/timeline": handle_timeline,
     "/api/correlations": handle_correlations,
     "/api/what_changed": handle_what_changed,  # SS-08 monthly "what changed"
+    "/api/pillar_coupling": handle_pillar_coupling,  # #590 constellation edge weights
     "/api/genome_risks": handle_genome_risks,
     # Sprint 9: new public endpoints
     "/api/supplements": handle_supplements,

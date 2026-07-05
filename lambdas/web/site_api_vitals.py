@@ -416,6 +416,19 @@ def handle_character(date: str | None = None) -> dict:
                 "composite_score": round(composite, 1),
                 "composite_delta_1d": composite_delta_1d,
                 "time_travel": bool(date),
+                # #590: the engine's designed cross-pillar couplings that are ACTIVE
+                # right now (rare gameplay thresholds — e.g. Sleep Drag). The home
+                # constellation lights these as directional overlay edges. Additive.
+                "active_effects": [
+                    {
+                        "name": e.get("name"),
+                        "emoji": e.get("emoji", ""),
+                        "condition": e.get("condition", ""),
+                        "targets": e.get("targets", {}),
+                    }
+                    for e in (record.get("active_effects") or [])
+                    if isinstance(e, dict)
+                ],
             },
             "pillars": pillars,
         },

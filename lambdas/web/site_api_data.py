@@ -21,6 +21,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3
+import stats_core  # shared layer (#529): the one sanctioned stats implementation (ADR-105)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 from source_registry import (  # #392: canonical source classification (shared layer)
@@ -446,6 +447,98 @@ def handle_what_changed() -> dict:
             "computed_at": item.get("computed_at"),
         },
         cache_seconds=900,
+    )
+
+
+_COUPLING_PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+_COUPLING_WINDOW = 60  # trailing character-sheet records to read
+_COUPLING_MIN_N = 6  # a pair needs this many co-present real days or it's honestly omitted
+
+
+def _coupling_real_score(pd: dict):
+    """The pillar's raw_score for a day IF that day carried real signal, else None.
+
+    ADR-104/105: a held/zero-coverage day is NOT a real low — counting a floored or
+    carried-forward score would manufacture spurious (anti-)correlation, especially
+    across a manual-logging gap. We correlate only days with genuine data.
+    """
+    if not isinstance(pd, dict):
+        return None
+    v = pd.get("raw_score")
+    if v is None:
+        return None
+    if pd.get("coverage_hold"):
+        return None
+    cov = pd.get("data_coverage")
+    if cov is not None and float(cov) <= 0:
+        return None
+    return float(v)
+
+
+def handle_pillar_coupling() -> dict:
+    """GET /api/pillar_coupling — #590: how the seven pillars have actually co-moved.
+
+    Deterministic pairwise Pearson of each pillar's daily raw_score over a trailing
+    window (real-signal days only, per _coupling_real_score). Every edge carries its
+    own n; pairs below the n floor or with no variance are omitted, never faked — the
+    constellation draws thin/absent data honestly faint. No AI, no forecast: this is a
+    descriptive statistic over the last ~60 days, labeled by its actual date range.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}character_sheet") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=_COUPLING_WINDOW,
+    )
+    recs = _decimal_to_float(resp.get("Items", []))
+    recs.sort(key=lambda r: str(r.get("sk", "")))  # chronological
+    if len(recs) < _COUPLING_MIN_N:
+        return _ok(
+            {
+                "edges": [],
+                "pillars": [],
+                "window_start": None,
+                "window_end": None,
+                "window_days": 0,
+                "min_n": _COUPLING_MIN_N,
+                "honest_null": True,
+            },
+            cache_seconds=3600,
+        )
+
+    series = {p: [_coupling_real_score(r.get(f"pillar_{p}")) for r in recs] for p in _COUPLING_PILLARS}
+    present = [p for p in _COUPLING_PILLARS if any(v is not None for v in series[p])]
+
+    edges = []
+    for i in range(len(present)):
+        for j in range(i + 1, len(present)):
+            a, b = present[i], present[j]
+            r = stats_core.pearson_r(series[a], series[b], min_n=_COUPLING_MIN_N)
+            if r is None:  # thin or flat → no honest edge to draw
+                continue
+            n = sum(1 for x, y in zip(series[a], series[b]) if x is not None and y is not None)
+            p_val = stats_core.pearson_p_value(r, n)
+            edges.append(
+                {
+                    "a": a,
+                    "b": b,
+                    "r": round(r, 2),
+                    "n": n,
+                    "p": round(p_val, 3) if p_val is not None else None,
+                    "significant": bool(p_val is not None and p_val < 0.05),
+                }
+            )
+    edges.sort(key=lambda e: -abs(e["r"]))
+    return _ok(
+        {
+            "edges": edges,
+            "pillars": present,
+            "window_start": str(recs[0].get("sk", "")).replace("DATE#", "")[:10],
+            "window_end": str(recs[-1].get("sk", "")).replace("DATE#", "")[:10],
+            "window_days": len(recs),
+            "min_n": _COUPLING_MIN_N,
+            "honest_null": not edges,
+        },
+        cache_seconds=3600,
     )
 
 
