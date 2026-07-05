@@ -13,7 +13,8 @@ DynamoDB schema:
   Fields vary by template. All entries include:
     template, date, source, notion_page_id, created_at, updated_at, raw_text
 
-EventBridge trigger: daily at 6:00 AM PT (before enrichment + daily brief).
+EventBridge trigger: hourly (cdk ingestion_stack INGEST_HOURLY) — captures late edits
+and same-day entries; the enricher + daily brief run downstream.
 
 Can also be invoked manually:
   {}                                → fetch last 2 days (default for scheduled)
@@ -21,9 +22,19 @@ Can also be invoked manually:
   {"start": "...", "end": "..."}   → backfill date range
   {"full_sync": true}              → fetch ALL entries (initial load)
 
+Sync semantics (#476):
+  - The query ORs Date / created_time / last_edited_time windows, so an entry authored
+    >2 days ago but EDITED in-window re-ingests (the enricher re-runs on the edit).
+  - Multi-per-day entries key on a stable notion_page_id suffix, not a positional #seq,
+    so inserting/deleting one entry no longer renumbers (and re-homes the enrichment of)
+    the others. Orphaned SKs (deletions + legacy #seq) are reconciled away per day.
+  - Each fetched page's raw Notion JSON + text is archived to S3 (raw/matthew/notion/)
+    so DynamoDB is not the only copy of irreplaceable journal text.
+
 Environment variables:
-  NOTION_SECRET_NAME — Secrets Manager key (default: life-platform/notion)
+  NOTION_SECRET_NAME — Secrets Manager key (default: life-platform/ingestion-keys)
   TABLE_NAME         — DynamoDB table (default: life-platform)
+  S3_BUCKET          — raw-archive bucket (default: matthew-life-platform)
 """
 
 import json
@@ -36,6 +47,7 @@ from urllib.request import Request
 from zoneinfo import ZoneInfo
 
 import boto3
+from boto3.dynamodb.conditions import Key  # #476/E-6: deletion-reconcile query
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -110,9 +122,11 @@ TEMPLATE_SK = {
 MULTI_PER_DAY = {"Stressor", "Health Event", "journal"}
 
 # ── AWS clients ───────────────────────────────────────────────────────────────
+S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")  # #476/X-7 raw archive
 secrets = boto3.client("secretsmanager", region_name="us-west-2")
 dynamodb = boto3.resource("dynamodb", region_name="us-west-2")
 table = dynamodb.Table(TABLE_NAME)
+s3_client = boto3.client("s3", region_name="us-west-2")
 
 # COST-OPT-1: Cache secrets in warm Lambda containers (15-min TTL)
 _secret_cache = {}
@@ -263,41 +277,31 @@ def query_database(api_key, database_id, start_date=None, end_date=None, start_c
         # created_time in UTC — a late-night PT entry (e.g. 10pm PT) crosses into
         # the next UTC day and would be missed by an exact date boundary.
         if not full_sync and (start_date or end_date):
-            date_filters = []
-            created_filters = []
-            # Extend created_time end boundary by +1 day for UTC offset
-            created_end = end_date
+            # Extend the timestamp end boundary by +1 day for the UTC offset (a late-night
+            # PT entry crosses into the next UTC day).
+            ts_end = end_date
             if end_date:
-                created_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-            if start_date and end_date:
-                date_filters = [
-                    {"property": "Date", "date": {"on_or_after": start_date}},
-                    {"property": "Date", "date": {"on_or_before": end_date}},
-                ]
-                created_filters = [
-                    {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
-                    {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
-                ]
-                body["filter"] = {
-                    "or": [
-                        {"and": date_filters},
-                        {"and": created_filters},
-                    ]
-                }
-            elif start_date:
-                body["filter"] = {
-                    "or": [
-                        {"property": "Date", "date": {"on_or_after": start_date}},
-                        {"timestamp": "created_time", "created_time": {"on_or_after": start_date}},
-                    ]
-                }
-            elif end_date:
-                body["filter"] = {
-                    "or": [
-                        {"property": "Date", "date": {"on_or_before": end_date}},
-                        {"timestamp": "created_time", "created_time": {"on_or_before": created_end}},
-                    ]
-                }
+                ts_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            def _window(kind):
+                # kind: ("Date" property) or a timestamp name ("created_time"/"last_edited_time")
+                clauses = []
+                if kind == "Date":
+                    if start_date:
+                        clauses.append({"property": "Date", "date": {"on_or_after": start_date}})
+                    if end_date:
+                        clauses.append({"property": "Date", "date": {"on_or_before": end_date}})
+                else:
+                    if start_date:
+                        clauses.append({"timestamp": kind, kind: {"on_or_after": start_date}})
+                    if end_date:
+                        clauses.append({"timestamp": kind, kind: {"on_or_before": ts_end}})
+                return {"and": clauses} if len(clauses) > 1 else clauses[0]
+
+            # #476/E-6: add a last_edited_time window so an entry authored >2 days ago but
+            # EDITED in-window re-ingests (previously invisible — Date + created_time both
+            # fell outside the 2-day window). The enricher re-runs off notion_last_edited.
+            body["filter"] = {"or": [_window("Date"), _window("created_time"), _window("last_edited_time")]}
 
         # Sort by created_time descending (works for all entries, not just those with Date)
         body["sorts"] = [{"timestamp": "created_time", "direction": "descending"}]
@@ -527,6 +531,9 @@ def parse_page(page, api_key=None):
         raw_parts.extend(prop_lines)
     item["raw_text"] = "\n".join(raw_parts)
 
+    # #476/X-7: second copy of the text before it only lives in DynamoDB.
+    _archive_page_raw(page, item, date_str)
+
     return date_str, template, item
 
 
@@ -537,12 +544,42 @@ def parse_page(page, api_key=None):
 # ── DynamoDB write ────────────────────────────────────────────────────────────
 
 
-def build_sk(date_str, template, seq=None):
-    """Build sort key for a journal entry."""
+def build_sk(date_str, template, page_id=None):
+    """Build sort key for a journal entry.
+
+    #476/E-6: multi-per-day entries key on a STABLE suffix derived from the Notion page
+    id (last 12 hex chars), not a positional #seq. Positional numbering renumbered every
+    following same-day entry whenever an earlier one was inserted/deleted — silently
+    re-homing a page's enrichment onto a different page. The stable suffix is idempotent.
+    """
     suffix = TEMPLATE_SK[template]
-    if template in MULTI_PER_DAY and seq is not None:
-        return f"DATE#{date_str}#journal#{suffix}#{seq}"
+    if template in MULTI_PER_DAY and page_id:
+        stable = page_id.replace("-", "")[-12:]
+        return f"DATE#{date_str}#journal#{suffix}#{stable}"
     return f"DATE#{date_str}#journal#{suffix}"
+
+
+def _archive_page_raw(page, item, date_str):
+    """#476/X-7: DDB was the only copy of irreplaceable journal text. Archive each fetched
+    page's raw Notion JSON + extracted text to S3 (raw/matthew/notion/YYYY/MM/DD-<id>.json)
+    so an accidental delete or schema mishap is recoverable. Best-effort — never blocks the
+    write."""
+    if not S3_BUCKET:
+        return
+    try:
+        year, month, day = date_str[:4], date_str[5:7], date_str[8:10]
+        page_id = (page.get("id") or "unknown").replace("-", "")
+        key = f"raw/matthew/notion/{year}/{month}/{day}-{page_id}.json"
+        payload = {
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "notion_page_id": page.get("id"),
+            "date": date_str,
+            "text": item.get("body_text") or item.get("raw_text", ""),
+            "raw_page": page,
+        }
+        s3_client.put_object(Bucket=S3_BUCKET, Key=key, Body=json.dumps(payload, default=str), ContentType="application/json")
+    except Exception as e:
+        logger.warning(f"[X-7] raw archive failed for page {page.get('id')}: {e}")
 
 
 def preserve_enrichment(item):
@@ -566,6 +603,35 @@ def preserve_enrichment(item):
             item.setdefault(key, val)
 
 
+def _reconcile_deleted(date_str, template, written_sks):
+    """#476/E-6: delete multi-per-day journal records for (date, template) that were NOT
+    written this run — entries deleted in Notion, or legacy positional #seq orphans left
+    behind by the old numbering. Scoped tightly to the (date, template) numbered prefix;
+    the raw text survives in S3 (X-7), so removal is non-destructive.
+
+    Note: a day whose entries are ALL deleted in Notion never reaches this path (it isn't
+    in the fetch) — whole-day deletion is out of scope here; single-entry edits/deletes on
+    an active day and the #seq→stable migration are covered."""
+    suffix = TEMPLATE_SK[template]
+    prefix = f"DATE#{date_str}#journal#{suffix}#"
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(PK) & Key("sk").begins_with(prefix),
+            ProjectionExpression="sk",
+        )
+        existing = [it["sk"] for it in resp.get("Items", [])]
+    except Exception as e:
+        logger.warning(f"[E-6] reconcile query failed for {prefix}: {e}")
+        return
+    for sk in existing:
+        if sk not in written_sks:
+            try:
+                table.delete_item(Key={"pk": PK, "sk": sk})
+                logger.info(f"[E-6] reconciled (removed) orphan/deleted entry {sk}")
+            except Exception as e:
+                logger.warning(f"[E-6] reconcile delete failed for {sk}: {e}")
+
+
 def write_entries(entries_by_date):
     """
     Write journal entries to DynamoDB.
@@ -582,9 +648,10 @@ def write_entries(entries_by_date):
 
         for template, items in by_template.items():
             if template in MULTI_PER_DAY:
-                # Numbered entries: stressor#1, stressor#2, etc.
-                for seq, item in enumerate(items, 1):
-                    sk = build_sk(date_str, template, seq)
+                # #476/E-6: stable per-page SKs (not positional #seq).
+                written_sks = set()
+                for item in items:
+                    sk = build_sk(date_str, template, item.get("notion_page_id"))
                     item["pk"] = PK
                     item["sk"] = sk
                     item["schema_version"] = 1
@@ -603,8 +670,13 @@ def write_entries(entries_by_date):
                     preserve_enrichment(item)
                     _stamp_phase(item, date_str)
                     table.put_item(Item=item)
+                    written_sks.add(sk)
                     written += 1
                     logger.info(f"Wrote {sk} ({template})")
+                # #476/E-6: reconcile — a day fully re-fetched here is authoritative, so any
+                # existing multi-per-day SK we did NOT just write is a Notion deletion or a
+                # legacy positional #seq orphan. Remove it (its text is preserved in S3).
+                _reconcile_deleted(date_str, template, written_sks)
             else:
                 # Single entry per day: morning, evening, weekly
                 item = items[0]  # Take latest if duplicates
