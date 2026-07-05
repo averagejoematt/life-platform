@@ -60,8 +60,12 @@ function entriesFor(s, data) {
       (((data && data.answers) || []).slice().reverse()).map((a) => ({ id: String(a.id), title: a.question, date: a.answered_at || "" }))
     );
   if (!data) return [];
-  if (s.kind === "bycoach" || s.kind === "team")
-    return (data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
+  if (s.kind === "bycoach" || s.kind === "team") {
+    const roster = (data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
+    // The Team leads with the collective read (CC-10, re-mounted from the retired
+    // /story/coaches/ surface) — the head coach + huddle live here now.
+    return s.kind === "team" ? [{ id: "team", title: "My Team", date: "the team's collective read on you" }].concat(roster) : roster;
+  }
   if (s.kind === "fieldnotes") return (data.entries || []).map((e) => ({ id: e.week, title: `Week ${e.week} field note`, date: e.ai_generated_at ? String(e.ai_generated_at).slice(0, 10) : "" }));
   if (s.kind === "scorecard") {
     const o = (data && data.overall) || {};
@@ -400,6 +404,43 @@ async function renderByCoach(read, id) {
 }
 
 // ── THE TEAM — roster / personalities / config (demoted reference) ──
+// CC-10 — "My Team": the team's collective read on Matthew right now. Re-mounted
+// here (the section's lead entry) after its /story/coaches/ home was retired in v4.
+async function renderTeamRead(read) {
+  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the team…</span></p>`;
+  let d;
+  try { d = await getJSON("/api/coach_team"); }
+  catch (e) { read.innerHTML = `<p class="dx-prose">Couldn't load the team just now.</p>`; return; }
+  let h = `<p class="dx-kicker label">your team · the collective read on you right now</p><h2 class="dx-title">My Team</h2>`;
+  if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  if (d.lead) {
+    const L = d.lead;
+    h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
+    h += `<div class="tl-head" style="--coach:${esc(L.color || "")}">${portrait(L, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(L, { title: "" })}</span>`}<span class="tl-name">${esc(L.name || "")}</span><span class="tl-role label">${esc(L.role || "")}</span></div>`;
+    if (L.short_bio) h += `<p class="dx-prose tl-bio">${esc(L.short_bio)}</p>`;
+    if (L.philosophy) h += `<blockquote class="tl-philosophy">${esc(L.philosophy)}</blockquote>`;
+    if ((L.staff_focus || []).length) h += `<p class="tl-focus label">what he's got the staff focused on: ${L.staff_focus.map(esc).join(" · ")}</p>`;
+    h += `</section>`;
+  }
+  if ((d.team_focus || []).length) {
+    h += `<section class="team-focus"><p class="dx-kicker label">what the team is focused on for you${d.current_stage ? ` · the ${esc(d.current_stage)} stage` : ""}</p>`;
+    h += `<ul class="tf-list">${d.team_focus.map((f) => `<li>${esc(f)}</li>`).join("")}</ul></section>`;
+  }
+  h += `<section class="team-tension"><p class="dx-kicker label">where the team disagrees</p>`;
+  if ((d.tensions || []).length) {
+    h += `<ul class="tt-list">${d.tensions.map((t) => `<li><span class="label">${esc((t.coaches || []).map((c) => String(c).replace("_coach", "")).join(" ↔ ") || t.topic || "")}</span> ${esc(t.summary || "")}</li>`).join("")}</ul>`;
+  } else {
+    h += `<p class="dx-prose">No live disagreements right now — the team's aligned (or it's early and the threads haven't formed yet). When they pull in different directions, you'll see the tradeoff here.</p>`;
+  }
+  h += `</section>`;
+  h += `<section class="team-huddle"><p class="dx-kicker label">the huddle — each coach's current read</p><ul class="th-list">`;
+  for (const c of d.huddle || []) {
+    h += `<li class="th-item" data-coach="${esc(c.persona_id)}" style="--coach:${esc(c.color || "")}"><button type="button" class="th-btn"><span class="th-name"><span class="coach-mark">${portrait(c, { title: "", size: 18 }) || sigil(c, { title: "" })}</span>${esc(c.name || "")}</span><span class="th-head">${esc(c.headline || "")}</span>${c.watch ? `<span class="th-watch label">watching: ${esc(c.watch)}</span>` : ""}</button></li>`;
+  }
+  h += `</ul></section>`;
+  read.innerHTML = h;
+  read.querySelectorAll(".th-item").forEach((li) => li.querySelector(".th-btn").addEventListener("click", () => selectEntry(BYKEY["team"], li.dataset.coach)));
+}
 async function renderTeamCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the profile…</span></p>`;
   const d = await tryJSON(`/api/coach/${encodeURIComponent(id)}`);
@@ -571,7 +612,7 @@ async function renderRead(s, id) {
   const read = $("[data-dx-read]");
   if (s.kind === "read") { if (id === "week") return renderReadWeek(read); if (id === "experiment") return renderReadExperiment(read); return renderReadToday(read); }
   if (s.kind === "bycoach") return renderByCoach(read, id);
-  if (s.kind === "team") return renderTeamCoach(read, id);
+  if (s.kind === "team") return String(id) === "team" ? renderTeamRead(read) : renderTeamCoach(read, id);
   if (s.kind === "fieldnotes") return renderFieldNote(read, id);
   if (s.kind === "scorecard") return renderScorecard(read, id);
   if (s.kind === "qa") { if (String(id) === "ask") return renderAskBoard(read); return renderAnswer(read, id); }
