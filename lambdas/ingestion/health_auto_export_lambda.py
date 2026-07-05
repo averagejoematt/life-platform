@@ -1475,14 +1475,13 @@ def lambda_handler(event, context):
     logger.info("Health Auto Export webhook received")
 
     # ── Auth ──
+    # #500: the ?key=... query-string fallback was removed 2026-07 — the app
+    # sends the Authorization header, and a token in the query string would
+    # leak into the API Gateway access log ($context.path, now recorded per
+    # cdk/stacks/ingestion_stack.py's AccessLogSettings).
     headers = event.get("headers", {})
     auth_header = headers.get("authorization", "")
     token = auth_header.replace("Bearer ", "").strip() if auth_header else ""
-
-    # Also check query string for ?key=... (fallback for apps that can't set headers)
-    query_params = event.get("queryStringParameters") or {}
-    if not token:
-        token = query_params.get("key", "")
 
     if not token:
         logger.warning("hae_auth_failure reason=no_token request_id=%s", context.aws_request_id if context else "local")

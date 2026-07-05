@@ -13,15 +13,18 @@ import aws_cdk as cdk
 from aws_cdk import (
     Duration,
     Stack,
+    aws_apigatewayv2 as apigwv2,
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
     aws_iam as iam,
     aws_lambda as _lambda,
+    aws_logs as logs,
     aws_s3 as s3,
     aws_sns as sns,
     aws_sqs as sqs,
 )
+from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
 from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, SHARED_LAYER_ARN, TABLE_NAME  # CONF-01
@@ -467,11 +470,62 @@ class IngestionStack(Stack):
                 "USER_ID": self.node.try_get_context("user_id") or "matthew",
             },
         )  # Phase 1.6 (2026-05-16): 60s→300s. Large Apple Health exports (10-50MB) silently 504'd. BUG-07.
-        hae.add_permission(
-            "ApiGatewayInvoke",
-            principal=iam.ServicePrincipal("apigateway.amazonaws.com"),
-            source_arn=f"arn:aws:execute-api:{self.region}:{self.account}:a76xwxt2wa/*/*/ingest",
+
+        # ── HTTP API front door (#500/D-7) ──
+        # Imported into CDK: this was console-created 2026-02-24 (api id
+        # a76xwxt2wa, name "health-auto-export-api") and only referenced by a
+        # hardcoded ARN string in a Lambda permission — the route, stage,
+        # throttle, and access-log config lived entirely outside IaC. Values
+        # below mirror the live config so `cdk deploy` can rebuild the edge
+        # from scratch. Auth is the Lambda's own bearer-token check (see
+        # health_auto_export_lambda.py) — WAFv2 cannot attach to HTTP APIs
+        # (only REST APIs / ALB / CloudFront), so it is NOT a defense here.
+        # See ADR-057's correction: WAF was removed 2026-06 platform-wide;
+        # rate limiting is in-Lambda/DynamoDB (rate_limiter.py), and this
+        # stage's throttle settings are the only edge-level guard.
+        hae_api = apigwv2.HttpApi(
+            self,
+            "HaeWebhookApi",
+            api_name="health-auto-export-api",
+            create_default_stage=False,
+            disable_execute_api_endpoint=False,
         )
+        hae_api.add_routes(
+            path="/ingest",
+            methods=[apigwv2.HttpMethod.POST],
+            integration=HttpLambdaIntegration("HaeWebhookIntegration", hae),
+        )
+        # Pre-existing log group (console-created alongside the API); imported
+        # rather than owned so CDK doesn't try to manage its retention/removal.
+        hae_access_log_group = logs.LogGroup.from_log_group_name(
+            self, "HaeWebhookApiAccessLogGroup", "/aws/apigateway/health-auto-export-api"
+        )
+        apigwv2.CfnStage(
+            self,
+            "HaeWebhookApiDefaultStage",
+            api_id=hae_api.http_api_id,
+            stage_name="$default",
+            auto_deploy=True,
+            access_log_settings=apigwv2.CfnStage.AccessLogSettingsProperty(
+                destination_arn=hae_access_log_group.log_group_arn,
+                format="$context.requestId $context.requestTime $context.httpMethod $context.path "
+                "$context.status $context.error.message $context.identity.sourceIp",
+            ),
+            default_route_settings=apigwv2.CfnStage.RouteSettingsProperty(
+                throttling_burst_limit=10,
+                throttling_rate_limit=1.67,
+            ),
+            route_settings={
+                "POST /ingest": apigwv2.CfnStage.RouteSettingsProperty(
+                    throttling_burst_limit=20,
+                    throttling_rate_limit=10.0,
+                ),
+            },
+        )
+        # NOTE: add_routes()'s HttpLambdaIntegration auto-grants the API
+        # Gateway invoke permission on `hae` scoped to this route — no manual
+        # hae.add_permission() needed (that hardcoded-ARN call is what this
+        # story removes).
 
         # ── 16. Google Calendar — RETIRED (ADR-030, v3.7.46)
         # All integration paths blocked by Smartsheet IT policy or macOS restrictions.
@@ -519,3 +573,6 @@ class IngestionStack(Stack):
 
         cdk.CfnOutput(self, "WhoopFnArn", value=whoop.function_arn, description="Whoop ingestion Lambda ARN")
         cdk.CfnOutput(self, "HaeWebhookFnArn", value=hae.function_arn, description="Health Auto Export webhook Lambda ARN")
+        cdk.CfnOutput(
+            self, "HaeWebhookApiEndpoint", value=hae_api.api_endpoint, description="Health Auto Export webhook API Gateway endpoint"
+        )
