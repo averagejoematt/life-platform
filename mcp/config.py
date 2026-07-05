@@ -54,7 +54,7 @@ _DEFAULT_SOURCE_OF_TRUTH = {
     "physiology": "whoop",
     "nutrition": "macrofactor",
     "sleep": "whoop",
-    "sleep_environment": "eightsleep",
+    # sleep_environment (eightsleep bed-temp) retired — ADR-118, #489
     "journal": "notion",
     "body": "withings",
     "steps": "apple_health",

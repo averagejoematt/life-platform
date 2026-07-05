@@ -397,132 +397,25 @@ def compute_derived_fields(record: dict, tz_offset: int = _DEFAULT_TZ_OFFSET) ->
 # ── Sleep data parsing ─────────────────────────────────────────────────────────
 
 
-def fetch_temperature_data(user_id: str, access_token: str, wake_date: str, tz: str) -> dict:
-    """
-    Fetch bed temperature data from Eight Sleep intervals endpoint.
-    Returns dict of temperature fields, or empty dict if unavailable.
-    Always safe — never raises exceptions that would block normal ingestion.
-    """
-    from_date = (datetime.strptime(wake_date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-
-    try:
-        data = api_get(
-            f"/v2/users/{user_id}/intervals",
-            access_token,
-            params={"from": from_date, "to": wake_date, "tz": tz},
-        )
-
-        intervals = data.get("intervals") or data.get("data") or []
-        if not intervals:
-            print(f"No intervals data returned for {wake_date}")
-            return {}
-
-        target = None
-        for interval in intervals:
-            int_date = interval.get("day") or interval.get("date") or ""
-            if int_date == wake_date:
-                target = interval
-                break
-        if target is None and len(intervals) == 1:
-            target = intervals[0]
-        if target is None:
-            print(f"No interval matching {wake_date}")
-            return {}
-
-        result = {}
-
-        # Method 1: Top-level temperature fields
-        if target.get("tempBedC") is not None:
-            result["bed_temp_c"] = round(float(target["tempBedC"]), 1)
-            result["bed_temp_f"] = round(float(target["tempBedC"]) * 9 / 5 + 32, 1)
-        if target.get("tempRoomC") is not None:
-            result["room_temp_c"] = round(float(target["tempRoomC"]), 1)
-            result["room_temp_f"] = round(float(target["tempRoomC"]) * 9 / 5 + 32, 1)
-
-        # Method 2: Timeseries temperature data
-        ts = target.get("timeseries") or {}
-        bed_temps = ts.get("tempBedC") or ts.get("tempBed") or []
-        room_temps = ts.get("tempRoomC") or ts.get("tempRoom") or []
-
-        if bed_temps and not result.get("bed_temp_c"):
-            vals = []
-            for point in bed_temps:
-                if isinstance(point, (list, tuple)) and len(point) >= 2:
-                    try:
-                        vals.append(float(point[1]))
-                    except (ValueError, TypeError):
-                        pass
-                elif isinstance(point, (int, float)):
-                    vals.append(float(point))
-            if vals:
-                result["bed_temp_c"] = round(sum(vals) / len(vals), 1)
-                result["bed_temp_f"] = round(result["bed_temp_c"] * 9 / 5 + 32, 1)
-                result["bed_temp_min_c"] = round(min(vals), 1)
-                result["bed_temp_max_c"] = round(max(vals), 1)
-
-        if room_temps and not result.get("room_temp_c"):
-            vals = []
-            for point in room_temps:
-                if isinstance(point, (list, tuple)) and len(point) >= 2:
-                    try:
-                        vals.append(float(point[1]))
-                    except (ValueError, TypeError):
-                        pass
-                elif isinstance(point, (int, float)):
-                    vals.append(float(point))
-            if vals:
-                result["room_temp_c"] = round(sum(vals) / len(vals), 1)
-                result["room_temp_f"] = round(result["room_temp_c"] * 9 / 5 + 32, 1)
-
-        # Method 3: Per-stage temperature settings (heating/cooling level)
-        stages = target.get("stages") or []
-        temp_levels = []
-        for stage in stages:
-            temp_info = stage.get("temp") or stage.get("temperature") or {}
-            level = temp_info.get("level")
-            if level is not None:
-                try:
-                    temp_levels.append(float(level))
-                except (ValueError, TypeError):
-                    pass
-            stage_bed = temp_info.get("bedC") or temp_info.get("bed_temp_c")
-            if stage_bed is not None and "bed_temp_c" not in result:
-                try:
-                    result["bed_temp_c"] = round(float(stage_bed), 1)
-                    result["bed_temp_f"] = round(float(stage_bed) * 9 / 5 + 32, 1)
-                except (ValueError, TypeError):
-                    pass
-
-        if temp_levels:
-            result["temp_level_avg"] = round(sum(temp_levels) / len(temp_levels), 1)
-            result["temp_level_min"] = round(min(temp_levels), 1)
-            result["temp_level_max"] = round(max(temp_levels), 1)
-
-        # Method 4: sleepQualityScore temperature hint
-        sq = target.get("sleepQualityScore") or {}
-        for key in ["temperature", "tempBedC", "bedTemp"]:
-            val = sq.get(key)
-            if isinstance(val, dict) and val.get("current") is not None and "bed_temp_c" not in result:
-                try:
-                    result["bed_temp_c"] = round(float(val["current"]), 1)
-                    result["bed_temp_f"] = round(result["bed_temp_c"] * 9 / 5 + 32, 1)
-                except (ValueError, TypeError):
-                    pass
-
-        if result:
-            print(f"Temperature data found: {list(result.keys())}")
-        else:
-            print("No temperature data found in intervals response")
-            print(f"  Interval keys: {list(target.keys())[:15]}")
-
-        return result
-
-    except urllib.error.HTTPError as e:
-        print(f"Intervals endpoint error: HTTP {e.code}")
-        return {}
-    except Exception as e:
-        print(f"Temperature fetch exception: {e}")
-        return {}
+# ── Bed-temperature ingestion: RETIRED (ADR-118, #489) ──────────────────────────
+# The former fetch_temperature_data() called GET /v2/users/{id}/intervals, which
+# has 404'd on every run for 4+ months (135×/week) and silently swallowed the
+# error — so bed_temp_*/room_temp_*/temp_level_* were never written and every
+# downstream surface (MCP env optimizer, the /data/sleep environment chart, the
+# chronicle email, AI env analysis) rendered a permanent empty state.
+#
+# Investigation (2026-07-05): the /v2/intervals path is dead — the maintained
+# community client (lukas-clarke/pyEight) no longer references it. The only
+# current temperature source is the /v1/users/{id}/trends response we ALREADY
+# fetch, where average bed/room temp appears (per pyEight) under
+# sleepQualityScore.tempBedC / .tempRoomC and in a timeseries.tempRoomC array.
+# We could not confirm those fields are populated for this account without a
+# live-credential spike, and the surfaces have been empty 4+ months, so the
+# honest call was to RETIRE the temperature surfaces rather than leave them
+# empty. Reactivation lead is recorded in docs/DECISIONS.md ADR-118: a future
+# attended session can read sleepQualityScore.tempBedC off the working trends
+# payload and, if present, re-light the consumers. Removing the fetch also
+# removes the silent 404-swallow (AC: "no silent 404-swallowing").
 
 
 def parse_trends_for_date(
@@ -652,7 +545,7 @@ def authenticate(secret_data: dict) -> dict:
 
 
 def fetch_day(credentials: dict, date_str: str) -> dict | None:
-    """Fetch trends for one wake_date. Returns raw + temperature data."""
+    """Fetch trends for one wake_date. Bed-temperature ingestion retired (ADR-118)."""
     secret = _secret_cache_simp2["secret"] or credentials
     user_id_es = secret["user_id"]
     token = secret["access_token"]
@@ -680,12 +573,11 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
             trends = api_get(f"/v1/users/{user_id_es}/trends", secret["access_token"], params={"from": from_date, "to": date_str, "tz": tz})
         else:
             raise
-    temp = fetch_temperature_data(user_id_es, secret["access_token"], date_str, tz)
-    return {"trends": trends, "temp": temp, "bed_side": bed_side, "tz": tz}
+    return {"trends": trends, "bed_side": bed_side, "tz": tz}
 
 
 def transform(raw: dict, date_str: str) -> list[dict]:
-    """Parse sleep + merge environment temperature."""
+    """Parse sleep. Bed-temperature merge retired (ADR-118, #489)."""
     if not raw:
         return []
     tz_offset = _tz_offset_hours(raw["tz"])
@@ -697,7 +589,6 @@ def transform(raw: dict, date_str: str) -> list[dict]:
             "source": "eightsleep",
             "date": date_str,
             **parsed,
-            **(raw["temp"] or {}),
         }
     ]
 

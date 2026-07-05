@@ -221,7 +221,7 @@ def test_eightsleep_401_relogin_persists_token(monkeypatch):
 
     monkeypatch.setattr(es, "api_get", fake_api_get)
     monkeypatch.setattr(es, "refresh_token", fake_refresh)
-    monkeypatch.setattr(es, "fetch_temperature_data", lambda *a, **k: {})
+    # #489/ADR-118: fetch_temperature_data retired (dead /v2/intervals endpoint).
     monkeypatch.setattr(es, "save_secret", lambda s: calls.__setitem__("saved", s))
     es._secret_cache_simp2["secret"] = None
 

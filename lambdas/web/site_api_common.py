@@ -104,11 +104,11 @@ CORS_HEADERS = {
 # hand-maintained.
 PLATFORM_STATS = {
     "data_sources": 20,
-    "mcp_tools": 144,
+    "mcp_tools": 143,
     "lambdas": 93,
     "cdk_stacks": 8,
     "alarms": 56,
-    "adrs": 99,
+    "adrs": 100,
     "monthly_cost": "~$60",  # real steady-state (~$29 AI + CloudWatch/Secrets/CE); the old
     # "$19" was stale and read as less than AI-alone MTD ($24) on the inference page — a visible
     # contradiction. ~$60 total keeps AI < total and matches the actual run-rate (still « $75 cap).

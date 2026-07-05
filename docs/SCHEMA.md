@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-05 (v8.6.0 — 144 MCP tools, 20 data sources, 93 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-05 (v8.6.0 — 143 MCP tools, 20 data sources, 93 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -414,15 +414,15 @@ Note: Individual BP readings stored in S3 at `raw/matthew/blood_pressure/YYYY/MM
 | `time_to_sleep_min` | number | Sleep onset latency (minutes) |
 | `sleep_start` | string | ISO timestamp of sleep onset (UTC) |
 | `sleep_end` | string | ISO timestamp of wake (UTC) |
-| `bed_temp_c` | number | Pod temperature (°C) |
-| `bed_temp_f` | number | Pod temperature (°F) |
-| `bed_temp_min_c` | number | Minimum pod temperature overnight (°C) |
-| `bed_temp_max_c` | number | Maximum pod temperature overnight (°C) |
-| `room_temp_c` | number | Room temperature (°C) |
-| `room_temp_f` | number | Room temperature (°F) |
-| `temp_level_avg` | number | Temp level setting avg (-10 to +10) |
-| `temp_level_min` | number | Temp level min |
-| `temp_level_max` | number | Temp level max |
+| ~~`bed_temp_c`~~ | number | **RETIRED (ADR-118, #489)** — Eight Sleep temperature pipeline dead (dead `/v2/intervals` endpoint, never written for 4+ months). |
+| ~~`bed_temp_f`~~ | number | **RETIRED (ADR-118, #489)** — see above. |
+| ~~`bed_temp_min_c`~~ | number | **RETIRED (ADR-118, #489)** |
+| ~~`bed_temp_max_c`~~ | number | **RETIRED (ADR-118, #489)** |
+| ~~`room_temp_c`~~ | number | **RETIRED (ADR-118, #489)** |
+| ~~`room_temp_f`~~ | number | **RETIRED (ADR-118, #489)** |
+| ~~`temp_level_avg`~~ | number | **RETIRED (ADR-118, #489)** |
+| ~~`temp_level_min`~~ | number | **RETIRED (ADR-118, #489)** |
+| ~~`temp_level_max`~~ | number | **RETIRED (ADR-118, #489)** |
 | `bed_side` | string | Left or right side of bed |
 | `sleep_onset_hour` | number | Hour of sleep onset (derived) |
 | `wake_hour` | number | Hour of wake (derived) |

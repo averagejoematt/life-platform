@@ -252,7 +252,7 @@ _SCHEMAS: dict[str, dict] = {
             "sleep_duration_hours": (0, 24),
             "hr_avg": (20, 200),  # #480/A-7: written name (was heart_rate_avg — never fired)
         },
-        "at_least_one_of": ["sleep_efficiency_pct", "sleep_duration_hours", "bed_temp_f"],
+        "at_least_one_of": ["sleep_efficiency_pct", "sleep_duration_hours"],  # bed_temp_f retired — ADR-118, #489
     },
     "withings": {
         "required_fields": ["pk", "sk", "date"],
