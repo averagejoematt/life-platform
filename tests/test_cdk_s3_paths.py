@@ -33,6 +33,9 @@ import sys
 
 import pytest
 
+# #416 / ADR-117: deploy-critical lane (CDK S3 path linter).
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 ROLE_POLICIES_PATH = os.path.join(ROOT, "cdk", "stacks", "role_policies.py")
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")

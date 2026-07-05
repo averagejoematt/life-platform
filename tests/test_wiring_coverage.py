@@ -27,6 +27,9 @@ import sys
 
 import pytest
 
+# #416 / ADR-117: deploy-critical lane (safety-module + MCP-tool wiring coverage).
+pytestmark = pytest.mark.deploy_critical
+
 # ── Project root ─────────────────────────────────────────────────────────────
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")

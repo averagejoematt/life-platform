@@ -29,6 +29,11 @@ import os
 import re
 import sys
 
+import pytest
+
+# #416 / ADR-117: deploy-critical lane (secret-name literal references — outage guard).
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # ── Source directories to scan ────────────────────────────────────────────────

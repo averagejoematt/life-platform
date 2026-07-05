@@ -124,6 +124,9 @@ def _has_ddb_writes(stmts):
 
 import pytest  # noqa — imported after sys.path manipulation
 
+# #416 / ADR-117: deploy-critical lane (static IAM policy linter for role_policies.py).
+pytestmark = pytest.mark.deploy_critical
+
 
 @pytest.mark.parametrize("fn_name", sorted(ALL_FUNCTIONS))
 def test_r1_ddb_read_requires_kms_decrypt(fn_name):

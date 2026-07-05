@@ -30,6 +30,11 @@ import os
 import re
 import sys
 
+import pytest
+
+# #416 / ADR-117: deploy-critical lane (CDK handler-name consistency).
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 CDK_STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")

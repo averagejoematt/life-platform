@@ -3,11 +3,17 @@
 #
 # Architecture:
 #   1. Lint (flake8 + py_compile syntax check) — runs on every push, no AWS access needed
-#   2. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
-#   3. Deploy — requires manual approval (GitHub Environment: production)
-#   4. Smoke test — invokes qa-smoke + canary, checks structured output
-#   5. Auto-rollback — fires if smoke-test fails after a successful deploy (TB7-25)
-#   6. Notify — posts to SNS on any failure
+#   2a. Deploy-critical tests — the FAST offline subset (marker: deploy_critical) that
+#       GATES the chain (#416, ADR-117). `plan` depends on THIS, not the full suite.
+#   2b. Unit Tests — the exhaustive suite; runs in parallel, still reds main, but no
+#       longer skips deploy + the reader-facing visual-QA gate on an unrelated red test.
+#   3. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
+#   4. Deploy — requires manual approval (GitHub Environment: production)
+#   5. Smoke test — invokes qa-smoke + canary, checks structured output
+#   6. Auto-rollback — Lambda/MCP (smoke failure, TB7-25) + SITE (smoke OR visual-QA
+#      failure, #418/ADR-117); shared-layer rollback surfaced as a runbook in the
+#      failure notification.
+#   7. Notify — posts to SNS on any failure
 #
 # AWS auth: OIDC federation (no long-lived keys)
 # See deploy/setup_github_oidc.sh to create the IAM provider + role
@@ -207,8 +213,50 @@ jobs:
         run: python3 deploy/sync_doc_metadata.py --check
 
   # ════════════════════════════════════════════════════════════════
-  # Job 2: Unit Tests — run pytest on tests/test_shared_modules.py
+  # Job 2a: Deploy-critical test lane (#416, ADR-117) — GATES the chain
   # ════════════════════════════════════════════════════════════════
+  # The FAST, fully-offline subset that decides whether a deploy is SAFE:
+  # the deploy contract (Lambda handler names/signatures, shared-layer
+  # module presence + consumer wiring, MCP tool registration, IAM role
+  # policies, secret-name references, DDB key patterns, CDK↔source
+  # consistency) + the reader-facing AI-output honesty gate. `plan`
+  # depends on THIS job, NOT the exhaustive `test` job below — so one
+  # unrelated red unit test no longer skips deploy AND the reader-facing
+  # visual-QA safety net (the "red main blacks out visual QA" failure).
+  # The exhaustive suite still runs (job `test`, in parallel) and still
+  # reds main + fires notify-failure; it just no longer gates the chain.
+  # Inclusion criteria + the exact file list live in docs/CONVENTIONS.md
+  # ("Deploy-critical test lane") and are enforced by the `deploy_critical`
+  # pytest marker (pytest.ini). `not integration` keeps the one live-AWS
+  # test in a marked file (test_lv6) out of this creds-free lane.
+  test-critical:
+    name: Deploy-critical tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install test dependencies
+        run: pip install pytest boto3 botocore
+
+      - name: Run deploy-critical test lane
+        run: |
+          echo "::group::Deploy-critical lane — pytest -m 'deploy_critical and not integration'"
+          python3 -m pytest tests/ -m "deploy_critical and not integration" -v --tb=short
+          echo "::endgroup::"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 2b: Unit Tests — the exhaustive offline suite
+  # ════════════════════════════════════════════════════════════════
+  # NON-GATING for deploy since #416/ADR-117: nothing downstream `needs`
+  # this job except notify-failure, so a red here still flags main (and
+  # emails a CI failure) but no longer skips plan → deploy → visual-QA.
+  # The deploy-gating subset is job `test-critical` above.
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -378,7 +426,9 @@ jobs:
   plan:
     name: Plan deployments
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    # #416/ADR-117: gate on the fast deploy-critical lane, NOT the exhaustive
+    # `test` suite — an unrelated red unit test must not skip deploy + visual-QA.
+    needs: [lint, test-critical]
     outputs:
       deploy_matrix: ${{ steps.plan.outputs.matrix }}
       has_deploys: ${{ steps.plan.outputs.has_deploys }}
@@ -1148,7 +1198,11 @@ jobs:
     name: Auto-rollback (smoke failure)
     runs-on: ubuntu-latest
     needs: [plan, deploy, smoke-test]
-    if: needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
+    # `always() &&` is REQUIRED: a job whose dependency (smoke-test) failed is
+    # skipped by default unless its `if` contains a status-check function — so
+    # without always() this rollback never actually fires (#418/ADR-117 fix; the
+    # bare condition here was previously dormant).
+    if: always() && needs.smoke-test.result == 'failure' && needs.deploy.result == 'success'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -1206,6 +1260,110 @@ jobs:
           echo "Note: If shared layer was also rebuilt, layer rollback is MANUAL."
           echo "  Run: bash deploy/build_layer.sh (from previous commit) + attach"
 
+      # #418/ADR-117: every rollback event must produce a notification (no silent
+      # revert), and the shared-layer rollback — which stays manual by design (a
+      # layer republish/attach is a CDK operation, too risky to auto-fire) — must
+      # be an EXPLICIT runbook line in that notification, not a buried log echo.
+      - name: Notify Lambda/MCP rollback (+ shared-layer runbook)
+        if: always()
+        run: |
+          COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          LAYER_NOTE=""
+          if [ "${{ needs.plan.outputs.layer_changed }}" = "true" ]; then
+            LAYER_NOTE="
+          ⚠️  SHARED LAYER was rebuilt in this deploy — Lambda CODE was rolled back
+              but the layer was NOT. Roll the layer back MANUALLY:
+                1. git checkout <previous-good-sha>
+                2. bash deploy/build_layer.sh
+                3. cd cdk && npx cdk deploy --all   (republish + re-attach to consumers)
+                4. verify: aws lambda list-layer-versions --layer-name life-platform-shared-utils"
+          fi
+          MESSAGE="AUTO-ROLLBACK (smoke failure) — Lambda/MCP code reverted to previous S3 artifact.
+          Commit: $SHORT (${{ github.ref_name }})
+          Run: $RUN_URL
+          Rollback job result: ${{ job.status }}$LAYER_NOTE
+
+          Investigate the smoke-test failure before re-deploying."
+          aws sns publish \
+            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
+            --subject "Life Platform AUTO-ROLLBACK [$SHORT]" \
+            --message "$MESSAGE" \
+            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — rollback still completed"
+          echo "✅ Rollback notification sent"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 6b: Auto-rollback the SITE on a failed post-deploy gate (#418/ADR-117)
+  # ════════════════════════════════════════════════════════════════
+  # The site + shared layer are the most-changed, most reader-hurting
+  # surfaces, yet only Lambda CODE had an auto-rollback net. This job
+  # closes the site half: when a CI SITE deploy is followed by a failed
+  # smoke test OR a failed visual/AI-QA gate, it reverts the site to the
+  # previous commit's build and re-invalidates CloudFront — via the (now
+  # CI-wired) deploy/rollback_site.sh, which re-hashes the asset graph +
+  # re-stamps version.json so /version.json returns to the prior build.
+  # Unlike the Lambda rollback (smoke-only), the site rollback ALSO fires
+  # on a visual-QA failure — that gate is the reader-facing safety net.
+  # NB: assumes a single squash-merge commit (main convention), so the
+  # previous good site == HEAD~1. If a push bundled several commits, roll
+  # back manually to the correct prior tag: bash deploy/rollback_site.sh <ref>.
+  rollback-site-on-failure:
+    name: Auto-rollback site (smoke or visual-QA failure)
+    runs-on: ubuntu-latest
+    needs: [plan, deploy, smoke-test, visual-qa]
+    if: >-
+      always() &&
+      needs.plan.outputs.site_changed == 'true' &&
+      needs.deploy.result == 'success' &&
+      (needs.smoke-test.result == 'failure' || needs.visual-qa.result == 'failure')
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 2  # need HEAD~1 to restore the previous good site build
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Roll back site to previous build + re-invalidate CDN
+        id: rollback
+        run: |
+          PRIOR=$(git rev-parse --short HEAD~1)
+          echo "⚠️  Post-deploy gate failed on a site deploy — rolling back site to $PRIOR"
+          # rollback_site.sh restores site/ from the ref, re-runs the canonical
+          # hashing+stamp build (ALLOW_STALE_SITE override for an intentional
+          # rollback), re-uploads, and invalidates CloudFront.
+          bash deploy/rollback_site.sh "HEAD~1"
+          echo "prior=$PRIOR" >> "$GITHUB_OUTPUT"
+          echo "✅ Site rolled back to $PRIOR — verify https://averagejoematt.com/version.json"
+
+      - name: Notify site rollback
+        if: always()
+        run: |
+          COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          GATE="smoke=${{ needs.smoke-test.result }} visual-qa=${{ needs.visual-qa.result }}"
+          MESSAGE="AUTO-ROLLBACK (site) — public site reverted after a failed post-deploy gate.
+          Deployed commit: $SHORT (${{ github.ref_name }})
+          Rolled back to:  ${{ steps.rollback.outputs.prior || 'HEAD~1' }}
+          Failing gate:    $GATE
+          Rollback result: ${{ job.status }}
+          Run: $RUN_URL
+
+          Verify the site returned to the prior build: curl -s https://averagejoematt.com/version.json"
+          aws sns publish \
+            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
+            --subject "Life Platform SITE AUTO-ROLLBACK [$SHORT]" \
+            --message "$MESSAGE" \
+            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — site rollback still completed"
+          echo "✅ Site rollback notification sent"
+
   # ════════════════════════════════════════════════════════════════
   # Job 7: Notify on failure
   # Runs if any upstream job fails. Posts to SNS life-platform-alerts.
@@ -1213,7 +1371,8 @@ jobs:
   notify-failure:
     name: Notify failure
     runs-on: ubuntu-latest
-    needs: [lint, test, plan, deploy, smoke-test]
+    # #416: include test-critical so a deploy-gating failure also notifies.
+    needs: [lint, test-critical, test, plan, deploy, smoke-test]
     if: failure()
     steps:
       - name: Configure AWS credentials (OIDC)
@@ -1228,10 +1387,22 @@ jobs:
           SHORT_COMMIT="${COMMIT:0:7}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
+          # #418/ADR-117: if this deploy rebuilt the shared layer, surface the
+          # manual layer-rollback runbook here (the layer has no auto-rollback net).
+          LAYER_NOTE=""
+          if [ "${{ needs.plan.outputs.layer_changed }}" = "true" ] && [ "${{ needs.deploy.result }}" = "success" ]; then
+            LAYER_NOTE="
+
+          ⚠️  SHARED LAYER was rebuilt this deploy and has NO auto-rollback. If the
+              failure is layer-related, roll it back manually:
+                git checkout <previous-good-sha> && bash deploy/build_layer.sh
+                cd cdk && npx cdk deploy --all"
+          fi
+
           MESSAGE="CI/CD FAILURE
           Commit: $SHORT_COMMIT (${{ github.ref_name }})
           Run: $RUN_URL
-          Triggered by: ${{ github.actor }}
+          Triggered by: ${{ github.actor }}$LAYER_NOTE
 
           Check GitHub Actions for details."
 

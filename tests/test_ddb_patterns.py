@@ -24,6 +24,9 @@ import sys
 
 import pytest
 
+# #416 / ADR-117: deploy-critical lane (DynamoDB access-pattern linter).
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 

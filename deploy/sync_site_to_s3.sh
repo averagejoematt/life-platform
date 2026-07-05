@@ -151,7 +151,11 @@ python3 "$(dirname "$0")/hash_site_assets.py" "$BUILD_DIR"
 # name so a stale page can't survive a reload (the real cause of "v451 vs v452"). The
 # muted visible stamp on the Cockpit + Evidence footers reads the meta tag (cockpit.js /
 # evidence.js).
-BUILD_SHA=$(git -C "$(dirname "$0")/.." rev-parse --short HEAD 2>/dev/null || echo unknown)
+# OVERRIDE_BUILD_SHA lets an intentional rollback (deploy/rollback_site.sh, #418)
+# stamp version.json + the <meta build> tag with the RESTORED build's short-SHA
+# instead of the working-tree HEAD, so /version.json truthfully returns to the
+# prior build. Normal deploys leave it unset and stamp HEAD as before.
+BUILD_SHA="${OVERRIDE_BUILD_SHA:-$(git -C "$(dirname "$0")/.." rev-parse --short HEAD 2>/dev/null || echo unknown)}"
 BUILD_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "→ Build stamp: $BUILD_SHA · $BUILD_AT"
 printf '{"build":"%s","deployed":"%s"}\n' "$BUILD_SHA" "$BUILD_AT" > "$BUILD_DIR/version.json"

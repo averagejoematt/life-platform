@@ -35,6 +35,11 @@ import sys
 
 import pytest
 
+# #416 / ADR-117: this file is in the deploy-critical lane (shared-layer wiring).
+# The critical lane runs `-m "deploy_critical and not integration"`, so the live
+# AWS test below (test_lv6, @pytest.mark.integration) is excluded from it.
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDA_MAP_PATH = os.path.join(ROOT, "ci", "lambda_map.json")
 CDK_STACKS_DIR = os.path.join(ROOT, "cdk", "stacks")

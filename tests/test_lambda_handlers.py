@@ -34,6 +34,9 @@ import sys
 
 import pytest
 
+# #416 / ADR-117: deploy-critical lane (handler existence/syntax/signature — I1-I6).
+pytestmark = pytest.mark.deploy_critical
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 LAMBDA_MAP_PATH = os.path.join(ROOT, "ci", "lambda_map.json")
