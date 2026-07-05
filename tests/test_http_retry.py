@@ -84,3 +84,26 @@ def test_network_error_retries(monkeypatch):
         with hr.urlopen_with_retry("req") as r:
             assert r.read() == b'{"ok":1}'
         assert m.call_count == 2
+
+
+def test_max_attempts_one_disables_retry(monkeypatch):
+    """#501/X-11: non-idempotent callers (e.g. a POST) pass max_attempts=1 to
+    skip the retry loop entirely — a single 503 raises immediately instead of
+    risking a duplicate write on a blind retry."""
+    monkeypatch.setattr(hr, "_BACKOFF_DELAYS", [0, 0])
+    with patch("urllib.request.urlopen") as m:
+        m.side_effect = [_http_error(503), _fake_ok_response(b'{"would have recovered":1}')]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            hr.urlopen_with_retry("req", max_attempts=1)
+        assert exc.value.code == 503
+        assert m.call_count == 1  # no retry despite a retryable status
+
+
+def test_max_attempts_none_keeps_default_policy(monkeypatch):
+    """Explicit max_attempts=None behaves identically to omitting it."""
+    monkeypatch.setattr(hr, "_BACKOFF_DELAYS", [0, 0])
+    with patch("urllib.request.urlopen") as m:
+        m.side_effect = [_http_error(503), _fake_ok_response(b'{"recovered":1}')]
+        with hr.urlopen_with_retry("req", max_attempts=None) as r:
+            assert r.read() == b'{"recovered":1}'
+        assert m.call_count == 2

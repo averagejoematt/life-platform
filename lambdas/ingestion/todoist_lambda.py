@@ -26,8 +26,6 @@ other 12 ingestion Lambdas can follow the same pattern.
 import json
 import logging
 import os
-import time
-import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -41,6 +39,11 @@ except ImportError:
     logger = logging.getLogger("todoist")
     logger.setLevel(logging.INFO)
 
+try:
+    from http_retry import urlopen_with_retry
+except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
+    urlopen_with_retry = urllib.request.urlopen
+
 # Framework (shipped in the shared layer)
 from ingestion_framework import IngestionConfig, run_ingestion
 
@@ -53,24 +56,15 @@ BASE_URL = "https://api.todoist.com/api/v1"
 
 
 def api_get(path, api_token, params=None):
-    """GET with retry on transient Todoist outages (429/500/502/503/504).
-    3 attempts with 2s/8s backoff.
-    """
+    """GET on the shared retry policy (#501/X-11 — converged onto http_retry;
+    3 attempts, 2s/8s backoff on 429/5xx and network errors; auth failures
+    bubble immediately)."""
     url = BASE_URL + path
     if params:
         url = url + "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_token}"})
-    backoff = [2, 8]
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                return json.loads(response.read())
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                logger.warning("Todoist HTTP %d on %s — retry %d/2 in %ds", e.code, path, attempt + 1, backoff[attempt])
-                time.sleep(backoff[attempt])
-                continue
-            raise
+    with urlopen_with_retry(req, timeout=30) as response:
+        return json.loads(response.read())
 
 
 def get_projects(api_token):
