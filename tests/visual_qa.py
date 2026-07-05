@@ -33,10 +33,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-# Default target is live prod. The PR-time render gate (tests/pr_render_gate.py)
-# overrides this to a local static server (http://127.0.0.1:PORT) via QA_SITE_URL
-# so the same capture_page() harness can shift-left onto site PRs without a deploy.
-SITE_URL = os.environ.get("QA_SITE_URL", "https://averagejoematt.com")
+SITE_URL = "https://averagejoematt.com"
 
 # ── Performance budgets (#580) ─────────────────────────────────────────────────
 # Baselines measured 2026-07-05 against production (headless Chromium, single run,

@@ -172,38 +172,6 @@ def sanity_scan(run_dir):
     return findings
 
 
-def impossible_values(ps):
-    """Scan a public_stats dict for impossible computed values.
-
-    Deterministic, data-source agnostic: negative training load (the -955 CTL/ATL
-    class) and out-of-range percentages. Extracted from live_checks so the PR-time
-    render gate (tests/pr_render_gate.py) can run the exact same numeric rubric
-    against a locally-served public_stats without a live deploy. Returns findings
-    (severity high/warn); an empty list means every value is in range.
-    """
-    findings = []
-    if not isinstance(ps, dict):
-        return [{"check": "impossible_value", "severity": "warn", "note": "public_stats not a JSON object"}]
-    t = ps.get("training", {}) or {}
-    for k in ("ctl_fitness", "atl_fatigue", "ctl", "atl"):
-        v = t.get(k)
-        if isinstance(v, (int, float)) and v < 0:
-            findings.append({"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"})
-    for blk_name in ("journey", "vitals"):
-        for k, v in (ps.get(blk_name, {}) or {}).items():
-            if k.endswith("_pct") and isinstance(v, (int, float)) and not (0 <= v <= 100):
-                findings.append(
-                    {
-                        "check": "impossible_value",
-                        "severity": "high",
-                        "field": f"{blk_name}.{k}",
-                        "value": v,
-                        "note": "pct out of [0,100]",
-                    }
-                )
-    return findings
-
-
 def live_checks():
     """Live-fetch checks that need NO prior capture (CI-friendly, post-deploy):
     (1) every harness page must resolve — catches the /data-vs-/method drift class +
@@ -233,7 +201,26 @@ def live_checks():
             findings.append({"check": "page_resolves", "severity": "high", "path": pg["path"], "status": status})
 
     try:
-        findings.extend(impossible_values(_fetch_json("/public_stats.json")))
+        ps = _fetch_json("/public_stats.json")
+        t = ps.get("training", {})
+        for k in ("ctl_fitness", "atl_fatigue", "ctl", "atl"):
+            v = t.get(k)
+            if isinstance(v, (int, float)) and v < 0:
+                findings.append(
+                    {"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"}
+                )
+        for blk_name in ("journey", "vitals"):
+            for k, v in (ps.get(blk_name, {}) or {}).items():
+                if k.endswith("_pct") and isinstance(v, (int, float)) and not (0 <= v <= 100):
+                    findings.append(
+                        {
+                            "check": "impossible_value",
+                            "severity": "high",
+                            "field": f"{blk_name}.{k}",
+                            "value": v,
+                            "note": "pct out of [0,100]",
+                        }
+                    )
     except Exception as e:  # noqa: BLE001
         findings.append({"check": "impossible_value", "severity": "warn", "note": f"public_stats fetch failed: {e}"})
     return findings

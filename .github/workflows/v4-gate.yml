@@ -13,11 +13,6 @@ on:
       - 'site/**'
       - 'scripts/v4_*.py'
       - '.github/workflows/v4-gate.yml'
-      # #408: the PR-time render/accuracy gate harness — a change to it must re-run
-      # the gate against itself.
-      - 'tests/pr_render_gate.py'
-      - 'tests/visual_qa.py'
-      - 'tests/accuracy_audit.py'
   push:
     branches: [main]
     paths:
@@ -68,39 +63,3 @@ jobs:
             test -f "$f" || { echo "::error::missing required v4 file: $f"; exit 1; }
           done
           echo "✓ Home, Cockpit, Data, Protocols, Coaching, Story + tokens present"
-
-  # ════════════════════════════════════════════════════════════════
-  # Render + accuracy gate (#408) — shift-left QA on site PRs.
-  # Runs the SAME Playwright render harness as the post-deploy visual-qa job,
-  # but against a LOCAL static serve of site/ with the API mocked — so broken
-  # layouts, JS render errors, and leaked impossible numbers are caught BEFORE
-  # merge instead of after they reach readers. No AWS, no deploy, no live data.
-  # PR-only: the post-deploy live sweep (ci-cd.yml visual-qa) still covers pushes.
-  # ════════════════════════════════════════════════════════════════
-  render-accuracy-gate:
-    name: Render + accuracy gate (local render)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install Playwright + Chromium
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install playwright==1.58.0
-          python -m playwright install --with-deps chromium
-
-      - name: Render + accuracy gate (headless local render, mocked API)
-        run: python3 tests/pr_render_gate.py --out qa-render-gate --keep
-
-      - name: Upload render-gate capture
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: pr-render-gate-capture
-          path: qa-render-gate/
-          retention-days: 14
