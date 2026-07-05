@@ -758,6 +758,12 @@ def compute_acwr() -> list[iam.PolicyStatement]:
     return _compute_base(needs_kms=True)
 
 
+def compute_personal_baselines() -> list[iam.PolicyStatement]:
+    """Personal baselines compute (#543): reads ~365d of computed_metrics from DDB, writes
+    one SOURCE#personal_baselines snapshot. Deterministic, no LLM — DDB read/write only."""
+    return _compute_base(needs_kms=True)
+
+
 def compute_failure_pattern() -> list[iam.PolicyStatement]:
     """Failure pattern compute (IC-4): reads DDB metrics, uses ai-keys for pattern analysis, writes to DDB."""
     return _compute_base(
@@ -2071,6 +2077,20 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             conditions={
                 "ForAllValues:StringLike": {
                     "dynamodb:LeadingKeys": ["COACH#*"],
+                },
+            },
+        ),
+        # #546: short-lived board follow-up sessions (opaque token, TTL ≤ 1h, no
+        # PII). PutItem mints a thread; UpdateItem appends a follow-up turn +
+        # bumps the counter under the atomic ≤3 cap. Scoped to the BOARDSESS#*
+        # partition via LeadingKeys so this role can only touch session records.
+        iam.PolicyStatement(
+            sid="DynamoDBBoardSessionWrite",
+            actions=["dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["BOARDSESS#*"],
                 },
             },
         ),

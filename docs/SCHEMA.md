@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-05 (v8.6.0 — 144 MCP tools, 20 data sources, 92 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-05 (v8.6.0 — 144 MCP tools, 20 data sources, 93 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -2016,6 +2016,7 @@ DynamoDB TTL is enabled on the `life-platform` table using the `ttl` attribute.
 | Partition | DDB TTL? | App-level expiry? | Policy | Enforcement | Notes |
 |-----------|----------|-------------------|--------|-------------|-------|
 | `CACHE#matthew` | ✅ Yes | — | 26 hours | `ttl` field set by `store_cache()` in `mcp_server.py` | Auto-expired by DDB background deletion. Avoids stale cache surviving past nightly warm cycle. |
+| `BOARDSESS#{token}` | ✅ Yes | ✅ Yes (in-code) | ≤ 1 hour | `ttl` set by `_create_board_session()` in `site_api_ai_lambda.py` (#546); `_load_board_session()` also rejects expired items in-code (DDB deletion is lazy) | Short-lived public board follow-up sessions. Opaque token (`secrets.token_urlsafe`), **no PII** — only an IP hash, the coach transcript, a ≤3 counter, and the TTL. ADR-112. |
 | `SOURCE#hypotheses` | ❌ No | ✅ Yes | 30 days | `expiry_date` field checked by `hypothesis-engine` Lambda + MCP tools | 30-day hard expiry enforced at application layer (v1.1.0). Expired hypotheses are never promoted regardless of evidence count. Status set to `expired`. |
 | `SOURCE#platform_memory` | ❌ No | ❌ No | ~90 days (policy, not enforced) | Query window limits (fetch_memory_records lookback) | Categories accumulate indefinitely in DDB; lookback windows (30–90 days) mean old records are never read. No cleanup needed until corpus exceeds 1,000 items. |
 | `SOURCE#insights` | ❌ No | ❌ No | ~180 days (policy, not enforced) | IC-16 lookback windows (30d for weekly, 90d for monthly) | Grows ~7 records/week (one per digest). At 180-day retention target: ~180 records. Low volume — no urgent cleanup need. Revisit when insight count exceeds 500 (trigger for Insights GSI, roadmap item #17). |

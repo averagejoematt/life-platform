@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-07-05 (v8.6.0 — 92 Lambdas, 9 active secrets, 144 MCP tools, ~56 alarms)
+> Last updated: 2026-07-05 (v8.6.0 — 93 Lambdas, 9 active secrets, 144 MCP tools, ~56 alarms)
 
 ---
 
@@ -174,8 +174,8 @@ Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(F
 
 > SIMP-2 cohort (8, ADR-056): whoop, garmin, strava, withings, eightsleep, habitify, todoist, weather. Pattern-exempt (6): notion, macrofactor, apple_health, dropbox_poll, food_delivery, measurements (HAE-fed).
 
-### Enrichment / Compute (14)
-`journal-enrichment` · `activity-enrichment` · `character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `circadian-compliance` · `failure-pattern-compute` · `journal-analyzer` · `field-notes-generate` · `weekly-signal`  *(sleep-reconciler RETIRED #487/ADR-113)*
+### Enrichment / Compute (15)
+`journal-enrichment` · `activity-enrichment` · `character-sheet-compute` · `adaptive-mode-compute` · `daily-metrics-compute` · `daily-insight-compute` · `hypothesis-engine` · `weekly-correlation-compute` · `acwr-compute` · `sleep-reconciler` · `circadian-compliance` · `failure-pattern-compute` · `journal-analyzer` · `field-notes-generate` · `weekly-signal`
 
 ### Coach Intelligence (8)
 `coach-computation-engine` · `coach-narrative-orchestrator` · `coach-quality-gate` (BLOCKING N-06 #390) · `coach-state-updater` · `coach-ensemble-digest` · `coach-prediction-evaluator` · `coach-history-summarizer` · `coach-observatory-renderer` · plus legacy `ai-expert-analyzer` (deprecated, fallback only)

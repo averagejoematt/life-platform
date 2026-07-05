@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 import scoring_engine
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
 import weight_trend  # shared weekly-rate + projection (layer module)
@@ -288,7 +289,7 @@ def tsb_load_basis(strava_60d, hevy_60d, today):
 # ==============================================================================
 
 
-def compute_readiness(data):
+def compute_readiness(data, baselines=None):
     """Composite readiness: recovery (40%), sleep (25%), HRV trend (20%), TSB (10%)."""
     # Readiness: recovery 40% (most actionable), sleep 25%, HRV trend 20%, TSB 10% (lagging).
     # Sleep is 25% (not 30%) to stay aligned with the live MCP get_readiness_score model
@@ -306,8 +307,11 @@ def compute_readiness(data):
     hrv_7d = data["hrv"].get("hrv_7d")
     hrv_30d = data["hrv"].get("hrv_30d")
     if hrv_7d and hrv_30d and hrv_30d > 0:
-        # Maps 7d/30d ratio to 0-100: ratio=0.75->0, ratio=1.0->50, ratio=1.25->100
-        hrv_score = clamp(round((hrv_7d / hrv_30d - 0.75) * 200))
+        # #543/ADR-105 rule 4: map the 7d/30d HRV ratio to 0-100 using percentile bands of
+        # Matthew's OWN ratio history (personal_baselines). Falls back to the hand-set
+        # 0.75/1.0/1.25 map when the band is thin — floor-guarded, so behavior is unchanged
+        # until enough of his data exists. (The fallback reproduces the old formula exactly.)
+        hrv_score, _band_src = personal_baselines.readiness_hrv_score(hrv_7d / hrv_30d, baselines)
         components.append(("hrv_trend", hrv_score, 0.20))
     tsb = data.get("tsb")
     if tsb is not None:
@@ -1076,7 +1080,10 @@ def lambda_handler(event, context):
             logger.info(f"  {comp:<20} {score}")
 
     # ── Readiness ──
-    readiness_score, readiness_colour, readiness_components = compute_readiness(data)
+    # #543: load the personal percentile bands once (floor-guarded read; {} on miss → the
+    # HRV sub-score cleanly falls back to the hand-set map).
+    baselines = personal_baselines.load_baselines(table, USER_PREFIX)
+    readiness_score, readiness_colour, readiness_components = compute_readiness(data, baselines)
     logger.info(f"Readiness: {readiness_score} ({readiness_colour})")
 
     # ── Habit streaks ──

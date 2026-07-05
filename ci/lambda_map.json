@@ -120,6 +120,9 @@
     "lambdas/compute/episode_detect_lambda.py": {
       "function": "episode-detect"
     },
+    "lambdas/compute/personal_baselines_lambda.py": {
+      "function": "personal-baselines-compute"
+    },
     "lambdas/compute/failure_pattern_compute_lambda.py": {
       "function": "failure-pattern-compute"
     },

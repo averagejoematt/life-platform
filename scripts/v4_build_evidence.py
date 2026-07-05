@@ -97,6 +97,29 @@ REGISTRY = [
         None,
         "/legacy/nutrition/",
     ),
+    (
+        # RQA-06 (#414): the computed 4-quadrant nervous-system view — distinct from
+        # the vitals hero's raw strain-vs-recovery 2×2. Ported from the private tool.
+        "autonomic",
+        "Autonomic balance",
+        "Where the nervous system sits — Flow, Stress, Recovery, or Burnout — Z-scored against your own baseline.",
+        "The body",
+        "data",
+        "/api/autonomic_balance",
+        None,
+        None,
+    ),
+    (
+        # RQA-07 (#414): the dedicated Zone-2 breakdown against the 150-min reference.
+        "zone2",
+        "Zone-2 training",
+        "Weekly aerobic minutes against the 150-min/week reference, plus the full 5-zone distribution.",
+        "The body",
+        "data",
+        "/api/zone2",
+        None,
+        None,
+    ),
     # ── Mind & accountability ──────────────────────────────────────────────
     (
         "mind",

@@ -73,6 +73,7 @@ _AI_WRITTEN_KEYS = [
     "RATE#board_ask#deadbeef",
     "RATE#ask#deadbeef",
     "COACH#sleep_coach",  # INTERACTION# episodic records (#531)
+    "BOARDSESS#deadbeefcafe",  # #546: board follow-up sessions (PutItem + UpdateItem)
 ]
 
 
@@ -96,12 +97,14 @@ def test_ai_leadingkeys_cover_every_ai_lambda_write():
 
 
 def test_ai_write_call_site_canary():
-    """The AI lambda's only in-module DDB write is the #531 interaction
-    write-back (rate-limit counters live in the shared rate_limiter module).
-    If this count changes, scope the new write's partition first."""
+    """The AI lambda's in-module DDB writes: the #531 interaction write-back
+    (PutItem, COACH#*) + the #546 board-session mint (PutItem) and follow-up
+    append (UpdateItem, BOARDSESS#*). Rate-limit counters live in the shared
+    rate_limiter module. If this count changes, scope the new write's partition
+    first."""
     n = len(re.findall(r"\.(put_item|update_item)\(", _read(_AI_LAMBDA)))
-    assert n == 1, (
-        f"site_api_ai write count is {n}, baseline 1 — a write was added/removed. "
+    assert n == 3, (
+        f"site_api_ai write count is {n}, baseline 3 — a write was added/removed. "
         "Confirm its partition is in site_api_ai()'s LeadingKeys + _AI_WRITTEN_KEYS, then update this baseline."
     )
 

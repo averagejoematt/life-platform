@@ -16,6 +16,7 @@ Lambdas (8+):
   weekly-correlation-compute cron(30 18 ? * SUN *) — Sunday 11:30 AM PT
   dashboard-refresh         cron(0 21 * * ? *)    — 2:00 PM PDT + 6:00 PM PDT
   challenge-generator       cron(0 22 ? * SUN *)  — Sunday 3:00 PM PT
+  personal-baselines-compute cron(0 8 1 * ? *)    — 1st of month 08:00 UTC (#543, ADR-105 r4)
 
 V2 P2.9 (2026-05-17): docstring corrected to match actual ADR-052 reordering
 (was 17:35-17:50, now 16:30-16:45 to run BEFORE daily-brief at 17:00).
@@ -380,6 +381,24 @@ class ComputeStack(Stack):
             timeout_seconds=60,
             memory_mb=256,
             custom_policies=rp.compute_acwr(),
+            **shared,
+        )
+
+        # ══════════════════════════════════════════════════════════════
+        # 9b. personal-baselines — #543 (ADR-105 rule 4): monthly percentile
+        #     bands from Matthew's OWN distribution replace hand-set cutoffs.
+        #     Monthly cadence (slow-moving distribution); fixed UTC, no DST drift.
+        # ══════════════════════════════════════════════════════════════
+        create_platform_lambda(
+            self,
+            "PersonalBaselinesCompute",
+            function_name="personal-baselines-compute",
+            handler="compute.personal_baselines_lambda.lambda_handler",
+            source_file="lambdas/compute/personal_baselines_lambda.py",
+            schedule="cron(0 8 1 * ? *)",  # 1st of every month, 08:00 UTC (fixed UTC, no DST drift)
+            timeout_seconds=120,
+            memory_mb=256,
+            custom_policies=rp.compute_personal_baselines(),
             **shared,
         )
 

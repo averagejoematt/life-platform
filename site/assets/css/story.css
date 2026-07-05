@@ -638,6 +638,18 @@ body { overflow-x: hidden; }
   html.mo .cv-text.is-answered { opacity: 0; animation: cvIn 0.6s var(--ease-out) forwards; animation-delay: var(--cv-delay, 0s); }
   @keyframes cvIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
+/* #546: per-card follow-up thread — continue with the SAME coach. */
+.cv-fu-q { display: block; margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: var(--border-hair);
+  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); }
+.cv-followup { margin-top: var(--sp-3); display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.cv-fu-in { flex: 1 1 12rem; min-width: 0; font-family: var(--font-sans); font-size: var(--fs-small);
+  padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--page); color: var(--ink); }
+.cv-fu-in:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.cv-fu-btn { cursor: pointer; background: transparent; color: var(--ember); border: 1px solid var(--ember-line);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3); font-family: var(--font-sans); font-size: var(--fs-small); }
+.cv-fu-btn:hover { background: var(--ember-wash); }
+.cv-fu-btn:disabled { opacity: 0.55; cursor: progress; }
+.cv-fu-note { flex-basis: 100%; color: var(--ink-faint); }
 
 /* ── Commentary-first coaching (2026-06-28 re-cut). The Read = the board's read on
    you now; By Coach = the read on top of the domain data. Reuses dx-/coach-/tt- tokens. */

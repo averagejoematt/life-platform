@@ -490,7 +490,7 @@ class IngestionStack(Stack):
             create_default_stage=False,
             disable_execute_api_endpoint=False,
         )
-        hae_api.add_routes(
+        hae_routes = hae_api.add_routes(
             path="/ingest",
             methods=[apigwv2.HttpMethod.POST],
             integration=HttpLambdaIntegration("HaeWebhookIntegration", hae),
@@ -500,7 +500,7 @@ class IngestionStack(Stack):
         hae_access_log_group = logs.LogGroup.from_log_group_name(
             self, "HaeWebhookApiAccessLogGroup", "/aws/apigateway/health-auto-export-api"
         )
-        apigwv2.CfnStage(
+        hae_stage = apigwv2.CfnStage(
             self,
             "HaeWebhookApiDefaultStage",
             api_id=hae_api.http_api_id,
@@ -515,13 +515,27 @@ class IngestionStack(Stack):
                 throttling_burst_limit=10,
                 throttling_rate_limit=1.67,
             ),
+            # NB: the per-route `route_settings` map is a CDK serialization
+            # trap — unlike default_route_settings (a typed property CDK runs
+            # through its converter → PascalCase), map VALUES are passed
+            # through untransformed, so a CfnStage.RouteSettingsProperty here
+            # emits camelCase keys (throttlingBurstLimit) that the CFN
+            # ApiGatewayV2::Stage handler rejects ("Unrecognized field ...").
+            # Pass a raw dict with CloudFormation-native PascalCase keys.
             route_settings={
-                "POST /ingest": apigwv2.CfnStage.RouteSettingsProperty(
-                    throttling_burst_limit=20,
-                    throttling_rate_limit=10.0,
-                ),
+                "POST /ingest": {
+                    "ThrottlingBurstLimit": 20,
+                    "ThrottlingRateLimit": 10.0,
+                },
             },
         )
+        # The stage's per-route RouteSettings ("POST /ingest") is validated by
+        # the ApiGatewayV2 service against routes that already exist — without
+        # an explicit ordering, CFN creates the stage before the route and
+        # fails with "Unable to find Route by key POST /ingest". Force the
+        # route(s) to materialize first.
+        for _route in hae_routes:
+            hae_stage.node.add_dependency(_route)
         # NOTE: add_routes()'s HttpLambdaIntegration auto-grants the API
         # Gateway invoke permission on `hae` scoped to this route — no manual
         # hae.add_permission() needed (that hardcoded-ARN call is what this

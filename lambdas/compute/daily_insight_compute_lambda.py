@@ -24,6 +24,13 @@ Schedule:
   9:42 AM PT  daily-insight-compute  ← this Lambda
   10:00 AM PT daily-brief            (reads computed_insights via data["computed_insights"])
 
+v1.5.0 — 2026-07-05 (IC-31 / #542: changepoint detection)
+  - _compute_changepoints(): stats_core.detect_changepoints (CUSUM-style scan +
+    binary segmentation, stdlib) over HRV / Resting HR / Weight — surfaces abrupt
+    LEVEL shifts ("stepped down around Jun 14") that fixed-window drift misses,
+    with magnitude + confidence + approximate date; honest on thin data (ADR-105).
+  - Stored as `changepoints` on computed_insights; injected into the AI context
+    block at priority 3 (adverse) / 4 (favorable).
 v1.4.0 — 2026-03-13 (TB7-22: equalize slow drift windows)
   - _compute_slow_drift(): windows changed from 7d recent/8-28d baseline
     to 14d recent/15-28d baseline (equal 14d windows, same SE of mean)
@@ -52,6 +59,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
 import stats_core  # shared layer (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -173,10 +181,14 @@ def fetch_memory_records(category, days=30):
 # ==============================================================================
 
 
-def compute_momentum(grade_records_14d, yesterday_str):
+def compute_momentum(grade_records_14d, yesterday_str, baselines=None):
     """Compare this week vs last week average grade.
 
     Returns: (signal, this_week_avg, prev_week_avg, trend_pct)
+
+    #543/ADR-105 rule 4: the improving/declining cutoffs come from percentile bands of
+    Matthew's OWN week-over-week grade swings (personal_baselines), not a hand-set +-5%.
+    Floor-guarded — falls back to +-5% until his distribution has enough observations.
     """
     week_boundary = (datetime.strptime(yesterday_str, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
 
@@ -200,12 +212,7 @@ def compute_momentum(grade_records_14d, yesterday_str):
         return "stable", this_avg, None, None
 
     trend_pct = round((this_avg - prev_avg) / max(prev_avg, 1) * 100, 1)
-    if trend_pct > 5:
-        signal = "improving"
-    elif trend_pct < -5:
-        signal = "declining"
-    else:
-        signal = "stable"
+    signal, _band_src = personal_baselines.grade_trend_signal(trend_pct, baselines)
 
     return signal, this_avg, prev_avg, trend_pct
 
@@ -1162,6 +1169,138 @@ def _compute_slow_drift(yesterday_str, profile):
 
 
 # ==============================================================================
+# IC-31: CHANGEPOINT DETECTION (#542 — CUSUM/binary-seg over key personal series)
+# ==============================================================================
+#
+# Slow-drift (above) compares two FIXED 14d windows, so a regime shift landing
+# between the window boundaries is invisible — and it can only ever say "trending
+# down", never "stepped down around June 14". This consumer runs the sanctioned
+# stats_core.detect_changepoints (CUSUM-style max-statistic scan + binary
+# segmentation, all stdlib) over a longer window of each key series and surfaces
+# the abrupt LEVEL shifts with magnitude + confidence + approximate date.
+#
+# Honest by construction (ADR-105): detect_changepoints returns status
+# "insufficient_data" on thin series (we never claim a shift we can't test), gates
+# each break on a Bonferroni-corrected confidence AND a >=1.0-SD effect floor, and
+# reports the effective (autocorrelation-corrected) n behind every claim.
+
+# 60-day lookback: long enough that a shift ~3 weeks back still has >=7 post-shift
+# points to test, short enough to stay same-cycle after an experiment reset.
+CHANGEPOINT_WINDOW_DAYS = 60
+# Only surface a shift whose approximate date is recent enough to be actionable —
+# a level change 8 weeks ago isn't news for today's brief.
+CHANGEPOINT_RECENT_DAYS = 28
+
+# (source, field, label, unit, higher_is_better) — the key daily physiological
+# series. Journal sentiment + habit adherence are listed as #542 follow-ups.
+CHANGEPOINT_SERIES = [
+    ("whoop", "hrv", "HRV", "ms", True),
+    ("whoop", "resting_heart_rate", "Resting HR", "bpm", False),
+    ("withings", "weight_lbs", "Weight", "lbs", None),
+]
+
+
+def _compute_changepoints(yesterday_str, series_defs=None, window_days=CHANGEPOINT_WINDOW_DAYS):
+    """IC-31 (#542): detect abrupt regime shifts in key series via stats_core.
+
+    For each configured series, pull the last `window_days`, order chronologically,
+    and run stats_core.detect_changepoints. Emit one record per RECENT changepoint
+    (approximate date within CHANGEPOINT_RECENT_DAYS of yesterday), carrying
+    magnitude, effect size, confidence, direction, the approximate date, and the n
+    on each side. Thin/flat/noisy series contribute nothing (honest by design).
+
+    Returns a list of changepoint dicts sorted most-recent-first, most-confident-first.
+    """
+    yest = datetime.strptime(yesterday_str, "%Y-%m-%d").date()
+    win_start = (yest - timedelta(days=window_days)).isoformat()
+    recent_cutoff = (yest - timedelta(days=CHANGEPOINT_RECENT_DAYS)).isoformat()
+
+    results = []
+    for source, field, label, unit, higher_is_better in series_defs or CHANGEPOINT_SERIES:
+        try:
+            recs = fetch_range(source, win_start, yesterday_str)
+            # (date, value) pairs, chronological, nulls dropped.
+            pairs = []
+            for r in recs:
+                v = safe_float(r, field)
+                if v is None:
+                    continue
+                d = r.get("date") or (r.get("sk", "").replace("DATE#", ""))
+                if not d:
+                    continue
+                pairs.append((d, v))
+            pairs.sort(key=lambda p: p[0])
+            if len(pairs) < 14:  # below the changepoint floor — skip quietly
+                continue
+            dates = [p[0] for p in pairs]
+            values = [p[1] for p in pairs]
+
+            cp_result = stats_core.detect_changepoints(values, dates=dates)
+            if cp_result.get("status") != "ok":
+                continue
+
+            for cp in cp_result.get("changepoints", []):
+                cp_date = cp.get("date")
+                if not cp_date or cp_date < recent_cutoff:
+                    continue  # too old to be actionable in today's brief
+
+                # Direction relative to what's GOOD for this metric (weight has no
+                # inherent polarity — a step is just a step).
+                if higher_is_better is None:
+                    worsening = None
+                else:
+                    worsening = (cp["direction"] == "decrease") if higher_is_better else (cp["direction"] == "increase")
+
+                results.append(
+                    {
+                        "metric": label,
+                        "field": field,
+                        "source": source,
+                        "unit": unit,
+                        "date": cp_date,
+                        "before_mean": round(cp["before_mean"], 2),
+                        "after_mean": round(cp["after_mean"], 2),
+                        "magnitude": round(cp["magnitude"], 2),
+                        "effect_size": round(cp["effect_size"], 2),
+                        "confidence": round(cp["confidence"], 4),
+                        "direction": cp["direction"],
+                        "worsening": worsening,
+                        "n_before": cp["n_before"],
+                        "n_after": cp["n_after"],
+                        "window_days": window_days,
+                    }
+                )
+        except Exception as e:
+            logger.warning(f"IC-31 changepoint scan failed for {source}/{field} (non-fatal): {e}")
+
+    # Most recent shift first; ties broken by confidence.
+    results.sort(key=lambda c: (c["date"], c["confidence"]), reverse=True)
+    return results
+
+
+def _format_changepoint_line(cp):
+    """One compact 'what shifted' line for the AI context block (#542)."""
+    unit = cp.get("unit", "")
+    unit_sfx = f" {unit}" if unit else ""
+    mag = cp.get("magnitude", 0)
+    mag_str = f"{mag:+.1f}{unit_sfx}"
+    when = cp.get("date", "?")
+    arrow = "↓" if cp.get("direction") == "decrease" else "↑"
+    tag = ""
+    if cp.get("worsening") is True:
+        tag = " (adverse)"
+    elif cp.get("worsening") is False:
+        tag = " (favorable)"
+    return (
+        f"\U0001f500 REGIME SHIFT{tag}: {cp['metric']} stepped {arrow} {mag_str} around {when} "
+        f"({cp.get('before_mean')}{unit_sfx} → {cp.get('after_mean')}{unit_sfx}, "
+        f"{abs(cp.get('effect_size', 0)):.1f} SD, {round(cp.get('confidence', 0) * 100)}% confidence; "
+        f"n={cp.get('n_before')}→{cp.get('n_after')} over {cp.get('window_days')}d). "
+        f"This is a level change, not gradual drift."
+    )
+
+
+# ==============================================================================
 # EXPERIMENT CONTEXT INJECTION  (IC-19 Deliverable 3A — Anika/Raj/Patrick/Conti)
 # ==============================================================================
 
@@ -1670,6 +1809,7 @@ def build_ai_context_block(
     deficit_ceiling_tier=None,
     prior_guidance="",
     corr_ctx="",
+    changepoints=None,
 ):
     """Assemble the compact text block injected into all Daily Brief AI prompts.
 
@@ -1710,6 +1850,14 @@ def build_ai_context_block(
             if d.get("note"):
                 line += f" {d['note']}"
             signals.append({"priority": 2, "content": line, "token_estimate": 40})
+
+    # P3: Changepoint / regime shift (IC-31 #542) — an abrupt LEVEL step that
+    # fixed-window drift can't name. Surface the most recent/confident shift; an
+    # adverse one displaces lower-priority signals just as severe drift does.
+    if changepoints:
+        for cp in changepoints[:2]:  # at most the two most recent shifts
+            priority = 3 if cp.get("worsening") is True else 4
+            signals.append({"priority": priority, "content": _format_changepoint_line(cp), "token_estimate": 55})
 
     # P3: Decision Fatigue (BS-MP3) — fires when task load AND habit completion both breach thresholds
     if decision_fatigue_block:
@@ -1859,6 +2007,8 @@ def store_computed_insights(yesterday_str, payload):
         item["synergy_health"] = json.dumps(payload["synergy_health"])
     if payload.get("slow_drift_metrics"):
         item["slow_drift_metrics"] = json.dumps(payload["slow_drift_metrics"])
+    if payload.get("changepoints"):
+        item["changepoints"] = json.dumps(payload["changepoints"])
 
     item = {k: v for k, v in item.items() if v is not None}
     # DATA-2: validate_item for computed_insights (Item 3, R12)
@@ -1918,7 +2068,9 @@ def lambda_handler(event, context):
     logger.info(f"Loaded: {len(computed_7d)} computed_metrics, {len(habit_7d)} habit_scores, {len(grade_14d)} day_grade records")
 
     # ── 2. Momentum ──
-    momentum_signal, this_week_avg, prev_week_avg, trend_pct = compute_momentum(grade_14d, yesterday_str)
+    # #543: personal-variance bands for the momentum cutoffs (floor-guarded; {} → +-5%).
+    baselines = personal_baselines.load_baselines(table, USER_PREFIX)
+    momentum_signal, this_week_avg, prev_week_avg, trend_pct = compute_momentum(grade_14d, yesterday_str, baselines)
     logger.info(f"Momentum: {momentum_signal} (this_week={this_week_avg or 0:.1f}, prev_week={prev_week_avg}, trend={trend_pct}%)")
 
     # ── 3. Metric trends ──
@@ -1954,6 +2106,19 @@ def lambda_handler(event, context):
         logger.info(f"IC-19 slow drift: {len(slow_drift_metrics)} signals detected")
     except Exception as e:
         logger.warning(f"IC-19 slow drift failed (non-fatal): {e}")
+
+    # ── 5d2. IC-31: Changepoint / regime-shift detection (#542, non-fatal) ──
+    changepoints = []
+    try:
+        changepoints = _compute_changepoints(yesterday_str)
+        if changepoints:
+            logger.info(
+                "IC-31 changepoints: %d recent regime shift(s) — %s",
+                len(changepoints),
+                ", ".join(f"{c['metric']}@{c['date']}({c['confidence']:.2f})" for c in changepoints[:3]),
+            )
+    except Exception as e:
+        logger.warning(f"IC-31 changepoint detection failed (non-fatal): {e}")
 
     # ── 5e. IC-19: Active Experiment Context (non-fatal) ──
     experiment_ctx = ""
@@ -2121,6 +2286,7 @@ def lambda_handler(event, context):
         deficit_ceiling_tier=deficit_ceiling_tier,
         prior_guidance=prior_guidance,
         corr_ctx=_corr_ctx,
+        changepoints=changepoints,
     )
     logger.info(f"AI context block: {len(ai_block)} chars")
 
@@ -2139,6 +2305,7 @@ def lambda_handler(event, context):
         "memory_context": memory_ctx,
         "ai_context_block": ai_block,
         "slow_drift_metrics": slow_drift_metrics,
+        "changepoints": changepoints,
     }
     store_computed_insights(yesterday_str, payload)
 
@@ -2154,4 +2321,5 @@ def lambda_handler(event, context):
         "ic5_markers": ic5_markers,
         "decision_fatigue_fired": df_fired,
         "deficit_ceiling_tier": deficit_ceiling_tier,
+        "changepoint_count": len(changepoints),
     }

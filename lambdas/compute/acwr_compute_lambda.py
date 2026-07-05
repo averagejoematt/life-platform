@@ -1,39 +1,57 @@
 """
-ACWR Compute Lambda — v1.0.0
+ACWR Compute Lambda — v2.0.0
 BS-09: Acute:Chronic Workload Ratio from Whoop strain data.
 
 Schedule: daily at 9:55 AM PT (cron(55 16 * * ? *) UTC) — runs after
   ingestion (7–9 AM) and before Daily Brief (11 AM), slotted between
   adaptive-mode-compute (9:50 AM) and freshness-checker (10:45 AM).
 
-Computes:
-  Acute load   = 7-day rolling average of Whoop day strain
-  Chronic load = 28-day rolling average of Whoop day strain
+Computes (#543 — EWMA-ACWR, replacing v1's flat rolling means):
+  Acute load   = EWMA of Whoop day strain, 7-day time-constant
+  Chronic load = EWMA of Whoop day strain, 28-day time-constant
   ACWR         = acute / chronic
+
+  Why EWMA (Williams et al. 2017): a flat rolling mean weights every day in its window
+  equally and then drops days off a cliff at the window edge, so a single big/rest day
+  step-changes the ratio when it enters or leaves. An exponentially-weighted average
+  decays smoothly — recent load counts most, older load fades — which tracks physiological
+  adaptation/decay more faithfully and removes the rolling window's edge artifacts. The
+  EWMA math is the sanctioned `stats_core.ewma_series` (the same helper the MCP training
+  tools use), warm-started at the first-week mean so a short lookback doesn't anchor the
+  chronic average at zero.
+
+Zone thresholds are the Gabbett (2016) zones (see _classify_acwr): a POPULATION-derived
+constant kept deliberately (ADR-105 rule 4 explicitly sanctions population constants for
+things like ACWR zones and clinical ranges — provided they are LABELLED as such where
+used, which acwr_method / the interpretation strings now do). The estimator changed; the
+zone semantics did not.
+
+Ratio-coupling caveat (surfaced in the record + MCP tool + methods page): ACWR is a ratio
+whose numerator (acute) is mathematically a component of its denominator (chronic), so the
+two are coupled by construction (Lolli et al. 2019) — the ratio can move for reasons that
+aren't a real change in the underlying spurious-correlation-inflating relationship. Read
+ACWR as a directional recovery signal, not a precise injury predictor.
 
 Writes to DynamoDB SOURCE#computed_metrics | DATE#<yesterday> via UpdateItem
 (merges with day_grade / readiness fields already written by daily-metrics-compute):
-  acwr                float   (acute / chronic ratio)
-  acute_load_7d       float   (7-day avg strain)
-  chronic_load_28d    float   (28-day avg strain)
-  acwr_zone           str     ("safe" | "caution" | "danger" | "detraining")
-  acwr_alert          bool    (True if >1.3 or <0.8)
-  acwr_alert_reason   str     (human-readable)
-  acwr_days_acute     int     (days with actual Whoop data in 7-day window)
-  acwr_days_chronic   int     (days with actual Whoop data in 28-day window)
-  acwr_computed_at    str     (ISO timestamp)
-
-Alert thresholds (Gabbett et al., 2016 — standard athletic conditioning):
-  > 1.5   DANGER      — very high injury risk; stop non-essential training load
-  > 1.3   CAUTION     — elevated injury risk; reduce volume this week
-  0.8-1.3 SAFE        — optimal training stimulus range
-  < 0.8   DETRAINING  — insufficient load to maintain fitness
+  acwr                  float   (acute / chronic ratio)
+  acute_load_7d         float   (EWMA-7 strain — field name kept for schema stability)
+  chronic_load_28d      float   (EWMA-28 strain — field name kept for schema stability)
+  acwr_zone             str     ("safe" | "caution" | "danger" | "detraining")
+  acwr_alert            bool    (True if >1.3 or <0.8)
+  acwr_alert_reason     str     (human-readable)
+  acwr_days_acute       int     (days with actual Whoop data in trailing 7-day window)
+  acwr_days_chronic     int     (days with actual Whoop data in trailing 28-day window)
+  acwr_method           str     ("ewma" — the estimator, so consumers can label it)
+  acwr_coupling_caveat  str     (the ratio-coupling note above)
+  acwr_computed_at      str     (ISO timestamp)
 
 The Daily Brief reads acwr / acwr_zone / acwr_alert from computed_metrics
 and surfaces it in the Training Report section (no recomputation needed).
 The MCP get_acwr_status tool also reads this record for on-demand queries.
 
 v1.0.0 — 2026-03-16 (BS-09)
+v2.0.0 — 2026-07-05 (#543): rolling means → EWMA-ACWR; ratio-coupling caveat surfaced.
 """
 
 import logging
@@ -43,6 +61,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import stats_core  # #543: the sanctioned EWMA (stats_core.ewma_series), ADR-105
 
 try:
     from platform_logger import get_logger
@@ -57,6 +76,22 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
+
+# EWMA time-constants (days). Same window lengths as the v1 rolling means, so the zone
+# semantics are re-derived over the smoother estimator rather than re-tuned (#543).
+ACUTE_DECAY_DAYS = 7
+CHRONIC_DECAY_DAYS = 28
+# Lookback for the daily strain series. 84d (12 weeks) gives the 28-day chronic EWMA a
+# long enough burn-in that the warm-start seed's residual weight is negligible.
+LOOKBACK_DAYS = 84
+
+# ADR-105 rule 4: the ratio-coupling critique, carried on the record so every surface that
+# shows ACWR (daily brief, MCP tool, methods page) can display it.
+COUPLING_CAVEAT = (
+    "ACWR is a coupled ratio: the acute load (numerator) is mathematically a component of "
+    "the chronic load (denominator), so the two move together by construction (Lolli et al. "
+    "2019). Treat ACWR as a directional recovery signal, not a precise injury predictor."
+)
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -140,6 +175,61 @@ def _rolling_avg(items: list, field: str, n_days: int, end_date: str):
     return round(sum(vals) / len(vals), 3), n_data
 
 
+def _build_daily_strain(items, start_date, end_date):
+    """Continuous chronological [(date, strain)] from start_date..end_date inclusive.
+
+    Missing days = 0.0 strain (rest day) — the same convention v1's rolling mean used, so
+    EWMA and the old rolling mean treat rest identically (only the weighting differs).
+    Returns (series, n_data) where n_data is the count of days with actual Whoop strain.
+    """
+    by_date = {}
+    for item in items:
+        d = item.get("date")
+        if not d:
+            continue
+        raw = item.get("strain")
+        try:
+            v = float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            v = None
+        if v is not None:
+            by_date[d] = v
+
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    series = []
+    n_data = 0
+    d = start_dt
+    while d <= end_dt:
+        ds = d.strftime("%Y-%m-%d")
+        if ds in by_date:
+            series.append((ds, by_date[ds]))
+            n_data += 1
+        else:
+            series.append((ds, 0.0))
+        d += timedelta(days=1)
+    return series, n_data
+
+
+def _ewma_acwr(series):
+    """EWMA-ACWR from a chronological (date, strain) series.
+
+    Returns (acwr, acute_ewma, chronic_ewma). Warm-starts both EWMAs at the mean of the
+    first week of the series so a short lookback doesn't anchor the chronic average at 0
+    (which would spuriously inflate ACWR early). Returns (None, None, None) on empty input;
+    acwr is None when the chronic EWMA is not positive.
+    """
+    if not series:
+        return None, None, None
+    vals = [v for _, v in series]
+    warm = vals[: min(7, len(vals))]
+    seed = sum(warm) / len(warm) if warm else 0.0
+    acute = stats_core.ewma_series(series, ACUTE_DECAY_DAYS, seed=seed)[-1][1]
+    chronic = stats_core.ewma_series(series, CHRONIC_DECAY_DAYS, seed=seed)[-1][1]
+    acwr = round(acute / chronic, 3) if chronic and chronic > 0 else None
+    return acwr, acute, chronic
+
+
 def _classify_acwr(acwr):
     """
     Returns (zone, alert, reason).
@@ -194,15 +284,19 @@ def _write_acwr(date_str, acwr, acute_7d, chronic_28d, zone, alert, alert_reason
         ":cat": now_iso,
         ":da": Decimal(str(n_days_acute)),
         ":dc": Decimal(str(n_days_chronic)),
+        ":method": "ewma",
+        ":caveat": COUPLING_CAVEAT,
     }
 
     set_parts += [
-        "acwr_zone         = :zone",
-        "acwr_alert        = :alert",
-        "acwr_alert_reason = :reason",
-        "acwr_computed_at  = :cat",
-        "acwr_days_acute   = :da",
-        "acwr_days_chronic = :dc",
+        "acwr_zone            = :zone",
+        "acwr_alert           = :alert",
+        "acwr_alert_reason    = :reason",
+        "acwr_computed_at     = :cat",
+        "acwr_days_acute      = :da",
+        "acwr_days_chronic    = :dc",
+        "acwr_method          = :method",
+        "acwr_coupling_caveat = :caveat",
     ]
 
     if acwr is not None:
@@ -263,8 +357,8 @@ def _lambda_handler_impl(event, context):
         today = datetime.now(timezone.utc).date()
         target_date = (today - timedelta(days=1)).isoformat()
 
-    # Fetch Whoop strain records — 30 days back gives us full 28d chronic window
-    fetch_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=30)).strftime("%Y-%m-%d")
+    # Fetch Whoop strain records — 84 days back gives the 28d chronic EWMA burn-in room
+    fetch_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
 
     whoop_items = _fetch_range("whoop", fetch_start, target_date)
     logger.info(
@@ -274,14 +368,17 @@ def _lambda_handler_impl(event, context):
         target_date,
     )
 
-    # Compute rolling averages
-    acute_7d, n_acute = _rolling_avg(whoop_items, "strain", 7, target_date)
-    chronic_28d, n_chronic = _rolling_avg(whoop_items, "strain", 28, target_date)
+    # #543: EWMA-ACWR over the continuous daily strain series (rest days = 0).
+    series, _ = _build_daily_strain(whoop_items, fetch_start, target_date)
+    acwr, acute_7d, chronic_28d = _ewma_acwr(series)
+    if acute_7d is not None:
+        acute_7d = round(acute_7d, 3)
+    if chronic_28d is not None:
+        chronic_28d = round(chronic_28d, 3)
 
-    # ACWR ratio
-    acwr = None
-    if acute_7d is not None and chronic_28d is not None and chronic_28d > 0:
-        acwr = round(acute_7d / chronic_28d, 3)
+    # Data-coverage counts over the trailing 7d/28d windows (unchanged reporting).
+    _, n_acute = _rolling_avg(whoop_items, "strain", 7, target_date)
+    _, n_chronic = _rolling_avg(whoop_items, "strain", 28, target_date)
 
     zone, alert, reason = _classify_acwr(acwr)
 
