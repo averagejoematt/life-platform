@@ -12,12 +12,20 @@ on:
     paths:
       - 'site/**'
       - 'scripts/v4_*.py'
+      - 'tests/pr_render_gate.py'
+      - 'tests/visual_qa.py'
+      - 'tests/accuracy_audit.py'
+      - 'tests/fixtures/pr_gate/**'
       - '.github/workflows/v4-gate.yml'
   push:
     branches: [main]
     paths:
       - 'site/**'
       - 'scripts/v4_*.py'
+      - 'tests/pr_render_gate.py'
+      - 'tests/visual_qa.py'
+      - 'tests/accuracy_audit.py'
+      - 'tests/fixtures/pr_gate/**'
 
 permissions:
   contents: read
@@ -63,3 +71,31 @@ jobs:
             test -f "$f" || { echo "::error::missing required v4 file: $f"; exit 1; }
           done
           echo "✓ Home, Cockpit, Data, Protocols, Coaching, Story + tokens present"
+
+  # ════════════════════════════════════════════════════════════════
+  # PR-time LOCAL render + accuracy gate (#408 — shift QA left).
+  # Reuses tests/visual_qa.py against site/ served from a LOCAL http.server
+  # (no live site, no AWS, no deploy) so a broken layout or a leaked/impossible
+  # number is caught BEFORE merge. Fails only on render-class regressions
+  # (JS errors, layout overflow, stuck copy, prose sentinel leaks) + impossible
+  # numbers; honest empty states pass. The post-deploy live visual-qa + accuracy
+  # jobs in ci-cd.yml stay in place — this supplements, never replaces them.
+  # ════════════════════════════════════════════════════════════════
+  render-gate:
+    name: Local render + accuracy gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Playwright + Chromium
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+
+      - name: Render + accuracy gate (local serve, mocked API)
+        run: python3 tests/pr_render_gate.py

@@ -33,7 +33,12 @@ import os
 import sys
 from datetime import datetime, timezone
 
-SITE_URL = "https://averagejoematt.com"
+# Target origin. Defaults to live prod (the post-deploy gate); the PR-time render
+# gate (tests/pr_render_gate.py) sets QA_SITE_URL to a local http.server serving
+# site/ so it can catch layout/render breaks before merge. Read from env at import
+# so site_review.py / accuracy_audit.py (which do `SITE_URL = visual_qa.SITE_URL`)
+# inherit the same target without any change of their own.
+SITE_URL = os.environ.get("QA_SITE_URL", "https://averagejoematt.com").rstrip("/")
 
 # ── Performance budgets (#580) ─────────────────────────────────────────────────
 # Baselines measured 2026-07-05 against production (headless Chromium, single run,

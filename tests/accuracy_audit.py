@@ -172,6 +172,26 @@ def sanity_scan(run_dir):
     return findings
 
 
+def impossible_values(ps):
+    """Scan a public_stats dict for impossible computed values. Pure (no I/O) so it
+    runs identically against a live fetch (live_checks) or a local fixture served by
+    the PR-time render gate (tests/pr_render_gate.py). Catches: negative CTL/ATL (the
+    -955 class) and percentages outside [0,100]. Returns a list of HIGH findings."""
+    findings = []
+    t = ps.get("training", {}) or {}
+    for k in ("ctl_fitness", "atl_fatigue", "ctl", "atl"):
+        v = t.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and v < 0:
+            findings.append({"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"})
+    for blk_name in ("journey", "vitals"):
+        for k, v in (ps.get(blk_name, {}) or {}).items():
+            if k.endswith("_pct") and isinstance(v, (int, float)) and not isinstance(v, bool) and not (0 <= v <= 100):
+                findings.append(
+                    {"check": "impossible_value", "severity": "high", "field": f"{blk_name}.{k}", "value": v, "note": "pct out of [0,100]"}
+                )
+    return findings
+
+
 def live_checks():
     """Live-fetch checks that need NO prior capture (CI-friendly, post-deploy):
     (1) every harness page must resolve — catches the /data-vs-/method drift class +
@@ -201,26 +221,7 @@ def live_checks():
             findings.append({"check": "page_resolves", "severity": "high", "path": pg["path"], "status": status})
 
     try:
-        ps = _fetch_json("/public_stats.json")
-        t = ps.get("training", {})
-        for k in ("ctl_fitness", "atl_fatigue", "ctl", "atl"):
-            v = t.get(k)
-            if isinstance(v, (int, float)) and v < 0:
-                findings.append(
-                    {"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"}
-                )
-        for blk_name in ("journey", "vitals"):
-            for k, v in (ps.get(blk_name, {}) or {}).items():
-                if k.endswith("_pct") and isinstance(v, (int, float)) and not (0 <= v <= 100):
-                    findings.append(
-                        {
-                            "check": "impossible_value",
-                            "severity": "high",
-                            "field": f"{blk_name}.{k}",
-                            "value": v,
-                            "note": "pct out of [0,100]",
-                        }
-                    )
+        findings.extend(impossible_values(_fetch_json("/public_stats.json")))
     except Exception as e:  # noqa: BLE001
         findings.append({"check": "impossible_value", "severity": "warn", "note": f"public_stats fetch failed: {e}"})
     return findings

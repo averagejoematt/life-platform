@@ -1,0 +1,19 @@
+{
+  "_note": "Static fixture for the PR-time render gate (tests/pr_render_gate.py, #408). Values are plausible + in-range so accuracy_audit.impossible_values() returns clean on an unmodified tree. Seed an out-of-range value here (e.g. training.ctl_fitness: -955) to prove the gate fails.",
+  "training": {
+    "ctl_fitness": 42.5,
+    "atl_fatigue": 38.1,
+    "ctl": 42.5,
+    "atl": 38.1,
+    "tsb_form": 4.4
+  },
+  "journey": {
+    "progress_pct": 63,
+    "adherence_pct": 88,
+    "weight_lost_lbs": 14.2
+  },
+  "vitals": {
+    "recovery_pct": 71,
+    "sleep_pct": 82
+  }
+}
