@@ -2,7 +2,7 @@
   evidence_discovery.js — discoveries/hypotheses, the genome, challenges, protocols and
   experiments (the /protocols/ door). Split out of evidence.js (#581) — no behavior change.
 */
-import { dumbbell } from "/assets/js/charts.js";
+import { dumbbell, nDots } from "/assets/js/charts.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, evClass, kvtable } from "/assets/js/evidence_shared.js";
 
@@ -60,8 +60,12 @@ export async function renderDiscoveries(d) {
     hyp = d.active_hypotheses || [];
   const card = (t, b, badge) =>
     `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(t)}</h3>${badge ? `<span class="rd-badge">${esc(badge)}</span>` : ""}</header>${b ? `<p class="rd-why">${esc(b)}</p>` : ""}</article>`;
+  // #551 — each found correlation carries its sample size as DOTS (the confidence grammar):
+  // the reader sees how much data stands behind the finding. REAL overlapping-day n only.
+  const findingCard = (f) =>
+    `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(f.title)}</h3></header>${f.body ? `<p class="rd-why">${esc(f.body)}</p>` : ""}${f.n ? `<p class="rd-meta label">evidence weight ${nDots(f.n, { unit: "overlapping days" })}</p>` : ""}</article>`;
   const fs = findings.length
-    ? sec("Correlations found in the data", `<div class="rd-cards">${findings.map((f) => card(f.title, f.body, f.n ? `n=${f.n}` : "")).join("")}</div>`)
+    ? sec("Correlations found in the data", `<div class="rd-cards">${findings.map(findingCard).join("")}</div>`)
     : "";
   const is = inner.length ? sec("Inner-life findings", `<div class="rd-cards">${inner.map((f) => card(f.title, f.body, f.confidence)).join("")}</div>`) : "";
   // What the machine suspects — the hypothesis engine's REAL live bets

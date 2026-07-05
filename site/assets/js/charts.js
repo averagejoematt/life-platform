@@ -135,25 +135,40 @@ export function weightTrendChart(readings, { goal = null, genesis = null, valueK
     `${genesis ? " · genesis marked" : ""}${goal != null ? ` · goal ${_r(Number(goal))} lb, ${gap} lb away (annotation, not the axis floor)` : ""}</figcaption></figure>`;
 }
 
-// P0.6 — projection cone. A WIDENING confidence band from the current weigh-in to ~goal,
-// modelled as an exponential approach (weight = goal + (cur−goal)·e^(−t/τ)): it starts at the
-// measured rate and SLOWS as it nears goal — the honest shape of a cut, not a straight line.
-// Three τ (fast = current rate sustained, mid, slow) give the cone; rung date-markers come off
-// the mid path. The cone is wide because the early rate is water-inflated and unproven. The
-// "bet" (fast goal-date) is stated AND flagged for grading as real weigh-ins resolve it.
+// P0.6 / #551 — projection FAN. A WIDENING confidence band from the current weigh-in toward
+// goal, whose edges are the REAL block-bootstrap CI on the loss slope (weekly_rate_ci_low =
+// faster-loss bound, weekly_rate_ci_high = slower). This is the honesty upgrade over the old
+// heuristic 0.72/0.5 multipliers: the band width IS a computed interval, never an invented
+// spread. The dated "bet" is the backend's OWN goal-date RANGE (projected_goal_date_earliest/
+// latest), so the drawn edges and the stated dates land on the same math. When the slow CI
+// bound is ≥ 0 the interval is open-ended (goal may not be reached at this trajectory) — the
+// slow edge holds flat, honestly. HONEST FALLBACK: no CI (or provisional) ⇒ the mid trajectory
+// line ONLY, no band — a point read, never a fabricated cone.
 // current: {date, w}. ratePerWeek: negative (lb/wk). rungs: [weights] to date-mark.
-export function projectionCone(current, goal, ratePerWeek, { provisional = false, height = 210, rungs = [], label = "" } = {}) {
+// rateCiLow/rateCiHigh: weekly lb/wk CI bounds (REAL). goalDateRange: {earliest, latest} ISO
+// (REAL, from the backend). confidence: the CI level, e.g. 0.8.
+export function projectionCone(current, goal, ratePerWeek, {
+  provisional = false, height = 210, rungs = [], label = "",
+  rateCiLow = null, rateCiHigh = null, goalDateRange = null, confidence = null,
+} = {}) {
   const cur = Number(current && current.w), g = Number(goal), rWk = Number(ratePerWeek);
   const t0 = current && current.date ? Date.parse(current.date) : NaN;
   if (!Number.isFinite(cur) || !Number.isFinite(g) || !Number.isFinite(rWk) || !Number.isFinite(t0) || rWk >= 0 || cur <= g) {
     return `<figure class="chart chart--empty"><figcaption class="chart-cap label">The projection cone draws once there's a sustained downward rate to extend — right now the loss is too new (and too watery) to forecast.</figcaption></figure>`;
   }
-  // Linear bounds from the same apex: fast = current rate (water-inflated), mid ~72%, slow
-  // 50%. Their divergence over time IS the uncertainty cone — wide because the rate is young.
-  const rDay = Math.abs(rWk) / 7;
-  const rFast = rDay, rMid = rDay * 0.72, rSlow = rDay * 0.5;
-  const reach = (r) => (cur - g) / r; // days to goal at that rate
-  const horizon = Math.min(900, reach(rSlow));
+  const rDayMid = Math.abs(rWk) / 7;
+  // REAL confidence band: edges from the slope CI (ciLow = faster loss, ciHigh = slower).
+  const ciLoWk = Number(rateCiLow), ciHiWk = Number(rateCiHigh);
+  const hasCI = !provisional && Number.isFinite(ciLoWk) && Number.isFinite(ciHiWk) && Math.min(ciLoWk, ciHiWk) < 0;
+  const rDayFast = hasCI ? Math.abs(Math.min(ciLoWk, ciHiWk)) / 7 : rDayMid;   // faster-loss edge
+  const slowWk = hasCI ? Math.max(ciLoWk, ciHiWk) : rWk;                        // slower edge (may be ≥ 0)
+  const slowOpen = hasCI && slowWk >= 0;                                        // open-ended: goal not guaranteed
+  const rDaySlow = slowOpen ? 0 : (hasCI ? Math.abs(slowWk) / 7 : rDayMid);
+  // Keep the mid trajectory inside its own band (the recomputed point slope can drift from
+  // the slope the CI was measured on).
+  const rDayMidC = hasCI ? Math.max(rDaySlow, Math.min(rDayFast, rDayMid)) : rDayMid;
+  const reach = (r) => (r > 0 ? (cur - g) / r : Infinity);
+  const horizon = Math.min(900, slowOpen ? reach(rDayMidC) * 1.6 : reach(rDaySlow || rDayMidC));
   const W = 600, H = height, P = 10;
   const x = (t) => P + (t / horizon) * (W - 2 * P);
   const ymin = g - 3, ymax = cur + 3;
@@ -161,34 +176,139 @@ export function projectionCone(current, goal, ratePerWeek, { provisional = false
   const wAt = (r, t) => Math.max(g, cur - r * t);
   const curvePts = (r) => { const a = []; const step = horizon / 64; for (let t = 0; t <= horizon + 1e-6; t += step) a.push([t, wAt(r, t)]); return a; };
   const toPath = (a) => a.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ");
-  const fast = curvePts(rFast), slow = curvePts(rSlow), mid = curvePts(rMid);
-  const cone = `${toPath(slow)} ${fast.slice().reverse().map((p) => `L${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ")} Z`;
+  const mid = curvePts(rDayMidC);
+  // The fan (real band only). Slow edge holds flat at cur when the CI is open-ended.
+  const conf = confLevel({ provisional: !hasCI, confidence, ciWidthFrac: hasCI && rDayMidC > 0 ? (rDayFast - rDaySlow) / rDayMidC : (slowOpen ? 2 : null) });
+  let coneEl = "";
+  if (hasCI) {
+    const fast = curvePts(rDayFast);
+    const slow = slowOpen ? [[0, cur], [horizon, cur]] : curvePts(rDaySlow);
+    const cone = `${toPath(slow)} ${fast.slice().reverse().map((p) => `L${x(p[0]).toFixed(1)} ${y(p[1]).toFixed(1)}`).join(" ")} Z`;
+    coneEl = `<path class="pc-cone ${conf.cls}" d="${cone}"/>`;
+  }
   const goalLine = `<line class="pc-goal" x1="${P}" y1="${y(g).toFixed(1)}" x2="${W - P}" y2="${y(g).toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
-  const dateAt = (r, w) => t0 + ((cur - w) / r) * 86400000;
   // Rung date-markers from the MID path (only rungs strictly between goal and current).
   const marks = (rungs || []).filter((r) => r > g + 0.5 && r < cur - 0.5).map((r) => {
-    const t = (cur - r) / rMid;
+    const t = (cur - r) / rDayMidC;
     return `<line class="pc-rung" x1="${x(t).toFixed(1)}" y1="${y(r).toFixed(1)}" x2="${x(t).toFixed(1)}" y2="${(H - P).toFixed(1)}" vector-effect="non-scaling-stroke"/>`;
   }).join("");
   const _d = (ms) => { const d = new Date(ms); return `${_MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
-  const betFast = _d(dateAt(rFast, g)), betMid = _d(dateAt(rMid, g)), betSlow = _d(dateAt(rSlow, g));
-  const summary = `Projection cone from ${Math.round(cur)} lb toward ${g} lb: at the current rate ~${betFast}, realistically ${betMid}–${betSlow} as the loss slows.`;
-  // Interactive scrub (uplevel P4): cpts along the MID path — hover/tap any point of
-  // the projection to read "when ≈ what weight". Honest labels: these are projected
-  // dates on the middle path, so each carries a ~ prefix. motion.js wires it free.
+  const _dISO = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || "")); return m ? `${_MON[+m[2] - 1]} ${m[1]}` : ""; };
+  // The dated bet — the backend's OWN goal-date range when present (the same interval the
+  // fan is drawn from). No CI ⇒ the point date, honestly caveated.
+  const gr = goalDateRange || {};
+  const dEarly = _dISO(gr.earliest), dLate = _dISO(gr.latest);
+  const betMidMs = t0 + reach(rDayMidC) * 86400000;
+  let bet;
+  if (hasCI && dEarly) {
+    bet = (slowOpen || !dLate)
+      ? `The honest read: ${_r1(rWk)} lb/wk now puts ${g} around <strong>${escAttr(dEarly)}</strong> at the earliest — but the slow end of the interval can't rule out holding flat, so no late date is claimed yet. The band's the honest part; it tightens as weigh-ins accrue.`
+      : `The honest read: hold ${_r1(rWk)} lb/wk and ${g} lands about <strong>${escAttr(dEarly)}–${escAttr(dLate)}</strong> — that range is the ${confidence != null ? Math.round(Number(confidence) * 100) + "% " : ""}CI on the trend, not a single promised day. The band tightens as weigh-ins accrue.`;
+  } else {
+    bet = `Current trajectory points at ${g} around <strong>~${escAttr(_d(betMidMs))}</strong> — shown as a single line, not a band: the rate's still too young for an honest interval.${provisional ? " Early loss is mostly water; this will slow." : ""} The confidence band draws in once the slope stabilises.`;
+  }
+  const summary = (hasCI && dEarly)
+    ? `Projection fan from ${Math.round(cur)} lb toward ${g} lb: ${(dLate && !slowOpen) ? `${dEarly}–${dLate} (the CI on the trend)` : `${dEarly} at the earliest, open-ended at the slow bound`}.`
+    : `Projection line from ${Math.round(cur)} lb toward ${g} lb at ~${_r1(rWk)} lb/wk — no band drawn (rate too young for an interval).`;
+  // Interactive scrub: cpts along the MID path — hover/tap to read "when ≈ what weight".
   const cpts = mid.filter((_, i) => i % 2 === 0).map(([t, w]) => ({
     x: +(x(t) / W).toFixed(4), y: +(y(w) / H).toFixed(4), v: +w.toFixed(1),
     l: `~${_d(t0 + t * 86400000)} · ${Math.round(w)} lb (mid path)`,
   }));
   return `<figure class="chart pc-chart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
-    `<path class="pc-cone" d="${cone}"/>${marks}${goalLine}` +
+    `${coneEl}${marks}${goalLine}` +
     `<path class="pc-mid" d="${toPath(mid)}" fill="none" vector-effect="non-scaling-stroke"/>` +
     `<circle class="chart-dot" cx="${x(0).toFixed(1)}" cy="${y(cur).toFixed(1)}" r="3.5"/></svg>` +
-    `<figcaption class="chart-cap label">${escAttr(label || "Projected weight → goal")} · the band widens with uncertainty; the goal line is ${g} lb` +
-    `<span class="pc-bet">The bet: hold ${_r1(rWk)} lb/wk and 185 lands ~${escAttr(betFast)} — but a cut slows as it goes, so realistically <strong>${escAttr(betMid)}–${escAttr(betSlow)}</strong>.${provisional ? " Early rate is mostly water; this will slow." : ""} Graded against each new weigh-in as it resolves.</span>` +
+    `<figcaption class="chart-cap label">${escAttr(label || "Projected weight → goal")} · ${hasCI ? "the band is the real slope CI" : "point trajectory (no band yet)"}; the goal line is ${g} lb` +
+    `<span class="pc-bet">${bet} Graded against each new weigh-in as it resolves.</span>` +
     `</figcaption></figure>`;
 }
 const _r1 = (n) => { const r = Math.round(Number(n) * 10) / 10; return Number.isInteger(r) ? String(r) : r.toFixed(1); };
+
+/* ── Uncertainty-first visual language (#551) ────────────────────────────────
+   The site's rigor backend produces real intervals (block-bootstrap CIs), real
+   sample sizes (overlapping-day n), and graded forecasts — ADR-105. These three
+   helpers are where that lives visually, honestly: the band width IS a computed
+   interval, the dots ARE the real n. Nothing invents a spread to look sophisticated.
+
+   THE CONFIDENCE GRAMMAR — one consistent read across every chart:
+     • HIGH   → a defined, tight band (or a solid-filled n-dot row): trust it.
+     • MEDIUM → a wider, dashed-edge band (or a muted dot row): directional.
+     • LOW    → NO band at all — the point is drawn honestly, never a fake spread.
+   ONE hue (ember), never red; opacity + edge treatment carry the message. */
+export function confLevel({ confidence = null, n = null, provisional = false, ciWidthFrac = null } = {}) {
+  if (provisional) return { level: "low", cls: "cf-low" };
+  // Relative CI width dominates when supplied — a wider band is a less-certain claim.
+  if (Number.isFinite(ciWidthFrac)) {
+    if (ciWidthFrac <= 0.5) return { level: "high", cls: "cf-high" };
+    if (ciWidthFrac <= 1.2) return { level: "medium", cls: "cf-med" };
+    return { level: "low", cls: "cf-low" };
+  }
+  if (Number.isFinite(n)) {
+    if (n >= 21) return { level: "high", cls: "cf-high" };   // ≥3 weeks of overlap
+    if (n >= 8) return { level: "medium", cls: "cf-med" };   // enough to be directional
+    return { level: "low", cls: "cf-low" };
+  }
+  const c = Number(confidence);
+  if (Number.isFinite(c)) {
+    if (c >= 0.8) return { level: "high", cls: "cf-high" };
+    if (c >= 0.5) return { level: "medium", cls: "cf-med" };
+    return { level: "low", cls: "cf-low" };
+  }
+  return { level: "medium", cls: "cf-med" };
+}
+
+// Sample-size dots (#551) — n rendered as a row of dots so a reader SEES the evidence
+// weight behind a correlation, not just a number. REAL n only, never padded: filled dots
+// up to `cap` (then "+extra"), the confidence grammar tinting the row (few dots read faint,
+// many read solid ember). Inline HTML, safe in a table cell or a card meta line.
+export function nDots(n, { cap = 12, unit = "overlapping days" } = {}) {
+  const k = Math.max(0, Math.round(Number(n) || 0));
+  if (!k) return `<span class="ndots ndots--none mono" title="no ${escAttr(unit)} yet">n=0</span>`;
+  const { cls } = confLevel({ n: k });
+  const shown = Math.min(k, cap);
+  const dots = Array.from({ length: shown }, () => `<i class="ndot"></i>`).join("");
+  const more = k > cap ? `<span class="ndots-more mono">+${k - cap}</span>` : "";
+  return `<span class="ndots ${cls}" role="img" aria-label="sample size n equals ${k} ${escAttr(unit)}" title="n = ${k} ${escAttr(unit)}">${dots}${more}<span class="ndots-n mono">n=${k}</span></span>`;
+}
+
+// CI band / whisker (#551) — a point estimate with its confidence interval drawn as a
+// horizontal band + center marker on a small auto-scaled rail. The band IS the honest part:
+// a REAL interval, never a decorative spread. A faint zero reference makes "the interval
+// crosses zero" (i.e. the direction isn't established) legible at a glance. Confidence
+// grammar tints the band. HONEST FALLBACK: no finite lo/hi ⇒ the point marker alone,
+// captioned "no interval yet" — never an invented band. value/lo/hi share one unit.
+export function ciWhisker(value, lo, hi, { unit = "", label = "", confidence = null, zeroRef = true, caption = "" } = {}) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(caption || "Fills in once the estimate lands.")}</figcaption></figure>`;
+  const loN0 = Number(lo), hiN0 = Number(hi);
+  const hasCI = Number.isFinite(loN0) && Number.isFinite(hiN0) && loN0 !== hiN0;
+  const _r = (n) => Math.round(n * 100) / 100;
+  const loN = hasCI ? Math.min(loN0, hiN0) : v, hiN = hasCI ? Math.max(loN0, hiN0) : v;
+  let dmin = Math.min(loN, v, zeroRef ? 0 : loN), dmax = Math.max(hiN, v, zeroRef ? 0 : hiN);
+  const padd = Math.max(1e-6, (dmax - dmin) * 0.14); dmin -= padd; dmax += padd;
+  const pos = (t) => Math.max(0, Math.min(100, ((t - dmin) / (dmax - dmin)) * 100));
+  const crosses = hasCI && loN < 0 && hiN > 0;
+  const conf = confLevel({ confidence, provisional: !hasCI });
+  const cLbl = confidence != null ? `${Math.round(Number(confidence) * 100)}% ` : "";
+  const zeroEl = (zeroRef && dmin < 0 && dmax > 0) ? `<span class="ciw-zero" style="left:${pos(0).toFixed(1)}%"></span>` : "";
+  const bandEl = hasCI ? `<span class="ciw-band ${conf.cls}" style="left:${pos(loN).toFixed(1)}%;width:${(pos(hiN) - pos(loN)).toFixed(1)}%"></span>` : "";
+  const aria = hasCI
+    ? `${label || "estimate"} ${_r(v)}${unit}, ${cLbl}CI ${_r(loN)} to ${_r(hiN)}${unit}${crosses ? " — the interval crosses zero, so the direction isn't established" : ""}.`
+    : `${label || "estimate"} ${_r(v)}${unit} — no interval yet.`;
+  const cpts = hasCI
+    ? [{ x: +(pos(loN) / 100).toFixed(4), y: 0.5, l: `low ${_r(loN)}${unit}` },
+       { x: +(pos(v) / 100).toFixed(4), y: 0.5, l: `estimate ${_r(v)}${unit}` },
+       { x: +(pos(hiN) / 100).toFixed(4), y: 0.5, l: `high ${_r(hiN)}${unit}` }]
+    : [{ x: +(pos(v) / 100).toFixed(4), y: 0.5, l: `estimate ${_r(v)}${unit}` }];
+  const cap = caption || (hasCI
+    ? `Point estimate with its ${cLbl}interval (the band).${crosses ? " The band crosses zero — the direction isn't nailed down yet." : ""}`
+    : "No interval yet — the point alone, honestly (an interval needs more data).");
+  return `<figure class="chart ciw-fig"><div class="ciw-wrap" role="img" aria-label="${escAttr(aria)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
+    `<div class="ciw-rule"></div>${zeroEl}${bandEl}` +
+    `<span class="ciw-dot ${conf.cls}" style="left:${pos(v).toFixed(1)}%"></span>` +
+    `</div><figcaption class="chart-cap label">${label ? escAttr(label) + " · " : ""}${escAttr(cap)}</figcaption></figure>`;
+}
 
 // Two overlaid trajectories on a shared scale — ember = primary (A), muted = reference (B).
 // For the reconciliation view (projected loss vs actual). Refuses if either series < 4 pts.
