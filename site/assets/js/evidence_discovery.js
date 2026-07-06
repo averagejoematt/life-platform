@@ -189,7 +189,13 @@ export async function renderExperiments(d) {
     if (x.design && x.design.criterion && x.design.criterion.metric) {
       const c = x.design.criterion;
       const wash = Number(x.design.washout_days) ? ` · washout ${esc(String(x.design.washout_days))}d` : "";
-      design = `<p class="rd-line"><span class="label">pre-registered design</span> ${esc(c.metric)} ${esc(c.direction || "")} by ≥${esc(String(c.min_effect))} · baseline ${esc(String(x.design.baseline_days))}d${wash}</p>`;
+      // #728: the public frozen artifact — the timestamped before-the-results proof.
+      const proof = x.pre_registration_url ? ` · <a class="supp-ev-link" href="${esc(x.pre_registration_url)}" target="_blank" rel="noopener">frozen artifact ↗</a>` : "";
+      design = `<p class="rd-line"><span class="label">pre-registered design</span> ${esc(c.metric)} ${esc(c.direction || "")} by ≥${esc(String(c.min_effect))} · baseline ${esc(String(x.design.baseline_days))}d${wash}${proof}</p>`;
+      // #728: the declared stopping rule — an early stop is checkable against this.
+      if (x.design.stopping_rule && !isBad(x.design.stopping_rule)) {
+        design += `<p class="rd-line"><span class="label">stopping rule</span> ${esc(String(x.design.stopping_rule))}</p>`;
+      }
     }
     // #539: the deterministic close-path result — effect [CI, n/n] → verdict.
     let analysis = "";

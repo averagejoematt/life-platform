@@ -884,6 +884,9 @@ def handle_experiments() -> dict:
                 # deterministic close-path analysis (effect, CI, n's, verdict).
                 "design": item.get("design"),
                 "pre_registered_at": item.get("pre_registered_at"),
+                # #728: the public timestamped artifact frozen at creation —
+                # the page renders this as the before-the-results proof link.
+                "pre_registration_url": item.get("prereg_url"),
                 "analysis": item.get("analysis"),
                 "origin": "live",  # an actual run on the ledger (this experiment cycle)
             }
