@@ -650,8 +650,10 @@ def tool_get_journal_sentiment_trajectory(args):
     Tracks mood, energy, and stress trajectories from enriched journal entries,
     detects divergence (e.g., mood rising while energy falls), and identifies
     inflection points where trajectories change direction.
-    Seligman PERMA + Beck CBT: mood-energy divergence is a leading indicator
-    of unsustainable effort or suppressed emotional processing.
+    Beck CBT: mood-energy divergence is a leading indicator of unsustainable
+    effort or suppressed emotional processing. (#758: this docstring previously
+    also cited Seligman PERMA, but that citation was never in the actual output —
+    see the `methodology` field below, which is what callers see.)
     """
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     days = int(args.get("days", 60))
