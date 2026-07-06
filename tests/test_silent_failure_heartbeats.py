@@ -18,6 +18,7 @@ MONITORING = os.path.join(os.path.dirname(__file__), "..", "cdk", "stacks", "mon
 _DETECTORS = [
     ("ingest-liveness-unhealthy", "ingest-liveness-heartbeat", "UnhealthySourceCount"),
     ("ingest-reconciliation-strava", "ingest-reconciliation-strava-heartbeat", "MissingActivityCount"),
+    ("ingest-reconciliation-whoop", "ingest-reconciliation-whoop-heartbeat", "MissingActivityCount"),
     ("freshness-interior-gap", "freshness-interior-gap-heartbeat", "InteriorGapCount"),
     ("coherence-overall", "coherence-heartbeat", "OverallAlarm"),
 ]

@@ -102,6 +102,32 @@ class IngestionStack(Stack):
         )
         whoop_recovery.add_target(targets.LambdaFunction(whoop))
 
+        # ── 1a. Whoop reconciliation (DI-2 / TR-07 #415) — daily source-of-truth
+        # diff, the Strava pattern generalized. Every other Whoop freshness check
+        # reads only DDB and so sees only the high-water mark — blind to a silent
+        # drop (a scored night, or a late-syncing workout, that the API has but
+        # never landed). This rule invokes the SAME lambda with {"reconcile": true}:
+        # it pulls a trailing 14-day sleep+workout set from the Whoop API and diffs
+        # it against the store, emitting
+        # LifePlatform/IngestReconciliation::MissingActivityCount{Source=whoop}
+        # (alarmed in monitoring_stack). READ-ONLY — reports gaps, never heals.
+        # 18:20 UTC = 11:20 AM PT: after the morning ingestion crons settle and
+        # clear of Whoop's own :00 hourly + :30 recovery slots (reserved
+        # concurrency=1). UTC-fixed, no DST drift. Opt-in via the whoop
+        # `provider_reconcile` facet in source_registry (garmin excluded, ADR-123).
+        whoop_reconcile_rule = events.Rule(
+            self,
+            "WhoopReconciliation",
+            schedule=events.Schedule.cron(hour="18", minute="20"),
+            description="DI-2/TR-07: diff stored Whoop sleeps+workouts vs the Whoop API (trailing 14d) — emits MissingActivityCount{whoop}",
+        )
+        whoop_reconcile_rule.add_target(
+            targets.LambdaFunction(
+                whoop,
+                event=events.RuleTargetInput.from_object({"reconcile": True}),
+            )
+        )
+
         # ── 2. Garmin — PAUSED, no schedule (#497/C-2, 2026-07-04). ADR-074
         # declares the pause (vendor anti-automation 429-blocks server-side
         # OAuth refresh), yet the cron kept firing 4×/day into the throttle —

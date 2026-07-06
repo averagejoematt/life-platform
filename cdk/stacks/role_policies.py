@@ -179,6 +179,10 @@ def ingestion_whoop() -> list[iam.PolicyStatement]:
     # calls secretsmanager.update_secret() (not put_secret_value — verified
     # against lambdas/ingestion_framework.py:592). UpdateSecret is opt-in and
     # scoped to this Lambda's own life-platform/whoop secret only.
+    # TR-07 (#415): the same lambda serves the {"reconcile": true} provider-diff
+    # invocation — READ-ONLY, needing only DDB Query + cloudwatch:PutMetricData +
+    # the secret read/UpdateSecret already granted by _ingestion_base. No new
+    # grant (mirrors ingestion_strava, whose _reconcile reuses this base).
     return _ingestion_base(
         "whoop",
         secret_name="life-platform/whoop",

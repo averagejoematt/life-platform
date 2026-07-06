@@ -198,6 +198,25 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # DI-2 / TR-07 (#415): the Strava reconciler generalized to Whoop. Same
+        # metric, distinguished by the Source dimension — the whoop reconcile job
+        # (daily, {"reconcile": true}) diffs the trailing-14d Whoop sleep+workout
+        # set against the store and emits the count the API has but we never stored.
+        # Catches the silent-drop class (a late-syncing workout / dropped night)
+        # that every DDB-only Whoop check is blind to.
+        _alarm(
+            "IngestReconciliationWhoop",
+            "ingest-reconciliation-whoop",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            dims={"Source": "whoop"},
+            to_digest=True,
+        )
+
         # DI-2b: interior-gap detection. Freshness/liveness see only the latest
         # date per source; this catches a DAILY source going dead mid-window then
         # resuming (a hole behind the high-water mark). Emitted by freshness_checker
@@ -266,6 +285,15 @@ class MonitoringStack(Stack):
             "LifePlatform/IngestReconciliation",
             "MissingActivityCount",
             dims={"Source": "strava"},
+        )
+        # TR-07 (#415): the whoop reconciler is a daily detector too — pair its
+        # ≥1-problem alarm with an absence heartbeat (producer went dark).
+        _heartbeat_alarm(
+            "IngestReconciliationWhoopHeartbeat",
+            "ingest-reconciliation-whoop-heartbeat",
+            "LifePlatform/IngestReconciliation",
+            "MissingActivityCount",
+            dims={"Source": "whoop"},
         )
         _heartbeat_alarm(
             "FreshnessInteriorGapHeartbeat",

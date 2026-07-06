@@ -89,6 +89,14 @@ DEFAULT_STALE_HOURS = 48
 #   raw_layout     the ACTUAL raw-S3 shape: {prefix, scheme[, note]} where scheme is
 #                  'date-tree' ({prefix}/{YYYY}/{MM}/{DD}.json), 'flat-uuid'
 #                  ({prefix}/{id}.json), or 'timestamped'; None = no raw archive.
+#   provider_reconcile
+#                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
+#                  daily job diffs the PROVIDER API against stored records and
+#                  emits MissingActivityCount{Source=<key>} — the one check that
+#                  sees a silent drop the DDB high-water mark hides. Only sources
+#                  whose provider exposes a queryable record list AND that aren't
+#                  rate-limit-degraded qualify; garmin is EXPLICITLY excluded
+#                  (ADR-123). Default absent/False. Read by provider_reconcile_source_ids().
 SOURCE_REGISTRY = {
     "whoop": {
         "label": "Whoop",
@@ -104,6 +112,11 @@ SOURCE_REGISTRY = {
         "metrics": "Recovery, sleep, HRV, resting HR, strain",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/whoop", "scheme": "date-tree"},
+        # TR-07 (#415): opt-in provider-diff reconciliation. Whoop runs hourly with
+        # no rate-limit breaker, so a daily trailing-window diff (sleeps + workouts)
+        # against the API is cheap and catches the late-workout / dropped-day silent
+        # drop the DDB-only checks are blind to. whoop_lambda._reconcile.
+        "provider_reconcile": True,
     },
     "withings": {
         "label": "Withings",
@@ -139,6 +152,10 @@ SOURCE_REGISTRY = {
         "metrics": "Activities, walks, heart rate",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/strava/activities", "scheme": "date-tree"},
+        # DI-2: the original source-of-truth reconciler (the Jun-2026 evening-walk
+        # fix). strava_lambda._reconcile, wired in ingestion_stack. TR-07 generalized
+        # this facet so whoop opts in the same way.
+        "provider_reconcile": True,
     },
     "eightsleep": {
         "label": "Eight Sleep",
@@ -295,6 +312,13 @@ SOURCE_REGISTRY = {
         "metrics": "Stress, body battery, steps",
         "posture": "paused",
         "raw_layout": {"prefix": "raw/matthew/garmin", "scheme": "date-tree"},
+        # TR-07 (#415): NO provider_reconcile facet — deliberate. Garmin is paused
+        # (ADR-074, datacenter-IP 429 block) and even when live is capped at 4x/day
+        # under the OAuth rate limit + best_effort. A reconciler would spend that
+        # scarce request budget re-listing what ingestion already can't reliably
+        # fetch, and would false-alarm on the accepted-degraded state. The honest
+        # answer is DON'T reconcile — recorded as ADR-123. Revisit only if Garmin
+        # ingestion itself is restored to a healthy cadence.
     },
     "notion": {
         "label": "Notion",
@@ -458,6 +482,13 @@ def reconciliation_sources() -> list:
     computed partitions stay local to that lambda — they are compute outputs,
     not sources)."""
     return [(k, v["expected_days"], v["desc"]) for k, v in SOURCE_REGISTRY.items() if v.get("expected_days") and v.get("partition", True)]
+
+
+def provider_reconcile_source_ids() -> list:
+    """Sources with OPT-IN source-of-truth reconciliation (DI-2/TR-07): the daily
+    provider-API diff that catches a silent drop the DDB high-water mark hides.
+    garmin is deliberately absent (ADR-123 — rate-limited/paused, not worth it)."""
+    return sorted(k for k, v in SOURCE_REGISTRY.items() if v.get("provider_reconcile"))
 
 
 def qa_required() -> list:

@@ -27,7 +27,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
@@ -90,6 +90,9 @@ _ZONE_WORD = ["zero", "one", "two", "three", "four", "five"]
 _dynamodb = boto3.resource("dynamodb", region_name=REGION)
 _table = _dynamodb.Table(DYNAMODB_TABLE)
 
+# Module-level CloudWatch client for the reconciliation metric (mirrors strava).
+_cw = boto3.client("cloudwatch", region_name=REGION)
+
 
 # ── Whoop API ─────────────────────────────────────────────────────────────────
 
@@ -128,6 +131,33 @@ def _fetch_endpoint(access_token: str, endpoint: str, start_dt: str, end_dt: str
     )
     with urlopen_with_retry(req, timeout=30) as resp:
         return json.loads(resp.read())
+
+
+def _fetch_all_records(access_token: str, endpoint: str, start_dt: str, end_dt: str, max_pages: int = 60) -> list:
+    """Page through EVERY record in [start_dt, end_dt] by following Whoop's
+    ``next_token`` cursor. ``_fetch_endpoint`` above takes only the first page
+    (limit=25) — fine for a single-day ingest, but the reconciler's trailing
+    window can hold more than a page of workouts/sleeps, so a silent drop past
+    page 1 would masquerade as a gap. ``max_pages`` is a runaway guard."""
+    records: list = []
+    next_token = None
+    for _ in range(max_pages):
+        params = {"start": start_dt, "end": end_dt, "limit": 25}
+        if next_token:
+            params["nextToken"] = next_token
+        url = f"{WHOOP_API_BASE}/{endpoint}?{urllib.parse.urlencode(params)}"
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "User-Agent": "WhoopIngestion/1.0"},
+        )
+        with urlopen_with_retry(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+        records.extend(data.get("records", []) or [])
+        next_token = data.get("next_token")
+        if not next_token:
+            break
+    return records
 
 
 # ── Field extractors (DDB-shape preserved from pre-migration) ────────────────
@@ -423,10 +453,240 @@ _config = IngestionConfig(
 )
 
 
+# ── Reconciliation (DI-2, TR-07 #415) ─────────────────────────────────────────
+# Every other Whoop freshness check reads only DynamoDB, so it sees only the
+# high-water mark — blind to a *silent drop* where the Whoop API holds a record
+# (a scored night, or a workout that synced from the band AFTER its day's
+# recovery was already stored) that never landed in the store. That is the same
+# class as the Jun-2026 evening-walk bug the Strava DI-2 reconciler catches.
+# `refresh_trailing_days=2` HEALS the late-workout variant, but healing is blind
+# to whether it actually worked; reconciliation is the independent audit that
+# compares against the source of truth.
+#
+# This mirrors the shipped Strava pattern (strava_lambda._reconcile): the SAME
+# lambda is invoked with {"reconcile": true}, pulls a trailing window from the
+# Whoop API, and diffs it against the store. Two record classes are checked:
+#   • daily biometric  — each SCORED main sleep (nap=false) anchors a UTC day
+#     that MUST have a stored DATE#{day} record.
+#   • workout          — each workout id W on day D must have a stored
+#     DATE#{D}#WORKOUT#{W} sub-record.
+# Emitted as LifePlatform/IngestReconciliation::MissingActivityCount{Source=whoop}
+# (same metric as strava, distinguished by the Source dimension) and alarmed in
+# monitoring_stack — READ-ONLY: it reports gaps, it never heals (that stays the
+# ingestion job's role).
+#
+# OPT-IN: wired only because whoop carries the `provider_reconcile` facet in
+# source_registry (garmin explicitly does NOT — ADR-123). The schedule lives in
+# ingestion_stack; this handler branch is inert unless invoked with reconcile.
+
+RECONCILE_WINDOW_DAYS = int(os.environ.get("WHOOP_RECONCILE_WINDOW_DAYS", "14"))
+
+
+def _parse_iso(s) -> datetime | None:
+    """Parse a Whoop ISO-8601 UTC start ('...Z' or '+00:00') to an aware datetime."""
+    if not s or not isinstance(s, str):
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _utc_day(s) -> str | None:
+    """The UTC calendar date (YYYY-MM-DD) a Whoop record is keyed under — the
+    ingestion per-date loop fetches by [day T00:00Z, nextday T00:00Z), so a
+    record's DDB day is the UTC day of its ``start``."""
+    t = _parse_iso(s)
+    return t.astimezone(timezone.utc).strftime("%Y-%m-%d") if t else None
+
+
+def _dedup_workouts(workouts: list, tolerance_seconds: int = 120) -> list:
+    """Collapse near-simultaneous workout twins (a GPS-drop / double-log pair the
+    band can surface as two ids for one session) so a legitimately single stored
+    record is not reported as a gap for the twin. Mirrors strava._dedup: keep one
+    representative per overlap window."""
+    parsed = [(w, _parse_iso(w.get("start"))) for w in workouts]
+    kept: list = []
+    kept_times: list = []
+    for w, t in sorted(parsed, key=lambda p: (p[1] is None, p[1] or datetime.min.replace(tzinfo=timezone.utc))):
+        if t is not None and any(abs((t - kt).total_seconds()) <= tolerance_seconds for kt in kept_times):
+            continue  # twin of an already-kept workout
+        kept.append(w)
+        if t is not None:
+            kept_times.append(t)
+    return kept
+
+
+def _records_missing_from_store(
+    sleeps: list, workouts: list, stored_sks: set, stored_workout_starts: list, tolerance_seconds: int = 120
+) -> list:
+    """Return the Whoop API records with no counterpart in the store.
+
+    Dedup-aware on both axes: multiple sleep/recovery records for one UTC day
+    collapse to a single expected DATE#{day} (inherent), and near-simultaneous
+    workout twins collapse via ``_dedup_workouts`` + a time-tolerance match
+    against stored workout starts — so a known twin never raises a false gap.
+    """
+    missing: list = []
+
+    # Daily biometric: a SCORED main sleep means the day exists at the provider.
+    expected_days = set()
+    for s in sleeps:
+        if s.get("nap", False) or s.get("score_state") != "SCORED":
+            continue
+        d = _utc_day(s.get("start"))
+        if d:
+            expected_days.add(d)
+    for d in sorted(expected_days):
+        if f"DATE#{d}" not in stored_sks:
+            missing.append({"kind": "daily", "date": d, "sk": f"DATE#{d}"})
+
+    # Workouts: id-keyed sub-records, dedup-aware.
+    for w in _dedup_workouts(workouts, tolerance_seconds):
+        wid = str(w.get("id", ""))
+        d = _utc_day(w.get("start"))
+        if wid and d and f"DATE#{d}#WORKOUT#{wid}" in stored_sks:
+            continue
+        t = _parse_iso(w.get("start"))
+        if t is not None and any(abs((t - ts).total_seconds()) <= tolerance_seconds for ts in stored_workout_starts):
+            continue  # near-duplicate of a stored workout (e.g. a deduped twin)
+        missing.append({"kind": "workout", "id": wid, "date": d})
+
+    return missing
+
+
+def _fetch_stored_records(table, start_date: str, end_date: str) -> tuple:
+    """Return (stored_sks, stored_workout_starts) for the whoop partition across
+    [start_date, end_date] inclusive. The SK upper bound appends U+FFFF so the
+    range also captures DATE#{end_date}#WORKOUT#... sub-records (which sort AFTER
+    the bare DATE#{end_date})."""
+    from boto3.dynamodb.conditions import Key
+
+    pk = f"USER#{USER_ID}#SOURCE#whoop"
+    sks: set = set()
+    workout_starts: list = []
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}\uffff"),
+        "ProjectionExpression": "sk, start_time",
+    }
+    while True:
+        resp = table.query(**kwargs)
+        for item in resp.get("Items", []):
+            sk = item.get("sk", "")
+            if not sk:
+                continue
+            sks.add(sk)
+            if "#WORKOUT#" in sk:
+                t = _parse_iso(item.get("start_time"))
+                if t is not None:
+                    workout_starts.append(t)
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return sks, workout_starts
+
+
+def _emit_reconciliation_metric(missing_count: int) -> None:
+    try:
+        _cw.put_metric_data(
+            Namespace="LifePlatform/IngestReconciliation",
+            MetricData=[
+                {
+                    "MetricName": "MissingActivityCount",
+                    "Dimensions": [{"Name": "Source", "Value": "whoop"}],
+                    "Value": float(missing_count),
+                    "Unit": "Count",
+                }
+            ],
+        )
+    except Exception as e:  # metric emission must never fail the run
+        logger.warning("reconcile metric emit failed (non-fatal): %s", e)
+
+
+def _reconcile(event: dict, context) -> dict:
+    """Diff the trailing-window Whoop API record set against the store (read-only)."""
+    try:
+        secrets_client = boto3.client("secretsmanager", region_name=REGION)
+        try:
+            from secret_cache import get_secret_json
+
+            secret_data = get_secret_json(SECRET_NAME, secrets_client)
+        except ImportError:
+            secret_data = json.loads(secrets_client.get_secret_value(SecretId=SECRET_NAME)["SecretString"])
+
+        secret = authenticate(secret_data)
+        # Whoop rotates the single-use refresh_token on refresh — persist it or the
+        # next ingestion run's refresh fails on a stale token (same as ingestion's
+        # enable_secret_writeback path, mirrored for the reconcile invocation).
+        if secret.get("refresh_token") != secret_data.get("refresh_token"):
+            try:
+                secrets_client.update_secret(SecretId=SECRET_NAME, SecretString=json.dumps(secret))
+            except Exception as e:
+                logger.warning("reconcile secret writeback failed (non-fatal): %s", e)
+
+        token = secret["access_token"]
+        today = datetime.now(timezone.utc).date()
+        start = today - timedelta(days=RECONCILE_WINDOW_DAYS)
+        start_dt = f"{start.isoformat()}T00:00:00.000Z"
+        end_dt = f"{(today + timedelta(days=1)).isoformat()}T00:00:00.000Z"
+
+        sleeps = _fetch_all_records(token, "activity/sleep", start_dt, end_dt)
+        workouts = _fetch_all_records(token, "activity/workout", start_dt, end_dt)
+
+        # DDB is keyed by the record's UTC day; the API window is UTC too, but a
+        # workout that starts just before midnight UTC on the window edge can key
+        # one day out — bracket the stored-side fetch by ±1 day (the strava-side
+        # pattern). Extra stored rows only ADD match candidates; never a false gap.
+        stored_sks, stored_workout_starts = _fetch_stored_records(
+            _table,
+            (start - timedelta(days=1)).isoformat(),
+            (today + timedelta(days=1)).isoformat(),
+        )
+        missing = _records_missing_from_store(sleeps, workouts, stored_sks, stored_workout_starts)
+
+        _emit_reconciliation_metric(len(missing))
+        if missing:
+            logger.warning(
+                "[RECONCILE] %d Whoop records missing from store: %s",
+                len(missing),
+                [(m["kind"], m.get("id"), m.get("date")) for m in missing],
+            )
+        else:
+            logger.info(
+                "[RECONCILE] clean — %d sleeps + %d workouts all present in store (window=%dd)",
+                len(sleeps),
+                len(workouts),
+                RECONCILE_WINDOW_DAYS,
+            )
+        return {
+            "statusCode": 200,
+            "body": json.dumps(
+                {
+                    "mode": "reconcile",
+                    "source": "whoop",
+                    "window_days": RECONCILE_WINDOW_DAYS,
+                    "sleep_count": len(sleeps),
+                    "workout_count": len(workouts),
+                    "missing_count": len(missing),
+                    "missing": missing,
+                }
+            ),
+        }
+    except Exception as e:
+        # A reconcile failure (e.g. transient Whoop outage) must NOT raise — that
+        # would trip the ingestion-error-whoop alarm on an unrelated cause. Skip
+        # the metric for the day (the alarm treats missing data as not-breaching).
+        logger.error("[RECONCILE] failed (non-fatal): %s", e, exc_info=True)
+        return {"statusCode": 200, "body": json.dumps({"mode": "reconcile", "source": "whoop", "error": str(e)})}
+
+
 def lambda_handler(event: dict, context) -> dict:
     try:
         if event.get("healthcheck"):
             return {"statusCode": 200, "body": "ok"}
+        if event.get("reconcile"):
+            return _reconcile(event, context)
         return run_ingestion(_config, authenticate, fetch_day, transform, event, context)
     except Exception as e:
         logger.error("whoop ingestion failed: %s", e, exc_info=True)
