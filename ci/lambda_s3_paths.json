@@ -21,7 +21,7 @@
     "hevy": {
       "expected_prefix": "raw/hevy/",
       "iam_prefix": "raw/hevy/*",
-      "reason": "ADR-060 / SPEC_HEVY \u00a72.3: Hevy workouts archive to raw/hevy/{workout_id}.json (single-user platform, no user_id segment needed). Both hevy-webhook and hevy-backfill write here.",
+      "reason": "ADR-060 / SPEC_HEVY \u00a72.3: Hevy workouts archive to raw/hevy/{workout_id}.json (single-user platform, no user_id segment needed). hevy-backfill writes here (hevy-webhook FunctionURL retired 2026-07-06, #756).",
       "lambda_file": "lambdas/hevy_common.py",
       "evidence": "lambdas/hevy_common.py: key = f\"raw/{SOURCE}/{workout_id}.json\""
     }

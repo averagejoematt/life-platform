@@ -242,11 +242,6 @@
       "cdk_only": true,
       "function": "hevy-backfill"
     },
-    "lambdas/ingestion/hevy_webhook_lambda.py": {
-      "_cdk_only_reason": "Has sibling imports (web.site_api_*, hevy_common, etc.) that deploy_lambda.sh doesn't bundle. Single-file hot-deploy would break Runtime.ImportModuleError at next invoke. Only `cdk deploy` ships the full Code.from_asset('../lambdas') bundle correctly.",
-      "cdk_only": true,
-      "function": "hevy-webhook"
-    },
     "lambdas/ingestion/journal_enrichment_lambda.py": {
       "function": "journal-enrichment"
     },
@@ -470,6 +465,7 @@
   "skip_deploy": {
     "_comment": "Files that are part of the repo but not directly deployable Lambdas (Layer modules or utilities). V2 P0.8: 17 layer-resident shared modules added 2026-05-17.",
     "files": [
+      "lambdas/ingestion/hevy_webhook_lambda.py",
       "lambdas/ingestion_validator.py",
       "lambdas/item_size_guard.py",
       "lambdas/sick_day_checker.py",
@@ -506,5 +502,8 @@
   },
   "_retired_sleep_reconciler": {
     "_comment": "sleep-reconciler RETIRED 2026-07-05 (#487 / ADR-113). Dead per-field merge (read fields that never existed) + 1\u20132 nights stale, zero compute consumers. Lambda + EventBridge rule + IAM role + /api/sleep_reconciliation removed. LifePlatformCompute needs a deploy to drop the live function."
+  },
+  "_retired_hevy_webhook": {
+    "_comment": "hevy-webhook FunctionURL RETIRED 2026-07-06 (#756 / ADR-103 retire-candidate, R21 kill list #8). Hevy publishes no webhooks so the standing public FunctionURL served nothing. Lambda + FunctionURL + error alarm + IAM policy (ingestion_hevy_webhook) removed from cdk/stacks/ingestion_stack.py + role_policies.py. lambdas/ingestion/hevy_webhook_lambda.py is kept in git (moved to skip_deploy above) for revival if Hevy ever ships webhooks. LifePlatformIngestion needs a deploy to drop the live function + FunctionURL."
   }
 }

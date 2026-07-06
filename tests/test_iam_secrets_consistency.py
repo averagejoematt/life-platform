@@ -79,7 +79,7 @@ KNOWN_SECRETS = [
     "life-platform/notion",  # Notion API key (also in ingestion-keys bundle)
     "life-platform/dropbox",  # Dropbox API key (also in ingestion-keys bundle)
     "life-platform/todoist",  # Todoist API token — read by MCP write tools (mcp/tools_todoist.py:22). Created 2026-02-21. TD-23 added to mcp_server() IAM.
-    "life-platform/hevy",  # ADR-060 / SPEC_HEVY §2.4: api_key + webhook_secret for hevy-webhook + hevy-backfill. Created 2026-05-25.
+    "life-platform/hevy",  # ADR-060 / SPEC_HEVY §2.4: api_key (+ vestigial webhook_secret) for hevy-backfill. Created 2026-05-25; hevy-webhook FunctionURL retired 2026-07-06 (#756).
     "life-platform/hevy-write",  # ADR-066 (2026-05-31): write-capable Hevy key for hevy-routine-cron + MCP manage_hevy_routine. Separate from read per Yael bundling rule.
     "life-platform/github-dispatch-token",  # ADR-064 (2026-05-29): fine-grained PAT for remediation-dispatcher Lambda → GitHub repository_dispatch. Rotates ~2026-08-27.
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens, dedicated (was sha256(anthropic-api-key)).

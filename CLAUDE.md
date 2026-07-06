@@ -14,7 +14,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/README.md` — **the full doc index** (everything in `docs/`, categorized)
 - `docs/ONBOARDING.md` — first-day mental model, key concepts
 - `docs/QUICKSTART.md` — first-day commands (AWS auth, deploy, rollback)
-- `docs/ARCHITECTURE.md` — full system design, ~94 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py`), 8 CDK stacks, data flows
+- `docs/ARCHITECTURE.md` — full system design, ~93 Lambdas (CDK-defined; canonical count via `sync_doc_metadata.py`), 8 CDK stacks, data flows
 - `docs/SCHEMA.md` — DynamoDB field reference (authoritative)
 - `docs/RUNBOOK.md` — daily operations, troubleshooting
 - **The forward-work backlog is GitHub Issues (ADR-099)** — epics (`type:epic`) + ranked stories (`type:story`) on Now/Next/Later milestones; seed sessions from `gh issue list --label type:story --milestone Now --state open`; a shipping PR carries `Fixes #N`. `docs/BACKLOG.md` is a frozen archive.
@@ -59,7 +59,7 @@ python3 mcp_bridge.py
 
 **Ingest → Store → Serve** pipeline on AWS (us-west-2):
 
-1. **Ingest**: 15 scheduled ingestion Lambda functions pull from APIs on EventBridge (8 SIMP-2 framework + 7 pattern-exempt per ADR-056/060; hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather at 2x daily, Todoist at 1x daily (14:00 UTC — its 72h staleness threshold in `source_registry.py` is derived from that cadence, #471), Hevy at hourly 12-23 UTC). Plus 1 webhook-driven FunctionURL Lambda (`hevy-webhook`, currently parked since Hevy doesn't publish webhooks). Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
+1. **Ingest**: 15 scheduled ingestion Lambda functions pull from APIs on EventBridge (8 SIMP-2 framework + 7 pattern-exempt per ADR-056/060; hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather at 2x daily, Todoist at 1x daily (14:00 UTC — its 72h staleness threshold in `source_registry.py` is derived from that cadence, #471), Hevy at hourly 12-23 UTC). The standing `hevy-webhook` FunctionURL (parked since Hevy doesn't publish webhooks) was removed 2026-07-06 (#756, R21 kill list #8) — its handler source stays in git history for revival if Hevy ever ships webhooks. Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
 
 2. **Store**: Raw JSON in S3 — the raw/ zone is **three-generation fractured** (X-9/#498): most sources write `raw/matthew/{source}/{YYYY}/{MM}/{DD}.json`, legacy todoist/weather write `raw/{source}/…` with no user segment, and hevy is flat UUID-keyed (`raw/hevy/{workout_id}.json`). **Each source's actual layout is the `raw_layout` facet in `lambdas/source_registry.py` — read it, don't guess; no mass-move (raw/* is delete-protected).** Normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 

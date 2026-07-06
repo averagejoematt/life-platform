@@ -252,20 +252,11 @@ def ingestion_strava() -> list[iam.PolicyStatement]:
     )
 
 
-def ingestion_hevy_webhook() -> list[iam.PolicyStatement]:
-    """Hevy webhook FunctionURL Lambda — receives webhook POST + fetches workout.
-
-    Per SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25 + ADR-014 (dedicated secret).
-    Reads: life-platform/hevy secret (api_key + webhook_secret).
-    Writes: DDB workouts under USER#matthew#SOURCE#hevy + S3 raw/hevy/.
-    """
-    return _ingestion_base(
-        "hevy",
-        secret_name="life-platform/hevy",
-        s3_prefix="raw/hevy/*",
-        # #412: adherence_calc reads the movement catalog + resolved template cache from S3 to map movements → Hevy template ids.
-        extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json"],
-    )
+# ingestion_hevy_webhook() removed 2026-07-06 — see #756 / ADR-103 retire-candidate.
+# The hevy-webhook FunctionURL Lambda it scoped was a standing public endpoint
+# that never received traffic (Hevy has no webhook subscriptions). Handler
+# source (lambdas/ingestion/hevy_webhook_lambda.py) stays in git history for
+# revival if Hevy ever ships webhooks.
 
 
 def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:

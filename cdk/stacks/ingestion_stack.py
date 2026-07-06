@@ -249,42 +249,18 @@ class IngestionStack(Stack):
             )
         )
 
-        # ── 6b. Hevy webhook (real-time) — FunctionURL, no schedule.
-        #        Per SPEC_HEVY_AND_NUTRITION_BRIDGE_2026_05_25 §2.2-A. The URL is
-        #        registered with Hevy's webhook subscription endpoint after deploy.
-        hevy_webhook = create_platform_lambda(
-            self,
-            "HevyWebhook",
-            function_name="hevy-webhook",
-            source_file="lambdas/ingestion/hevy_webhook_lambda.py",
-            handler="ingestion.hevy_webhook_lambda.lambda_handler",
-            timeout_seconds=30,
-            memory_mb=256,
-            environment={
-                "SECRET_NAME": "life-platform/hevy",
-                "S3_BUCKET": "matthew-life-platform",
-                "TABLE_NAME": "life-platform",
-            },
-            alarm_name="ingestion-error-hevy-webhook",
-            shared_layer=shared_utils_layer,
-            custom_policies=rp.ingestion_hevy_webhook(),
-            **shared,
-        )
-        # Expose a public FunctionURL for Hevy to POST to. Auth=NONE because
-        # Hevy can't sign with a CDK-managed IAM principal; we validate via
-        # the webhook_secret stored in life-platform/hevy.
-        hevy_webhook_url = hevy_webhook.add_function_url(
-            auth_type=_lambda.FunctionUrlAuthType.NONE,
-        )
-
-        # ── 6c. Hevy events-feed poller (PRIMARY ingestion path — hourly).
+        # ── 6b. Hevy events-feed poller (PRIMARY ingestion path — hourly).
         # Discovered 2026-05-25: Hevy doesn't currently offer public webhook
         # subscriptions (OpenAPI spec at api.hevyapp.com/docs/ has no
-        # /v1/webhook* endpoints). The webhook Lambda above stays deployed
-        # for future Hevy webhook support but currently doesn't receive
-        # traffic. This poller is the actual ingestion mechanism: every
-        # waking hour, walk /v1/workouts/events?since=<last_success>.
-        # 12-23 UTC = 5 AM – 4 PM PT.  Adjust if Matthew lifts later.
+        # /v1/webhook* endpoints). A `hevy-webhook` FunctionURL Lambda was
+        # stood up in anticipation of future webhook support but never
+        # received traffic; removed 2026-07-06 (#756, R21 kill list #8 /
+        # ADR-103 retire-candidate). The handler source
+        # (lambdas/ingestion/hevy_webhook_lambda.py) stays in git history for
+        # revival if Hevy ever ships webhooks. This poller is the actual
+        # ingestion mechanism: every waking hour, walk
+        # /v1/workouts/events?since=<last_success>. 12-23 UTC = 5 AM – 4 PM
+        # PT. Adjust if Matthew lifts later.
         create_platform_lambda(
             self,
             "HevyBackfill",
@@ -305,16 +281,7 @@ class IngestionStack(Stack):
             **shared,
         )
 
-        # Export the FunctionURL so the post-deploy `setup_hevy_webhook_subscription.sh`
-        # script can register it with Hevy.
-        cdk.CfnOutput(
-            self,
-            "HevyWebhookFunctionUrl",
-            value=hevy_webhook_url.url,
-            description="POST this URL to Hevy's webhook subscription endpoint",
-        )
-
-        # ── (6d) MacroFactor unofficial-API puller removed 2026-05-25.
+        # ── (6c) MacroFactor unofficial-API puller removed 2026-05-25.
         # Was attempted as WS-2 Tier 1 under SPEC_HEVY_AND_NUTRITION_BRIDGE §3
         # and ADR-061: pull nutrition + workouts via reverse-engineered Firebase
         # auth + Firestore. Blocked by Firebase App Check enforcement (5
