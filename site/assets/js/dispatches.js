@@ -376,12 +376,15 @@ async function renderRead(s, id) {
   if (rf) rf.addEventListener("click", () => loadFull(rf, read.querySelector("[data-fulltext]"), read.querySelector(".dx-excerpt")));
   const sf = read.querySelector(".dx-startfirst");
   if (sf) sf.addEventListener("click", () => selectEntry(s, sf.dataset.startid));
+  const shb = read.querySelector(".dx-share-btn");
+  if (shb) shb.addEventListener("click", () => shareDispatch(shb));
   enhanceCoachNames(read);  // CC-04: coach-name popovers in chronicle/journal prose
 }
 
-// PG-03 — the per-dispatch foot: a subscribe CTA (the chronicle is the only
-// organic-share engine) + a "start from the beginning" link. The first dispatch
-// is the chronologically-earliest by date (week labels run -4…N, non-linear).
+// PG-03 / #733 — the per-dispatch foot: a SHARE affordance for this post (the
+// crawlable permalink is the organic-share engine), a subscribe CTA for future
+// dispatches, and a "start from the beginning" link. The first dispatch is the
+// chronologically-earliest by date (week labels run -4…N, non-linear).
 function dispatchFoot(s, ent, all) {
   const sorted = (all || []).slice().sort((a, b) =>
     String(a.date || "").localeCompare(String(b.date || "")) || (Number(a.id) - Number(b.id)));
@@ -389,13 +392,42 @@ function dispatchFoot(s, ent, all) {
   const startLink = (first && String(first.id) !== String(ent.id))
     ? `<button type="button" class="dx-startfirst" data-startid="${esc(first.id)}">↩ Start from the beginning — &ldquo;${esc(first.title)}&rdquo;</button>`
     : "";
-  return `
+  // #733: share the post's own crawlable permalink (/journal/posts/week-N/), the
+  // same URL RSS + the sitemap point at — one content identity, one shareable URL.
+  // Falls back to the in-app deep link when a post has no permalink page yet.
+  const permalink = ent.url ? (location.origin + ent.url) : (location.origin + `/story/${s.key}/#${ent.id}`);
+  const share = `
+    <p class="dx-share">
+      <button type="button" class="dx-share-btn" data-url="${esc(permalink)}" data-title="${esc(ent.title || "")}">Share this dispatch</button>
+      <span class="dx-share-link label" aria-hidden="true">${esc(permalink.replace(/^https?:\/\//, ""))}</span>
+    </p>`;
+  return share + `
     <aside class="dx-subscribe" aria-label="Follow the experiment">
       <p class="dx-sub-h">Follow the experiment as it's written.</p>
       <p class="dx-sub-p">New dispatches land here first — the down weeks included. No selling, unsubscribe anytime.</p>
       <p class="dx-sub-cta"><a class="dx-sub-btn" href="/subscribe/">Subscribe by email</a><a class="dx-sub-rss" href="/rss.xml">or follow via RSS</a></p>
       ${startLink}
     </aside>`;
+}
+
+// #733 — native share sheet where supported (mobile), copy-to-clipboard otherwise.
+// No blocking browser dialog as a fallback; the last resort just reveals the URL text.
+async function shareDispatch(btn) {
+  const url = btn.dataset.url;
+  const title = btn.dataset.title || "The Measured Life";
+  if (navigator.share) {
+    try { await navigator.share({ title, url }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }  // user dismissed the sheet
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    const prev = btn.textContent;
+    btn.textContent = "Link copied ✓"; btn.classList.add("is-copied"); btn.disabled = true;
+    setTimeout(() => { btn.textContent = prev; btn.classList.remove("is-copied"); btn.disabled = false; }, 2000);
+  } catch (e) {
+    const link = btn.parentElement && btn.parentElement.querySelector(".dx-share-link");
+    if (link) link.removeAttribute("aria-hidden");  // reveal the copyable URL as a last resort
+  }
 }
 
 // Expand the full chronicle/journal piece inline (same-origin, platform-authored content):

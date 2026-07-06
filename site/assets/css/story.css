@@ -307,6 +307,19 @@ body { overflow-x: hidden; }
 }
 .dx-startfirst:hover { color: var(--ember); text-decoration: underline; }
 .dx-sub-btn:focus-visible, .dx-sub-rss:focus-visible, .dx-startfirst:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+/* #733 — per-post share affordance (the crawlable permalink, made shareable) */
+.dx-share { display: flex; align-items: baseline; gap: var(--sp-4); flex-wrap: wrap; margin: var(--sp-6) 0 0; max-width: var(--measure); }
+.dx-share-btn {
+  appearance: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
+  color: var(--ember); background: transparent;
+  border: 1px solid var(--ember-line); border-radius: var(--radius-xs);
+  padding: var(--sp-2) var(--sp-4); transition: background var(--dur-fast);
+}
+.dx-share-btn:hover { background: color-mix(in oklch, var(--ember) 14%, transparent); }
+.dx-share-btn.is-copied { color: var(--ink-muted); }
+.dx-share-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.dx-share-link { font-family: var(--font-mono); color: var(--ink-muted); word-break: break-all; }
 /* full article, rendered inline in the v4 reader */
 .dx-fulltext { margin-top: var(--sp-4); max-width: var(--measure); }
 .dx-fulltext p { font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); color: var(--ink); margin-top: var(--sp-4); }
