@@ -131,6 +131,25 @@ def test_derive_failure_is_non_fatal(monkeypatch):
     assert adherence_calc.derive_adherence(_performed()) is None
 
 
+# ── ADR-069 "tmpl:<id>" movement keys carry the template id in the suffix ───────
+def test_tmpl_prefixed_movement_key_resolves_directly(monkeypatch):
+    # A routine can program an exercise by raw template ("tmpl:<id>") rather than a
+    # catalog movement. It must count as PERFORMED when the workout has that template id
+    # — else adherence is deflated (the real 2026-06-25 workout regression).
+    monkeypatch.setattr(adherence_calc, "_load_catalog", lambda: {"movements": {}})
+    monkeypatch.setattr(adherence_calc, "_load_template_cache", lambda: {})
+    ir = _ir(movements=("tmpl:BE640BA0", "tmpl:54508215-4069-4f0b-bd2a-718dc159e1e1"))
+    performed = {
+        "exercises": [
+            {"exercise_template_id": "BE640BA0", "sets": [{}, {}, {}]},
+            {"exercise_template_id": "54508215-4069-4f0b-bd2a-718dc159e1e1", "sets": [{}, {}, {}]},
+        ]
+    }
+    result = adherence_calc.calculate_adherence(ir, performed)
+    assert result["overall_pct"] == 100.0
+    assert result["missing"] == []
+
+
 # ── ADR-069 title-resolved movement resolves via the cache, not a catalog hint ─
 def test_title_resolved_movement_uses_cache(monkeypatch):
     # reverse_pec_deck has NO catalog hint (ADR-069) — its id lives in the resolved cache.
