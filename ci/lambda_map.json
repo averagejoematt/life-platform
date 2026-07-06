@@ -398,7 +398,8 @@
       "adaptive-mode-compute",
       "hypothesis-engine",
       "dashboard-refresh",
-      "weekly-correlation-compute"
+      "weekly-correlation-compute",
+      "ai-expert-analyzer"
     ],
     "modules": [
       "lambdas/adherence_calc.py",

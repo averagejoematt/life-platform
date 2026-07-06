@@ -49,7 +49,10 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 #        new calibration_core scorer, compute_credibility consumes it
 # v115: #417 first-class routine branches — routine_ir.RoutineBranch,
 #        hevy_compiler branch-menu render, routine_generator.emit_branch_model
-SHARED_LAYER_VERSION = 115
+# v116: #725 code-stamp prediction metadata — intelligence_common.stamp_thread_predictions
+#        (LLM no longer authors prediction_id/target_date). Also reconciles the
+#        v115-published-but-never-attached drift (all consumers were left on v114).
+SHARED_LAYER_VERSION = 116
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 
