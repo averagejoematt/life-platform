@@ -107,6 +107,11 @@ MODULES=(
     # by daily-metrics-compute, dashboard-refresh, daily-brief, monday-compass,
     # digest_utils, and (lazily) the MCP tools.
     training_load.py
+    # #738 (2026-07-06): hash-and-reuse for coach generation briefs — fingerprints
+    # the semantic inputs so an unchanged brief reuses the last gate-passed output
+    # instead of paying full Sonnet + gates. Imported (lazily) by ai_calls' coach-v2
+    # pipeline. MUST be in the layer or every coach lambda's reuse path no-ops.
+    generation_cache.py
 )
 
 rm -rf "$PROJ_ROOT/cdk/layer-build"
