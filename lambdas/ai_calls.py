@@ -1399,6 +1399,53 @@ COMPUTATION OUTPUTS:
 
 Write your {domain_label} coaching section now."""
 
+        # Step 4.5 (#738 / ADR-126): hash-and-reuse. On a quiet day the semantic
+        # brief is identical to the last one, and regenerating just re-says the
+        # same silence at full Sonnet + gate cost. Fingerprint the exact generation
+        # inputs (system_prompt + user_message carry the facts, forecast, brief
+        # thread-state, and domain data); if it matches the last gate-passed run,
+        # reuse that stored output and skip the whole generation path. The
+        # fingerprint covers every semantic input — a staleness day-count ticking
+        # up busts it — so reuse is never stale-but-fresh. Entirely fail-soft.
+        output_type = f"daily_brief_{domain_label.lower().replace(' ', '_')}"
+        _gen_cache = None
+        _cache_tbl = None
+        _brief_fp = None
+        try:
+            import generation_cache as _gen_cache
+
+            _cache_tbl = boto3.resource("dynamodb", region_name="us-west-2").Table(os.environ.get("TABLE_NAME", "life-platform"))
+            _brief_fp = _gen_cache.brief_fingerprint(system_prompt, user_message)
+            _reuse, _unchanged_since = _gen_cache.check_reuse(_cache_tbl, coach_id, output_type, _brief_fp)
+            if _reuse:
+                print(f"[COACH-V2:{coach_id}] brief unchanged since {_unchanged_since} — reusing gated output, skipping generation")
+                _today = _date_cls.today().isoformat()
+                _gen_cache.record_reuse(_cache_tbl, coach_id, output_type, _today)
+                _gen_cache.emit_skip_metric(_cw, _CW_NAMESPACE, coach_id)
+                # Still record today's section (no Bedrock generation cost) so the
+                # downstream contract — today has a coach record + thread state — is
+                # unchanged from a real generation.
+                try:
+                    lambda_client.invoke(
+                        FunctionName="coach-state-updater",
+                        InvocationType="Event",
+                        Payload=json.dumps(
+                            {
+                                "coach_id": coach_id,
+                                "output_text": _reuse,
+                                "output_type": output_type,
+                                "generation_date": _today,
+                                "unchanged_since": _unchanged_since,
+                            }
+                        ).encode(),
+                    )
+                except Exception as e:
+                    print(f"[COACH-V2:{coach_id}] State updater invoke (reuse) failed (non-blocking): {e}")
+                return _reuse
+        except Exception as _gc_e:
+            print(f"[COACH-V2:{coach_id}] generation cache unavailable (non-blocking): {_gc_e}")
+            _gen_cache = None
+
         # Step 5: Generate with Sonnet
         print(f"[COACH-V2:{coach_id}] Generating output...")
         output = call_anthropic(system_prompt + "\n\n" + user_message, api_key, max_tokens=600)
@@ -1450,6 +1497,12 @@ Write your {domain_label} coaching section now."""
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
             return None
 
+        # Step 6.5 (#738): persist this fresh, gate-passed output under its brief
+        # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a
+        # cache MISS, so first_generated resets the unchanged-since clock.
+        if _gen_cache is not None and _cache_tbl is not None and _brief_fp and output:
+            _gen_cache.store_entry(_cache_tbl, coach_id, output_type, _brief_fp, output, _date_cls.today().isoformat())
+
         # Step 7: Invoke state updater (async) — records the final, gate-passed text.
         try:
             lambda_client.invoke(
@@ -1459,7 +1512,7 @@ Write your {domain_label} coaching section now."""
                     {
                         "coach_id": coach_id,
                         "output_text": output,
-                        "output_type": f"daily_brief_{domain_label.lower().replace(' ', '_')}",
+                        "output_type": output_type,
                         "generation_date": _date_cls.today().isoformat(),
                     }
                 ).encode(),
