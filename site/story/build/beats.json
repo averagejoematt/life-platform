@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-05",
+  "updated_at": "2026-07-06",
   "beats": [
     {
       "id": "2026-07-05-a-pulse-tied-to-a-real-clock",
@@ -384,6 +384,24 @@
         {
           "label": "PR #711",
           "url": "https://github.com/averagejoematt/life-platform/pull/711"
+        }
+      ]
+    },
+    {
+      "id": "2026-07-06-predictions-stamped-by-code",
+      "date": "2026-07-06",
+      "title": "The AI no longer writes its own report card",
+      "shipped": "The coaching engine makes forward calls about the data — and until this week, the model also wrote each prediction's ID and deadline. An audit found what you'd expect: years-off dates, duplicates, and 88 predictions that could never be graded. Now the model writes only the claim and its confidence; code stamps the ID, the date, and a strictly-future deadline, and a re-stated claim updates its original record instead of minting a daily duplicate. Verified by invoking the live analyzer and reading the fresh record back — clean ID, real deadline.",
+      "gotcha": "The deploy surfaced a second, quieter failure: a shared code layer had been published but never attached, so every function was silently one version behind — and the drift check wasn't tracking the one Lambda that mattered. Fresh layer, attached fleet-wide, missing consumer added to the map.",
+      "honest_miss": "The old corrupt predictions were still in the ledger when this shipped — voiding them (marked, never deleted) landed as the follow-up. And the honest scoreboard state is still zero graded: the first real number arrives only when deadlines start passing.",
+      "prs": [
+        {
+          "label": "PR #761",
+          "url": "https://github.com/averagejoematt/life-platform/pull/761"
+        },
+        {
+          "label": "PR #767",
+          "url": "https://github.com/averagejoematt/life-platform/pull/767"
         }
       ]
     }
