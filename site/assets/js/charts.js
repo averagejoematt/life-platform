@@ -351,8 +351,12 @@ export function ring({ value = "", sub = "", label = "", fill = 0, tone = "ember
   const r = 42, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, Number(fill) || 0));
   const dash = `${(f * c).toFixed(1)} ${(c - f * c).toFixed(1)}`;
   const aria = `${label}: ${value}${sub ? " " + sub : ""}`;
+  // Interactive readout (#583): a single focus point on the arc so the ring answers to
+  // hover/tap/keyboard like every other chart — the arc midpoint, label = the value.
+  const mid = (-Math.PI / 2) + f * 2 * Math.PI;
+  const cpts = [{ x: +((50 + r * Math.cos(mid)) / 100).toFixed(4), y: +((50 + r * Math.sin(mid)) / 100).toFixed(4), l: aria }];
   return `<div class="vr vr-${escAttr(tone)}${thin ? " vr-thin" : ""}">` +
-    `<svg class="vr-svg" viewBox="0 0 100 100" role="img" aria-label="${escAttr(aria)}">` +
+    `<svg class="vr-svg" viewBox="0 0 100 100" role="img" aria-label="${escAttr(aria)}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-hit="xy">` +
     `<circle class="vr-track" cx="50" cy="50" r="${r}" fill="none"/>` +
     `<circle class="vr-arc" cx="50" cy="50" r="${r}" fill="none" stroke-dasharray="${dash}" transform="rotate(-90 50 50)" stroke-linecap="round"/>` +
     `</svg>` +
@@ -417,8 +421,12 @@ export function autonomicQuadrant(points, { size = 300 } = {}) {
     { t: "STRESS", x: (xMid + (W - P)) / 2, y: H - P - 6 },
     { t: "LOW", x: (P + xMid) / 2, y: H - P - 6 },
   ].map((l) => `<text class="aq-lab" x="${l.x.toFixed(0)}" y="${l.y.toFixed(0)}" text-anchor="middle">${l.t}</text>`).join("");
-  const dots = pts.map((p) => `<circle class="aq-dot${p.today ? " aq-today" : ""}" cx="${x(p.strain).toFixed(1)}" cy="${y(p.recovery).toFixed(1)}" r="${p.today ? 5 : 3.5}"><title>${escAttr((p.date || "") + " · recovery " + Math.round(p.recovery) + "% · strain " + (Math.round(p.strain * 10) / 10))}</title></circle>`).join("");
-  return `<figure class="chart aq-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Autonomic 2x2: recovery vs strain, last ${pts.length} days, today highlighted.">` +
+  const dotLabel = (p) => (p.today ? "today · " : (p.date ? p.date + " · " : "")) + "recovery " + Math.round(p.recovery) + "% · strain " + (Math.round(p.strain * 10) / 10);
+  const dots = pts.map((p) => `<circle class="aq-dot${p.today ? " aq-today" : ""}" cx="${x(p.strain).toFixed(1)}" cy="${y(p.recovery).toFixed(1)}" r="${p.today ? 5 : 3.5}"></circle>`).join("");
+  // Interactive readout (#583): a 2×2 scatter → 2-D nearest (data-cpts-hit="xy"); the
+  // shared tooltip replaces the native <title> so it matches every other chart.
+  const cpts = pts.map((p) => ({ x: +(x(p.strain) / W).toFixed(4), y: +(y(p.recovery) / H).toFixed(4), l: dotLabel(p) }));
+  return `<figure class="chart aq-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Autonomic 2x2: recovery vs strain, last ${pts.length} days, today highlighted." data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-hit="xy">` +
     `<line class="aq-div" x1="${xMid.toFixed(0)}" y1="${P}" x2="${xMid.toFixed(0)}" y2="${H - P}"/>` +
     `<line class="aq-div" x1="${P}" y1="${yMid.toFixed(0)}" x2="${W - P}" y2="${yMid.toFixed(0)}"/>` +
     labels + dots +
@@ -573,15 +581,16 @@ export function heatStrip(days, { valueKey = "value", label = "", unit = "", div
     const cut = cutDate && r.d === cutDate ? " heat-cut" : "";
     const tip = escAttr(`${dl}: ${Math.round(r.v)}${unit}`);
     if (compact) {
-      // Dense GitHub-style calendar: saturation only, no per-cell text (tooltip carries it).
-      return `<div class="heat-cell heat-compact${cut}" style="--heat:${sat.toFixed(3)}" title="${tip}"></div>`;
+      // Dense GitHub-style calendar: saturation only, no per-cell text — the shared
+      // readout (motion.js data-cells) carries the label/value on hover, tap + keyboard.
+      return `<div class="heat-cell heat-compact${cut}" style="--heat:${sat.toFixed(3)}" data-l="${tip}"></div>`;
     }
     const dayNum = dl.split(" ")[1] || "";
-    return `<div class="heat-cell${cut}" style="--heat:${sat.toFixed(3)}" title="${tip}">` +
+    return `<div class="heat-cell${cut}" style="--heat:${sat.toFixed(3)}" data-l="${tip}">` +
       `<span class="heat-v mono">${(r.v / divisor).toFixed(1)}${escAttr(suffix)}</span><span class="heat-d label">${escAttr(dayNum)}</span></div>`;
   };
   const cap = caption || `${label} — ember intensity = volume; low days shown muted, not hidden.`;
-  return `<figure class="chart heat"><div class="heat-strip${compact ? " heat-strip-compact" : ""}" role="img" aria-label="${escAttr(label)}">${rows.map(cell).join("")}</div>` +
+  return `<figure class="chart heat"><div class="heat-strip${compact ? " heat-strip-compact" : ""}" role="img" aria-label="${escAttr(label)}" data-cells>${rows.map(cell).join("")}</div>` +
     `<figcaption class="chart-cap label">${escAttr(cap)}</figcaption></figure>`;
 }
 
@@ -674,13 +683,14 @@ export function mealWindowRibbon(days, { refHours = 8, label = "" } = {}) {
   const row = (d) => {
     const l = pos(d.first_min), w = Math.max(1.5, pos(d.last_min) - pos(d.first_min));
     const hrs = ((d.last_min - d.first_min) / 60).toFixed(1);
-    return `<div class="ewin-row"><span class="ewin-day label">${escAttr(_shortDate(d.date))}</span>` +
+    const tip = escAttr(`${_shortDate(d.date)}: ${fmtT(d.first_min)}–${fmtT(d.last_min)} · ${hrs}h`);
+    return `<div class="ewin-row" data-l="${tip}"><span class="ewin-day label">${escAttr(_shortDate(d.date))}</span>` +
       `<span class="ewin-track"><span class="ewin-ref" style="left:${l.toFixed(1)}%;width:${refW.toFixed(1)}%"></span>` +
       `<span class="ewin-bar" style="left:${l.toFixed(1)}%;width:${w.toFixed(1)}%"></span></span>` +
       `<span class="ewin-v mono">${fmtT(d.first_min)}–${fmtT(d.last_min)} · ${hrs}h</span></div>`;
   };
   return `<figure class="chart ewin">${label ? `<p class="suf-head label">${escAttr(label)}</p>` : ""}` +
-    `<div class="ewin-rows">${rows.map(row).join("")}</div>` +
+    `<div class="ewin-rows" role="img" aria-label="${escAttr(label || "eating-window ribbon")}" data-cells>${rows.map(row).join("")}</div>` +
     `<figcaption class="chart-cap label">5am → midnight · ember = your window · faint = an ${refHours}h (16:8) reference from the first meal.</figcaption></figure>`;
 }
 
@@ -774,6 +784,25 @@ export function pillarRing(pillars, { size = 360, rimR = 0.46, width = 10 } = {}
   return out;
 }
 
+// Companion to pillarRing: the interaction points for the shared readout (#583). pillarRing
+// returns only the arc <circle>s (the caller owns the <svg>), so the caller attaches these
+// to that svg as data-cpts + data-cpts-hit="xy". One focus point per segment, placed on the
+// arc MIDLINE (angle measured clockwise from 12 o'clock, matching the rotate(-90) dash start);
+// geometry stays here beside the arcs so the two never drift. labels: optional name→text map.
+export function pillarRingCpts(pillars, { size = 360, rimR = 0.46, labels = null } = {}) {
+  const ps = (pillars || []).filter((p) => p && p.name);
+  if (!ps.length) return [];
+  const C = size / 2, R = size * rimR, N = ps.length;
+  const GAP_DEG = 4, SEG_DEG = (360 - N * GAP_DEG) / N;
+  return ps.map((p, i) => {
+    const theta = ((i * (SEG_DEG + GAP_DEG) + SEG_DEG / 2) * Math.PI) / 180;
+    const x = C + R * Math.sin(theta), y = C - R * Math.cos(theta);
+    const raw = Math.max(0, Math.min(Number(p.raw_score) || 0, 100));
+    const nm = (labels && labels[p.name]) || (String(p.name).charAt(0).toUpperCase() + String(p.name).slice(1));
+    return { x: +(x / size).toFixed(4), y: +(y / size).toFixed(4), l: `${nm}: ${Math.round(raw)}` };
+  });
+}
+
 export function radarChart(axes, { size = 320 } = {}) {
   const ax = (axes || []).filter((a) => a && a.label != null);
   if (ax.length < 3) return "";
@@ -798,7 +827,14 @@ export function radarChart(axes, { size = 320 } = {}) {
     dots += `<circle class="radar-dot" cx="${dx.toFixed(1)}" cy="${dy.toFixed(1)}" r="3.5" fill="${color}"/>`;
   });
   const poly = ax.map((a, i) => pt(i, (R * Math.max(0, Math.min(Number(a.value) || 0, 100))) / 100).map((n) => n.toFixed(1)).join(",")).join(" ");
-  return `<figure class="chart radar-chart"><svg viewBox="0 0 ${size} ${size}" role="img" aria-label="Pillar radar: ${escAttr(ax.map((a) => `${a.label} ${Math.round(a.value || 0)}`).join(", "))}">` +
+  // Interactive readout (#583): one focus point per vertex (where the radar-dot sits) →
+  // 2-D nearest (data-cpts-hit="xy"); label carries the axis + its 0–100 value.
+  const cpts = ax.map((a, i) => {
+    const v = Math.max(0, Math.min(Number(a.value) || 0, 100));
+    const [dx, dy] = pt(i, (R * v) / 100);
+    return { x: +(dx / size).toFixed(4), y: +(dy / size).toFixed(4), l: `${a.label}: ${Math.round(v)}` };
+  });
+  return `<figure class="chart radar-chart"><svg viewBox="0 0 ${size} ${size}" role="img" aria-label="Pillar radar: ${escAttr(ax.map((a) => `${a.label} ${Math.round(a.value || 0)}`).join(", "))}" data-cpts="${escAttr(JSON.stringify(cpts))}" data-cpts-hit="xy">` +
     grid + spokes +
     `<polygon class="radar-poly" points="${poly}"/>` +
     dots + labels + `</svg></figure>`;

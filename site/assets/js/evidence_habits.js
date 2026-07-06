@@ -134,11 +134,12 @@ export function habitsEffortMap(groupAvgs, registryHabits) {
   const rows = items.map((i) => {
     const sat = i.pct != null ? Math.max(0.12, i.pct / 100) : 0.12;
     const sz = (12 + (i.count / maxCount) * 24).toFixed(0);
-    return `<div class="em-row"><span class="em-dot" style="width:${sz}px;height:${sz}px;--heat:${sat.toFixed(2)}"></span>` +
+    const tip = esc(`${ttl(i.group)}: ${i.count} habit${i.count > 1 ? "s" : ""}${i.pct != null ? ` · ${fmt(i.pct)}% held` : ""}`);
+    return `<div class="em-row" data-l="${tip}"><span class="em-dot" style="width:${sz}px;height:${sz}px;--heat:${sat.toFixed(2)}"></span>` +
       `<span class="em-l">${esc(ttl(i.group))}</span><span class="em-meta label">${i.count} habit${i.count > 1 ? "s" : ""}${i.pct != null ? ` · ${fmt(i.pct)}%` : ""}</span></div>`;
   }).join("");
   return sec("Where the effort is",
-    `<div class="em-strip">${rows}</div>` +
+    `<div class="em-strip" role="img" aria-label="Effort map — habit groups by count and adherence" data-cells>${rows}</div>` +
     `<p class="rd-meta label">Each group: dot size = how many habits it carries, ember intensity = how reliably they're held. One ember scale + size — deliberately a ranked strip, not a radar (misleading geometry) and not a rainbow.</p>`);
 }
 
