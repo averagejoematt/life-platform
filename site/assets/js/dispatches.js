@@ -233,11 +233,22 @@ async function renderRead(s, id) {
         const lk = b.date ? `<a href="/story/chronicle/#${esc(b.date)}">${esc(lbl)}</a>` : `<span>${esc(lbl)}</span>`;
         return `<li class="tl-recap-beat"><span class="tl-recap-beat-k label">${lk}</span> ${esc(b.beat || "")}</li>`;
       }).join("");
+      // #786: the recap is written when a chronicle week publishes and can lag the
+      // present. Stamp "where we are now" with the recap's own as-of week/date so a
+      // returning reader is told which week this state is from — never a weeks-old
+      // state presented as the live "now". (The stat line below shows the CURRENT week.)
+      const asOfWk = er.as_of_week != null ? Math.round(Number(er.as_of_week)) : null;
+      const asOfDate = String(er.as_of || "").slice(0, 10);
+      const weeksBehind = asOfWk != null && weekN != null && weekN > asOfWk ? weekN - asOfWk : 0;
+      const nowStamp =
+        asOfWk != null
+          ? `<p class="tl-recap-asof label">where things stood as of Week ${asOfWk}${asOfDate ? ` · ${esc(asOfDate)}` : ""}${weeksBehind ? ` — ${weeksBehind} week${weeksBehind === 1 ? "" : "s"} ago` : ""}</p>`
+          : "";
       recap = `<aside class="tl-recap tl-recap-elena">` +
         `<p class="tl-recap-k label">previously on · the measured life</p>` +
         `<p class="tl-recap-story">${esc(er.story_so_far)}</p>` +
         (beats ? `<ul class="tl-recap-beats">${beats}</ul>` : "") +
-        (er.where_we_are_now ? `<p class="tl-recap-now">${esc(er.where_we_are_now)}</p>` : "") +
+        (er.where_we_are_now ? `<p class="tl-recap-now">${esc(er.where_we_are_now)}</p>${nowStamp}` : "") +
         statLine +
         `<p class="tl-recap-by label">— Elena Voss</p></aside>`;
     } else {
