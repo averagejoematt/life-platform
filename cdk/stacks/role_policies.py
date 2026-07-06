@@ -263,6 +263,8 @@ def ingestion_hevy_webhook() -> list[iam.PolicyStatement]:
         "hevy",
         secret_name="life-platform/hevy",
         s3_prefix="raw/hevy/*",
+        # #412: adherence_calc reads the movement catalog + resolved template cache from S3 to map movements → Hevy template ids.
+        extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json"],
     )
 
 
@@ -276,6 +278,8 @@ def ingestion_hevy_backfill() -> list[iam.PolicyStatement]:
         "hevy",
         secret_name="life-platform/hevy",
         s3_prefix="raw/hevy/*",
+        # #412: adherence_calc reads the movement catalog + resolved template cache from S3 to map movements → Hevy template ids.
+        extra_s3_read=["config/movement_catalog.json", "config/hevy_template_cache.json"],
     )
 
 

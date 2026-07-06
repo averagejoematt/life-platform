@@ -147,6 +147,14 @@ def lambda_handler(event: dict, context: Any) -> dict:
         raw = fetch_workout(workout_id)
         archive_raw(workout_id, raw)
         record = normalize_workout(raw)
+        try:  # #412 pushed-vs-performed adherence, embedded pre-write (guarded, non-fatal)
+            import adherence_calc
+
+            _adh = adherence_calc.derive_adherence(raw.get("workout") or raw)
+            if _adh:
+                record["adherence"] = _adh
+        except Exception as _e:  # noqa: BLE001
+            logger.warning("adherence attach failed (non-fatal) %s: %s", workout_id, _e)
         write_normalized(record)
     except HevyAPIError as e:
         logger.error("hevy fetch failed for %s: %s", workout_id, e)
