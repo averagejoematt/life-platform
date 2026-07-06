@@ -275,7 +275,7 @@ class _FakeBedrockResponse:
 
 class TestNarrate:
     def test_budget_tier_paused_falls_back(self, monkeypatch):
-        monkeypatch.setattr(budget_guard, "current_tier", lambda: 1)  # tier 1 == state_of_matthew cutoff
+        monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)  # tier 2 == state_of_matthew cutoff (ADR-125 reader-narrative band)
         state = _full_state()
         result = eng.narrate(state)
         assert result["narrated"] is False

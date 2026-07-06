@@ -6,17 +6,29 @@ based on near-real-time spend vs the $75/mo ceiling. AI features call allow()
 to decide whether to run or degrade; bedrock_client.invoke() calls current_tier()
 as the Tier-3 hard backstop.
 
-Tiers (cumulative — higher tier disables more):
+Tiers (cumulative — higher tier disables more). The sacrifice order is by
+AUDIENCE, not by cost: internal/dev AI dies first, reader-facing product last
+(ADR-125). The June-2026 breach that motivated this was dev-session-caused, yet
+tier 1 was pausing the coach narratives — the product's soul — while dev re-runs
+kept spending. This ladder inverts that.
+
   0 Normal    everything runs
-  1 Caution   heavy DAILY coach AI off (narrative/ensemble); weekly flagship
-              content (chronicle + the Friday Panel podcast) keeps running —
-              it's ~$1/wk and is the product, so it survives until tier 2.
-  2 Restrict  + chronicle off (matches the Panel's own SKIP_TIER=2, so the two
-              stay in lockstep). The PUBLIC ask endpoints keep answering —
-              readers degrade LAST (ADR-100): a reader question costs ~$0.02
-              at worst and it's the platform's most differentiating hook.
-  3 Hard stop + ALL Bedrock off (incl. /api/ask + /api/board_ask, which return
-              an honest friendly 'paused' message); daily brief is data-only
+  1 Caution   INTERNAL / dev AI off — the coach-ensemble meta-digest, the
+              coherence-sentinel semantic QA pass, and Margaret's chronicle
+              embellishment pass. None of these is a reader-facing surface; each
+              has a deterministic fallback. Nothing a reader reads pauses here.
+  2 Restrict  + reader NARRATIVE content off — the daily coach commentary
+              (coach_narrative), the weekly "State of Matthew" brief narration,
+              and the weekly chronicle + Friday Panel podcast (chronicle stays in
+              lockstep with the Panel's own SKIP_TIER=2). This is the first tier
+              a reader can perceive, and it's the biggest recurring daily bucket,
+              so it's the real cost lever — but it still outlives ALL internal AI.
+  3 Hard stop + the two irreducible reader promises off: the PUBLIC ask
+              endpoints (/api/ask + /api/board_ask — ADR-100's differentiating
+              hook, ~$0.02/call, rate-limited) and the daily brief's AI. Both
+              return honest 'paused' output; the brief falls back to data-only.
+              These degrade LAST by design — a reader question and the morning
+              brief are the platform's last two AI commitments to keep.
 
 Fail-open: if SSM is unreadable (transient error, missing grant, param absent)
 we return tier 0 — a monitoring blip must never take AI down. The AWS Budgets
@@ -34,32 +46,52 @@ _SSM_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
 _CACHE_TTL_S = 300  # 5 min — matches the governor's hourly cadence well enough
 
-# feature → tier at which it becomes DISABLED (current_tier >= cutoff → blocked)
+# feature → tier at which it becomes DISABLED (current_tier >= cutoff → blocked).
+# Ordered by AUDIENCE band (ADR-125): internal (1) < reader-narrative (2) <
+# irreducible-reader (3). Keep this map grouped by band — the band comments below
+# are the contract, and tests/test_budget_guard_ladder.py pins the ordering.
 _FEATURE_CUTOFF = {
-    "coach_narrative": 1,
+    # ── Band 1: INTERNAL / dev AI — pauses FIRST. Nothing here is a surface a
+    #    reader reads; each degrades to a deterministic fallback (ADR-125).
+    #
+    # ensemble (coach_ensemble_digest): the cross-coach agreement/disagreement
+    # meta-synthesis. A derived analysis layer, not first-party coach voice; falls
+    # back to a default digest when paused.
     "ensemble": 1,
     # chronicle_editor (#548): Margaret Calloway's critique + revision pass over
-    # the chronicle draft. A narrative embellishment, not the flagship content
-    # itself — pauses at the same mild tier as coach_narrative/Elena's state
-    # extraction, well before "chronicle" (cutoff 2) takes the whole installment
-    # down. A paused pass just means Elena's own draft ships unedited.
+    # the chronicle draft — a narrative embellishment, not the content itself. A
+    # paused pass just means Elena's own draft ships unedited.
     "chronicle_editor": 1,
-    # #552: the weekly "State of Matthew" brief's one Haiku narration call — same
-    # cutoff as coach_narrative/ensemble per the issue's explicit budget line
-    # ("+1 Haiku call/week, tier-1 paused"). A pause still produces a full record;
-    # narrate() falls back to a deterministic templated narrative.
-    "state_of_matthew": 1,
-    # chronicle: was 1 (paused at the mildest budget state, which silently starved
-    # the Friday Panel podcast — its only input is the weekly chronicle). Raised to
-    # 2 so the flagship weekly Story+podcast survives tier 1, in lockstep with the
-    # Panel lambda's own SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs $75.
+    # coherence_semantic: the coherence sentinel's Haiku read on whether served
+    # narratives cohere with the facts — the content analogue of the visual AI-QA,
+    # advisory only (the DETERMINISTIC verdict is what alarms). Was UNLISTED, so it
+    # defaulted to cutoff 3 and outlived every reader surface — the exact inversion
+    # ADR-125 fixes. An internal QA pass must pause before any reader content.
+    "coherence_semantic": 1,
+    # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
+    #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
+    #    the real cost lever, but the reader product is never the first sacrifice.
+    #
+    # coach_narrative: the daily coach commentary — the product's soul. Was 1
+    # (paused first, the defect ADR-125 corrects). Raised to 2 so it outlives every
+    # internal/dev AI feature; still pauses before the two irreducible promises.
+    "coach_narrative": 2,
+    # state_of_matthew (#552): the weekly "State of Matthew" brief narration. Was 1;
+    # raised to 2 with the rest of the reader narrative band. narrate() falls back
+    # to a deterministic templated narrative when paused.
+    "state_of_matthew": 2,
+    # chronicle: the weekly Story installment + its Friday Panel podcast (the
+    # podcast's only input). Kept at 2 in lockstep with the Panel lambda's own
+    # SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs $75.
     "chronicle": 2,
-    # website_ai: was 2 — the budget defense switched off the PUBLIC ask
-    # endpoints while internal content kept running, making the reader-facing
-    # hook the first casualty of growth. ADR-100 inverts the sacrifice order:
-    # readers degrade LAST. Rate limits (5/hr/IP) + Haiku pricing bound the
+    # ── Band 3: the two IRREDUCIBLE reader promises — pause LAST (ADR-100/125).
+    #
+    # website_ai: the PUBLIC /api/ask + /api/board_ask hook — the platform's most
+    # differentiating surface. Rate limits (5/hr/IP) + Haiku pricing bound the
     # worst case; the tier-3 hard stop keeps its honest 'paused' message.
     "website_ai": 3,
+    # daily_brief_ai: the 11 AM brief — "protect longest" by design. Falls back to
+    # a data-only brief at tier 3.
     "daily_brief_ai": 3,
 }
 
