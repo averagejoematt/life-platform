@@ -55,6 +55,11 @@ fi
 # deploy if offline). Keeps the feed's pubDates/lastBuildDate correct on every sync.
 if [ "${1:-}" != "--dry-run" ]; then
   python3 "$(dirname "$0")/../scripts/v4_build_rss.py" || echo "  ⚠️  rss build skipped (offline?) — keeping existing site/rss.xml"
+  # #733: regenerate sitemap.xml (every published post URL) + inject the dated post
+  # link-list into the chronicle hub's <noscript> — so crawlers/LLMs/no-JS visitors
+  # see the posts. Best-effort; keeps the existing sitemap if the live posts feed is
+  # unreachable. Was NOT wired in before, so the sitemap silently drifted post-less.
+  python3 "$(dirname "$0")/../scripts/v4_build_sitemap.py" || echo "  ⚠️  sitemap build skipped (offline?) — keeping existing site/sitemap.xml"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
