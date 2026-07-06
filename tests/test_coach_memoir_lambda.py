@@ -132,7 +132,7 @@ def _stance(coach_id, dt, headline, changed=""):
 
 
 def test_self_skips_when_budget_tier_pauses_coach_narrative(monkeypatch):
-    monkeypatch.setattr(budget_guard, "current_tier", lambda: 1)  # coach_narrative cutoff is 1
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)  # coach_narrative cutoff is 2 (ADR-125 reader-narrative band)
     out = writer.lambda_handler({}, None)
     assert out == {"skipped": True, "reason": "budget_tier"}
 
