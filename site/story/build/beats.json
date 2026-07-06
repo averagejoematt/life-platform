@@ -2,6 +2,20 @@
   "updated_at": "2026-07-06",
   "beats": [
     {
+      "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
+      "date": "2026-07-06",
+      "title": "Dating the past, so it stops pretending to be now",
+      "shipped": "The recap and each coach's read now carry the date they were actually written. The chronicle's 'previously on — where we are now' had frozen at Week 1 while a Week 3 post sat on the same page; it now reads 'where things stood as of Week 1 · Jun 20 — 3 weeks ago', with the current week shown right beside it. And because the eight coaches each regenerate on their own day, two could quote different 'current' recovery numbers side by side under a 'no invented numbers, real data' banner — every read now shows its own as-of date, so each number reads as that coach's most recent take rather than a shared 'today' that contradicts itself.",
+      "gotcha": "Both were pure front-end fixes: the APIs already returned the timestamps, nothing was showing them. The honest fix wasn't new data — it was surfacing the date that had been sitting in the payload all along.",
+      "honest_miss": "Stamping the date is honest but doesn't refresh the content — the recap still won't advance until the chronicle's weekly publish writes a new one. That underlying staleness is a separate fix.",
+      "prs": [
+        {
+          "label": "PR #831",
+          "url": "https://github.com/averagejoematt/life-platform/pull/831"
+        }
+      ]
+    },
+    {
       "id": "2026-07-05-a-pulse-tied-to-a-real-clock",
       "date": "2026-07-05",
       "title": "A pulse tied to a real clock, not a decorative loop",

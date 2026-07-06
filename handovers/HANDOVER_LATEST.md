@@ -1,64 +1,60 @@
-# HANDOVER — R22 Consultancy Review: 47 findings filed #779–#825 — 2026-07-06
+# HANDOVER — R22 build & backlog paydown: 7 Now-milestone issues shipped — 2026-07-06
 
-> Instruction: "review handover + memory + /uplevel, put together a prompt then a plan for a
-> consultancy-grade deep-dive (CIO/CTO/CPO + reader panel); evaluate bugs, architecture,
-> security, tech debt, modernization, how we use Claude, Fable-specific opportunities; red-team;
-> move all findings into git issues with outcome ranking + plan of attack + model." Then:
-> "Yes run it" → "out of band security but track it · file all 47 · do it now."
+> Instruction: "start building and paying down our backlog" → "do #779/#780 first out-of-band"
+> → "I approve edits, merges, and deploys this session" → "do your next picks and then once
+> deployed write documentation and handover so I can clear."
 
-## What this session produced
-- **Charter + plan:** `docs/reviews/REVIEW_PROMPT_R22_CONSULTANCY.md` (committed 20852ab0).
-- **Method:** 14-lens discovery Workflow (`wf_17a5d2ee-85f`, 13 agents, ~1.34M tok) → inline dedup
-  vs the 61 open issues + §13b → small adversarial-verify Workflow (`wf_64fab22e-f66`, red-team +
-  live re-verify). 54 raw → **47 unique, all verified.** Red team corrected 2 of my own severities
-  DOWN (F37 High→Low, F38 out of the Critical chain) — the FP firewall working.
-- **Filed: #779–#825** (47 `type:story`, under existing epics; Critical/High→Now, Medium→Next,
-  Low→Later; each carries a `model:` label = the plan-of-attack routing).
-- **Closure record:** `docs/reviews/REVIEW_2026-07-06_R22.md` (redacted; committed c2ac8e90).
-- **§13b** in `deploy/generate_review_bundle.py` now lists the R22 issues + corrects the stale R17
-  WAF resolution → R23 can't re-flag.
+## What shipped (7 issues, all off the Now milestone)
 
-## ⚠️ CRITICAL — LIVE security exposure, handled out-of-band (Matthew's action)
-Public repo + open MCP `/token` = **unauthenticated read/write of ALL private health data**
-(get_cgm/labs/genome + memory write/delete). Red-team confirmed the full chain. **Reproduction
-detail is deliberately NOT in the repo** (it's public) — it's in private operator memory
-`security-r22-mcp-token-exposure`. Public tracking = **#779** (harden /token+/authorize) + **#780**
-(rotate + stop committing the Function URL), both terse/no-recipe. Fixing #779 closes the breach
-even if the URL stays known; #780 is the rotation half. **Remediate before any public disclosure.**
+| # | Ref | What | State |
+|---|-----|------|-------|
+| **#779** | SEC-01 | MCP `/token` unauth exposure — real OAuth 2.1: `/authorize` issues single-use PKCE-bound codes (DDB, 10-min TTL, redirect allowlist); `/token` only exchanges a server-issued code, PKCE-verified | **deployed (cdk LifePlatformMcp) + live-verified** |
+| **#782** | DEBT-02 | `personal_baselines.py` added to `build_layer.sh` **and** `lambda_map.json` `shared_layer.modules` — #697 recurrence closed structurally | merged (preventive; lands on next layer rebuild) |
+| **#783** | BUG-01 | `latest_weight` given avatar_weight's 14d→30d fallback so the ADR-104 grounding gate covers weight during routine weigh-in gaps | **deployed (cdk LifePlatformCompute) + live-verified** |
+| **#784** | CLAUDE-01 | Removed blanket `Bash(*)`; committed `.claude/settings.json` `ask`-rules for git push / gh pr merge / cdk deploy / lambda update / s3 sync·cp·rm / secret+SSM writes / deploy scripts / `--no-verify` / pre-commit disable | merged |
+| **#785** | CLAUDE-02 | `black --check` + `ruff` folded into the git pre-commit hook (`scripts/install_hooks.sh`), CI-parity, fail-open | merged + verified (blocks a bad staged .py) |
+| **#786** | CONTENT-01 | Recap "where we are now" stamped with its own as-of week/date + "N weeks ago" | **deployed (site) + live-verified (build 7d73cf3a)** |
+| **#787** | CONTENT-02 | Each coach's read stamped with its own `generated_at` date — staggered-regen vitals no longer read as one contradictory "today" | **deployed (site) + live-verified** |
 
-## Top non-security themes (all filed)
-- **Layer-drift disease** #781 (3 distribution channels; full-tree asset shadows the pinned layer)
-  + I2 CI check mis-specified #792 + `personal_baselines` still missing from build_layer.sh #782 (5-min).
-- **Content honesty** #786 (recap frozen 3wks, narrated "now") / #787 (coaches self-contradict on
-  vitals under a "no invented numbers" banner) — highest reader-trust risk.
-- **Claude-usage** #784 (Bash(*) leaves deploy boundary unenforced) / #785 (no hooks → main reds
-  weekly) / #796 (no .claude/agents). Compounding leverage — do early.
-- **Cost** #790 — June actually breached the $75 ceiling ($79.80); Haiku now the top AI line #808.
+PRs: **#826 → #827 → #828** (SEC-01, three rounds), **#829** (#782+#783), **#830** (#784+#785), **#831** (#786+#787).
 
-## Session wrap state (2026-07-06, pushed)
-- **All commits pushed to origin/main** (through `74e89c30`; tree even with origin). Safe to `/clear`.
-- **No deploy this session and none pending from it** — read-only review; every artifact is a
-  GitHub issue or a docs/tooling commit. Zero Lambda/site runtime change ⇒ nothing to `cdk deploy`
-  or sync. The only deploy question is the SEPARATE, pre-existing Operational-stack hold (greens
-  main's freshness-checker I2 red) — still Matthew's call, unchanged, NOT part of this session.
-- Memory current: `project_r22_consultancy_review` + private `security_r22_mcp_token_exposure`
-  (both indexed in MEMORY.md).
+## ⚠️ STILL OPEN — #780 (SEC-02), needs Matthew's call
+#779 closed the *minting* path; #780 is the residual-risk closer (a bearer that could have leaked
+while the hole was open stays valid until the api_key rotates). It's the one item that can disrupt
+Matthew's own claude.ai access, so it was deliberately **not** done. Three parts, in order:
+1. **Rotate `life-platform/mcp-api-key`** — invalidates the leaked deterministic bearer; claude.ai
+   re-auths transparently through the now-hardened flow. **Risk:** breaks the legacy **local Claude
+   Desktop bridge** (`handle_bridge_invoke`, raw `x-api-key`) *if still used*. **OPEN QUESTION for
+   Matthew: do you still use the local bridge?** If not, this half is safe to do now.
+2. **Rotate the Function URL** — removes the known committed endpoint; **breaks the claude.ai
+   connector until Matthew re-adds the new URL.** Schedule for a window he can immediately reconnect.
+3. **Stop committing the URL** — redact from `cdk/stacks/mcp_stack.py`, `operational_stack.py`,
+   `cdk.json`, docs, `tests/test_integration_aws.py`. Cosmetic without (2) — git history still leaks it.
 
-## Notes / caveats
-- The pre-commit hook DID run `sync_doc_metadata` this session (printed Alarms:110 vs live 122 —
-  re-confirms DOC-01 #795). So CI-02 #818 ("hook doesn't run sync_doc_metadata") may be a partial
-  FP — verify before working it.
-- `docs/reviews/REVIEW_BUNDLE_2026-07-06.md` left untracked (regenerable, 317KB).
-- No deploys, no feature-code changes this session (read-only engagement + issue filing + docs).
-- main's only red is still the PRE-EXISTING freshness-checker v116 drift (Operational hold), now
-  captured properly as R22-CI-01 #792 / ARCH-01 #781 root cause. `cdk deploy LifePlatformOperational`
-  still greens it — Matthew's call (unchanged from R21 handover).
+Full detail + the reproduction chain live in **private** operator memory
+`security-r22-mcp-token-exposure` (NOT in the repo — it's public).
 
-## Recommended plan of attack
-1. Security #779/#780 out-of-band NOW.
-2. Green main + kill drift class: #782 (5-min) → #792 → #781 (L) + #791.
-3. Honesty: #786/#787/#802 + #783.
-4. Claude-usage hardening: #784/#785/#796.
-5. Cost before readers: #790/#808/#810.
-6. UX returnability: #788/#789 + jargon/SSR cluster.
-Model split per issue label: sonnet=mechanical · opus=front-end/refactor · fable=security/arch/honesty/tooling.
+## New guardrails now in effect (from #784/#785)
+- **Deploy/merge/push now prompt** instead of running silently. The `.claude/settings.json` `ask`
+  rules become fully durable from **next session** (settings-watcher only reloads a brand-new
+  settings.json on session start / `/hooks`); the `Bash(*)` removal in settings.local.json is
+  already live this session.
+- **Pre-commit format gate**: `bash scripts/install_hooks.sh` once per clone installs black+ruff.
+  It fail-opens if the tools are missing. `--no-verify` now prompts (it's in the `ask` list).
+
+## Gotchas learned this session (durable → also in memory)
+- **Green unit tests missed two LIVE-only bugs in SEC-01** — the MCP role's `DeleteItem` is
+  deliberately scoped (LeadingKeys) away from the OAuth partition, and `consumed` is a DynamoDB
+  reserved word. **Validate a DDB-shaped change against real DynamoDB (admin creds) before trusting
+  the FakeDdb-backed suite.** Consume the OAuth code via conditional `UpdateItem`, never DeleteItem.
+- **MCP deploy = `cdk LifePlatformMcp`** (not `deploy_mcp_split.sh`). Compute = `cdk LifePlatformCompute`
+  (shared asset ripples ~15 AI lambdas; same-hash-for-all confirms one code delta). Site = `bash
+  deploy/sync_site_to_s3.sh` (content-hashed modules; verify the served hashed URL carries the change).
+- **Both #786/#787 were front-end only** — the APIs already returned the dates; nothing surfaced them.
+
+## Next-session picks (remaining Now)
+- **#780** rotation (once Matthew answers the local-bridge question).
+- **#781** ARCH-01 — collapse the three shared-code distribution channels (the layer-drift root cause). The big one.
+- **#788/#789** UX (static-render `/now/`, "is he okay this week?" surface) · **#790** COST-01 (June breached $75) · **#791** FABLE-01 (weekly drift-reconciler agent).
+
+Prior session's handover archived at `handovers/HANDOVER_2026-07-06_R22-review.md`.
