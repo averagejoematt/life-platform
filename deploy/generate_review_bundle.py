@@ -354,6 +354,30 @@ def build_bundle():
 > resolution is adequate and note it as confirmed-resolved in your output.
 > Re-issuing resolved findings wastes review budget and creates noise.
 
+### R22 Findings — OPEN, filed 2026-07-06 (do NOT re-discover; check the issue first)
+
+> The R22 consultancy review (`docs/reviews/REVIEW_2026-07-06_R22.md`) filed 47 verified
+> findings as GitHub issues **#779–#825**. Before raising anything in security, layer-drift,
+> claude-usage, content-honesty, cost, or UX, check whether it is already one of these.
+> **Correction to the R17 rows below:** the WAF that R17-F01/F02/F03/F04 credit as the
+> rate-limiting/edge control was **removed 2026-06**; rate limiting is now in-Lambda
+> (`rate_limiter.py`). Those rows are NO LONGER an accurate resolution — treat public-surface
+> auth/rate-limit posture as governed by R22-SEC-* (esp. the out-of-band MCP-auth items #779/#780).
+
+| Cluster | R22 issues | Note |
+|---|---|---|
+| MCP remote-auth (private, out-of-band) | #779 #780 | Detail NOT in repo; see operator private memory |
+| Layer-drift disease + CI drift-check | #781 #782 #791 #792 #794 #793 | 3-channel root cause; I2 test mis-specified |
+| Claude-usage hardening | #784 #785 #796 #797 #798 #823 | Bash(*), no hooks, no .claude/agents, memory hygiene |
+| Content honesty | #786 #787 #802 #803 #806 #821 | recap frozen, coaches self-contradict, no as-of |
+| Bugs/rigor | #783 #800 #801 #819 #820 | weight-grounding, canary judge dead, flat=inconclusive |
+| Cost | #790 #808 #809 #810 #822 | June breached $75; Haiku top line; no CW lever |
+| UX/returnability | #788 #789 #804 #805 #807 | no SSR on /now//coaching/, no "is he okay" surface |
+| Docs-can't-lie | #795 #816 #817 | alarm_count/GSI/.claude-README drift |
+| Fable opportunities | #791 #812 #813 | drift-reconciler, harness generalize, gradability triage |
+| Security defense-in-depth | #811 #815 | board_ask injection delimiter, site-api origin header |
+| Modernization | #814 #824 #825 | CDK pins, shared test fixture, py3.13 deferred |
+
 ### R13 Findings — All Resolved (as of 2026-03-15, v3.7.40)
 
 | ID | Finding | Status | Version | Proof |
