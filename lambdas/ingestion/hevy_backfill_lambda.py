@@ -96,6 +96,24 @@ def _derive_training_notes(rec: dict) -> None:
         logger.warning("training-notes derive failed (non-fatal) %s: %s", rec.get("workout_uid"), e)
 
 
+def _attach_adherence(rec: dict, raw_workout: dict) -> None:
+    """#412 training-truth: compute programmed-vs-performed adherence and embed it in
+    the workout record BEFORE it is written, so it persists in the same idempotent
+    put_item and self-heals on every re-ingest. Fully guarded — a derive error must
+    NEVER break ingestion (mirrors _derive_training_notes). `raw_workout` is the RAW
+    Hevy item (its per-exercise template ids survive; the normalized rec renames them),
+    so the Hevy-schema knowledge stays inside adherence_calc, not in this lambda."""
+    try:
+        import adherence_calc
+
+        adh = adherence_calc.derive_adherence(raw_workout)
+        if adh:
+            rec["adherence"] = adh
+            logger.info("hevy adherence %s: status=%s pct=%s", rec.get("workout_uid"), adh.get("status"), adh.get("overall_pct"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning("adherence attach failed (non-fatal) %s: %s", rec.get("workout_uid"), e)
+
+
 def _record_health(*, attempted: bool, succeeded: bool, exc) -> None:
     """Write the ER-01 INGEST_HEALTH sentinel + EMF metric (best-effort).
 
@@ -177,6 +195,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
                         # to GET /v1/workouts/{id} separately (per OpenAPI shape).
                         archive_raw(wid, ev)
                         rec = normalize_workout(ev)  # accepts {workout:{...}} wrapper
+                        _attach_adherence(rec, ev.get("workout") or ev)  # #412 pushed-vs-performed (guarded, pre-write)
                         write_normalized(rec)
                         _derive_training_notes(rec)  # on-ingest note-signal projection (guarded)
                         ingested += 1

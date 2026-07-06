@@ -141,6 +141,10 @@ def _slim_workout(item: dict, include_sets: bool = False) -> dict:
         "set_count": item.get("set_count"),
         "total_volume_kg": item.get("total_volume_kg"),
         "original_unit": item.get("original_unit"),
+        # #412 training-truth: programmed-vs-performed adherence, embedded at ingest.
+        # Absent (None) for pre-#412 workouts and honestly {status: ad_hoc|ambiguous}
+        # with no pct when there was no plan to grade against — never a fabricated 0.
+        "adherence": item.get("adherence"),
     }
     if include_sets:
         out["exercises"] = item.get("exercises", [])

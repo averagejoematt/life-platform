@@ -17,7 +17,7 @@ keyed by the Pacific day. DST-aware via ``zoneinfo`` (mirrors the existing usage
 Pacific "today" from a raw UTC ``now`` inline.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 # DST-aware Pacific Time. PT swings between UTC-8 (PST) and UTC-7 (PDT) — a hardcoded
@@ -33,3 +33,22 @@ def pacific_now() -> datetime:
 def pacific_today() -> str:
     """Today's date as YYYY-MM-DD in America/Los_Angeles — the Pacific calendar day."""
     return pacific_now().strftime("%Y-%m-%d")
+
+
+def pacific_date_of(iso_ts: str) -> str | None:
+    """The Pacific calendar date (YYYY-MM-DD) of an ISO-8601 instant.
+
+    A record keyed by its UTC date lands on the wrong platform day for evening-PT
+    events (they roll into the next UTC day) — use this to recover the Pacific day
+    a timestamp actually belongs to. A naive (tz-less) timestamp is assumed UTC.
+    Returns None if the timestamp can't be parsed (caller decides the fallback).
+    """
+    if not iso_ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(iso_ts).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(PACIFIC).strftime("%Y-%m-%d")
