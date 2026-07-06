@@ -20,12 +20,13 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import time
 import urllib.parse
 import uuid
 
 from mcp.config import __version__, logger
-from mcp.core import decimal_to_float, get_api_key
+from mcp.core import decimal_to_float, get_api_key, oauth_code_consume, oauth_code_store
 from mcp.registry import TOOLS
 from mcp.utils import mcp_error, validate_date_range, validate_single_date
 from mcp.warmer import nightly_cache_warmer
@@ -481,47 +482,127 @@ def _handle_register(event):
     )
 
 
+# ── OAuth redirect_uri allowlist (SEC-01 / #779) ──
+# /authorize must not act as an open redirect. Only hand a code back to a callback
+# whose host we trust. The default set covers the first-party MCP clients (claude.ai /
+# claude.com / anthropic.com and their subdomains) plus loopback for desktop/CLI clients.
+# Override with OAUTH_REDIRECT_HOSTS (comma-separated hostnames) without a code change.
+_DEFAULT_REDIRECT_HOSTS = ("claude.ai", "claude.com", "anthropic.com")
+_LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
+
+
+def _redirect_uri_allowed(redirect_uri: str) -> bool:
+    """True if redirect_uri is an https callback on an allowlisted host (or loopback)."""
+    if not redirect_uri:
+        return False
+    try:
+        parsed = urllib.parse.urlparse(redirect_uri)
+    except Exception:
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return False
+    if host in _LOOPBACK_HOSTS:
+        return True  # native/desktop clients use http://127.0.0.1:<port>/callback
+    if parsed.scheme != "https":
+        return False
+    extra = [h.strip().lower() for h in os.environ.get("OAUTH_REDIRECT_HOSTS", "").split(",") if h.strip()]
+    allowed = set(_DEFAULT_REDIRECT_HOSTS) | set(extra)
+    # Exact host or a subdomain of an allowed apex (foo.claude.ai), never a suffix trick.
+    return any(host == a or host.endswith("." + a) for a in allowed)
+
+
+def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
+    """RFC 7636 PKCE verification. S256 is required; 'plain' accepted only if the
+    client explicitly registered it (Claude uses S256)."""
+    if not code_challenge:
+        return False
+    if method == "S256":
+        if not code_verifier:
+            return False
+        digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+        computed = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+        return hmac.compare_digest(computed, code_challenge)
+    if method == "plain":
+        return bool(code_verifier) and hmac.compare_digest(code_verifier, code_challenge)
+    return False
+
+
 def _handle_authorize(event):
-    """GET /authorize — Auto-approve and redirect back with auth code."""
+    """GET /authorize — issue a single-use, PKCE-bound authorization code and redirect back.
+
+    SEC-01: the code is stored server-side (DDB, 10-min TTL) with its PKCE challenge and
+    redirect_uri so /token can only exchange a code this server actually minted. The
+    redirect target is allowlisted so /authorize can't be turned into an open redirect.
+    """
     qs = event.get("queryStringParameters") or {}
     redirect_uri = qs.get("redirect_uri", "")
     state = qs.get("state", "")
-    code = uuid.uuid4().hex
-
-    logger.info(f"[OAuth] Auto-approve → redirect_uri={redirect_uri} state={state[:20]}...")
+    code_challenge = qs.get("code_challenge", "")
+    code_challenge_method = (qs.get("code_challenge_method") or "S256").upper()
 
     if not redirect_uri:
-        return _remote_response(400, json.dumps({"error": "missing redirect_uri"}))
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "missing redirect_uri"}))
+    if not _redirect_uri_allowed(redirect_uri):
+        logger.warning(f"[OAuth] Rejected disallowed redirect_uri host: {urllib.parse.urlparse(redirect_uri).hostname!r}")
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
 
-    # Build redirect back to Claude's callback
+    code = uuid.uuid4().hex + uuid.uuid4().hex  # 256-bit opaque code
+    if not oauth_code_store(code, code_challenge, code_challenge_method, redirect_uri):
+        return _remote_response(500, json.dumps({"error": "server_error", "error_description": "could not issue code"}))
+
+    logger.info(f"[OAuth] Issued code → host={urllib.parse.urlparse(redirect_uri).hostname} pkce={'y' if code_challenge else 'n'}")
+
     params = urllib.parse.urlencode({"code": code, "state": state})
     sep = "&" if "?" in redirect_uri else "?"
     location = f"{redirect_uri}{sep}{params}"
 
     return {
         "statusCode": 302,
-        "headers": {
-            "Location": location,
-            "Cache-Control": "no-store",
-        },
+        "headers": {"Location": location, "Cache-Control": "no-store"},
         "body": "",
     }
 
 
 def _handle_token(event):
-    """POST /token — Exchange auth code for deterministic access token."""
+    """POST /token — exchange a server-issued, single-use, PKCE-verified code for the bearer.
+
+    SEC-01: previously returned the real bearer for ANY POST (fully unauthenticated). Now the
+    request must present a code /authorize issued; the code is consumed atomically (single-use),
+    the PKCE code_verifier is checked against the stored challenge, and redirect_uri must match.
+    """
     body = _parse_body(event)
-    logger.info(f"[OAuth] Token exchange: grant_type={body.get('grant_type', '?')}")
-    token = _get_bearer_token() or f"lp_{uuid.uuid4().hex}"
+    grant_type = body.get("grant_type", "")
+    code = (body.get("code") or "").strip()
+    code_verifier = body.get("code_verifier") or ""
+    redirect_uri = body.get("redirect_uri") or ""
+
+    if grant_type != "authorization_code":
+        return _remote_response(400, json.dumps({"error": "unsupported_grant_type"}))
+
+    binding = oauth_code_consume(code)
+    if binding is None:
+        logger.warning("[OAuth] Token exchange rejected: unknown/expired/replayed code")
+        return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "invalid or expired code"}))
+
+    # redirect_uri, when the client sends one, must match what it authorized with.
+    if redirect_uri and binding["redirect_uri"] and not hmac.compare_digest(redirect_uri, binding["redirect_uri"]):
+        logger.warning("[OAuth] Token exchange rejected: redirect_uri mismatch")
+        return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "redirect_uri mismatch"}))
+
+    # PKCE: if the code was issued with a challenge (Claude always sends S256), it must verify.
+    if binding["code_challenge"] and not _verify_pkce(code_verifier, binding["code_challenge"], binding["code_challenge_method"]):
+        logger.warning("[OAuth] Token exchange rejected: PKCE verification failed")
+        return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "PKCE verification failed"}))
+
+    token = _get_bearer_token()
+    if not token or token == "__NO_KEY_CONFIGURED__":
+        return _remote_response(500, json.dumps({"error": "server_error"}))
+
+    logger.info("[OAuth] Token exchange OK — bearer issued")
     return _remote_response(
         200,
-        json.dumps(
-            {
-                "access_token": token,
-                "token_type": "Bearer",
-                "expires_in": 86400,
-            }
-        ),
+        json.dumps({"access_token": token, "token_type": "Bearer", "expires_in": 86400}),
     )
 
 
