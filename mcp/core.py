@@ -21,6 +21,7 @@ from mcp.config import (
     MEM_CACHE_TTL,
     PROFILE_PK,
     PROFILE_SK,
+    USER_ID,
     USER_PREFIX,
     logger,
     secrets,
@@ -128,6 +129,65 @@ def ddb_cache_set(cache_key: str, data):
         logger.info(f"[cache:ddb] stored — {cache_key}")
     except Exception as e:
         logger.warning(f"[cache:ddb] write error for {cache_key}: {e}")
+
+
+# ── OAuth authorization-code store (SEC-01 / #779) ──
+# The remote MCP auth flow must not mint a bearer for an unbound request. /authorize
+# issues a single-use, short-lived code bound to the client's PKCE challenge and
+# redirect_uri; /token may only exchange a code this server actually issued. Codes
+# live in the single table under a dedicated partition with a DDB TTL, and are
+# consumed atomically (delete-if-exists) so a code can never be replayed.
+_OAUTH_PK = f"OAUTH#{USER_ID}"
+OAUTH_CODE_TTL_SECS = 600  # 10 min — an auth code is exchanged immediately in practice
+
+
+def oauth_code_store(code: str, code_challenge: str, code_challenge_method: str, redirect_uri: str) -> bool:
+    """Persist a server-issued authorization code with its PKCE binding. Returns True on success."""
+    try:
+        ttl_epoch = int(time.time()) + OAUTH_CODE_TTL_SECS
+        table.put_item(
+            Item={
+                "pk": _OAUTH_PK,
+                "sk": f"CODE#{code}",
+                "code_challenge": code_challenge or "",
+                "code_challenge_method": (code_challenge_method or "").upper(),
+                "redirect_uri": redirect_uri or "",
+                "ttl": Decimal(str(ttl_epoch)),
+                "issued_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        )
+        return True
+    except Exception as e:
+        logger.warning(f"[oauth] code store failed: {e}")
+        return False
+
+
+def oauth_code_consume(code: str):
+    """Atomically consume a one-time authorization code. Returns the stored binding
+    dict if the code existed and was unexpired, else None. Deletion is the atomic
+    single-use gate — a replayed code finds nothing to delete."""
+    if not code:
+        return None
+    try:
+        resp = table.delete_item(
+            Key={"pk": _OAUTH_PK, "sk": f"CODE#{code}"},
+            ReturnValues="ALL_OLD",
+        )
+    except Exception as e:
+        logger.warning(f"[oauth] code consume failed: {e}")
+        return None
+    item = resp.get("Attributes")
+    if not item:
+        return None
+    ttl = item.get("ttl")
+    if ttl and float(ttl) < time.time():
+        # DDB TTL deletion can lag; enforce expiry ourselves.
+        return None
+    return {
+        "code_challenge": item.get("code_challenge", ""),
+        "code_challenge_method": (item.get("code_challenge_method") or "").upper(),
+        "redirect_uri": item.get("redirect_uri", ""),
+    }
 
 
 # ── DynamoDB queries ──
