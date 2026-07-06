@@ -24,8 +24,13 @@ from mcp import (
 )
 
 
+class _ConditionalCheckFailed(Exception):
+    """Stand-in for botocore's ConditionalCheckFailedException."""
+
+
 class _FakeTable:
-    """Minimal DDB stand-in supporting put_item / delete_item(ReturnValues=ALL_OLD)."""
+    """Minimal DDB stand-in supporting put_item + the conditional single-use
+    update_item(SET consumed, ConditionExpression exists-and-unconsumed)."""
 
     def __init__(self):
         self.store = {}
@@ -33,9 +38,13 @@ class _FakeTable:
     def put_item(self, Item):
         self.store[(Item["pk"], Item["sk"])] = dict(Item)
 
-    def delete_item(self, Key, ReturnValues=None):
-        old = self.store.pop((Key["pk"], Key["sk"]), None)
-        return {"Attributes": old} if (old and ReturnValues == "ALL_OLD") else {}
+    def update_item(self, Key, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None, ReturnValues=None):
+        item = self.store.get((Key["pk"], Key["sk"]))
+        # Emulate: attribute_exists(sk) AND attribute_not_exists(consumed)
+        if item is None or "consumed" in item:
+            raise _ConditionalCheckFailed("ConditionalCheckFailedException")
+        item["consumed"] = True
+        return {"Attributes": dict(item)} if ReturnValues == "ALL_NEW" else {}
 
 
 def setup_function(_fn):

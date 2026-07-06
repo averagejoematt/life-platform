@@ -164,21 +164,28 @@ def oauth_code_store(code: str, code_challenge: str, code_challenge_method: str,
 
 def oauth_code_consume(code: str):
     """Atomically consume a one-time authorization code. Returns the stored binding
-    dict if the code existed and was unexpired, else None. Deletion is the atomic
-    single-use gate — a replayed code finds nothing to delete."""
+    dict if the code existed, was unexpired, and had not already been consumed; else
+    None. A conditional UpdateItem (set consumed=true only if the code exists and is
+    unconsumed) is the atomic single-use gate — a forged or replayed code fails the
+    condition. UpdateItem is used rather than DeleteItem because the MCP role's
+    DeleteItem is deliberately scoped to the meal-prune partition only (see
+    role_policies.mcp_server); the item is left to expire via its TTL."""
     if not code:
         return None
     try:
-        resp = table.delete_item(
+        resp = table.update_item(
             Key={"pk": _OAUTH_PK, "sk": f"CODE#{code}"},
-            ReturnValues="ALL_OLD",
+            UpdateExpression="SET consumed = :t",
+            ConditionExpression="attribute_exists(sk) AND attribute_not_exists(consumed)",
+            ExpressionAttributeValues={":t": True},
+            ReturnValues="ALL_NEW",
         )
     except Exception as e:
-        logger.warning(f"[oauth] code consume failed: {e}")
+        # ConditionalCheckFailedException (unknown/replayed code) lands here too — all
+        # failure modes collapse to "invalid code", which is the correct client signal.
+        logger.warning(f"[oauth] code consume rejected: {type(e).__name__}")
         return None
-    item = resp.get("Attributes")
-    if not item:
-        return None
+    item = resp.get("Attributes") or {}
     ttl = item.get("ttl")
     if ttl and float(ttl) < time.time():
         # DDB TTL deletion can lag; enforce expiry ourselves.
