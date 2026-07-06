@@ -173,10 +173,12 @@ def oauth_code_consume(code: str):
     if not code:
         return None
     try:
+        # `consumed` is a DynamoDB reserved word — alias it via ExpressionAttributeNames.
         resp = table.update_item(
             Key={"pk": _OAUTH_PK, "sk": f"CODE#{code}"},
-            UpdateExpression="SET consumed = :t",
-            ConditionExpression="attribute_exists(sk) AND attribute_not_exists(consumed)",
+            UpdateExpression="SET #consumed = :t",
+            ConditionExpression="attribute_exists(sk) AND attribute_not_exists(#consumed)",
+            ExpressionAttributeNames={"#consumed": "consumed"},
             ExpressionAttributeValues={":t": True},
             ReturnValues="ALL_NEW",
         )

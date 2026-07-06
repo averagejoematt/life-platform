@@ -38,7 +38,15 @@ class _FakeTable:
     def put_item(self, Item):
         self.store[(Item["pk"], Item["sk"])] = dict(Item)
 
-    def update_item(self, Key, UpdateExpression=None, ConditionExpression=None, ExpressionAttributeValues=None, ReturnValues=None):
+    def update_item(
+        self,
+        Key,
+        UpdateExpression=None,
+        ConditionExpression=None,
+        ExpressionAttributeNames=None,
+        ExpressionAttributeValues=None,
+        ReturnValues=None,
+    ):
         item = self.store.get((Key["pk"], Key["sk"]))
         # Emulate: attribute_exists(sk) AND attribute_not_exists(consumed)
         if item is None or "consumed" in item:
