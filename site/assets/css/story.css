@@ -70,6 +70,17 @@ body { overflow-x: hidden; }
   line-height: 1.45; color: var(--ink-muted); margin-top: var(--sp-5); max-width: 40ch;
 }
 .hero-sub { margin-top: var(--sp-4); color: var(--ink-muted); max-width: 46ch; }
+/* #732 — the protagonist above the fold: who, the prior-attempts arc, the stakes. */
+.hero-who { margin-top: var(--sp-4); color: var(--ink-muted); max-width: 46ch; }
+.hero-who strong { color: var(--ink); font-weight: var(--weight-med); }
+/* The provisional finish line — machine-voice, contract-like, quietly underlined in ember. */
+.hero-finish {
+  margin-top: var(--sp-4); max-width: 46ch; font-family: var(--font-mono); font-size: var(--fs-small);
+  color: var(--ink); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line);
+}
+.hero-finish .hf-label { display: block; color: var(--ember); margin-bottom: var(--sp-1); }
+.hero-finish .hf-note { color: var(--ink-faint); }
+.hero-finish a { color: var(--ink-muted); }
 .hero-for {
   margin-top: var(--sp-4); max-width: 46ch; color: var(--ink-muted);
   padding-left: var(--sp-3); border-left: 2px solid var(--ember-line);
