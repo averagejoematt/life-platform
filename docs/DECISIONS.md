@@ -3384,3 +3384,39 @@ Measured live 2026-07-05 to confirm the fix and ground the threshold re-eval:
 **The self-referential guard.** The harness's own tests assert `grounding_guard` is importable *and* that a synthetic contradiction actually fires — because a silently-disabled contradiction detector is precisely the failure that would make every contradiction canary pass as "clean" and report a false green. The thing that proves the gate works must itself prove it isn't looking at a dead gate.
 
 **Consequences.** Pure test/CI infrastructure — no shared-layer change, no Lambda deploy, no runtime path touched; value lands on merge. The harness is hermetic and free by default (no AWS/Bedrock) — the deterministic verdict is the gate; `--judge`/`--emit` (Bedrock spend + `LifePlatform/GoldenBrief` CloudWatch metrics) is manual-dispatch only, deliberately *not* wired to auto-spend on a schedule: standing up a weekly AI-spending CI job belongs behind a dedicated least-privilege role (`bedrock:InvokeModel` on the Haiku profile + `cloudwatch:PutMetricData`), a small follow-up consistent with the ADR-063 budget posture and one-role-per-purpose least privilege. Fixtures are frozen artifacts, hand-maintained; adding a coach or a fault class is a new JSON object plus (for canaries) an `expect_checks` entry. Deps: complements #738 (batch pricing #409 would let a future mode replay live regeneration, not just the frozen set).
+
+## ADR-128: No standing multi-model LLM Council — the bottleneck is accountability data, not deliberation diversity (E8/#757)
+
+**Date:** 2026-07-06 · **Status:** Accepted (non-decision recorded) · **Story:** #757 (R21 definitive review, kill list #10)
+
+**Context.** Every few reviews someone proposes a standing multi-model "LLM Council": route each coach narrative (or the daily brief) through 2–3 different foundation models and have them deliberate/vote before publishing, on the theory that cross-model disagreement surfaces errors a single model misses. It sounds rigorous, so it keeps resurfacing. R21 took a position and this ADR records it so it stops.
+
+**Decision.** The platform will **not** run a standing multi-model council for the coach/narrative layer. Reasons, in order of weight:
+
+1. **The bottleneck is data, not deliberation.** The coaches' central credibility gap (R21 Finding 1) is an empty accountability ledger — 0 graded predictions — not a shortage of model opinions. A council spends the $75/mo ceiling (ADR-063) on diversity the product isn't yet constrained by.
+2. **Disagreement is already a designed, cheaper feature.** Eight distinct-persona coaches already disagree by construction (enforced cross-coach distinctiveness, ADR-108; `get_coach_disagreements`). That is deliberation diversity at persona granularity, at single-model cost.
+3. **The honesty ceiling already pauses, it doesn't average.** When a narrative can't be grounded, the number gate (ADR-104) and `grounding_guard` *withhold* the claim — a strictly safer failure mode than a plurality vote that can still publish a confidently-wrong consensus.
+
+**Narrow exception (allowed, not built):** a single council-style *pre-publication verifier* on the highest-stakes **public** claims (e.g. a headline finding in a chronicle post) is consistent with this ADR — it's a gate, not a generator, and it doesn't run per-narrative. **Revisit trigger:** readership grows ~100× (the point at which a wrong public claim's blast radius, not deliberation quality, justifies the spend), or the batch-inference path (#409) makes a verifier pass effectively free.
+
+**Consequences.** No code. Future "add an LLM council" proposals are answered by this ADR unless a proposer clears the revisit trigger. Complements ADR-105 (rigor bar), ADR-108 (distinctiveness), ADR-063 (budget).
+
+## ADR-129: Remediation agent returned to `shadow` until it earns `auto` — zero merged safe-class PRs in ~6 weeks (E8/#754)
+
+**Date:** 2026-07-06 · **Status:** Accepted · **Story:** #754 (R21 definitive review, kill list #7)
+
+**Context.** The self-healing remediation agent (ADR-064/065) runs under an SSM kill-switch `/life-platform/remediation-mode` (`off|shadow|auto`). It had been left in `auto`, but the deterministic auto-merge gate (`remediation/automerge.py`) has merged **zero** `auto-fix-safe` PRs since it was enabled — verified 2026-07-06: no merged `auto-fix-safe` PRs and an empty `s3://matthew-life-platform/remediation-log/automerge/` audit prefix. `auto` mode that never produces is unearned standing risk (a deploy-adjacent automation trusted more than its track record warrants), and the code already ships defaulting to `shadow` (`remediation/agent.py`), with an `earn_or_shadow_check` (#396) that already flags this exact 0-merge state as needs-human.
+
+**Decision.** Flip the live SSM parameter to `shadow` (`aws ssm put-parameter --name /life-platform/remediation-mode --value shadow --overwrite`). The agent continues to triage and open PRs; it simply does not self-merge. Re-earning `auto` is an explicit operator decision (flip the SSM back) once safe-class fixes are actually landing — the bar the `earn_or_shadow_check` already encodes. No code change (the code default is already `shadow`).
+
+**Consequences.** Removes an unexercised auto-merge path from the trusted deploy perimeter until it demonstrates value; costs nothing (shadow still surfaces every proposed fix for human review). Reversible in one SSM write.
+
+## ADR-130: GitHub Pages disabled — a second, unmanaged public surface redundant with the canonical CloudFront site (E8/#752)
+
+**Date:** 2026-07-06 · **Status:** Accepted · **Story:** #752 (R21 definitive review, kill list / perimeter close-out)
+
+**Context.** The public repo had classic GitHub Pages enabled (`build_type: legacy`, source `main:/`, `.nojekyll` at root), serving the raw repository root at `averagejoematt.github.io/life-platform/`. The canonical product site is `averagejoematt.com` (S3 + CloudFront, ADR-071). The Pages surface was linked from nowhere, served an unstyled/raw view of repo files, and drifted independently of the real site — an unmanaged second front door that carried review risk for weeks with zero upside (the repo is already public by design, so Pages hid nothing and added nothing).
+
+**Decision.** Disable GitHub Pages (`gh api -X DELETE repos/averagejoematt/life-platform/pages`) and remove the now-purposeless root `.nojekyll`. The canonical site remains the single served surface. Reversible: Pages can be re-enabled at any time.
+
+**Consequences.** One fewer public surface to reason about; no effect on `averagejoematt.com`. If a lightweight repo-docs site is ever wanted, re-enable Pages deliberately with a scoped source (e.g. `/docs`), not the repo root.
