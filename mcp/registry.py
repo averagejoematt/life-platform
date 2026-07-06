@@ -435,11 +435,11 @@ TOOLS = {
         "fn": tool_get_predictions,
         "schema": {
             "name": "get_predictions",
-            "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses (pending/confirmed/refuted). Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. NOTE: reads the legacy SOURCE#coach_thread# partition; for hit-rate analysis on the post-ADR-047 COACH# partition, use get_coach_track_record.",
+            "description": "Cross-coach prediction ledger — all predictions from all coaches with statuses. Use for: 'what predictions are pending?', 'which coach is most accurate?', 'prediction scorecard'. #726: reads the canonical COACH#/PREDICTION# store (evaluator-graded, code-stamped IDs per #725 — the SAME store the public site serves); the legacy SOURCE#coach_thread# embedded predictions were tombstoned. For hit-rate + calibration analysis, use get_coach_track_record.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "status": {"type": "string", "enum": ["pending", "confirmed", "refuted"]},
+                    "status": {"type": "string", "enum": ["pending", "confirmed", "refuted", "inconclusive", "expired"]},
                     "coach_id": {"type": "string"},
                     "limit": {"type": "number"},
                 },

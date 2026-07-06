@@ -70,13 +70,21 @@ def tool_get_coach_thread(args):
 
 
 def tool_get_predictions(args):
-    """Cross-coach prediction ledger — all predictions with statuses."""
-    status_filter = args.get("status")  # pending, confirmed, refuted, or None
-    coach_filter = args.get("coach_id")
+    """Cross-coach prediction ledger — all predictions with statuses.
+
+    #726: reads the canonical `COACH#{coach}_coach` / `PREDICTION#` store — the
+    partition the daily evaluator grades and the public site serves — NOT the
+    legacy `SOURCE#coach_thread#` embedded arrays (those pre-#725 records held
+    LLM-authored, ungradeable metadata and were tombstoned to
+    `predictions_voided_726` by `deploy/void_legacy_predictions_726.py`).
+    MCP and `site_api_coach.handle_predictions` now read the same store.
+    """
+    status_filter = args.get("status")  # pending, confirmed, refuted, inconclusive, expired, or None
+    coach_filter = (args.get("coach_id") or "").strip().lower() or None
     limit = int(args.get("limit", 20))
 
     all_predictions = []
-    coaches_to_check = [coach_filter] if coach_filter else COACH_IDS
+    coaches_to_check = [coach_filter.removesuffix("_coach")] if coach_filter else COACH_IDS
 
     for cid in coaches_to_check:
         try:
@@ -86,30 +94,42 @@ def tool_get_predictions(args):
             resp = table.query(
                 **_apply_phase_filter(
                     {
-                        "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(f"SOURCE#coach_thread#{cid}#"),
-                        "ScanIndexForward": False,
-                        "Limit": 8,
+                        # Evaluator convention: pk carries the `_coach` suffix
+                        # (same normalization as tool_get_coach_track_record).
+                        "KeyConditionExpression": Key("pk").eq(f"COACH#{cid}_coach") & Key("sk").begins_with("PREDICTION#"),
+                        "ScanIndexForward": False,  # pred_id is date-prefixed → newest first
+                        "Limit": 50,
                     }
                 )
             )
             for item in resp.get("Items", []):
-                entry = decimal_to_float(item)
-                for pred in entry.get("predictions", []):
-                    if status_filter and pred.get("status") != status_filter:
-                        continue
-                    all_predictions.append(
-                        {
-                            "coach_id": cid,
-                            "coach_name": COACH_NAMES.get(cid, cid),
-                            "date": entry.get("date"),
-                            **pred,
-                        }
-                    )
+                rec = decimal_to_float(item)
+                if status_filter and rec.get("status", "pending") != status_filter:
+                    continue
+                evaluation = rec.get("evaluation") or {}
+                all_predictions.append(
+                    {
+                        "coach_id": cid,
+                        "coach_name": COACH_NAMES.get(cid, cid),
+                        "prediction_id": rec.get("prediction_id"),
+                        "date": rec.get("created_date"),
+                        "claim": rec.get("claim_natural", ""),
+                        "confidence": rec.get("confidence", "medium"),
+                        "status": rec.get("status", "pending"),
+                        "subdomain": rec.get("subdomain", ""),
+                        "metric": evaluation.get("metric"),
+                        "eval_type": evaluation.get("type"),
+                        "window_days": evaluation.get("evaluation_window_days"),
+                        "outcome": rec.get("outcome"),
+                        "outcome_date": rec.get("outcome_date"),
+                        "outcome_notes": rec.get("outcome_notes"),
+                    }
+                )
         except Exception:
             pass
 
     # Sort by date descending
-    all_predictions.sort(key=lambda p: p.get("date", ""), reverse=True)
+    all_predictions.sort(key=lambda p: p.get("date") or "", reverse=True)
 
     summary = defaultdict(int)
     for p in all_predictions:
@@ -118,6 +138,7 @@ def tool_get_predictions(args):
     return {
         "total": len(all_predictions),
         "summary": dict(summary),
+        "store": "COACH#/PREDICTION# (canonical, evaluator-graded — same store the public site reads)",
         "predictions": all_predictions[:limit],
     }
 
