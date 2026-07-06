@@ -1,0 +1,560 @@
+[
+  {
+    "id": "sleep_01",
+    "coach_id": "sleep_coach",
+    "authoritative_facts": {
+      "recovery_pct": 64,
+      "hrv_ms": 42
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "deep_sleep_status": "healthy"
+        }
+      }
+    },
+    "reference_output": "Your sleep architecture held together well this week even though the schedule pushed back. Deep sleep stayed in a healthy band and the 64% recovery this morning tells me the system absorbed the later bedtimes without dipping into real debt. Keep the wake time anchored and the rest follows."
+  },
+  {
+    "id": "sleep_02",
+    "coach_id": "sleep_coach",
+    "authoritative_facts": {
+      "hrv_ms": 42,
+      "rhr_bpm": 54
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The thing I keep coming back to is your wake-time consistency. When you hold a steady rise, your HRV settles around 42 ms and resting heart rate sits near 54 — both signs the circadian rhythm is doing its job. The nights it drifts are the nights the numbers wobble."
+  },
+  {
+    "id": "sleep_03",
+    "coach_id": "sleep_coach",
+    "authoritative_facts": {
+      "recovery_pct": 71
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Two clean nights in a row and recovery answered at 71% this morning. That is what a repaid sleep debt looks like — not a single heroic night, but consecutive ones. I would protect this window rather than spend it on a late evening."
+  },
+  {
+    "id": "sleep_04",
+    "coach_id": "sleep_coach",
+    "authoritative_facts": {
+      "hrv_ms": 39
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "HRV came in at 39 ms, a touch under your usual, and I would read that as the travel catching up rather than anything structural. Sleep efficiency was still solid. Give it one more anchored night before drawing any conclusion — one reading is a data point, not a trend."
+  },
+  {
+    "id": "training_01",
+    "coach_id": "training_coach",
+    "authoritative_facts": {
+      "recovery_pct": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "accumulation block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "acwr": 1.28
+        }
+      }
+    },
+    "reference_output": "We are at the tail of the accumulation block and your acute:chronic workload ratio has climbed to 1.28, just under the threshold where injury risk starts to matter. With recovery at 64% the system is telling us it is time to absorb the work — I would start the planned deload a day early."
+  },
+  {
+    "id": "training_02",
+    "coach_id": "training_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "squat_tonnage_pct": 12
+        }
+      }
+    },
+    "reference_output": "Your squat tonnage is up 12% from the start of the block, which is exactly the stimulus this phase was designed to deliver. What I am watching on the other side of the deload is whether the working weights hold — if they do, the block did its job; if they drop, we overreached and I scale the next one back."
+  },
+  {
+    "id": "training_03",
+    "coach_id": "training_coach",
+    "authoritative_facts": {
+      "rhr_bpm": 54
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "cardiac_drift_pct": 5
+        }
+      }
+    },
+    "reference_output": "The Zone 2 work has been quietly excellent and I want that acknowledged alongside the strength numbers. Cardiac drift has stayed under 5% across the last three sessions, and the resting heart rate near 54 is the aerobic base compounding underneath. Hold the volume exactly where it is."
+  },
+  {
+    "id": "training_04",
+    "coach_id": "training_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "interventional",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "I want to push back gently on the frustration about the bench plateau. A stall while the squat and deadlift still progress, during a deficit, is an expected tradeoff, not a failure — the smallest muscle group gives first. Hold the weight, keep the form clean, and expect it to move once fueling returns."
+  },
+  {
+    "id": "nutrition_01",
+    "coach_id": "nutrition_coach",
+    "authoritative_facts": {
+      "protein_g_avg": 172,
+      "protein_g_target": 190,
+      "protein_g_floor": 170
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Protein intake averaged 172 g a day this week, which clears the 170 g floor and sits just under the 190 g target. In an aggressive deficit that is the single most important number you are hitting — it is what preserves the strength the training is defending."
+  },
+  {
+    "id": "nutrition_02",
+    "coach_id": "nutrition_coach",
+    "authoritative_facts": {
+      "protein_g_avg": 168,
+      "protein_g_floor": 170
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The week dipped to 168 g of protein on average, a hair under the 170 g floor. Not a crisis, but worth naming — the two lowest days were both travel days. A shelf-stable option in the bag closes that gap without any real effort."
+  },
+  {
+    "id": "nutrition_03",
+    "coach_id": "nutrition_coach",
+    "authoritative_facts": {
+      "latest_weight": 181,
+      "weekly_rate_lbs": -1.1
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "weekly_rate": -1.1
+        }
+      }
+    },
+    "reference_output": "Weight is tracking down at about 1.1 lb a week and the latest reading is 181. That is a sustainable rate — fast enough to see progress, slow enough that the fiber and protein can keep satiety manageable. I would not accelerate it; the adherence you have is the asset."
+  },
+  {
+    "id": "nutrition_04",
+    "coach_id": "nutrition_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Fiber landed on the higher end again this week and I suspect that is why the afternoon hunger has been quieter. The meal timing matters less than people think; the composition is doing the work. Keep the vegetables front-loaded at lunch and the evening takes care of itself."
+  },
+  {
+    "id": "mind_01",
+    "coach_id": "mind_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "reflect low-sentiment gently"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The journal this week reads steadier than last. There is less of the late-night rumination that showed up earlier in the month, and more entries that simply note the day without grading it. I would sit with that rather than analyze it — a quieter mind is not a problem to solve."
+  },
+  {
+    "id": "mind_02",
+    "coach_id": "mind_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "I notice the entries thin out on the busiest days, which is exactly when the reflection would help most. No judgment in that — it is the pattern for almost everyone. A single line before sleep is enough; the practice is the point, not the length."
+  },
+  {
+    "id": "mind_03",
+    "coach_id": "mind_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "There is a thread of frustration running through the training notes that I want to gently separate from how the week actually went. The mood, read across all the entries, is more even than the loudest sentence suggests. Progress and impatience can share the same page."
+  },
+  {
+    "id": "mind_04",
+    "coach_id": "mind_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The stretch of quiet in the journal earlier this month has clearly lifted. What stands out now is how much of the writing is about other people rather than metrics — that shift toward connection is worth more than any single data point I could hand you."
+  },
+  {
+    "id": "physical_01",
+    "coach_id": "physical_coach",
+    "authoritative_facts": {
+      "rhr_bpm": 54,
+      "recovery_pct": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Resting heart rate is holding at 54 and this morning's recovery came back at 64%. Read together, those say the cardiovascular system is adapting on schedule — the aerobic base from the Zone 2 work is showing up exactly where it should, in a lower resting rate."
+  },
+  {
+    "id": "physical_02",
+    "coach_id": "physical_coach",
+    "authoritative_facts": {
+      "rhr_bpm": 54
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "rhr_6wk": 54
+        }
+      }
+    },
+    "reference_output": "The six-week resting heart rate trend is the quiet win here — a steady drift down to 54. That is a structural change, not a good day. It correlates almost perfectly with the aerobic volume you have been logging, which is the infrastructure underneath everything else."
+  },
+  {
+    "id": "physical_03",
+    "coach_id": "physical_coach",
+    "authoritative_facts": {
+      "latest_weight": 181
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Body composition is moving the right way even where the scale is slow — the weight at 181 undersells it because you are holding lean mass while the fat comes off. Waist measurement is the number I would trust more than the scale through this stretch."
+  },
+  {
+    "id": "physical_04",
+    "coach_id": "physical_coach",
+    "authoritative_facts": {
+      "hrv_ms": 42,
+      "rhr_bpm": 54
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Autonomic balance looks healthy: HRV around 42 ms against a resting heart rate of 54 is the profile of a system with headroom. Blood pressure has stayed in range on every reading this week. Nothing here asks for a change — this is what maintenance is supposed to look like."
+  },
+  {
+    "id": "glucose_01",
+    "coach_id": "glucose_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "time_in_range_pct": 94
+        }
+      }
+    },
+    "reference_output": "Time-in-range held at 94% this week, which is genuinely strong. The two excursions both followed late dinners, and neither crossed into territory worth worrying about. The pattern says your metabolism handles the load fine when the timing is reasonable."
+  },
+  {
+    "id": "glucose_02",
+    "coach_id": "glucose_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The postprandial rise after lunch has been flatter since the fiber went up — the curves are smoother and the return to baseline quicker. That is the CGM confirming what the nutrition side changed. I would keep the lunch composition exactly as it is."
+  },
+  {
+    "id": "glucose_03",
+    "coach_id": "glucose_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Glucose variability was low again, and the overnight baseline sat right where I like to see it. The one spike this week was a clear meal-response signal, not a fasting problem — the distinction matters, because it points at timing rather than anything metabolic to fix."
+  },
+  {
+    "id": "glucose_04",
+    "coach_id": "glucose_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "What is quietly notable is how boring the trace has become — and boring is the goal. A steady overnight line and a controlled daytime range mean the deficit is not stressing the system. I have nothing to prescribe here except to let it keep being uneventful."
+  },
+  {
+    "id": "labs_01",
+    "coach_id": "labs_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The most recent panel moved in the direction the training and deficit predicted — ApoB came down into a healthier band and hsCRP stayed low, which together read as reduced cardiovascular and inflammatory load. I would re-test in the usual interval before calling it a durable trend."
+  },
+  {
+    "id": "labs_02",
+    "coach_id": "labs_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Ferritin sits comfortably within the reference range, so the fatigue on the heavy training days is almost certainly recovery load rather than an iron issue. That is a useful thing to rule out — it keeps us from chasing a supplement the bloodwork says you do not need."
+  },
+  {
+    "id": "labs_03",
+    "coach_id": "labs_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "One caution on the lipid panel: a single draw during an active deficit can read differently than maintenance, because mobilized fat transiently shifts the numbers. I would not over-interpret this one point — the trend across draws is the signal, not any individual reading."
+  },
+  {
+    "id": "explorer_01",
+    "coach_id": "explorer_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "experiment mid-run",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "The Zone 2 floor experiment has enough clean days now to be worth a first look, and the early signal points where we hypothesized — the aerobic markers are moving. It is not conclusive yet, and I would let it run the full pre-registered window before we grade it either way."
+  },
+  {
+    "id": "explorer_02",
+    "coach_id": "explorer_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "Here is a correlation worth a hypothesis, not a conclusion: your steadier journal weeks line up with your steadier recovery weeks. Cause could run either direction, or a third thing could drive both. That is exactly the kind of question an N=1 protocol is built to actually test."
+  },
+  {
+    "id": "explorer_03",
+    "coach_id": "explorer_coach",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "reference_output": "I want to retire one hypothesis cleanly: the idea that late workouts were wrecking your sleep did not survive the data — the nights held up fine. That is a good outcome. A disproven guess is worth as much as a confirmed one; it just costs less to act on."
+  }
+]

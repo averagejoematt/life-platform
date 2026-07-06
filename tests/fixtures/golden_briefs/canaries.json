@@ -1,0 +1,118 @@
+[
+  {
+    "id": "canary_hrv_fabricated",
+    "coach_id": "physical_coach",
+    "mutation": "invents an HRV value (58 ms) that appears in no input — the fabricated-vital class",
+    "authoritative_facts": {
+      "hrv_ms": 42,
+      "rhr_bpm": 54
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "Great signs overnight — your HRV climbed to 58 ms, the strongest reading in weeks, and resting heart rate held at 54.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_recovery_contradiction",
+    "coach_id": "physical_coach",
+    "mutation": "states recovery at 30% when the canonical Whoop recovery is 64% — a hard vital contradiction",
+    "authoritative_facts": {
+      "recovery_pct": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "Rough morning physiologically — your recovery sits at just 30% today, so I would pull back hard and treat this as a full rest day.",
+    "expect_checks": [
+      "grounding_contradiction"
+    ]
+  },
+  {
+    "id": "canary_weight_fabricated",
+    "coach_id": "nutrition_coach",
+    "mutation": "invents a bodyweight (174 lb) absent from every input — fabricated number, out of gate scope for contradiction",
+    "authoritative_facts": {
+      "latest_weight": 181
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "Big week on the scale — you are down to 174 lb from 181, and that pace is exactly what protects the muscle underneath the loss.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_glucose_trend_fabricated",
+    "coach_id": "glucose_coach",
+    "mutation": "invents a two-point glucose trend (118 -> 95) with neither endpoint in any input",
+    "authoritative_facts": {},
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {
+          "time_in_range_pct": 94
+        }
+      }
+    },
+    "mutated_output": "The trace is improving fast — your average glucose fell from 118 down to 95 across the week, a textbook adaptation.",
+    "expect_checks": [
+      "evidence_ceiling"
+    ]
+  },
+  {
+    "id": "canary_anti_pattern",
+    "coach_id": "training_coach",
+    "mutation": "otherwise-grounded output containing two blacklisted phrases (Beast mode, Push through)",
+    "authoritative_facts": {
+      "recovery_pct": 64
+    },
+    "generation_brief": {
+      "narrative_beat": "steady-state",
+      "journey_phase": "deficit block",
+      "decision_class_ceiling": "observational",
+      "voice_guidance": {
+        "structural_note": "open in your own voice"
+      },
+      "computation_outputs": {
+        "trends": {}
+      }
+    },
+    "mutated_output": "Recovery at 64% is plenty — time to go into Beast mode this week. Push through the fatigue; the plan does not care how you feel.",
+    "expect_checks": [
+      "anti_pattern"
+    ]
+  }
+]
