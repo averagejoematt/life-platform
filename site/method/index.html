@@ -4,17 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>The Method — averagejoematt</title>
-  <meta name="description" content="Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.">
+  <meta name="description" content="The trust contract — how every number is gated, how predictions are registered and graded, what the AI is not allowed to do, what would falsify the experiment, and what never gets published.">
   <link rel="canonical" href="https://averagejoematt.com/method/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/method/">
   <meta property="og:title" content="The Method — averagejoematt">
-  <meta property="og:description" content="Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.">
+  <meta property="og:description" content="The trust contract — how every number is gated, how predictions are registered and graded, what the AI is not allowed to do, and what would falsify the experiment.">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="The Method — averagejoematt">
-  <meta name="twitter:description" content="Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.">
+  <meta name="twitter:description" content="The trust contract — how every number is gated, how predictions are registered and graded, what the AI is not allowed to do, and what would falsify the experiment.">
   <link rel="icon" href="/favicon.ico">
   <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2" as="font" type="font/woff2" crossorigin><link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin><link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -29,9 +29,47 @@
     <div class="page-hero">
       <p class="ph-kicker label">the method · under the hood</p>
       <h1 class="ph-title">The Method</h1>
-      <p class="ph-promise">Under the hood — how the numbers are made, how honest they are, and the resets along the way. The machine, how it holds up, and the reset log.</p>
+      <p class="ph-promise">Start with the trust contract below — how the numbers are gated, what the AI can't do, and what would falsify all of this. Then the machine, how it holds up, and the reset log.</p>
       <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/now/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
     </div>
+    <section class="trust-doc" id="trust" aria-labelledby="trust-h">
+      <div class="prose">
+        <h2 id="trust-h">The trust contract</h2>
+        <p>You've landed on a site where an AI writes daily about one man's health data. Every instinct you have to distrust that is a good one. This page is the contract: how a number earns its way onto these pages, what the model is not allowed to do, what would falsify the whole experiment, and what will never be published no matter how it goes. Everything below is enforced by code that runs on every publish — not by policy, and not by promise.</p>
+
+        <h3>Who does the math</h3>
+        <p>Not the model — ever. Every number on this site (correlations, scores, trends, deltas) is computed deterministically in Python from the raw data. The language model narrates values it is handed and is never handed the freedom to compute its own. All AI inference routes through a single chokepoint (<code>bedrock_client.py</code>), so there is exactly one place to audit what was asked and what came back.</p>
+
+        <h3>How a sentence gets published</h3>
+        <p>Every AI narrative passes a deterministic number-gate before it ships: any number in the output must already exist in the data the model was handed. Invented endpoints — "climbed from X to Y" where Y was never measured — die at the gate. Before the gate was built (July&nbsp;2026), fourteen days of stored narratives were audited first: roughly one in ten carried a hard numeric contradiction. That measurement is why the gate exists, and it is published here instead of buried. A second, blocking quality gate has scored every coach note since 2026-07-05: a failing note is regenerated once, and if it fails again it is held — nothing goes out just because the schedule fired.</p>
+
+        <h3>Predictions are registered by code and graded in public</h3>
+        <p>When a coach makes a forward call, the model writes only the claim and its confidence. The prediction's ID and its deadline are stamped by code — dated the day it was made, deadline strictly in the future — so no prediction can be ungradeable by construction. An evaluator grades every due prediction against what actually happened, and the <a href="/method/calibration/">calibration scoreboard</a> publishes the hit-rates and Brier scores, including when the honest number is "nothing graded yet." A thin scoreboard is the state of the evidence, not a rendering error.</p>
+
+        <h3>Experiments are pre-registered, with stopping rules</h3>
+        <p>An experiment doesn't start until its design is declared: the hypothesis, the one metric that decides it, a baseline window, a minimum effect worth caring about, and an explicit stopping rule — validated by code and rejected if incomplete. The registration is written to a public, timestamped artifact at creation, before any results exist, so "it worked" can always be checked against what was promised beforehand. This matters double here: after this many restarts, baseline volatility is enormous, and without pre-registration a lucky oscillation is indistinguishable from a result.</p>
+
+        <h3>What would falsify this</h3>
+        <p>The experiment carries a public collapse definition — four or more consecutive days with no weigh-in, food log, or journal entry — and a <a href="/method/survival/">survival page</a> where the model handicaps its own human's odds of reaching day 30, using the real record of prior cycles, including the dead ones. Restarts are never erased: every collapsed cycle keeps its autopsy in the <a href="/method/postmortems/">reset log</a>. The falsification condition for the project is plain: if the target is never reached and held, the experiment failed — and the numbers publish on the same schedule either way.</p>
+
+        <h3>The no-cherry-picking rule</h3>
+        <p>Everything publishes on a schedule the results don't control. Down weeks render exactly like up weeks; a silent stretch shows up as a silent stretch, in the honest vocabulary of absence — "not logged for N days" — never smoothed into a fabricated neutral. Nothing published is retroactively deleted. If you are reading this during a bad stretch, the bad stretch is on the site right now; that is the point.</p>
+
+        <h3>Where the AI fails, with receipts</h3>
+        <p>The model is kept honest by writing its failures down where you can read them. <a href="/method/wrong/">The wrong page</a> logs every caught claim and refuted call. A monthly blind panel tests whether judges can even tell the coaches apart, and the scores are <a href="/method/voicefidelity/">public</a>. And one failure worth disclosing in full: in July 2026 an internal review found the model had been authoring its own prediction IDs and deadlines — years-off dates, duplicates, records that could never be graded. That was this platform violating its own "code stamps the metadata" rule at the exact point its credibility depends on. It was found by the platform's own review process, fixed the same day by moving the stamping into code, and disclosed here rather than quietly patched.</p>
+
+        <h3>The limits of one subject</h3>
+        <p>This is an N=1 experiment. Nothing here generalizes to you — the value is the framework, never the conclusions. Every finding is correlative, never causal; the engine runs a false-discovery-rate correction across its ~23 simultaneous metric pairs, requires a minimum sample before surfacing anything, and labels thin evidence as thin ("preliminary pattern" under 12 observations). When you see a confidence label on a claim, it was computed, not vibed.</p>
+
+        <h3>What never gets published</h3>
+        <p>Chronological age (biological-age markers only — the dates-on-a-driver's-license number stays private). Other people's names or identifying details. Precise locations. Raw journal text beyond what is deliberately excerpted. And a small set of private categories that stay private regardless of how the experiment goes. The <a href="/privacy/">privacy page</a> carries the full policy.</p>
+
+        <h3>What it costs, and what happens at the ceiling</h3>
+        <p>The whole platform runs under a hard $75-a-month ceiling with an hourly cost governor. When projected spend crosses the line, AI features pause loudly — you get an honest "paused" notice, never a silent degradation or a quietly cheaper answer. The one month that breached (June 2026, $79.80 — caused by development sessions, not readers) is on the record, and the <a href="/method/inference/">inference receipt</a> prices every AI call live.</p>
+
+        <p class="correlative">Everything above has machinery behind it, and the explorer below opens it — the pipelines, the gates, the scoreboards, the reset log. If this contract and a data page ever disagree, the data page wins, and the disagreement is a bug worth <a href="/story/about/">telling me about</a>.</p>
+      </div>
+    </section>
     <nav class="ev-tabs" data-tabs aria-label="Sections"></nav>
     <div class="ev-layout">
       <aside class="ev-side" data-side aria-label="Topics"></aside>

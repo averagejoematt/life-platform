@@ -1057,6 +1057,12 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .prose.prose-sm { font-size: var(--fs-body); }
 .prose.prose-sm > * + * { margin-top: var(--sp-3); }
 
+/* ── .trust-doc — the static skeptic's contract on /method/ (#731). Container
+   geometry only; all typography comes from .prose. Deliberately server-rendered
+   static HTML — it must read with JS off, so it never depends on evidence.js. */
+.trust-doc { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-7); }
+.trust-doc .prose { border-top: var(--border-hair); padding-top: var(--sp-6); }
+
 /* ── .page-hero — the "which part of the loop am I" banner. Identical on all
    five doors so a visitor always orients the same way. */
 .page-hero { max-width: var(--container); margin-inline: auto; padding: var(--sp-7) var(--gutter) var(--sp-5); }
