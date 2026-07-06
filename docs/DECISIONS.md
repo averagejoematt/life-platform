@@ -1789,10 +1789,10 @@ A two-component guardrail system:
 1. **`cost_governor_lambda`** (hourly, in `operational_stack`) — projects month-end spend using `mtd + (non_ai_daily + ai_daily) × days_remaining`. `non_ai_daily` averaged across elapsed days; `ai_daily` averaged across days that actually had AI activity (not full month). Writes the resulting **tier 0–3** to SSM `/life-platform/budget-tier`.
 2. **`lambdas/budget_guard.py`** (shared-layer module) — `current_tier()` reads SSM with 5-min cache (fail-open to 0). `allow(feature)` returns False once tier ≥ that feature's cutoff. `BudgetExceeded` raised by `bedrock_client.invoke()` at Tier 3 as a hard chokepoint failsafe.
 
-Feature → tier cutoffs (priority ordering "protect daily brief longest"; amended by ADR-100 — readers degrade last):
-- `coach_narrative`, `ensemble`: tier 1 (`chronicle` later raised to tier 2 to keep the Panel fed)
-- `website_ai` (`/api/ask`, `/api/board_ask`): tier 3 (was 2 — see ADR-100)
-- `daily_brief_ai`: tier 3 (last to degrade)
+Feature → tier cutoffs (amended by ADR-100 — readers degrade last; **re-banded by audience in ADR-125** — internal/dev AI degrades before any reader surface):
+- **band 1 (internal/dev):** `ensemble`, `coherence_semantic`, `chronicle_editor` — tier 1
+- **band 2 (reader narrative):** `coach_narrative`, `state_of_matthew`, `chronicle` — tier 2 (`coach_narrative` raised from tier 1 in ADR-125 — the product's soul is no longer the first sacrifice)
+- **band 3 (irreducible reader):** `website_ai` (`/api/ask`, `/api/board_ask`), `daily_brief_ai` — tier 3 (last to degrade — see ADR-100)
 
 Plus a single `CfnBudget` `life-platform-monthly-75` in `core_stack` with 50/70/85/100% email alerts via SES.
 
@@ -3330,7 +3330,23 @@ Measured live 2026-07-05 to confirm the fix and ground the threshold re-eval:
 
 **Consequences.** A+C is the pick: restart the State of Mind habit and wire the publish surface per the posture above, plus one S-sized story for the C one-tap two-scalar path (filed against epic #718). This unblocks #746/#747 (staleness nudges, honest pillar state) and starts the ≥4-week lived-data clock that gates #748.
 
-<!-- ADR-125 is assigned to #737 (budget-tier re-band) — see PR #770; merge that first for contiguous numbering. -->
+## ADR-125: The budget degradation ladder sacrifices by audience — internal/dev AI dies first, the reader product last (E5.2, #737)
+
+**Date:** 2026-07-06 · **Status:** Accepted · **Story:** #737 (epic #719, "a budget that protects the product") · **Amends:** ADR-063 (the tier ladder), ADR-100 (readers degrade last)
+
+**Context.** The budget guard (`lambdas/budget_guard.py`) degrades AI features as month-end projected spend climbs toward the $75 ceiling, tier by tier. The cutoffs had accreted by cost intuition rather than by who the feature serves, and it showed: `coach_narrative` — the daily coach commentary that is the reader-facing product's *soul* — paused at **tier 1**, the mildest budget state, right alongside the internal `ensemble` meta-digest. During the R21 review the platform was sitting at tier 1 with the coach narratives dark, **while the actual June-2026 budget pressure that triggered the tier was dev-session/ensemble re-run spend, not reader traffic.** The product was the first thing sacrificed to protect a ceiling that dev work was breaching. Worse, `coherence_semantic` — the coherence sentinel's internal QA pass — was never listed in the cutoff map at all, so it defaulted to the hard-stop bucket (tier 3) and *outlived every reader surface*: an internal advisory check burning tokens after the reader product had already gone dark. Both are the same inversion: sacrifice order tracked neither audience nor even cost.
+
+**Decision.** Re-band the cutoffs by **audience**, and pin the order with tests so it can't silently invert again. Three bands, degrading in order:
+
+1. **Band 1 — internal / dev AI (tier 1, pauses FIRST).** `ensemble` (the cross-coach meta-digest — a derived analysis layer, not first-party voice), `coherence_semantic` (**newly classified**; internal QA, advisory-only since the deterministic verdict is what alarms), and `chronicle_editor` (Margaret's embellishment pass — a paused pass just ships Elena's own draft). None is a surface a reader reads; each degrades to a deterministic fallback. This is what a dev-caused breach should hit.
+2. **Band 2 — reader narrative content (tier 2).** `coach_narrative` (**raised from tier 1** — the core correction), `state_of_matthew` (**raised from tier 1**), and `chronicle` (unchanged; stays in lockstep with the Friday Panel podcast's own `SKIP_TIER=2`). This is the first tier a reader can *perceive*, and — being the biggest recurring daily generation bucket — it remains the real cost lever. It just no longer degrades before the internal AI does.
+3. **Band 3 — the two irreducible reader promises (tier 3, pause LAST).** `website_ai` (the public `/api/ask` + `/api/board_ask` hook — ADR-100's differentiating surface, ~$0.02/call, rate-limited) and `daily_brief_ai` (the 11 AM brief, "protect longest" by design). Both return honest 'paused' output at the hard stop.
+
+**Why narratives at tier 2, not tier 3.** The story's phrasing groups "narratives" with board_ask/daily-brief as "last." Faithfully, "last" is *relative to internal AI* — and narratives now outlive **all** of it. But putting the daily 8-coach narration at tier 3 would keep the single largest daily generation cost running through 85–95% of the ceiling, which defeats the ceiling's purpose. The two things that genuinely must survive to the very end are the public reader question (the hook) and the morning brief (protect-longest by design); everything else, product included, yields before them. Band 2 keeps a real cost lever while guaranteeing the reader product is never the *first* casualty — the actual defect.
+
+**Tests pin the order** (`tests/test_budget_guard_ladder.py`): internal < reader-narrative < irreducible-reader is asserted structurally (`test_band_ordering_is_strict_*`), every gated feature must be classified into a band (`test_all_gated_features_are_classified` — this is exactly the guard that would have caught the `coherence_semantic` default-to-3 bug), and the ask endpoint + daily brief are asserted to be the last to go.
+
+**Consequences.** `budget_guard.py` is a shared-layer module, so this rides a layer rebuild → `LifePlatformCore` publish → consumer redeploy (CONVENTIONS §1) — the blast radius is every AI-gated Lambda, but the change is data-only (a cutoff map) and fail-open behavior is unchanged. No SSM/tier-writer change: the `cost_governor` still emits 0–3; only what each tier *disables* moved. After deploy, a tier-1 budget state pauses internal AI and leaves the coach narratives, the ask endpoints, and the brief all running — the first budget response a reader could notice is now tier 2, not tier 1.
 
 ## ADR-126: Hash-and-reuse unchanged coach generation briefs — stop paying to re-say the same silence (E5.3, #738)
 
