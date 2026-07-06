@@ -7,6 +7,7 @@ from decimal import Decimal
 from routine_ir import (
     IR_SCHEMA_VERSION,
     ExerciseBlock,
+    RoutineBranch,
     RoutineSpec,
     Set,
     deserialize,
@@ -70,3 +71,45 @@ def test_deserialize_empty_raises():
 def test_schema_version_pinned():
     ir = _example_ir()
     assert ir.schema_version == IR_SCHEMA_VERSION == 1
+
+
+def test_branches_default_empty_backward_compat():
+    """#417: an IR that defines no branches keeps behaving exactly as before."""
+    ir = _example_ir()
+    assert ir.branches == []
+    body = serialize(ir)
+    assert body["branches"] == []
+
+
+def test_branch_round_trip_preserves_nested_content():
+    """#417: branches survive serialize→deserialize, including nested exercises."""
+    ir = _example_ir()
+    ir.branches = [
+        RoutineBranch(label="as-written", cue="the plan", recommended=True, order=0, rationale="ideal"),
+        RoutineBranch(
+            label="easier",
+            cue="min effective dose",
+            recommended=False,
+            order=1,
+            rationale="floor",
+            exercises=[
+                ExerciseBlock(
+                    movement_key="machine_chest_press",
+                    sets=[Set(type="normal", weight_kg=30.0, reps=10)],
+                    rest_seconds=90,
+                )
+            ],
+        ),
+    ]
+    body = serialize(ir)
+    body["pk"] = "USER#matthew#ROUTINE#r-1"
+    body["sk"] = "VERSION#current"
+    restored = deserialize(body)
+    assert len(restored.branches) == 2
+    assert restored.branches[0].label == "as-written"
+    assert restored.branches[0].recommended is True
+    easier = restored.branches[1]
+    assert easier.label == "easier"
+    assert len(easier.exercises) == 1
+    assert easier.exercises[0].movement_key == "machine_chest_press"
+    assert easier.exercises[0].sets[0].weight_kg == 30.0

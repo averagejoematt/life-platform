@@ -131,17 +131,30 @@ def lambda_handler(event, context):
         import routine_repo as repo
         from hevy_compiler import to_create_body
         from hevy_template_cache import resolve_movement
-        from routine_generator import generate_routines
+        from routine_generator import emit_branch_model, generate_routines
         from routine_title import build_title_context, format_why_note
 
         routines = generate_routines(inputs)
-        logger.info(f"generated {len(routines)} variant(s) for {target_date}: " f"{[r.variant for r in routines]}")
+        # #417 (TR-04): fold the generated variants (ideal + floor + optional
+        # re-entry) into ONE primary routine carrying first-class branches. We
+        # push the branch model — a single routine whose morning selection is a
+        # branch choice — instead of the legacy "push only ideal, drop floor".
+        primary = emit_branch_model(routines)
+        logger.info(
+            f"generated {len(routines)} variant(s) for {target_date}: "
+            f"{[r.variant for r in routines]}; "
+            f"branch model primary={getattr(primary, 'routine_id', None)} "
+            f"branches={[b.label for b in (getattr(primary, 'branches', []) or [])]}"
+        )
 
         summary: list[dict[str, Any]] = []
         pushed_one = False
         for ir in routines:
             repo.put_versioned(ir)
-            if ir.variant != "ideal" or pushed_one or not ir.exercises:
+            # Push only the primary (branch-carrying) routine. Siblings are
+            # persisted above for the record but folded into the primary's
+            # branch menu — they are not pushed as separate routines anymore.
+            if primary is None or ir.routine_id != primary.routine_id or pushed_one or not ir.exercises:
                 summary.append({"routine_id": ir.routine_id, "variant": ir.variant, "pushed": False})
                 continue
             try:
@@ -163,7 +176,15 @@ def lambda_handler(event, context):
                     repo.upsert_id_map(ir.routine_id, ir.hevy_routine_id)
                 pushed_one = True
                 _emit_metric("RoutinePushed")
-                summary.append({"routine_id": ir.routine_id, "variant": ir.variant, "pushed": True, "hevy_routine_id": ir.hevy_routine_id})
+                summary.append(
+                    {
+                        "routine_id": ir.routine_id,
+                        "variant": ir.variant,
+                        "pushed": True,
+                        "hevy_routine_id": ir.hevy_routine_id,
+                        "branches": [b.label for b in (ir.branches or [])],
+                    }
+                )
             except wc.HevyOrphanCreated as e:
                 logger.warning(
                     f"HevyOrphanCreated on push for {ir.routine_id}: " f"Hevy returned {e.status} but created {e.hevy_routine_id}. Linking."

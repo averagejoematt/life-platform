@@ -47,7 +47,9 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 #        grounded_generation carries the rate CI/goal range, site_writer emits them
 # v111: #538 calibration scoreboard — stats_core Brier/reliability primitives,
 #        new calibration_core scorer, compute_credibility consumes it
-SHARED_LAYER_VERSION = 114
+# v115: #417 first-class routine branches — routine_ir.RoutineBranch,
+#        hevy_compiler branch-menu render, routine_generator.emit_branch_model
+SHARED_LAYER_VERSION = 115
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 

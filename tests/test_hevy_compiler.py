@@ -8,11 +8,12 @@ from hevy_compiler import (
     MovementUnmappable,
     from_hevy_response,
     normalize_set_type,
+    render_branches_note,
     sanitize_note,
     to_create_body,
     to_update_body,
 )
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 
 def _ir() -> RoutineSpec:
@@ -154,6 +155,60 @@ def test_sanitize_note_applied_to_exercise_and_routine_notes():
     body = to_create_body(ir, _resolver_fn, why_note="why\x00note")
     assert body["routine"]["exercises"][0]["notes"] == "feltstrong"
     assert body["routine"]["notes"] == "whynote"
+
+
+def _branched_ir() -> RoutineSpec:
+    ir = _ir()
+    ir.notes = "Upper day."
+    ir.branches = [
+        RoutineBranch(label="easier", cue="min dose", recommended=False, order=1),
+        RoutineBranch(label="as-written", cue="the plan", recommended=True, order=0),
+    ]
+    return ir
+
+
+def test_no_branches_notes_unchanged_backward_compat():
+    """#417 criterion 5: a routine with no branches pushes EXACTLY as before."""
+    ir = _ir()
+    ir.notes = "MEV starter."
+    assert ir.branches == []
+    body = to_create_body(ir, _resolver_fn)
+    assert body["routine"]["notes"] == "MEV starter."
+    body_why = to_create_body(ir, _resolver_fn, why_note="Readiness green.")
+    assert body_why["routine"]["notes"] == "Readiness green."
+
+
+def test_branches_render_into_notes():
+    """#417: the compiler renders branches; every branch is visible, recommended starred."""
+    body = to_create_body(_branched_ir(), _resolver_fn, why_note="Readiness yellow.")
+    notes = body["routine"]["notes"]
+    assert notes.startswith("Readiness yellow.")
+    assert "CHOOSE YOUR BRANCH" in notes
+    assert "AS-WRITTEN" in notes and "EASIER" in notes  # every branch visible
+    assert "★ AS-WRITTEN (recommended)" in notes  # highlighted, not removed
+    # order respected: recommended (order 0) appears before easier (order 1)
+    assert notes.index("AS-WRITTEN") < notes.index("EASIER")
+
+
+def test_branches_render_in_update_body_too():
+    body = to_update_body(_branched_ir(), _resolver_fn, why_note="x")
+    assert "CHOOSE YOUR BRANCH" in body["routine"]["notes"]
+    assert "folder_id" not in body["routine"]
+
+
+def test_render_branches_note_empty_when_no_branches():
+    assert render_branches_note([]) == ""
+
+
+def test_branch_menu_reflects_reordering():
+    """Re-stamp re-orders by `order`; the rendered menu must follow (recommended first)."""
+    branches = [
+        RoutineBranch(label="as-written", recommended=False, order=1),
+        RoutineBranch(label="easier", recommended=True, order=0),
+    ]
+    note = render_branches_note(branches)
+    assert note.index("EASIER") < note.index("AS-WRITTEN")
+    assert "★ EASIER (recommended)" in note
 
 
 def test_round_trip_response_to_diff():

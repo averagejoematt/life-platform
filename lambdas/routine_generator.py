@@ -28,7 +28,7 @@ import uuid
 from datetime import date
 from typing import Any
 
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 logger = logging.getLogger("routine_generator")
 
@@ -350,6 +350,76 @@ def generate_routines(inputs: GeneratorInputs) -> list[RoutineSpec]:
     if inputs.days_since_last_workout >= week_cfg.get("re_entry_days_threshold", 7):
         result.append(_make_re_entry(inputs, archetype, targets, catalog, week_cfg, ideal.routine_id))
     return result
+
+
+# ── Branch model (#417 / TR-04) ──────────────────────────────────────────────
+# The legacy output is a list of separate RoutineSpecs (ideal + floor + optional
+# re-entry). emit_branch_model folds that list into ONE primary routine carrying
+# first-class `branches`, so the scheduled authoring path pushes a single routine
+# whose morning selection is a branch choice rather than three separate routines.
+_BRANCH_LABELS = {
+    # variant -> (label, recommended, order)
+    "ideal": ("as-written", True, 0),
+    "floor": ("easier", False, 1),
+    "re_entry": ("re-entry", False, 2),
+}
+
+
+def _branch_cue(ir: RoutineSpec) -> str:
+    """One-line cue for a branch, taken from the variant's own rationale/notes.
+
+    No invention — the cue quotes the deterministic rationale the generator
+    already produced for that variant.
+    """
+    if ir.rationale:
+        return ir.rationale[0]
+    if ir.notes:
+        return ir.notes.splitlines()[0]
+    return ""
+
+
+def build_branches(routines: list[RoutineSpec]) -> list[RoutineBranch]:
+    """Fold generated variant RoutineSpecs into an ordered list of RoutineBranch.
+
+    Each variant becomes one branch carrying its own exercise content; the
+    `ideal` variant is the recommended default. Never drops a variant — every
+    generated option becomes a visible, choosable branch (self-selection).
+    """
+    branches: list[RoutineBranch] = []
+    for ir in routines:
+        label, recommended, order = _BRANCH_LABELS.get(ir.variant, (ir.variant, False, 9))
+        branches.append(
+            RoutineBranch(
+                label=label,
+                cue=_branch_cue(ir),
+                recommended=recommended,
+                order=order,
+                rationale=ir.variant,
+                exercises=list(ir.exercises),
+            )
+        )
+    return branches
+
+
+def emit_branch_model(routines: list[RoutineSpec]) -> RoutineSpec | None:
+    """Return the primary (ideal) RoutineSpec with its `branches` field populated.
+
+    The scheduled authoring path persists every variant (for the record) but
+    pushes only this primary — one routine that carries the full branch menu.
+    Returns None when the generator produced nothing. If more than one variant
+    exists, the primary's `branches` folds them all in; a lone routine (e.g. a
+    non-lifting day) still gets a single as-written branch so the model is
+    uniform, but a routine with no siblings and no exercises stays branch-light.
+    """
+    if not routines:
+        return None
+    primary = next((r for r in routines if r.variant == "ideal"), routines[0])
+    # Only attach branches when there is a genuine choice OR real content to
+    # branch — a bare non-lifting placeholder (no exercises, no siblings) keeps
+    # backward-compatible behaviour (no branch menu, pushes exactly as before).
+    if len(routines) > 1 or primary.exercises:
+        primary.branches = build_branches(routines)
+    return primary
 
 
 def _make_floor(
