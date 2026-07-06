@@ -38,5 +38,5 @@ def test_full_loop_diagram_not_regressed():
 def test_constellation_caption_carries_the_scale():
     cap = HOME[HOME.find("constellation-desc") : HOME.find("</figcaption>")]
     assert "out of 100" in cap
-    assert "not a broken one" in cap  # low reads early/low, never alarming
+    assert "not broken" in cap  # #590: "a young experiment starts low, not broken" — low reads early, never alarming
     assert "const-legend" in cap  # the at-a-glance low→high dot legend
