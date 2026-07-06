@@ -368,6 +368,24 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/689"
         }
       ]
+    },
+    {
+      "id": "2026-07-05-a-watcher-that-caught-a-lost-workout",
+      "date": "2026-07-05",
+      "title": "A watcher that asks the source what it holds — and caught a workout we'd silently lost",
+      "shipped": "The platform learned to double-check its fitness providers against its own records. For a long time every health check watched only the database's latest date — blind to a reading that never arrived behind it (the platform once lost five afternoon walks with no alarm at all). Strava already had the fix: periodically ask the provider what it holds and compare. This session generalized that to Whoop — a daily, read-only, trailing-two-week diff that reports anything the provider has but we never stored. On its very first live run it flagged a workout the API held but our store had missed. In the same session, workout routines also gained first-class ‘branches’ — one routine that carries an easier and an as-written option instead of two separate pushes.",
+      "gotcha": "The shared-code layer bites the unwary. Common modules ship as a versioned Lambda layer, and the fleet attaches it by a hardcoded version string — so republishing new code isn't enough; you have to bump the version number or every function keeps running the old copy. Worse, the new routine format would crash any function still on the old layer the moment it tried to read a branched routine — so the deploy had to reach exactly the functions that read routines, and no fewer, before the first branched routine was ever written.",
+      "honest_miss": "The overnight re-stamp — the piece that would pre-highlight the branch matching last night's recovery — shipped turned OFF, on purpose. It's scheduled earlier in the morning than the recovery data actually refreshes, so as wired it would decide on stale numbers. Rather than fake it, it ships disabled until the timing is reconciled. And the Whoop gap it caught is only reported, not healed: the watcher's job is to see, not fix — whether that lost workout comes back is still the ingestion job's problem. Garmin, meanwhile, got no watcher at all — it's too rate-limited to reconcile honestly, so we wrote down that decision instead of pretending.",
+      "prs": [
+        {
+          "label": "PR #710",
+          "url": "https://github.com/averagejoematt/life-platform/pull/710"
+        },
+        {
+          "label": "PR #711",
+          "url": "https://github.com/averagejoematt/life-platform/pull/711"
+        }
+      ]
     }
   ]
 }
