@@ -35,6 +35,15 @@ even if the URL stays known; #780 is the rotation half. **Remediate before any p
   weekly) / #796 (no .claude/agents). Compounding leverage — do early.
 - **Cost** #790 — June actually breached the $75 ceiling ($79.80); Haiku now the top AI line #808.
 
+## Session wrap state (2026-07-06, pushed)
+- **All commits pushed to origin/main** (through `74e89c30`; tree even with origin). Safe to `/clear`.
+- **No deploy this session and none pending from it** — read-only review; every artifact is a
+  GitHub issue or a docs/tooling commit. Zero Lambda/site runtime change ⇒ nothing to `cdk deploy`
+  or sync. The only deploy question is the SEPARATE, pre-existing Operational-stack hold (greens
+  main's freshness-checker I2 red) — still Matthew's call, unchanged, NOT part of this session.
+- Memory current: `project_r22_consultancy_review` + private `security_r22_mcp_token_exposure`
+  (both indexed in MEMORY.md).
+
 ## Notes / caveats
 - The pre-commit hook DID run `sync_doc_metadata` this session (printed Alarms:110 vs live 122 —
   re-confirms DOC-01 #795). So CI-02 #818 ("hook doesn't run sync_doc_metadata") may be a partial
