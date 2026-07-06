@@ -332,6 +332,36 @@ class MonitoringStack(Stack):
             "BudgetTier",
         )
 
+        # #727: scientific-liveness heartbeat. The coach-prediction-evaluator ran
+        # daily for WEEKS and graded nothing, and no alarm noticed — every heartbeat
+        # above watches the ingestion/coherence PIPELINE, none watched the SCIENCE.
+        # The evaluator now emits LifePlatform/Predictions::DaysSinceLastDecided every
+        # run: whole days since grading last produced a confirmed/refuted outcome
+        # (999 = never, this cycle). ALARM when it sits >= 14 for 2 consecutive daily
+        # periods. ONE alarm covers BOTH failure modes: a genuine 14-day grading
+        # stall, AND a dead evaluator (treat_missing=BREACHING — an absent gauge is
+        # itself a stall). 2 periods, not 1, mirrors the REL-01 heartbeats' guard
+        # against a false fire from the in-progress UTC period (the reason those use
+        # days=2). Fires on the CURRENT state the day it deploys — grading has been
+        # dark for weeks, which is exactly the point (E1.3 / #727 AC). Digest.
+        grading_stalled = cloudwatch.Alarm(
+            self,
+            "GradingStalled",
+            alarm_name="grading-stalled",
+            metric=cloudwatch.Metric(
+                namespace="LifePlatform/Predictions",
+                metric_name="DaysSinceLastDecided",
+                period=Duration.seconds(86400),
+                statistic="Maximum",
+            ),
+            evaluation_periods=2,
+            datapoints_to_alarm=2,
+            threshold=14,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        )
+        grading_stalled.add_alarm_action(cw_actions.SnsAction(digest))
+
         # ══════════════════════════════════════════════════════════════
         # Daily-brief operational alarms (not in EmailStack)
         # ══════════════════════════════════════════════════════════════
