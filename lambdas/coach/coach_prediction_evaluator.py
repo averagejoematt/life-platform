@@ -155,6 +155,26 @@ EXPIRY_MULTIPLIER = 2
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 _lambda_client = boto3.client("lambda", region_name=_REGION)  # #534: fires coach-history-summarizer's event refresh
+_cw = boto3.client("cloudwatch", region_name=_REGION)  # #727: grading-liveness metrics
+
+# ── #727: grading-liveness (scientific-liveness heartbeat) ───────────────────
+# The evaluator ran daily for weeks producing zero graded outcomes and nothing
+# noticed — the ingestion/coherence heartbeats watch the *pipeline*, not the
+# *science*. This emits, every run, the two counts that make a stall visible
+# (LifePlatform/Predictions) plus a DaysSinceLastDecided gauge the monitoring
+# stack alarms on at >= 14 days (monitoring_stack.GradingStalled). A rolling-sum
+# "zero decided in N days" alarm can't express 14 days — CloudWatch caps a
+# daily-period alarm's window at 7 days (EvaluationPeriods x Period <= 604800;
+# see monitoring_stack._heartbeat_alarm) — so a single deterministic gauge
+# alarmed at a threshold is both the correct 14-day semantic AND fires on the
+# CURRENT state the day it deploys (no marker yet + 0 decided => sentinel => ALARM).
+LIVENESS_NAMESPACE = "LifePlatform/Predictions"
+_LAST_DECIDED_PK = "EVALUATOR#coach_prediction"
+_LAST_DECIDED_SK = "STATE#last_decided"
+# Emitted when the marker has never been written (grading has produced nothing in
+# this experiment cycle). Any value >= the 14-day alarm threshold works; 999 reads
+# unambiguously as "never" in a dashboard without pretending to be a real day count.
+_NEVER_DECIDED_DAYS = 999
 
 
 # =============================================================================
@@ -1276,6 +1296,98 @@ def _fire_event_stance_refreshes(events, today_str):
 
 
 # =============================================================================
+# #727: SCIENTIFIC-LIVENESS HEARTBEAT
+# =============================================================================
+
+
+def _read_last_decided_date():
+    """The date grading last produced a decided (confirmed/refuted) outcome, or
+    None if the marker has never been written. Exact-key GetItem — not phase
+    filtered (this is operational system-state, not experiment-scoped data)."""
+    try:
+        item = table.get_item(Key={"pk": _LAST_DECIDED_PK, "sk": _LAST_DECIDED_SK}).get("Item")
+        return (item or {}).get("date")
+    except Exception as e:
+        logger.warning("[liveness] read last-decided marker failed (non-fatal): %s", e)
+        return None
+
+
+def _write_last_decided_date(today_str):
+    """Stamp the last-decided marker to today. Called only when this run actually
+    decided something, so the DaysSinceLastDecided gauge resets to 0."""
+    try:
+        table.put_item(
+            Item={
+                "pk": _LAST_DECIDED_PK,
+                "sk": _LAST_DECIDED_SK,
+                "date": today_str,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+    except Exception as e:
+        logger.warning("[liveness] write last-decided marker failed (non-fatal): %s", e)
+
+
+def _days_since(today_str, prior_str):
+    """Whole days between two YYYY-MM-DD strings (>= 0), or the never sentinel if
+    prior is missing/unparseable."""
+    if not prior_str:
+        return _NEVER_DECIDED_DAYS
+    try:
+        d = (datetime.strptime(today_str, "%Y-%m-%d") - datetime.strptime(prior_str, "%Y-%m-%d")).days
+        return max(0, d)
+    except (ValueError, TypeError):
+        return _NEVER_DECIDED_DAYS
+
+
+def emit_grading_liveness(stats, gradable_count, today_str):
+    """#727: emit the scientific-liveness metrics EVERY run (even a zero run — the
+    whole point is that a metric must be present daily for the stall alarm to have
+    data). Returns the dict it emitted so the handler can surface + tests can pin it.
+
+    - DecidedCount    — confirmed + refuted THIS run (the outcomes that fill the
+      public track record). The number that has been silently 0 for weeks.
+    - GradableCount   — evaluable predictions found this run (pending/confirming,
+      non-qualitative). A gradability floor: >0 gradable but 0 decided over a long
+      window is the exact stall this closes.
+    - DaysSinceLastDecided — the gauge monitoring_stack.GradingStalled alarms on at
+      >= 14. Reads the marker; if this run decided anything, resets to 0 and
+      re-stamps the marker. Fail-soft — a metrics error must never sink evaluation.
+    """
+    decided_count = int(stats.get("confirmed", 0)) + int(stats.get("refuted", 0))
+
+    if decided_count > 0:
+        _write_last_decided_date(today_str)
+        days_since = 0
+    else:
+        days_since = _days_since(today_str, _read_last_decided_date())
+
+    payload = {
+        "decided_count": decided_count,
+        "gradable_count": int(gradable_count),
+        "days_since_last_decided": days_since,
+    }
+    try:
+        _cw.put_metric_data(
+            Namespace=LIVENESS_NAMESPACE,
+            MetricData=[
+                {"MetricName": "DecidedCount", "Value": float(decided_count), "Unit": "Count"},
+                {"MetricName": "GradableCount", "Value": float(gradable_count), "Unit": "Count"},
+                {"MetricName": "DaysSinceLastDecided", "Value": float(days_since), "Unit": "Count"},
+            ],
+        )
+        logger.info(
+            "[liveness] decided=%d gradable=%d days_since_last_decided=%d",
+            decided_count,
+            gradable_count,
+            days_since,
+        )
+    except Exception as e:
+        logger.warning("[liveness] metric emit failed (non-fatal): %s", e)
+    return payload
+
+
+# =============================================================================
 # LAMBDA HANDLER
 # =============================================================================
 
@@ -1329,6 +1441,15 @@ def lambda_handler(event: dict, context) -> dict:
         except Exception as e:
             logger.error("Stance-event detection failed (non-fatal): %s", e)
 
+        # #727: scientific-liveness — emit decided/gradable counts + the
+        # days-since-last-decided gauge EVERY run (the stall alarm needs a daily
+        # datapoint). gradable_count is the evaluable predictions found this run.
+        liveness = {}
+        try:
+            liveness = emit_grading_liveness(stats, len(predictions), today_str)
+        except Exception as e:
+            logger.error("Grading-liveness emit failed (non-fatal): %s", e)
+
         return {
             "statusCode": 200,
             "date": today_str,
@@ -1338,6 +1459,7 @@ def lambda_handler(event: dict, context) -> dict:
             "stats": stats,
             "commitment_stats": commitment_stats,
             "stance_refresh_stats": stance_refresh_stats,
+            "liveness": liveness,
             "evaluations": evaluations,
         }
     except Exception as e:

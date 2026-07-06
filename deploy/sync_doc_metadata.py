@@ -248,7 +248,7 @@ PLATFORM_FACTS = {
     "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
-    "alarm_count": 109,  # CDK-defined CloudWatch alarms (synth ground truth). #411/ADR-116 (2026-07) reconciled the stale 56 undercount: 107 IaC-defined + 2 adopted orphans (compute-pipeline-stale, hae-webhook). See docs/reviews/CLOUDWATCH_AUDIT_2026-07.md.
+    "alarm_count": 110,  # CDK-defined CloudWatch alarms (synth ground truth). #411/ADR-116 (2026-07) reconciled the stale 56 undercount: 107 IaC-defined + 2 adopted orphans (compute-pipeline-stale, hae-webhook). See docs/reviews/CLOUDWATCH_AUDIT_2026-07.md. +1 grading-stalled (#727, 2026-07-06).
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 8,
     "iam_roles": 43,
