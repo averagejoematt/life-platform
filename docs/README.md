@@ -70,4 +70,4 @@ top and stop when you have what you need.
 [SPEC_HEVY_ROUTINE_WRITELOOP](SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md) (+ [prereqs](SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31_PREREQS.md))
 
 ## Subdirectories
-`archive/` (superseded specs/designs) · `reviews/` (board reviews + the 2026-06-07 product summit) · `rca/` (post-mortems) · `restart/` (reset run reports) · `audits/` · `specs/` · `briefs/` · `content/` · `design/`
+`archive/` (superseded specs/designs) · `reviews/` (board reviews + the 2026-06-07 product summit + the [R21 definitive review](reviews/R21_BACKLOG.md), 2026-07-06) · `rca/` (post-mortems) · `restart/` (reset run reports) · `audits/` · `specs/` · `briefs/` · `content/` · `design/`
