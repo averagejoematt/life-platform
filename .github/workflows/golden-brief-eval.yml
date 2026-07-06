@@ -1,0 +1,76 @@
+# Golden-brief eval harness (#742, R21 epic #720/E6) — the falsifiable-honesty layer.
+#
+# The DETERMINISTIC verdict already gates every deploy: tests/test_golden_brief_eval.py
+# carries the `deploy_critical` marker, so it runs in the main pipeline's deploy-critical
+# lane on every push and BLOCKS deploy if a golden output false-flags or a seeded-fault
+# canary slips the gate. This workflow is the WEEKLY complement: it re-runs the harness on
+# a schedule (catching drift even in weeks with no gate/prompt change) and surfaces the
+# advisory Haiku voice-rubric trend.
+#
+# By default the scheduled run is deterministic + free (no AWS, no Bedrock). The advisory
+# `--judge`/`--emit` path (Bedrock spend + CloudWatch LifePlatform/GoldenBrief metrics) is
+# manual-dispatch only, pending a dedicated least-privilege role (bedrock:InvokeModel on the
+# Haiku profile + cloudwatch:PutMetricData) — see ADR-127. It is fail-soft either way.
+name: Golden-brief eval
+
+on:
+  schedule:
+    - cron: '17 15 * * 1'   # Mondays 15:17 UTC — weekly voice/gate drift check
+  workflow_dispatch:
+    inputs:
+      run_judge:
+        description: 'Also run the advisory Haiku voice rubric + emit CloudWatch metrics (Bedrock spend)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write   # only used by the optional judge/emit step
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+
+jobs:
+  golden-brief:
+    name: Golden-brief falsifiability check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install pytest boto3 botocore
+
+      - name: Deterministic verdict (gating, free)
+        run: |
+          echo "::group::Golden-brief deterministic harness"
+          python3 tests/golden_brief_eval.py | tee /tmp/golden.txt
+          echo "::endgroup::"
+          # first line is the ops-email line — surface it in the run summary
+          head -1 /tmp/golden.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Self-tests
+        run: python3 -m pytest tests/test_golden_brief_eval.py -q
+
+      # ── advisory voice trend + metrics — manual dispatch only ──────────────
+      - name: Configure AWS (judge/emit)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_judge }}
+        uses: aws-actions/configure-aws-credentials@50ac8dd1e1b10d09dac7b8727528b91bed831ac0 # v3.0.1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Advisory voice rubric + metric emit
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_judge }}
+        continue-on-error: true   # advisory: never fails the run (harness is fail-soft too)
+        run: |
+          echo "::group::Advisory Haiku voice rubric + CloudWatch emit"
+          python3 tests/golden_brief_eval.py --judge --emit | tee /tmp/golden_judge.txt
+          head -1 /tmp/golden_judge.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "::endgroup::"
