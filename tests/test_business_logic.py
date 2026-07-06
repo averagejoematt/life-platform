@@ -536,8 +536,38 @@ except Exception as _e:
     _dmc_import_error = str(_e)
 
 
-class TestComputeTSB:
-    """TSB (Training Stress Balance) = CTL - ATL (Banister model)."""
+class TestLatestWeightFallback:
+    """BUG-01 (#783): latest_weight must survive a >7-day weigh-in gap so the
+    ADR-104 grounding gate covers weight instead of going dark on the headline metric."""
+
+    def _fn(self):
+        if not _dmc_available:
+            pytest.skip(f"daily_metrics_compute_lambda unavailable: {_dmc_import_error}")
+        return dmc.latest_weight_lbs
+
+    def _rec(self, d, w):
+        return {"sk": f"DATE#{d}", "weight_lbs": w}
+
+    def test_returns_most_recent_in_window(self):
+        f = self._fn()
+        recs = [self._rec("2026-07-01", 301.0), self._rec("2026-07-04", 300.2)]
+        assert f(recs) == 300.2
+
+    def test_empty_window_is_none(self):
+        assert self._fn()([]) is None
+
+    def test_skips_null_weight_records(self):
+        f = self._fn()
+        recs = [self._rec("2026-07-01", 300.5), {"sk": "DATE#2026-07-04"}]
+        assert f(recs) == 300.5  # falls back to the latest record that HAS a weight
+
+    def test_fallback_chain_covers_week_plus_gap(self):
+        """The resolution the compute lambda runs: 7d empty → 14d has a weigh-in."""
+        f = self._fn()
+        withings_7d = []  # no weigh-in in the last week (routine)
+        withings_14d = [self._rec("2026-06-28", 300.77)]
+        resolved = f(withings_7d) or f(withings_14d)
+        assert resolved == 300.77
 
     def _import_fn(self):
         if not _dmc_available:

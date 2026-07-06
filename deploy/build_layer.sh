@@ -43,6 +43,11 @@ MODULES=(
     # #529/ADR-105 (2026-07-04): the one sanctioned statistics module (pearson,
     # effective-n, block-bootstrap CIs, BH-FDR) — replaces 3 pearson + 2 p-value copies
     stats_core.py
+    # #543/ADR-105 r4 (2026-07-05): personal percentile bands from Matthew's own
+    # distribution. Imported as a shared-layer module by daily-metrics-compute,
+    # daily-insight-compute, and personal-baselines-lambda. DEBT-02/#782: must be in
+    # the layer or a single-file deploy of those consumers re-triggers the #697 outage.
+    personal_baselines.py
     # #539 (2026-07-04): n-of-1 pre-registration design validation + paired analysis.
     # Imported by mcp/tools_lifestyle (create/end_experiment).
     experiment_design.py

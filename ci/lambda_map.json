@@ -450,6 +450,7 @@
       "lambdas/secret_cache.py",
       "lambdas/sick_day_checker.py",
       "lambdas/site_writer.py",
+      "lambdas/personal_baselines.py",
       "lambdas/source_registry.py",
       "lambdas/source_state.py",
       "lambdas/stats_core.py",
