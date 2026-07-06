@@ -3,7 +3,11 @@
 import json
 import os
 
-from web import og_coach_cards as cc
+import pytest
+
+pytest.importorskip("PIL")  # CI test lanes run without Pillow — skip these drawing tests there
+
+from web import og_coach_cards as cc  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

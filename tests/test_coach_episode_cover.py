@@ -12,6 +12,8 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
+pytest.importorskip("PIL")  # CI test lanes run without Pillow — skip these drawing tests there
+
 cover = importlib.import_module("make_coach_episode_cover")
 vbp = importlib.import_module("v4_build_portraits")
 

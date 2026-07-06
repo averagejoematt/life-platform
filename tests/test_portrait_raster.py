@@ -4,7 +4,10 @@ import json
 import os
 
 import pytest
-from web import portrait_raster as pr
+
+pytest.importorskip("PIL")  # CI test lanes run without Pillow — skip these drawing tests there
+
+from web import portrait_raster as pr  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RECIPE_DIR = os.path.join(ROOT, "config", "portraits")
