@@ -1507,14 +1507,25 @@ TOOLS = {
                             "validated at creation and FROZEN (immutable, publicly stamped 'pre-registered on DATE'). "
                             "With a design, end_experiment runs the paired analysis automatically "
                             "(baseline vs washout-trimmed window, block-bootstrap 95% CI, deterministic verdict). "
-                            "Example: {baseline_days: 14, washout_days: 3, criterion: {metric: 'deep_pct', "
-                            "direction: 'higher', min_effect: 2}}."
+                            "Example: {baseline_days: 14, washout_days: 3, stopping_rule: 'run the full 21 days regardless "
+                            "of interim trend; abort only if recovery < 40% for 3 consecutive days', criterion: "
+                            "{metric: 'deep_pct', direction: 'higher', min_effect: 2}}. "
+                            "#728: the registration is also frozen to a PUBLIC timestamped artifact "
+                            "(/experiments/prereg/{id}.json) at creation — before-the-results proof."
                         ),
                         "properties": {
                             "baseline_days": {"type": "integer", "description": "Baseline window: days before start (7-56)."},
                             "washout_days": {
                                 "type": "integer",
                                 "description": "Days after start excluded from analysis while the intervention takes effect (0-14).",
+                            },
+                            "stopping_rule": {
+                                "type": "string",
+                                "description": (
+                                    "#728 REQUIRED: plain-language rule (20-500 chars) declaring when the experiment "
+                                    "ends or aborts — stated before any data exists so an early stop is checkable "
+                                    "against what was promised."
+                                ),
                             },
                             "criterion": {
                                 "type": "object",
@@ -1538,7 +1549,7 @@ TOOLS = {
                                 "required": ["metric", "direction", "min_effect"],
                             },
                         },
-                        "required": ["baseline_days", "criterion"],
+                        "required": ["baseline_days", "criterion", "stopping_rule"],
                     },
                 },
                 "required": ["name", "hypothesis"],

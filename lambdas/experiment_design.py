@@ -54,6 +54,12 @@ VALID_DIRECTIONS = ("higher", "lower")
 MIN_BASELINE_DAYS = 7
 MAX_BASELINE_DAYS = 56
 MAX_WASHOUT_DAYS = 14
+# #728: a pre-registration without a stopping rule is post-hoc storytelling with
+# extra steps — the rule must be stated before the data exists, in plain words
+# long enough to be checkable ("stop at N days regardless of trend", "abort if
+# recovery drops below X for 3 straight days", ...).
+MIN_STOPPING_RULE_CHARS = 20
+MAX_STOPPING_RULE_CHARS = 500
 # stats_core's bootstrap floor; below this per arm the verdict is inconclusive, never forced.
 MIN_POINTS_PER_ARM = 5
 
@@ -62,7 +68,7 @@ def validate_design(design):
     """Validate a pre-registration design dict. Returns (is_valid, issues).
 
     Expected shape:
-      {"baseline_days": int, "washout_days": int,
+      {"baseline_days": int, "washout_days": int, "stopping_rule": str,
        "criterion": {"metric": slug, "direction": "higher"|"lower", "min_effect": number}}
     """
     issues = []
@@ -76,6 +82,17 @@ def validate_design(design):
     washout = design.get("washout_days", 0)
     if not isinstance(washout, int) or isinstance(washout, bool) or not (0 <= washout <= MAX_WASHOUT_DAYS):
         issues.append(f"washout_days must be an integer in [0, {MAX_WASHOUT_DAYS}]")
+
+    # #728: the stopping rule is REQUIRED. It is free text by design — the analysis
+    # never executes it — but it must be declared up front so "we stopped early
+    # because it was working / hurting" is checkable against what was promised.
+    stopping_rule = design.get("stopping_rule")
+    if not isinstance(stopping_rule, str) or not (MIN_STOPPING_RULE_CHARS <= len(stopping_rule.strip()) <= MAX_STOPPING_RULE_CHARS):
+        issues.append(
+            f"stopping_rule is required: a plain-language rule of {MIN_STOPPING_RULE_CHARS}-{MAX_STOPPING_RULE_CHARS} chars "
+            'stating when the experiment ends or aborts (e.g. "run the full 21 days regardless of interim trend; '
+            'abort only if recovery < 40% for 3 consecutive days")'
+        )
 
     criterion = design.get("criterion")
     if not isinstance(criterion, dict):
@@ -92,7 +109,7 @@ def validate_design(design):
     if not isinstance(min_effect, (int, float)) or isinstance(min_effect, bool) or min_effect < 0:
         issues.append("criterion.min_effect must be a number >= 0")
 
-    unknown = set(design) - {"baseline_days", "washout_days", "criterion"}
+    unknown = set(design) - {"baseline_days", "washout_days", "criterion", "stopping_rule"}
     if unknown:
         issues.append(f"unknown design fields: {sorted(unknown)}")
     unknown_c = set(criterion) - {"metric", "direction", "min_effect"}

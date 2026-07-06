@@ -2737,6 +2737,50 @@ def tool_create_experiment(args):
         "pre_registered_at": now.strftime("%Y-%m-%dT%H:%M:%S") if design else None,
     }
 
+    # #728: freeze the pre-registration as a PUBLIC, timestamped S3 artifact —
+    # written at creation, before any results exist, and never mutated afterward.
+    # The S3 Last-Modified + this body's registered_at are the before-the-results
+    # proof the experiment page links. Fail-soft: an S3 hiccup must not block the
+    # experiment itself, but the response says so honestly instead of pretending.
+    prereg_url = None
+    prereg_warning = None
+    if design is not None:
+        prereg_key = f"generated/experiments/prereg/{exp_id}.json"
+        artifact = {
+            "schema_version": 1,
+            "experiment_id": exp_id,
+            "name": name,
+            "hypothesis": hypothesis,
+            "start_date": start_date,
+            "planned_duration_days": item["planned_duration_days"],
+            "duration_tier": duration_tier or None,
+            "experiment_type": experiment_type or None,
+            "iteration": iteration,
+            "design": design,  # raw JSON floats — this is the public copy, not the DDB one
+            "registered_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "contract": (
+                "Frozen at creation, before any results existed. The design above is what "
+                "was promised; the closing analysis is graded against it, not against hindsight."
+            ),
+        }
+        try:
+            s3_client.put_object(
+                Bucket=S3_BUCKET,
+                Key=prereg_key,
+                Body=json.dumps(artifact, indent=2),
+                ContentType="application/json",
+                CacheControl="public, max-age=300",
+            )
+            prereg_url = f"https://averagejoematt.com/experiments/prereg/{exp_id}.json"
+            item["prereg_key"] = prereg_key
+            item["prereg_url"] = prereg_url
+        except Exception as e:  # noqa: BLE001 — fail-soft by design, surfaced in the response
+            logger.warning(f"create_experiment: pre-registration artifact write failed for {exp_id}: {e}")
+            prereg_warning = (
+                "pre-registration artifact could NOT be written to S3 — the experiment exists "
+                "but has no public timestamped proof; re-create it or write the artifact manually"
+            )
+
     # Clean None values for DynamoDB
     clean_item = {k: v for k, v in item.items() if v is not None}
     table.put_item(Item=clean_item)
@@ -2756,6 +2800,8 @@ def tool_create_experiment(args):
         "iteration": iteration,
         "design": design,
         "pre_registered_at": item.get("pre_registered_at"),
+        "pre_registration_url": prereg_url,
+        **({"pre_registration_warning": prereg_warning} if prereg_warning else {}),
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",
             "Attia": "Define your primary endpoint now. What number would convince you this worked? Statistical noise requires \u226514 days of data.",

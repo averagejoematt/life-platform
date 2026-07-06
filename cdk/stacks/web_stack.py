@@ -765,6 +765,23 @@ class WebStack(Stack):
                         allowed_methods=["GET", "HEAD"],
                         cached_methods=["GET", "HEAD"],
                     ),
+                    # #728: experiment pre-registration artifacts — create_experiment (MCP)
+                    # freezes the declared design to generated/experiments/prereg/{id}.json
+                    # at creation, BEFORE any results exist; the experiment page links it as
+                    # the timestamped proof. Immutable by contract (nothing mutates a
+                    # pre-registration after the stamp), so caching is safe; short default
+                    # TTL only so a brand-new artifact is fetchable within minutes.
+                    cloudfront.CfnDistribution.CacheBehaviorProperty(
+                        path_pattern="/experiments/prereg/*",
+                        target_origin_id="S3GeneratedOrigin",
+                        viewer_protocol_policy="redirect-to-https",
+                        forwarded_values=cloudfront.CfnDistribution.ForwardedValuesProperty(query_string=False),
+                        default_ttl=300,
+                        max_ttl=86400,
+                        min_ttl=0,
+                        allowed_methods=["GET", "HEAD"],
+                        cached_methods=["GET", "HEAD"],
+                    ),
                     cloudfront.CfnDistribution.CacheBehaviorProperty(
                         path_pattern="/public_stats.json",
                         target_origin_id="S3GeneratedOrigin",

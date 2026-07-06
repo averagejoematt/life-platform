@@ -2233,8 +2233,11 @@ def mcp_server() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="S3Write",
+            # #728: generated/experiments/prereg/* — create_experiment freezes the
+            # pre-registration artifact (public, timestamped, immutable-by-contract).
+            # Write-only; the delete-protection bucket policy still applies to generated/*.
             actions=["s3:PutObject"],
-            resources=_s3("config/*"),
+            resources=_s3("config/*", "generated/experiments/prereg/*"),
         ),
         iam.PolicyStatement(
             sid="Secrets",

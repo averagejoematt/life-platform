@@ -19,6 +19,8 @@ def _design(**over):
     d = {
         "baseline_days": 14,
         "washout_days": 3,
+        # #728: required — a pre-registration must declare its stop before the data exists.
+        "stopping_rule": "run the full 21 days regardless of interim trend; abort only if recovery < 40% for 3 consecutive days",
         "criterion": {"metric": "deep_pct", "direction": "higher", "min_effect": 2},
     }
     d.update(over)
@@ -65,6 +67,22 @@ class TestValidateDesign:
     def test_non_dict(self):
         ok, issues = ed.validate_design("14 days")
         assert not ok
+
+    # #728: the stopping rule is REQUIRED and must be substantive free text.
+    def test_rejects_missing_stopping_rule(self):
+        d = _design()
+        del d["stopping_rule"]
+        ok, issues = ed.validate_design(d)
+        assert not ok and any("stopping_rule" in i for i in issues)
+
+    def test_rejects_trivial_or_bloated_stopping_rule(self):
+        for bad in ("stop", "  ", 14, "x" * 501):
+            ok, issues = ed.validate_design(_design(stopping_rule=bad))
+            assert not ok and any("stopping_rule" in i for i in issues), repr(bad)
+
+    def test_stopping_rule_boundary_lengths_pass(self):
+        assert ed.validate_design(_design(stopping_rule="a" * 20))[0]
+        assert ed.validate_design(_design(stopping_rule="a" * 500))[0]
 
 
 class TestDesignWindows:
