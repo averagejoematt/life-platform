@@ -79,8 +79,13 @@ def _load_template_cache() -> dict[str, Any]:
 
 def _ir_movement_to_template(catalog: dict[str, Any], movement_key: str, cache: dict[str, Any] | None = None) -> str | None:
     """Resolve a programmed movement_key to the Hevy template id it was pushed as.
-    Hint first (authoritative for hinted movements); for ADR-069 title-resolved
-    movements (no hint on purpose) fall back to the resolved template cache."""
+    Three tiers: (1) ADR-069 template-index keys of the form "tmpl:<id>" already carry
+    the resolved id in the suffix (a movement added by raw template, not a catalog entry
+    — mirrors tools_hevy_routine.py); resolve it directly or it would be counted "missing"
+    even when performed, deflating adherence. (2) catalog hint (authoritative for hinted
+    movements). (3) resolved template cache for title-resolved movements (no hint on purpose)."""
+    if movement_key and movement_key.startswith("tmpl:"):
+        return movement_key[len("tmpl:") :]
     hint = catalog.get("movements", {}).get(movement_key, {}).get("hevy_template_id_hint")
     if hint:
         return hint
