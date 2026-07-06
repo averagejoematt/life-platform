@@ -74,45 +74,35 @@
   //    inspects (lingers briefly — touch has no hover-out). Keyboard rides the
   //    SAME path: the plot is focusable, arrows/Home/End walk points, Escape
   //    dismisses (pairs with #579's focus styles). ──
-  function wireChart(el) {
-    if (el.__ix) return; el.__ix = 1;
-    var cpts; try { cpts = JSON.parse(el.getAttribute("data-cpts")); } catch (e) { return; }
-    if (!cpts || !cpts.length) return;
-    var fig = el.closest(".chart") || el.parentElement; if (!fig) return;
+  // ONE readout implementation (the focus dot + cursor-following tooltip), shared by
+  //    every hit-test strategy below (#582 line/bar path, #583 radial + cell paths).
+  //    Hosts the dot/tip inside `fig` (positioned relative) and exposes set()/hide().
+  function makeReadout(fig, srcEl) {
     if (getComputedStyle(fig).position === "static") fig.style.position = "relative";
-    el.style.touchAction = "pan-y";
-    var yAxis = el.getAttribute("data-cpts-axis") === "y";
     var dot = document.createElement("span"); dot.className = "chart-focus"; dot.hidden = true;
     var tip = document.createElement("span"); tip.className = "chart-tip label"; tip.hidden = true;
     fig.appendChild(dot); fig.appendChild(tip);
-    var hideT = null, cur = -1;
-    function place(pt) {
-      var r = el.getBoundingClientRect(), fr = fig.getBoundingClientRect();
-      if (!r.width || !r.height) return;
-      var px = (r.left - fr.left) + pt.x * r.width, py = (r.top - fr.top) + pt.y * r.height;
-      dot.style.left = px + "px"; dot.style.top = py + "px"; dot.hidden = false;
-      tip.textContent = pt.l; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.hidden = false;
-      // Cross-highlight hook (uplevel P4): fire-and-forget — a consumer (e.g. the
-      // weight silhouette) can follow the focused point; a listener error must
-      // never break the chart itself.
-      try { el.dispatchEvent(new CustomEvent("chart:point", { bubbles: true, detail: { label: pt.l, v: pt.v } })); } catch (e) {}
-    }
-    function showIndex(i) { if (i < 0 || i >= cpts.length) return; cur = i; place(cpts[i]); }
-    function showAt(clientX, clientY) {
-      var r = el.getBoundingClientRect();
-      if (!r.width || !r.height) return;
-      var ratio = yAxis ? Math.max(0, Math.min(1, (clientY - r.top) / r.height))
-                        : Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-      var best = Infinity, bi = 0;
-      for (var i = 0; i < cpts.length; i++) {
-        var d = Math.abs((yAxis ? cpts[i].y : cpts[i].x) - ratio);
-        if (d < best) { best = d; bi = i; }
-      }
-      showIndex(bi);
-    }
-    function hide() { clearTimeout(hideT); dot.hidden = true; tip.hidden = true; }
-    el.addEventListener("pointermove", function (e) { clearTimeout(hideT); showAt(e.clientX, e.clientY); });
-    el.addEventListener("pointerdown", function (e) { clearTimeout(hideT); showAt(e.clientX, e.clientY); });
+    return {
+      set: function (px, py, label, v) {
+        dot.style.left = px + "px"; dot.style.top = py + "px"; dot.hidden = false;
+        tip.textContent = label; tip.style.left = px + "px"; tip.style.top = py + "px"; tip.hidden = false;
+        // Cross-highlight hook (uplevel P4): fire-and-forget — a consumer (e.g. the
+        // weight silhouette) can follow the focused point; a listener error must
+        // never break the chart itself.
+        try { srcEl.dispatchEvent(new CustomEvent("chart:point", { bubbles: true, detail: { label: label, v: v } })); } catch (e) {}
+      },
+      hide: function () { dot.hidden = true; tip.hidden = true; },
+    };
+  }
+
+  // Wire the pointer + tap-linger + keyboard grammar shared by both strategies onto
+  //    `el`, delegating the actual point resolution to the caller's closures:
+  //    resolveAt(clientX, clientY) → index, step(dir) → index (keyboard), showIndex(i).
+  function wireGrammar(el, showIndex, resolveAt, step, hide) {
+    var hideT = null;
+    el.style.touchAction = "pan-y";
+    el.addEventListener("pointermove", function (e) { clearTimeout(hideT); showIndex(resolveAt(e.clientX, e.clientY)); });
+    el.addEventListener("pointerdown", function (e) { clearTimeout(hideT); showIndex(resolveAt(e.clientX, e.clientY)); });
     el.addEventListener("pointerup", function (e) {
       // tap-to-inspect: linger long enough to read, then tidy up.
       if (e.pointerType !== "mouse") { clearTimeout(hideT); hideT = setTimeout(hide, 2600); }
@@ -122,24 +112,121 @@
       if (e.pointerType === "mouse") hide();
     });
     el.addEventListener("pointercancel", hide); // the scroll took over the gesture
-    // Keyboard exploration — same code path. Skip decorative (aria-hidden) plots.
+    // Keyboard exploration — same readout. Skip decorative (aria-hidden) plots.
     if (el.getAttribute("aria-hidden") !== "true") {
       if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
       el.addEventListener("keydown", function (e) {
-        var k = e.key;
-        if (k === "ArrowRight" || k === "ArrowDown") { clearTimeout(hideT); showIndex(cur < 0 ? 0 : Math.min(cpts.length - 1, cur + 1)); e.preventDefault(); }
-        else if (k === "ArrowLeft" || k === "ArrowUp") { clearTimeout(hideT); showIndex(cur < 0 ? 0 : Math.max(0, cur - 1)); e.preventDefault(); }
-        else if (k === "Home") { clearTimeout(hideT); showIndex(0); e.preventDefault(); }
-        else if (k === "End") { clearTimeout(hideT); showIndex(cpts.length - 1); e.preventDefault(); }
-        else if (k === "Escape") { hide(); cur = -1; }
+        var i = step(e.key);
+        if (i === -2) { clearTimeout(hideT); hide(); return; } // Escape
+        if (i === -1) return; // key not handled — let it bubble
+        clearTimeout(hideT); showIndex(i); e.preventDefault();
       });
       el.addEventListener("blur", hide);
     }
   }
+
+  // Strategy 1 — abstract coordinate points (data-cpts). Hit-test is NEAREST on the
+  //    dominant axis (x, or y for data-cpts-axis="y"), OR 2-D Euclidean for radial /
+  //    scatter plots (data-cpts-hit="xy" — rings, radar, the autonomic 2×2), where a
+  //    single axis is meaningless. Keyboard walks the point array in order.
+  function wireChart(el) {
+    if (el.__ix) return; el.__ix = 1;
+    var cpts; try { cpts = JSON.parse(el.getAttribute("data-cpts")); } catch (e) { return; }
+    if (!cpts || !cpts.length) return;
+    var fig = el.closest(".chart") || el.parentElement; if (!fig) return;
+    var yAxis = el.getAttribute("data-cpts-axis") === "y";
+    var xy = el.getAttribute("data-cpts-hit") === "xy";
+    var rd = makeReadout(fig, el);
+    var cur = -1;
+    function place(pt) {
+      var r = el.getBoundingClientRect(), fr = fig.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      rd.set((r.left - fr.left) + pt.x * r.width, (r.top - fr.top) + pt.y * r.height, pt.l, pt.v);
+    }
+    function showIndex(i) { if (i < 0 || i >= cpts.length) return; cur = i; place(cpts[i]); }
+    function resolveAt(clientX, clientY) {
+      var r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return -1;
+      var best = Infinity, bi = 0, i;
+      if (xy) {
+        var nx = (clientX - r.left) / r.width, ny = (clientY - r.top) / r.height;
+        for (i = 0; i < cpts.length; i++) { var dx = cpts[i].x - nx, dy = cpts[i].y - ny, d = dx * dx + dy * dy; if (d < best) { best = d; bi = i; } }
+      } else {
+        var ratio = yAxis ? Math.max(0, Math.min(1, (clientY - r.top) / r.height))
+                          : Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+        for (i = 0; i < cpts.length; i++) { var da = Math.abs((yAxis ? cpts[i].y : cpts[i].x) - ratio); if (da < best) { best = da; bi = i; } }
+      }
+      return bi;
+    }
+    function step(k) {
+      if (k === "ArrowRight" || k === "ArrowDown") return cur < 0 ? 0 : Math.min(cpts.length - 1, cur + 1);
+      if (k === "ArrowLeft" || k === "ArrowUp") return cur < 0 ? 0 : Math.max(0, cur - 1);
+      if (k === "Home") return 0;
+      if (k === "End") return cpts.length - 1;
+      if (k === "Escape") { cur = -1; return -2; }
+      return -1;
+    }
+    wireGrammar(el, showIndex, resolveAt, step, rd.hide);
+  }
+
+  // Strategy 2 — reflowing DOM cells (data-cells). Each cell carries data-l (its label);
+  //    hit-test is nearest cell CENTRE in live screen space (robust to responsive wrap —
+  //    heat calendars, effort maps, meal-window rows all reflow), and the keyboard walks
+  //    cells in 2-D (arrows pick the nearest cell in the pressed direction). One readout,
+  //    measured at interaction time so a re-layout can never desync the dot from a cell.
+  function wireCells(el) {
+    if (el.__ix) return; el.__ix = 1;
+    var cells = Array.prototype.slice.call(el.querySelectorAll("[data-l]"));
+    if (!cells.length) return;
+    var rd = makeReadout(el, el); // the container hosts its own dot/tip
+    var cur = -1;
+    function centre(i) { var r = cells[i].getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+    function showIndex(i) {
+      if (i < 0 || i >= cells.length) return; cur = i;
+      var er = el.getBoundingClientRect(), r = cells[i].getBoundingClientRect();
+      if (!er.width) return;
+      rd.set((r.left - er.left) + r.width / 2, (r.top - er.top) + r.height / 2, cells[i].getAttribute("data-l"), cells[i].getAttribute("data-v"));
+    }
+    function resolveAt(clientX, clientY) {
+      var best = Infinity, bi = 0;
+      for (var i = 0; i < cells.length; i++) { var c = centre(i), dx = c.x - clientX, dy = c.y - clientY, d = dx * dx + dy * dy; if (d < best) { best = d; bi = i; } }
+      return bi;
+    }
+    function directional(dx, dy) {
+      if (cur < 0) return 0;
+      var c0 = centre(cur), best = Infinity, bi = cur;
+      for (var i = 0; i < cells.length; i++) {
+        if (i === cur) continue;
+        var c = centre(i), ddx = c.x - c0.x, ddy = c.y - c0.y;
+        if (dx > 0 && ddx <= 1) continue; if (dx < 0 && ddx >= -1) continue;
+        if (dy > 0 && ddy <= 1) continue; if (dy < 0 && ddy >= -1) continue;
+        // cross-axis drift is penalised so a step reads as "the next one over", not a diagonal jump.
+        var along = dx ? Math.abs(ddx) : Math.abs(ddy), across = dx ? Math.abs(ddy) : Math.abs(ddx);
+        var score = along + across * 2;
+        if (score < best) { best = score; bi = i; }
+      }
+      return bi;
+    }
+    function step(k) {
+      if (k === "ArrowRight") return cur < 0 ? 0 : directional(1, 0);
+      if (k === "ArrowLeft") return cur < 0 ? 0 : directional(-1, 0);
+      if (k === "ArrowDown") return cur < 0 ? 0 : directional(0, 1);
+      if (k === "ArrowUp") return cur < 0 ? 0 : directional(0, -1);
+      if (k === "Home") return 0;
+      if (k === "End") return cells.length - 1;
+      if (k === "Escape") { cur = -1; return -2; }
+      return -1;
+    }
+    wireGrammar(el, showIndex, resolveAt, step, rd.hide);
+  }
   function wireCharts(scope) {
     if (!scope.querySelectorAll) return;
     Array.prototype.forEach.call(scope.querySelectorAll("[data-cpts]"), wireChart);
-    if (scope.matches && scope.matches("[data-cpts]")) wireChart(scope);
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-cells]"), wireCells);
+    if (scope.matches) {
+      if (scope.matches("[data-cpts]")) wireChart(scope);
+      if (scope.matches("[data-cells]")) wireCells(scope);
+    }
   }
 
   var reduce;

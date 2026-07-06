@@ -3,7 +3,7 @@
   stat block, mechanics layer, record and time-travel wiring. Split out of evidence.js
   (#581) — no behavior change.
 */
-import { sparkline, ring, pillarRing, radarChart } from "/assets/js/charts.js";
+import { sparkline, ring, pillarRing, pillarRingCpts, radarChart } from "/assets/js/charts.js";
 import { badgeMark, tierEmblem } from "/assets/js/sigils.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { esc, tryJSON, has, fmt, ttl, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
@@ -57,7 +57,7 @@ export function chHeroHtml(ch, pillars, jj, wave) {
   return `<section class="rd-sec ch-hero" data-tier="${esc(tier.toLowerCase())}">
     <div class="ch-stage">
       <div class="ch-figwrap">
-        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven pillar ring around the body silhouette — each arc fills with its pillar's score">${pillarRing(pillars, { size: RING })}${center}</svg>
+        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven pillar ring around the body silhouette — each arc fills with its pillar's score" data-cpts="${esc(JSON.stringify(pillarRingCpts(pillars, { size: RING })))}" data-cpts-hit="xy">${pillarRing(pillars, { size: RING })}${center}</svg>
         <div class="ch-legend label">${legend}</div>
       </div>
       <div class="ch-id">
