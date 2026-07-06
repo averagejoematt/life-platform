@@ -184,7 +184,7 @@ ORIENTATION_VOICE = (
     "- List 2-3 specific things you're watching for as data accumulates\n"
     "- Name exactly what data you have and what's missing\n"
     "- Do NOT make analytical claims, trend statements, or recommendations\n"
-    '- End with: "I\'ll have more to say around {target_date}."\n'
+    '- End with: "I\'ll have more to say once I have enough data to see a pattern."\n'
     "- Tone: professional introduction, not apology for lack of data\n"
 )
 
@@ -421,7 +421,6 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
     days = domain_maturity.get("days", 0)
     unit = domain_maturity.get("unit", "days")
     threshold = domain_maturity.get("threshold", 7)
-    target_date = domain_maturity.get("target_date", "")
 
     if phase == "orientation":
         voice_tmpl = ORIENTATION_VOICE.format(
@@ -430,7 +429,6 @@ def build_coach_preamble(coach_name: str, domain: str, goals: dict, inventory: d
             threshold=threshold,
             name=coach_name,
             domain=domain,
-            target_date=target_date or "soon",
         )
     elif phase == "emerging":
         voice_tmpl = EMERGING_VOICE.format(days=days, unit=unit)
@@ -1517,11 +1515,112 @@ def build_thread_prompt_block(coach_id: str, personality: dict = None) -> str:
     return "\n".join(parts)
 
 
+def _prediction_slug(text: str) -> str:
+    """Deterministic semantic slug for a prediction claim (the dedup key).
+
+    Same construction as the canonical COACH#/PREDICTION# path in
+    coach_state_updater.py so both prediction stores read the same identity.
+    """
+    return re.sub(r"[^a-z0-9]+", "_", (text or "").lower()[:40]).strip("_")
+
+
+def _timeframe_to_window_days(timeframe: str) -> int:
+    """Map a natural-language horizon ('in 2 weeks', 'by next month') to a
+    strictly-positive evaluation window in days. Mirrors coach_state_updater's
+    mapping; defaults to 14 so a metric-bearing claim is always gradeable."""
+    tf = (timeframe or "").lower()
+    if not tf:
+        return 14
+    if "month" in tf:
+        m = re.search(r"(\d+)", tf)
+        return int(m.group(1)) * 30 if m else 30
+    if "week" in tf:
+        m = re.search(r"(\d+)", tf)
+        return int(m.group(1)) * 7 if m else 7
+    if "day" in tf:
+        m = re.search(r"(\d+)", tf)
+        return int(m.group(1)) if m else 14
+    return 14
+
+
+def stamp_thread_predictions(coach_id: str, raw_predictions: list, today: str = None) -> list:
+    """Code-stamp prediction identity + target date (ADR-106: only code ships).
+
+    The LLM authors claim text, confidence, an optional metric and an optional
+    natural timeframe — never `prediction_id` or `target_date`. This function:
+      • strips any model-authored id/date (defensive — the schema no longer asks),
+      • stamps `prediction_id = pred_{today}_{semantic-slug}` and a strictly-future
+        `target_date` (today + timeframe window) so no record is ungradeable-by-
+        construction whenever a metric is present,
+      • carries an open prior prediction forward on a matching `semantic_key` so
+        daily re-emission of the same claim UPDATES one record instead of minting
+        a new duplicate every day (the `pred_2024…` vs `pred_2025…` inflation bug).
+
+    Returns the cleaned prediction list (deduped within the batch by semantic_key).
+    """
+    today = today or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day_compact = today.replace("-", "")
+
+    # Prior OPEN predictions by semantic key — so a re-emitted claim reuses its
+    # original id + target_date (a stable deadline) rather than resetting daily.
+    prior_open = {}
+    try:
+        for entry in read_coach_thread(coach_id, limit=10):
+            for p in entry.get("predictions", []):
+                key = p.get("semantic_key") or _prediction_slug(p.get("text", ""))
+                if key and p.get("status", "pending") == "pending" and key not in prior_open:
+                    prior_open[key] = p
+    except Exception as e:  # read is best-effort; a fresh stamp is always valid
+        logger.warning("prior-prediction lookup failed for %s: %s", coach_id, e)
+
+    stamped = {}
+    for pred in raw_predictions or []:
+        text = (pred.get("text") or "").strip()
+        if not text:
+            continue
+        key = _prediction_slug(text)
+        if not key:
+            continue
+        metric = (pred.get("metric") or "").strip() or None
+        confidence = pred.get("confidence") or "medium"
+
+        carried = prior_open.get(key)
+        if carried:
+            # Update in place: keep the original id + deadline, refresh confidence/metric.
+            rec = {
+                "prediction_id": carried.get("prediction_id") or f"pred_{day_compact}_{key}",
+                "semantic_key": key,
+                "text": text,
+                "confidence": confidence,
+                "metric": metric,
+                "target_date": carried.get("target_date"),
+                "first_seen": carried.get("first_seen") or carried.get("target_date"),
+                "status": "pending",
+                "reaffirmed_on": today,
+            }
+        else:
+            window = _timeframe_to_window_days(pred.get("timeframe", ""))
+            target = (datetime.strptime(today, "%Y-%m-%d") + timedelta(days=max(1, window))).strftime("%Y-%m-%d")
+            rec = {
+                "prediction_id": f"pred_{day_compact}_{key}",
+                "semantic_key": key,
+                "text": text,
+                "confidence": confidence,
+                "metric": metric,
+                "target_date": target,  # strictly future by construction
+                "first_seen": today,
+                "status": "pending",
+            }
+        stamped[key] = rec  # dedup within-batch by semantic key
+    return list(stamped.values())
+
+
 def extract_thread_from_narrative(coach_id: str, narrative: str, api_key: str) -> dict:
     """Extract thread data from a coach's generated narrative via a lightweight API call.
 
     Makes a Haiku-class call to parse: position_summary, predictions, surprises,
-    emotional_investment_level, open_questions.
+    emotional_investment_level, open_questions. Prediction identity + target dates
+    are stamped in code (ADR-106) — see stamp_thread_predictions.
     """
     import urllib.request
 
@@ -1534,7 +1633,7 @@ Extract:
 {{
   "position_summary": "2-3 sentence summary of the coach's current stance/assessment",
   "predictions": [
-    {{"prediction_id": "pred_YYYYMMDD_slug", "text": "the prediction in natural language", "confidence": "low|medium|high", "metric": "optional metric to check", "target_date": "optional YYYY-MM-DD", "status": "pending"}}
+    {{"text": "the prediction in natural language", "confidence": "low|medium|high", "metric": "optional metric to check", "timeframe": "optional natural horizon, e.g. 'in 2 weeks' or 'by next month'"}}
   ],
   "surprises": ["things that surprised the coach — empty list if nothing surprising"],
   "emotional_investment": "detached|observing|engaged|invested|concerned|excited",
@@ -1543,7 +1642,7 @@ Extract:
 
 Rules:
 - position_summary: what does the coach believe RIGHT NOW about their domain for Matthew?
-- predictions: only include explicit forward-looking claims. Not observations.
+- predictions: only include explicit forward-looking claims. Not observations. State the claim, a confidence, an optional metric, and an optional timeframe. Do NOT invent an ID or a calendar date — the system stamps prediction_id and target_date in code.
 - emotional_investment: infer from language intensity. Academic/measured = observing. Strong opinions = invested. Worry = concerned.
 - If nothing fits a field, use empty list or "observing" default."""
 
@@ -1583,7 +1682,10 @@ Rules:
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
         if cleaned.endswith("```"):
             cleaned = cleaned[:-3]
-        return json.loads(cleaned.strip())
+        parsed = json.loads(cleaned.strip())
+        # ADR-106: code owns prediction identity + target dates, never the model.
+        parsed["predictions"] = stamp_thread_predictions(coach_id, parsed.get("predictions", []))
+        return parsed
 
     except Exception as e:
         logger.warning("Thread extraction failed for %s: %s — using defaults", coach_id, e)
