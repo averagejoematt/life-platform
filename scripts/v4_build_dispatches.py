@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
+from v4_proof import chronicle_list_html, load_chronicle  # noqa: E402  — #730 static proof
 
 OUT = Path("site/story")
 
@@ -95,6 +96,7 @@ SHELL = """<!DOCTYPE html>
       <p class="ph-promise">The chronicle, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>, the AI team in <a href="/coaching/">the coaching</a>; this is the why.</p>
       {ribbon}
     </div>
+    {proof}
     <nav class="dx-tabs" data-dx-tabs aria-label="Story sections"></nav>
     <div class="dx-layout">
       <ul class="dx-list" data-dx-list aria-label="Entries"></ul>
@@ -134,6 +136,11 @@ def write(path: Path, html_text: str) -> None:
 
 
 def main() -> None:
+    # #730: bake the dated chronicle post list into the served HTML (noscript) so the
+    # best writing is crawlable/greppable, not locked behind JS. Shown on the hub
+    # (which defaults to the chronicle view) and the /story/chronicle/ sub-page.
+    chronicle_proof = chronicle_list_html(load_chronicle())
+
     # hub (defaults to chronicle)
     write(
         OUT / "index.html",
@@ -142,11 +149,21 @@ def main() -> None:
             desc="The chronicle, the journal, the timeline, and the context behind the experiment.",
             canon="",
             start="chronicle",
+            proof=chronicle_proof,
         ),
     )
     # per-section sub-pages
     for key, label, desc in SECTIONS:
-        write(OUT / key / "index.html", SHELL.format(title=f"{label} — The Story — averagejoematt", desc=desc, canon=f"{key}/", start=key))
+        write(
+            OUT / key / "index.html",
+            SHELL.format(
+                title=f"{label} — The Story — averagejoematt",
+                desc=desc,
+                canon=f"{key}/",
+                start=key,
+                proof=chronicle_proof if key == "chronicle" else "",
+            ),
+        )
     print(f"✅ wrote site/story/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
 
 

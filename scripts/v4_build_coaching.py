@@ -20,6 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
+from v4_proof import load_scorecard, scorecard_block_html  # noqa: E402  — #729/#730 static proof
 
 OUT = Path("site/coaching")
 
@@ -112,6 +113,7 @@ SHELL = """<!DOCTYPE html>
       {ribbon}
       <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
     </div>
+    {proof}
     <nav class="dx-tabs" data-dx-tabs aria-label="Coaching sections"></nav>
     <div class="dx-layout">
       <ul class="dx-list" data-dx-list aria-label="Entries"></ul>
@@ -151,6 +153,11 @@ def write(path: Path, html_text: str) -> None:
 
 
 def main() -> None:
+    # #729/#730: bake the scorecard's honest empty-state + counts into the served
+    # HTML (noscript) so a crawler / LLM / no-JS skeptic sees the falsifiable track
+    # record, not an empty shell. JS still renders the rich interactive scorecard.
+    scorecard_proof = scorecard_block_html(load_scorecard())
+
     write(
         OUT / "index.html",
         SHELL.format(
@@ -158,11 +165,19 @@ def main() -> None:
             desc="What the AI board is saying about the data right now — the read, by coach, the disagreements, and the weekly lab notes.",
             canon="",
             start="read",
+            proof="",
         ),
     )
     for key, label, desc in SECTIONS:
         write(
-            OUT / key / "index.html", SHELL.format(title=f"{label} — The Coaching — averagejoematt", desc=desc, canon=f"{key}/", start=key)
+            OUT / key / "index.html",
+            SHELL.format(
+                title=f"{label} — The Coaching — averagejoematt",
+                desc=desc,
+                canon=f"{key}/",
+                start=key,
+                proof=scorecard_proof if key == "scorecard" else "",
+            ),
         )
     print(f"✅ wrote site/coaching/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))
 
