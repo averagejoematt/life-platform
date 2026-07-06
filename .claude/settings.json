@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(cdk deploy:*)",
+      "Bash(npx cdk deploy:*)",
+      "Bash(aws lambda update-function-code:*)",
+      "Bash(aws lambda invoke:*)",
+      "Bash(aws s3 sync:*)",
+      "Bash(aws s3 cp:*)",
+      "Bash(aws s3 rm:*)",
+      "Bash(aws ssm put-parameter:*)",
+      "Bash(aws secretsmanager put-secret-value:*)",
+      "Bash(aws secretsmanager update-secret:*)",
+      "Bash(aws secretsmanager create-secret:*)",
+      "Bash(aws dynamodb put-item:*)",
+      "Bash(aws dynamodb delete-item:*)",
+      "Bash(aws dynamodb update-item:*)",
+      "Bash(bash deploy/deploy_lambda.sh:*)",
+      "Bash(bash deploy/deploy_and_verify.sh:*)",
+      "Bash(bash deploy/deploy_site_api.sh:*)",
+      "Bash(bash deploy/sync_site_to_s3.sh:*)",
+      "Bash(bash deploy/deploy_mcp_split.sh:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit -n:*)",
+      "Bash(mv .git/hooks/pre-commit:*)",
+      "Bash(rm .git/hooks/pre-commit:*)"
+    ]
+  }
+}
