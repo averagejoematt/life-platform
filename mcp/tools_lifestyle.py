@@ -127,6 +127,15 @@ def _is_traveling(date_str=None):
         return None
 
 
+# ── Citation gate (#758) ──
+# Seligman/Holt-Lunstad-style research citations read as rigor-flavored garnish when the
+# underlying personal sample is a handful of days (ADR-105: uncertainty + n on every claim).
+# Gate the citation on real data volume; below threshold, omit it — the honest numbers
+# (counts, streaks, correlations) still return either way. 14 = two full rolling weeks of
+# enriched_social_quality logs, matching this tool's own rolling_7d/rolling_30d windows —
+# enough to say "this is a pattern," not one journal entry dressed up as a finding.
+_SOCIAL_CITATION_MIN_N = 14
+
 # ── Experiment metrics ──
 
 _EXPERIMENT_METRICS = [
@@ -946,7 +955,8 @@ def tool_get_social_connection_trend(args):
     """
     Aggregates enriched_social_quality from journal entries over time.
     Tracks social connection quality, streaks, rolling averages, and
-    correlates with health outcomes. Seligman PERMA model.
+    correlates with health outcomes. The `perma_context` field (a Seligman
+    PERMA / Holt-Lunstad citation) is gated on n — see `_SOCIAL_CITATION_MIN_N` (#758).
     """
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d"))
@@ -1089,7 +1099,7 @@ def tool_get_social_connection_trend(args):
         if m_avg is not None and l_avg is not None:
             comparison[label] = {"meaningful_avg": m_avg, "low_social_avg": l_avg, "diff": round(m_avg - l_avg, 2)}
 
-    return {
+    result = {
         "start_date": start_date,
         "end_date": end_date,
         "total_days_with_data": len(daily_social),
@@ -1106,8 +1116,17 @@ def tool_get_social_connection_trend(args):
         "health_correlations": health_correlations,
         "journal_correlations": journal_correlations,
         "meaningful_vs_low_comparison": comparison,
-        "perma_context": "Seligman PERMA: Relationships are #1 wellbeing predictor. Holt-Lunstad: isolation increases mortality 26%. Target: meaningful+ connection 5+ days/week.",
     }
+
+    # #758: cite external wellbeing research only once there's enough real data to
+    # ground it in — below the floor it's garnish, not a finding about this person.
+    if len(daily_social) >= _SOCIAL_CITATION_MIN_N:
+        result["perma_context"] = (
+            "Seligman PERMA: Relationships are #1 wellbeing predictor. Holt-Lunstad: isolation "
+            "increases mortality 26%. Target: meaningful+ connection 5+ days/week."
+        )
+
+    return result
 
 
 def tool_get_social_isolation_risk(args):
