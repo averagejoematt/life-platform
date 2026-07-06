@@ -1,9 +1,51 @@
-# HANDOVER — the fable batch: all 6 model:fable R21 stories in one session — 2026-07-06
+# HANDOVER — the fable batch + authorized carry-overs (#726 + the #725 beat) — 2026-07-06
 
-> Directed session: Matthew asked for "all issues in backlog marked model:fable, completed
-> efficiently without sacrificing quality." **No deploy/merge authorization was given this
-> session — NOTHING is merged or deployed.** Five PRs are open and CI-green; three
-> decisions are batched for Matthew (below). Single-threaded on `main`; branches per story.
+> TWO halves. **First half** (fable batch): "all model:fable issues, efficiently without
+> sacrificing quality" — no deploy/merge authorization, so 5 PRs opened and held (below).
+> **Second half**: Matthew said "take care of that" for the two carry-overs — **#726 shipped,
+> merged, deployed, prod-migrated, LIVE-verified** and the **#725 build beat is published**.
+> Single-threaded on `main`; branches per story.
+
+## SECOND HALF — shipped under explicit authorization
+
+### #726 — one prediction store (PR #767 → main `7474cf90`, deployed + migrated + live-verified)
+- `get_predictions` repointed: legacy `SOURCE#coach_thread#` embedded arrays → canonical
+  `COACH#{coach}_coach/PREDICTION#` (the store the evaluator grades and `/api/predictions`
+  serves); track-record-style id normalization; registry docstring corrected; status enum
+  +inconclusive/expired. Tests `tests/test_predictions_one_store_726.py` (7) incl. AST-level
+  one-store assertions on BOTH readers.
+- **Prod migration executed:** `deploy/void_legacy_predictions_726.py --apply` → **712 corrupt
+  embedded predictions voided across 345 thread records** (705 pending; hallucinated
+  `pred_2024/2025` IDs, past/null targets — the FULL corruption; R21's "88" was just the old
+  tool's visible slice). ADR-077 tombstone: `predictions_voided_726` + voided_at/by/`cycle=4`;
+  clean #725-stamped records untouched (spot-checked `training#2026-07-06`); idempotent
+  (re-run: 0 new / 345 already).
+- **Live verification (the real flow):** drove the deployed MCP FunctionURL with the
+  `lp_`-prefixed HMAC bearer (`mcp/handler.py:388` — the `lp_` prefix is the gotcha) →
+  `get_predictions` returned **357 canonical records (302 pending / 55 inconclusive — the
+  evaluator IS grading)**, all code-stamped 2026 IDs. Deploy: `cdk deploy LifePlatformMcp`
+  (diff was exactly code-hash + layer 115→116; the raw-zip path is NOT needed — the stack
+  bundles mcp/ + stages reading/).
+
+### #725 build beat — published (PR #768 → main `2f634e03`, site synced, verified live)
+"The AI no longer writes its own report card" on `/story/build/` — shipped/gotcha/honest-miss
+per the #380 checklist, content-policy scan PASS, `/version.json == 2f634e03`.
+
+### Layer-truth discovered while deploying (the "16/16 on v116" was wrong)
+The live sweep found **three tiers**: (1) `life-platform-mcp` + `life-platform-site-api` were
+still on **v115** (the two special-path consumers the drift check can't see) — **both fixed**
+(MCP via the #726 stack deploy; site-api via manual re-attach per the standing runbook memory);
+(2) `life-platform-freshness-checker` v115 — caught by the post-deploy I1/I2/I5 integration
+check (redded the run), **fixed + job re-run**; (3) **29 functions across the Ingestion +
+Operational stacks remain on v115** — functionally harmless (v116 only changed
+`intelligence_common`, which none of them import) and **deliberately NOT fixed**: the clean fix
+is a stack deploy, but `LifePlatformIngestion` carries the staged HAE change that is
+**explicitly gated on Matthew's call** (session-17 memory). → Next session: the
+`ci/lambda_map.json` consumer audit (#342-adjacent), then reconcile the 29 with Matthew.
+
+---
+
+## FIRST HALF — the fable batch (5 PRs open, held on the batched ask)
 
 ## What was built (5 open PRs, 0 merged)
 
@@ -23,7 +65,8 @@
 4. **Merges + deploys** (all held): merge order #765 → #763 (+#764 after decision 1; #762/#766 anytime). Deploy: layer v117 rebuild→publish→attach (CONVENTIONS §1; `rm -rf cdk.out` first), `cdk deploy LifePlatformWeb LifePlatformMcp`, MCP zip (stage `lambdas/reading/`!), `deploy_site_api.sh`, `sync_site_to_s3.sh`.
 
 ## State at close
-- `main` == origin (untouched); branches `feat/745…/731…/732…/728…/740…` pushed; PRs #762–#766 open, checks green (render+accuracy gate passed on the site PRs; full pipeline runs post-merge).
-- Pre-existing `stash@{0} "On main: session-local"` (settings churn + feed/rss regen) — not this session's, left alone. Untracked `docs/reviews/R21_BACKLOG.md` still present, left alone.
-- No build dispatch distilled (#380 rule: merged work only — nothing merged).
-- Next session: execute whatever subset of the ask Matthew approves; then #726 (void legacy prediction partition — mutates prod data, confirm first) and Session B epic #716 (#730 static proof render / #733 permalinks) remain the R21 spine.
+- `main` == origin == **live** (`/version.json` = `2f634e03`); #726 + the beat merged; PRs #762–#766 still open, checks green, held on the ask above.
+- Layer: constants v116; **53 functions on v116** (incl. mcp, site-api, freshness-checker — all reconciled this session); **29 Ingestion/Operational functions on v115, deliberately left** (see second-half notes — LifePlatformIngestion deploy is gated on Matthew's staged-HAE call).
+- Legacy prediction partition: **voided (712/345, cycle-stamped)**; canonical store serving 357 records via MCP + site. #726 CLOSED by the merge; **E1 remainder = #727** (liveness heartbeat).
+- Pre-existing `stash@{0} "On main: session-local"` + untracked `docs/reviews/R21_BACKLOG.md` — left alone.
+- Next session: whatever subset of the ask Matthew approves (merge order #765→#763; #764 after the finish-line pick) · #727 · Session B epic #716 (#730 static proof render / #733 permalinks) · the `ci/lambda_map.json` consumer audit + the 29-straggler reconcile.
