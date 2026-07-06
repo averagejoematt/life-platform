@@ -419,6 +419,7 @@
       "lambdas/digest_utils.py",
       "lambdas/exercise_history.py",
       "lambdas/experiment_design.py",
+      "lambdas/generation_cache.py",
       "lambdas/grounded_generation.py",
       "lambdas/hevy_compiler.py",
       "lambdas/hevy_template_cache.py",
