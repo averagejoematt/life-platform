@@ -92,6 +92,11 @@ def safe_float(rec, field, default=None):
     return default
 
 
+def latest_weight_lbs(records):
+    """Most-recent non-null weight in a chronological withings record list, else None."""
+    return next((safe_float(w, "weight_lbs") for w in reversed(records) if safe_float(w, "weight_lbs")), None)
+
+
 def avg(vals):
     v = [x for x in vals if x is not None]
     return round(sum(v) / len(v), 1) if v else None
@@ -857,7 +862,6 @@ def assemble_data(yesterday_str, profile):
     # Weight (latest + week-ago + avatar fallback)
     withings_7d = fetch_range("withings", (today - timedelta(days=7)).isoformat(), yesterday_str)
     withings_14d = fetch_range("withings", (today - timedelta(days=14)).isoformat(), yesterday_str)
-    latest_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_7d) if safe_float(w, "weight_lbs")), None)
     target_7d_date = (today - timedelta(days=7)).isoformat()
     week_ago_weight = next(
         (
@@ -867,12 +871,17 @@ def assemble_data(yesterday_str, profile):
         ),
         None,
     )
-    avatar_weight = latest_weight
-    if not avatar_weight:
-        avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_14d) if safe_float(w, "weight_lbs")), None)
-    if not avatar_weight:
+    # BUG-01 (#783): weigh-ins are sporadic — a >7-day gap is routine, not an outage
+    # (source_registry: 'a missing week is a lapse, not an outage'). latest_weight feeds
+    # the ADR-104 grounding/honesty gate via canonical_facts; with only a 7-day lookback it
+    # goes dark on the headline metric during normal gaps and fires false-positive canary
+    # alarms. Fall back 14d then 30d so the gate actually covers weight. avatar_weight
+    # (display) shares the same resolved value.
+    latest_weight = latest_weight_lbs(withings_7d) or latest_weight_lbs(withings_14d)
+    if not latest_weight:
         withings_30d = fetch_range("withings", (today - timedelta(days=30)).isoformat(), yesterday_str)
-        avatar_weight = next((safe_float(w, "weight_lbs") for w in reversed(withings_30d) if safe_float(w, "weight_lbs")), None)
+        latest_weight = latest_weight_lbs(withings_30d)
+    avatar_weight = latest_weight
 
     # Weight trajectory (28d regression rate + suppressed-when-provisional projection) —
     # the ONE shared computation (weight_trend); the brief/public_stats read this, so the
