@@ -54,7 +54,7 @@ SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 #        v115-published-but-never-attached drift (all consumers were left on v114).
 # v117: #728 experiment pre-registration — experiment_design.validate_design requires
 #        stopping_rule; create_experiment freezes the public prereg artifact.
-SHARED_LAYER_VERSION = 117
+SHARED_LAYER_VERSION = 118
 
 SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
 
