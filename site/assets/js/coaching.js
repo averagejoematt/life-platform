@@ -297,7 +297,11 @@ async function renderByCoach(read, id) {
 
   // 1) THE READ — lead with the coach's actual verdict on the domain.
   if (analysis && (analysis.analysis || analysis.key_recommendation)) {
-    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week</p>`;
+    // #787: stamp the read with ITS OWN as-of date. Coaches regenerate on staggered
+    // days, so any two can quote different "current" vitals; the date makes clear each
+    // number is that coach's most recent read, not a shared "today" that self-contradicts.
+    const readAsOf = String(analysis.generated_at || "").slice(0, 10);
+    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week${readAsOf ? ` · as of ${esc(readAsOf)}` : ""}</p>`;
     if (analysis.analysis) h += `<p class="bc-analysis dx-prose">${esc(analysis.analysis)}</p>`;
     if (analysis.key_recommendation) h += `<p class="bc-rec"><span class="label">the one thing</span> ${esc(analysis.key_recommendation)}</p>`;
     if (analysis.cross_domain_note) h += `<p class="bc-xnote label">cross-domain: ${esc(analysis.cross_domain_note)}</p>`;

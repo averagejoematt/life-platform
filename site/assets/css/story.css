@@ -403,6 +403,7 @@ body { overflow-x: hidden; }
 .tl-recap-beat-k { color: var(--ink-faint); margin-right: var(--sp-1); }
 .tl-recap-beat-k a { color: var(--ember); }
 .tl-recap-now { color: var(--ink); font-size: var(--fs-small); margin: var(--sp-3) 0 0; font-style: italic; }
+.tl-recap-asof { color: var(--ink-faint); margin: 2px 0 0; letter-spacing: 0.02em; }
 .tl-recap-by { color: var(--ink-faint); margin: var(--sp-3) 0 0; text-align: right; }
 /* The quiet stretch (2026-06-30) — when the owner's own logging goes quiet, or he
    returns. Sits below the recap; honest, never alarmist. Accent warms with a real
