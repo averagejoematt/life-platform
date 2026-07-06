@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from routine_ir import ExerciseBlock, RoutineSpec, Set
+from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 
 class MovementUnmappable(Exception):
@@ -118,6 +118,40 @@ def _exercise_to_wire(ex: ExerciseBlock, template_resolver: Callable[[str], str]
     }
 
 
+def render_branches_note(branches: list[RoutineBranch]) -> str:
+    """Render a routine's first-class branches into an annotated notes block (#417).
+
+    Hevy holds ONE exercise list per routine, so the branch MENU lives in the
+    notes field — the only place the write client can carry alternatives. Every
+    branch is rendered (self-selection preserved: the reader can choose any of
+    them); the `recommended` branch is starred. Branches render in `order`, so
+    the overnight re-stamp re-ordering surfaces here directly. Pure — no I/O.
+
+    Returns "" when there are no branches, so a routine that defines none
+    compiles and pushes byte-identical to before (backward compat).
+    """
+    if not branches:
+        return ""
+    ordered = sorted(branches, key=lambda b: (b.order, b.label))
+    lines = ["— CHOOSE YOUR BRANCH —"]
+    for b in ordered:
+        marker = "★" if b.recommended else "•"
+        rec = " (recommended)" if b.recommended else ""
+        cue = f" — {b.cue}" if b.cue else ""
+        lines.append(f"{marker} {b.label.upper()}{rec}{cue}")
+    lines.append("You choose — every branch is yours to take; the star is only a suggestion.")
+    return "\n".join(lines)
+
+
+def _compose_notes(ir: RoutineSpec, why_note: str | None) -> str:
+    """Base WHY note (or ir.notes) + the branch menu, both sanitized for the wire."""
+    base = sanitize_note(why_note if why_note is not None else ir.notes)
+    branch_block = sanitize_note(render_branches_note(ir.branches))
+    if not branch_block:
+        return base
+    return f"{base}\n\n{branch_block}" if base else branch_block
+
+
 def _resolve_title(ir: RoutineSpec, title_context: dict[str, Any] | None) -> str:
     """If a title_context is supplied use the ADR-067 format; otherwise keep
     the IR title (or a deterministic fallback). Lazy-imports routine_title so
@@ -149,7 +183,7 @@ def to_create_body(
         "routine": {
             "title": _resolve_title(ir, title_context),
             "folder_id": ir.hevy_folder_id,
-            "notes": sanitize_note(why_note if why_note is not None else ir.notes),
+            "notes": _compose_notes(ir, why_note),
             "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
         },
     }
@@ -167,7 +201,7 @@ def to_update_body(
     return {
         "routine": {
             "title": _resolve_title(ir, title_context),
-            "notes": sanitize_note(why_note if why_note is not None else ir.notes),
+            "notes": _compose_notes(ir, why_note),
             "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
         },
     }

@@ -168,3 +168,51 @@ def test_exercise_notes_off_mode_yields_empty_notes(monkeypatch, tmp_path):
     ideal = next(r for r in routines if r.variant == "ideal")
     assert all(ex.notes == "" for ex in ideal.exercises)
     assert called["loaded"] is False  # off mode skips the DDB load entirely
+
+
+# ── Branch model (#417 / TR-04) ──────────────────────────────────────────────
+
+
+def test_emit_branch_model_folds_variants_into_primary():
+    """The scheduled path emits ONE branched routine, not a separate ideal/floor pair."""
+    from routine_generator import emit_branch_model
+
+    routines = generate_routines(_green_inputs("2026-06-01"))  # ideal + floor
+    primary = emit_branch_model(routines)
+    assert primary is not None
+    assert primary.variant == "ideal"
+    labels = {b.label for b in primary.branches}
+    assert "as-written" in labels
+    assert "easier" in labels  # the floor variant, folded in — not dropped
+    recommended = [b for b in primary.branches if b.recommended]
+    assert len(recommended) == 1
+    assert recommended[0].label == "as-written"
+    # No variant is lost: one branch per generated routine.
+    assert len(primary.branches) == len(routines)
+
+
+def test_emit_branch_model_includes_re_entry_when_present():
+    from routine_generator import emit_branch_model
+
+    inputs = _green_inputs("2026-06-01")
+    inputs.days_since_last_workout = 8
+    routines = generate_routines(inputs)
+    primary = emit_branch_model(routines)
+    labels = {b.label for b in primary.branches}
+    assert "re-entry" in labels
+
+
+def test_emit_branch_model_none_on_empty():
+    from routine_generator import emit_branch_model
+
+    assert emit_branch_model([]) is None
+
+
+def test_emit_branch_model_branch_carries_its_own_exercises():
+    from routine_generator import emit_branch_model
+
+    routines = generate_routines(_green_inputs("2026-06-01"))
+    primary = emit_branch_model(routines)
+    easier = next(b for b in primary.branches if b.label == "easier")
+    floor = next(r for r in routines if r.variant == "floor")
+    assert [e.movement_key for e in easier.exercises] == [e.movement_key for e in floor.exercises]

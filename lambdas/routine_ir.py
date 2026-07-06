@@ -48,6 +48,33 @@ class ExerciseBlock:
 
 
 @dataclass
+class RoutineBranch:
+    """A first-class branch of a routine (#417 / TR-04).
+
+    A routine can carry an ordered list of branches — e.g. "as-written",
+    "easier", "harder" (or the recovery-band GREEN/YELLOW/RED model). Exactly
+    one branch is `recommended` (the highlighted default the morning starts on);
+    the overnight re-stamp (TR-05) may RE-ORDER or re-flag which branch is
+    recommended, but it must never add or remove a branch — every branch stays
+    visible and choosable (self-selection is preserved by construction).
+
+    `cue` is a one-line session cue rendered by the compiler into the pushed
+    routine's notes (Hevy holds one exercise list per routine, so the branch
+    menu lives in the notes field — the only place the write client can carry
+    alternatives). `exercises` optionally carries a branch's own set/rep
+    content for the front-end / future per-branch push; the wire push renders
+    the shared base `RoutineSpec.exercises` plus the annotated branch menu.
+    """
+
+    label: str
+    cue: str = ""
+    recommended: bool = False
+    order: int = 0
+    rationale: str = ""
+    exercises: list[ExerciseBlock] = field(default_factory=list)
+
+
+@dataclass
 class RoutineSpec:
     routine_id: str
     target_date: str
@@ -63,6 +90,7 @@ class RoutineSpec:
     status: str = "draft"
     sibling_routine_id: str | None = None
     exercises: list[ExerciseBlock] = field(default_factory=list)
+    branches: list[RoutineBranch] = field(default_factory=list)
     budget_used: dict[str, int] = field(default_factory=dict)
     inputs_snapshot: dict[str, Any] = field(default_factory=dict)
     rationale: list[str] = field(default_factory=list)
@@ -92,15 +120,24 @@ def serialize(ir: RoutineSpec) -> dict[str, Any]:
     return _floats_to_decimal(asdict(ir))
 
 
+def _exercise_from_raw(raw_ex: dict[str, Any]) -> ExerciseBlock:
+    sets = [Set(**s) for s in raw_ex.get("sets", [])]
+    ex_data = {k: v for k, v in raw_ex.items() if k != "sets"}
+    return ExerciseBlock(sets=sets, **ex_data)
+
+
+def _branch_from_raw(raw_branch: dict[str, Any]) -> RoutineBranch:
+    exercises = [_exercise_from_raw(e) for e in raw_branch.get("exercises", [])]
+    b_data = {k: v for k, v in raw_branch.items() if k != "exercises"}
+    return RoutineBranch(exercises=exercises, **b_data)
+
+
 def deserialize(item: dict[str, Any]) -> RoutineSpec:
     """DDB item -> IR. Strips DDB-internal keys (pk/sk/ttl). Decimal-safe."""
     if not item:
         raise ValueError("deserialize() called with empty item")
     data = _decimal_to_float({k: v for k, v in item.items() if k not in ("pk", "sk", "ttl")})
-    exercises = []
-    for raw_ex in data.get("exercises", []):
-        sets = [Set(**s) for s in raw_ex.get("sets", [])]
-        ex_data = {k: v for k, v in raw_ex.items() if k != "sets"}
-        exercises.append(ExerciseBlock(sets=sets, **ex_data))
-    base = {k: v for k, v in data.items() if k != "exercises"}
-    return RoutineSpec(exercises=exercises, **base)
+    exercises = [_exercise_from_raw(raw_ex) for raw_ex in data.get("exercises", [])]
+    branches = [_branch_from_raw(raw_branch) for raw_branch in data.get("branches", [])]
+    base = {k: v for k, v in data.items() if k not in ("exercises", "branches")}
+    return RoutineSpec(exercises=exercises, branches=branches, **base)

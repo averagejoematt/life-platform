@@ -2332,6 +2332,56 @@ def hevy_routine_cron() -> list[iam.PolicyStatement]:
     ]
 
 
+def hevy_restamp() -> list[iam.PolicyStatement]:
+    """Hevy overnight re-stamp (#417 / TR-05): reads the pushed routine +
+    latest Whoop recovery, re-orders/re-highlights branches, and re-pushes the
+    routine (Hevy PUT). Never adds/removes branches or set/rep content; fails
+    open. Same data surface as the cron minus routine generation — it edits an
+    existing routine rather than authoring a new one.
+    """
+    return [
+        iam.PolicyStatement(
+            sid="DynamoDB",
+            actions=["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"],
+            resources=[TABLE_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="KMS",
+            actions=["kms:Decrypt", "kms:GenerateDataKey"],
+            resources=[KMS_KEY_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="S3ConfigRead",
+            actions=["s3:GetObject"],
+            resources=_s3("config/*"),
+        ),
+        iam.PolicyStatement(
+            sid="S3TemplateCacheWrite",
+            actions=["s3:PutObject"],
+            resources=_s3("config/hevy_template_cache.json"),
+        ),
+        iam.PolicyStatement(
+            sid="HevyWriteSecret",
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/hevy-write")],
+        ),
+        iam.PolicyStatement(
+            sid="SsmGates",
+            actions=["ssm:GetParameter"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/pause-mode",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/restamp_enabled",
+            ],
+        ),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
+    ]
+
+
 # ═════════════════════════════════════════════════════════════════════════
 # WEB STACK — OG Image Lambda (WR-17)
 # ═════════════════════════════════════════════════════════════════════════

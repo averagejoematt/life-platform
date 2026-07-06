@@ -319,6 +319,11 @@
       "cdk_only": true,
       "function": "hevy-routine-cron"
     },
+    "lambdas/operational/hevy_restamp_lambda.py": {
+      "_cdk_only_reason": "Imports sibling layer modules (routine_repo, hevy_compiler, hevy_write_client, hevy_template_cache, routine_title). Single-file hot-deploy via deploy_lambda.sh would miss them. Only `cdk deploy` ships the full Lambda layer bundle.",
+      "cdk_only": true,
+      "function": "hevy-restamp"
+    },
     "lambdas/operational/key_rotator_lambda.py": {
       "function": "life-platform-key-rotator"
     },

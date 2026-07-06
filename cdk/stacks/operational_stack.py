@@ -973,6 +973,58 @@ class OperationalStack(Stack):
         )
         hevy_routine_cron_rule.add_target(targets.LambdaFunction(hevy_routine_cron))
 
+        # ── 14b. Hevy Overnight Branch Re-stamp (#417 / TR-05) ──
+        # Runs AFTER the overnight wearable sync and RE-ORDERS / re-highlights
+        # which branch of the already-pushed routine is recommended, so the
+        # morning's plan reflects the night's recovery. FAILS OPEN: a missed or
+        # failed run leaves the last pushed routine fully usable. Never adds or
+        # removes a branch. SHIPS DISABLED at BOTH the EventBridge level AND SSM
+        # /life-platform/hevy/restamp_enabled (default "false") — belt-and-
+        # suspenders, same posture as the cron above.
+        #
+        # Schedule (UTC-fixed, no DST): 12:45 UTC = 04:45 PST / 05:45 PDT — after
+        # the first early-morning wearable ingestion hour (12:00 UTC), before a
+        # morning gym trip. ⚠️ For the night's recovery to be fresh this early,
+        # the Whoop recovery pull (currently 17:30 UTC / 9:30 AM PT) must move
+        # earlier, OR this must run later — that timing coupling is Matthew's
+        # call before enabling. Until enabled, the re-stamp does not fire.
+        hevy_restamp = create_platform_lambda(
+            self,
+            "HevyRestamp",
+            function_name="hevy-restamp",
+            source_file="lambdas/operational/hevy_restamp_lambda.py",
+            handler="operational.hevy_restamp_lambda.lambda_handler",
+            timeout_seconds=120,
+            memory_mb=256,
+            environment={
+                "TABLE_NAME": "life-platform",
+                "USER_ID": "matthew",
+                "S3_BUCKET": "matthew-life-platform",
+                "PAUSE_MODE_PARAM": "/life-platform/pause-mode",
+                "BUDGET_TIER_PARAM": "/life-platform/budget-tier",
+                "HEVY_RESTAMP_ENABLED_PARAM": "/life-platform/hevy/restamp_enabled",
+                "HEVY_WRITE_SECRET": "life-platform/hevy-write",
+            },
+            custom_policies=rp.hevy_restamp(),
+            table=local_table,
+            bucket=local_bucket,
+            dlq=None,
+            alerts_topic=local_alerts_topic,
+            digest_topic=local_digest_topic,
+            digest=True,
+            alarm_name="hevy-restamp-errors",
+            shared_layer=shared_utils_layer,
+        )
+        hevy_restamp_rule = events.Rule(
+            self,
+            "HevyRestampRule",
+            rule_name="hevy-restamp-daily",
+            description="#417 TR-05 ships disabled; operator enables after confirming recovery freshness timing.",
+            schedule=events.Schedule.expression("cron(45 12 * * ? *)"),
+            enabled=False,
+        )
+        hevy_restamp_rule.add_target(targets.LambdaFunction(hevy_restamp))
+
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
         cdk.CfnOutput(
