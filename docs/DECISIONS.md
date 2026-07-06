@@ -3308,7 +3308,7 @@ Measured live 2026-07-05 to confirm the fix and ground the threshold re-eval:
 
 ## ADR-124: The fulfillment capture channel — options memo + publication posture (E4.1, #745)
 
-**Date:** 2026-07-06 · **Status:** 🟡 Proposed — the channel pick and the publication posture are Matthew's decisions; nothing builds until both are made · **Story:** #745 (epic #718, R21 E4.1 — "the DECISION story that gates the epic")
+**Date:** 2026-07-06 · **Status:** ✅ Accepted 2026-07-06 — Matthew picked **A as primary + C as the floor** and confirmed the publication posture below as written · **Story:** #745 (epic #718, R21 E4.1 — "the DECISION story that gates the epic")
 
 **Context.** The thesis's differentiating half — connection/mood/fulfillment — has architecture and no evidence stream: **0 social interactions ever logged** (`INTERACTIONS_PK`, `mcp/tools_social.py` #42), **41-day journal silence** (Notion journal, hourly pull), State of Mind kept-pending-data with the habit still unresumed (ADR-121; ~1 datapoint/90d per R21), and the relationships pillar reading a silent flat-50. Every body input is passive; every fulfillment input is manual — so the half of the thesis the platform exists to prove is the half with no data. The presence engine (`engagement_core.py`) already detects "manual channels dark while the wearables keep talking," so honest *absence* display is solved; capture is not. The Ethicist gate (R21, standing): **how much of this publishes when it's bad must be decided before the data flows** — a channel adopted without that decision produces data Matthew will be tempted to suppress in exactly the weeks it matters.
 
@@ -3320,12 +3320,12 @@ Measured live 2026-07-05 to confirm the fix and ground the threshold re-eval:
 
 **C — A scheduled two-scalar micro-ritual.** The evening nudge (`evening_nudge_lambda`) already fires; add a two-item response — connection today (0–4) and mood valence — via a one-tap path. *Friction:* the lowest that still involves consent — two taps, no prose, no app-switching; sized to survive a bad week precisely because it is tiny. *Honesty:* high for a deliberately narrow construct (it measures "felt connection today," claims nothing more; n accrues fast because the ask is small). *Privacy:* near-nil — two scalars, no free text, no third parties. *Build:* S (nudge already exists; needs the one-tap write path).
 
-**Recommendation (advisory, not the decision):** **A as the primary channel with C as the floor.** A leverages machinery ADR-121 explicitly chose to keep and the habit Matthew already committed to restarting; C is the backstop that keeps the stream alive on the days A's richer gesture doesn't happen — and the two cross-validate (the check-in valence against the ritual scalar). B is rejected as primary and recorded as such.
+**The decision (Matthew, 2026-07-06):** **A as the primary channel with C as the floor** — accepting the recommendation as advised. A leverages machinery ADR-121 explicitly chose to keep and the habit Matthew already committed to restarting; C is the backstop that keeps the stream alive on the days A's richer gesture doesn't happen — and the two cross-validate (the check-in valence against the ritual scalar). B is rejected as primary and recorded as such.
 
-**Publication posture for bad weeks (proposed — confirm before any data flows):**
+**Publication posture for bad weeks (confirmed by Matthew 2026-07-06, before any data flows):**
 1. **The aggregate always publishes**, bad weeks included: 7-day valence trend, check-in count, streak. A fulfillment story that pauses when it hurts is not evidence (the R21 bar: "survives one bad week").
 2. **Labels, associations, and free text never publish** — they name people who didn't consent and content the standing sensitive-content policy already excludes.
 3. **A dark channel publishes as honest absence** ("not logged for N days" — the presence engine's existing vocabulary), never as a fabricated neutral.
 4. **No retroactive removal of published aggregates** — that is the falsifiability bar applied to the meta-layer (ADR-104/105).
 
-**Consequences.** Once Matthew picks: A alone = zero build (restart the habit, wire the publish surface per posture above); A+C = one S-sized story for the one-tap path; either unblocks #746/#747 (staleness nudges, honest pillar state) and starts the ≥4-week clock that gates #748. The decision itself — not the build — is what this ADR exists to force.
+**Consequences.** A+C is the pick: restart the State of Mind habit and wire the publish surface per the posture above, plus one S-sized story for the C one-tap two-scalar path (filed against epic #718). This unblocks #746/#747 (staleness nudges, honest pillar state) and starts the ≥4-week lived-data clock that gates #748.
