@@ -404,6 +404,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/767"
         }
       ]
+    },
+    {
+      "id": "2026-07-06-first-preregistered-experiment",
+      "date": "2026-07-06",
+      "title": "The first experiment is registered — and the prediction was published before day one",
+      "shipped": "The experiment registry was empty for 28 days; now every experiment freezes its design into a public, timestamped artifact at creation — hypothesis, success criterion, and a required plain-language stopping rule, published before any results exist. The first entry is live: a 28-day daily zone-2 cardio floor, predicting recovery rises at least 5 points over a 14-day baseline. The same batch put the stakes on the home page — sixteen prior attempts, 315 aimed at 185, a falsifiable finish line (185 held for 90 consecutive days) — and rebuilt /method/ as the skeptic's contract.",
+      "gotcha": "The CI gate that checks every function runs the same shared-code version went red mid-deploy — it raced the deploy itself. The version bump landed on main minutes before the sixteen consumer functions had the new layer attached, and the check fired in the gap. The fix was nothing: finish the attach, re-run. But a gate that can red on correct in-flight work will eventually train someone to ignore it.",
+      "honest_miss": "Pre-registration can't be applied retroactively — the 28 empty days stay empty, and the first entry only proves the mechanism from here forward. And the platform's other half still has no data: the fulfillment capture channel got its decision this session (State of Mind check-ins plus a two-tap evening ritual, publication posture fixed before any data flows), but a decision is not a datapoint — that stream is still at zero until the habit restarts.",
+      "prs": [
+        {
+          "label": "PR #765",
+          "url": "https://github.com/averagejoematt/life-platform/pull/765"
+        },
+        {
+          "label": "PR #764",
+          "url": "https://github.com/averagejoematt/life-platform/pull/764"
+        },
+        {
+          "label": "PR #763",
+          "url": "https://github.com/averagejoematt/life-platform/pull/763"
+        },
+        {
+          "label": "PR #762",
+          "url": "https://github.com/averagejoematt/life-platform/pull/762"
+        }
+      ]
     }
   ]
 }
