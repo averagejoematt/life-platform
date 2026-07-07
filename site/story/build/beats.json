@@ -444,6 +444,20 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/762"
         }
       ]
+    },
+    {
+      "id": "2026-07-06-one-deploy-channel",
+      "date": "2026-07-06",
+      "title": "Ninety functions, one bundle — the shared layer is gone",
+      "shipped": "For a year, shared code reached the platform's ~90 Lambda functions through three overlapping channels at once: a versioned AWS 'layer', full code bundles that silently shadowed it, and hand-built partial zips. Version drift between them caused four separate production incidents. Today the whole thing collapsed to one channel: every function now ships the complete shared codebase inside its own bundle, staged by a single 100-line script every deploy path shares. The version pin, the hand-curated module list, and the ritual deploy sequence are deleted. A CI check now enforces the simple invariant: nothing references the old layer, ever.",
+      "gotcha": "The audit that motivated this found the layer was already runtime-inert for most functions — the bundled copy won the import race, so the carefully-maintained version pin had been decorative for months. The scariest bugs are the ones that only matter sometimes: a handful of hot-deployed functions genuinely depended on the layer, which is exactly the inconsistency that bites at 2am. And the CI step that deploys the AI-tools server had been quietly rebuilding a known broken bundle shape the whole time — the collapse fixed a bug nobody had filed.",
+      "honest_miss": "The old layer versions are orphaned in AWS rather than deleted — nothing references them, but they linger. And the weekly drift report will now nag about a documentation number (110 alarms documented, 122 live) that this work made visible but deliberately didn't fix; that reconciliation is its own backlog item.",
+      "prs": [
+        {
+          "label": "PR #833",
+          "url": "https://github.com/averagejoematt/life-platform/pull/833"
+        }
+      ]
     }
   ]
 }
