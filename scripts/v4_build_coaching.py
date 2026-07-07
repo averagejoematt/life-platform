@@ -109,7 +109,7 @@ SHELL = """<!DOCTYPE html>
       <p class="ph-kicker label">the coaching · the AI team reading the data</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
       <h1 class="ph-title">The Coaching</h1>
-      <p class="ph-promise">A board of named AI coaches reads the data and argues about it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>.</p>
+      <p class="ph-promise">A board of named AI coaches reads the data and offers different takes on it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>.</p>
       {ribbon}
       <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
     </div>

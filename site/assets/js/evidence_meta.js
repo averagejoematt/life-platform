@@ -44,7 +44,7 @@ export async function renderBoard(d) {
     : empty("The expert board is being assembled.");
   return chair + disagreements + sec("The experts — pick one to read their take", roster) +
     `<div class="coach-read" data-board-read></div>` +
-    note("A board of named AI characters who argue about the data. Interpretation, not instruction.");
+    note("A board of named AI characters who each read the data differently. Interpretation, not instruction.");
 }
 
 export function renderPlatform(d) { return figs([fig(d.data_sources, "data sources (incl. derived)"), fig(d.mcp_tools, "MCP tools"), fig(d.lambdas, "lambdas"), fig(d.cdk_stacks, "CDK stacks")]) + sec("By the numbers", kvtable({ adrs: d.adrs, review_grade: d.review_grade, site_pages: d.site_pages })) + note("Built with Claude + the wearables already on his body — not a million-dollar lab. The full architecture (alarms, tests, the deeper counts) lives in the build write-up; this page keeps the human-legible ones."); }

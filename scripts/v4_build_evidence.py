@@ -257,7 +257,7 @@ REGISTRY = [
     (
         "board",
         "The board",
-        "The named AI experts who argue about the data — reads & roster.",
+        "The named AI experts who each bring a different take on the data — reads & roster.",
         "Credibility & the machine",
         "data",
         "/api/coaching-dashboard",
@@ -628,10 +628,10 @@ EDITORIAL = {
         "</g></svg>"
         '<figcaption class="rd-figcap label">Ingest → store → serve. Every number is computed in Python; the model only narrates, through one Bedrock chokepoint, gated by a budget governor.</figcaption>'
         "</figure>"
-        '<section class="rd-sec"><h2 class="rd-h">A board of AI experts that argues</h2>'
+        '<section class="rd-sec"><h2 class="rd-h">A board of AI experts with different takes</h2>'
         "<p class=\"rd-prose\">The coaching layer isn't one assistant — it's an ensemble of eight named personas (a sports scientist, a metabolic doctor, a behavioural coach, an N=1 statistician, and others) that each read the week from their own discipline. They disagree, and the disagreements are surfaced rather than averaged away — a single confident voice is exactly what an experiment of one should distrust. <em>(ADR-047 / ADR-055; <strong>coach_computation_engine.py</strong>.)</em></p></section>"
         '<section class="rd-sec"><h2 class="rd-h">Keeping a model honest about my own data</h2>'
-        '<p class="rd-prose">The rule the whole system is built around: the model never does the math. Every number — correlations, scores, deltas — is computed in Python; the model only narrates pre-computed values, always correlatively, always with the confidence label attached. It cannot invent a statistic in prose because it is never handed the raw freedom to. All inference routes through one Bedrock chokepoint so there is a single place to audit what was asked and what came back. <em>(ADR-062; <strong>bedrock_client.py</strong>.)</em> <span class="confidence conf-low">interpretive only</span></p></section>'
+        '<p class="rd-prose">The rule the whole system is built around: the model never does the math. Every number — correlations, scores, deltas — is computed in Python; the model only narrates pre-computed values, always as a correlation, never a causal claim, always with the confidence label attached. It cannot invent a statistic in prose because it is never handed the raw freedom to. All inference routes through one Bedrock chokepoint so there is a single place to audit what was asked and what came back. <em>(ADR-062; <strong>bedrock_client.py</strong>.)</em> <span class="confidence conf-low">interpretive only</span></p></section>'
         '<section class="rd-sec"><h2 class="rd-h">A governor that won\'t let the bill run away</h2>'
         '<p class="rd-prose">Putting an AI behind a public website is a way to get a surprise invoice. So a cost governor projects month-end spend every hour and writes a budget tier (0–3). As the projection climbs, AI features degrade on purpose — first the heavy ensemble narratives pause, then the public ask-the-data endpoint returns a friendly "paused" instead of a charge, and at the ceiling even the daily brief skips inference. One traffic spike cannot empty the budget and dark-fire the site. <em>(ADR-063; <strong>cost_governor_lambda.py</strong> + <strong>budget_guard.py</strong>.)</em></p></section>'
         '<section class="rd-sec"><h2 class="rd-h">An agent that fixes the platform while I sleep</h2>'
