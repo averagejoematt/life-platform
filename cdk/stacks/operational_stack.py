@@ -50,6 +50,16 @@ from stacks.lambda_helpers import create_platform_lambda
 #   2. Set context: cdk.json "site_api_fn_url_domain": "<captured-domain>"
 #   3. Run cdk deploy LifePlatformWeb (web_stack will import via context var)
 # ──────────────────────────────────────────────────────────────────────────────
+# ── #794: site-api ownership (resolves the "dual ownership" ambiguity) ────────
+# CDK (here) is the infrastructure owner: function definition, IAM role, env
+# vars, timeout/memory, concurrency, and the CloudWatch alarms below.
+# deploy/deploy_site_api.sh remains the sanctioned FAST CODE PATH for iterating
+# on lambdas/web/*.py without a full stack synth/deploy. Both channels stage
+# the identical package through the one bundle implementation,
+# deploy/build_bundle.py (see lambda_helpers.staged_tree_asset()) — so neither
+# side can silently ship a differently-shaped zip. See docs/DECISIONS.md
+# ADR-131 and tests/test_deploy_bundle_paths.py.
+# ──────────────────────────────────────────────────────────────────────────────
 
 REGION = "us-west-2"
 ACCT = "205930651321"
@@ -590,9 +600,12 @@ class OperationalStack(Stack):
                 "S3_REGION": "us-west-2",
                 "CORS_ORIGIN": "https://averagejoematt.com",
             },
-            # 2026-05-24: shared layer re-attached after drift. Lambda was running
-            # `Layers: null` and importing constants/phase_filter from the deploy
-            # zip directly (worked but fragile). Layer provides the canonical copy.
+            # #794: CDK owns this function's definition (role, env, alarms); the
+            # code asset is the shared staged full-tree bundle (build_bundle.py
+            # via lambda_helpers.staged_tree_asset()) — the SAME bundle shape
+            # deploy_site_api.sh ships for hot deploys, so the two channels can
+            # never drift apart in package layout (ADR-131 / #781 retired the
+            # shared layer this comment used to reference).
         )
 
         site_api_url = site_api_fn.add_function_url(
@@ -634,7 +647,7 @@ class OperationalStack(Stack):
                 "S3_REGION": "us-west-2",
                 "CORS_ORIGIN": "https://averagejoematt.com",
             },
-            # 2026-05-24: shared layer attached. Was running `Layers: null` — same drift as site-api.
+            # #794: same staged full-tree bundle as site-api above — no layer (ADR-131).
         )
 
         # Cap AI Lambda concurrency — 2 concurrent is enough for personal site traffic
@@ -750,7 +763,7 @@ class OperationalStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            # 2026-05-24: shared layer attached. Was running `Layers: null` — same drift as site-api.
+            # #794: same staged full-tree bundle as site-api above — no layer (ADR-131).
         )
         # Four EventBridge cron rules — UTC equivalents of 8am/12pm/4pm/8pm Pacific (no DST drift)
         for utc_hour, label in [(15, "8amPT"), (19, "12pmPT"), (23, "4pmPT"), (3, "8pmPT")]:

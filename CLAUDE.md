@@ -68,7 +68,7 @@ python3 mcp_bridge.py
    - **Compute Lambdas** (5) — run before 11 AM daily: `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute`, `hypothesis-engine`; store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 11 AM reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
-   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with 60+ endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): deploy the full `web/` dir, never single-file (see `.claude/commands/deploy.md`).
+   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with 60+ endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file); infra (role/env/alarms) is CDK-owned in `operational_stack.py` (#794 — see `.claude/commands/deploy.md`).
 
 ## Key Technical Conventions
 
