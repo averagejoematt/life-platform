@@ -115,3 +115,49 @@ def test_team_stage_mix_is_honest():
     assert stages["training_coach"] == "foundation"
     assert stages["nutrition_coach"] == "visibility"
     assert data["all_same_stage"] is False
+
+
+# ── predictions (/api/predictions, R22-BUG-03 #819) ──────────────────────────
+
+
+def test_predictions_overall_accuracy_pct_null_when_nothing_resolved(monkeypatch):
+    class _EmptyTable:
+        def query(self, **kw):
+            return {"Items": []}
+
+    monkeypatch.setattr(api, "table", _EmptyTable())
+    data = _body(api.handle_predictions({}))
+    o = data["overall"]
+    assert o["decided"] == 0
+    # ADR-104: an unearned 0% would read as "the board is bad at this" when in
+    # truth nothing has graded yet — must be an honest absence, not a fabricated zero.
+    assert o["accuracy_pct"] is None
+
+
+def test_predictions_overall_accuracy_pct_rounds_when_some_resolved(monkeypatch):
+    calls = []
+
+    class _FakeTable:
+        def query(self, **kw):
+            calls.append(kw)
+            # scan_coaches iterates in a fixed order (sleep first) — hand the first
+            # coach queried a mix of graded calls, every other coach comes back empty.
+            if len(calls) == 1:
+                return {
+                    "Items": [
+                        {"status": "confirmed", "created_date": "2026-07-01", "claim_natural": "a"},
+                        {"status": "confirmed", "created_date": "2026-07-02", "claim_natural": "b"},
+                        {"status": "confirmed", "created_date": "2026-07-03", "claim_natural": "c"},
+                        {"status": "refuted", "created_date": "2026-07-04", "claim_natural": "d"},
+                        {"status": "pending", "created_date": "2026-07-05", "claim_natural": "e"},
+                    ]
+                }
+            return {"Items": []}
+
+    monkeypatch.setattr(api, "table", _FakeTable())
+    data = _body(api.handle_predictions({}))
+    o = data["overall"]
+    assert o["confirmed"] == 3
+    assert o["refuted"] == 1
+    assert o["decided"] == 4
+    assert o["accuracy_pct"] == 75.0
