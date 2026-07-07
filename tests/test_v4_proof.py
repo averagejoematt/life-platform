@@ -82,6 +82,132 @@ class TestChronicleList:
         assert "<b>bold</b>" not in html
 
 
+class TestCockpitBlock:
+    """#788 — the cockpit's static proof: level + tier + pillar scores + as-of."""
+
+    CH = {
+        "level": 12,
+        "tier": "Foundation",
+        "as_of": "2026-07-06",
+        "pillars": {
+            "sleep": {"raw_score": 82.9, "tier": "Momentum"},
+            "movement": {"raw_score": 25.8, "tier": "Foundation"},
+            "nutrition": {"raw_score": 1.6, "tier": "Foundation"},
+            "metabolic": {"raw_score": 59.4, "tier": "Foundation"},
+            "mind": {"raw_score": 15.9, "tier": "Foundation"},
+            "relationships": {"raw_score": 50.0, "tier": "Foundation"},
+            "consistency": {"raw_score": 32.5, "tier": "Foundation"},
+        },
+    }
+
+    def test_bakes_level_pillars_and_as_of(self):
+        html = v4_proof.cockpit_block_html(self.CH)
+        # #788 AC: real numbers + the honest stamp in the served no-JS HTML.
+        assert "Character level 12 · Foundation" in html
+        assert "as of 2026-07-06" in html
+        assert "Sleep 83" in html and "Momentum" in html
+        assert "Movement 26" in html and "Nutrition 2" in html
+        assert "Consistency 33" in html  # rounded, same as cockpit.js
+        assert html.startswith("<noscript>") and html.endswith("</noscript>")
+
+    def test_rollups_match_cockpit_js_semantics(self):
+        # Body = mean(movement, nutrition, sleep, metabolic); Mind = mean(mind, relationships).
+        html = v4_proof.cockpit_block_html(self.CH)
+        assert "Body 42" in html  # (25.8+1.6+82.9+59.4)/4 = 42.4 → 42
+        assert "Mind 33" in html  # (15.9+50.0)/2 = 32.95 → 33
+
+    def test_missing_pillar_is_omitted_never_zeroed(self):
+        ch = {"level": 8, "tier": "Foundation", "as_of": "2026-07-06", "pillars": {"sleep": {"raw_score": 70.0, "tier": ""}}}
+        html = v4_proof.cockpit_block_html(ch)
+        assert "Sleep 70" in html
+        # ADR-104: absent pillars never render as fabricated zeros.
+        assert "Nutrition" not in html and "Movement" not in html
+        assert "Mind 0" not in html and "Consistency" not in html
+
+    def test_missing_data_omits_block_never_fabricates(self):
+        assert v4_proof.cockpit_block_html({}) == ""
+        assert v4_proof.cockpit_block_html(None) == ""
+        assert v4_proof.cockpit_block_html({"tier": "Foundation"}) == ""  # no level → no block
+
+    def test_loader_parses_live_api_shape(self, monkeypatch):
+        monkeypatch.setattr(
+            v4_proof,
+            "_fetch_json",
+            lambda path, timeout=8: {
+                "character": {"level": 12.0, "tier": "Foundation", "as_of_date": "2026-07-06"},
+                "pillars": [
+                    {"name": "sleep", "raw_score": 82.9, "tier": "Momentum"},
+                    {"name": "movement", "raw_score": None, "tier": "Foundation"},  # absent value → dropped
+                ],
+            },
+        )
+        out = v4_proof.load_character()
+        assert out["level"] == 12 and out["tier"] == "Foundation" and out["as_of"] == "2026-07-06"
+        assert out["pillars"] == {"sleep": {"raw_score": 82.9, "tier": "Momentum"}}
+        assert out["source"] == "live"
+
+    def test_loader_falls_back_to_snapshot_offline(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
+        monkeypatch.setattr(v4_proof, "_snapshot", lambda: {"cockpit": {"level": 9, "as_of": "2026-07-01", "pillars": {}}})
+        assert v4_proof.load_character() == {"level": 9, "as_of": "2026-07-01", "pillars": {}}
+
+
+class TestCockpitInjection:
+    """#788 — v4_build_cockpit_proof.inject(): sentinel-delimited, idempotent."""
+
+    SHELL = (
+        '<main id="cockpit">\n'
+        '    <article class="panel" aria-busy="true">\n'
+        '      <span data-bind="level">··</span>\n'
+        "    </article>\n"
+        "</main>"
+    )
+
+    def _mod(self):
+        import v4_build_cockpit_proof
+
+        return v4_build_cockpit_proof
+
+    def test_first_injection_lands_before_the_panel(self):
+        mod = self._mod()
+        block = v4_proof.cockpit_block_html(TestCockpitBlock.CH)
+        out = mod.inject(self.SHELL, block)
+        assert out is not None
+        assert mod._START in out and mod._END in out
+        assert "Character level 12" in out
+        # baked block precedes the JS app shell
+        assert out.index(mod._START) < out.index('<article class="panel"')
+
+    def test_reinjection_replaces_in_place(self):
+        mod = self._mod()
+        once = mod.inject(self.SHELL, v4_proof.cockpit_block_html(TestCockpitBlock.CH))
+        newer = dict(TestCockpitBlock.CH, level=13, as_of="2026-07-07")
+        twice = mod.inject(once, v4_proof.cockpit_block_html(newer))
+        assert twice.count(mod._START) == 1 and twice.count(mod._END) == 1
+        assert "Character level 13" in twice and "Character level 12" not in twice
+        assert "as of 2026-07-07" in twice
+
+    def test_no_anchor_returns_none(self):
+        assert self._mod().inject("<html><body>nope</body></html>", "<noscript>x</noscript>") is None
+
+    def test_committed_now_page_carries_the_baked_block(self):
+        # The #788 acceptance test: the DELIVERED /now/ HTML carries real static
+        # content — curl-visible, no JS required.
+        html = (Path(__file__).resolve().parent.parent / "site" / "now" / "index.html").read_text(encoding="utf-8")
+        assert "cockpit-proof:start" in html
+        assert "<noscript>" in html
+        assert "Character level" in html
+        assert "as of 20" in html  # a dated honesty stamp
+
+    def test_committed_now_page_carries_the_first_visit_hint(self):
+        # #807: the inline explainer markup ships in the HTML (hidden; JS unhides
+        # it for first-time visitors only).
+        html = (Path(__file__).resolve().parent.parent / "site" / "now" / "index.html").read_text(encoding="utf-8")
+        assert "data-hub-hint" in html
+        assert "1&ndash;100 score" in html
+        assert "hub-hint-x" in html
+
+
 class TestFallback:
     def test_scorecard_falls_back_to_snapshot_offline(self, monkeypatch):
         monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
@@ -100,6 +226,9 @@ class TestFallback:
         snap = json.loads((Path(__file__).resolve().parent.parent / "scripts" / "proof_snapshot.json").read_text())
         assert "scorecard" in snap and "chronicle" in snap
         assert snap["scorecard"].get("evaluator_live_since")
+        # #788: the cockpit fallback must carry a level + as-of (honest stamp)
+        assert snap["cockpit"].get("level") is not None
+        assert snap["cockpit"].get("as_of")
 
 
 class TestEscape:

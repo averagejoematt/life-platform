@@ -78,6 +78,9 @@
 
   <main id="cockpit" class="cockpit" data-state="loading">
     <h1 class="sr-only">The Cockpit — one life, measured live: today's whole-life score and the one thing that matters now.</h1>
+    <!-- cockpit-proof:start -->
+    <noscript><section class="proof-static dx-prose" aria-label="Cockpit summary"><p class="label">The cockpit — one life, measured live · as of 2026-07-06</p><p><strong>Character level 12 · Foundation</strong> — a 1–100 score of the whole day: seven pillars, each from real data, rolled into one.</p><p>Body 42 · Mind 33 · Consistency 33</p><ul><li>Movement 26 · Foundation</li><li>Nutrition 2 · Foundation</li><li>Sleep 83 · Momentum</li><li>Metabolic 59 · Foundation</li><li>Mind 16 · Foundation</li><li>Relationships 50 · Foundation</li></ul><p>The live view (today's board read, trends, time travel) needs JavaScript. What a level means: <a href="/method/character/">the method</a>.</p></section></noscript>
+    <!-- cockpit-proof:end -->
     <article class="panel" aria-busy="true">
       <!-- Signature 1: the measuring-rule spine -->
       <div class="spine" aria-hidden="true">
@@ -86,6 +89,10 @@
 
       <div class="panel-body">
         <p class="cap label">character level · <span data-bind="scopeLabel">today</span> · <a href="/method/character/">what's a level?</a></p>
+
+        <!-- #807: one-sentence first-visit context for the bare number. JS unhides it
+             until dismissed (localStorage) — a returning visitor never sees it. -->
+        <p class="hub-hint label" data-hub-hint hidden>Character level: a 1&ndash;100 score of Matthew's whole day &mdash; seven pillars of real data, rolled into one each morning. <button class="hub-hint-x" type="button" aria-label="Dismiss the level explainer">got it</button></p>
 
         <!-- The hub: the single largest, calmest element -->
         <div class="hub">
