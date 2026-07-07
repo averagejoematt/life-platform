@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-07-06",
+  "updated_at": "2026-07-07T03:20:00Z",
   "beats": [
     {
       "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
@@ -456,6 +456,36 @@
         {
           "label": "PR #833",
           "url": "https://github.com/averagejoematt/life-platform/pull/833"
+        }
+      ]
+    },
+    {
+      "id": "2026-07-06-honest-numbers-bug-bash",
+      "date": "2026-07-06",
+      "title": "Nine small lies, fixed in one afternoon sweep",
+      "shipped": "A parallel bug-bash closed nine small honesty and reliability gaps found by last week's outside-consultant-style review. The public predictions API now says 'nothing graded yet' instead of a fabricated 0% hit rate. A coach's directional call that goes nowhere now counts against them — the scorecard was structurally impossible to lose. Journal mood-trend claims now carry their fit quality, so five noisy data points can't announce 'possible burnout' with a straight face. And when the monthly AI budget pauses a coach's weekly read, the site now stamps it 'as of / refresh paused' instead of serving stale words in the present tense.",
+      "gotcha": "The best find: the AI quality judge that reviews the site's public answers every week had never run — not once. It called an internal function with arguments that don't exist, and the error handler swallowed the failure silently every single week. The fix was three lines; the lesson is that a safety net you never hear from might not be attached to anything. It now emits a metric when it fails.",
+      "honest_miss": "The count of CloudWatch alarms in the docs said 110; the code actually defines 113 and the live account runs 122. The doc number is now computed from source instead of hand-typed, but the 113-vs-122 gap — nine alarms living in the cloud with no code behind them — is real, still open, and now on the backlog with its own ticket.",
+      "prs": [
+        {
+          "label": "PR #837",
+          "url": "https://github.com/averagejoematt/life-platform/pull/837"
+        },
+        {
+          "label": "PR #838",
+          "url": "https://github.com/averagejoematt/life-platform/pull/838"
+        },
+        {
+          "label": "PR #839",
+          "url": "https://github.com/averagejoematt/life-platform/pull/839"
+        },
+        {
+          "label": "PR #842",
+          "url": "https://github.com/averagejoematt/life-platform/pull/842"
+        },
+        {
+          "label": "PR #843",
+          "url": "https://github.com/averagejoematt/life-platform/pull/843"
         }
       ]
     }
