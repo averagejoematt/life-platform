@@ -244,7 +244,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_canary(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #809/ADR-116: terminal async failures -> DLQ digest (replaces the 2026-05-25 orphan error alarm)
             alerts_topic=None,
         )
 
@@ -321,7 +321,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_pip_audit(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #809/ADR-116: terminal async failures -> DLQ digest (replaces the 2026-05-25 orphan error alarm)
             alerts_topic=None,
         )
 
@@ -347,7 +347,7 @@ class OperationalStack(Stack):
             # import dies (broke the 2026-07-04 smoke run).
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #809/ADR-116: terminal async failures -> DLQ digest (replaces the 2026-05-25 orphan error alarm)
             alerts_topic=None,
         )
 
@@ -433,7 +433,7 @@ class OperationalStack(Stack):
             # #498: expected-days derive from source_registry (shared layer).
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #809/ADR-116: terminal async failures -> DLQ digest (replaces the 2026-05-25 orphan error alarm)
             alerts_topic=None,
         )
 
@@ -654,6 +654,30 @@ class OperationalStack(Stack):
         # 2026-06-17: account concurrency quota raised to 100 (AWS case 177921309700709) — enabled.
         site_api_ai_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
 
+        # ── #809: site-api-ai error alarm (adopted from the 2026-05-25 orphan batch) ──
+        # site-api-ai is SYNC (Function URL) — the ADR-116 DLQ path can't cover it,
+        # so it keeps a real Errors alarm. Threshold ≥3/hr like slo-mcp-availability:
+        # a single transient Bedrock hiccup surfaces to the reader as one failed ask,
+        # not an incident. Replaces the misnamed live orphan
+        # `life-platform-life-platform-site-api-ai-errors` (deleted after deploy).
+        site_api_ai_errors = cloudwatch.Alarm(
+            self,
+            "SiteApiAiErrorsAlarm",
+            alarm_name="site-api-ai-errors",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Errors",
+                dimensions_map={"FunctionName": "life-platform-site-api-ai"},
+                period=Duration.seconds(3600),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=3,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        site_api_ai_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         site_api_ai_url = site_api_ai_fn.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.NONE,
             cors=_lambda.FunctionUrlCorsOptions(
@@ -761,7 +785,7 @@ class OperationalStack(Stack):
             custom_policies=rp.operational_site_stats_refresh(),
             table=local_table,
             bucket=local_bucket,
-            dlq=None,
+            dlq=local_dlq,  # #809/ADR-116: terminal async failures -> DLQ digest (replaces the 2026-05-25 orphan error alarm)
             alerts_topic=None,
             # #794: same staged full-tree bundle as site-api above — no layer (ADR-131).
         )
