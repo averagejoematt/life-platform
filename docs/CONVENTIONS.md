@@ -103,6 +103,15 @@ CI pins specific tool versions — read them from CI rather than quoting here
 Note `requirements-dev.txt` can drift from the CI pin; match the **CI** version when
 they disagree.
 
+**The CDK toolchain is pinned both directions too (#814, R22-MOD-01).** Before this
+fix, `ci-cd.yml`'s `npm install -g aws-cdk` had no version (always latest CLI) and
+`cdk/requirements.txt` was floor-only (`aws-cdk-lib>=X`), so a fresh CI install could
+silently pick up an untested CDK release and red a routine push. Both are now exact
+pins — `grep -E 'aws-cdk@|aws-cdk-lib==|constructs==' .github/workflows/ci-cd.yml
+cdk/requirements.txt requirements-dev.txt`. Bump the CLI pin, `cdk/requirements.txt`,
+and `requirements-dev.txt` together as one deliberate PR (Dependabot proposes the
+`cdk/requirements.txt` half; the CLI pin in `ci-cd.yml` is manual).
+
 **CI-parity test runs need FAKE creds, not absent ones.** CI's runner has no valid AWS
 credentials, but `env -u` alone lets boto3 fall back to the `[default]` profile and
 silently query prod. Present-but-invalid beats absent:

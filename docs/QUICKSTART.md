@@ -51,12 +51,21 @@ pip install boto3 anthropic
 
 ### CDK setup (first time only)
 
+The CDK toolchain is pinned both directions (#814, R22-MOD-01) — CLI in
+`ci-cd.yml`, `aws-cdk-lib`/`constructs` in `cdk/requirements.txt` +
+`requirements-dev.txt`. Match CI's pinned CLI version rather than installing
+whatever npm resolves as latest today (an unpinned install is exactly what
+caused #814):
+
 ```bash
 cd cdk
-npm install -g aws-cdk
-pip install -r requirements.txt
+npm install -g aws-cdk@2.1129.0   # match the pin in .github/workflows/ci-cd.yml
+pip install -r requirements.txt   # aws-cdk-lib/constructs pinned exactly — see comments in that file
 cdk bootstrap aws://205930651321/us-west-2   # one-time per account
 ```
+
+Bumping either pin is a deliberate PR (bump CLI + lib + constructs together,
+verify `cdk synth`/`cdk diff` still work), never an incidental drift.
 
 ---
 

@@ -1,2 +1,13 @@
-aws-cdk-lib>=2.260.0
-constructs>=10.6.0
+# Pinned exactly (#814, R22-MOD-01) — a floor-only `>=` let a fresh CI install
+# silently pick up an untested aws-cdk-lib release. CI runs `pip install -r
+# requirements.txt --quiet` into a fresh venv every run (no lockfile, no
+# cache), so the most recent green run (PR #835, run 28833524530, "Plan
+# deployments" job) resolved to whatever was latest-satisfying at that
+# moment; the run logs are --quiet and don't echo the resolved version, so
+# this pin uses the current PyPI-latest for aws-cdk-lib>=2.260.0 /
+# constructs>=10.6.0 as of this PR (2.261.0 / 10.6.0) — the same value that
+# run would have resolved. Bump both together (and the CLI pin in ci-cd.yml)
+# as a deliberate PR, not an incidental drift — Dependabot (cdk/requirements.txt
+# pip ecosystem) will propose the bump PRs.
+aws-cdk-lib==2.261.0
+constructs==10.6.0

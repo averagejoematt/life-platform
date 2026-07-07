@@ -461,7 +461,10 @@ jobs:
         run: |
           echo "::group::CDK diff"
           node --version
-          npm install -g aws-cdk --quiet
+          # Pinned exactly (#814, R22-MOD-01) — an unpinned `npm install -g aws-cdk`
+          # always pulls whatever released today, so a routine push can red CI on an
+          # untested CDK release. Bump deliberately, in lockstep with cdk/requirements.txt.
+          npm install -g aws-cdk@2.1129.0 --quiet
 
           cd cdk
           python3 -m venv .venv
