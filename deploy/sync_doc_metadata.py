@@ -35,6 +35,7 @@ WHAT IT DOES NOT UPDATE (requires human judgment):
 v1.0.0 — 2026-03-14 (post doc-audit that found 19 stale facts)
 """
 
+import ast
 import re
 import sys
 from datetime import datetime, timezone
@@ -98,6 +99,266 @@ def _auto_discover_lambda_count() -> int | None:
         if len(names) < 30:
             return None
         return len(names)
+    except Exception:
+        return None
+
+
+_ALARM_CONSTRUCTOR_ATTRS = ("Alarm", "create_alarm")  # cloudwatch.Alarm(...) and metric.create_alarm(...)
+
+
+def _is_alarm_constructor_call(node: ast.AST) -> bool:
+    return isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in _ALARM_CONSTRUCTOR_ATTRS
+
+
+def _count_direct_alarm_calls(stmts: list[ast.stmt]) -> int:
+    """Count qualifying alarm-constructor calls in `stmts`, NOT descending into nested defs.
+
+    Used to auto-detect "single-alarm helper" functions: a def whose own body
+    (ignoring further-nested defs) constructs exactly one alarm.
+    """
+    count = 0
+
+    class _DirectCountVisitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node):  # don't descend into nested function bodies
+            return
+
+        def visit_AsyncFunctionDef(self, node):
+            return
+
+        def visit_Lambda(self, node):
+            return
+
+        def visit_Call(self, node):
+            nonlocal count
+            if _is_alarm_constructor_call(node):
+                count += 1
+            self.generic_visit(node)
+
+    visitor = _DirectCountVisitor()
+    for stmt in stmts:
+        visitor.visit(stmt)
+    return count
+
+
+def _static_iter_length(iter_node: ast.AST) -> int | None:
+    """Length of a for-loop's iterable if it's a literal tuple/list/set, else None."""
+    if isinstance(iter_node, (ast.Tuple, ast.List, ast.Set)):
+        return len(iter_node.elts)
+    return None
+
+
+def _dict_call_kwargs(call_node: ast.AST) -> dict:
+    """{kwarg_name: value_node} for a literal `dict(...)` Call node's keyword args."""
+    if isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name) and call_node.func.id == "dict":
+        return {kw.arg: kw.value for kw in call_node.keywords if kw.arg is not None}
+    return {}
+
+
+def _collect_dict_assignments(tree: ast.AST) -> dict:
+    """Map `name -> {kwarg: value_node}` for every `name = dict(...)` assignment in the module.
+
+    Handles the `shared = dict(alerts_topic=..., error_alarm=False, ...)` kwargs-spread
+    pattern that ingestion/compute/email stacks use to fan identical kwargs into many
+    `create_platform_lambda(**shared)` call sites.
+    """
+    out = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            kwargs = _dict_call_kwargs(node.value)
+            if kwargs:
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        out[target.id] = kwargs
+    return out
+
+
+def _resolve_kwarg_value(call_node: ast.Call, kwarg_name: str, dict_assignments: dict):
+    """Resolve the effective value node for `kwarg_name` on a Call, following **spreads.
+
+    Returns the winning ast node, or None if the kwarg is never provided anywhere (the
+    callee's own default then applies). Handles the three shapes used in cdk/stacks/*.py:
+    an explicit `kwarg=value`, a `**shared` spread to a `shared = dict(...)` assignment,
+    and an inline merge-override dict `**{**shared, "kwarg": value}` (email_stack.py's
+    daily-brief alarm opt-out) — dict-literal order means a later explicit key overrides
+    an earlier spread, so keys are walked in source order and the last match wins.
+    """
+    result = None
+    for kw in call_node.keywords:
+        if kw.arg == kwarg_name:
+            result = kw.value
+        elif kw.arg is None:  # a **spread
+            spread = kw.value
+            if isinstance(spread, ast.Name) and spread.id in dict_assignments:
+                if kwarg_name in dict_assignments[spread.id]:
+                    result = dict_assignments[spread.id][kwarg_name]
+            elif isinstance(spread, ast.Dict):
+                for key, value in zip(spread.keys, spread.values):
+                    if key is None and isinstance(value, ast.Name) and value.id in dict_assignments:
+                        if kwarg_name in dict_assignments[value.id]:
+                            result = dict_assignments[value.id][kwarg_name]
+                    elif isinstance(key, ast.Constant) and key.value == kwarg_name:
+                        result = value
+    return result
+
+
+def _is_none_literal(node) -> bool:
+    return isinstance(node, ast.Constant) and node.value is None
+
+
+def _is_false_literal(node) -> bool:
+    return isinstance(node, ast.Constant) and node.value is False
+
+
+def _create_platform_lambda_makes_alarm(call_node: ast.Call, dict_assignments: dict) -> bool:
+    """Whether a `create_platform_lambda(...)` call site creates its per-Lambda error
+    alarm, per the `if _selected_topic and error_alarm:` gate in lambda_helpers.py:
+    needs a non-None `alerts_topic` AND `error_alarm` not explicitly False (default True).
+    """
+    topic = _resolve_kwarg_value(call_node, "alerts_topic", dict_assignments)
+    has_topic = topic is not None and not _is_none_literal(topic)
+    error_alarm = _resolve_kwarg_value(call_node, "error_alarm", dict_assignments)
+    error_alarm_enabled = not (error_alarm is not None and _is_false_literal(error_alarm))
+    return has_topic and error_alarm_enabled
+
+
+def _count_alarms_in_tree(tree: ast.AST, parents: dict) -> int:
+    dict_assignments = _collect_dict_assignments(tree)
+
+    # Auto-detect single-alarm helper functions/closures: any def whose own body (not
+    # counting further-nested defs) constructs exactly one alarm. Excludes class methods
+    # (e.g. a Stack's __init__) — those are multi-purpose constructors, not single-alarm
+    # closures, even on the rare file where __init__ itself has exactly one direct Alarm()
+    # call (web_stack.py) sitting alongside unrelated code.
+    helper_names = set()
+    helper_def_ids = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(parents.get(id(node)), ast.ClassDef):
+                continue
+            if _count_direct_alarm_calls(node.body) == 1:
+                helper_names.add(node.name)
+                helper_def_ids.add(id(node))
+
+    total = 0
+
+    class _AlarmCountVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.multiplier_stack = [1]
+
+        @property
+        def multiplier(self):
+            m = 1
+            for x in self.multiplier_stack:
+                m *= x
+            return m
+
+        def visit_FunctionDef(self, node):
+            if id(node) in helper_def_ids:
+                return  # already accounted for via call-site counting in visit_Call
+            self.generic_visit(node)
+
+        def visit_AsyncFunctionDef(self, node):
+            self.visit_FunctionDef(node)
+
+        def visit_For(self, node):
+            length = _static_iter_length(node.iter)
+            self.multiplier_stack.append(length if length else 1)
+            for stmt in node.body:
+                self.visit(stmt)
+            self.multiplier_stack.pop()
+            for stmt in node.orelse:
+                self.visit(stmt)
+
+        def visit_Call(self, node):
+            nonlocal total
+            if _is_alarm_constructor_call(node):
+                total += self.multiplier
+            elif isinstance(node.func, ast.Name):
+                # create_platform_lambda is cross-file (defined once in lambda_helpers.py,
+                # called from every other stack) so it's checked by name, not by whether
+                # THIS file's own AST walk happened to define it.
+                if node.func.id == "create_platform_lambda":
+                    if _create_platform_lambda_makes_alarm(node, dict_assignments):
+                        total += self.multiplier
+                elif node.func.id in helper_names:
+                    total += self.multiplier
+            self.generic_visit(node)
+
+    _AlarmCountVisitor().visit(tree)
+    return total
+
+
+def _auto_discover_alarm_count() -> int | None:
+    """Count CDK-DEFINED CloudWatch alarms across cdk/stacks/*.py via AST (#795).
+
+    This is a SOURCE count (synth ground truth) mirroring _auto_discover_lambda_count(),
+    not a live-AWS count — `aws cloudwatch describe-alarms` can (and did: #795 found
+    110 documented vs 122 live) diverge when alarms exist outside IaC (console-created
+    orphans, alarms from a code version not yet deployed). Reconcile drift by deploying
+    the stack or running an orphan-adoption pass (docs/reviews/CLOUDWATCH_AUDIT_2026-07.md),
+    not by hand-editing PLATFORM_FACTS.
+
+    Alarms are created via three patterns in this codebase:
+      1. Direct `cloudwatch.Alarm(...)` constructor calls (monitoring/operational/mcp/web
+         stacks).
+      2. Local single-alarm helper closures (`_alarm`/`_heartbeat_alarm` in
+         monitoring_stack.py, `_canary_alarm` in operational_stack.py) that each wrap
+         exactly one Alarm() call and create it unconditionally when called —
+         auto-detected (not hardcoded by name): any function whose own body contains
+         exactly one qualifying alarm-constructor call.
+      3. `create_platform_lambda(...)` (cdk/stacks/lambda_helpers.py) — creates ONE
+         per-Lambda error alarm via `.create_alarm(...)`, but ONLY when `alerts_topic`
+         resolves non-None AND `error_alarm` isn't explicitly False (the ingestion fleet
+         sets `error_alarm=False` via a `shared = dict(...)` kwargs spread, consolidating
+         ~46 per-Lambda alarms into one metric-math aggregate, 2026-05-29). This function
+         is auto-detected as a single-alarm helper the same way as #2 (its one
+         `.create_alarm(` sits inside an `if` guard) but resolved specially per call site
+         because its alarm is conditional, not unconditional — see
+         _create_platform_lambda_makes_alarm.
+
+    A for-loop with a statically-resolvable literal iterable (e.g. the 5-source
+    `for _src in ("whoop", "withings", ...)` ingest-liveness loop in monitoring_stack.py)
+    multiplies its body's alarm count by the iterable's length. A loop whose iterable
+    is NOT a literal (e.g. a module-level list name) is walked at multiplier x1 — this
+    would under-count if such a loop ever wrapped an alarm constructor, which it does
+    not at time of writing (only dashboard-widget loops over route/function name lists
+    do that, and those build Metric/Widget objects, not alarms).
+
+    AST (not regex/text-scan) is deliberate: kwarg blocks carry inline comments that
+    read exactly like a live kwarg (operational_stack.py's traffic-digest call has a
+    comment showing `alerts_topic=local_alerts_topic` as an example of how to opt back
+    in, right next to the real `alerts_topic=None`) and lambda_helpers.py's module
+    docstring shows a `create_platform_lambda(...)` usage EXAMPLE — both are invisible
+    to ast.parse and would be silent miscounts for a text-scan.
+
+    Verified 2026-07-06 against `cdk synth --all` (`AWS::CloudWatch::Alarm` resource
+    count across the 8 synthesized templates): 113, matching this function exactly.
+    See the #795 PR body for the live-vs-CDK reconciliation of the remaining delta.
+
+    Returns None (falls back to the manual PLATFORM_FACTS literal) if fewer than 5
+    stack files were readable or the discovered count is suspiciously low (<50) —
+    mirrors the sanity floor in _auto_discover_lambda_count().
+    """
+    cdk_stacks_dir = ROOT / "cdk" / "stacks"
+    if not cdk_stacks_dir.exists():
+        return None
+    try:
+        total = 0
+        stack_files_read = 0
+        for stack_file in sorted(cdk_stacks_dir.glob("*.py")):
+            try:
+                src = stack_file.read_text(encoding="utf-8")
+                tree = ast.parse(src, filename=str(stack_file))
+            except Exception:
+                continue
+            parents = {id(child): parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+            total += _count_alarms_in_tree(tree, parents)
+            stack_files_read += 1
+        if stack_files_read < 5:
+            return None
+        if total < 50:
+            return None
+        return total
     except Exception:
         return None
 
@@ -216,6 +477,12 @@ def _apply_auto_discovered(facts: dict) -> dict:
             print(f"  [auto] lambda_count: {facts.get('lambda_count')} → {lambda_count} (from CDK stacks)")
         facts["lambda_count"] = lambda_count
 
+    alarm_count = _auto_discover_alarm_count()
+    if alarm_count is not None:
+        if facts.get("alarm_count") != alarm_count:
+            print(f"  [auto] alarm_count: {facts.get('alarm_count')} → {alarm_count} (from CDK stacks, #795)")
+        facts["alarm_count"] = alarm_count
+
     module_count = _auto_discover_module_count()
     if module_count is not None:
         facts["module_count"] = module_count
@@ -241,14 +508,14 @@ def _apply_auto_discovered(facts: dict) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 PLATFORM_FACTS = {
-    # Core counts (tool_count + lambda_count auto-discovered from source when available)
+    # Core counts (tool_count + lambda_count + alarm_count auto-discovered from source when available)
     "version": "v3.9.38",
     "date": "2026-03-26",
     "lambda_count": 45,  # fallback: auto-discovery may under-count Lambda@Edge
     "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
-    "alarm_count": 110,  # CDK-defined CloudWatch alarms (synth ground truth). #411/ADR-116 (2026-07) reconciled the stale 56 undercount: 107 IaC-defined + 2 adopted orphans (compute-pipeline-stale, hae-webhook). See docs/reviews/CLOUDWATCH_AUDIT_2026-07.md. +1 grading-stalled (#727, 2026-07-06).
+    "alarm_count": 113,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count)
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 8,
     "iam_roles": 43,
