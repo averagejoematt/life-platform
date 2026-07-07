@@ -33,6 +33,7 @@ from decimal import Decimal
 
 import boto3
 import privacy_guard  # deterministic real-name + vice scrub (layer module)
+from ai_context import wrap_untrusted_reader_text  # R22-SEC-04 (#811): delimit untrusted reader text
 from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
@@ -845,7 +846,9 @@ def _coach_recent_interactions(pid: str, limit: int = 2) -> str:
             sk_parts = str(it.get("sk") or "").split("#")
             d = sk_parts[1] if len(sk_parts) > 1 else ""
             if q and a:
-                lines.append(f"[{d}] A reader asked: {q} — you answered: {a}")
+                # R22-SEC-04 (#811): the stored reader question is untrusted —
+                # delimit it as data on replay (the answer is coach-generated).
+                lines.append(f"[{d}] A reader asked: {wrap_untrusted_reader_text(q)} — you answered: {a}")
         return "\n".join(lines)
     except Exception:
         return ""
@@ -1102,8 +1105,14 @@ def _handle_ask(event: dict) -> dict:
                 "max_tokens": 600,
                 "system": system_prompt,
                 "messages": (
-                    [m for q_, a_ in history for m in ({"role": "user", "content": q_}, {"role": "assistant", "content": a_})]
-                    + [{"role": "user", "content": question}]
+                    # R22-SEC-04 (#811): reader questions (current + client-supplied
+                    # history) are untrusted — delimit them as data at render time.
+                    [
+                        m
+                        for q_, a_ in history
+                        for m in ({"role": "user", "content": wrap_untrusted_reader_text(q_)}, {"role": "assistant", "content": a_})
+                    ]
+                    + [{"role": "user", "content": wrap_untrusted_reader_text(question)}]
                 ),
             }
         )
@@ -1141,9 +1150,17 @@ def _handle_ask(event: dict) -> dict:
                             "max_tokens": 600,
                             "system": system_prompt,
                             "messages": (
-                                [m for q_, a_ in history for m in ({"role": "user", "content": q_}, {"role": "assistant", "content": a_})]
+                                # R22-SEC-04 (#811): same untrusted-reader delimiting on the regen turn.
+                                [
+                                    m
+                                    for q_, a_ in history
+                                    for m in (
+                                        {"role": "user", "content": wrap_untrusted_reader_text(q_)},
+                                        {"role": "assistant", "content": a_},
+                                    )
+                                ]
                                 + [
-                                    {"role": "user", "content": question},
+                                    {"role": "user", "content": wrap_untrusted_reader_text(question)},
                                     {"role": "assistant", "content": answer},
                                     {"role": "user", "content": _corr},
                                 ]
@@ -1463,7 +1480,7 @@ def _handle_board_ask(event: dict) -> dict:
                     if episodic
                     else ""
                 )
-                + f"READER QUESTION: {question}"
+                + f"READER QUESTION: {wrap_untrusted_reader_text(question)}"  # R22-SEC-04 (#811)
             )
             _sys_txt = _coach_system(pid)
             req_body = json.dumps(
@@ -1656,13 +1673,21 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
         pa = _scrub_blocked_terms(str(turn.get("a", ""))[:1200]).strip()
         if not (pq and pa) or not _ask_question_safe(pq)[0]:
             continue
-        user_turn = (context_block + f"READER QUESTION: {pq}") if first else f"READER FOLLOW-UP: {pq}"
+        # R22-SEC-04 (#811): stored reader question is untrusted — delimit as data.
+        _pq_wrapped = wrap_untrusted_reader_text(pq)
+        user_turn = (context_block + f"READER QUESTION: {_pq_wrapped}") if first else f"READER FOLLOW-UP: {_pq_wrapped}"
         messages.append({"role": "user", "content": user_turn})
         messages.append({"role": "assistant", "content": pa})
         prior_answers.append(pa)
         first = False
     # The new follow-up (carries the fresh context block if no prior turn survived).
-    messages.append({"role": "user", "content": (context_block if first else "") + f"READER FOLLOW-UP: {question}"})
+    messages.append(
+        {
+            "role": "user",
+            # R22-SEC-04 (#811): fresh reader follow-up is untrusted — delimit as data.
+            "content": (context_block if first else "") + f"READER FOLLOW-UP: {wrap_untrusted_reader_text(question)}",
+        }
+    )
 
     _sys_txt = _coach_system(persona)
     from bedrock_client import invoke as _bedrock_invoke

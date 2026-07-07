@@ -78,7 +78,10 @@ def test_board_qa_interaction_still_renders_as_before():
         }
     ]
     msg = chs._build_compression_message("sleep_coach", state)
-    assert "A reader asked: Why is my HRV low this week?" in msg
+    # #811 (R22-SEC-04): the stored reader question now renders inside the
+    # untrusted-input fence; the coach's own answer stays unfenced.
+    assert "A reader asked: " in msg
+    assert "<untrusted_reader_input>Why is my HRV low this week?</untrusted_reader_input>" in msg
     assert "You answered: Likely the travel stretch you logged." in msg
 
 
