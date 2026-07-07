@@ -169,6 +169,19 @@ provable equivalence — but it is a compute+email deploy with its own blast rad
 must not be rushed inside a monitoring-cost PR. Estimated additional saving: ~$4.70/mo,
 which (with §2's $1.80) clears the $4–6 target. Recorded in ADR-116.
 
+> **EXECUTED — 2026-07-07 (COST-01, #790).** Done. **Premise correction:** the
+> "1 of 32 compute / 1 of 17 email pass `dlq=`" count above was a *live-AWS*
+> undercount — in CDK, `dlq=local_dlq` has been in the `shared` dict of both
+> `compute_stack.py` and `email_stack.py` since v3.2.9. `cdk synth --all` confirms
+> **32/32 compute + 17/17 email app functions already carry a `DeadLetterConfig` →
+> `life-platform-ingestion-dlq`** with a per-role `sqs:SendMessage` grant, so the DLQ
+> path was already covering terminal async failures. The remaining step — retiring the
+> now-redundant per-lambda alarms — shipped by setting `error_alarm=False` in both
+> `shared` dicts, dropping all **48** `ingestion-error-*` alarms (32 compute + 16 email).
+> Auto-discovered `alarm_count`: **113 → 65** (== synth grep of `AWS::CloudWatch::Alarm`).
+> daily-brief unaffected (already `alerts_topic=None`, keeps its `MonitoringStack` alarms).
+> Saving **~$4.80/mo**. Requires `cdk deploy` of Compute + Email.
+
 ---
 
 ## 6. Billable custom metrics (`MetricMonitorUsage` $4.41/mo)
@@ -212,4 +225,6 @@ billing once its last datapoint ages out of the 15-month retention (no action).
 - CDK-defined alarms: 107 → **109** (the 2 adopted).
 - Remaining out-of-IaC drift: **9** (the §3c keep-orphans, each justified, flagged for a
   future adopt PR).
-- Recovered: **~$1.80/mo** now; **~$4.70/mo more** unlocked by the §5 DLQ-wiring follow-up.
+- Recovered: **~$1.80/mo** now; **~$4.80/mo more** by the §5 DLQ-digest follow-up
+  (EXECUTED 2026-07-07, COST-01 #790 — 48 per-lambda `ingestion-error-*` alarms retired,
+  CDK-defined alarm_count 113 → **65**).

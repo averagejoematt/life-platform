@@ -50,9 +50,17 @@ class EmailStack(Stack):
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
-        # ADR-050: email Lambda error alarms route to digest. They're recoverable
-        # (next day's run picks up where this one failed) and rarely user-facing.
-        # daily-brief still has its urgent alarm via MonitoringStack.
+        # COST-01 (#790, ADR-116 executed 2026-07-07): the ~16 per-Lambda
+        # `ingestion-error-*` first-error alarms on email Lambdas are RETIRED
+        # (error_alarm=False). Every email Lambda already routes terminal async
+        # failures to the shared `life-platform-ingestion-dlq` (dlq=local_dlq below,
+        # verified in synth: 17/17 have a DeadLetterConfig + per-role sqs:SendMessage),
+        # which is alarmed by `life-platform-ingestion-dlq-messages` (monitoring) +
+        # `life-platform-dlq-depth-warning` (operational) and covered by the DLQ
+        # digest. daily-brief is unaffected — it already opted out here
+        # (alerts_topic=None) and keeps its dedicated MonitoringStack alarms
+        # (life-platform-daily-brief-errors, slo-daily-brief-delivery, etc.).
+        # ~$1.60/mo (16 × $0.10). See ADR-116 §5.
         shared = dict(
             table=local_table,
             bucket=local_bucket,
@@ -60,6 +68,7 @@ class EmailStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
+            error_alarm=False,
         )
 
         # daily-brief: alerts_topic=None — MonitoringStack owns its alarms
