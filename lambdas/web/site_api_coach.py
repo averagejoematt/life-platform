@@ -1312,7 +1312,7 @@ def handle_predictions(event):
         inconclusive = sum(c["inconclusive"] for c in by_coach.values())
         expired = sum(c["expired"] for c in by_coach.values())
         resolved = confirmed + refuted
-        accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else 0
+        accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
 
         return _ok(
             {
