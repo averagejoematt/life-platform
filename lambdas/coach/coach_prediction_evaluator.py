@@ -342,9 +342,11 @@ def _evaluate_commitments(commitments, today_str, data_cache):
 
     Metric-backed commitments reuse the directional evaluator: the action_check
     metric moving in the committed direction is evidence the subject followed
-    through (kept); moving the opposite way is broken; flat/no-data is unresolved
-    once past expiry, else left pending. Metric-less commitments can't be auto-graded
-    — they expire to 'unresolved' past 2x window so the coach stops carrying them.
+    through (kept); moving the opposite way OR staying flat is broken (#801 —
+    "nothing happened" is evidence against the commitment, not a non-result);
+    genuinely missing data is unresolved once past expiry, else left pending.
+    Metric-less commitments can't be auto-graded — they expire to 'unresolved'
+    past 2x window so the coach stops carrying them.
     """
     today = datetime.strptime(today_str, "%Y-%m-%d")
     stats = {"kept": 0, "broken": 0, "unresolved": 0, "pending": 0}
@@ -647,7 +649,10 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
 
     Uses EWMA trend detection to determine actual direction, then compares
     against the predicted direction. Confirmed only if the direction matches
-    AND the magnitude exceeds the noise threshold.
+    AND the magnitude exceeds the noise threshold. Refuted if the metric moved
+    the opposite way, OR (#801) if it stayed flat — a directional call is a bet
+    that something moves, and "nothing happened" is evidence against that bet,
+    not a non-result. Only missing data or a malformed prediction is inconclusive.
     """
     metric_key = eval_spec.get("metric")
     predicted_direction = eval_spec.get("condition")  # "up" or "down"
@@ -680,16 +685,28 @@ def _evaluate_directional(pred, eval_spec, data_cache, today_str):
     if direction_matches and magnitude_sufficient:
         status = "confirmed"
         beats_null = True
+        reason = f"{metric_key} trend={actual_direction} (slope={slope:.4f}), " f"predicted={pred_dir}"
     elif actual_direction == "flat":
-        status = "inconclusive"
+        # #801: a directional call is refuted whether the metric moved the OPPOSITE
+        # way or didn't move at all. "Flat" isn't "no evidence either way" — the coach
+        # predicted movement (up/down) and the metric stayed inside the noise band
+        # (±DIRECTIONAL_NOISE_THRESHOLD), so the predicted move simply didn't happen.
+        # Only a genuinely undecidable case (missing data, invalid prediction) stays
+        # inconclusive — see the earlier early-returns in this function.
+        status = "refuted"
         beats_null = False
+        reason = (
+            f"predicted {pred_dir}, metric flat (slope={slope:.4f}, "
+            f"within ±{DIRECTIONAL_NOISE_THRESHOLD} noise band) — no movement to confirm the call"
+        )
     else:
         status = "refuted"
         beats_null = False
+        reason = f"{metric_key} trend={actual_direction} (slope={slope:.4f}), " f"predicted={pred_dir}"
 
     return {
         "status": status,
-        "reason": (f"{metric_key} trend={actual_direction} (slope={slope:.4f}), " f"predicted={pred_dir}"),
+        "reason": reason,
         "actual_value": slope,
         "beats_null": beats_null,
     }
