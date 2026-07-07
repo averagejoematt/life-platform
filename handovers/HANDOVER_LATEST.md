@@ -49,11 +49,22 @@ test added after the doc sync). The fix is in the wrap commit alongside this han
 - `restart_pipeline.py` no longer bumps/builds a layer (step 4 is just cdk deploy).
 - A regression re-attaching the old layer reds CI (plan job) and pytest I2.
 
-## Still open (Now milestone: 4 left)
-- **#780 (SEC-02) — NEEDS MATTHEW**: rotate mcp-api-key (breaks local Claude Desktop
-  bridge IF still used — **unanswered question**) + rotate the Function URL (breaks
-  claude.ai until reconnect) + scrub the committed URL. Detail in private memory
-  `security-r22-mcp-token-exposure`.
+## 🔴 #780 (SEC-02) — api-key ROTATED; Function URL rotation PARKED for a laptop window
+Escalated this session. **api-key: rotated + verified** (old bearer→401, new→200; claude.ai
+re-auths transparently; Matthew confirmed the local bridge is dead so nothing else breaks).
+**But while verifying I proved SEC-01 did NOT close the exposure:** `/authorize` issues a code
+to any anonymous caller and the attacker brings their own PKCE pair, so anonymous
+`/authorize→/token→tools/list` = 200 / 143 tools (ran against prod). The only gate is the
+Function URL secrecy — and that URL is in **18 tracked files / 44 commits of the PUBLIC repo**.
+So all private health data is readable by anyone browsing GitHub, RIGHT NOW.
+**Containment = rotate the Function URL (delete+recreate → new url-id) + scrub it + never commit.**
+There is NO non-breaking interim fix (any gate that stops the anonymous dance stops claude.ai too).
+It breaks Matthew's claude.ai connector until he pastes the new URL in — **he was on his phone, so
+it's parked for a laptop window.** Full reproduction + the exact rotation runbook + the (c) scrub
+list are in PRIVATE memory `security-r22-mcp-token-exposure` (NOT here — repo is public).
+**Next action when Matthew is at a laptop: run the runbook, hand him the new URL, verify his
+access, then scrub + commit.** Also worth filing: the URL-possession model is the root weakness
+(SEC-01's PKCE is theater without a real per-request gate or a CI "never commit the URL" rule).
 - **#788/#789** (static-render /now/ + friends-family surface) — batch as one opus site
   session, optionally + #804 (Next, same pattern). **#790** COST-01 (alarm + secrets
   consolidation; pairs with #808/#809 from Next).
