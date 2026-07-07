@@ -383,6 +383,17 @@ def evaluate_probe(probe: dict, status, payload: dict, facts: dict):
 # ── advisory judge (never drives the alarm) ───────────────────────────────────
 
 
+def _emit_judge_failure() -> None:
+    """The judge is advisory (never trips OverallAlarm), but a silent failure
+    is exactly what let this call drift off its real signature undetected
+    (#800/R22-BUG-02) — so failures still get a metric of their own, dimensioned
+    separately from the deterministic ProbeAlarming/OverallAlarm gauges. Fail-soft."""
+    try:
+        _cw.put_metric_data(Namespace=CW_NAMESPACE, MetricData=[{"MetricName": "JudgeFailure", "Value": 1.0, "Unit": "Count"}])
+    except Exception as e:  # noqa: BLE001
+        logger.warning("canary: judge-failure metric emit failed: %s", e)
+
+
 def _judge(transcript):
     """Budget-gated Haiku read: is each answer on-character and grounded? ADVISORY
     only — kept in the record/digest for a human, never tied to the metric gauge
@@ -397,17 +408,19 @@ def _judge(transcript):
             "on-character (never names an AI vendor/model), grounded (no invented numbers), and coherent. "
             'Respond ONLY as JSON: {"coherent": bool, "notes": ["short issue", ...]}.\n\n' + json.dumps(transcript, default=str)[:6000]
         )
-        out = bedrock_client.invoke(
-            messages=[{"role": "user", "content": prompt}],
-            system="Terse QA judge. JSON only.",
-            max_tokens=400,
-            model=os.environ.get("AI_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
-        )
+        body = {
+            "model": os.environ.get("AI_MODEL_HAIKU", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+            "max_tokens": 400,
+            "system": "Terse QA judge. JSON only.",
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        out = bedrock_client.invoke(body)
         text = "".join(b.get("text", "") for b in out.get("content", [])) if isinstance(out, dict) else str(out)
         m = re.search(r"\{.*\}", text, re.S)
         return json.loads(m.group(0)) if m else None
     except Exception as e:  # noqa: BLE001
         logger.warning("canary: advisory judge failed (non-fatal): %s", e)
+        _emit_judge_failure()
         return None
 
 

@@ -160,6 +160,52 @@ def test_transport_failure_alarms():
     assert canary.overall_status(f) == canary.ALARM
 
 
+# ── #800/R22-BUG-02: the judge's bedrock_client.invoke() call must use the real
+# signature (body: dict, model_name=None) — a `messages=`/`system=`/`model=` kwarg
+# call raises TypeError, swallowed by _judge's bare except, so nothing ever ran. ──
+
+
+def test_judge_calls_bedrock_invoke_with_a_valid_body_dict(monkeypatch):
+    import bedrock_client
+
+    captured = {}
+
+    def fake_invoke(body, model_name=None):
+        captured["body"] = body
+        captured["model_name"] = model_name
+        return {"content": [{"type": "text", "text": '{"coherent": true, "notes": []}'}]}
+
+    monkeypatch.setattr(bedrock_client, "invoke", fake_invoke)
+    result = canary._judge([{"probe": "ask_factual", "status": 200, "response": {"answer": "ok"}}])
+
+    assert result == {"coherent": True, "notes": []}
+    body = captured["body"]
+    assert isinstance(body, dict)
+    # the real contract: {messages, max_tokens, system?} — no top-level kwargs
+    assert isinstance(body.get("messages"), list) and body["messages"]
+    assert body["messages"][0]["role"] == "user"
+    assert isinstance(body["messages"][0]["content"], str) and body["messages"][0]["content"]
+    assert body.get("max_tokens") == 400
+    assert isinstance(body.get("system"), str) and body["system"]
+
+
+def test_judge_failure_is_observable_via_metric(monkeypatch):
+    import bedrock_client
+
+    def broken_invoke(*args, **kwargs):
+        raise TypeError("invoke() got an unexpected keyword argument 'messages'")
+
+    monkeypatch.setattr(bedrock_client, "invoke", broken_invoke)
+    emitted = []
+    monkeypatch.setattr(canary._cw, "put_metric_data", lambda **kw: emitted.append(kw))
+
+    result = canary._judge([{"probe": "ask_factual", "status": 200, "response": {"answer": "ok"}}])
+
+    assert result is None  # still advisory / non-fatal
+    names = [m["MetricName"] for kw in emitted for m in kw["MetricData"]]
+    assert "JudgeFailure" in names
+
+
 # ── the advisory judge never drives the verdict ───────────────────────────────
 
 
