@@ -51,6 +51,12 @@ from mcp.helpers import (
     query_chronicling,
 )
 
+# R22-SCI-02 (#820): fit-quality floor for the sentiment-trajectory regressions below.
+# r² < 0.09 is |r| < 0.3 — the same "below moderate" floor already used as the weak/moderate
+# correlation boundary in tools_habits.py (habit-lever interpretation) and tools_training.py
+# (correlation interpretation). ADR-105 rule 1: every statistical claim carries its fit quality.
+_TRAJECTORY_LOW_FIT_R2 = 0.09
+
 # ── Journal query helper ──
 
 
@@ -725,16 +731,17 @@ def tool_get_journal_sentiment_trajectory(args):
     # ── Linear regression for overall trajectory ──
     def compute_slope(signals, field):
         vals = [(i, float(s.get(field))) for i, s in enumerate(signals) if s.get(field) is not None]
-        if len(vals) < 5:
-            return None, None
-        slope, intercept, _r_sq = _linear_regression(vals)
+        n = len(vals)
+        if n < 5:
+            return None, None, None, n
+        slope, intercept, r_sq = _linear_regression(vals)
         if slope is None:
-            return None, None
-        return round(slope, 3), round(intercept, 2)
+            return None, None, None, n
+        return round(slope, 3), round(intercept, 2), r_sq, n
 
-    mood_slope, _ = compute_slope(daily_signals, "mood")
-    energy_slope, _ = compute_slope(daily_signals, "energy")
-    stress_slope, _ = compute_slope(daily_signals, "stress")
+    mood_slope, _, mood_r2, mood_n = compute_slope(daily_signals, "mood")
+    energy_slope, _, energy_r2, energy_n = compute_slope(daily_signals, "energy")
+    stress_slope, _, stress_r2, stress_n = compute_slope(daily_signals, "stress")
 
     def slope_label(slope):
         if slope is None:
@@ -745,6 +752,17 @@ def tool_get_journal_sentiment_trajectory(args):
             return "falling"
         return "stable"
 
+    # R22-SCI-02 (#820): the divergence claims below read like strong pattern detections
+    # (e.g. "possible forced positivity") but are gated only on slope magnitude — with no
+    # indication of how well that slope actually fits the underlying data. Append an honest
+    # fit-quality qualifier (ADR-105 rule 1) whenever the weaker of the two contributing
+    # regressions falls below the low-fit floor.
+    def fit_qualifier(*r2_n_pairs):
+        r2, n = min(r2_n_pairs, key=lambda pair: pair[0] if pair[0] is not None else 1.0)
+        if r2 is not None and r2 < _TRAJECTORY_LOW_FIT_R2:
+            return f" Low fit (r²={round(r2, 2)}, n={n}) — weak signal, treat as suggestive only."
+        return ""
+
     # ── Divergence detection ──
     divergences = []
     if mood_slope is not None and energy_slope is not None:
@@ -752,18 +770,24 @@ def tool_get_journal_sentiment_trajectory(args):
             divergences.append(
                 {
                     "type": "mood_up_energy_down",
-                    "signal": "Mood rising while energy falls — possible forced positivity or emotional suppression. Monitor for burnout onset.",
+                    "signal": "Mood rising while energy falls — possible forced positivity or emotional suppression. Monitor for burnout onset."
+                    + fit_qualifier((mood_r2, mood_n), (energy_r2, energy_n)),
                     "mood_slope": mood_slope,
                     "energy_slope": energy_slope,
+                    "mood_r_squared": mood_r2,
+                    "energy_r_squared": energy_r2,
                 }
             )
         elif mood_slope < -0.03 and energy_slope > 0.03:
             divergences.append(
                 {
                     "type": "mood_down_energy_up",
-                    "signal": "Energy available but mood declining — may indicate social disconnection, value misalignment, or unprocessed emotion.",
+                    "signal": "Energy available but mood declining — may indicate social disconnection, value misalignment, or unprocessed emotion."
+                    + fit_qualifier((mood_r2, mood_n), (energy_r2, energy_n)),
                     "mood_slope": mood_slope,
                     "energy_slope": energy_slope,
+                    "mood_r_squared": mood_r2,
+                    "energy_r_squared": energy_r2,
                 }
             )
     if stress_slope is not None and mood_slope is not None:
@@ -771,9 +795,12 @@ def tool_get_journal_sentiment_trajectory(args):
             divergences.append(
                 {
                     "type": "stress_and_mood_both_rising",
-                    "signal": "Both stress and mood rising — may indicate eustress (productive challenge). Sustainable if sleep and recovery hold.",
+                    "signal": "Both stress and mood rising — may indicate eustress (productive challenge). Sustainable if sleep and recovery hold."
+                    + fit_qualifier((stress_r2, stress_n), (mood_r2, mood_n)),
                     "stress_slope": stress_slope,
                     "mood_slope": mood_slope,
+                    "stress_r_squared": stress_r2,
+                    "mood_r_squared": mood_r2,
                 }
             )
 
@@ -819,9 +846,27 @@ def tool_get_journal_sentiment_trajectory(args):
     return {
         "period": {"start_date": start_date, "end_date": end_date, "entries_analysed": len(daily_signals)},
         "trajectories": {
-            "mood": {"slope": mood_slope, "direction": slope_label(mood_slope), "avg": safe_avg("mood")},
-            "energy": {"slope": energy_slope, "direction": slope_label(energy_slope), "avg": safe_avg("energy")},
-            "stress": {"slope": stress_slope, "direction": slope_label(stress_slope), "avg": safe_avg("stress")},
+            "mood": {
+                "slope": mood_slope,
+                "direction": slope_label(mood_slope),
+                "avg": safe_avg("mood"),
+                "r_squared": mood_r2,
+                "n": mood_n,
+            },
+            "energy": {
+                "slope": energy_slope,
+                "direction": slope_label(energy_slope),
+                "avg": safe_avg("energy"),
+                "r_squared": energy_r2,
+                "n": energy_n,
+            },
+            "stress": {
+                "slope": stress_slope,
+                "direction": slope_label(stress_slope),
+                "avg": safe_avg("stress"),
+                "r_squared": stress_r2,
+                "n": stress_n,
+            },
         },
         "divergences": divergences,
         "inflections": {
@@ -836,9 +881,12 @@ def tool_get_journal_sentiment_trajectory(args):
         "daily_signals": daily_signals,
         "methodology": (
             "Extracts enriched mood/energy/stress scores from Haiku-processed journal entries. "
-            "Linear regression computes overall trajectory slope (>0.05 rising, <-0.05 falling). "
+            "Linear regression computes overall trajectory slope (>0.05 rising, <-0.05 falling); "
+            "each trajectory reports r² and the entry count (n) feeding its regression alongside the slope. "
             "Divergence detection flags when trajectories move in opposing directions — "
-            "mood↑/energy↓ is a burnout precursor (Beck CBT). Inflection points found via "
+            "mood↑/energy↓ is a burnout precursor (Beck CBT) — and is annotated 'low fit' when the "
+            f"weaker contributing slope's r² < {_TRAJECTORY_LOW_FIT_R2} (|r| < 0.3, the same weak/moderate "
+            "floor used elsewhere in the platform's correlation tools). Inflection points found via "
             "rolling average local minima/maxima. Theme and emotion frequency surfaces recurring patterns."
         ),
     }
