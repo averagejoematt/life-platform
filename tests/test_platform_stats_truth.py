@@ -50,6 +50,16 @@ def test_lambda_count_matches_cdk():
     assert PLATFORM_STATS["lambdas"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
 
 
+def test_alarm_count_matches_cdk():
+    """#795: alarm_count is now AST-discovered from cdk/stacks/*.py, same as lambda_count —
+    the doc-drift gate can finally catch it rotting instead of only catching a rewrite of
+    itself. See sync._auto_discover_alarm_count docstring for the CDK-vs-live distinction."""
+    actual = sync._auto_discover_alarm_count()
+    assert actual is not None, "discoverer bailed (unreadable/suspiciously-low stack parse) — investigate before trusting a fallback"
+    assert isinstance(actual, int) and actual > 0
+    assert PLATFORM_STATS["alarms"] == actual, "run: python3 deploy/sync_doc_metadata.py --apply"
+
+
 def test_alarms_and_sources_share_the_maintained_fact():
     """One number, one home: the maintained PLATFORM_FACTS values are the source."""
     assert PLATFORM_STATS["alarms"] == sync.PLATFORM_FACTS["alarm_count"]
