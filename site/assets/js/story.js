@@ -241,6 +241,82 @@ function renderNumbers(journey) {
   }
 }
 
+/* ── "Is he okay this week?" — the friends/family surface (#789) ──────────────
+   North Star's fourth audience asks "is he okay, is it working, what's the
+   journey?" — and the doors route them to an opaque cockpit. This renders the
+   answer in plain language, DETERMINISTICALLY, from data the page already
+   fetched: the /api/character pillars (raw_score + xp_delta 7-day trend + the
+   ADR-104 coverage provenance) and the /api/journey weight delta. Nothing is
+   invented and nothing new is fetched. A pillar the engine says carried no
+   signal this week reads honestly absent ("not measured this week"); the
+   character sheet's own as_of_date stamps the read. No AI, no lambda write. */
+const OKAY_LEGIBLE = [
+  ["sleep", "Sleep"],
+  ["movement", "Training"],
+  ["nutrition", "Eating"],
+  ["consistency", "Daily habits"],
+  ["mind", "Headspace"],
+];
+// One pillar → one plain, warm status. Honest absent when the engine flags the
+// week as no-signal (coverage_hold), coverage is thin (<25%), or the score is a
+// flat zero with no movement — never a faked "steady".
+function okayStatus(p) {
+  if (!p) return { txt: "not measured this week", state: "absent" };
+  const cov = p.data_coverage;
+  const absent = p.coverage_hold === true || (typeof cov === "number" && cov < 0.25) || (Number(p.raw_score) === 0 && !Number(p.xp_delta));
+  if (absent) return { txt: "not measured this week", state: "absent" };
+  const t = trend(p.xp_delta);
+  if (t === "up") return { txt: "on the up", state: "up" };
+  if (t === "down") return { txt: "eased off a little", state: "down" };
+  return { txt: "holding steady", state: "flat" };
+}
+function renderOkay(charV, journeyV) {
+  const wrap = $("[data-okay]");
+  if (!wrap) return;
+  const character = (charV && (charV.character || charV)) || {};
+  const pillars = (charV && (charV.pillars || (charV.character && charV.character.pillars))) || [];
+  const asOf = character.as_of_date || "";
+  const byName = {};
+  for (const p of pillars) byName[p.name] = p;
+
+  // The lead line answers the family's "is it working?" with the real weight move
+  // — with an honest as-of when the last weigh-in is a couple of days stale (the
+  // scale moves slower than the page's day counter).
+  let lead = "";
+  if (journeyV && journeyV.lost_lbs != null) {
+    const lost = Number(journeyV.lost_lbs);
+    const n1 = Math.round(Math.abs(lost) * 10) / 10;
+    let asofW = "";
+    if (journeyV.last_weighin_date) {
+      const lw = new Date(`${journeyV.last_weighin_date}T12:00:00`);
+      if ((Date.now() - lw.getTime()) / 86400000 > 1.5) asofW = ` (last weigh-in ${lw.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+    }
+    if (lost > 0.05) lead = `The short version: he's <strong>down ${n1} lb</strong> since the start${esc(asofW)}, and the day-to-day looks like this —`;
+    else if (lost < -0.05) lead = `The short version: the scale is <strong>up ${n1} lb</strong> right now${esc(asofW)} — the down weeks get shown here too. Day-to-day, it looks like this —`;
+    else lead = `The short version: weight is <strong>holding steady</strong>${esc(asofW)}, and the day-to-day looks like this —`;
+  } else {
+    lead = "The short version — how the week's actually going, in plain terms:";
+  }
+
+  const rows = OKAY_LEGIBLE.map(([name, label]) => ({ label, s: okayStatus(byName[name]) }));
+  const allAbsent = rows.every((r) => r.s.state === "absent");
+  const asofLine = asOf
+    ? `<p class="okay-asof label">as of ${esc(asOf)} · plain-language, computed from the same numbers on <a href="/now/">the cockpit</a></p>`
+    : `<p class="okay-asof label">plain-language, from the live cockpit numbers</p>`;
+
+  if (allAbsent) {
+    // Fresh cycle / post-reset: refuse to read a week with no signal. Honest silence.
+    wrap.innerHTML =
+      `<p class="okay-lead">This week's numbers are still filling in — too early to read honestly yet. <a href="/now/">The cockpit</a> shows whatever's landed so far.</p>` +
+      asofLine;
+    return;
+  }
+  const chips = rows
+    .map((r) => `<li class="okay-chip okay-${r.s.state}"><span class="okay-lab">${esc(r.label)}</span><span class="okay-val">${esc(r.s.txt)}</span></li>`)
+    .join("");
+  wrap.innerHTML = `<p class="okay-lead">${lead}</p><ul class="okay-chips">${chips}</ul>${asofLine}`;
+}
+
 /* ── the quiet stretch (presence) ────────────────────────────────────────── */
 // Home is where family lands first — when the manual logs go quiet, say so in one
 // calm line (the shipped /api/presence contract; same tone as the Story timeline's
@@ -509,6 +585,10 @@ async function load() {
   );
   const cw = bind("const-window");
   if (cw && couplingV && couplingV.window_days) cw.textContent = ` over the last ${couplingV.window_days} days`;
+
+  // #789 — the friends/family "is he okay this week?" plain-language read, from the
+  // pillars + weight already in hand (no extra fetch). Renders after both land.
+  renderOkay(charV, journeyV);
 }
 
 load();

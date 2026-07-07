@@ -113,6 +113,23 @@
 
   <!-- ── THE ARC: scrollytelling waveform with honest down-beats ──────────── -->
   <main id="arc" class="arc">
+    <!-- #789 — "Is he okay this week?" the friends/family surface. North Star names this
+         audience ("is he okay, is it working, what's the journey?"); the doors route them
+         to an opaque cockpit or a days-old chronicle. This one plain-language beat answers
+         it in a glance — DETERMINISTIC, computed client-side from the already-loaded
+         /api/character pillars (7-day trend + ADR-104 coverage provenance) + the already-
+         loaded /api/journey weight. No new fetch, no AI, no lambda write. Absent data reads
+         honestly absent ("not measured this week"); an "as of" date stamps every read. The
+         no-JS fallback below is a static pointer to the live cockpit (full static bake is #788). -->
+    <section class="beat beat-okay" id="okay" aria-label="Is he okay this week — the plain-language version">
+      <p class="beat-kicker label">for family &amp; friends · the short version</p>
+      <h2 class="beat-h">Is he okay this week?</h2>
+      <div class="okay-card" data-okay>
+        <p class="okay-fallback">A plain-language weekly status loads here. In the meantime, <a href="/now/">the live cockpit</a> has the day's actual numbers.</p>
+      </div>
+      <p class="beat-deeper"><a href="/now/" class="cta cta-quiet">See the full daily instrument →</a></p>
+    </section>
+
     <!-- Returnability strip (uplevel P5): what moved since YOUR last visit (keyed to the
          reader's own localStorage stamp — the cockpit owns the stamp; this only reads) +
          anything the correlation engine newly unlocked this month. Self-hides entirely
