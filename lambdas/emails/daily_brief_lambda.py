@@ -1165,6 +1165,198 @@ def record_email_send(table, lambda_name):
         # Don't re-raise (email already sent) but log as ERROR for CloudWatch alarm
 
 
+def _daily_brief_ai_allowed() -> bool:
+    """Explicit Band-3 budget-ladder gate for the brief's AI pipeline (ADR-125,
+    R22-COST-04 / #810). Before this, the only thing standing between the
+    brief and Tier-3 spend was bedrock_client.invoke() raising BudgetExceeded
+    deep inside ai_calls — an exception that ~20 generic `except Exception`
+    blocks around each AI call site were swallowing as a coincidental catch,
+    not an intentional feature-level check. This mirrors the call-site pattern
+    used by coach_narrative_orchestrator / state_of_matthew_lambda: check
+    budget_guard.allow(...) explicitly at the branch point, and skip AI
+    cleanly into the existing data-only path with a clear log line.
+
+    Fail-open: an unavailable budget_guard module or an SSM blip must never
+    take the brief's AI down — same convention as every other gated feature
+    (budget_guard.current_tier() itself fails open to tier 0).
+    """
+    try:
+        import budget_guard
+
+        if not budget_guard.allow("daily_brief_ai"):
+            logger.info("[budget] daily_brief_ai paused by budget tier — falling back to the data-only brief")
+            return False
+        return True
+    except Exception as e:
+        logger.warning(f"[budget] daily_brief_ai gate check failed (fail-open, AI proceeds): {e}")
+        return True
+
+
+def _run_ai_coach_pipeline(
+    data,
+    profile,
+    api_key,
+    day_grade_score,
+    grade,
+    component_scores,
+    component_details,
+    readiness_score,
+    readiness_colour,
+    character_sheet,
+    brief_mode,
+):
+    """Runs the full AI coach pipeline (8 v2 coaches + ensemble digest kick-off +
+    Board of Directors + Training/Nutrition + Journal + TL;DR/Guidance) and
+    returns a dict of the generated fields. Gated on both `api_key` presence
+    and `_daily_brief_ai_allowed()` (budget tier 3 / ADR-125 Band 3,
+    "daily_brief_ai") — when either is false, returns all-empty defaults so
+    the caller's existing data-only rendering path is exercised unchanged."""
+    result = {
+        "bod_insight": "",
+        "training_nutrition": {},
+        "journal_coach_text": "",
+        "tldr_guidance": {},
+        "sleep_coach_v2_text": "",
+        "nutrition_coach_v2_text": "",
+        "training_coach_v2_text": "",
+        "mind_coach_v2_text": "",
+        "physical_coach_v2_text": "",
+        "glucose_coach_v2_text": "",
+        "labs_coach_v2_text": "",
+        "explorer_coach_v2_text": "",
+    }
+    if not api_key:
+        return result
+    if not _daily_brief_ai_allowed():
+        return result
+
+    # Coach Intelligence Pipeline — Full 8-coach system (Phase 5)
+    # Reset computation cache at start of each daily brief cycle
+    ai_calls._comp_results_cache = None
+
+    for _cid, _call_fn, _label in [
+        ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
+        ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
+        ("training", ai_calls.call_training_coach_v2, "Training"),
+        ("mind", ai_calls.call_mind_coach_v2, "Mind"),
+        ("physical", ai_calls.call_physical_coach_v2, "Physical"),
+        ("glucose", ai_calls.call_glucose_coach_v2, "Glucose"),
+        ("labs", ai_calls.call_labs_coach_v2, "Labs"),
+        ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
+    ]:
+        try:
+            _result = _call_fn(data, profile, api_key) or ""
+            if _cid == "sleep":
+                result["sleep_coach_v2_text"] = _result
+            elif _cid == "nutrition":
+                result["nutrition_coach_v2_text"] = _result
+            elif _cid == "training":
+                result["training_coach_v2_text"] = _result
+            elif _cid == "mind":
+                result["mind_coach_v2_text"] = _result
+            elif _cid == "physical":
+                result["physical_coach_v2_text"] = _result
+            elif _cid == "glucose":
+                result["glucose_coach_v2_text"] = _result
+            elif _cid == "labs":
+                result["labs_coach_v2_text"] = _result
+            elif _cid == "explorer":
+                result["explorer_coach_v2_text"] = _result
+            if _result:
+                logger.info(f"{_label} Coach V2: {_result[:80]}")
+            else:
+                logger.info(f"{_label} Coach V2 returned None — will use legacy")
+        except Exception as e:
+            logger.warning(f"{_label} Coach V2 failed (non-blocking): {e}")
+
+    # Invoke ensemble digest (async) after all v2 coaches complete
+    try:
+        _lc = boto3.client("lambda", region_name="us-west-2")
+        _lc.invoke(
+            FunctionName="coach-ensemble-digest",
+            InvocationType="Event",
+            Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
+        )
+        logger.info("Ensemble digest invoked (async)")
+    except Exception as e:
+        logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
+
+    # Build the shared system block ONCE; pass to all 4 AI calls so they
+    # share one preamble object (smaller request build, single construction).
+    # NB (D-01, 2026-06-05): the original Phase-3.8 intent was Anthropic
+    # prompt-cache reuse across the 4 calls (first pays full, next 3 pay 10%).
+    # That never materialized — CloudWatch showed 0 cache-reads / ~10K writes
+    # per 14d. Root cause: Bedrock cross-region inference profiles route each
+    # call to a region-local cache, so a once/day, 4-call brief never hits;
+    # we were only paying the 25% cache-write premium. cache_system is now
+    # False on all 4 daily-brief calls in ai_calls.py. (coach-narrative-
+    # orchestrator is high-frequency and keeps a region warm, so it still caches.)
+    try:
+        shared_system = ai_calls.daily_brief_shared_system(data, profile, day_grade=day_grade_score, grade=grade)
+    except Exception as e:
+        shared_system = None
+        logger.warning("shared_system build failed (proceeding without): " + str(e))
+
+    try:
+        result["bod_insight"] = ai_calls.call_board_of_directors(
+            data,
+            profile,
+            day_grade_score,
+            grade,
+            component_scores,
+            api_key,
+            character_sheet=character_sheet,
+            brief_mode=brief_mode,
+            shared_system=shared_system,
+        )
+        logger.info("BoD: " + result["bod_insight"][:80])
+    except Exception as e:
+        logger.warning("BoD failed: " + str(e))
+
+    try:
+        result["training_nutrition"] = ai_calls.call_training_nutrition_coach(data, profile, api_key, shared_system=shared_system)
+        logger.info("Training/Nutrition coach returned")
+    except Exception as e:
+        logger.warning("Training/Nutrition coach failed: " + str(e))
+
+    if data.get("journal_entries"):
+        try:
+            journal_coach_text = ai_calls.call_journal_coach(data, profile, api_key, shared_system=shared_system)
+            # V2 P3.5 (2026-05-17): substitute a stub if LLM returned empty
+            # (validator blocks empty + falls through). Stub keeps the section
+            # rendered with a graceful no-op rather than a missing block.
+            if not journal_coach_text or len(journal_coach_text.strip()) < 10:
+                n_entries = len(data.get("journal_entries", []))
+                logger.info(f"Journal coach: empty after {n_entries} entries — using stub")
+                journal_coach_text = (
+                    "Quieter journal day — no clear pattern surfaced. " "|| One small thing: jot down what you're saving energy for."
+                )
+            else:
+                logger.info("Journal coach: " + journal_coach_text[:80])
+            result["journal_coach_text"] = journal_coach_text
+        except Exception as e:
+            logger.warning("Journal coach failed: " + str(e))
+
+    try:
+        result["tldr_guidance"] = ai_calls.call_tldr_and_guidance(
+            data,
+            profile,
+            day_grade_score,
+            grade,
+            component_scores,
+            component_details,
+            readiness_score,
+            readiness_colour,
+            api_key,
+            shared_system=shared_system,
+        )
+        logger.info("TL;DR+Guidance: " + str(result["tldr_guidance"].get("tldr", ""))[:80])
+    except Exception as e:
+        logger.warning("TL;DR+Guidance failed: " + str(e))
+
+    return result
+
+
 def lambda_handler(event, context):
     if event.get("healthcheck"):
         return {"statusCode": 200, "body": "ok"}
@@ -1549,149 +1741,41 @@ def lambda_handler(event, context):
     data["labs_coaching_ctx"] = _labs_ctx
     data["genome_coaching_ctx"] = _genome_ctx
 
-    # AI calls (all optional — brief works without them)
+    # AI calls (all optional — brief works without them). Gated by both API-key
+    # availability and the explicit budget_guard.allow("daily_brief_ai") check
+    # inside _run_ai_coach_pipeline (Band 3 / ADR-125, #810) — at tier 3 this
+    # returns all-empty defaults and the brief below renders data-only.
     api_key = None
     try:
         api_key = get_anthropic_key()
     except Exception as e:
         logger.warning("Could not get API key: " + str(e))
 
-    bod_insight = ""
-    training_nutrition = {}
-    journal_coach_text = ""
-    tldr_guidance = {}
-    sleep_coach_v2_text = ""
-    nutrition_coach_v2_text = ""
-    training_coach_v2_text = ""
-    mind_coach_v2_text = ""
-    physical_coach_v2_text = ""
-    glucose_coach_v2_text = ""
-    labs_coach_v2_text = ""
-    explorer_coach_v2_text = ""
-
-    if api_key:
-        # Coach Intelligence Pipeline — Full 8-coach system (Phase 5)
-        # Reset computation cache at start of each daily brief cycle
-        ai_calls._comp_results_cache = None
-
-        for _cid, _call_fn, _label in [
-            ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
-            ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
-            ("training", ai_calls.call_training_coach_v2, "Training"),
-            ("mind", ai_calls.call_mind_coach_v2, "Mind"),
-            ("physical", ai_calls.call_physical_coach_v2, "Physical"),
-            ("glucose", ai_calls.call_glucose_coach_v2, "Glucose"),
-            ("labs", ai_calls.call_labs_coach_v2, "Labs"),
-            ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
-        ]:
-            try:
-                _result = _call_fn(data, profile, api_key) or ""
-                if _cid == "sleep":
-                    sleep_coach_v2_text = _result
-                elif _cid == "nutrition":
-                    nutrition_coach_v2_text = _result
-                elif _cid == "training":
-                    training_coach_v2_text = _result
-                elif _cid == "mind":
-                    mind_coach_v2_text = _result
-                elif _cid == "physical":
-                    physical_coach_v2_text = _result
-                elif _cid == "glucose":
-                    glucose_coach_v2_text = _result
-                elif _cid == "labs":
-                    labs_coach_v2_text = _result
-                elif _cid == "explorer":
-                    explorer_coach_v2_text = _result
-                if _result:
-                    logger.info(f"{_label} Coach V2: {_result[:80]}")
-                else:
-                    logger.info(f"{_label} Coach V2 returned None — will use legacy")
-            except Exception as e:
-                logger.warning(f"{_label} Coach V2 failed (non-blocking): {e}")
-
-        # Invoke ensemble digest (async) after all v2 coaches complete
-        try:
-            _lc = boto3.client("lambda", region_name="us-west-2")
-            _lc.invoke(
-                FunctionName="coach-ensemble-digest",
-                InvocationType="Event",
-                Payload=json.dumps({"cycle_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")}).encode(),
-            )
-            logger.info("Ensemble digest invoked (async)")
-        except Exception as e:
-            logger.warning(f"Ensemble digest invoke failed (non-blocking): {e}")
-
-        # Build the shared system block ONCE; pass to all 4 AI calls so they
-        # share one preamble object (smaller request build, single construction).
-        # NB (D-01, 2026-06-05): the original Phase-3.8 intent was Anthropic
-        # prompt-cache reuse across the 4 calls (first pays full, next 3 pay 10%).
-        # That never materialized — CloudWatch showed 0 cache-reads / ~10K writes
-        # per 14d. Root cause: Bedrock cross-region inference profiles route each
-        # call to a region-local cache, so a once/day, 4-call brief never hits;
-        # we were only paying the 25% cache-write premium. cache_system is now
-        # False on all 4 daily-brief calls in ai_calls.py. (coach-narrative-
-        # orchestrator is high-frequency and keeps a region warm, so it still caches.)
-        try:
-            shared_system = ai_calls.daily_brief_shared_system(data, profile, day_grade=day_grade_score, grade=grade)
-        except Exception as e:
-            shared_system = None
-            logger.warning("shared_system build failed (proceeding without): " + str(e))
-
-        try:
-            bod_insight = ai_calls.call_board_of_directors(
-                data,
-                profile,
-                day_grade_score,
-                grade,
-                component_scores,
-                api_key,
-                character_sheet=character_sheet,
-                brief_mode=brief_mode,
-                shared_system=shared_system,
-            )
-            logger.info("BoD: " + bod_insight[:80])
-        except Exception as e:
-            logger.warning("BoD failed: " + str(e))
-
-        try:
-            training_nutrition = ai_calls.call_training_nutrition_coach(data, profile, api_key, shared_system=shared_system)
-            logger.info("Training/Nutrition coach returned")
-        except Exception as e:
-            logger.warning("Training/Nutrition coach failed: " + str(e))
-
-        if data.get("journal_entries"):
-            try:
-                journal_coach_text = ai_calls.call_journal_coach(data, profile, api_key, shared_system=shared_system)
-                # V2 P3.5 (2026-05-17): substitute a stub if LLM returned empty
-                # (validator blocks empty + falls through). Stub keeps the section
-                # rendered with a graceful no-op rather than a missing block.
-                if not journal_coach_text or len(journal_coach_text.strip()) < 10:
-                    n_entries = len(data.get("journal_entries", []))
-                    logger.info(f"Journal coach: empty after {n_entries} entries — using stub")
-                    journal_coach_text = (
-                        "Quieter journal day — no clear pattern surfaced. " "|| One small thing: jot down what you're saving energy for."
-                    )
-                else:
-                    logger.info("Journal coach: " + journal_coach_text[:80])
-            except Exception as e:
-                logger.warning("Journal coach failed: " + str(e))
-
-        try:
-            tldr_guidance = ai_calls.call_tldr_and_guidance(
-                data,
-                profile,
-                day_grade_score,
-                grade,
-                component_scores,
-                component_details,
-                readiness_score,
-                readiness_colour,
-                api_key,
-                shared_system=shared_system,
-            )
-            logger.info("TL;DR+Guidance: " + str(tldr_guidance.get("tldr", ""))[:80])
-        except Exception as e:
-            logger.warning("TL;DR+Guidance failed: " + str(e))
+    _ai = _run_ai_coach_pipeline(
+        data,
+        profile,
+        api_key,
+        day_grade_score,
+        grade,
+        component_scores,
+        component_details,
+        readiness_score,
+        readiness_colour,
+        character_sheet,
+        brief_mode,
+    )
+    bod_insight = _ai["bod_insight"]
+    training_nutrition = _ai["training_nutrition"]
+    journal_coach_text = _ai["journal_coach_text"]
+    tldr_guidance = _ai["tldr_guidance"]
+    sleep_coach_v2_text = _ai["sleep_coach_v2_text"]
+    nutrition_coach_v2_text = _ai["nutrition_coach_v2_text"]
+    training_coach_v2_text = _ai["training_coach_v2_text"]
+    mind_coach_v2_text = _ai["mind_coach_v2_text"]
+    physical_coach_v2_text = _ai["physical_coach_v2_text"]
+    glucose_coach_v2_text = _ai["glucose_coach_v2_text"]
+    labs_coach_v2_text = _ai["labs_coach_v2_text"]
+    explorer_coach_v2_text = _ai["explorer_coach_v2_text"]
 
     # Phase 1B: Write guidance_given back to computed_insights for anti-repetition
     try:
