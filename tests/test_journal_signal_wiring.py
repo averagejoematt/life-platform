@@ -92,6 +92,98 @@ def test_trajectory_reads_written_enrichment_names(monkeypatch):
     assert "error" not in result, result.get("error")
 
 
+# ── #820 R22-SCI-02: trajectory slopes carry r² + n, low-fit divergences are annotated ────
+
+
+def _make_trajectory_entries(n=10):
+    entries = []
+    for i in range(1, n + 1):
+        entries.append(
+            dict(
+                ENRICHED_ENTRY,
+                sk=f"DATE#2026-06-{i:02d}#journal#evening",
+                date=f"2026-06-{i:02d}",
+                enriched_mood=Decimal(str(3 + (i % 2))),
+                enriched_energy=Decimal(str(2 + (i % 3))),
+                enriched_stress=Decimal(str(1 + (i % 2))),
+            )
+        )
+    return entries
+
+
+def test_trajectory_reports_r_squared_and_n_per_metric(monkeypatch):
+    """Each trajectory (mood/energy/stress) surfaces r² and the n that fed its regression,
+    additively alongside the existing slope/direction/avg fields (ADR-105 rule 1)."""
+    import mcp.tools_journal as tj
+
+    entries = _make_trajectory_entries(10)
+    monkeypatch.setattr(tj, "_query_journal", lambda start, end, template=None: entries)
+    result = tj.tool_get_journal_sentiment_trajectory({"start_date": "2026-06-01", "end_date": "2026-06-10"})
+    assert "error" not in result, result.get("error")
+    for metric in ("mood", "energy", "stress"):
+        traj = result["trajectories"][metric]
+        # Existing fields untouched.
+        assert set(["slope", "direction", "avg"]).issubset(traj.keys())
+        # New, additive fields.
+        assert "r_squared" in traj
+        assert "n" in traj
+        assert traj["n"] >= 5
+
+
+def test_low_fit_divergence_gets_qualifier(monkeypatch):
+    """A divergence gated purely on slope magnitude gets an honest low-fit qualifier
+    (ADR-105 rule 1) when the weaker contributing regression's r² is below the
+    documented floor (r² < 0.09, i.e. |r| < 0.3 — the weak/moderate boundary already
+    used in tools_habits.py / tools_training.py)."""
+    import mcp.tools_journal as tj
+
+    entries = _make_trajectory_entries(10)
+    monkeypatch.setattr(tj, "_query_journal", lambda start, end, template=None: entries)
+
+    # compute_slope() calls _linear_regression once per field, in mood/energy/stress order.
+    # Force a mood-up/energy-down divergence (crosses the ±0.03 threshold) with a poor fit
+    # on both contributing slopes, and a stress slope too small to trigger its own branch.
+    canned = iter(
+        [
+            (0.1, 1.0, 0.02),  # mood: rising, very low fit
+            (-0.1, 1.0, 0.05),  # energy: falling, low fit
+            (0.0, 1.0, 0.9),  # stress: flat, high fit (irrelevant here)
+        ]
+    )
+    monkeypatch.setattr(tj, "_linear_regression", lambda vals: next(canned))
+
+    result = tj.tool_get_journal_sentiment_trajectory({"start_date": "2026-06-01", "end_date": "2026-06-10"})
+    assert "error" not in result, result.get("error")
+    divergence = next(d for d in result["divergences"] if d["type"] == "mood_up_energy_down")
+    assert "Low fit" in divergence["signal"]
+    assert "r²=0.02" in divergence["signal"]
+    assert divergence["mood_r_squared"] == 0.02
+    assert divergence["energy_r_squared"] == 0.05
+
+
+def test_high_fit_divergence_has_no_qualifier(monkeypatch):
+    """The same divergence, but with well-fitting slopes, ships with no low-fit annotation."""
+    import mcp.tools_journal as tj
+
+    entries = _make_trajectory_entries(10)
+    monkeypatch.setattr(tj, "_query_journal", lambda start, end, template=None: entries)
+
+    canned = iter(
+        [
+            (0.1, 1.0, 0.9),  # mood: rising, strong fit
+            (-0.1, 1.0, 0.85),  # energy: falling, strong fit
+            (0.0, 1.0, 0.9),  # stress
+        ]
+    )
+    monkeypatch.setattr(tj, "_linear_regression", lambda vals: next(canned))
+
+    result = tj.tool_get_journal_sentiment_trajectory({"start_date": "2026-06-01", "end_date": "2026-06-10"})
+    assert "error" not in result, result.get("error")
+    divergence = next(d for d in result["divergences"] if d["type"] == "mood_up_energy_down")
+    assert "Low fit" not in divergence["signal"]
+    assert divergence["mood_r_squared"] == 0.9
+
+
 # ── #502: edit-aware skip logic ───────────────────────────────────────────
 
 
