@@ -55,7 +55,10 @@ bash deploy/deploy_site_api.sh        # full bundle + invoke-verify a real route
 ```
 (#781: the script ships the same full-tree bundle as CDK — web/ siblings,
 reading/, methods_registry, and every shared module included. The old
-single-file / partial-zip import breaks are structurally dead.)
+single-file / partial-zip import breaks are structurally dead. #794 ownership:
+CDK — LifePlatformOperational — owns the function's infra (role, env, alarms);
+this script is the sanctioned fast code path. `tests/test_deploy_bundle_paths.py`
+enforces both channels stay on `deploy/build_bundle.py`.)
 
 ## Function Name → Source File Mapping
 
@@ -116,7 +119,7 @@ single-file / partial-zip import breaks are structurally dead.)
 - life-platform-data-export → data_export_lambda.py
 - life-platform-data-reconciliation → data_reconciliation_lambda.py
 - insight-email-parser → insight_email_parser_lambda.py
-- life-platform-site-api → SPECIAL BUILD — full `web/` package (see Special case above; NOT single-file)
+- life-platform-site-api → SPECIAL BUILD — full-tree bundle via `deploy_site_api.sh` (see Special case above; NOT single-file)
 - life-platform-site-api-ai → site_api_ai_lambda.py
 - site-stats-refresh → site_stats_refresh_lambda.py
 - pipeline-health-check → pipeline_health_check_lambda.py
