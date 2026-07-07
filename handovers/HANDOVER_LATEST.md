@@ -1,60 +1,65 @@
-# HANDOVER — R22 build & backlog paydown: 7 Now-milestone issues shipped — 2026-07-06
+# HANDOVER — ARCH-01: the shared layer is retired (#781/ADR-131) + #791/#792 closed — 2026-07-06
 
-> Instruction: "start building and paying down our backlog" → "do #779/#780 first out-of-band"
-> → "I approve edits, merges, and deploys this session" → "do your next picks and then once
-> deployed write documentation and handover so I can clear."
+> Instruction: "Read memory and handover to plan for next session and all the issues paid
+> down from backlog in an efficient manner" → "I also approve you to do merges deploys etc."
+> Plan chose #781 first because it shrinks/retires downstream work (#791, #792).
 
-## What shipped (7 issues, all off the Now milestone)
+## What shipped (PR #833, merged + deployed + live-verified)
 
-| # | Ref | What | State |
-|---|-----|------|-------|
-| **#779** | SEC-01 | MCP `/token` unauth exposure — real OAuth 2.1: `/authorize` issues single-use PKCE-bound codes (DDB, 10-min TTL, redirect allowlist); `/token` only exchanges a server-issued code, PKCE-verified | **deployed (cdk LifePlatformMcp) + live-verified** |
-| **#782** | DEBT-02 | `personal_baselines.py` added to `build_layer.sh` **and** `lambda_map.json` `shared_layer.modules` — #697 recurrence closed structurally | merged (preventive; lands on next layer rebuild) |
-| **#783** | BUG-01 | `latest_weight` given avatar_weight's 14d→30d fallback so the ADR-104 grounding gate covers weight during routine weigh-in gaps | **deployed (cdk LifePlatformCompute) + live-verified** |
-| **#784** | CLAUDE-01 | Removed blanket `Bash(*)`; committed `.claude/settings.json` `ask`-rules for git push / gh pr merge / cdk deploy / lambda update / s3 sync·cp·rm / secret+SSM writes / deploy scripts / `--no-verify` / pre-commit disable | merged |
-| **#785** | CLAUDE-02 | `black --check` + `ruff` folded into the git pre-commit hook (`scripts/install_hooks.sh`), CI-parity, fail-open | merged + verified (blocks a bad staged .py) |
-| **#786** | CONTENT-01 | Recap "where we are now" stamped with its own as-of week/date + "N weeks ago" | **deployed (site) + live-verified (build 7d73cf3a)** |
-| **#787** | CONTENT-02 | Each coach's read stamped with its own `generated_at` date — staggered-regen vitals no longer read as one contradictory "today" | **deployed (site) + live-verified** |
+**#781 (ARCH-01, effort L) — one code-distribution channel.** The three channels
+(full-tree CDK asset shadowing the pinned layer · hand-curated `build_layer.sh`
+allowlist · per-script partial zips) collapsed into ONE: the staged full-tree bundle
+from the new **`deploy/build_bundle.py`** (lambdas/ tree + `food_vocabulary.json` at
+root; the MCP shape adds `mcp_server.py` + `mcp/`). Every path stages through it:
 
-PRs: **#826 → #827 → #828** (SEC-01, three rounds), **#829** (#782+#783), **#830** (#784+#785), **#831** (#786+#787).
+- **CDK**: `lambda_helpers.staged_tree_asset()`; layer resource + `SHARED_LAYER_VERSION`
+  deleted (old versions ≤v118 stay published, RETAIN, unreferenced); garth/pillow
+  dependency layers kept.
+- **`deploy_lambda.sh`**: always full-bundle — the single-file-strips-siblings class is
+  dead; MCP no longer rejected (mcp-shaped bundle automatic).
+- **NEW `deploy_fleet.sh`**: shared-module change → one zip → S3 → every function, with a
+  live-handler-resolves-in-bundle guard (protects e.g. the us-east-1 email-subscriber).
+- **`deploy_site_api.sh`**: same bundle, layer-attach block gone.
+- **CI**: layer checks inverted to ONE invariant — **zero functions reference
+  `life-platform-shared-utils`** (plan job + `test_i2_shared_layer_retired` +
+  session_postflight + drift_sentinel). Any changed `lambdas/` file with no per-function
+  mapping → automatic fleet deploy (closes the silent unmapped-helper gap). CI's MCP step
+  had been shipping WITHOUT `reading/` (the known boot-break trap) — now ships the full
+  bundle. `cdk_only` import-skips removed.
 
-## ⚠️ STILL OPEN — #780 (SEC-02), needs Matthew's call
-#779 closed the *minting* path; #780 is the residual-risk closer (a bearer that could have leaked
-while the hole was open stays valid until the api_key rotates). It's the one item that can disrupt
-Matthew's own claude.ai access, so it was deliberately **not** done. Three parts, in order:
-1. **Rotate `life-platform/mcp-api-key`** — invalidates the leaked deterministic bearer; claude.ai
-   re-auths transparently through the now-hardened flow. **Risk:** breaks the legacy **local Claude
-   Desktop bridge** (`handle_bridge_invoke`, raw `x-api-key`) *if still used*. **OPEN QUESTION for
-   Matthew: do you still use the local bridge?** If not, this half is safe to do now.
-2. **Rotate the Function URL** — removes the known committed endpoint; **breaks the claude.ai
-   connector until Matthew re-adds the new URL.** Schedule for a window he can immediately reconnect.
-3. **Stop committing the URL** — redact from `cdk/stacks/mcp_stack.py`, `operational_stack.py`,
-   `cdk.json`, docs, `tests/test_integration_aws.py`. Cosmetic without (2) — git history still leaks it.
+**Deployed**: all 8 stacks (consumers first, Core last) + `deploy_site_api.sh`.
+**Verified live**: zero shared-utils references fleet-wide · MCP boots (401 = healthy) ·
+site-api 200 on /api/status · qa-smoke 0 failed · hevy-restamp's zip (previously
+v115-layer-dependent) now carries all 206 modules + vocab.
 
-Full detail + the reproduction chain live in **private** operator memory
-`security-r22-mcp-token-exposure` (NOT in the repo — it's public).
+**#791 (FABLE-01) closed by scope-down**: the weekly sentinel already runs (remediation
+workflow, Mondays) feeding the one curated report; #781 retired its layer lens; the missing
+**doc-literals lens** shipped (sentinel `check_doc_literals`: live CloudWatch alarm count vs
+`PLATFORM_FACTS` — the R22 110-vs-122 gap now self-reports weekly). **#792 closed as
+superseded** (I2 rewritten). Retired incident classes: March-9 stale-layer P2, #697
+personal_baselines omission, #535/#538 site-api partial zips, MCP-missing-reading/.
 
-## New guardrails now in effect (from #784/#785)
-- **Deploy/merge/push now prompt** instead of running silently. The `.claude/settings.json` `ask`
-  rules become fully durable from **next session** (settings-watcher only reloads a brand-new
-  settings.json on session start / `/hooks`); the `Bash(*)` removal in settings.local.json is
-  already live this session.
-- **Pre-commit format gate**: `bash scripts/install_hooks.sh` once per clone installs black+ruff.
-  It fail-opens if the tools are missing. `--no-verify` now prompts (it's in the `ask` list).
+## ⚠️ Main was briefly red post-merge — wrap commit fixes it
+The doc-drift gate reds on `site_api_common.py` `test_count` (2455 → 2456; the sentinel
+test added after the doc sync). The fix is in the wrap commit alongside this handover.
 
-## Gotchas learned this session (durable → also in memory)
-- **Green unit tests missed two LIVE-only bugs in SEC-01** — the MCP role's `DeleteItem` is
-  deliberately scoped (LeadingKeys) away from the OAuth partition, and `consumed` is a DynamoDB
-  reserved word. **Validate a DDB-shaped change against real DynamoDB (admin creds) before trusting
-  the FakeDdb-backed suite.** Consume the OAuth code via conditional `UpdateItem`, never DeleteItem.
-- **MCP deploy = `cdk LifePlatformMcp`** (not `deploy_mcp_split.sh`). Compute = `cdk LifePlatformCompute`
-  (shared asset ripples ~15 AI lambdas; same-hash-for-all confirms one code delta). Site = `bash
-  deploy/sync_site_to_s3.sh` (content-hashed modules; verify the served hashed URL carries the change).
-- **Both #786/#787 were front-end only** — the APIs already returned the dates; nothing surfaced them.
+## New reflexes (CONVENTIONS §1 rewritten; deploy.md updated)
+- Shared-module change → `bash deploy/deploy_fleet.sh` or `cdk deploy --all`. No layer
+  bump, no build_layer.sh, no consumer list, no version pin.
+- `restart_pipeline.py` no longer bumps/builds a layer (step 4 is just cdk deploy).
+- A regression re-attaching the old layer reds CI (plan job) and pytest I2.
 
-## Next-session picks (remaining Now)
-- **#780** rotation (once Matthew answers the local-bridge question).
-- **#781** ARCH-01 — collapse the three shared-code distribution channels (the layer-drift root cause). The big one.
-- **#788/#789** UX (static-render `/now/`, "is he okay this week?" surface) · **#790** COST-01 (June breached $75) · **#791** FABLE-01 (weekly drift-reconciler agent).
+## Still open (Now milestone: 4 left)
+- **#780 (SEC-02) — NEEDS MATTHEW**: rotate mcp-api-key (breaks local Claude Desktop
+  bridge IF still used — **unanswered question**) + rotate the Function URL (breaks
+  claude.ai until reconnect) + scrub the committed URL. Detail in private memory
+  `security-r22-mcp-token-exposure`.
+- **#788/#789** (static-render /now/ + friends-family surface) — batch as one opus site
+  session, optionally + #804 (Next, same pattern). **#790** COST-01 (alarm + secrets
+  consolidation; pairs with #808/#809 from Next).
+- Older pending Matthew decisions: #417 re-stamp timing/format · LifePlatformIngestion/HAE
+  deploy call (session-17) · #740 essay edit pass.
+- `docs/reviews/REVIEW_BUNDLE_2026-07-06.md` still untracked in the working tree
+  (generated scratch — commit or delete, Matthew's call).
 
-Prior session's handover archived at `handovers/HANDOVER_2026-07-06_R22-review.md`.
+Prior session's handover archived at `handovers/HANDOVER_2026-07-06_R22-build-paydown.md`.
