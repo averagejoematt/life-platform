@@ -475,9 +475,15 @@ jobs:
 
           echo "::endgroup::"
 
-          if grep -q '\[-\]\|destroy\|Destroy' /tmp/cdk_diff.txt; then
+          # Flag RESOURCE-level removals only (lines starting '[-] AWS::…'). Property
+          # old-value lines (indented '├─ [-] <hash>.zip' halves of [~] changes) are
+          # normal — post-#781 every lambdas/ change legitimately moves ~90 functions'
+          # Code hashes. This gate was historically MASKED by the layer-consistency
+          # step ahead of it (red since v116 drift); #781 removed that step and
+          # unmasked the over-broad grep.
+          if grep -qE '^\[-\] AWS::|destroy|Destroy' /tmp/cdk_diff.txt; then
             echo "::error::CDK diff detected resource DESTRUCTIONS — review before deploying:"
-            grep '\[-\]\|destroy\|Destroy' /tmp/cdk_diff.txt | head -20
+            grep -E '^\[-\] AWS::|destroy|Destroy' /tmp/cdk_diff.txt | head -20
             exit 1
           fi
 
