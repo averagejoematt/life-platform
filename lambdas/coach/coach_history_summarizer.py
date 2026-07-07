@@ -194,6 +194,16 @@ try:
 except ImportError:  # pragma: no cover — environment-dependent
     allowed_numbers = grounding_findings = regen_once = None
 
+# R22-SEC-04 (#811): the compression prompt replays stored public-board reader
+# questions (INTERACTION#) — delimit that untrusted text as data. Fail-soft to a
+# local no-op if the shared module is somehow missing from the bundle.
+try:
+    from ai_context import wrap_untrusted_reader_text
+except ImportError:  # pragma: no cover — environment-dependent
+
+    def wrap_untrusted_reader_text(text):
+        return "" if text is None else str(text)
+
 
 def _emit_failure_metric():
     """Emit API failure metric to CloudWatch (non-fatal)."""
@@ -680,7 +690,8 @@ def _build_compression_message(coach_id, state):
                 q = str(it.get("question", ""))[:200]
                 a = str(it.get("answer", ""))[:300]
                 flag = "" if it.get("grounded", True) else " [answered with a grounding refusal]"
-                parts.append(f"  - [{date}]{flag} A reader asked: {q}")
+                # R22-SEC-04 (#811): stored reader question is untrusted — delimit as data.
+                parts.append(f"  - [{date}]{flag} A reader asked: {wrap_untrusted_reader_text(q)}")
                 parts.append(f"    You answered: {a}")
         parts.append("")
     else:
