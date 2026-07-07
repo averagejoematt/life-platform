@@ -13,7 +13,8 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
      MODIFIED / DELETED resource (`describe_stack_resource_drifts`). This is the live
      state vs. the deployed template, which `cdk diff` cannot see.
   2. POSTFLIGHT REUSE — the human-invoked-only checks from session_postflight:
-     layer uniformity, lambda config drift, bundled-asset completeness.
+     layer retirement (#781: zero shared-utils references), lambda config
+     drift, bundled-asset completeness.
   3. NO FUNCTIONS OUTSIDE IaC — every live Lambda in the region must be a member of one
      of our CloudFormation stacks. A function that exists live but in no stack's
      resource list was created out of band (orphan) — surfaced, minus a small allowlist
@@ -298,6 +299,53 @@ def _protect_prefixes(policy):
     return out
 
 
+def check_doc_literals():
+    """#791: live counts vs the documented literals in sync_doc_metadata.PLATFORM_FACTS.
+
+    The R22 review found live alarms (122) had silently outrun the documented
+    count (110) — doc literals only got reconciled when a session happened to
+    notice. This closes the loop weekly: compare the live CloudWatch alarm
+    count and live Lambda count against PLATFORM_FACTS. A mismatch is 'drift'
+    (it lands in the weekly curated report, not an alarm) with the exact
+    reconcile command. Alarm-count remediation is tracked in #795/#809."""
+    try:
+        sys.path.insert(0, os.path.join(_ROOT, "deploy"))
+        import sync_doc_metadata as sdm
+
+        facts = dict(sdm.PLATFORM_FACTS)
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"import sync_doc_metadata: {e}"}
+
+    mismatches = []
+    try:
+        cw = _client("cloudwatch")
+        live_alarms = 0
+        token = None
+        while True:
+            kw = {"MaxRecords": 100}
+            if token:
+                kw["NextToken"] = token
+            resp = cw.describe_alarms(**kw)
+            live_alarms += len(resp.get("MetricAlarms", [])) + len(resp.get("CompositeAlarms", []))
+            token = resp.get("NextToken")
+            if not token:
+                break
+        doc_alarms = facts.get("alarm_count")
+        if doc_alarms is not None and live_alarms != doc_alarms:
+            mismatches.append(
+                {
+                    "fact": "alarm_count",
+                    "documented": doc_alarms,
+                    "live": live_alarms,
+                    "fix": "reconcile the count (see #809 audit), then update PLATFORM_FACTS + run sync_doc_metadata --apply",
+                }
+            )
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"describe_alarms: {e}"}
+
+    return {"status": "drift" if mismatches else "clean", "mismatches": mismatches}
+
+
 # ── Assemble + persist ───────────────────────────────────────────────────────
 
 
@@ -307,6 +355,7 @@ def run_sweep():
         **check_postflight(),
         "orphan_functions": check_orphan_functions(),
         "bucket_policy": check_bucket_policy(),
+        "doc_literals": check_doc_literals(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -336,10 +385,11 @@ def _summary(status, checks):
         parts.append(f"{len(drifted_stacks)} stack(s) drifted: {', '.join(drifted_stacks)}")
     for key, label in (
         ("config_drift", "config drift"),
-        ("layer_uniformity", "layer behind"),
+        ("layer_uniformity", "retired-layer reference(s)"),
         ("asset_completeness", "asset gap"),
         ("orphan_functions", "orphan function(s)"),
         ("bucket_policy", "delete-protection gap"),
+        ("doc_literals", "doc-literal drift"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -380,6 +430,8 @@ def print_summary(record):
                 detail = f" — {[b.get('function') for b in c.get('behind', [])]}"
             elif name == "asset_completeness":
                 detail = f" — {[i.get('function') for i in c.get('incomplete', [])]}"
+            elif name == "doc_literals":
+                detail = f" — {[(m['fact'], m['documented'], 'live', m['live']) for m in c.get('mismatches', [])]}"
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")

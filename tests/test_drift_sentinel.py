@@ -86,11 +86,12 @@ def test_orphan_allowlist_excludes_cdk_bootstrap():
 # ── sweep status aggregation + summary (AC1/AC4) ─────────────────────────────
 
 
-def _patch_all(monkeypatch, cfn, post, orphan, bucket):
+def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None):
     monkeypatch.setattr(ds, "check_cfn_drift", lambda *a, **k: cfn)
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
     monkeypatch.setattr(ds, "check_bucket_policy", lambda: bucket)
+    monkeypatch.setattr(ds, "check_doc_literals", lambda: doc or {"status": "clean", "mismatches": []})
 
 
 def test_sweep_clean(monkeypatch):
@@ -130,6 +131,20 @@ def test_sweep_degraded_when_error_no_drift(monkeypatch):
     )
     rec = ds.run_sweep()
     assert rec["status"] == "degraded"
+
+
+def test_sweep_doc_literal_drift(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean"},
+        doc={"status": "drift", "mismatches": [{"fact": "alarm_count", "documented": 110, "live": 122, "fix": "…"}]},
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "doc-literal" in rec["summary"]
 
 
 # ── report seam (AC4) ────────────────────────────────────────────────────────

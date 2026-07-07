@@ -8,11 +8,17 @@ standard Life Platform conventions:
   - Environment variables (TABLE_NAME, S3_BUCKET, USER_ID)
   - CloudWatch error alarm
   - Handler auto-detection from source file
-  - Shared Layer attachment (optional)
 
 v2.0 (v3.4.0): Added custom_policies parameter to replace existing_role_arn.
   CDK now OWNS all IAM roles — no more from_role_arn references.
   Migration: existing_role_arn is DEPRECATED and will be removed in a future version.
+
+v3.0 (#781, 2026-07-06): the shared layer (life-platform-shared-utils) is RETIRED.
+  Every function's code asset is the staged full-tree bundle from
+  deploy/build_bundle.py (lambdas/ + food_vocabulary.json), so shared modules
+  ship inside the function bundle — one distribution channel, no layer-version
+  drift. `additional_layers` remains for real third-party dependency layers
+  (garth, pillow) only.
 
 Usage in a stack:
     from stacks.lambda_helpers import create_platform_lambda
@@ -32,6 +38,9 @@ Usage in a stack:
     )
 """
 
+import os
+import sys
+
 from aws_cdk import (
     Duration,
     aws_cloudwatch as cloudwatch,
@@ -47,6 +56,25 @@ from aws_cdk import (
     aws_sqs as sqs,
 )
 from constructs import Construct
+
+# ── The ONE code bundle (#781) ────────────────────────────────────────────────
+# All function code stages through deploy/build_bundle.py so CDK, hot deploys,
+# and fleet deploys ship byte-identical bundles. Staged once per synth process.
+_DEPLOY_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "deploy"))
+if _DEPLOY_DIR not in sys.path:
+    sys.path.insert(0, _DEPLOY_DIR)
+import build_bundle  # noqa: E402
+
+_TREE_STAGE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "_bundle_staging"))
+_staged = {"tree": False}
+
+
+def staged_tree_asset():
+    """Return the shared full-tree Code asset, staging it on first call."""
+    if not _staged["tree"]:
+        build_bundle.stage_tree(_TREE_STAGE)
+        _staged["tree"] = True
+    return _lambda.Code.from_asset(_TREE_STAGE)
 
 
 def create_platform_lambda(
@@ -67,8 +95,7 @@ def create_platform_lambda(
     timeout_seconds: int = 120,
     memory_mb: int = 256,
     environment: dict = None,
-    shared_layer: _lambda.ILayerVersion = None,
-    additional_layers: list = None,
+    additional_layers: list = None,  # third-party dependency layers ONLY (garth, pillow)
     # ── Legacy parameter (DEPRECATED — use custom_policies instead) ──
     existing_role_arn: str = None,
     # ── Fine-grained IAM (v2.0) ──
@@ -232,21 +259,6 @@ def create_platform_lambda(
         )
 
     # ── Lambda Function ──
-    _ASSET_EXCLUDES = [
-        "__pycache__",
-        "**/__pycache__/**",
-        "*.pyc",
-        "**/*.pyc",
-        "*.md",
-        "dashboard",
-        "dashboard/**",
-        "cf-auth",
-        "cf-auth/**",
-        "requirements",
-        "requirements/**",
-        ".DS_Store",
-    ]
-
     # When using an existing role (from_role_arn), we must NOT pass dead_letter_queue
     # to the Function constructor — CDK automatically calls grant_send_messages which
     # generates an AWS::IAM::Policy that causes import issues.
@@ -259,13 +271,13 @@ def create_platform_lambda(
         function_name=function_name,
         runtime=_lambda.Runtime.PYTHON_3_12,
         handler=handler,
-        code=code if code else _lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES),
+        code=code if code else staged_tree_asset(),
         role=role,
         timeout=Duration.seconds(timeout_seconds),
         memory_size=memory_mb,
         environment=env,
         dead_letter_queue=dlq if use_dlq_constructor else None,
-        layers=([shared_layer] if shared_layer else []) + (additional_layers or []),
+        layers=additional_layers or [],
         tracing=tracing,  # R13-XR: None = CDK default (PASS_THROUGH); ACTIVE = X-Ray
         # V2 P2.3 (2026-05-17): default 30-day retention on log groups created
         # by CDK for new Lambdas. Prevents indefinite log accumulation

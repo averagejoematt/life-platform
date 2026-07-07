@@ -47,7 +47,7 @@ flat UUID-keyed `raw/hevy/{id}.json`. Each source's `raw_layout` documents its
 ACTUAL shape. Do NOT mass-move: raw/* is a delete-protected prefix (ADR-046),
 and replay tooling should read the layout from here instead of guessing.
 
-Ships in the shared layer (build_layer.sh MODULES + ci/lambda_map.json) so the
+Ships inside every function bundle (deploy/build_bundle.py, #781) so the
 MCP and site-api Lambdas resolve it; stacks that bundle lambdas/ get the same
 file at /var/task, which shadows the layer copy harmlessly.
 """

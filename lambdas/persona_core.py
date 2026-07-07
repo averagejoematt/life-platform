@@ -21,7 +21,7 @@ Design constraints:
   public endpoint.
 
 Import paths: bundled at lambdas/ root (Code.from_asset ships the whole tree)
-AND listed in deploy/build_layer.sh for layer consumers.
+(ships inside every function bundle — deploy/build_bundle.py, #781).
 """
 
 import json

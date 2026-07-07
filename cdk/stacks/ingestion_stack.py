@@ -27,8 +27,8 @@ from aws_cdk import (
 from aws_cdk.aws_apigatewayv2_integrations import HttpLambdaIntegration
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, SHARED_LAYER_ARN, TABLE_NAME  # CONF-01
-from stacks.lambda_helpers import create_platform_lambda
+from stacks.constants import ACCT, GARTH_LAYER_ARN, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
+from stacks.lambda_helpers import create_platform_lambda, staged_tree_asset
 
 # ── Hourly ingestion with 10pm-4am PST maintenance window ──
 # Active hours: 4am-10pm PST = UTC 12-6 (next day) = 0,1,2,3,4,5,12,13,14,15,16,17,18,19,20,21,22,23
@@ -46,7 +46,6 @@ DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 class IngestionStack(Stack):
     def __init__(self, scope, construct_id, table, bucket, dlq, alerts_topic, digest_topic=None, **kwargs):
         super().__init__(scope, construct_id, **kwargs)
-        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(self, "SharedUtilsLayer", SHARED_LAYER_ARN)
         garth_layer = _lambda.LayerVersion.from_layer_version_arn(self, "GarthLayer", GARTH_LAYER_ARN)
         local_dlq = sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_table = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
@@ -78,7 +77,6 @@ class IngestionStack(Stack):
             schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=300,
             alarm_name="ingestion-error-whoop",
-            shared_layer=shared_utils_layer,
             # No async retry: Whoop rotates its refresh token on every refresh, so
             # a failed run is almost always a token-rotation race (HTTP 400). The
             # default 2 EventBridge retries just re-hit it with the same stale
@@ -144,7 +142,6 @@ class IngestionStack(Stack):
             handler="ingestion.garmin_lambda.lambda_handler",
             timeout_seconds=300,
             memory_mb=512,
-            shared_layer=shared_utils_layer,
             additional_layers=[garth_layer],
             custom_policies=rp.ingestion_garmin(),
             # No async retry: a failed run is almost always an OAuth-refresh 429.
@@ -166,7 +163,6 @@ class IngestionStack(Stack):
             schedule=f"cron(0 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120,
             environment={"NOTION_SECRET_NAME": "life-platform/ingestion-keys"},
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_notion(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
@@ -182,7 +178,6 @@ class IngestionStack(Stack):
             schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120,
             alarm_name="ingestion-error-withings",
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_withings(),
             **shared,
         )
@@ -198,7 +193,6 @@ class IngestionStack(Stack):
             schedule=f"cron(5 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=180,
             environment={"HABITIFY_SECRET_NAME": "life-platform/habitify"},
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_habitify(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
@@ -220,7 +214,6 @@ class IngestionStack(Stack):
             schedule=f"cron(10 {INGEST_HOURLY} * * ? *)",  # RE-ENABLED 2026-06-20
             timeout_seconds=300,
             alarm_name="ingestion-error-strava",
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_strava(),
             **shared,
         )
@@ -276,7 +269,6 @@ class IngestionStack(Stack):
                 "TABLE_NAME": "life-platform",
             },
             alarm_name="ingestion-error-hevy-backfill",
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_hevy_backfill(),
             **shared,
         )
@@ -301,7 +293,6 @@ class IngestionStack(Stack):
             schedule="cron(30 14 * * ? *)",
             timeout_seconds=300,
             environment={"ANTHROPIC_SECRET": "life-platform/ai-keys"},
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_journal_enrichment(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
@@ -324,7 +315,6 @@ class IngestionStack(Stack):
             timeout_seconds=120,
             alarm_name="ingestion-error-todoist",
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_todoist(),
             **shared,
         )
@@ -339,7 +329,6 @@ class IngestionStack(Stack):
             schedule=f"cron(15 {INGEST_HOURLY} * * ? *)",
             timeout_seconds=120,
             alarm_name="ingestion-error-eightsleep",
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_eightsleep(),
             **shared,
         )
@@ -355,7 +344,6 @@ class IngestionStack(Stack):
             schedule="cron(30 15 * * ? *)",
             timeout_seconds=300,
             alarm_name="ingestion-error-enrichment",
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_activity_enrichment(),
             **shared,
         )
@@ -373,7 +361,6 @@ class IngestionStack(Stack):
             handler="ingestion.macrofactor_lambda.lambda_handler",
             timeout_seconds=300,
             alarm_name="ingestion-error-macrofactor",
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_macrofactor(),
             **shared,
         )
@@ -393,7 +380,6 @@ class IngestionStack(Stack):
             handler="ingestion.weather_lambda.lambda_handler",
             schedule="cron(0 14,2 * * ? *)",
             timeout_seconds=60,
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_weather(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
@@ -409,7 +395,6 @@ class IngestionStack(Stack):
             schedule="rate(30 minutes)",
             timeout_seconds=120,
             environment={"SECRET_NAME": "life-platform/ingestion-keys"},
-            shared_layer=shared_utils_layer,
             custom_policies=rp.ingestion_dropbox(),
             alerts_topic=None,
             **{k: v for k, v in shared.items() if k != "alerts_topic"},
@@ -423,20 +408,6 @@ class IngestionStack(Stack):
         # backfill/archive/backfill_apple_health.py (hard-guarded).
 
         # ── 15. Health Auto Export Webhook — API Gateway trigger
-        _ASSET_EXCLUDES = [
-            "__pycache__",
-            "**/__pycache__/**",
-            "*.pyc",
-            "**/*.pyc",
-            "*.md",
-            ".DS_Store",
-            "dashboard",
-            "dashboard/**",
-            "cf-auth",
-            "cf-auth/**",
-            "requirements",
-            "requirements/**",
-        ]
         hae_role = iam.Role(
             self,
             "HaeWebhookRole",
@@ -445,7 +416,7 @@ class IngestionStack(Stack):
         )
         for stmt in rp.ingestion_hae():
             hae_role.add_to_policy(stmt)
-        # NOTE: HAE uses code=from_asset (entire lambdas/ dir), not source_file=.
+        # NOTE: HAE uses code= (the staged full-tree bundle), not source_file=.
         # Handler health_auto_export_lambda.lambda_handler → lambdas/health_auto_export_lambda.py  # noqa: CDK_HANDLER_ORPHAN
         hae = _lambda.Function(
             self,
@@ -453,7 +424,7 @@ class IngestionStack(Stack):
             function_name="health-auto-export-webhook",
             runtime=_lambda.Runtime.PYTHON_3_12,
             handler="ingestion.health_auto_export_lambda.lambda_handler",
-            code=_lambda.Code.from_asset("../lambdas", exclude=_ASSET_EXCLUDES),
+            code=staged_tree_asset(),
             role=hae_role,
             timeout=Duration.seconds(300),
             memory_size=256,
@@ -546,7 +517,6 @@ class IngestionStack(Stack):
             source_file="lambdas/ingestion/food_delivery_lambda.py",
             handler="ingestion.food_delivery_lambda.lambda_handler",
             timeout_seconds=60,
-            shared_layer=shared_utils_layer,
             custom_policies=rp.food_delivery_ingestion(),
             **shared,
         )
@@ -567,7 +537,6 @@ class IngestionStack(Stack):
             source_file="lambdas/ingestion/measurements_ingestion_lambda.py",
             handler="ingestion.measurements_ingestion_lambda.lambda_handler",
             timeout_seconds=60,
-            shared_layer=shared_utils_layer,
             custom_policies=rp.measurements_ingestion(),
             **shared,
         )

@@ -7,7 +7,7 @@ ingestion + compute Lambdas. Identical recursive shape, occasionally
 divergent edge cases — consolidating eliminates the bug-fix-in-N-places
 risk.
 
-Bundled into the shared layer via `deploy/build_layer.sh` MODULES list.
+Ships inside every function bundle (deploy/build_bundle.py, #781).
 Lambdas that previously defined their own local helper can now do:
 
     from numeric import floats_to_decimal

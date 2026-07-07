@@ -52,8 +52,7 @@ ACCOUNT = "205930651321"
 TABLE_NAME = "life-platform"
 BUCKET = "matthew-life-platform"
 DLQ_URL = f"https://sqs.{REGION}.amazonaws.com/{ACCOUNT}/life-platform-ingestion-dlq"
-SHARED_LAYER_NAME = "life-platform-shared-utils"
-SHARED_LAYER_MIN_VERSION = 4
+SHARED_LAYER_NAME = "life-platform-shared-utils"  # RETIRED (#781) — I2 asserts nothing references it
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -175,65 +174,32 @@ def test_i1_lambda_handlers_match_expected():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# I2 — Lambda Layer version is current
-# Root cause of: 2026-03-09 P2 (all 13 ingestion Lambdas failing after logger update)
+# I2 — Shared layer is retired: nothing may reference it (#781)
+# Root cause class: layer-version drift (2026-03-09 P2, #697 personal_baselines).
+# The layer is gone — shared modules ship inside every function bundle
+# (deploy/build_bundle.py). Any function still referencing the layer either
+# predates the collapse (redeploy its stack) or a regression re-attached it.
 # ══════════════════════════════════════════════════════════════════════════════
 
-LAMBDAS_REQUIRING_LAYER = [
-    "daily-brief",
-    "weekly-digest",
-    # life-platform-mcp: uses self-contained package, not shared layer
-    "life-platform-freshness-checker",
-    "anomaly-detector",
-    "character-sheet-compute",
-    "daily-metrics-compute",
-    "daily-insight-compute",
-]
 
-
-def test_i2_lambda_layer_version_current():
-    """I2: Key Lambdas must reference the current shared layer version.
-
-    Stale layer references caused the March 9 P2 (set_date AttributeError).
-    Fix: bash deploy/deploy_lambda.sh <function-name> lambdas/<source>.py
-         (deploy_lambda.sh auto-attaches current layer version)
-    """
+def test_i2_shared_layer_retired():
+    """I2: No Lambda function may reference the retired shared-utils layer."""
     boto3 = _get_boto3()
     lc = boto3.client("lambda", region_name=REGION)
 
-    # Find current layer version
-    try:
-        layer_versions = lc.list_layer_versions(LayerName=SHARED_LAYER_NAME)["LayerVersions"]
-        if not layer_versions:
-            pytest.skip(f"Layer {SHARED_LAYER_NAME} has no versions")
-        current_version = layer_versions[0]["Version"]  # sorted newest first
-    except Exception as e:
-        pytest.skip(f"Could not query layer versions: {e}")
+    attached = []
+    paginator = lc.get_paginator("list_functions")
+    for page in paginator.paginate():
+        for fn in page["Functions"]:
+            for layer in fn.get("Layers", []):
+                if SHARED_LAYER_NAME in layer.get("Arn", ""):
+                    attached.append(f"{fn['FunctionName']} → {layer['Arn']}")
 
-    stale = []
-    for fn_name in LAMBDAS_REQUIRING_LAYER:
-        try:
-            config = lc.get_function_configuration(FunctionName=fn_name)
-            layers = config.get("Layers", [])
-            layer_arns = [l["Arn"] for l in layers]
-            has_current = any(f":{SHARED_LAYER_NAME}:{current_version}" in arn for arn in layer_arns)
-            if not layer_arns:
-                stale.append(f"{fn_name}: NO layer attached at all")
-            elif not has_current:
-                # Find what version it has
-                found_version = None
-                for arn in layer_arns:
-                    if SHARED_LAYER_NAME in arn:
-                        found_version = arn.split(":")[-1]
-                stale.append(f"{fn_name}: layer v{found_version} " f"(current is v{current_version})")
-        except Exception:
-            pass  # Lambda might not exist — I1 catches that
-
-    assert not stale, (
-        f"I2 FAIL: {len(stale)} Lambda(s) on stale layer:\n"
-        + "\n".join(f"  ⚠️  {s}" for s in stale)
-        + f"\n\nAll should reference {SHARED_LAYER_NAME}:{current_version}"
-        + "\nFix: bash deploy/deploy_lambda.sh <function-name> lambdas/<source>.py"
+    assert not attached, (
+        f"I2 FAIL: {len(attached)} function(s) still reference the RETIRED shared layer:\n"
+        + "\n".join(f"  ⚠️  {s}" for s in attached)
+        + "\n\nShared code ships inside the bundle now (#781). "
+        "Fix: cd cdk && npx cdk deploy <their stacks> (removes the layer reference)."
     )
 
 

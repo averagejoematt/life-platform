@@ -3,15 +3,6 @@
 # CONF-01: All account/region/resource identifiers live here so a second environment
 # (staging, DR) only requires environment variable overrides, not code edits.
 #
-# SHARED_LAYER_VERSION: Update this when a new shared utils layer is published.
-# Consumers: ingestion_stack.py, email_stack.py (and any future stacks that attach the layer).
-#
-# After updating layer version:
-#   1. Change the version number below
-#   2. Run: npx cdk deploy LifePlatformIngestion LifePlatformEmail
-#   3. Run: bash deploy/post_cdk_reconcile_smoke.sh
-#   4. CI plan job verifies all consumers are on the new version
-
 import os
 
 REGION = os.environ.get("CDK_REGION", "us-west-2")
@@ -33,30 +24,10 @@ AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 # SEC-08: SES sender domain — parameterized so staging can use a different verified identity.
 SES_DOMAIN = os.environ.get("SES_DOMAIN", "mattsusername.com")
 
-# Shared utils layer — update on every layer rebuild (bash deploy/build_layer.sh)
-# v101: #482 public phase_for_date; #481 loud secret-writeback; #480 validator spec truth
-# v103: #490 training_load.py — one TSS-like load scale for every Banister consumer
-# v104: #505 retry_utils.call_anthropic_raw accepts a plain Messages dict (journal v2)
-# v105: #529 stats_core.py — the one sanctioned statistics module (ADR-105)
-# v106: #541 stats_core.ewma_fit/ewma_forecast (+0.80 z) + ai_calls forecast block
-# v107: #539 experiment_design.py — n-of-1 pre-registration + paired analysis
-# v108: #506 ai_calls journal-signals preamble line (journal Phase 2)
-# v109: #498/#550 phase_taxonomy joins the layer (data_export derives from it);
-#        weather/supplements/dropbox facet entries in source_registry
-# v110: #535 uncertainty everywhere — weight_trend rate CI + goal-date range,
-#        grounded_generation carries the rate CI/goal range, site_writer emits them
-# v111: #538 calibration scoreboard — stats_core Brier/reliability primitives,
-#        new calibration_core scorer, compute_credibility consumes it
-# v115: #417 first-class routine branches — routine_ir.RoutineBranch,
-#        hevy_compiler branch-menu render, routine_generator.emit_branch_model
-# v116: #725 code-stamp prediction metadata — intelligence_common.stamp_thread_predictions
-#        (LLM no longer authors prediction_id/target_date). Also reconciles the
-#        v115-published-but-never-attached drift (all consumers were left on v114).
-# v117: #728 experiment pre-registration — experiment_design.validate_design requires
-#        stopping_rule; create_experiment freezes the public prereg artifact.
-SHARED_LAYER_VERSION = 118
-
-SHARED_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:life-platform-shared-utils:{SHARED_LAYER_VERSION}"
+# SHARED LAYER RETIRED (#781, 2026-07-06). life-platform-shared-utils ended at
+# v118; the full version history lives in git (this file, pre-#781). Shared code
+# now ships inside every function's code bundle (deploy/build_bundle.py) — one
+# distribution channel, no version pin to drift.
 
 # Pillow image processing layer (HP-13: OG image generator)
 PILLOW_LAYER_VERSION = 1

@@ -1,4 +1,4 @@
-Deploy a Lambda function, the site, or the shared layer.
+Deploy a Lambda function, the site, or the fleet (one full-tree bundle, #781).
 
 ## Arguments: $ARGUMENTS
 
@@ -18,20 +18,18 @@ only for an out-of-band hotfix or when CI is unavailable. It syncs `site/` to S3
 content-hashed assets and invalidates CloudFront; the clobber guard blocks a sync from a
 checkout behind `origin/main` (override `ALLOW_STALE_SITE=1` for an intentional rollback).
 
-### Mode 2: `layer`
-Run: `bash deploy/build_layer.sh`
-Then report the module count and remind the user to run `cd cdk && npx cdk deploy --all` to publish the new layer version.
+### Mode 2: `layer` / `fleet`
+The shared layer is RETIRED (#781): shared modules ship inside every function's
+code bundle (`deploy/build_bundle.py` — the one staging implementation used by
+CDK, `deploy_lambda.sh`, `deploy_fleet.sh`, and `deploy_site_api.sh`). To push a
+shared-module change to every function:
+```bash
+bash deploy/deploy_fleet.sh          # one bundle → S3 → every function
+```
+(or `cd cdk && npx cdk deploy --all`, which ships the same staged bundle).
 
 ### Mode 3: Lambda function (anything else)
 Match the argument against the function-name mapping below using fuzzy matching (e.g., "whoop" matches "whoop-data-ingestion", "site-api" matches "life-platform-site-api"). If ambiguous, list the matches and ask which one.
-
-**Before deploying any Lambda**, check if any shared layer module was modified more recently than `cdk/layer-build/python/`. The layer modules are: retry_utils.py, board_loader.py, insight_writer.py, scoring_engine.py, character_engine.py, output_writers.py, ai_calls.py, html_builder.py, ai_output_validator.py, platform_logger.py, ingestion_framework.py, ingestion_validator.py, item_size_guard.py, digest_utils.py, sick_day_checker.py, site_writer.py. Check with:
-```bash
-# Find newest layer module modification time vs last layer build
-NEWEST_MOD=$(stat -f %m lambdas/ai_calls.py lambdas/output_writers.py lambdas/scoring_engine.py lambdas/board_loader.py lambdas/html_builder.py lambdas/retry_utils.py lambdas/insight_writer.py lambdas/character_engine.py lambdas/ai_output_validator.py lambdas/platform_logger.py lambdas/ingestion_framework.py lambdas/ingestion_validator.py lambdas/item_size_guard.py lambdas/digest_utils.py lambdas/sick_day_checker.py lambdas/site_writer.py 2>/dev/null | sort -rn | head -1)
-LAYER_BUILD=$(stat -f %m cdk/layer-build/python/ai_calls.py 2>/dev/null || echo 0)
-```
-If `NEWEST_MOD > LAYER_BUILD`, warn: "Shared layer modules have changed since last build. Run `/deploy layer` first, then `cd cdk && npx cdk deploy --all` to publish the new layer version."
 
 **Deploy command:**
 ```bash
@@ -39,47 +37,25 @@ bash deploy/deploy_and_verify.sh <function-name> lambdas/<source-file>
 ```
 
 **Special case — `life-platform-mcp`:**
-Do NOT use deploy_lambda.sh. The bundle must mirror the CDK `_mcp_staging` in
-`cdk/stacks/mcp_stack.py` EXACTLY: `mcp_server.py` + the `mcp/` package **+ the
-`lambdas/reading/` package staged as top-level `reading/`** (ADR-097 Phase B —
-`mcp/tools_reading.py` does `from reading import ...`). Omitting `reading/` ships a
-zip that boots with `Runtime.ImportModuleError: No module named 'reading'` (re-broke
-prod 2026-07-05). `numeric`/`retry_utils` that `reading` needs come from the shared
-layer, so no layer bump. `mcp_bridge.py` is NOT in the CDK asset — leave it out.
-```bash
-STAGE=/tmp/mcp_stage; rm -rf $STAGE && mkdir -p $STAGE
-cp mcp_server.py $STAGE/
-cp -r mcp $STAGE/mcp
-cp -r lambdas/reading $STAGE/reading
-find $STAGE -name '__pycache__' -type d -exec rm -rf {} + ; find $STAGE -name '*.pyc' -delete
-ZIP=/tmp/mcp_deploy.zip; rm -f $ZIP
-(cd $STAGE && zip -rq $ZIP .)
-aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
-```
-Then verify it BOOTS (a raw update-function-code saves no rollback artifact, so a bad
-bundle has no one-command recovery — you must re-bundle correctly):
+`deploy_lambda.sh life-platform-mcp mcp_server.py` now builds the correct
+mcp-shaped bundle automatically (full tree + `mcp_server.py` + `mcp/` via
+`build_bundle.py --mcp` — `reading/`, the hevy modules, and every shared module
+are inside; there is no layer). Verify it BOOTS after deploy (statusCode 401 =
+auth gate = healthy import):
 ```bash
 sleep 7
 aws lambda invoke --function-name life-platform-mcp --region us-west-2 --cli-binary-format raw-in-base64-out \
   --payload '{"method":"tools/list","params":{}}' /tmp/mcp.json >/dev/null
 python3 -c "import json; d=json.load(open('/tmp/mcp.json')); assert 'errorType' not in d, d; print('mcp OK', d.get('statusCode'))"
-# statusCode 401 (auth gate) is EXPECTED and healthy — it means the module imported and the handler ran.
 ```
 
-**Special case — `life-platform-site-api` (MULTI-MODULE — do NOT single-file deploy):**
-The handler is `web.site_api_lambda.lambda_handler` and `site_api_lambda.py` imports many siblings (`web/site_api_common.py`, `site_api_vitals.py`, `site_api_data.py`, `site_api_intelligence.py`, `site_api_social.py`, `site_api_observatory.py`, `site_api_coach.py`). A single-file `deploy_lambda.sh` ships only `site_api_lambda.py` and drops the siblings → `Runtime.ImportModuleError: No module named 'web.site_api_common'` (broke prod 2026-06-01). **`rollback_lambda.sh` does NOT reliably recover it** — site-api is normally CDK-deployed, so the saved `previous.zip` may also be single-file/incomplete. Deploy the FULL `web/` package:
+**Special case — `life-platform-site-api`:**
 ```bash
-rm -rf /tmp/siteapi && mkdir -p /tmp/siteapi/web && cp lambdas/web/*.py /tmp/siteapi/web/
-(cd /tmp/siteapi && zip -r /tmp/siteapi.zip web/ -x '*__pycache__*' '*.pyc')
-aws lambda update-function-code --function-name life-platform-site-api --zip-file fileb:///tmp/siteapi.zip --region us-west-2
+bash deploy/deploy_site_api.sh        # full bundle + invoke-verify a real route
 ```
-Then verify imports loaded (not just a 200 via CloudFront, which can cache a prior 500):
-```bash
-aws lambda invoke --function-name life-platform-site-api --region us-west-2 --cli-binary-format raw-in-base64-out \
-  --payload '{"rawPath":"/api/status","requestContext":{"http":{"method":"GET","path":"/api/status"}}}' /tmp/st.json >/dev/null
-python3 -c "import json; d=json.load(open('/tmp/st.json')); assert 'errorType' not in d, d; print('site-api OK', d.get('statusCode'))"
-```
-(Other `web/` handlers — `site_api_ai_lambda`, `email_subscriber_lambda`, `og_image_lambda`, `site_stats_refresh_lambda`, `subscriber_onboarding_lambda` — import NO siblings, so single-file deploy is fine for them. Only `site_api_lambda` needs the full package.)
+(#781: the script ships the same full-tree bundle as CDK — web/ siblings,
+reading/, methods_registry, and every shared module included. The old
+single-file / partial-zip import breaks are structurally dead.)
 
 ## Function Name → Source File Mapping
 
