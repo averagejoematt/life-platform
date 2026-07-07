@@ -76,7 +76,7 @@ python3 mcp_bridge.py
 
 **Decimal for DynamoDB** — boto3 rejects Python `float`; cast to `Decimal` before writing.
 
-**Single-table DynamoDB** — no GSIs; all access via composite key. Don't add GSIs without an ADR.
+**Single-table DynamoDB** — two sanctioned GSIs exist (GSI1 recall-due sparse index, GSI2 reading state/time — ADR-097, documented in `lambdas/reading/reading_keys.py`); all other access via the composite key. Adding another GSI still requires an ADR.
 
 **Secrets Manager only** — all credentials at `life-platform/` prefix. Never `.env` files or hardcoded values.
 
