@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-07-07 (v8.6.0 — 143 tools, 43-module MCP package, 20 data sources, 93 Lambdas, 9 secrets, 65 alarms, 8 CDK stacks deployed).
+Last updated: 2026-07-07 (v8.6.0 — 143 tools, 43-module MCP package, 20 data sources, 93 Lambdas, 9 secrets, 67 alarms, 8 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared-layer version: see the discovery command in [CONVENTIONS.md](CONVENTIONS.md#facts-that-drift-run-the-command-never-quote-a-number) (don't hand-write it — it drifts). **91 ADRs** (ADR-001 → ADR-103; newest: ADR-101 distribution-before-monetization, ADR-102 single-table-DynamoDB-kept-on-purpose, ADR-103 complexity-posture ledger). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -81,7 +81,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | ACM Certificate | TLS | us-east-1 — `averagejoematt.com` + all subdomains (DNS-validated via Route 53) |
 | SES Receipt Rule Set | Inbound email routing | `life-platform-inbound` (active) — rule `insight-capture` routes `insight@aws.mattsusername.com` → S3 |
 | SES Configuration Set | Outbound delivery telemetry | `life-platform-emails` wired to `daily-brief`, `weekly-digest`, `monthly-digest`, `partner-weekly-email` |
-| CloudWatch | Alarms + logs | **~65 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
+| CloudWatch | Alarms + logs | **~67 metric alarms**. Per-Lambda `ingestion-error-*` first-error alarms are retired across ingestion (2026-05-29), compute + email (#790/ADR-116, 2026-07-07 — 48 alarms) in favour of the shared `life-platform-ingestion-dlq` digest path (`life-platform-ingestion-dlq-messages` + `life-platform-dlq-depth-warning`). |
 | CDK | Infrastructure as Code | `cdk/` — 8 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `web_stack`, `monitoring_stack`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$75/mo all-in cap** (ADR-063), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (hourly) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features (1=coaches, 2=website AI, 3=hard cutoff in `bedrock_client.invoke()`). |

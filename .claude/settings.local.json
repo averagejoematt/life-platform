@@ -137,7 +137,8 @@
       "Bash(timeout 500 npx cdk synth --all)",
       "Bash(node --check site/assets/js/story.js)",
       "Bash(node -e ' *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(python3 /private/tmp/claude-501/-Users-matthewwalker-Documents-Claude-life-platform/6a84918b-c898-4cd7-ae7e-63aa9061ccad/scratchpad/verify_hint.py)"
     ]
   },
   "enableAllProjectMcpServers": true,

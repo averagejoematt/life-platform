@@ -200,6 +200,29 @@ class McpStack(Stack):
         # ADR-050: warmer failure means stale caches all day, but not user-blocking → digest.
         warmer_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
+        # ── #809: recursive-invocation guard (adopted from the 2026-05-25 orphan batch) ──
+        # AWS drops Lambda invocations it detects as recursive; a nonzero
+        # RecursiveInvocationsDropped on the MCP server would indicate a serious
+        # tool-loop bug. Reuses the live alarm's exact name so CloudFormation
+        # adopts the existing orphan in place (PutMetricAlarm upserts by name).
+        recursive_alarm = cloudwatch.Alarm(
+            self,
+            "McpRecursiveLoopAlarm",
+            alarm_name="life-platform-recursive-loop",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="RecursiveInvocationsDropped",
+                dimensions_map={"FunctionName": MCP_FUNCTION_NAME},
+                period=Duration.seconds(3600),
+                statistic="Sum",
+            ),
+            evaluation_periods=1,
+            threshold=1,
+            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        recursive_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
         cdk.CfnOutput(self, "McpFunctionArn", value=mcp.function_arn, description="MCP server Lambda ARN")
         cdk.CfnOutput(self, "McpWarmerArn", value=warmer.function_arn, description="MCP cache warmer Lambda ARN")
         cdk.CfnOutput(
