@@ -19,6 +19,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
+import budget_guard  # noqa: E402
 from web import site_api_coach as api  # noqa: E402
 
 
@@ -161,3 +162,55 @@ def test_predictions_overall_accuracy_pct_rounds_when_some_resolved(monkeypatch)
     assert o["refuted"] == 1
     assert o["decided"] == 4
     assert o["accuracy_pct"] == 75.0
+
+
+# ── /api/coach_analysis regeneration-paused disclosure (#802, R22-CONTENT-03) ─
+# coach_narrative_orchestrator skips a coach's OUTPUT# write entirely at budget
+# tier >= 2 — a served analysis can be a HELD read from before the pause. The
+# endpoint now carries `regeneration_paused`, derived from budget_guard's
+# "coach_narrative" feature cutoff, alongside the existing `generated_at`.
+
+
+def _fake_query_first_call_only(item):
+    """table.query stub: the first call (the OUTPUT# lookup) returns `item`;
+    every later call (threads/ensemble/computation/learning, each individually
+    try/except-wrapped in handle_coach_analysis) raises, exercising the
+    fail-soft fallback for those secondary reads."""
+    calls = {"n": 0}
+
+    def _query(**kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {"Items": [item]}
+        raise RuntimeError("offline test — no secondary reads")
+
+    return _query
+
+
+def test_coach_analysis_flags_regeneration_paused_at_tier_2(monkeypatch):
+    out_item = {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-06-29",
+        "content": "the analysis text",
+        "generated_at": "2026-06-29T14:00:00Z",
+    }
+    monkeypatch.setattr(api.table, "query", _fake_query_first_call_only(out_item))
+    monkeypatch.setattr(api.table, "get_item", lambda Key: {})
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)
+    data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
+    assert data["analysis"] == "the analysis text"
+    assert data["regeneration_paused"] is True
+
+
+def test_coach_analysis_not_paused_at_tier_0(monkeypatch):
+    out_item = {
+        "pk": "COACH#sleep_coach",
+        "sk": "OUTPUT#2026-06-29",
+        "content": "the analysis text",
+        "generated_at": "2026-06-29T14:00:00Z",
+    }
+    monkeypatch.setattr(api.table, "query", _fake_query_first_call_only(out_item))
+    monkeypatch.setattr(api.table, "get_item", lambda Key: {})
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    data = _body(api.handle_coach_analysis({"queryStringParameters": {"domain": "sleep"}}))
+    assert data["regeneration_paused"] is False

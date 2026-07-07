@@ -39,6 +39,18 @@ export const BASE = window.__ARCHIVE_BASE__ || "/data/";
 
 const DOOR = window.__ARCHIVE_DOOR__ || "evidence";
 
+// #802 (R22-CONTENT-03): honest "refresh paused" disclosure for a coach's
+// analysis, disclosed only when it's noteworthy — budget_guard paused this
+// coach's regeneration (tier >= 2), or the served read is >48h old.
+function coachRefreshNote(generatedAt, paused) {
+  const d = generatedAt ? new Date(generatedAt) : null;
+  const valid = d && !isNaN(d.getTime());
+  const date = valid ? d.toLocaleDateString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric" }) : "";
+  if (paused) return date ? `as of ${date} — refresh paused (budget guard)` : "refresh paused (budget guard)";
+  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${date} — next refresh pending`;
+  return "";
+}
+
 const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
 
 const slugFromPath = () => { const seg = location.pathname.split("/").filter(Boolean); return seg.length ? seg[seg.length - 1] : ""; };
@@ -65,8 +77,10 @@ const WIRE = {
       out.innerHTML = `<p class="rd-archive"><span class="shimmer">Reading ${esc(name)}…</span></p>`;
       const [an, tl] = await Promise.all([tryJSON(`/api/coach_analysis?domain=${encodeURIComponent(id)}`), tryJSON(`/api/coach_timeline?coach_id=${encodeURIComponent(id)}`)]);
       const analysis = an && an.analysis; const ms = (tl && tl.milestones) || [];
+      const refreshNote = an ? coachRefreshNote(an.generated_at, !!an.regeneration_paused) : "";
       out.innerHTML = `<div class="coach-detail"><p class="dx-kicker label">${esc(title)} · ${esc(name)}</p>` +
         (analysis && !isBad(analysis) ? `<p class="rd-prose">${esc(analysis)}</p>` : `<p class="rd-archive">${esc(name)}'s read posts here as data in their domain accrues.</p>`) +
+        (refreshNote ? `<p class="rd-meta label">${esc(refreshNote)}</p>` : "") +
         (ms.length ? sec("Track record", `<ul class="coach-tl">${ms.slice(0, 12).map((m) => `<li><span class="label">${esc(String(m.date || "").slice(0, 10))}</span> ${esc(m.title || m.text || m.note || "")}</li>`).join("")}</ul>`) : "") +
         `</div>`;
     };

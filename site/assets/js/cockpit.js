@@ -127,6 +127,19 @@ function writtenStamp(iso) {
   return `written ${d.toLocaleDateString("en-US", { timeZone: PT, month: "short", day: "numeric" })}`;
 }
 
+// #802 (R22-CONTENT-03): honest "as of / refresh paused" disclosure for a
+// pillar's coach read. budget_guard (ADR-063/125) can pause a coach's
+// narrative regeneration at tier >= 2 — when it does, a served read can be a
+// HELD read from before the pause, not today's, and the cockpit must say so.
+function pillarAsOf(iso, paused) {
+  const d = iso ? new Date(iso) : null;
+  const valid = d && !isNaN(d.getTime());
+  const date = valid ? d.toLocaleDateString("en-US", { timeZone: PT, month: "short", day: "numeric" }) : "";
+  if (paused) return date ? `as of ${date} — refresh paused (budget guard)` : "refresh paused (budget guard)";
+  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${date} — next refresh pending`;
+  return "";
+}
+
 // Honest "held since {date}" — stance data is weekly (ADR-104/105), so this is a
 // real date + a coarse "~N weeks", NEVER a fabricated day count.
 function heldSince(iso) {
@@ -382,6 +395,7 @@ async function togglePillar(btn, key) {
       `<span class="pd-conf">score ${Math.round(p.raw_score ?? 0)}${sdTxt}</span>` +
       `<span class="pd-conf">${p.tier || ""}</span>` +
       `<span class="pd-conf">${read.confidence}</span>` +
+      (read.asOf ? `<span class="pd-conf">${escapeHTML(read.asOf)}</span>` : "") +
     `</p>`;
 }
 
@@ -394,7 +408,7 @@ function collapse(btn) {
 // Lazy per-pillar read from the coach intelligence; honest correlative framing.
 async function loadPillarRead(key) {
   if (state.coachCache[key]) return state.coachCache[key];
-  let text = "", action = "", confidence = "";
+  let text = "", action = "", confidence = "", asOf = "";
   try {
     const data = await getJSON(`${API}/coach_analysis?domain=${encodeURIComponent(key)}`);
     const a = data.analysis || data.coach_analysis || data;
@@ -404,6 +418,9 @@ async function loadPillarRead(key) {
     if (typeof n === "number") {
       confidence = n < 12 ? "preliminary pattern" : n < 30 ? "low confidence (n<30)" : `n=${n}`;
     }
+    // #802: disclose only when it's noteworthy — the budget guard paused this
+    // coach's regeneration, or the served read is >48h old (see pillarAsOf()).
+    asOf = pillarAsOf(data.generated_at, !!data.regeneration_paused);
   } catch (e) { /* fall through to the deterministic read */ }
 
   if (!text) {
@@ -412,8 +429,9 @@ async function loadPillarRead(key) {
     const moving = dir === "up" ? "climbing" : dir === "down" ? "slipping" : "holding";
     text = `${PILLAR_LABEL[key]} is at ${Math.round(p.raw_score ?? 0)} and ${moving} (${p.tier || "Foundation"}). ` +
            `Correlative read only — open the Data door for the components behind it.`;
+    asOf = "";  // the deterministic fallback has no coach generation to date-stamp
   }
-  const out = { text: escapeHTML(text).replace(/^&gt;\s*/, ""), action, confidence: confidence || "correlative" };
+  const out = { text: escapeHTML(text).replace(/^&gt;\s*/, ""), action, confidence: confidence || "correlative", asOf };
   state.coachCache[key] = out;
   return out;
 }
