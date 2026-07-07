@@ -1033,10 +1033,11 @@ jobs:
             -v --tb=short -m integration 2>&1
           echo "I1 complete"
 
-      - name: I2 — Shared layer version current on all consumers
-        # Catches stale layer (2026-03-09 P2: 13 Lambdas failed after logger update).
+      - name: I2 — Shared layer retired (zero shared-utils references fleet-wide)
+        # #781/ADR-131 renamed the I2 test when the shared layer was retired; the old
+        # node id red the whole post-deploy job with a pytest collection error (exit 4).
         run: |
-          python3 -m pytest tests/test_integration_aws.py::test_i2_lambda_layer_version_current \
+          python3 -m pytest tests/test_integration_aws.py::test_i2_shared_layer_retired \
             -v --tb=short -m integration 2>&1
           echo "I2 complete"
 
