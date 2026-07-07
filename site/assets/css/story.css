@@ -641,6 +641,25 @@ body { overflow-x: hidden; }
 /* Story tab medium-marks (i-chronicle / i-podcast) — sit at label height. */
 .dx-tab .tab-ico { width: 0.95em; height: 0.95em; vertical-align: -0.12em; margin-right: 0.45em; }
 
+/* ── "Is he okay this week?" (#789) — the friends/family surface. Plain-language,
+   deterministic from the already-loaded /api/character pillars + /api/journey weight;
+   honest absent ("not measured this week") via the engine's coverage provenance
+   (ADR-104). Warm, low-quant: one serif lead sentence + a soft status row + an "as of"
+   stamp. Ember is earned — only the "on the up" pillars get the accent rule. ── */
+.okay-card { margin-top: var(--sp-4); }
+.okay-lead { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); max-width: var(--measure); }
+.okay-lead strong { color: var(--ink); font-weight: var(--weight-med); }
+.okay-chips { list-style: none; display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-4) 0 0; padding: 0; }
+.okay-chip { display: inline-flex; align-items: baseline; gap: var(--sp-2); background: var(--surface); border: var(--border-hair);
+  border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3); font-family: var(--font-mono); font-size: var(--fs-small); }
+.okay-lab { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.okay-val { color: var(--ink-muted); }
+.okay-chip.okay-up { border-left: 3px solid var(--ember); }
+.okay-chip.okay-up .okay-val { color: var(--ink); }
+.okay-chip.okay-absent .okay-val { font-style: italic; color: var(--ink-faint); }
+.okay-asof { margin-top: var(--sp-4); color: var(--ink-faint); }
+.okay-fallback { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); }
+
 /* ── Returnability (uplevel P5) — the since-strip + NEW badges. Quiet by design:
    a single mono line, ember only on the section key; hides entirely when silent. ── */
 .beat-since { padding: var(--sp-4) 0; }
