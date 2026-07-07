@@ -367,14 +367,6 @@ jobs:
           python3 -m pytest tests/test_secret_references.py -v --tb=short
           echo "::endgroup::"
 
-      - name: Layer version consistency linter (test_layer_version_consistency.py)
-        # R13-F08: Offline check — verifies layer module files exist, no hardcoded ARNs,
-        # and all consumers are wired in CDK. Complements the live AWS check in the Plan job.
-        run: |
-          echo "::group::Layer version consistency linter"
-          python3 -m pytest tests/test_layer_version_consistency.py -v --tb=short
-          echo "::endgroup::"
-
       - name: Upstream-API contract tests (test_upstream_contracts.py)
         # ER-02: assert each active source's transform contract against committed,
         # scrubbed fixtures (tests/fixtures/upstream/**). Catches vendor payload
@@ -432,7 +424,7 @@ jobs:
     outputs:
       deploy_matrix: ${{ steps.plan.outputs.matrix }}
       has_deploys: ${{ steps.plan.outputs.has_deploys }}
-      layer_changed: ${{ steps.plan.outputs.layer_changed }}
+      fleet_changed: ${{ steps.plan.outputs.fleet_changed }}
       mcp_changed: ${{ steps.plan.outputs.mcp_changed }}
       site_changed: ${{ steps.plan.outputs.site_changed }}
     steps:
@@ -452,14 +444,6 @@ jobs:
               MISSING=$((MISSING + 1))
             fi
           done < <(jq -r '.lambdas | keys[]' ci/lambda_map.json)
-
-          echo "Checking shared layer modules..."
-          while IFS= read -r mod; do
-            if [ ! -f "$mod" ]; then
-              echo "  ❌ MISSING layer module: $mod (in .shared_layer.modules — file not found)"
-              MISSING=$((MISSING + 1))
-            fi
-          done < <(jq -r '.shared_layer.modules[]' ci/lambda_map.json)
 
           if [ "$MISSING" -gt 0 ]; then
             echo "::error::lambda_map.json references $MISSING missing file(s). Update ci/lambda_map.json to match current repo state."
@@ -586,51 +570,22 @@ jobs:
           fi
           echo "✅ All stateful resources verified"
 
-      - name: Verify layer version consistency
+      - name: Verify shared layer is fully retired (#781)
         run: |
+          # The shared layer (life-platform-shared-utils) is retired — shared
+          # code ships inside every function bundle. Any function still
+          # referencing it is drift from before the collapse (or a regression
+          # re-attaching it). Dependency layers (garth, pillow) are fine.
           LAYER_NAME="life-platform-shared-utils"
-
-          # AWS CLI paginates list-layer-versions; `[0]` returns the first
-          # value PER PAGE, so we get one version per page concatenated. Pipe
-          # through head -1 to take the actual latest (first item of page 1).
-          LATEST_VER=$(aws lambda list-layer-versions \
-            --layer-name "$LAYER_NAME" \
+          ATTACHED=$(aws lambda list-functions \
             --region ${{ env.AWS_REGION }} \
-            --query 'LayerVersions[0].Version' --output text 2>/dev/null | head -1)
-
-          if [ -z "$LATEST_VER" ] || [ "$LATEST_VER" = "None" ]; then
-            echo "::warning::Layer '$LAYER_NAME' not found in AWS — skipping consistency check (first deploy?)"
-            exit 0
-          fi
-          echo "Latest layer version: v$LATEST_VER"
-
-          MISMATCH=0
-          while IFS= read -r consumer; do
-            ATTACHED_ARN=$(aws lambda get-function-configuration \
-              --function-name "$consumer" \
-              --region ${{ env.AWS_REGION }} \
-              --query "Layers[?contains(Arn, '$LAYER_NAME')].Arn | [0]" \
-              --output text 2>/dev/null || echo "")
-
-            if [ -z "$ATTACHED_ARN" ] || [ "$ATTACHED_ARN" = "None" ]; then
-              echo "  ⚠️  $consumer: no $LAYER_NAME layer attached"
-              MISMATCH=$((MISMATCH + 1))
-            else
-              ATTACHED_VER=$(echo "$ATTACHED_ARN" | awk -F: '{print $NF}')
-              if [ "$ATTACHED_VER" != "$LATEST_VER" ]; then
-                echo "  ❌ $consumer: layer v$ATTACHED_VER (latest is v$LATEST_VER)"
-                MISMATCH=$((MISMATCH + 1))
-              else
-                echo "  ✅ $consumer: layer v$LATEST_VER"
-              fi
-            fi
-          done < <(jq -r '.shared_layer.consumers[]' "${{ env.LAMBDA_MAP }}")
-
-          if [ "$MISMATCH" -gt 0 ]; then
-            echo "::error::$MISMATCH consumer(s) not on layer v$LATEST_VER — run deploy/build_layer.sh + attach to fix"
+            --query "Functions[?Layers[?contains(Arn, '$LAYER_NAME')]].FunctionName" \
+            --output text 2>/dev/null || echo "")
+          if [ -n "$ATTACHED" ] && [ "$ATTACHED" != "None" ]; then
+            echo "::error::function(s) still reference $LAYER_NAME: $ATTACHED — run 'cd cdk && npx cdk deploy <their stacks>' to converge (bundles carry the shared code now)"
             exit 1
           fi
-          echo "✅ All shared-layer consumers on v$LATEST_VER"
+          echo "✅ No function references $LAYER_NAME — single-channel invariant holds"
 
       - name: Validate handler function names
         run: |
@@ -672,16 +627,27 @@ jobs:
 
           LAMBDA_MAP_FILE="${{ env.LAMBDA_MAP }}"
 
-          LAYER_CHANGED="false"
-          LAYER_MODULES=$(jq -r '.shared_layer.modules[]' "$LAMBDA_MAP_FILE")
-          for mod in $LAYER_MODULES; do
-            if echo "$CHANGED" | grep -qx "$mod"; then
-              LAYER_CHANGED="true"
-              echo "⚡ Shared layer module changed: $mod"
-              break
-            fi
+          # #781: the shared layer is retired. A changed file under lambdas/ that
+          # is NOT a mapped per-function source is a shared module — it ships to
+          # every function, so the FLEET redeploys (deploy/deploy_fleet.sh: one
+          # bundle, one S3 upload, N update-function-code calls). This also
+          # closes the old silent gap where an unmapped helper module deployed
+          # to nobody. food_vocabulary.json rides inside the bundle too.
+          FLEET_CHANGED="false"
+          VOCAB_CHANGED=$(git diff --name-only HEAD~1 HEAD -- config/food_vocabulary.json 2>/dev/null || true)
+          [ -n "$VOCAB_CHANGED" ] && FLEET_CHANGED="true" && echo "⚡ food_vocabulary.json changed → fleet deploy"
+          for file in $CHANGED; do
+            case "$file" in
+              lambdas/*)
+                MAPPED=$(jq -r --arg f "$file" '.lambdas[$f].function // empty' "$LAMBDA_MAP_FILE")
+                if [ -z "$MAPPED" ]; then
+                  FLEET_CHANGED="true"
+                  echo "⚡ Shared module changed: $file → fleet deploy"
+                fi
+                ;;
+            esac
           done
-          echo "layer_changed=$LAYER_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "fleet_changed=$FLEET_CHANGED" >> "$GITHUB_OUTPUT"
 
           MCP_CHANGED="false"
           if echo "$CHANGED" | grep -q "^mcp/" || echo "$CHANGED" | grep -q "mcp_server.py"; then
@@ -714,19 +680,6 @@ jobs:
             fi
           done
 
-          if [ "$LAYER_CHANGED" = "true" ]; then
-            CONSUMERS=$(jq -r '.shared_layer.consumers[]' "$LAMBDA_MAP_FILE")
-            for consumer in $CONSUMERS; do
-              SRC=$(jq -r --arg fn "$consumer" '[.lambdas | to_entries[] | select(.value.function == $fn) | .key] | first // empty' "$LAMBDA_MAP_FILE")
-              if [ -n "$SRC" ]; then
-                EXISTS=$(echo "$DEPLOYS" | jq --arg fn "$consumer" '[.[] | select(.function == $fn)] | length')
-                if [ "$EXISTS" = "0" ]; then
-                  DEPLOYS=$(echo "$DEPLOYS" | jq --arg fn "$consumer" --arg src "$SRC" '. + [{"function": $fn, "source": $src}]')
-                fi
-              fi
-            done
-          fi
-
           DEPLOYS=$(echo "$DEPLOYS" | jq 'unique_by(.function)')
 
           COUNT=$(echo "$DEPLOYS" | jq 'length')
@@ -734,7 +687,7 @@ jobs:
           echo "$DEPLOYS" | jq -r '.[] | "  → \(.function) (\(.source))"'
 
           HAS_DEPLOYS="false"
-          if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ] || [ "$SITE_CHANGED" = "true" ]; then
+          if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ] || [ "$SITE_CHANGED" = "true" ] || [ "$FLEET_CHANGED" = "true" ]; then
             HAS_DEPLOYS="true"
           fi
 
@@ -759,66 +712,22 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Verify shared layer is current
-        if: needs.plan.outputs.layer_changed == 'true'
+      - name: Fleet deploy (shared module changed)
+        if: needs.plan.outputs.fleet_changed == 'true'
         run: |
-          echo "═══ Verifying shared utils layer ═══"
-          # The layer is CDK-managed: cdk/stacks/constants.py SHARED_LAYER_VERSION
-          # is the single source of truth, and `cdk deploy` publishes the new
-          # version + attaches it to every consumer. CI does NOT publish/attach
-          # the layer itself (the old deploy/p3_*_shared_utils_layer.sh scripts
-          # were removed in the CDK migration). Instead CI verifies that all
-          # consumers are already on the latest published version, and fails with
-          # remediation steps if a manual `cdk deploy` is still outstanding.
-          # --no-paginate is required: AWS CLI default page-size is 50, and once
-          # the layer crossed v50 the unpaginated query returned a multi-line
-          # value (62 from page 1, 12 from page 2) which made every consumer
-          # look mismatched ("on layer v62, expected v62\n12"). 2026-05-29 fix.
-          LATEST_VER=$(aws lambda list-layer-versions \
-            --layer-name life-platform-shared-utils \
-            --region ${{ env.AWS_REGION }} \
-            --no-paginate \
-            --query 'LayerVersions[0].Version' --output text)
-          echo "Latest published layer version: v$LATEST_VER"
-
-          MISMATCH=0
-          while IFS= read -r consumer; do
-            ATTACHED_ARN=$(aws lambda get-function-configuration \
-              --function-name "$consumer" \
-              --region ${{ env.AWS_REGION }} \
-              --query 'Layers[?contains(Arn, `life-platform-shared-utils`)].Arn | [0]' \
-              --output text 2>/dev/null)
-            ATTACHED_VER=$(echo "$ATTACHED_ARN" | awk -F: '{print $NF}')
-            if [ "$ATTACHED_VER" != "$LATEST_VER" ]; then
-              echo "  ⚠️  $consumer is on layer v${ATTACHED_VER:-unknown}, expected v$LATEST_VER"
-              MISMATCH=$((MISMATCH + 1))
-            else
-              echo "  ✅ $consumer → layer v$LATEST_VER"
-            fi
-          done < <(jq -r '.shared_layer.consumers[]' "${{ env.LAMBDA_MAP }}")
-
-          if [ "$MISMATCH" -gt 0 ]; then
-            echo "::error::$MISMATCH consumer(s) not on layer v$LATEST_VER. Run locally: bash deploy/build_layer.sh && (cd cdk && npx cdk deploy --all), then re-push."
-            exit 1
-          fi
-          echo "✅ All consumers verified on layer v$LATEST_VER"
+          echo "═══ Shared module changed — deploying the bundle fleet-wide ═══"
+          # #781: one staged bundle (deploy/build_bundle.py), one S3 upload,
+          # N update-function-code calls. Covers MCP (mcp-shaped bundle) too,
+          # so the per-function and MCP steps below are skipped when this runs.
+          bash deploy/deploy_fleet.sh
 
       - name: Deploy MCP server
-        if: needs.plan.outputs.mcp_changed == 'true'
+        if: needs.plan.outputs.mcp_changed == 'true' && needs.plan.outputs.fleet_changed != 'true'
         run: |
-          echo "═══ Deploying MCP server ═══"
+          echo "═══ Deploying MCP server (full bundle, #781) ═══"
 
           WORK_DIR=$(mktemp -d)
-
-          HANDLER=$(aws lambda get-function-configuration \
-            --function-name life-platform-mcp \
-            --region ${{ env.AWS_REGION }} \
-            --query "Handler" --output text)
-          MODULE_NAME=$(echo "$HANDLER" | cut -d'.' -f1)
-
-          cp mcp_server.py "$WORK_DIR/${MODULE_NAME}.py"
-          cp -r mcp/ "$WORK_DIR/mcp/"
-          (cd "$WORK_DIR" && zip -r deploy.zip "${MODULE_NAME}.py" mcp/ -q)
+          python3 deploy/build_bundle.py --mcp --out "$WORK_DIR/stage" --zip "$WORK_DIR/deploy.zip"
 
           # S3 rollback artifact for MCP
           BUCKET="matthew-life-platform"
@@ -846,6 +755,7 @@ jobs:
           rm -rf "$WORK_DIR"
 
       - name: Deploy Lambdas
+        if: needs.plan.outputs.fleet_changed != 'true'
         run: |
           MATRIX='${{ needs.plan.outputs.deploy_matrix }}'
           COUNT=$(echo "$MATRIX" | jq 'length')
@@ -876,19 +786,6 @@ jobs:
             SKELETON=$(jq -r --arg f "$SRC" '.lambdas[$f].not_deployed // false' "${{ env.LAMBDA_MAP }}")
             if [ "$SKELETON" = "true" ]; then
               echo "  ⚠️ SKIPPED: $FUNC is a skeleton (\'not_deployed\' flag) — activate before deploying via CDK"
-              continue
-            fi
-
-            # 2026-05-27: cdk_only flag — multi-module Lambdas that import
-            # sibling files (web.site_api_common, hevy_common, etc.) can't
-            # be hot-deployed via deploy_lambda.sh (which only zips the
-            # single source file). Only `cdk deploy` ships the full
-            # Code.from_asset('../lambdas') bundle. Skip with a clear message.
-            # P0 incident 2026-05-27: site-api went down 3 min after a CDK
-            # deploy when CI re-uploaded with a broken single-file zip.
-            CDK_ONLY=$(jq -r --arg f "$SRC" '.lambdas[$f].cdk_only // false' "${{ env.LAMBDA_MAP }}")
-            if [ "$CDK_ONLY" = "true" ]; then
-              echo "  ⚠️ SKIPPED: $FUNC is cdk_only (multi-module imports — see lambda_map.json _cdk_only_reason). Run \`cd cdk && npx cdk deploy <stack>\` locally."
               continue
             fi
 

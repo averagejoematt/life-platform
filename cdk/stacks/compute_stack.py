@@ -27,7 +27,6 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_events as events,
     aws_events_targets as targets,
-    aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
     aws_sqs as sqs,
@@ -35,7 +34,7 @@ from aws_cdk import (
 from constructs import Construct
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, AI_MODEL_HAIKU, REGION, S3_BUCKET, SHARED_LAYER_ARN, TABLE_NAME  # CONF-01, CONF-04
+from stacks.constants import ACCT, AI_MODEL_HAIKU, REGION, S3_BUCKET, TABLE_NAME  # CONF-01, CONF-04
 from stacks.lambda_helpers import create_platform_lambda
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
@@ -55,17 +54,9 @@ class ComputeStack(Stack):
         local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
-        # Phase B re-entry sweep (2026-05-03): attach the shared utils layer to all
-        # Compute Lambdas. Previously these Lambdas were created without a layer
-        # argument, so they pinned to whatever layer version they had at first
-        # one-time deploy (v22 / v25 / v40 — way behind v42). Result: hypothesis-
-        # engine + ai-expert-analyzer + others were missing the COST-OPT-2 prompt
-        # caching benefit, the TD-20 platform_logger fix, etc.
-        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
-            self,
-            "SharedUtilsLayer",
-            SHARED_LAYER_ARN,
-        )
+        # #781 (2026-07-06): the shared utils layer is retired — every function's
+        # code asset is the staged full-tree bundle (deploy/build_bundle.py), so
+        # shared modules ship inside the bundle itself.
 
         # ADR-050: every compute Lambda's error alarm routes to the digest topic.
         # Compute Lambdas are background pre-computation; transient errors recover
@@ -77,7 +68,6 @@ class ComputeStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
-            shared_layer=shared_utils_layer,
         )
 
         # ══════════════════════════════════════════════════════════════

@@ -68,19 +68,9 @@ class OperationalStack(Stack):
         local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
-        # Phase B re-entry sweep (2026-05-03): shared layer for Lambdas that import
-        # platform_logger (currently freshness-checker + canary). They have a
-        # try/except ImportError fallback to stdlib logging, so the missing layer
-        # was hidden — but TD-20 platform_logger fix never reached freshness-checker
-        # (still pinned at v19). Other operational Lambdas (site-api, key-rotator,
-        # pip-audit, etc.) don't import shared modules so don't need the layer.
-        from stacks.constants import SHARED_LAYER_ARN
-
-        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
-            self,
-            "SharedUtilsLayer",
-            SHARED_LAYER_ARN,
-        )
+        # #781 (2026-07-06): the shared utils layer is retired — every function's
+        # code asset is the staged full-tree bundle (deploy/build_bundle.py), so
+        # shared modules ship inside the bundle itself.
 
         # ── 1. Freshness Checker — 9:45 AM PT daily (previously in separate CFn stack)
         # ADR-052: SNS_ARN points to the digest topic. The freshness checker's
@@ -108,7 +98,6 @@ class OperationalStack(Stack):
             digest_topic=local_digest_topic,
             digest=True,
             alarm_name="freshness-checker-errors",
-            shared_layer=shared_utils_layer,
         )
 
         # ── 2. DLQ Consumer — every 6 hours
@@ -176,7 +165,6 @@ class OperationalStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            shared_layer=shared_utils_layer,
         )
         cdk.CfnOutput(self, "AlertDigestQueueUrl", value=digest_queue.queue_url)
         cdk.CfnOutput(self, "AlertDigestLambdaArn", value=digest_lambda.function_arn)
@@ -248,7 +236,6 @@ class OperationalStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            shared_layer=shared_utils_layer,
         )
 
         # ── 3b. Cost Governor — budget-tier estimator (budget guardrails)
@@ -281,7 +268,6 @@ class OperationalStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            shared_layer=shared_utils_layer,
         )
 
         # ── 3c. Remediation Dispatcher — SNS-subscribed urgent-alarm → GH dispatch
@@ -308,7 +294,6 @@ class OperationalStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            shared_layer=shared_utils_layer,
         )
         local_alerts_topic.add_subscription(sns_subs.LambdaSubscription(dispatcher_lambda))
 
@@ -350,7 +335,6 @@ class OperationalStack(Stack):
             # #498: qa tiers derive from source_registry (shared layer). Without the
             # layer, CI's single-file hot deploy strips the bundled copy and the
             # import dies (broke the 2026-07-04 smoke run).
-            shared_layer=shared_utils_layer,
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -393,7 +377,6 @@ class OperationalStack(Stack):
             alarm_name="life-platform-data-export-errors",
             custom_policies=rp.operational_data_export(),
             # #498: export census derives from phase_taxonomy (shared layer as of v109).
-            shared_layer=shared_utils_layer,
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -438,7 +421,6 @@ class OperationalStack(Stack):
             environment={"EMAIL_RECIPIENT": "awsdev@mattsusername.com", "EMAIL_SENDER": "awsdev@mattsusername.com"},
             custom_policies=rp.operational_data_reconciliation(),
             # #498: expected-days derive from source_registry (shared layer).
-            shared_layer=shared_utils_layer,
             table=local_table,
             bucket=local_bucket,
             dlq=None,
@@ -611,7 +593,6 @@ class OperationalStack(Stack):
             # 2026-05-24: shared layer re-attached after drift. Lambda was running
             # `Layers: null` and importing constants/phase_filter from the deploy
             # zip directly (worked but fragile). Layer provides the canonical copy.
-            shared_layer=shared_utils_layer,
         )
 
         site_api_url = site_api_fn.add_function_url(
@@ -654,7 +635,6 @@ class OperationalStack(Stack):
                 "CORS_ORIGIN": "https://averagejoematt.com",
             },
             # 2026-05-24: shared layer attached. Was running `Layers: null` — same drift as site-api.
-            shared_layer=shared_utils_layer,
         )
 
         # Cap AI Lambda concurrency — 2 concurrent is enough for personal site traffic
@@ -771,7 +751,6 @@ class OperationalStack(Stack):
             dlq=None,
             alerts_topic=None,
             # 2026-05-24: shared layer attached. Was running `Layers: null` — same drift as site-api.
-            shared_layer=shared_utils_layer,
         )
         # Four EventBridge cron rules — UTC equivalents of 8am/12pm/4pm/8pm Pacific (no DST drift)
         for utc_hour, label in [(15, "8amPT"), (19, "12pmPT"), (23, "4pmPT"), (3, "8pmPT")]:
@@ -880,7 +859,6 @@ class OperationalStack(Stack):
             # DI-1.1 (2026-06-20): needs the shared layer for ingest_health + source_state
             # (is_paused). Was previously running on an out-of-band v85 that CDK didn't
             # manage, so source_state silently fell back to the no-op stub.
-            shared_layer=shared_utils_layer,
             custom_policies=rp.pipeline_health_check(),
             table=local_table,
             bucket=local_bucket,
@@ -959,7 +937,6 @@ class OperationalStack(Stack):
             digest_topic=local_digest_topic,
             digest=True,
             alarm_name="hevy-routine-cron-errors",
-            shared_layer=shared_utils_layer,
         )
         # Manual events.Rule escape hatch — create_platform_lambda's schedule= shortcut
         # auto-enables the rule. ADR-066 ships disabled. Do NOT collapse this back.
@@ -1013,7 +990,6 @@ class OperationalStack(Stack):
             digest_topic=local_digest_topic,
             digest=True,
             alarm_name="hevy-restamp-errors",
-            shared_layer=shared_utils_layer,
         )
         hevy_restamp_rule = events.Rule(
             self,

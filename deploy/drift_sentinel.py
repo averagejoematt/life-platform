@@ -13,7 +13,8 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
      MODIFIED / DELETED resource (`describe_stack_resource_drifts`). This is the live
      state vs. the deployed template, which `cdk diff` cannot see.
   2. POSTFLIGHT REUSE — the human-invoked-only checks from session_postflight:
-     layer uniformity, lambda config drift, bundled-asset completeness.
+     layer retirement (#781: zero shared-utils references), lambda config
+     drift, bundled-asset completeness.
   3. NO FUNCTIONS OUTSIDE IaC — every live Lambda in the region must be a member of one
      of our CloudFormation stacks. A function that exists live but in no stack's
      resource list was created out of band (orphan) — surfaced, minus a small allowlist
@@ -336,7 +337,7 @@ def _summary(status, checks):
         parts.append(f"{len(drifted_stacks)} stack(s) drifted: {', '.join(drifted_stacks)}")
     for key, label in (
         ("config_drift", "config drift"),
-        ("layer_uniformity", "layer behind"),
+        ("layer_uniformity", "retired-layer reference(s)"),
         ("asset_completeness", "asset gap"),
         ("orphan_functions", "orphan function(s)"),
         ("bucket_policy", "delete-protection gap"),

@@ -175,7 +175,7 @@ python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
 
 The pipeline runs (in order, each idempotent):
 1. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
-2. `bash deploy/build_layer.sh` + layer version bump + `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail`
+2. `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail` (full-tree bundles carry the new constants — #781)
 3. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
 4. `restart_intelligence_wipe.py --apply` — tombstones any newly pre-genesis records
 5. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis

@@ -1,12 +1,10 @@
 """
-CoreStack — Shared infrastructure: SQS DLQ, SNS alerts, Lambda Layer.
+CoreStack — Shared infrastructure: SQS DLQ, SNS alerts, budget.
 
 DynamoDB and S3 are deliberately NOT CDK-managed (stateful resources).
 SQS DLQ and SNS topic are CDK-managed via `cdk import` (first time).
-Lambda Layer is CDK-managed — new versions published on each deploy.
-
-IMPORTANT: Run `bash deploy/build_layer.sh` before `cdk deploy` to
-build the layer directory at cdk/layer-build/python/*.
+The shared Lambda layer was RETIRED here (#781, 2026-07-06) — shared code
+ships inside every function's staged full-tree bundle (deploy/build_bundle.py).
 """
 
 import aws_cdk as cdk
@@ -16,7 +14,6 @@ from aws_cdk import (
     Stack,
     aws_budgets as budgets,
     aws_dynamodb as dynamodb,
-    aws_lambda as _lambda,
     aws_s3 as s3,
     aws_sns as sns,
     aws_sqs as sqs,
@@ -76,18 +73,13 @@ class CoreStack(Stack):
         # scheduled deletion independently. IAM policies in role_policies.py
         # still reference the (soon-orphan) ARN — harmless, cleaned up later.
 
-        # ── Lambda Layer (CDK-managed) ──
-        # Pre-built by deploy/build_layer.sh → cdk/layer-build/python/
-        # No Docker needed. CDK zips the directory and publishes.
-        self.shared_layer = _lambda.LayerVersion(
-            self,
-            "SharedUtilsLayer",
-            layer_version_name="life-platform-shared-utils",
-            code=_lambda.Code.from_asset("layer-build"),
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_12],
-            description="Shared utils for Life Platform Lambdas",
-            removal_policy=RemovalPolicy.RETAIN,
-        )
+        # ── Lambda Layer RETIRED (#781, 2026-07-06) ──
+        # life-platform-shared-utils is no longer published or attached. Every
+        # function's code asset is the staged full-tree bundle
+        # (deploy/build_bundle.py), so shared modules ship inside the bundle and
+        # layer-version drift is structurally impossible. The old published
+        # versions remain in AWS (the resource had RemovalPolicy.RETAIN) but
+        # nothing references them.
 
         # ── AWS Budget — single $75/mo all-in ceiling (replaces 2 stale $20 manual budgets) ──
         # Lagged secondary backstop + notice; the real-time enforcer is the
@@ -131,4 +123,3 @@ class CoreStack(Stack):
         cdk.CfnOutput(self, "DlqArn", value=self.dlq.queue_arn)
         cdk.CfnOutput(self, "AlertsTopicArn", value=self.alerts_topic.topic_arn)
         cdk.CfnOutput(self, "DigestTopicArn", value=self.digest_topic.topic_arn)
-        cdk.CfnOutput(self, "SharedLayerArn", value=self.shared_layer.layer_version_arn)

@@ -52,41 +52,26 @@ class McpStack(Stack):
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
-        # ── MCP code asset ────────────────────────────────────────────────────
-        # MCP Lambda lives at repo root (mcp_server.py + mcp/ package), not
-        # in lambdas/. Stage just those files so CDK packages the correct code.
-        # Without this, cdk deploy bundles the lambdas/ directory which doesn't
-        # contain mcp_server or mcp/.
+        # ── MCP code asset (#781) ─────────────────────────────────────────────
+        # MCP Lambda lives at repo root (mcp_server.py + mcp/ package), not in
+        # lambdas/. The bundle is the SAME staged full tree every other function
+        # gets (shared modules flat, reading/ package, food_vocabulary.json) PLUS
+        # mcp_server.py + mcp/ — staged by the one bundle implementation in
+        # deploy/build_bundle.py. This retires the shared-layer dependency
+        # (ADR-066 hevy routine modules, numeric/retry_utils) and the
+        # hand-curated staging that kept re-breaking (reading/ omitted from the
+        # CI zip; hevy modules only on the layer).
         import os
-        import shutil
+        import sys
+
+        _deploy_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "deploy"))
+        if _deploy_dir not in sys.path:
+            sys.path.insert(0, _deploy_dir)
+        import build_bundle
 
         _stage = os.path.join(os.path.dirname(__file__), "..", "_mcp_staging")
-        if os.path.exists(_stage):
-            shutil.rmtree(_stage)
-        os.makedirs(_stage)
-        shutil.copy2("../mcp_server.py", _stage)
-        shutil.copytree("../mcp", os.path.join(_stage, "mcp"), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        # ADR-097 (Phase B): the reading/Mind tools (mcp/tools_reading.py) import the
-        # reading data layer package. Stage lambdas/reading/ as a top-level package in
-        # the MCP bundle so `from reading import reading_store` resolves at runtime
-        # (numeric/retry_utils that reading depends on come from the shared layer). This
-        # keeps the package's single source of truth in lambdas/reading/ — no copy/paste
-        # into mcp/, and no shared-layer bump (so no fleet redeploy).
-        shutil.copytree("../lambdas/reading", os.path.join(_stage, "reading"), ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        build_bundle.stage_mcp(_stage)
         mcp_code = _lambda.Code.from_asset(_stage)
-
-        # ADR-066 (2026-05-31): MCP gets the shared layer so manage_hevy_routine
-        # can import routine_ir / hevy_compiler / hevy_write_client / routine_repo /
-        # routine_generator / hevy_template_cache / adherence_calc at runtime.
-        # Historically MCP ran with `Layers: null` — no other tool needed cross-layer
-        # modules. This attaches the layer so the Hevy write loop works end-to-end.
-        from stacks.constants import SHARED_LAYER_ARN
-
-        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(
-            self,
-            "SharedUtilsLayer",
-            SHARED_LAYER_ARN,
-        )
 
         # ── MCP Server Lambda (request-serving) ───────────────────────────────
         # R13-XR: ACTIVE tracing enables X-Ray for every invocation.
@@ -115,7 +100,6 @@ class McpStack(Stack):
             bucket=local_bucket,
             dlq=None,
             alerts_topic=None,
-            shared_layer=shared_utils_layer,
         )
 
         # Existing EventBridge permission kept for legacy nightly-warmer rule.
@@ -154,7 +138,6 @@ class McpStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
-            shared_layer=shared_utils_layer,
         )
 
         # ── MCP Server alarms ─────────────────────────────────────────────────

@@ -28,19 +28,14 @@ else
   echo "   ⚠️  could not fetch current code for rollback (continuing)"
 fi
 
-echo "── 3. Build the full MCP package ──"
+echo "── 3. Build the full MCP bundle (#781: tree + mcp/, one staging implementation) ──"
 ZIP="/tmp/mcp_deploy.zip"
-rm -f "$ZIP"
-find mcp -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-zip -q -j "$ZIP" mcp_server.py mcp_bridge.py
-zip -q -r "$ZIP" mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
-echo "   zip: $(du -h "$ZIP" | cut -f1)"
+python3 deploy/build_bundle.py --mcp --out /tmp/mcp_stage --zip "$ZIP"
 echo "   sanity (entry + key modules in zip):"
-unzip -l "$ZIP" | grep -E 'mcp_server.py|mcp/registry.py|mcp/tools_hevy_routine.py' | sed 's/^/     /'
+unzip -l "$ZIP" | grep -E 'mcp_server.py|mcp/registry.py|reading/|hevy_compiler.py' | head -6 | sed 's/^/     /'
 
 echo "── 4. Deploy ──"
 aws lambda update-function-code --function-name "$FN" --zip-file "fileb://$ZIP" --region "$REGION" \
   --query '{State:State,LastUpdateStatus:LastUpdateStatus,CodeSize:CodeSize}' --output table
 aws lambda wait function-updated --function-name "$FN" --region "$REGION"
-echo "✅ $FN deployed. (Layer-resident modules — hevy_write_client, hevy_compiler, etc. — are NOT"
-echo "   changed by this script; those need bash deploy/build_layer.sh + cdk deploy LifePlatformCore.)"
+echo "✅ $FN deployed (full bundle — shared modules included; no layer dependency)."

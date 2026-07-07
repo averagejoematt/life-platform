@@ -5,8 +5,9 @@ session_postflight.py — after a multi-deploy session, verify the fleet is cons
 Encodes this era's deploy-hygiene lessons as one read-only command, so a session
 doesn't end with a silent inconsistency:
 
-  1. LAYER UNIFORMITY — every shared-layer consumer is on the latest published
-     `life-platform-shared-utils` version. The v89/v91 stall: a new layer was
+  1. LAYER RETIREMENT (#781) — NO function references the retired
+     `life-platform-shared-utils` layer (shared code ships inside every
+     bundle now). Historical context — the v89/v91 stall: a new layer was
      published but consumers were left on the old version, and the Plan gate
      blocked the next deploy until the fleet was made uniform.
 
@@ -23,7 +24,6 @@ Run from the repo root:
 """
 from __future__ import annotations
 
-import json
 import os
 import sys
 
@@ -39,23 +39,20 @@ def _lambda():
 
 
 def check_layer_uniformity():
-    """Returns (latest_version, [(function, attached_version), ...] behind)."""
+    """#781: the shared layer is RETIRED — uniformity now means ZERO references.
+
+    Returns (0, [(function, attached_version), ...]) for any function still
+    referencing life-platform-shared-utils (drift from before the collapse, or
+    a regression re-attaching it). Shared code ships inside every bundle."""
     cl = _lambda()
-    versions = cl.list_layer_versions(LayerName=LAYER_NAME, MaxItems=1).get("LayerVersions", [])
-    if not versions:
-        return None, []
-    latest = versions[0]["Version"]
-    consumers = json.load(open(os.path.join(_ROOT, "ci", "lambda_map.json"))).get("shared_layer", {}).get("consumers", [])
-    behind = []
-    for fn in consumers:
-        try:
-            cfg = cl.get_function_configuration(FunctionName=fn)
-        except Exception:  # noqa: BLE001 — a consumer name that isn't live yet
-            continue
-        attached = [int(l["Arn"].rsplit(":", 1)[-1]) for l in cfg.get("Layers", []) if LAYER_NAME in l["Arn"]]
-        if attached and max(attached) != latest:
-            behind.append((fn, max(attached)))
-    return latest, behind
+    offenders = []
+    paginator = cl.get_paginator("list_functions")
+    for page in paginator.paginate():
+        for fn in page["Functions"]:
+            attached = [int(l["Arn"].rsplit(":", 1)[-1]) for l in fn.get("Layers", []) if LAYER_NAME in l["Arn"]]
+            if attached:
+                offenders.append((fn["FunctionName"], max(attached)))
+    return 0, offenders
 
 
 # Bundled-asset canaries: a function that imports a root-level lambdas/*.py module,
@@ -114,16 +111,14 @@ def main() -> int:
     print("── session postflight ──")
 
     try:
-        latest, behind = check_layer_uniformity()
-        if latest is None:
-            print("  ⚠️  layer: couldn't read published versions")
-        elif behind:
+        _, behind = check_layer_uniformity()
+        if behind:
             problems += 1
-            print(f"  🔴 layer uniformity: {len(behind)} consumer(s) behind v{latest}:")
+            print(f"  🔴 layer retirement: {len(behind)} function(s) still reference the RETIRED shared layer:")
             for fn, v in behind:
-                print(f"       {fn} on v{v} (latest v{latest}) — redeploy to attach the current layer")
+                print(f"       {fn} on v{v} — cdk deploy its stack to drop the reference (#781)")
         else:
-            print(f"  🟢 layer uniformity: all consumers on v{latest}")
+            print("  🟢 layer retirement: no function references life-platform-shared-utils")
     except Exception as e:  # noqa: BLE001
         print(f"  ⚠️  layer check skipped: {e}")
 

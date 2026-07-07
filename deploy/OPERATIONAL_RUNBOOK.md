@@ -83,7 +83,7 @@ The pipeline runs (in order, each idempotent):
 1. Fetch Withings reading for the target date (fails clearly if absent)
 2. `sync_constants_from_config.py` — regenerate `lambdas/constants.py`
 3. `update_ddb_profile()` — sync `USER#matthew PROFILE#v1`
-4. Bump `SHARED_LAYER_VERSION`, `bash deploy/build_layer.sh`, `cdk deploy --all`
+4. `cdk deploy --all` (#781: full-tree bundles carry the new constants — no layer)
 5. `restart_phase_tag.py --apply`
 6. `restart_intelligence_wipe.py --apply`
 7. `restart_character_rebuild.py --apply`
@@ -124,13 +124,14 @@ For the MCP Lambda (`life-platform-mcp`), `deploy_lambda.sh` will refuse — it 
 
 ---
 
-## "The shared Lambda layer needs to be updated"
+## "A shared module changed — how does it reach the fleet?"
+
+The shared layer is RETIRED (#781). Shared modules ship inside every function's
+code bundle. Either path converges the fleet:
 
 ```bash
-# 1. Bump SHARED_LAYER_VERSION in cdk/stacks/constants.py
-# 2. Rebuild the layer:
-bash deploy/build_layer.sh
-# 3. Deploy:
+bash deploy/deploy_fleet.sh                     # one bundle → every function
+# or
 cd cdk && npx cdk deploy --all --require-approval never
 ```
 
@@ -210,7 +211,8 @@ python3 deploy/restart_verify_rendered.py                    # 27-page public pr
 - **`sync_constants_from_config.py`** — Regenerates `lambdas/constants.py` from `config/user_goals.json`.
 - **`deploy_lambda.sh`** — Single-Lambda surgical redeploy. Source-of-truth for hot fixes.
 - **`rollback_lambda.sh`** — Inverse of above.
-- **`build_layer.sh`** — Rebuilds the shared Lambda layer directory.
+- **`build_bundle.py`** — Stages/zips the ONE full-tree code bundle (#781); used by every deploy path.
+- **`deploy_fleet.sh`** — Pushes the bundle to every function (shared-module changes).
 - **`deploy_and_verify.sh`** — `deploy_lambda.sh` + smoke test combo.
 - **`safe_sync.sh`** — S3 sync wrapper that's guaranteed not to `--delete` bucket root (ADR-032/033).
 - **`sync_doc_metadata.py`** — Updates PLATFORM_FACTS dict in docs from CDK source-of-truth.

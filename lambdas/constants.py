@@ -4,8 +4,8 @@ constants.py — Runtime constants shared across life-platform Lambdas.
 GENERATED FILE. Do not edit by hand. Source of truth is config/user_goals.json.
 Regenerate with: python3 deploy/sync_constants_from_config.py --apply
 
-Part of the shared Lambda layer (ADR-058). Changes require layer rebuild
-(`bash deploy/build_layer.sh`) before deploying dependent functions.
+Ships inside every function bundle (ADR-058, #781). Changes reach the fleet
+via `cdk deploy --all` or `bash deploy/deploy_fleet.sh`.
 """
 
 from datetime import date

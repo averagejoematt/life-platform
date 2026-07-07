@@ -30,7 +30,7 @@ from grounded_generation import allowed_numbers as _allowed_numbers  # noqa: E40
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHRONICLE_SRC = open(os.path.join(ROOT, "lambdas/emails/wednesday_chronicle_lambda.py")).read()
 BUDGET_SRC = open(os.path.join(ROOT, "lambdas/budget_guard.py")).read()
-LAYER_SRC = open(os.path.join(ROOT, "deploy/build_layer.sh")).read()
+# #781: the shared layer is retired — the full-tree bundle ships every module.
 
 SAMPLE_INSTALLMENT = (
     '"The Week the Numbers Argued With Him"\n\n'
@@ -384,8 +384,11 @@ def test_has_board_detection_excludes_editors_note():
     assert "editor's note" in block.lower()
 
 
-def test_layer_carries_the_new_module():
-    assert "margaret_editor_pass.py" in LAYER_SRC
+def test_bundle_carries_the_new_module():
+    # #781: the full-tree bundle ships every lambdas/*.py module automatically;
+    # this guards against the module being deleted/renamed out from under
+    # wednesday_chronicle_lambda's import.
+    assert os.path.isfile(os.path.join(ROOT, "lambdas", "margaret_editor_pass.py"))
 
 
 # ── M9: budget_guard tier-1 pause ─────────────────────────────────────────────

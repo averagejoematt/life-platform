@@ -35,7 +35,6 @@ every step.
 """
 import argparse
 import json
-import re
 import subprocess
 import sys
 from datetime import date, datetime, timezone
@@ -144,25 +143,6 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
         CHAR_SHEET.write_text(json.dumps(cs, indent=2) + "\n")
 
 
-def bump_layer_version(apply: bool) -> int:
-    text = CDK_CONSTANTS.read_text()
-    m = re.search(r"SHARED_LAYER_VERSION = (\d+)", text)
-    if not m:
-        raise RuntimeError("Could not find SHARED_LAYER_VERSION in cdk/stacks/constants.py")
-    current = int(m.group(1))
-    new_version = current + 1
-    today_iso = date.today().isoformat()
-    new_text = re.sub(
-        r"SHARED_LAYER_VERSION = \d+.*",
-        f"SHARED_LAYER_VERSION = {new_version}  # v{new_version}: ADR-058 restart pipeline ({today_iso})",
-        text,
-        count=1,
-    )
-    if apply:
-        CDK_CONSTANTS.write_text(new_text)
-    return new_version
-
-
 def run_step(name: str, cmd: list[str], apply: bool, log: list[str]) -> int:
     print(f"\n──[ {name} ]──")
     print(f"    $ {' '.join(cmd)}")
@@ -236,17 +216,11 @@ def main():
     if rc and args.apply:
         sys.exit(rc)
 
-    # Step 4 + 5: bump layer + build + deploy
+    # Step 4: CDK deploy (#781: no layer to bump/build — constants.py ships
+    # inside every function bundle, so a full-stack deploy converges the fleet)
     if not args.skip_deploy:
-        print("\n[4] Bumping SHARED_LAYER_VERSION")
-        new_v = bump_layer_version(args.apply)
-        print(f"    → v{new_v}")
         if args.apply:
-            print("\n[5] Building layer + CDK deploy")
-            run_step("build_layer", ["bash", "deploy/build_layer.sh"], True, log)
-            # Deploy ALL stacks from cdk/ working dir so CDK re-synths against
-            # the freshly built layer-build/. Every stack imports the shared
-            # layer, so all of them need to redeploy when constants change.
+            print("\n[4] CDK deploy (full-tree bundles carry the new constants)")
             cdk_proc = subprocess.run(
                 ["npx", "cdk", "deploy", "--all", "--require-approval", "never"],
                 cwd=REPO_ROOT / "cdk",

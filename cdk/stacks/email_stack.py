@@ -29,7 +29,7 @@ from aws_cdk import (
 from constructs import Construct
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, CF_DIST_ID, REGION, SHARED_LAYER_ARN  # single source of truth for layer version
+from stacks.constants import ACCT, CF_DIST_ID, REGION
 from stacks.lambda_helpers import create_platform_lambda
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
@@ -50,7 +50,6 @@ class EmailStack(Stack):
         local_alerts_topic = sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
 
-        shared_utils_layer = _lambda.LayerVersion.from_layer_version_arn(self, "SharedUtilsLayer", SHARED_LAYER_ARN)
         # ADR-050: email Lambda error alarms route to digest. They're recoverable
         # (next day's run picks up where this one failed) and rarely user-facing.
         # daily-brief still has its urgent alarm via MonitoringStack.
@@ -61,7 +60,6 @@ class EmailStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
-            shared_layer=shared_utils_layer,
         )
 
         # daily-brief: alerts_topic=None — MonitoringStack owns its alarms

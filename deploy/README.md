@@ -15,8 +15,8 @@
 **"I changed a file. Which script do I run?"** See `docs/QUICKSTART.md` for the full table. Key rules:
 
 1. **Lambda code only** → `deploy_lambda.sh` or `deploy_and_verify.sh`
-2. **Shared layer module** (ai_calls.py, scoring_engine.py, etc.) → `build_layer.sh` FIRST, then deploy dependents
-3. **MCP Lambda** → **NEVER `deploy_lambda.sh`** — use the full zip build (ADR-031). `deploy_lambda.sh` hard-rejects this.
+2. **Shared module** (ai_calls.py, scoring_engine.py, etc.) → `deploy_fleet.sh` (#781: one full-tree bundle to every function — the layer is retired)
+3. **MCP Lambda** → `deploy_lambda.sh life-platform-mcp mcp_server.py` (builds the mcp-shaped full bundle automatically)
 4. **CDK changes** (IAM, schedules, new Lambda) → `cd cdk && npx cdk deploy <StackName>`
 5. **Site content** → `sync_site_to_s3.sh`
 6. **S3 data** → NEVER `aws s3 sync --delete` without `safe_sync.sh` (ADR-032)
@@ -48,8 +48,8 @@ bash deploy_lambda.sh daily-brief
 | `deploy_lambda.sh <name>` | Zip + upload a single Lambda | Any code change to a Lambda |
 | `deploy_and_verify.sh <name>` | Deploy + smoke test + auto-rollback | Preferred for production deploys |
 | `rollback_lambda.sh <name>` | Restore previous Lambda version | After a bad deploy |
-| `build_layer.sh` | Build the shared-utils Lambda layer | After adding a new shared module |
-| `build_mcp_stable_layer.sh` | Build the MCP stable-core layer (ADR-027) | Apr 13 — SIMP-1 Phase 2 |
+| `build_bundle.py` | Stage/zip the ONE full-tree code bundle (#781) | Used by every deploy path |
+| `deploy_fleet.sh` | Push the bundle to every function | After changing a shared module |
 
 ### Testing & verification
 
@@ -158,7 +158,7 @@ bash deploy/post_cdk_smoke.sh
 
 | Stack | Lambdas / Resources |
 |-------|-------------------|
-| `LifePlatformCore` | DLQ, SNS alerts topic, shared layer |
+| `LifePlatformCore` | DLQ, SNS alerts topic, budget |
 | `LifePlatformIngestion` | 13 ingestion Lambdas + EventBridge rules |
 | `LifePlatformCompute` | 5 compute Lambdas + EventBridge rules |
 | `LifePlatformEmail` | 8 email/digest Lambdas + EventBridge rules |

@@ -5,7 +5,7 @@ time) to confirm the restart pipeline produced a healthy, consistent state.
 
 Checks (each pass/fail):
   1. lambdas/constants.py genesis matches config/user_goals.json
-  2. CDK SHARED_LAYER_VERSION matches the latest published AWS layer
+  2. No function references the retired shared layer (#781)
   3. DDB PROFILE#v1 matches lambdas/constants.py baseline
   4. Live /api/journey returns started_date == genesis
   5. Live /api/journey returns start_weight == baseline (rounded)
@@ -13,7 +13,7 @@ Checks (each pass/fail):
   7. Withings record exists for genesis date
   8. Character sheet exists for at least one post-genesis day
   9. No habit streak > day_n (would indicate leak from pre-genesis data)
- 10. pytest layer-consistency tests pass (i2, lv1-6)
+ 10. pytest layer-retirement test passes (i2)
 
 Returns 0 if all checks pass, 1 if any fail.
 
@@ -73,16 +73,14 @@ def main():
         f"config={cfg_w} constants={EXPERIMENT_BASELINE_WEIGHT_LBS}",
     )
 
-    # 2. layer version
+    # 2. layer retirement (#781): nothing may reference the retired shared layer
     lam = boto3.client("lambda", region_name=REGION)
-    versions = lam.list_layer_versions(LayerName=LAYER)["LayerVersions"]
-    aws_latest = versions[0]["Version"]
-    cdk_text = (REPO_ROOT / "cdk" / "stacks" / "constants.py").read_text()
-    import re
-
-    m = re.search(r"SHARED_LAYER_VERSION = (\d+)", cdk_text)
-    cdk_v = int(m.group(1)) if m else None
-    check("CDK SHARED_LAYER_VERSION matches AWS latest", cdk_v == aws_latest, f"cdk={cdk_v} aws={aws_latest}")
+    attached = []
+    for page in lam.get_paginator("list_functions").paginate():
+        for fn in page["Functions"]:
+            if any(LAYER in l.get("Arn", "") for l in fn.get("Layers", [])):
+                attached.append(fn["FunctionName"])
+    check("No function references the retired shared layer", not attached, f"attached={attached[:5]}")
 
     # 3. DDB profile consistency
     ddb = boto3.resource("dynamodb", region_name=REGION)
@@ -162,8 +160,7 @@ def main():
             "python3",
             "-m",
             "pytest",
-            "tests/test_integration_aws.py::test_i2_lambda_layer_version_current",
-            "tests/test_layer_version_consistency.py",
+            "tests/test_integration_aws.py::test_i2_shared_layer_retired",
             "-q",
         ],
         cwd=REPO_ROOT,
@@ -171,7 +168,7 @@ def main():
         text=True,
     )
     pytest_ok = proc.returncode == 0
-    check("pytest layer-consistency tests pass", pytest_ok, proc.stdout.strip().splitlines()[-1] if proc.stdout else "no output")
+    check("pytest layer-retirement test passes", pytest_ok, proc.stdout.strip().splitlines()[-1] if proc.stdout else "no output")
 
     # Summary
     total = len(checks)

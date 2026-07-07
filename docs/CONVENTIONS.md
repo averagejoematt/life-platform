@@ -14,31 +14,29 @@ sync. See [Facts that drift](#facts-that-drift-run-the-command-never-quote-a-num
 
 ---
 
-## 1. Shared-layer rebuild + deploy sequence
+## 1. The ONE code bundle — no shared layer (#781)
 
-Publishing a shared-layer change (a `SHARED_LAYER_VERSION` bump in
-`cdk/stacks/constants.py`) has a specific, non-obvious order. Getting it wrong fails
-the deploy with `Layer version arn:...:N does not exist`.
+The shared layer (`life-platform-shared-utils`) was **retired 2026-07-06** (#781,
+ended at v118). Shared modules ship **inside every function's code bundle**, staged
+by the single implementation `deploy/build_bundle.py` (the whole `lambdas/` tree +
+`config/food_vocabulary.json`; MCP additionally gets `mcp_server.py` + `mcp/`).
+Every deploy path uses it — CDK (`lambda_helpers.staged_tree_asset()`),
+`deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh` — so what any path
+ships is byte-identical by construction.
 
-- `bash deploy/build_layer.sh` **only builds** `cdk/layer-build/python/` — it does
-  **not** publish to AWS. The live version is unchanged after it runs.
-- `cdk deploy LifePlatformCore` is what **publishes** the new version (`core_stack.py`
-  owns the `LayerVersion(Code.from_asset("layer-build"))` construct). Deploying any
-  layer-*consuming* stack before Core fails.
-- Run `cdk` from **inside `cdk/`** — `from_asset("layer-build")` resolves relative to
-  the cwd; from the repo root it errors `CannotFindAsset`.
-
-**Correct order:**
-```bash
-bash deploy/build_layer.sh
-cd cdk && npx cdk deploy LifePlatformCore
-# verify the new version is live BEFORE deploying consumers:
-aws lambda list-layer-versions --layer-name life-platform-shared-utils \
-  --region us-west-2 --query 'LayerVersions[0].Version'
-npx cdk deploy <consuming stacks>
-```
-Deploys are run by Matthew in his terminal, never via MCP. Source: the ER-01 layer
-deploy (`feedback_layer_deploy_sequence`).
+- **A shared-module change reaches the fleet** via `bash deploy/deploy_fleet.sh`
+  (one bundle → S3 → every function) or `cd cdk && npx cdk deploy --all`. CI does
+  this automatically: any changed `lambdas/` file that is not a mapped
+  per-function source triggers the fleet-deploy step.
+- **The invariant** (enforced by CI's plan job + `test_i2_shared_layer_retired` +
+  `session_postflight`): **zero** functions reference `life-platform-shared-utils`.
+  A function referencing it predates the collapse (redeploy its stack) or a
+  regression re-attached it.
+- Dependency layers with real third-party packages (**garth**, **pillow**) are
+  NOT the shared layer — they stay.
+- The retired incident classes this replaces (stale-layer P2, #697
+  missing-from-allowlist, single-file-deploy-strips-siblings, MCP zip missing
+  `reading/`): see git history of this section + `docs/DECISIONS.md`.
 
 ## 2. Deploy from `main`, not the worktree branch
 
