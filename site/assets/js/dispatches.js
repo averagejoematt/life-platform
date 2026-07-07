@@ -244,11 +244,19 @@ async function renderRead(s, id) {
         asOfWk != null
           ? `<p class="tl-recap-asof label">where things stood as of Week ${asOfWk}${asOfDate ? ` · ${esc(asOfDate)}` : ""}${weeksBehind ? ` — ${weeksBehind} week${weeksBehind === 1 ? "" : "s"} ago` : ""}</p>`
           : "";
+      // #802 (R22-CONTENT-03): the Wednesday chronicle (this recap included) skips
+      // its whole run at budget tier >= 2 — a served recap can then be a HELD
+      // read from before the pause, not this week's. Disclose it plainly,
+      // independent of whether "where we are now" text exists.
+      const pausedNote = er.regeneration_paused
+        ? `<p class="tl-recap-asof label">refresh paused (budget guard)${asOfDate ? ` — last written ${esc(asOfDate)}` : ""}</p>`
+        : "";
       recap = `<aside class="tl-recap tl-recap-elena">` +
         `<p class="tl-recap-k label">previously on · the measured life</p>` +
         `<p class="tl-recap-story">${esc(er.story_so_far)}</p>` +
         (beats ? `<ul class="tl-recap-beats">${beats}</ul>` : "") +
         (er.where_we_are_now ? `<p class="tl-recap-now">${esc(er.where_we_are_now)}</p>${nowStamp}` : "") +
+        pausedNote +
         statLine +
         `<p class="tl-recap-by label">— Elena Voss</p></aside>`;
     } else {

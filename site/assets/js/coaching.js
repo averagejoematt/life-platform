@@ -54,6 +54,21 @@ const cache = {};
 async function secFetch(s) { if (!s.url) return null; if (cache[s.key]) return cache[s.key]; const d = await tryJSON(s.url); cache[s.key] = d; return d; }
 const domainOf = (pid) => String(pid || "").replace(/_coach$/, "");
 
+// #802 (R22-CONTENT-03): honest "as of / refresh paused" disclosure for a
+// coach's analysis body. budget_guard (ADR-063/125) can pause narrative
+// regeneration at tier >= 2 — when it does, a served read can be a HELD read
+// from before the pause, not today's, and the site must say so rather than
+// present it tense-free. Dates render in Pacific (site convention).
+const PT_TZ = "America/Los_Angeles";
+function coachAsOf(generatedAt, paused) {
+  const d = generatedAt ? new Date(generatedAt) : null;
+  const valid = d && !isNaN(d.getTime());
+  const dateStr = valid ? d.toLocaleDateString("en-US", { timeZone: PT_TZ, month: "short", day: "numeric" }) : "";
+  if (paused) return dateStr ? `as of ${dateStr} — refresh paused (budget guard)` : "refresh paused (budget guard)";
+  if (valid && (Date.now() - d.getTime()) / 36e5 > 48) return `as of ${dateStr} — next refresh pending`;
+  return dateStr ? `as of ${dateStr}` : "";
+}
+
 function entriesFor(s, data) {
   if (s.kind === "read") return READ_SCOPES.slice();
   // Reader Q&A — the ask form first, then any questions the board has answered.
@@ -297,15 +312,17 @@ async function renderByCoach(read, id) {
 
   // 1) THE READ — lead with the coach's actual verdict on the domain.
   if (analysis && (analysis.analysis || analysis.key_recommendation)) {
-    // #787: stamp the read with ITS OWN as-of date. Coaches regenerate on staggered
-    // days, so any two can quote different "current" vitals; the date makes clear each
-    // number is that coach's most recent read, not a shared "today" that self-contradicts.
-    const readAsOf = String(analysis.generated_at || "").slice(0, 10);
-    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week${readAsOf ? ` · as of ${esc(readAsOf)}` : ""}</p>`;
+    // #787/#802: stamp the read with ITS OWN as-of date (coaches regenerate on
+    // staggered days, so any two can quote different "current" vitals) AND
+    // disclose when the budget guard has paused regeneration — a served read
+    // can then be a HELD read from before the pause, not today's (#802).
+    const asOf = coachAsOf(analysis.generated_at, !!analysis.regeneration_paused);
+    h += `<section class="bc-read"><p class="dx-kicker label">their read on your ${esc(dom)} · this week</p>`;
     if (analysis.analysis) h += `<p class="bc-analysis dx-prose">${esc(analysis.analysis)}</p>`;
     if (analysis.key_recommendation) h += `<p class="bc-rec"><span class="label">the one thing</span> ${esc(analysis.key_recommendation)}</p>`;
     if (analysis.cross_domain_note) h += `<p class="bc-xnote label">cross-domain: ${esc(analysis.cross_domain_note)}</p>`;
     if (analysis.confidence_language) h += `<p class="bc-conf label">${esc(analysis.confidence_language)}</p>`;
+    if (asOf) h += `<p class="bc-asof label">${esc(asOf)}</p>`;
     h += `</section>`;
   } else if (typeof coach.daily === "string" && coach.daily.trim()) {
     h += `<section class="bc-read"><p class="dx-kicker label">today's read</p><p class="bc-analysis dx-prose">${esc(coach.daily)}</p></section>`;

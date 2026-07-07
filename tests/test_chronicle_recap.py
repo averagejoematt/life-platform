@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 
+import budget_guard  # noqa: E402
 import chronicle_approve_lambda as approve  # noqa: E402
 import phase_taxonomy  # noqa: E402
 import wednesday_chronicle_lambda as chron  # noqa: E402
@@ -217,6 +218,43 @@ def test_endpoint_withholds_stale_record(monkeypatch):
     monkeypatch.setattr(capi.table, "get_item", lambda Key: {"Item": rec})
     monkeypatch.setattr(capi, "_current_day_n", lambda: 16)
     assert json.loads(capi.handle_recap()["body"])["recap"] is None  # day 400 > current 16 → withheld
+
+
+# ── #802 (R22-CONTENT-03): honest "regeneration paused" disclosure ───────────
+# The Wednesday chronicle (recap included) skips entirely at budget tier >= 2
+# (wednesday_chronicle_lambda's own `current_tier() >= 2` gate) — a served
+# recap can be a HELD read from before the pause, never disclosed as such.
+# /api/recap now carries `regeneration_paused`, derived from budget_guard's
+# "chronicle" feature cutoff, so the front-end can say so honestly.
+
+
+def test_endpoint_recap_flags_regeneration_paused_at_tier_2(monkeypatch):
+    rec = {"story_so_far": "s", "experiment_day": 11, "as_of": "2026-06-24"}
+    monkeypatch.setattr(capi.table, "get_item", lambda Key: {"Item": rec})
+    monkeypatch.setattr(capi, "_current_day_n", lambda: 16)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 2)
+    body = json.loads(capi.handle_recap()["body"])
+    assert body["recap"]["regeneration_paused"] is True
+
+
+def test_endpoint_recap_not_paused_at_tier_0(monkeypatch):
+    rec = {"story_so_far": "s", "experiment_day": 11, "as_of": "2026-06-24"}
+    monkeypatch.setattr(capi.table, "get_item", lambda Key: {"Item": rec})
+    monkeypatch.setattr(capi, "_current_day_n", lambda: 16)
+    monkeypatch.setattr(budget_guard, "current_tier", lambda: 0)
+    body = json.loads(capi.handle_recap()["body"])
+    assert body["recap"]["regeneration_paused"] is False
+
+
+def test_regeneration_paused_fails_open_on_ssm_error(monkeypatch):
+    def _boom():
+        raise RuntimeError("SSM unreachable")
+
+    monkeypatch.setattr(budget_guard, "current_tier", _boom)
+    # allow() calls current_tier() directly, so a raising current_tier propagates
+    # out of allow() itself — _regeneration_paused's own try/except must still
+    # fail open (never fabricate a paused banner on an unrelated error).
+    assert capi._regeneration_paused("chronicle") is False
 
 
 # ── reset safety ──────────────────────────────────────────────────────────────

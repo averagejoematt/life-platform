@@ -69,6 +69,29 @@ _DISCLOSURE = (
 )
 
 
+def _regeneration_paused(feature: str) -> bool:
+    """True if the budget-tier ladder (ADR-063/125) currently pauses regeneration
+    of `feature` narratives — i.e. any content still being served is a HELD, not a
+    live, read. Callers attach this alongside `generated_at` so the front-end can
+    give an honest "as of / refresh paused" disclosure instead of presenting a
+    stale narrative present-tense (R22-CONTENT-03, #802).
+
+    Only call this with a feature name actually registered in
+    budget_guard._FEATURE_CUTOFF AND actually checked by that feature's writer
+    Lambda — e.g. "chronicle" (wednesday_chronicle_lambda, recap included) and
+    "coach_narrative" (coach_narrative_orchestrator, the OUTPUT# records
+    /api/coach_analysis reads). Fail-open to False (not paused) on any error,
+    mirroring budget_guard's own fail-open design — an SSM blip must never
+    manufacture a false disclosure banner.
+    """
+    try:
+        from budget_guard import allow
+
+        return not allow(feature)
+    except Exception:
+        return False
+
+
 def _registry():
     return persona_registry.load_registry(_S3, _S3_BUCKET)
 
@@ -790,6 +813,10 @@ def handle_recap():
                 "as_of_week": item.get("as_of_week"),
                 "author": item.get("author", "Elena Voss"),
                 "generated_at": item.get("generated_at"),
+                # #802: the Wednesday chronicle (and this recap, written at its
+                # publish time) skips entirely at budget tier >= 2 — a served
+                # recap can be a HELD read, not this week's. Honest disclosure.
+                "regeneration_paused": _regeneration_paused("chronicle"),
             }
         },
         cache_seconds=300,
@@ -1045,6 +1072,11 @@ def handle_coach_analysis(event):
             "generated_at": output.get("created_at") or output.get("generated_at", ""),
             "week_number": output.get("week_number"),
             "days_in_experiment": output.get("days_in_experiment"),
+            # #802: coach_narrative_orchestrator skips this coach's OUTPUT# write
+            # entirely at budget tier >= 2 — a served analysis can be a HELD read
+            # from before the pause, not today's. Honest disclosure alongside
+            # generated_at rather than a silent present-tense stale read.
+            "regeneration_paused": _regeneration_paused("coach_narrative"),
         }
 
         # Add cross-domain context note from the integrator (if available)
