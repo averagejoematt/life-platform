@@ -905,6 +905,28 @@ function wireFirstRun() {
   main.insertBefore(intro, main.firstChild);
 }
 
+/* ── #807: first-visit context for the bare level number ─────────────────────
+   The hub opens with "character level · today" and a bare number — a first-time
+   visitor doesn't know if 12 is good. One muted inline sentence (markup lives in
+   the HTML, hidden by default) shown until dismissed (localStorage); a returning
+   visitor never sees it. Private mode → never shown, mirroring wireFirstRun(). */
+const HINT_KEY = "ajm-level-hint-v1";
+function wireLevelHint() {
+  const hint = document.querySelector("[data-hub-hint]");
+  if (!hint) return;
+  let seen;
+  try { seen = localStorage.getItem(HINT_KEY); } catch (e) { seen = "1"; } // private mode → don't nag
+  if (seen) return;
+  hint.hidden = false;
+  const x = hint.querySelector(".hub-hint-x");
+  if (x) {
+    x.addEventListener("click", () => {
+      try { localStorage.setItem(HINT_KEY, "1"); } catch (e) {}
+      hint.hidden = true;
+    });
+  }
+}
+
 /* ── load + orchestrate ──────────────────────────────────────────────────── */
 async function load(dateStr) {
   const main = $("#cockpit");
@@ -1054,6 +1076,7 @@ function wireScrub() {
 wireScope();
 initTheme();
 wireFirstRun();
+wireLevelHint();
 wireScrub();
 bind("scopeLabel").textContent = "today";
 const _deepDate = new URLSearchParams(location.search).get("date");

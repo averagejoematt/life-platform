@@ -12,6 +12,21 @@
     "as_of": "2026-07-06",
     "source": "snapshot"
   },
+  "cockpit": {
+    "level": 12,
+    "tier": "Foundation",
+    "as_of": "2026-07-06",
+    "pillars": {
+      "sleep": {"raw_score": 82.9, "tier": "Momentum"},
+      "movement": {"raw_score": 25.8, "tier": "Foundation"},
+      "nutrition": {"raw_score": 1.6, "tier": "Foundation"},
+      "metabolic": {"raw_score": 59.4, "tier": "Foundation"},
+      "mind": {"raw_score": 15.9, "tier": "Foundation"},
+      "relationships": {"raw_score": 50.0, "tier": "Foundation"},
+      "consistency": {"raw_score": 32.5, "tier": "Foundation"}
+    },
+    "source": "snapshot"
+  },
   "chronicle": [
     {
       "date": "2026-06-30",

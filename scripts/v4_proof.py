@@ -27,6 +27,7 @@ Data sources (each with a committed-snapshot fallback so an offline/CI build sti
 bakes last-known-good numbers rather than blanks):
   - scorecard: GET /api/predictions        (overall confirmed/refuted/pending/decided)
   - chronicle: GET /journal/posts.json      (the dated weekly post list)
+  - cockpit:   GET /api/character           (the live level + tier + pillar scores — #788)
   - fallback:  scripts/proof_snapshot.json
 """
 from __future__ import annotations
@@ -91,6 +92,47 @@ def load_scorecard() -> dict:
             "source": "live",
         }
     return _snapshot().get("scorecard", {})
+
+
+# Cockpit pillar → domain grouping — MIRRORS assets/js/cockpit.js (Constitution §6).
+# Body and Mind are averaged rollups; Consistency is a standalone band.
+COCKPIT_BODY = ("movement", "nutrition", "sleep", "metabolic")
+COCKPIT_MIND = ("mind", "relationships")
+PILLAR_LABELS = {
+    "movement": "Movement",
+    "nutrition": "Nutrition",
+    "sleep": "Sleep",
+    "metabolic": "Metabolic",
+    "mind": "Mind",
+    "relationships": "Relationships",
+    "consistency": "Consistency",
+}
+
+
+def load_character() -> dict:
+    """Today's character level + pillar scores from the live API, else the snapshot.
+
+    /api/character returns {character:{level,tier,as_of_date,...}, pillars:[{name,
+    raw_score,tier}]} — the SAME body the cockpit's own JS renders (via /api/snapshot).
+    We keep only what that view shows; nothing is fabricated (ADR-104).
+    """
+    d = _fetch_json("/api/character")
+    char = d.get("character") if isinstance(d, dict) else None
+    if isinstance(char, dict) and char.get("level") is not None:
+        pillars = {}
+        for p in d.get("pillars", []) or []:
+            name = p.get("name")
+            score = p.get("raw_score")
+            if name and isinstance(score, (int, float)):
+                pillars[name] = {"raw_score": float(score), "tier": p.get("tier", "")}
+        return {
+            "level": _js_round(float(char["level"])),
+            "tier": char.get("tier", ""),
+            "as_of": char.get("as_of_date", "") or _today(),
+            "pillars": pillars,
+            "source": "live",
+        }
+    return _snapshot().get("cockpit", {})
 
 
 def load_chronicle() -> list:
@@ -170,3 +212,74 @@ def chronicle_list_html(posts: list, limit: int = 20) -> str:
         f'<ul>{"".join(rows)}</ul>'
         "</section></noscript>"
     )
+
+
+def _js_round(x) -> int:
+    """Math.round semantics (half-up) for non-negative scores — Python's round()
+    is banker's (round(32.5)=32) and would drift from what cockpit.js renders."""
+    return int(float(x) + 0.5)
+
+
+def _rollup(pillars: dict, keys: tuple):
+    """Average the raw pillar scores for a domain — the same rollup cockpit.js does."""
+    vals = [pillars[k]["raw_score"] for k in keys if k in pillars and isinstance(pillars[k].get("raw_score"), (int, float))]
+    if not vals:
+        return None
+    return _js_round(sum(vals) / len(vals))
+
+
+def cockpit_block_html(ch: dict) -> str:
+    """The cockpit's static proof (#788): the character level + tier, the Body/Mind
+    rollups, each pillar score, and the honest "as of" stamp — baked into /now/'s
+    served HTML as <noscript>, the same #729/#730 treatment the scorecard and
+    chronicle got.
+
+    Only values the page's own JS view renders (from /api/character — the same body
+    /api/snapshot carries) are baked; a missing pillar is omitted, never a
+    fabricated 0 (ADR-104/105). No data at all -> "" and the shell ships unchanged.
+    """
+    if not ch or ch.get("level") is None:
+        return ""
+    level = int(ch["level"])
+    tier = ch.get("tier", "")
+    as_of = ch.get("as_of", "")
+    pillars = ch.get("pillars", {}) or {}
+
+    head = f"Character level {level}"
+    if tier:
+        head += f" · {_esc(tier)}"
+    lines = [
+        '<noscript><section class="proof-static dx-prose" aria-label="Cockpit summary">',
+        f'<p class="label">The cockpit — one life, measured live · as of {_esc(as_of)}</p>',
+        f"<p><strong>{head}</strong> — a 1–100 score of the whole day: seven pillars, each from real data, rolled into one.</p>",
+    ]
+
+    body_roll = _rollup(pillars, COCKPIT_BODY)
+    mind_roll = _rollup(pillars, COCKPIT_MIND)
+    consistency = pillars.get("consistency", {}).get("raw_score")
+    rolls = []
+    if body_roll is not None:
+        rolls.append(f"Body {body_roll}")
+    if mind_roll is not None:
+        rolls.append(f"Mind {mind_roll}")
+    if isinstance(consistency, (int, float)):
+        rolls.append(f"Consistency {_js_round(consistency)}")
+    if rolls:
+        lines.append(f'<p>{" · ".join(rolls)}</p>')
+
+    rows = []
+    for key in (*COCKPIT_BODY, *COCKPIT_MIND):
+        p = pillars.get(key)
+        if not p or not isinstance(p.get("raw_score"), (int, float)):
+            continue  # honest absence — the pillar row is omitted, never a fake 0
+        tier_txt = f" · {_esc(p['tier'])}" if p.get("tier") else ""
+        rows.append(f"<li>{_esc(PILLAR_LABELS.get(key, key))} {_js_round(p['raw_score'])}{tier_txt}</li>")
+    if rows:
+        lines.append(f'<ul>{"".join(rows)}</ul>')
+
+    lines.append(
+        "<p>The live view (today's board read, trends, time travel) needs JavaScript. "
+        'What a level means: <a href="/method/character/">the method</a>.</p>'
+    )
+    lines.append("</section></noscript>")
+    return "".join(lines)

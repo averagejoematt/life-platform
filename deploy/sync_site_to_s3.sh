@@ -60,6 +60,10 @@ if [ "${1:-}" != "--dry-run" ]; then
   # see the posts. Best-effort; keeps the existing sitemap if the live posts feed is
   # unreachable. Was NOT wired in before, so the sitemap silently drifted post-less.
   python3 "$(dirname "$0")/../scripts/v4_build_sitemap.py" || echo "  ⚠️  sitemap build skipped (offline?) — keeping existing site/sitemap.xml"
+  # #788: bake the cockpit's static proof (character level + pillars + as-of stamp)
+  # into /now/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
+  # effort; keeps the last baked block if the live API is unreachable.
+  python3 "$(dirname "$0")/../scripts/v4_build_cockpit_proof.py" || echo "  ⚠️  cockpit proof skipped (offline?) — keeping existing baked block"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
