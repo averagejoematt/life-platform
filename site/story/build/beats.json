@@ -488,6 +488,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/843"
         }
       ]
+    },
+    {
+      "id": "2026-07-07-twelve-issue-paydown",
+      "date": "2026-07-07",
+      "title": "The flagship page stops shipping blank, and the monitoring bill meets its match",
+      "shipped": "Twelve backlog issues closed in one parallel sweep. The cockpit — the site's front door — now serves real numbers (character level, all seven pillar scores, an as-of date) even with JavaScript off, so link previews and crawlers finally see the instrument instead of shimmer placeholders. The home page gained a plain-language 'Is he okay this week?' read for family, computed from data already on the page. And 55 CloudWatch alarms were retired or reconciled against code — the live count now matches the codebase exactly, worth about $5.60/month back under the hard budget ceiling.",
+      "gotcha": "The cost audit that recommended keeping 48 per-lambda alarms did so because those lambdas 'had no dead-letter queue.' Live inspection showed every one already had the DLQ — the audit had counted a stale snapshot. The alarms were pure duplicate coverage; the receipts to prove it took longer than the deletion.",
+      "honest_miss": "The one security item that matters most — rotating the MCP endpoint URL that's committed in the public repo's history — still isn't done, because it breaks the AI connector until a human pastes the new URL in. It waits, again, for a laptop window.",
+      "prs": [
+        {
+          "label": "PR #855",
+          "url": "https://github.com/averagejoematt/life-platform/pull/855"
+        },
+        {
+          "label": "PR #850",
+          "url": "https://github.com/averagejoematt/life-platform/pull/850"
+        },
+        {
+          "label": "PR #853",
+          "url": "https://github.com/averagejoematt/life-platform/pull/853"
+        },
+        {
+          "label": "PR #856",
+          "url": "https://github.com/averagejoematt/life-platform/pull/856"
+        }
+      ]
     }
   ]
 }
