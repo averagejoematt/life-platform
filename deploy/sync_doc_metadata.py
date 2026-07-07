@@ -515,7 +515,7 @@ PLATFORM_FACTS = {
     "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
     "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
-    "alarm_count": 113,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count)
+    "alarm_count": 65,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (48 ingestion-error-* retired → DLQ digest, ADR-116)
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 8,
     "iam_roles": 43,

@@ -107,7 +107,7 @@ PLATFORM_STATS = {
     "mcp_tools": 143,
     "lambdas": 93,
     "cdk_stacks": 8,
-    "alarms": 113,
+    "alarms": 65,
     "adrs": 117,
     "monthly_cost": "~$60",  # real steady-state (~$29 AI + CloudWatch/Secrets/CE); the old
     # "$19" was stale and read as less than AI-alone MTD ($24) on the inference page — a visible

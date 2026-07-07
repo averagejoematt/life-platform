@@ -58,9 +58,17 @@ class ComputeStack(Stack):
         # code asset is the staged full-tree bundle (deploy/build_bundle.py), so
         # shared modules ship inside the bundle itself.
 
-        # ADR-050: every compute Lambda's error alarm routes to the digest topic.
-        # Compute Lambdas are background pre-computation; transient errors recover
-        # on the next scheduled run.
+        # COST-01 (#790, ADR-116 executed 2026-07-07): the ~32 per-Lambda
+        # `ingestion-error-*` first-error alarms on compute Lambdas are RETIRED
+        # (error_alarm=False). Every compute Lambda already routes terminal async
+        # failures to the shared `life-platform-ingestion-dlq` (dlq=local_dlq below,
+        # verified in synth: 32/32 have a DeadLetterConfig + per-role sqs:SendMessage),
+        # which is alarmed by `life-platform-ingestion-dlq-messages` (monitoring) +
+        # `life-platform-dlq-depth-warning` (operational) and covered by the DLQ
+        # digest. That per-N → digest consolidation preserves the terminal-failure
+        # signal while shrinking the fixed CloudWatch floor (~$3.20/mo, 32 × $0.10).
+        # The only failure mode it drops is a single transient throw that self-heals
+        # on retry — explicitly the noise class this change targets. See ADR-116 §5.
         shared = dict(
             table=local_table,
             bucket=local_bucket,
@@ -68,6 +76,7 @@ class ComputeStack(Stack):
             alerts_topic=local_alerts_topic,
             digest_topic=local_digest_topic,
             digest=True,
+            error_alarm=False,
         )
 
         # ══════════════════════════════════════════════════════════════
