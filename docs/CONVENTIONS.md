@@ -150,6 +150,7 @@ validates the *deploy contract*, not product/data correctness or AI narrative qu
 | `test_cdk_s3_paths.py` | CDK S3 path correctness |
 | `test_ddb_patterns.py` | DynamoDB single-table access-pattern rules |
 | `test_lambda_handlers.py` | handler existence / syntax / signature (I1–I6) |
+| `test_lambda_map_imports.py` | mapped handlers' imports resolve inside the real build_bundle.py bundle; `cdk_only` annotations correlate with a genuine sibling dependency (I7–I8, #799) |
 | `test_ai_output_faithfulness.py` | deterministic AI-output honesty gate (anti-fabrication / er03_gate wiring) |
 
 **Deliberately excluded** (still run in the full suite, still red main, must **not** gate
