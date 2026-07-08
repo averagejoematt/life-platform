@@ -42,7 +42,7 @@ def _d2f(obj):
 # ── Tool: log_sick_day ────────────────────────────────────────────────────────
 
 
-def tool_log_sick_day(args):
+def _log_sick_day(args):
     """Flag one or more dates as sick/rest days."""
     date_arg = args.get("date")
     dates_arg = args.get("dates")
@@ -92,7 +92,7 @@ def tool_log_sick_day(args):
 # ── Tool: get_sick_days ───────────────────────────────────────────────────────
 
 
-def tool_get_sick_days(args):
+def _get_sick_days(args):
     """List sick/rest days within a date range."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     end_date = args.get("end_date") or today
@@ -131,7 +131,7 @@ def tool_get_sick_days(args):
 # ── Tool: clear_sick_day ──────────────────────────────────────────────────────
 
 
-def tool_clear_sick_day(args):
+def _clear_sick_day(args):
     """Remove a sick day flag (use if logged in error)."""
     date = args.get("date")
     if not date:
@@ -166,9 +166,9 @@ def tool_clear_sick_day(args):
 def tool_manage_sick_days(args):
     """Unified sick day management dispatcher."""
     VALID_ACTIONS = {
-        "list": tool_get_sick_days,
-        "log": tool_log_sick_day,
-        "clear": tool_clear_sick_day,
+        "list": _get_sick_days,
+        "log": _log_sick_day,
+        "clear": _clear_sick_day,
     }
     action = (args.get("action") or "list").lower().strip()
     if action not in VALID_ACTIONS:

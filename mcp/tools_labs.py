@@ -30,63 +30,15 @@ _GENOME_PRIVACY_NOTICE = (
     "private MCP use and Matthew's personal reference only."
 )
 
-import json
-import logging
-import math
-import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from mcp.config import (
-    EXPERIMENTS_PK,
-    FIELD_ALIASES,
-    INSIGHTS_PK,
-    P40_GROUPS,
-    S3_BUCKET,
-    SOURCES,
-    TRAVEL_PK,
-    USER_ID,
-    USER_PREFIX,
-    logger,
-    s3_client,
-    table,
-)
-from mcp.core import (
-    date_diff_days,
-    ddb_cache_get,
-    ddb_cache_set,
-    decimal_to_float,
-    get_profile,
-    get_sot,
-    mem_cache_get,
-    mem_cache_set,
-    parallel_query_sources,
-    query_source,
-    query_source_range,
-    resolve_field,
-)
-from mcp.helpers import (
-    _habit_series,
-    _linear_regression,
-    aggregate_items,
-    classify_day_type,
-    compute_daily_load_score,
-    compute_ewa,
-    flatten_strava_activity,
-    pearson_r,
-    query_chronicling,
-)
-from mcp.labs_helpers import (
-    _GENOME_LAB_XREF,
-    _genome_context_for_biomarkers,
-    _get_genome_cached,
-    _query_all_lab_draws,
-    _query_dexa_scans,
-    _query_lab_meta,
-)
+from mcp.config import logger, table
+from mcp.helpers import _linear_regression
+from mcp.labs_helpers import _genome_context_for_biomarkers, _query_all_lab_draws
 
 
-def tool_get_lab_results(args):
+def _get_lab_results(args):
     """Single draw detail with genome annotations, or summary of all draws."""
     draw_date = args.get("draw_date")
     category = args.get("category")
@@ -136,7 +88,7 @@ def tool_get_lab_results(args):
     }
 
 
-def tool_get_lab_trends(args):
+def _get_lab_trends(args):
     """Biomarker trajectory across all draws with slope, projection, derived ratios."""
     biomarkers_req = args.get("biomarkers", [])
     single = args.get("biomarker")
@@ -232,7 +184,7 @@ def tool_get_lab_trends(args):
     return result
 
 
-def tool_get_out_of_range_history(args):
+def _get_out_of_range_history(args):
     """Every flagged biomarker across all draws with persistence and genome drivers."""
     draws = _query_all_lab_draws()
     if not draws:
@@ -291,161 +243,12 @@ def tool_get_out_of_range_history(args):
     }
 
 
-def tool_search_biomarker(args):
-    """Free-text search for a biomarker across all draws."""
-    query = args.get("query", "").lower().strip()
-    if not query:
-        return {"error": "Provide a search query (e.g. 'ldl', 'cholesterol', 'thyroid')."}
-
-    draws = _query_all_lab_draws()
-    if not draws:
-        return {"error": "No lab draws found"}
-
-    matches = defaultdict(list)
-    for d in draws:
-        date = d.get("draw_date", "")
-        bms = d.get("biomarkers", {})
-        for key, bm_data in bms.items():
-            cat = bm_data.get("category", "")
-            if query in key.lower() or query in cat.lower():
-                val = bm_data.get("value_numeric") or bm_data.get("value")
-                matches[key].append(
-                    {
-                        "date": date,
-                        "value": val,
-                        "flag": bm_data.get("flag", "normal"),
-                        "unit": bm_data.get("unit", ""),
-                        "ref_text": bm_data.get("ref_text", ""),
-                        "category": cat,
-                    }
-                )
-
-    if not matches:
-        all_keys = set()
-        for d in draws:
-            all_keys.update(d.get("biomarkers", {}).keys())
-        return {"error": f"No match for '{query}'", "available_biomarkers": sorted(all_keys)}
-
-    results = []
-    for key, values in sorted(matches.items()):
-        numeric_vals = [v["value"] for v in values if isinstance(v["value"], (int, float))]
-        entry = {
-            "biomarker": key,
-            "category": values[0]["category"],
-            "unit": values[0]["unit"],
-            "data_points": len(values),
-            "values": values,
-        }
-        if len(numeric_vals) >= 2:
-            entry["latest"] = numeric_vals[-1]
-            entry["earliest"] = numeric_vals[0]
-            entry["change"] = round(numeric_vals[-1] - numeric_vals[0], 2)
-            entry["direction"] = "rising" if entry["change"] > 0.5 else ("falling" if entry["change"] < -0.5 else "stable")
-        results.append(entry)
-
-    genome_ctx = _genome_context_for_biomarkers([r["biomarker"] for r in results])
-    return {"query": query, "matches": len(results), "results": results, "genome_context": genome_ctx if genome_ctx else None}
-
-
-def tool_get_genome_insights(args):
-    """Query genome SNPs by category/risk/gene with optional cross-reference."""
-    category = args.get("category")
-    risk_level = args.get("risk_level")
-    gene = args.get("gene")
-    cross_ref = args.get("cross_reference")
-
-    all_snps = _get_genome_cached()
-    if not all_snps:
-        return {"error": "No genome data found."}
-
-    filtered = [s for s in all_snps if s.get("sk", "").startswith("GENE#")]
-    if category:
-        filtered = [s for s in filtered if s.get("category") == category]
-    if risk_level:
-        filtered = [s for s in filtered if s.get("risk_level") == risk_level]
-    if gene:
-        g = gene.upper()
-        filtered = [s for s in filtered if s.get("gene", "").upper() == g]
-
-    snps_out = []
-    for s in filtered:
-        entry = {
-            "gene": s.get("gene"),
-            "rsid": s.get("rsid"),
-            "genotype": s.get("genotype"),
-            "category": s.get("category"),
-            "risk_level": s.get("risk_level"),
-            "summary": s.get("summary"),
-        }
-        if s.get("actionable_recs"):
-            entry["actionable_recs"] = s["actionable_recs"]
-        if s.get("related_biomarkers"):
-            entry["related_biomarkers"] = s["related_biomarkers"]
-        snps_out.append(entry)
-
-    result = {
-        "total_snps": len(snps_out),
-        "filters_applied": {k: v for k, v in {"category": category, "risk_level": risk_level, "gene": gene}.items() if v},
-        "snps": snps_out,
-    }
-
-    if cross_ref == "labs" and snps_out:
-        draws = _query_all_lab_draws()
-        if draws:
-            latest = draws[-1]
-            bms = latest.get("biomarkers", {})
-            snp_genes = set(s["gene"] for s in snps_out)
-            lab_links = {}
-            for bm_key, gene_list in _GENOME_LAB_XREF.items():
-                if any(g in snp_genes for g in gene_list) and bm_key in bms:
-                    val = bms[bm_key].get("value_numeric") or bms[bm_key].get("value")
-                    lab_links[bm_key] = {
-                        "latest_value": val,
-                        "latest_date": latest.get("draw_date"),
-                        "flag": bms[bm_key].get("flag"),
-                        "unit": bms[bm_key].get("unit"),
-                    }
-            if lab_links:
-                result["lab_cross_reference"] = lab_links
-
-    if cross_ref == "nutrition" and snps_out:
-        from datetime import datetime as _dt, timedelta as _td
-
-        today = _dt.now().strftime("%Y-%m-%d")
-        week_ago = (_dt.now() - _td(days=7)).strftime("%Y-%m-%d")
-        try:
-            mf = query_source("macrofactor", week_ago, today)
-            if mf:
-                result["nutrition_cross_reference"] = {
-                    "period": f"{week_ago} to {today}",
-                    "days": len(mf),
-                    "avg_calories": round(sum(d.get("total_calories_kcal", 0) for d in mf) / len(mf)),
-                    "avg_protein_g": round(sum(d.get("total_protein_g", 0) for d in mf) / len(mf), 1),
-                    "avg_fat_g": round(sum(d.get("total_fat_g", 0) for d in mf) / len(mf), 1),
-                    "avg_omega3_g": round(sum(d.get("total_omega3_g", 0) for d in mf) / len(mf), 2),
-                }
-        except Exception as e:
-            logger.warning(f"Nutrition cross-ref failed: {e}")
-
-    if not category and not risk_level and not gene:
-        cats, risks = defaultdict(int), defaultdict(int)
-        for s in snps_out:
-            cats[s.get("category", "unknown")] += 1
-            risks[s.get("risk_level", "unknown")] += 1
-        result["category_breakdown"] = dict(sorted(cats.items()))
-        result["risk_breakdown"] = dict(sorted(risks.items()))
-        result["available_categories"] = sorted(cats.keys())
-
-    result["_privacy"] = _GENOME_PRIVACY_NOTICE
-    return result
-
-
 def tool_get_labs(args):
     """Unified lab intelligence dispatcher."""
     VALID_VIEWS = {
-        "results": tool_get_lab_results,
-        "trends": tool_get_lab_trends,
-        "out_of_range": tool_get_out_of_range_history,
+        "results": _get_lab_results,
+        "trends": _get_lab_trends,
+        "out_of_range": _get_out_of_range_history,
     }
     view = (args.get("view") or "results").lower().strip()
     if view not in VALID_VIEWS:
@@ -639,146 +442,6 @@ def _build_cadence_trackers():
     return out
 
 
-def tool_get_lab_deltas(args):
-    """Cross-draw biomarker movement query.
-
-    Args:
-        comparison: "year_over_year" (default) | "since_first" | "latest_two"
-        threshold: float, minimum |ratio−1| to include (default 0.5 = ±50% movement)
-        direction: "any" (default) | "rising" | "falling"
-        panel: optional panel filter (e.g. "lipid_standard")
-        limit: max number of deltas in response (default 50)
-    """
-    comparison = (args.get("comparison") or "year_over_year").lower().strip()
-    threshold = float(args.get("threshold", 0.5))
-    direction = (args.get("direction") or "any").lower().strip()
-    panel_filter = args.get("panel")
-    limit = int(args.get("limit", 50))
-
-    draws = _query_all_lab_draws()
-    if len(draws) < 2:
-        return {"error": "Need at least 2 draws to compute deltas", "total_draws": len(draws)}
-
-    latest = draws[-1]
-    latest_date_str = latest.get("draw_date")
-    latest_date = datetime.strptime(latest_date_str, "%Y-%m-%d").date()
-
-    if comparison == "since_first":
-        baseline = draws[0]
-    elif comparison == "latest_two":
-        baseline = draws[-2]
-    elif comparison == "year_over_year":
-        # Find the draw closest to (latest - 365 days)
-        target = latest_date - timedelta(days=365)
-        baseline = min(draws[:-1], key=lambda d: abs((datetime.strptime(d.get("draw_date"), "%Y-%m-%d").date() - target).days))
-    else:
-        return {"error": f"Unknown comparison '{comparison}'.", "valid_comparisons": ["year_over_year", "since_first", "latest_two"]}
-
-    baseline_date = baseline.get("draw_date")
-    latest_bms = latest.get("biomarkers", {})
-    baseline_bms = baseline.get("biomarkers", {})
-
-    deltas = []
-    new_biomarkers = []  # in latest but not baseline
-
-    for key, bm in latest_bms.items():
-        if panel_filter and bm.get("panel") != panel_filter:
-            continue
-        # Allergy panel uses ordinal class; exclude from numeric deltas (use get_allergies)
-        if key.startswith("allergy_") and key != "allergy_total_ige":
-            continue
-
-        # Galleri/qualitative: skip if not numeric
-        v_to_raw = bm.get("value_numeric")
-        if v_to_raw is None:
-            continue
-        try:
-            v_to = float(v_to_raw)
-        except (TypeError, ValueError):
-            continue
-
-        if key not in baseline_bms:
-            new_biomarkers.append(
-                {
-                    "biomarker": key,
-                    "to": v_to,
-                    "unit": bm.get("unit", ""),
-                    "panel": bm.get("panel", ""),
-                    "category": bm.get("category", ""),
-                    "out_of_range": bm.get("flag") in ("high", "low"),
-                }
-            )
-            continue
-
-        v_from_raw = baseline_bms[key].get("value_numeric")
-        if v_from_raw is None:
-            continue
-        try:
-            v_from = float(v_from_raw)
-        except (TypeError, ValueError):
-            continue
-        if v_from == 0:
-            continue  # ratio undefined
-
-        ratio = v_to / v_from
-        pct_change = (ratio - 1) * 100
-        movement = abs(ratio - 1)
-        if movement < threshold:
-            continue
-
-        d_dir = "rising" if v_to > v_from else "falling"
-        if direction != "any" and direction != d_dir:
-            continue
-
-        deltas.append(
-            {
-                "biomarker": key,
-                "from": round(v_from, 4),
-                "to": round(v_to, 4),
-                "ratio": round(ratio, 3),
-                "pct_change": round(pct_change, 1),
-                "unit": bm.get("unit", ""),
-                "direction": d_dir,
-                "panel": bm.get("panel", ""),
-                "category": bm.get("category", ""),
-                "out_of_range": bm.get("flag") in ("high", "low"),
-            }
-        )
-
-    # Sort by absolute pct_change descending — biggest movers first
-    deltas.sort(key=lambda x: abs(x["pct_change"]), reverse=True)
-    deltas = deltas[:limit]
-
-    rising = sum(1 for d in deltas if d["direction"] == "rising")
-    falling = sum(1 for d in deltas if d["direction"] == "falling")
-    total_compared = sum(
-        1
-        for k, bm in latest_bms.items()
-        if k in baseline_bms
-        and bm.get("value_numeric") is not None
-        and baseline_bms[k].get("value_numeric") is not None
-        and not (k.startswith("allergy_") and k != "allergy_total_ige")
-    )
-
-    return {
-        "comparison": comparison,
-        "threshold": threshold,
-        "direction_filter": direction,
-        "panel_filter": panel_filter,
-        "from_draw": baseline_date,
-        "to_draw": latest_date_str,
-        "deltas": deltas,
-        "new_biomarkers": new_biomarkers,
-        "summary": {
-            "total_biomarkers_compared": total_compared,
-            "moved_above_threshold": len(deltas),
-            "rising": rising,
-            "falling": falling,
-            "new_in_latest": len(new_biomarkers),
-        },
-    }
-
-
 # ── DI-2b parity: interior-gap detection (B3) ──
 # The staleness check below only sees the newest DATE# per source (the high-water
 # mark), so a hole *behind* it — a daily source going dead mid-window then resuming
@@ -826,7 +489,6 @@ def tool_get_freshness_status(args):
     Args (all optional):
         sources: list[str] — restrict to these source keys; default = all 11
     """
-    from datetime import date as _date
 
     # #392: derive from the canonical registry (shared layer) instead of a third
     # hand-rolled mirror — this one had drifted worst (food_delivery still 90d,
@@ -1025,111 +687,4 @@ def tool_get_freshness_status(args):
             "Mirrors freshness_checker_lambda.py."
         ),
         "context": ("Status tiers: green (all fresh) / yellow (1 stale <7d) / " "orange (mixed) / red (3+ stale OR any >14d)."),
-    }
-
-
-def tool_get_allergies(args):
-    """Allergy panel surface — ordinal IgE class semantics, grouped by category.
-
-    Args:
-        draw_date: optional YYYY-MM-DD. Default = latest draw with allergy data.
-        min_class: int 0–6 (default 1). Filter out below this class.
-        category: optional str. "dust_mite" | "environmental_pollen" | "dander" |
-                  "mold" | "other" | None=all.
-    """
-    draw_date = args.get("draw_date")
-    min_class = int(args.get("min_class", 1))
-    category_filter = args.get("category")
-
-    draws = _query_all_lab_draws()
-    if not draws:
-        return {"error": "No lab draws found"}
-
-    # Latest draw with allergy data
-    if draw_date:
-        target = next((d for d in draws if d.get("draw_date") == draw_date), None)
-        if not target:
-            return {"error": f"No draw for {draw_date}", "available_dates": [d.get("draw_date") for d in draws]}
-    else:
-        target = None
-        for d in reversed(draws):
-            if any(k.startswith("allergy_") for k in d.get("biomarkers", {})):
-                target = d
-                break
-        if not target:
-            return {
-                "error": "No draw with allergy panel data found",
-                "hint": "Function Health 2026 (2026-04-03) was the first draw with the allergy panel.",
-            }
-
-    bms = target.get("biomarkers", {})
-    sensitizations = []
-    total_ige_obj = None
-
-    for key, bm in bms.items():
-        if not key.startswith("allergy_"):
-            continue
-        if key == "allergy_total_ige":
-            v = bm.get("value_numeric")
-            ref = bm.get("ref_text", "")
-            ref_max = None
-            try:
-                ref_max = float(ref.replace("<", "").strip()) if ref else None
-            except ValueError:
-                pass
-            x_above = round(float(v) / ref_max, 2) if (v and ref_max and ref_max > 0) else None
-            total_ige_obj = {
-                "value": v,
-                "unit": bm.get("unit", "kU/L"),
-                "ref_max": ref_max,
-                "x_above_max": x_above,
-                "flag": bm.get("flag"),
-            }
-            continue
-
-        v = bm.get("value_numeric")
-        cls = _ige_class(v)
-        if cls is None or cls < min_class:
-            continue
-
-        allergen_name, cat = _allergen_meta(key)
-        if category_filter and cat != category_filter:
-            continue
-
-        sensitizations.append(
-            {
-                "allergen": allergen_name,
-                "ige_kU_L": v,
-                "class": cls,
-                "class_label": _IGE_CLASS_LABELS.get(cls, ""),
-                "category": cat,
-            }
-        )
-
-    # Sort: highest class first, then by IgE value desc
-    sensitizations.sort(key=lambda x: (-(x["class"] or 0), -(x["ige_kU_L"] or 0)))
-
-    high_class = sum(1 for s in sensitizations if s["class"] >= 3)
-    moderate_class = sum(1 for s in sensitizations if s["class"] == 2)
-    low_class = sum(1 for s in sensitizations if s["class"] == 1)
-    cats_present = sorted(set(s["category"] for s in sensitizations))
-
-    return {
-        "draw_date": target.get("draw_date"),
-        "total_ige": total_ige_obj,
-        "min_class_filter": min_class,
-        "category_filter": category_filter,
-        "sensitizations": sensitizations,
-        "summary": {
-            "total_sensitizations": len(sensitizations),
-            "high_class_count": high_class,  # class >= 3
-            "moderate_class_count": moderate_class,
-            "low_class_count": low_class,
-            "categories_present": cats_present,
-        },
-        "context": (
-            "Allergy results surface for completeness but are not actionable in the "
-            "platform's optimization loop (per the Technical Board consult, 2026-05-02). "
-            "IgE class is ordinal: 0 = no detectable, 6 = maximum. ImmunoCAP scale."
-        ),
     }

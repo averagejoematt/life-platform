@@ -1,8 +1,8 @@
 """#735 — /verify/ page: GET /api/device_agreement (Whoop vs Garmin cross-device
 agreement on HRV + RHR — the "two devices disagreeing slightly" credibility signal).
 
-Pins: agree/minor/flag thresholds match the private mcp/tools_habits.py
-tool_get_device_agreement exactly (RHR <=3/6bpm, HRV <=10/20ms), workout sub-items
+Pins: agree/minor/flag thresholds (RHR <=3/6bpm, HRV <=10/20ms — inherited from
+the former mcp tool_get_device_agreement, pruned by #395), workout sub-items
 never corrupt the day-summary comparison (no resting_heart_rate field), an empty
 overlap returns a shaped "unavailable" 200 (ADR-104 honest-gaps semantics, never a
 500 or a silently-empty table), and a live Garmin pause is surfaced honestly.

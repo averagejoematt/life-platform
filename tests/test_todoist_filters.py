@@ -5,9 +5,7 @@ Locks the three fixes:
   1. Ingestion `get_filtered_tasks` hits the server-side filter endpoint
      (/tasks/filter?query=...), NOT /tasks?filter=... which the v1 API ignores.
   2. Ingestion `get_active_tasks` follows next_cursor (paginates past 200).
-  3. MCP `_list_all_tasks` routes a filter to /tasks/filter?query=..., and the
-     unfiltered call still uses /tasks.
-  4. The decision-fatigue detector measures pressing load (overdue + due_today),
+  3. The decision-fatigue detector measures pressing load (overdue + due_today),
      not active + overdue — so a large active backlog no longer inflates the signal.
 """
 
@@ -92,28 +90,6 @@ def test_get_active_tasks_paginates_past_page_cap(monkeypatch):
 
 
 # ── 3: MCP tool routing ─────────────────────────────────────────────────────────
-
-
-def test_mcp_list_all_tasks_routes_filter_to_filter_endpoint(monkeypatch):
-    import mcp.tools_todoist as tt
-
-    calls = []
-
-    def fake_request(method, path, payload=None):
-        calls.append(path)
-        return {"results": [{"id": "1"}], "next_cursor": None}
-
-    monkeypatch.setattr(tt, "_todoist_request", fake_request)
-
-    tt._list_all_tasks("today")
-    assert calls[0].startswith("/tasks/filter?"), "filter query must hit /tasks/filter"
-    assert "query=today" in calls[0]
-    assert "filter=today" not in calls[0]
-
-    calls.clear()
-    tt._list_all_tasks()  # unfiltered
-    assert calls[0].startswith("/tasks?"), "unfiltered list still uses /tasks"
-    assert "query=" not in calls[0] and "filter=" not in calls[0]
 
 
 # ── 4: decision-fatigue measures pressing load, not the backlog ─────────────────

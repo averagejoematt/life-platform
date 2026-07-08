@@ -2,53 +2,11 @@
 Nutrition tools: micronutrients, meal timing, macros, food log.
 """
 
-import json
-import logging
 import math
-import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
-from mcp.config import (
-    EXPERIMENTS_PK,
-    FIELD_ALIASES,
-    INSIGHTS_PK,
-    P40_GROUPS,
-    S3_BUCKET,
-    SOURCES,
-    TRAVEL_PK,
-    USER_ID,
-    USER_PREFIX,
-    logger,
-    s3_client,
-    table,
-)
-from mcp.core import (
-    date_diff_days,
-    ddb_cache_get,
-    ddb_cache_set,
-    decimal_to_float,
-    get_profile,
-    get_sot,
-    mem_cache_get,
-    mem_cache_set,
-    pacific_today,
-    parallel_query_sources,
-    query_source,
-    resolve_field,
-)
-from mcp.helpers import (
-    _habit_series,
-    _linear_regression,
-    aggregate_items,
-    classify_day_type,
-    compute_daily_load_score,
-    compute_ewa,
-    flatten_strava_activity,
-    pearson_r,
-    query_chronicling,
-)
+from mcp.core import get_profile, pacific_today, parallel_query_sources, query_source
 
 
 def _nutrition_through_date():
@@ -106,7 +64,7 @@ _OMEGA_RATIO_TARGET = 4.0  # Attia / Simopoulos: keep O6:O3 < 4:1
 _LEUCINE_MPS_THRESHOLD = 2.5  # g leucine per meal to trigger MPS (Phillips / Attia)
 
 
-def tool_get_micronutrient_report(args):
+def _get_micronutrient_report(args):
     """
     Score ~25 micronutrients against RDA and longevity-optimal targets.
     Flags chronic deficiencies (avg < 60% RDA), near-miss gaps (60-90%), upper-limit exceedances,
@@ -212,7 +170,7 @@ def tool_get_micronutrient_report(args):
     }
 
 
-def tool_get_meal_timing(args):
+def _get_meal_timing(args):
     """
     Eating window analysis: first bite, last bite, window duration, caloric distribution
     across morning/midday/evening/late, circadian consistency (SD of meal times),
@@ -374,104 +332,7 @@ def tool_get_meal_timing(args):
     }
 
 
-def tool_get_nutrition_biometrics_correlation(args):
-    """
-    Pearson correlations between daily nutrition inputs and biometric outcomes across
-    Whoop, Withings, and Eight Sleep. Optional lag tests next-day effects.
-    This is the personalized insight layer — what does YOUR diet actually predict about
-    YOUR recovery, sleep, HRV, and weight?
-    """
-    end_date = args.get("end_date", _nutrition_through_date())
-    start_date = args.get("start_date", (datetime.now(timezone.utc) - timedelta(days=89)).strftime("%Y-%m-%d"))
-    lag_days = int(args.get("lag_days", 1))
-
-    NUTRITION_FIELDS = [
-        ("total_calories_kcal", "Calories (kcal)"),
-        ("total_protein_g", "Protein (g)"),
-        ("total_carbs_g", "Carbs (g)"),
-        ("total_fat_g", "Fat (g)"),
-        ("total_fiber_g", "Fiber (g)"),
-        ("total_omega3_total_g", "Omega-3 (g)"),
-        ("total_sodium_mg", "Sodium (mg)"),
-        ("total_caffeine_mg", "Caffeine (mg)"),
-        ("total_magnesium_mg", "Magnesium (mg)"),
-        ("total_alcohol_g", "Alcohol (g)"),
-    ]
-    BIOMETRIC_FIELDS = [
-        ("whoop", "hrv", "HRV (ms)"),
-        ("whoop", "recovery_score", "Recovery Score"),
-        ("whoop", "resting_heart_rate", "Resting HR (bpm)"),
-        ("whoop", "sleep_performance_pct", "Sleep Performance (%)"),
-        ("whoop", "strain", "Strain"),
-        ("withings", "weight_lbs", "Weight (lbs)"),
-        ("eightsleep", "sleep_score", "Sleep Score"),
-        ("eightsleep", "efficiency", "Sleep Efficiency (%)"),
-        ("eightsleep", "hrv_avg_ms", "Sleep HRV (ms)"),
-    ]
-
-    mf_items = query_source("macrofactor", start_date, end_date)
-    if len(mf_items) < 14:
-        return {"error": f"Need ≥14 days of MacroFactor data. Found {len(mf_items)}."}
-    mf_by_date = {item["date"]: item for item in mf_items}
-
-    bio_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=lag_days + 1)).strftime("%Y-%m-%d")
-    bio_srcs = list({src for src, _, _ in BIOMETRIC_FIELDS})
-    bio_data = parallel_query_sources(bio_srcs, start_date, bio_end)
-    bio_by_src = {src: {i["date"]: i for i in items} for src, items in bio_data.items()}
-
-    results = []
-    for nf, nf_label in NUTRITION_FIELDS:
-        for bio_src, bf, bf_label in BIOMETRIC_FIELDS:
-            bbd = bio_by_src.get(bio_src, {})
-            pairs = []
-            for ds, mf_item in mf_by_date.items():
-                nv = mf_item.get(nf)
-                if nv is None:
-                    continue
-                bio_date = (datetime.strptime(ds, "%Y-%m-%d") + timedelta(days=lag_days)).strftime("%Y-%m-%d")
-                bi = bbd.get(bio_date)
-                if bi is None:
-                    continue
-                bv = bi.get(bf)
-                if bv is None:
-                    continue
-                pairs.append((float(nv), float(bv)))
-            if len(pairs) < 10:
-                continue
-            xs, ys = zip(*pairs)
-            r = pearson_r(list(xs), list(ys))
-            if r is None or abs(r) < 0.2:
-                continue
-            abs_r = abs(r)
-            results.append(
-                {
-                    "nutrition": nf_label,
-                    "biometric": bf_label,
-                    "r": r,
-                    "abs_r": abs_r,
-                    "strength": "strong" if abs_r >= 0.5 else "moderate" if abs_r >= 0.35 else "weak",
-                    "direction": "positive" if r > 0 else "negative",
-                    "n_days": len(pairs),
-                    "lag_days": lag_days,
-                    "interpretation": f"{'Higher' if r > 0 else 'Lower'} {nf_label} → {'higher' if r > 0 else 'lower'} {bf_label} {'next day' if lag_days == 1 else f'{lag_days}d later' if lag_days > 1 else 'same day'}",
-                }
-            )
-
-    results.sort(key=lambda x: -x["abs_r"])
-    actionable = [r for r in results if r["strength"] in ("strong", "moderate")]
-
-    return {
-        "period": {"start_date": start_date, "end_date": end_date},
-        "methodology": f"Pearson r: nutrition → biometrics shifted +{lag_days} day(s). |r| ≥ 0.5 strong, ≥ 0.35 moderate, ≥ 0.2 weak. Only |r| ≥ 0.2 reported.",
-        "top_findings": results[:15],
-        "actionable_findings": actionable,
-        "total_tested": len(NUTRITION_FIELDS) * len(BIOMETRIC_FIELDS),
-        "significant_pairs": len(results),
-        "all_results": results,
-    }
-
-
-def tool_get_nutrition_summary(args):
+def _get_nutrition_summary(args):
     """
     Daily macro breakdown + rolling averages for any date range.
     Returns per-day rows and period averages for calories, protein, carbs, fat, fiber,
@@ -557,7 +418,7 @@ def tool_get_nutrition_summary(args):
     }
 
 
-def tool_get_macro_targets(args):
+def _get_macro_targets(args):
     """
     Compare actual nutrition vs calorie / protein targets.
     Pulls recent Withings weight to compute TDEE-based calorie target,
@@ -648,68 +509,16 @@ def tool_get_macro_targets(args):
     }
 
 
-def tool_get_food_log(args):
-    """
-    Return individual food entries logged on a specific date.
-    Useful for 'what did I eat yesterday?', 'show me my food diary'.
-    """
-    date_str = args.get("date", (datetime.strptime(pacific_today(), "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d"))
-
-    pk = USER_PREFIX + "macrofactor"
-
-    response = table.get_item(Key={"pk": pk, "sk": f"DATE#{date_str}"})
-    item = response.get("Item")
-
-    if not item:
-        return {"error": f"No MacroFactor data for {date_str}. Check the date or re-export from MacroFactor."}
-
-    # Build clean food log
-    food_log = item.get("food_log", [])
-    clean_log = []
-    for entry in food_log:
-        clean_entry = {
-            "food": entry.get("food_name", "Unknown"),
-            "time": entry.get("time"),
-            "serving": entry.get("serving_size"),
-            "calories": entry.get("calories_kcal"),
-            "protein_g": entry.get("protein_g"),
-            "carbs_g": entry.get("carbs_g"),
-            "fat_g": entry.get("fat_g"),
-            "fiber_g": entry.get("fiber_g"),
-        }
-        clean_entry = {k: float(v) if isinstance(v, Decimal) else v for k, v in clean_entry.items() if v is not None}
-        clean_log.append(clean_entry)
-
-    # Day totals
-    totals = {
-        "calories_kcal": float(item.get("total_calories_kcal") or 0),
-        "protein_g": float(item.get("total_protein_g") or 0),
-        "carbs_g": float(item.get("total_carbs_g") or 0),
-        "fat_g": float(item.get("total_fat_g") or 0),
-        "fiber_g": float(item.get("total_fiber_g") or 0),
-        "sodium_mg": float(item.get("total_sodium_mg") or 0),
-        "caffeine_mg": float(item.get("total_caffeine_mg") or 0),
-        "omega3_total_g": float(item.get("total_omega3_total_g") or 0),
-    }
-
-    return {
-        "date": date_str,
-        "entries_logged": item.get("entries_count", len(food_log)),
-        "daily_totals": totals,
-        "food_log": clean_log,
-    }
-
-
 def tool_get_nutrition(args):
     """
     Unified nutrition intelligence dispatcher. Routes to the appropriate
     underlying function based on the 'view' parameter.
     """
     VALID_VIEWS = {
-        "summary": tool_get_nutrition_summary,
-        "macros": tool_get_macro_targets,
-        "meal_timing": tool_get_meal_timing,
-        "micronutrients": tool_get_micronutrient_report,
+        "summary": _get_nutrition_summary,
+        "macros": _get_macro_targets,
+        "meal_timing": _get_meal_timing,
+        "micronutrients": _get_micronutrient_report,
     }
     view = (args.get("view") or "summary").lower().strip()
     if view not in VALID_VIEWS:
@@ -911,7 +720,7 @@ def tool_get_deficit_sustainability(args):
 # ── IC-29: Metabolic Adaptation Intelligence ─────────────────────────────────
 
 
-def tool_get_metabolic_adaptation(args):
+def _get_metabolic_adaptation(args):
     """
     IC-29: TDEE divergence tracker — detects metabolic adaptation during prolonged deficit.
     Compares expected weight loss (from caloric deficit) against actual weight loss.

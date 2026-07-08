@@ -1,6 +1,6 @@
 """
 tests/test_health_window_guards.py — regression net for the 2026-06-13 date-window
-bugs in get_weight_loss_progress (F3) and get_body_composition_trend (F4).
+bugs in get_weight_loss_progress (F3). (get_body_composition_trend pruned by #395.)
 
 Root cause (both): the effective query window was clamped to journey_start in a
 way that (a) ignored an explicit start_date and (b) when journey_start sat AHEAD
@@ -61,7 +61,7 @@ def patched(monkeypatch):
     return calls
 
 
-@pytest.mark.parametrize("fn", ["tool_get_weight_loss_progress", "tool_get_body_composition_trend"])
+@pytest.mark.parametrize("fn", ["tool_get_weight_loss_progress"])
 def test_future_genesis_no_validation_exception(patched, fn):
     """No dates + future genesis → pre_genesis return, no start>end query."""
     result = getattr(th, fn)({})
@@ -69,7 +69,7 @@ def test_future_genesis_no_validation_exception(patched, fn):
     assert patched == [], f"{fn}: should short-circuit before querying when genesis is in the future"
 
 
-@pytest.mark.parametrize("fn", ["tool_get_weight_loss_progress", "tool_get_body_composition_trend"])
+@pytest.mark.parametrize("fn", ["tool_get_weight_loss_progress"])
 def test_explicit_dates_honored(patched, fn):
     """Explicit start_date must reach query_source verbatim, not be overridden
     by journey_start (the param-override half of the bug)."""

@@ -19,8 +19,7 @@ records are hidden unless include_pilot=True is set on the tool call.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from datetime import date, timedelta
 
 from boto3.dynamodb.conditions import Key
 
@@ -259,97 +258,3 @@ def _latest_per_workout_record(source: str) -> dict:
         return items[0] if items else {}
     except Exception:
         return {}
-
-
-def tool_get_workout_source_status(args: dict) -> dict:
-    """Per-source health + age of the most-recent workout record.
-
-    Surface for the site/admin view to answer "Hevy last synced 3h ago"
-    and "MF auto-pull is down — use the Dropbox fallback."
-    """
-    now = datetime.now(timezone.utc)
-    out: dict[str, Any] = {"as_of": now.isoformat(), "sources": {}}
-    for src in _WORKOUT_SOURCES:
-        rec = _latest_per_workout_record(src)
-        last_date = rec.get("date")
-        last_ingested = rec.get("ingested_at")
-        age_hours = None
-        if last_ingested:
-            try:
-                ts = datetime.fromisoformat(str(last_ingested).replace("Z", "+00:00"))
-                age_hours = round((now - ts).total_seconds() / 3600, 1)
-            except Exception:
-                pass
-        out["sources"][src] = {
-            "last_workout_date": last_date,
-            "last_ingested_at": last_ingested,
-            "age_hours": age_hours,
-            "title": rec.get("title"),
-            "set_count": rec.get("set_count"),
-            "healthy": (age_hours is not None and age_hours < 36),
-        }
-
-    # Legacy bridge: report freshness of the macrofactor_workouts daily-aggregate
-    # partition as macrofactor_export's effective health (the MCP read layer
-    # expands those aggregates per workout — see _expand_legacy_aggregate).
-    try:
-        from mcp.core import _apply_phase_filter
-
-        resp = table.query(
-            **_apply_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq("USER#matthew#SOURCE#macrofactor_workouts") & Key("sk").begins_with("DATE#"),
-                    "ScanIndexForward": False,
-                    "Limit": 1,
-                }
-            )
-        )
-        items = resp.get("Items") or []
-        if items:
-            rec = items[0]
-            last_ingested = rec.get("ingested_at")
-            age_hours = None
-            if last_ingested:
-                try:
-                    ts = datetime.fromisoformat(str(last_ingested).replace("Z", "+00:00"))
-                    age_hours = round((now - ts).total_seconds() / 3600, 1)
-                except Exception:
-                    pass
-            existing = out["sources"].get("macrofactor_export") or {}
-            # Take the more-recent of (per-workout records, legacy aggregates)
-            existing_age = existing.get("age_hours")
-            if existing_age is None or (age_hours is not None and age_hours < existing_age):
-                out["sources"]["macrofactor_export"] = {
-                    "last_workout_date": rec.get("date"),
-                    "last_ingested_at": last_ingested,
-                    "age_hours": age_hours,
-                    "title": "(legacy daily aggregate)",
-                    "set_count": int(rec.get("total_sets") or 0),
-                    "healthy": (age_hours is not None and age_hours < 36),
-                    "_legacy_aggregate": True,
-                }
-    except Exception:
-        pass
-
-    # Hevy backfill state record (high-water mark for the events poller)
-    try:
-        resp = table.get_item(
-            Key={
-                "pk": "USER#system",
-                "sk": "INGESTION_STATE#hevy",
-            }
-        )
-        state = resp.get("Item") or {}
-        out["hevy_backfill"] = {
-            "since_iso": state.get("since_iso"),
-            "updated_at": state.get("updated_at"),
-        }
-    except Exception:
-        pass
-
-    # (Removed 2026-05-25: MF Tier 1 status block — the mf-puller Lambda was
-    # torn down; INGESTION_STATE#macrofactor_api will not be updated again.
-    # See ADR-061 for the attempt + tear-down rationale. MF data flows via
-    # Tier 2 Dropbox export — see dropbox-poll + macrofactor-data-ingestion.)
-
-    return out

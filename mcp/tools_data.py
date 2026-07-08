@@ -3,55 +3,13 @@ Data access tools: sources, latest, daily summary, date range, search, compare.
 """
 
 import bisect
-import json
-import logging
-import math
-import re
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Key
 
-from mcp.config import (
-    EXPERIMENTS_PK,
-    FIELD_ALIASES,
-    INSIGHTS_PK,
-    P40_GROUPS,
-    RAW_DAY_LIMIT,
-    S3_BUCKET,
-    SOURCES,
-    TRAVEL_PK,
-    USER_ID,
-    USER_PREFIX,
-    logger,
-    s3_client,
-    table,
-)
-from mcp.core import (
-    date_diff_days,
-    ddb_cache_get,
-    ddb_cache_set,
-    decimal_to_float,
-    get_profile,
-    get_sot,
-    mem_cache_get,
-    mem_cache_set,
-    parallel_query_sources,
-    query_source,
-    query_source_range,
-    resolve_field,
-)
-from mcp.helpers import (
-    _habit_series,
-    _linear_regression,
-    aggregate_items,
-    classify_day_type,
-    compute_daily_load_score,
-    compute_ewa,
-    flatten_strava_activity,
-    pearson_r,
-    query_chronicling,
-)
+from mcp.config import RAW_DAY_LIMIT, SOURCES, USER_PREFIX, table
+from mcp.core import date_diff_days, decimal_to_float, get_sot, query_source, resolve_field
+from mcp.helpers import aggregate_items, flatten_strava_activity
 
 
 def tool_get_sources(_args):
@@ -80,7 +38,7 @@ def tool_get_sources(_args):
     return result
 
 
-def tool_get_latest(args):
+def _get_latest(args):
     from mcp.core import _apply_phase_filter  # ADR-058
 
     sources = args.get("sources", SOURCES)
@@ -98,7 +56,7 @@ def tool_get_latest(args):
     return result
 
 
-def tool_get_daily_summary(args):
+def _get_daily_summary(args):
     from mcp.core import _apply_phase_filter  # ADR-058
 
     date = args.get("date")
@@ -194,51 +152,6 @@ def tool_find_days(args):
     return matched
 
 
-def tool_get_aggregated_summary(args):
-    source = args.get("source")
-    period = args.get("period", "year")
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-
-    if period not in ("month", "year"):
-        raise ValueError("'period' must be 'month' or 'year'")
-
-    if source and source in SOURCES:
-        default_start = "2010-01-01"
-    else:
-        if period == "year":
-            default_start = (datetime.now(timezone.utc) - timedelta(days=365 * 5)).strftime("%Y-%m-%d")
-        else:
-            default_start = (datetime.now(timezone.utc) - timedelta(days=365 * 2)).strftime("%Y-%m-%d")
-
-    start_date = args.get("start_date", default_start)
-    sources_to_query = [source] if source and source in SOURCES else SOURCES
-
-    cache_key = f"aggregated_summary_{period}_{start_date}_{end_date}_{','.join(sources_to_query)}"
-    cached = ddb_cache_get(cache_key) or mem_cache_get(cache_key)
-    if cached:
-        return cached
-
-    if len(sources_to_query) > 1:
-        source_data = parallel_query_sources(sources_to_query, start_date, end_date, lean=True)
-    else:
-        source_data = {sources_to_query[0]: query_source(sources_to_query[0], start_date, end_date, lean=True)}
-
-    result = {}
-    for src, items in source_data.items():
-        if items:
-            result[src] = aggregate_items(items, period)
-
-    payload = {
-        "period": period,
-        "start_date": start_date,
-        "end_date": end_date,
-        "note": "Pass an explicit start_date to override the default window." if not args.get("start_date") else None,
-        "sources": result,
-    }
-    mem_cache_set(cache_key, payload)
-    return payload
-
-
 def tool_search_activities(args):
     start_date = args.get("start_date", "2010-01-01")
     end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
@@ -310,211 +223,14 @@ def tool_search_activities(args):
     }
 
 
-def tool_get_field_stats(args):
-    source = args.get("source")
-    field = args.get("field")
-    start_date = args.get("start_date", "2010-01-01")
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-
-    if not source or not field:
-        raise ValueError("'source' and 'field' are required")
-    if source not in SOURCES:
-        raise ValueError(f"Unknown source '{source}'. Valid: {SOURCES}")
-
-    items = query_source(source, start_date, end_date)
-    resolved_field = resolve_field(source, field)
-
-    values = []
-    for item in sorted(items, key=lambda x: x.get("date", "")):
-        if "#WORKOUT#" in item.get("sk", ""):
-            continue
-        val = item.get(resolved_field)
-        if val is not None:
-            values.append((round(float(val), 2), item.get("date", "unknown")))
-
-    if not values:
-        return {"source": source, "field": resolved_field, "message": "No data found for this field in the specified range."}
-
-    nums = [v for v, _ in values]
-    max_val = max(nums)
-    min_val = min(nums)
-    avg_val = round(sum(nums) / len(nums), 2)
-
-    sorted_desc = sorted(values, key=lambda x: x[0], reverse=True)
-    sorted_asc = sorted(values, key=lambda x: x[0])
-    top5_high = [{"value": v, "date": d} for v, d in sorted_desc[:5]]
-    top5_low = [{"value": v, "date": d} for v, d in sorted_asc[:5]]
-
-    third = max(1, len(values) // 3)
-    early_avg = round(sum(v for v, _ in values[:third]) / third, 2)
-    late_avg = round(sum(v for v, _ in values[-third:]) / third, 2)
-    delta = round(late_avg - early_avg, 2)
-    if abs(delta) < 0.5:
-        trend = "stable"
-    elif delta > 0:
-        trend = f"increasing (+{delta} from early to recent average)"
-    else:
-        trend = f"decreasing ({delta} from early to recent average)"
-
-    return {
-        "source": source,
-        "field": resolved_field,
-        "start_date": start_date,
-        "end_date": end_date,
-        "count": len(nums),
-        "max": max_val,
-        "max_dates": [d for v, d in values if v == max_val],
-        "min": min_val,
-        "min_dates": [d for v, d in values if v == min_val],
-        "avg": avg_val,
-        "top5_highest": top5_high,
-        "top5_lowest": top5_low,
-        "trend": trend,
-        "early_period_avg": early_avg,
-        "recent_period_avg": late_avg,
-        "storytelling_tip": "Pair with get_aggregated_summary (period=year) for the full arc.",
-    }
-
-
-def tool_compare_periods(args):
-    pa_start = args.get("period_a_start")
-    pa_end = args.get("period_a_end")
-    pb_start = args.get("period_b_start")
-    pb_end = args.get("period_b_end")
-    pa_label = args.get("period_a_label", "Period A")
-    pb_label = args.get("period_b_label", "Period B")
-    source = args.get("source")
-
-    if not all([pa_start, pa_end, pb_start, pb_end]):
-        raise ValueError("period_a_start, period_a_end, period_b_start, period_b_end are all required")
-
-    sources_to_query = [source] if source and source in SOURCES else SOURCES
-    skip_fields = {"pk", "sk", "source", "ingested_at", "date", "activities", "sport_types"}
-
-    result = {
-        "period_a": {"label": pa_label, "start": pa_start, "end": pa_end},
-        "period_b": {"label": pb_label, "start": pb_start, "end": pb_end},
-        "sources": {},
-    }
-
-    for src in sources_to_query:
-        items_a = query_source(src, pa_start, pa_end)
-        items_b = query_source(src, pb_start, pb_end)
-        if not items_a and not items_b:
-            continue
-
-        def field_avgs(items):
-            buckets = defaultdict(list)
-            for item in items:
-                if "#WORKOUT#" in item.get("sk", ""):
-                    continue
-                for k, v in item.items():
-                    if k not in skip_fields and isinstance(v, (int, float)):
-                        buckets[k].append(float(v))
-            return {k: round(sum(v) / len(v), 2) for k, v in buckets.items() if v}
-
-        avgs_a = field_avgs(items_a)
-        avgs_b = field_avgs(items_b)
-        all_fields = sorted(set(avgs_a) | set(avgs_b))
-
-        comparisons = {}
-        for field in all_fields:
-            val_a = avgs_a.get(field)
-            val_b = avgs_b.get(field)
-            row = {pa_label: val_a, pb_label: val_b}
-            if val_a is not None and val_b is not None:
-                delta = round(val_b - val_a, 2)
-                pct = round(100.0 * delta / val_a, 1) if val_a != 0 else None
-                row["delta"] = delta
-                row["pct_change"] = pct
-                row["direction"] = "improved" if delta > 0 else ("declined" if delta < 0 else "unchanged")
-            comparisons[field] = row
-
-        result["sources"][src] = {
-            "days_in_period_a": len(items_a),
-            "days_in_period_b": len(items_b),
-            "fields": comparisons,
-        }
-
-    return result
-
-
-def tool_get_weekly_summary(args):
-    start_date = args.get("start_date", "2000-01-01")
-    end_date = args.get("end_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    sort_by = args.get("sort_by", "total_distance_miles")
-    limit = int(args.get("limit", 52))
-    sort_asc = args.get("sort_ascending", False)
-
-    day_records = query_source(get_sot("cardio"), start_date, end_date)
-
-    weeks = defaultdict(
-        lambda: {
-            "total_distance_miles": 0.0,
-            "total_elevation_gain_feet": 0.0,
-            "total_moving_time_seconds": 0,
-            "activity_count": 0,
-            "days_active": 0,
-            "sport_types": defaultdict(int),
-            "dates": [],
-        }
-    )
-
-    for day in day_records:
-        date_str = day.get("date", "")
-        if not date_str:
-            continue
-        try:
-            dt = datetime.strptime(date_str, "%Y-%m-%d")
-            iso = dt.isocalendar()
-            key = f"{iso[0]}-W{iso[1]:02d}"
-        except ValueError:
-            continue
-
-        w = weeks[key]
-        w["total_distance_miles"] += float(day.get("total_distance_miles") or 0)
-        w["total_elevation_gain_feet"] += float(day.get("total_elevation_gain_feet") or 0)
-        w["total_moving_time_seconds"] += int(day.get("total_moving_time_seconds") or 0)
-        w["activity_count"] += int(day.get("activity_count") or 0)
-        w["days_active"] += 1
-        w["dates"].append(date_str)
-        for st in day.get("sport_types") or []:
-            if st:
-                w["sport_types"][st] += 1
-
-    rows = []
-    for week_key, w in weeks.items():
-        rows.append(
-            {
-                "week": week_key,
-                "week_start": min(w["dates"]) if w["dates"] else "",
-                "week_end": max(w["dates"]) if w["dates"] else "",
-                "total_distance_miles": round(w["total_distance_miles"], 2),
-                "total_elevation_gain_feet": round(w["total_elevation_gain_feet"], 1),
-                "total_moving_time_seconds": w["total_moving_time_seconds"],
-                "activity_count": w["activity_count"],
-                "days_active": w["days_active"],
-                "sport_types": dict(w["sport_types"]),
-            }
-        )
-
-    rows.sort(key=lambda x: x.get(sort_by, 0), reverse=not sort_asc)
-
-    return {
-        "total_weeks_with_data": len(rows),
-        "sorted_by": sort_by,
-        "weeks": rows[:limit],
-    }
-
-
 def tool_get_daily_snapshot(args):
     """
     Unified daily data dispatcher. Routes to get_daily_summary (specific date)
     or get_latest (most recent records across sources) based on view parameter.
     """
     VALID_VIEWS = {
-        "summary": tool_get_daily_summary,
-        "latest": tool_get_latest,
+        "summary": _get_daily_summary,
+        "latest": _get_latest,
     }
     view = (args.get("view") or "summary").lower().strip()
     if view not in VALID_VIEWS:
@@ -522,26 +238,6 @@ def tool_get_daily_snapshot(args):
             "error": f"Unknown view '{view}'.",
             "valid_views": list(VALID_VIEWS.keys()),
             "hint": "Use 'summary' for all data on a specific date, 'latest' for the most recent record per source.",
-        }
-    return VALID_VIEWS[view](args)
-
-
-def tool_get_longitudinal_summary(args):
-    """
-    Unified longitudinal data dispatcher. Routes to aggregated_summary,
-    seasonal_patterns, or personal_records based on view parameter.
-    """
-    VALID_VIEWS = {
-        "aggregate": tool_get_aggregated_summary,
-        "seasonal": tool_get_seasonal_patterns,  # noqa: F821
-        "records": tool_get_personal_records,  # noqa: F821
-    }
-    view = (args.get("view") or "aggregate").lower().strip()
-    if view not in VALID_VIEWS:
-        return {
-            "error": f"Unknown view '{view}'.",
-            "valid_views": list(VALID_VIEWS.keys()),
-            "hint": "Use 'aggregate' for monthly/yearly averages, 'seasonal' for month-by-month patterns across all years, 'records' for all-time PRs.",
         }
     return VALID_VIEWS[view](args)
 
@@ -554,7 +250,7 @@ def tool_get_intelligence_quality(args):
     """
     from boto3.dynamodb.conditions import Key
 
-    from mcp.core import USER_PREFIX, decimal_to_float, table
+    from mcp.core import decimal_to_float, table
 
     days = int(args.get("days", 7))
     severity_filter = args.get("severity")  # error, warning, or None for all
@@ -615,132 +311,3 @@ def tool_get_intelligence_quality(args):
         "flags": all_flags[:20],  # Cap at 20 for readability
         "coaches_checked": list(set(i.get("coach_id") for i in items)),
     }
-
-
-def tool_list_actions(args):
-    """List coach-issued actions with status tracking.
-
-    Shows open, completed, expired, and superseded actions across all coaches.
-    Supports filtering by domain, status, and time window.
-    """
-    domain_filter = args.get("domain")
-    status_filter = args.get("status")
-    days = int(args.get("days", 30))
-
-    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    try:
-        # ADR-058: phase=pilot hidden by default.
-        from mcp.core import _apply_phase_filter
-
-        resp = table.query(
-            **_apply_phase_filter(
-                {
-                    "KeyConditionExpression": (Key("pk").eq("USER#matthew") & Key("sk").begins_with("SOURCE#coach_actions#")),
-                }
-            )
-        )
-        items = [decimal_to_float(i) for i in resp.get("Items", [])]
-    except Exception as e:
-        return {"error": str(e)}
-
-    # Filter by date window
-    items = [i for i in items if (i.get("issued_date") or "") >= cutoff_date]
-
-    # Filter by domain
-    if domain_filter:
-        items = [i for i in items if i.get("domain") == domain_filter]
-
-    # Check for expired open actions
-    rules_config = {}
-    try:
-        resp_s3 = s3_client.get_object(Bucket=S3_BUCKET, Key="config/action_detection_rules.json")
-        rules_config = json.loads(resp_s3["Body"].read())
-    except Exception:
-        pass
-    expiry_days = rules_config.get("expiry_days", 14)
-
-    for item in items:
-        if item.get("status") == "open" and item.get("issued_date"):
-            try:
-                issued_dt = datetime.strptime(item["issued_date"], "%Y-%m-%d")
-                age = (datetime.strptime(today, "%Y-%m-%d") - issued_dt).days
-                if age > expiry_days:
-                    item["status"] = "expired"
-                    item["age_days"] = age
-                else:
-                    item["age_days"] = age
-            except ValueError:
-                pass
-
-    # Filter by status
-    if status_filter:
-        items = [i for i in items if i.get("status") == status_filter]
-
-    # Sort by issued_date descending
-    items.sort(key=lambda x: x.get("issued_date", ""), reverse=True)
-
-    # Strip pk/sk for cleaner output
-    clean_items = []
-    for item in items:
-        clean = {k: v for k, v in item.items() if k not in ("pk", "sk")}
-        clean_items.append(clean)
-
-    # Summary stats
-    status_counts = defaultdict(int)
-    for item in clean_items:
-        status_counts[item.get("status", "unknown")] += 1
-
-    return {
-        "period": {"start": cutoff_date, "end": today},
-        "total": len(clean_items),
-        "status_summary": dict(status_counts),
-        "actions": clean_items[:30],  # Cap at 30 for readability
-    }
-
-
-def tool_complete_action(args):
-    """Manually mark a coach action as completed.
-
-    Use when Matthew has done something a coach recommended.
-    """
-    action_id = args.get("action_id")
-    if not action_id:
-        raise ValueError("'action_id' is required")
-
-    note = args.get("note")
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-    update_expr = "SET #st = :completed, completion_date = :cd, completion_method = :cm"
-    attr_names = {"#st": "status"}
-    attr_values = {
-        ":completed": "completed",
-        ":cd": today,
-        ":cm": "manual",
-    }
-
-    if note:
-        update_expr += ", follow_up_note = :fn"
-        attr_values[":fn"] = note
-
-    try:
-        resp = table.update_item(
-            Key={
-                "pk": "USER#matthew",
-                "sk": f"SOURCE#coach_actions#{action_id}",
-            },
-            UpdateExpression=update_expr,
-            ExpressionAttributeNames=attr_names,
-            ExpressionAttributeValues=attr_values,
-            ReturnValues="ALL_NEW",
-        )
-        updated = decimal_to_float(resp.get("Attributes", {}))
-        clean = {k: v for k, v in updated.items() if k not in ("pk", "sk")}
-        return {
-            "status": "success",
-            "message": f"Action '{action_id}' marked as completed.",
-            "action": clean,
-        }
-    except Exception as e:
-        return {"error": f"Failed to complete action: {str(e)}"}
