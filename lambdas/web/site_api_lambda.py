@@ -101,6 +101,7 @@ from web.site_api_data import (
     handle_circadian,
     handle_correlations,
     handle_cycle_compare,
+    handle_device_agreement,
     handle_discoveries,
     handle_domains,
     handle_experiments,
@@ -411,6 +412,8 @@ ROUTES = {
     "/api/platform_stats": handle_platform_stats,
     # Live pipeline status: per-source freshness (fresh/stale/paused)
     "/api/source_freshness": handle_source_freshness,
+    # #735 (/verify/ page): Whoop vs Garmin cross-device HRV/RHR agreement
+    "/api/device_agreement": handle_device_agreement,
     # #406: real intra-day ingestion write times for the cockpit sync strip
     "/api/last_sync": handle_last_sync,
     # Presence / quiet-stretch: is Matthew actively logging or has he gone quiet

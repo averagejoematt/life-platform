@@ -253,6 +253,166 @@ def handle_source_freshness() -> dict:
     return _ok({"sources": sources, "summary": summary}, cache_seconds=300)
 
 
+# ── #735 (/verify/ page): cross-device agreement, the credibility signal ────
+# Whoop vs Garmin never agree perfectly on HRV/RHR — that imperfect, correlated
+# noise is the thing a skeptic can't get from synthetic data. whoop + garmin are
+# both RAW_TIMESERIES (cross_phase, ADR-077 phase_taxonomy.py — "phase tags are
+# harmless/optional" on this class), so include_pilot=True and a generous lookback
+# floor here are deliberate: this looks across the full recorded history, not just
+# the current experiment cycle. Mirrors the private mcp/tools_habits.py
+# tool_get_device_agreement thresholds exactly, reimplemented DDB-direct because
+# the site-api bundle does not ship the mcp/ package (deploy/build_bundle.py).
+_DEVICE_AGREEMENT_START = "2020-01-01"  # generous floor; predates any real device data
+_DEVICE_AGREEMENT_DAILY_CAP = 90  # most-recent N overlap days in the payload; aggregates cover the full window
+
+
+def handle_device_agreement() -> dict:
+    """GET /api/device_agreement — Whoop vs Garmin cross-device agreement on HRV + RHR.
+
+    Garmin ingestion has been paused since 2026-06 (vendor anti-automation, ADR-074),
+    so recent days may show no overlap — the historical window still stands as evidence.
+    Always a shaped 200 (ADR-104 honest-gaps semantics): a thin/empty window says so
+    explicitly rather than silently rendering nothing.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        whoop_items = _query_source("whoop", _DEVICE_AGREEMENT_START, today, include_pilot=True)
+        garmin_items = _query_source("garmin", _DEVICE_AGREEMENT_START, today, include_pilot=True)
+    except Exception as e:
+        logger.error(f"[site_api] /api/device_agreement query failed: {e}")
+        return _error(500, "device agreement unavailable")
+
+    # Day-summary records only — Whoop workout sub-items (sk DATE#...#WORKOUT#...)
+    # never carry resting_heart_rate/hrv, so this filter drops them for free.
+    whoop_by_date = {i["date"]: i for i in whoop_items if i.get("date") and i.get("resting_heart_rate") is not None}
+    garmin_by_date = {i["date"]: i for i in garmin_items if i.get("date") and i.get("resting_heart_rate") is not None}
+    garmin_last_date = max((i.get("date") for i in garmin_items if i.get("date")), default=None)
+
+    all_dates = sorted(set(whoop_by_date) & set(garmin_by_date))
+
+    if not all_dates:
+        return _ok(
+            {
+                "status": "unavailable",
+                "reason": "No overlapping Whoop + Garmin days recorded.",
+                "garmin_last_date": garmin_last_date,
+            },
+            cache_seconds=3600,
+        )
+
+    hrv_agree = hrv_minor = hrv_flag = 0
+    rhr_agree = rhr_minor = rhr_flag = 0
+    daily = []
+    flagged = []
+
+    for date in all_dates:
+        w = whoop_by_date[date]
+        g = garmin_by_date[date]
+        row = {"date": date}
+        flags = []
+
+        whoop_hrv = w.get("hrv")
+        garmin_hrv = g.get("hrv_last_night")
+        if whoop_hrv is not None and garmin_hrv is not None:
+            wh, gh = float(whoop_hrv), float(garmin_hrv)
+            diff = abs(wh - gh)
+            row.update({"whoop_hrv_ms": round(wh, 1), "garmin_hrv_ms": round(gh, 1), "hrv_abs_diff_ms": round(diff, 1)})
+            if diff <= 10:
+                row["hrv_agreement"] = "agree"
+                hrv_agree += 1
+            elif diff <= 20:
+                row["hrv_agreement"] = "minor_variance"
+                hrv_minor += 1
+            else:
+                row["hrv_agreement"] = "flag"
+                hrv_flag += 1
+                flags.append(f"HRV diff {diff:.0f}ms")
+
+        whoop_rhr = w.get("resting_heart_rate")
+        garmin_rhr = g.get("resting_heart_rate")
+        if whoop_rhr is not None and garmin_rhr is not None:
+            wr, gr = float(whoop_rhr), float(garmin_rhr)
+            diff = abs(wr - gr)
+            row.update({"whoop_rhr_bpm": round(wr, 1), "garmin_rhr_bpm": round(gr, 1), "rhr_abs_diff_bpm": round(diff, 1)})
+            if diff <= 3:
+                row["rhr_agreement"] = "agree"
+                rhr_agree += 1
+            elif diff <= 6:
+                row["rhr_agreement"] = "minor_variance"
+                rhr_minor += 1
+            else:
+                row["rhr_agreement"] = "flag"
+                rhr_flag += 1
+                flags.append(f"RHR diff {diff:.0f}bpm")
+
+        daily.append(row)
+        if flags:
+            flagged.append({"date": date, "flags": flags})
+
+    n = len(all_dates)
+    hrv_days = hrv_agree + hrv_minor + hrv_flag
+    rhr_days = rhr_agree + rhr_minor + rhr_flag
+    hrv_rate = round(hrv_agree / hrv_days * 100, 1) if hrv_days else None
+    rhr_rate = round(rhr_agree / rhr_days * 100, 1) if rhr_days else None
+    rates = [r for r in (hrv_rate, rhr_rate) if r is not None]
+    combined = round(sum(rates) / len(rates), 1) if rates else None
+
+    if combined is None:
+        confidence = "UNKNOWN — insufficient overlapping data"
+    elif combined >= 80:
+        confidence = "HIGH — devices closely agree; composite readiness score is reliable"
+    elif combined >= 60:
+        confidence = "MODERATE — minor inter-device variance; composite score is broadly reliable"
+    else:
+        confidence = "LOW — significant disagreement; investigate fit, positioning, or artifacts"
+
+    # Newest-first, capped — aggregate stats above already cover the full window.
+    daily_recent = list(reversed(daily))[:_DEVICE_AGREEMENT_DAILY_CAP]
+    flagged_recent = list(reversed(flagged))[:_DEVICE_AGREEMENT_DAILY_CAP]
+
+    return _ok(
+        {
+            "status": "ok",
+            "period": {"start": all_dates[0], "end": all_dates[-1], "overlapping_days": n},
+            "hrv_agreement": (
+                {
+                    "agree_days": hrv_agree,
+                    "minor_days": hrv_minor,
+                    "flagged_days": hrv_flag,
+                    "agreement_rate_pct": hrv_rate,
+                    "threshold_note": "Agree: <=10ms delta; minor: 10-20ms; flag: >20ms",
+                }
+                if hrv_days
+                else None
+            ),
+            "rhr_agreement": (
+                {
+                    "agree_days": rhr_agree,
+                    "minor_days": rhr_minor,
+                    "flagged_days": rhr_flag,
+                    "agreement_rate_pct": rhr_rate,
+                    "threshold_note": "Agree: <=3bpm delta; minor: 3-6bpm; flag: >6bpm",
+                }
+                if rhr_days
+                else None
+            ),
+            "device_confidence": confidence,
+            "combined_agreement_rate_pct": combined,
+            "daily": daily_recent,
+            "flagged_disagreement_days": flagged_recent if flagged_recent else None,
+            "garmin_last_date": garmin_last_date,
+            "garmin_paused": bool(garmin_last_date and garmin_last_date < today),
+            "interpretation": (
+                "HRV delta is expected between devices (different sampling windows and algorithms); "
+                "10-15ms variance is normal. RHR should agree within 3-5bpm; larger gaps suggest sensor "
+                "placement or motion artifacts. Consistent small disagreement, not perfect agreement, is "
+                "what real independent sensors produce — identical numbers would be the red flag."
+            ),
+        },
+        cache_seconds=3600,
+    )
+
+
 # ── #406: intra-day sync freshness (the cockpit's "measured — live" proof) ──
 # REAL ingestion write times only: the latest DATE# records' ingested_at /
 # webhook_ingested_at stamps, never the day-granular DATE key. Passive pipes

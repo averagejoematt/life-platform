@@ -446,6 +446,16 @@ REGISTRY = [
         None,
     ),
     (
+        "verify",
+        "Verify the data",
+        "Cross-device agreement, public profile links, and a raw payload sample — everything a skeptic needs to check this is real.",
+        "Credibility & the machine",
+        "data",
+        "/api/device_agreement",
+        None,
+        None,
+    ),
+    (
         "inference",
         "The inference receipt",
         "Every AI call, priced — the meter behind the $75 ceiling, live.",
@@ -531,6 +541,7 @@ _REGROUP = {
     "wrong": "How it holds up",
     "results": "How it holds up",
     "mirror": "How it holds up",
+    "verify": "How it holds up",  # #735: the credibility surface itself — cross-device agreement + raw samples
     "board": "The machine",
     "build": "The machine",
     "intelligence": "The machine",

@@ -98,6 +98,67 @@ export function renderAsk() {
 
 export function renderExplorer(d) { const v = (d.vitals && d.vitals.vitals) || d.vitals || {}; const ch = (d.character && d.character.character) || {}; const j = (d.journey && d.journey.journey) || d.journey || {}; const rows = { weight_lbs: j.current_weight_lbs, character_level: ch.level, ...Object.fromEntries(Object.entries(v).filter(([k, x]) => ["string", "number"].includes(typeof x)).slice(0, 12)) }; return `<p class="rd-archive">Today's raw record, straight from the pipeline. For the full historical day-by-day browser, open the preserved Explorer below.</p>` + sec("Today", kvtable(rows)) + note("The unfiltered daily record."); }
 
+/* #735 — /verify/: make "the data is real" independently checkable. Three parts:
+   (1) cross-device agreement (the disagreement IS the credibility — synthetic
+       numbers don't misbehave the way two real sensors do), (2) public device-
+       profile cross-links (honest "not yet linked" states — never invent a URL),
+       (3) a privacy-filtered raw-payload sample. Endpoint: /api/device_agreement
+       (lambdas/web/site_api_data.py::handle_device_agreement). */
+function verifyDeviceLinks() {
+  // No confirmed public-profile URLs exist for these accounts yet — this section
+  // states that honestly rather than guessing a username/URL. Whoever picks this
+  // up next: drop the real public URL in the href below (and drop the "not yet
+  // linked" wording) once Matthew confirms it; Whoop has no public-profile
+  // feature at all, so its row explains the cross-check instead of a dead link.
+  const rows = [
+    ["Whoop", "No public profile pages exist on Whoop's platform — its HRV/RHR readings are instead cross-checked against Garmin's independent sensor above."],
+    ["Strava", "Not yet linked publicly. <!-- TODO(#735): Matthew's public Strava athlete profile URL, if training is shared publicly -->"],
+    ["Hevy", "Not yet linked publicly. <!-- TODO(#735): Matthew's public Hevy profile URL, if lifting sessions are shared publicly -->"],
+    ["Garmin Connect", "Not yet linked publicly (ingestion has also been paused since 2026-06, ADR-074 — vendor anti-automation). <!-- TODO(#735): public Garmin Connect profile URL, if enabled -->"],
+  ];
+  return sec("Public device profiles", `<p class="rd-prose">The devices behind this data, and whether their own platforms let a stranger check them directly. No links are invented — a row says "not yet linked" until a real, confirmed public URL exists.</p>` +
+    `<ul class="rd-tierlist">${rows.map(([name, text]) => `<li><strong>${esc(name)}</strong> — ${text}</li>`).join("")}</ul>`);
+}
+
+function verifyRawSample() {
+  // One real day (2026-06-15), both sensors, straight from DynamoDB — partition/sort
+  // keys (pk/sk, which carry the internal user-id shape) stripped; every remaining
+  // field is exactly what the ingestion pipeline wrote, unedited.
+  const whoop = { source: "whoop", date: "2026-06-15", phase: "experiment", ingested_at: "2026-06-15T23:00:41.814388+00:00", resting_heart_rate: 61, hrv: 42.34, recovery_score: 76, sleep_duration_hours: 10.4, sleep_efficiency_percentage: 96.74, respiratory_rate: 13.3, strain: 3.56 };
+  const garmin = { source: "garmin", date: "2026-06-15", phase: "experiment", ingested_at: "2026-06-16T00:00:17.374875+00:00", resting_heart_rate: 56, training_readiness: 79, training_readiness_level: "HIGH", body_battery_end: 84, avg_stress: 17, steps: 298 };
+  return sec("A raw payload, identifiers stripped", `<p class="rd-prose">One real night (June 15), as both devices actually reported it — the same night the table above compares. Partition/sort keys (the internal row-id shape) are removed; every other field is untouched.</p>` +
+    `<pre class="rd-code">// Whoop — DATE#2026-06-15\n${esc(JSON.stringify(whoop, null, 2))}</pre>` +
+    `<pre class="rd-code">// Garmin — DATE#2026-06-15\n${esc(JSON.stringify(garmin, null, 2))}</pre>` +
+    `<p class="rd-meta label">The 61 vs 56 bpm resting-heart-rate reading above is row one of the comparison table — a real 5bpm sensor disagreement, not a rounding artifact.</p>`);
+}
+
+export function renderVerify(d) {
+  const links = verifyDeviceLinks();
+  const sample = verifyRawSample();
+  const methodLink = `<p class="rd-archive">Every statistic this platform publishes — its exact formula, the window it runs over, what it can't tell you — is documented at <a href="/method/registry/">the Methods Registry</a>, generated straight from the code, not hand-written.</p>`;
+  if (!d || d.status === "unavailable") {
+    return sec("Cross-device agreement — the credibility signal", empty(d && d.reason ? d.reason : "No overlapping device data recorded yet.")) + links + sample + methodLink + note("Nothing here is fabricated to fill a gap — an empty section says so.");
+  }
+  const rhr = d.rhr_agreement;
+  const headFigs = figs([
+    d.period && fig(d.period.overlapping_days, "nights both devices recorded"),
+    d.combined_agreement_rate_pct != null && fig(d.combined_agreement_rate_pct + "%", "agreement rate"),
+    rhr && fig(rhr.flagged_days, "nights flagged (RHR diff >6bpm)"),
+  ]);
+  const rows = (d.daily || []).slice(0, 30).map((r) => {
+    const flagged = r.rhr_agreement === "flag" || r.hrv_agreement === "flag";
+    return `<tr class="${flagged ? "rd-flag" : ""}"><td class="rd-name">${esc(r.date)}</td><td class="num">${r.whoop_rhr_bpm != null ? fmt(r.whoop_rhr_bpm) : "—"}</td><td class="num">${r.garmin_rhr_bpm != null ? fmt(r.garmin_rhr_bpm) : "—"}</td><td class="num">${r.rhr_abs_diff_bpm != null ? fmt(r.rhr_abs_diff_bpm) : "—"}</td><td>${esc(r.rhr_agreement || "—")}</td></tr>`;
+  }).join("");
+  const table = rows ? sec("Whoop vs Garmin, night by night (resting heart rate, bpm)", `<table class="rd-tbl"><thead><tr><th>date</th><th>Whoop</th><th>Garmin</th><th>diff</th><th>agreement</th></tr></thead><tbody>${rows}</tbody></table>`) : "";
+  const pausedNote = d.garmin_paused ? `<p class="rd-meta label">Garmin ingestion has been paused since ${esc(d.garmin_last_date)} (vendor anti-automation, ADR-074) — the window above is real history through that date, not a live feed.</p>` : "";
+  const agreeDays = rhr ? rhr.agree_days : 0, minorDays = rhr ? rhr.minor_days : 0, flagDays = rhr ? rhr.flagged_days : 0;
+  return sec("Cross-device agreement — the credibility signal", headFigs +
+      `<p class="rd-prose">Whoop and Garmin are two independently-made sensors, worn the same nights, that were never designed to talk to each other. Across every overlapping night on record: ${esc(agreeDays)} agreed within 3bpm, ${esc(minorDays)} were within 6bpm, and ${esc(flagDays)} disagreed enough to flag. That specific, correlated-but-imperfect pattern is what two real pieces of hardware produce — synthetic or copy-pasted numbers don't misbehave this particular way.</p>` +
+      pausedNote) +
+    table + links + sample + methodLink +
+    note(d.interpretation || "Cross-device HRV/RHR comparison, thresholded from real inter-device variance — not a claim either sensor is 'right.'");
+}
+
 export function renderPipeline(d) {
   const src = d.sources || [];
   if (!src.length) return empty("Pipeline status unavailable — check back shortly.");
