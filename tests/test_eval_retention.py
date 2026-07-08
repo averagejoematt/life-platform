@@ -113,7 +113,22 @@ def test_fetch_skips_stale_and_unparseable(table):
 
 # ── the surface list matches the harness ─────────────────────────────────────
 def test_surfaces_match_harness():
+    """Every golden_surface_eval surface must be retained. `coach_brief` (#744)
+    is the one deliberate exception: retained (see the SURFACES docstring) but
+    not yet replayable by this harness — it has no adapter here, only the
+    hand-curated tests/golden_brief_eval.py. If this ever grows a second
+    retention-only surface, extend the exception set rather than looping this
+    test back into an unconditional equality."""
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import golden_surface_eval as h
 
-    assert set(er.SURFACES) == set(h.SURFACES)
+    assert set(h.SURFACES).issubset(set(er.SURFACES))
+    assert set(er.SURFACES) - set(h.SURFACES) == {"coach_brief"}
+
+
+def test_coach_brief_is_a_valid_surface(table):
+    """#744: the original surface this issue named (ai_calls._enforce_quality_gate,
+    ADR-108) must be retainable, not just the 5 surfaces #812 added."""
+    rec = er.build_record("coach_brief", "flagged_corrected", draft="d", final="f")
+    assert rec["pk"] == "EVALRET#coach_brief"
+    assert er.retain("coach_brief", "flagged_dropped", draft="d") is True

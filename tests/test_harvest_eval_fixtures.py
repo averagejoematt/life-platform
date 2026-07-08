@@ -120,3 +120,28 @@ def test_memoir_reason_mapping():
     assert hv._expect_checks("memoir", [{"type": "memoir_gate", "detail": "fabricated numbers: [19.0]"}]) == ["evidence_ceiling"]
     assert hv._expect_checks("memoir", [{"type": "memoir_gate", "detail": "no_miss_cited_despite_refuted_learnings"}]) == ["miss_dodged"]
     assert hv._expect_checks("memoir", [{"type": "memoir_gate", "detail": "empty"}]) == ["empty_output"]
+
+
+# ── #744: coach_brief is retained but has no golden_surface_eval adapter yet ──
+def test_split_harness_ready_separates_unadaptered_surfaces():
+    """`eval_retention.SURFACES` includes `coach_brief` (#744) but the harness
+    (`golden_surface_eval.SURFACES`) does not — it has no replay adapter for it.
+    The split must route coach_brief records to `retention_only`, never into
+    `build_candidates` (which would silently mis-evaluate them through the
+    wrong check dimension), while still reporting their count so nothing
+    retained goes unnoticed."""
+    records = {
+        "chronicle": [_rec(draft="x")],
+        "coach_brief": [_rec(draft="y"), _rec(draft="z")],
+        "board_ask": [],
+    }
+    ready, retention_only = hv._split_harness_ready(records, hv.harness.SURFACES)
+    assert set(ready) == {"chronicle", "board_ask"}
+    assert retention_only == {"coach_brief": 2}  # board_ask excluded: zero records
+
+
+def test_split_harness_ready_empty_when_all_covered():
+    records = _by_surface(chronicle=[_rec(draft="x")])
+    ready, retention_only = hv._split_harness_ready(records, hv.harness.SURFACES)
+    assert set(ready) == set(hv.harness.SURFACES)
+    assert retention_only == {}

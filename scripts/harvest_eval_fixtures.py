@@ -123,17 +123,33 @@ def build_candidates(records_by_surface):
     return out
 
 
+def _split_harness_ready(records_by_surface, harness_surfaces):
+    """Pure: partition retained records into ones the deterministic harness knows
+    how to replay (→ build_candidates) vs. ones `eval_retention.py` retains but
+    that have no golden_surface_eval adapter yet (#744 — e.g. coach_brief, whose
+    own harness is the hand-curated tests/golden_brief_eval.py, not this harvest
+    loop). Never invent a mismatched replay for the latter — that would silently
+    mis-evaluate a surface whose real gate checks (anti-pattern/decision-class/
+    voice-distinctiveness) this harness doesn't implement. Reported, not dropped:
+    the caller surfaces the count so nothing retained goes unnoticed."""
+    ready = {s: v for s, v in records_by_surface.items() if s in harness_surfaces}
+    retention_only = {s: len(v) for s, v in records_by_surface.items() if s not in harness_surfaces and v}
+    return ready, retention_only
+
+
 def harvest(days, out_path):
     import eval_retention
 
     records_by_surface = {s: eval_retention.fetch(s, since_days=days) for s in eval_retention.SURFACES}
     n_records = sum(len(v) for v in records_by_surface.values())
-    result = build_candidates(records_by_surface)
+    harness_ready, retention_only = _split_harness_ready(records_by_surface, harness.SURFACES)
+    result = build_candidates(harness_ready)
     doc = {
         "harvested_at": datetime.now(timezone.utc).isoformat(),
         "window_days": days,
         "records_seen": n_records,
         "per_surface_records": {s: len(v) for s, v in records_by_surface.items()},
+        "retention_only_no_harness_yet": retention_only,
         **result,
     }
     with open(out_path, "w", encoding="utf-8") as f:
