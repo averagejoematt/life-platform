@@ -44,7 +44,6 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import boto3
-
 from mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
