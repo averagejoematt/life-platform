@@ -15,15 +15,16 @@ AWS credentials or network access are needed to synth locally, and a missing
 secret fails loudly at deploy (CloudFormation error) rather than silently
 degrading to an empty/disabled guard.
 
-Cross-region safe: Secret.from_secret_partial_arn accepts a full-region ARN,
-so WebStack (us-east-1) can resolve a secret that physically lives in
-us-west-2 — the same trick stacks/constants.py::CF_AUTH_VERSION_ARN uses for a
-fixed-region ARN independent of the stack's own deploy region.
+Cross-region: CloudFormation dynamic references resolve secrets ONLY in the
+stack's own region (a us-west-2 ARN from a us-east-1 stack fails with
+ResourceNotFoundException at deploy — observed 2026-07-08). The secret is
+therefore multi-region: primary in us-west-2, replica in us-east-1 (same name,
+same value), and each stack resolves the copy in its own region.
 """
 
-from aws_cdk import aws_secretsmanager as secretsmanager
+from aws_cdk import Stack, aws_secretsmanager as secretsmanager
 
-from stacks.constants import SITE_API_ORIGIN_SECRET_ARN
+from stacks.constants import ACCT, SITE_API_ORIGIN_SECRET_NAME
 
 
 def site_api_origin_secret_value(scope, construct_id: str = "SiteApiOriginSecret") -> str:
@@ -32,5 +33,7 @@ def site_api_origin_secret_value(scope, construct_id: str = "SiteApiOriginSecret
     Call once per stack (construct ids are scoped per-stack, so the default id
     is safe to reuse across ServeStack and WebStack without collision).
     """
-    secret = secretsmanager.Secret.from_secret_partial_arn(scope, construct_id, SITE_API_ORIGIN_SECRET_ARN)
+    region = Stack.of(scope).region
+    arn = f"arn:aws:secretsmanager:{region}:{ACCT}:secret:{SITE_API_ORIGIN_SECRET_NAME}"
+    secret = secretsmanager.Secret.from_secret_partial_arn(scope, construct_id, arn)
     return secret.secret_value.unsafe_unwrap()

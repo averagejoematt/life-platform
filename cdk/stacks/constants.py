@@ -60,11 +60,13 @@ CF_AUTH_VERSION_ARN = f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-c
 # be visible in the synthesized CloudFormation template / CloudFront console,
 # same posture as any other origin-verification header secret.
 #
-# Lives at this path in Secrets Manager (us-west-2 — co-located with every
-# other life-platform/ secret) as a PLAIN STRING secret (not JSON), regardless
-# of which stack/region resolves it: CloudFormation's
-# {{resolve:secretsmanager:...}} dynamic reference honors an explicit-region ARN,
-# same cross-region trick CF_AUTH_VERSION_ARN above uses. The partial ARN (no
-# random Secrets-Manager suffix) is intentional — Secret.from_secret_partial_arn
+# Lives at this NAME as a PLAIN STRING secret (not JSON) in Secrets Manager,
+# MULTI-REGION: primary in us-west-2 (co-located with every other
+# life-platform/ secret), replica in us-east-1 for WebStack/CloudFront.
+# CloudFormation's {{resolve:secretsmanager:...}} dynamic reference resolves
+# only within the stack's own region (a cross-region ARN fails at deploy with
+# ResourceNotFoundException — observed 2026-07-08), so secrets_helpers.py
+# builds the region-local ARN per stack. The partial ARN (no random
+# Secrets-Manager suffix) is intentional — Secret.from_secret_partial_arn
 # resolves it without needing the suffix known at synth time.
-SITE_API_ORIGIN_SECRET_ARN = f"arn:aws:secretsmanager:us-west-2:{ACCT}:secret:life-platform/site-api-origin-secret"
+SITE_API_ORIGIN_SECRET_NAME = "life-platform/site-api-origin-secret"  # noqa: S105 — secret name, not a secret value
