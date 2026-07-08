@@ -770,6 +770,11 @@ def _weighted_pillar_score(component_scores, components_config):
     if total_weight == 0:
         details["_confidence"] = 0.0
         details["_data_coverage"] = 0.0
+        # #747: zero components had ANY value today — not a bad day for an
+        # otherwise-instrumented pillar, but a literal absence of signal. The
+        # 50.0 below is a mathematical placeholder (F-09's "true neutral"),
+        # never a real reading; callers must not present it as one.
+        details["_not_instrumented"] = True
         return 50.0, details  # true neutral when no data [F-09]
 
     raw_score = weighted_sum / total_weight
@@ -782,6 +787,7 @@ def _weighted_pillar_score(component_scores, components_config):
 
     details["_confidence"] = round(confidence, 3)
     details["_data_coverage"] = round(data_coverage, 3)
+    details["_not_instrumented"] = False
 
     return round(_clamp(adjusted_score), 1), details
 
@@ -1126,6 +1132,16 @@ def compute_character_sheet(
         _day_number = None
     pillar_configs = config.get("pillars", {})
 
+    # #747: a pillar's config may carry an explanatory note for the day it has
+    # zero data — e.g. Relationships has no wired data source at all today, so
+    # `_not_instrumented` is True on every compute. The note is attached here
+    # (not baked into the front end) so it clears itself automatically the day
+    # a real source starts filling the pillar's components (`_not_instrumented`
+    # goes False and the note is simply never attached).
+    def _attach_not_instrumented_note(pillar_name, details):
+        if details.get("_not_instrumented"):
+            details["_not_instrumented_note"] = pillar_configs.get(pillar_name, {}).get("not_instrumented_note")
+
     # Step 1: Raw scores for 6 primary pillars
     pillar_raw_scores = {}
     pillar_details = {}
@@ -1133,11 +1149,13 @@ def compute_character_sheet(
         raw_score, details = compute_fn(data, config)
         pillar_raw_scores[pillar_name] = raw_score
         pillar_details[pillar_name] = details
+        _attach_not_instrumented_note(pillar_name, details)
 
     # Step 2: Consistency meta-pillar
     consistency_raw, consistency_details = compute_consistency_raw(data, config, pillar_raw_scores)
     pillar_raw_scores["consistency"] = consistency_raw
     pillar_details["consistency"] = consistency_details
+    _attach_not_instrumented_note("consistency", consistency_details)
 
     # Step 3: EMA level scores — per-pillar lambda [F-03]
     pillar_level_scores = {}
@@ -1198,6 +1216,11 @@ def compute_character_sheet(
             "xp_earned": xp_earned,
             "confidence": pillar_details[pillar_name].get("_confidence"),
             "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
+            # #747: deterministic, engine-computed — True only when every
+            # weighted component had zero data today (never an LLM verdict,
+            # ADR-105). Auto-clears the day any component gets a real value.
+            "not_instrumented": bool(pillar_details[pillar_name].get("_not_instrumented", False)),
+            "not_instrumented_note": pillar_details[pillar_name].get("_not_instrumented_note"),
             "xp_buffer": level_state.get("xp_buffer", 0),
             "streak_above": level_state["streak_above"],
             "streak_below": level_state["streak_below"],

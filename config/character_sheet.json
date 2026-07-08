@@ -159,6 +159,7 @@
       "ema_lambda": 0.93,
       "rolling_window_days": 14,
       "owner": "Social Connection",
+      "not_instrumented_note": "No relationship data source feeds this pillar yet — tracked as future work (#747).",
       "components": {
         "social_interaction_frequency": {
           "weight": 0.4

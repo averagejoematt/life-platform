@@ -246,28 +246,44 @@ async function renderBoard() {
 
 /* ── render: the two domains + consistency band ──────────────────────────── */
 function rollup(keys) {
-  const vals = keys.map((k) => state.pillars[k]?.raw_score).filter((n) => typeof n === "number");
+  // #747: a not-yet-instrumented pillar's placeholder neutral score must not
+  // quietly drag the domain composite toward 50 — exclude it from the average,
+  // the same way an absent reading is already excluded (typeof n === "number").
+  const vals = keys
+    .filter((k) => !state.pillars[k]?.not_instrumented)
+    .map((k) => state.pillars[k]?.raw_score)
+    .filter((n) => typeof n === "number");
   if (!vals.length) return null;
   return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
 }
 
 function pillarRow(key) {
   const p = state.pillars[key];
+  // #747: a pillar with no data source feeding it renders a labeled state
+  // instead of the engine's placeholder neutral score — data-driven off the
+  // engine's own flag (state.pillars[key].not_instrumented), not hardcoded
+  // per pillar name, so this clears itself the day real data starts flowing.
+  const notInstrumented = !!p?.not_instrumented;
   const score = Math.round(p?.raw_score ?? 0);
   // score_delta is the day-over-day move (vs yesterday's sheet); prefer it for the
   // glance arrow so the trend means the same thing the detail spells out.
-  const dir = trendOf(p?.score_delta ?? p?.xp_delta);
+  const dir = notInstrumented ? "flat" : trendOf(p?.score_delta ?? p?.xp_delta);
   const btn = document.createElement("button");
   btn.type = "button";
-  btn.className = `row ${dir === "up" ? "up" : dir === "down" ? "dn" : ""}`;
+  btn.className = `row ${dir === "up" ? "up" : dir === "down" ? "dn" : ""}${notInstrumented ? " not-instrumented" : ""}`;
   btn.dataset.pillar = key;
   btn.setAttribute("aria-expanded", "false");
-  btn.innerHTML =
-    `<span class="lab">${domainIcon(key, { cls: "dom-ico" })}${PILLAR_LABEL[key] || key}</span>` +
-    `<span class="track"><i style="width:${Math.min(100, score)}%"></i></span>` +
-    `<span class="val num">${score}</span>` +
-    `<span class="tr">${MARK[dir]}</span>` +
-    `<span class="chev" aria-hidden="true">›</span>`;
+  btn.innerHTML = notInstrumented
+    ? `<span class="lab">${domainIcon(key, { cls: "dom-ico" })}${PILLAR_LABEL[key] || key}</span>` +
+      `<span class="track track-none" aria-hidden="true"></span>` +
+      `<span class="val label" title="not yet instrumented">n/a</span>` +
+      `<span class="tr"></span>` +
+      `<span class="chev" aria-hidden="true">›</span>`
+    : `<span class="lab">${domainIcon(key, { cls: "dom-ico" })}${PILLAR_LABEL[key] || key}</span>` +
+      `<span class="track"><i style="width:${Math.min(100, score)}%"></i></span>` +
+      `<span class="val num">${score}</span>` +
+      `<span class="tr">${MARK[dir]}</span>` +
+      `<span class="chev" aria-hidden="true">›</span>`;
   btn.addEventListener("click", () => togglePillar(btn, key));
   return btn;
 }
@@ -378,6 +394,19 @@ async function togglePillar(btn, key) {
   const detail = document.createElement("div");
   detail.className = "pillar-detail";
   detail.setAttribute("aria-live", "polite");
+
+  const pNow = state.pillars[key] || {};
+  // #747: nothing to fetch from the coach for a pillar with no data — the
+  // engine's own note is the honest read, so skip the lazy /api/coach_analysis
+  // call entirely rather than asking a coach to comment on a placeholder score.
+  if (pNow.not_instrumented) {
+    detail.innerHTML =
+      `<p class="pd-read">${escapeHTML(pNow.not_instrumented_note || "Not yet instrumented — no data source feeds this pillar yet.")}</p>` +
+      `<p class="pd-meta"><span class="pd-conf">not yet instrumented</span></p>`;
+    withTransition(() => btn.after(detail));
+    return;
+  }
+
   detail.innerHTML = `<p class="pd-read"><span class="pd-who">loading ${PILLAR_LABEL[key]}…</span></p>`;
   withTransition(() => btn.after(detail));
 

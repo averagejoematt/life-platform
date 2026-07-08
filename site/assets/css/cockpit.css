@@ -331,6 +331,11 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .row.up .tr { color: var(--ember); }
 .row .chev { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); width: 12px; text-align: center; transition: transform var(--dur-fast); }
 .row[aria-expanded="true"] .chev { transform: rotate(90deg); color: var(--ink-muted); }
+/* #747: not-yet-instrumented pillars — a dashed empty track, never a filled
+   bar implying a real reading, and a muted "n/a" instead of a bare number. */
+.row .track.track-none { background: none; position: relative; }
+.row .track.track-none::after { content: ""; position: absolute; inset: 0; border-top: 1px dashed var(--ink-faint); opacity: 0.6; }
+.row .val.label { color: var(--ink-faint); font-size: var(--fs-small); letter-spacing: 0.02em; }
 
 /* In-place pillar disclosure (View Transitions) — detail opens on the surface */
 .pillar-detail {

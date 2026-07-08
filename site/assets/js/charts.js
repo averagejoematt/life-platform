@@ -775,7 +775,9 @@ export function pillarRing(pillars, { size = 360, rimR = 0.46, width = 10 } = {}
   ps.forEach((p, i) => {
     const color = `var(--pillar-${escAttr(String(p.name).toLowerCase())}, var(--ember))`;
     const segLen = (SEG_DEG / 360) * circ;
-    const fillLen = segLen * Math.max(0, Math.min(Number(p.raw_score) || 0, 100)) / 100;
+    // #747: a not-yet-instrumented pillar has no real raw_score to fill with —
+    // an empty arc (just the pale track) rather than the placeholder neutral 50.
+    const fillLen = p.not_instrumented ? 0 : (segLen * Math.max(0, Math.min(Number(p.raw_score) || 0, 100)) / 100);
     const off = (-i * (SEG_DEG + GAP_DEG) * circ) / 360;
     const rot = `transform="rotate(-90 ${C} ${C})"`;
     out += `<circle class="pring-seg" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${segLen.toFixed(2)} ${(circ - segLen).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" ${rot}/>`;
@@ -799,7 +801,8 @@ export function pillarRingCpts(pillars, { size = 360, rimR = 0.46, labels = null
     const x = C + R * Math.sin(theta), y = C - R * Math.cos(theta);
     const raw = Math.max(0, Math.min(Number(p.raw_score) || 0, 100));
     const nm = (labels && labels[p.name]) || (String(p.name).charAt(0).toUpperCase() + String(p.name).slice(1));
-    return { x: +(x / size).toFixed(4), y: +(y / size).toFixed(4), l: `${nm}: ${Math.round(raw)}` };
+    // #747: the hover readout shouldn't quote the placeholder neutral score either.
+    return { x: +(x / size).toFixed(4), y: +(y / size).toFixed(4), l: p.not_instrumented ? `${nm}: not yet instrumented` : `${nm}: ${Math.round(raw)}` };
   });
 }
 

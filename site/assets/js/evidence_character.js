@@ -82,6 +82,13 @@ export function chHeroHtml(ch, pillars, jj, wave) {
 export function chWhy(p) {
   const drv = p.drivers || {};
   const names = (a) => (a || []).map((n) => ttl(n)).join(", ");
+  // #747: engine-computed and deterministic (ADR-105) — checked first because a
+  // not-instrumented pillar is also, incidentally, coverage_hold (0% coverage
+  // is below any leveling threshold). "Not yet instrumented" is the honest
+  // reason; "levels frozen" would undersell it as a temporary data gap.
+  if (p.not_instrumented) {
+    return p.not_instrumented_note || "Not yet instrumented — no data source feeds this pillar yet.";
+  }
   if (p.coverage_hold) {
     const cov = p.data_coverage != null ? `${Math.round(Number(p.data_coverage) * 100)}%` : "too little";
     return `Levels frozen — only ${cov} of this pillar's data exists right now. The engine won't judge on gaps: no data can't climb, and no data can't crash.`;
@@ -100,13 +107,27 @@ export function chStatHtml(pillars, hist) {
     const spark = scoreVals.filter((s) => s.v > 0).length >= 2 ? sparkline(scoreVals, { height: 26 }) : "";
     const raw = Math.max(0, Math.min(Number(p.raw_score) || 0, 100));
     const why = chWhy(p);
+    // #747: a pillar with zero real inputs renders a labeled state instead of
+    // the placeholder neutral score — data-driven off the engine's own flag,
+    // so this clears itself automatically the day a component gets real data.
+    const notInstrumented = !!p.not_instrumented;
+    const lvBadge = notInstrumented
+      ? `<span class="ch-hold" title="not yet instrumented — no data source feeds this pillar">n/a</span>`
+      : (p.coverage_hold ? `<span class="ch-hold" title="levels frozen — not enough data to judge">held</span>` : "");
+    const bar = notInstrumented
+      ? `<i class="ch-rbar-none"></i>`
+      : `<i style="width:${raw}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i>`;
+    const rawCell = notInstrumented
+      ? `<span class="ch-rraw label" title="not yet instrumented">—</span>`
+      : `<span class="ch-rraw num">${fmt(raw)}<small>/100</small></span>`;
+    const xpCell = notInstrumented ? `<span class="ch-d ch-d0">—</span>` : chDelta(p.xp_delta, " xp");
     return `<div class="ch-row">
       <span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>
       <span class="ch-rname">${esc(ttl(p.name))}</span>
-      <span class="ch-rlv label">Lv ${Math.round(Number(p.level) || 1)}${p.coverage_hold ? `<span class="ch-hold" title="levels frozen — not enough data to judge">held</span>` : ""}</span>
-      <span class="ch-rbar"><i style="width:${raw}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i><b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></span>
-      <span class="ch-rraw num">${fmt(raw)}<small>/100</small></span>
-      ${chDelta(p.xp_delta, " xp")}
+      <span class="ch-rlv label">Lv ${Math.round(Number(p.level) || 1)}${lvBadge}</span>
+      <span class="ch-rbar">${bar}<b style="left:25%"></b><b style="left:50%"></b><b style="left:75%"></b></span>
+      ${rawCell}
+      ${xpCell}
       ${spark ? `<span class="ch-rspark">${spark}</span>` : ""}
     </div>${why ? `<p class="ch-rwhy">${esc(why)}</p>` : ""}`;
   }).join("");

@@ -524,6 +524,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-rbar { position: relative; height: 8px; background: var(--surface-sunken, var(--surface)); border: var(--border-hair); border-radius: 4px; overflow: hidden; }
 .ch-rbar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
 .ch-rbar b { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--rule); }
+/* #747: the not-yet-instrumented track — no fill, a faint dashed rule instead
+   of a colored bar, so an absent data source never reads as "a real 50". */
+.ch-rbar i.ch-rbar-none {
+  left: 0; right: 0; top: 50%; bottom: auto; width: auto; height: 0;
+  background: none; border-top: 1px dashed var(--ink-faint); opacity: 0.6; transform: translateY(-50%);
+}
 .ch-rraw { font-size: var(--fs-small); color: var(--ink); text-align: right; }
 .ch-rraw small { color: var(--ink-faint); font-size: 0.72em; }
 .ch-d { font-family: var(--font-mono); font-size: var(--fs-label); text-align: right; }

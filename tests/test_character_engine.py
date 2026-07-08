@@ -34,6 +34,7 @@ from character_engine import (
     _weighted_pillar_score,
     compute_character_sheet,
     compute_ema_level_score,
+    compute_relationships_raw,
     evaluate_level_changes,
     pillar_drivers,
 )
@@ -73,6 +74,100 @@ def test_weighted_pillar_score_no_data():
     score, details = _weighted_pillar_score(scores, config)
     assert score == 50.0
     assert details["_confidence"] == 0.0
+
+
+# ── #747: not-instrumented flag (deterministic, ADR-105) ──
+
+
+def test_weighted_pillar_score_no_data_flags_not_instrumented():
+    """Zero components had ANY value today -> the placeholder 50 is flagged so
+    callers never present it as a real reading."""
+    scores = {"a": None, "b": None}
+    config = {"a": {"weight": 0.5}, "b": {"weight": 0.5}}
+    score, details = _weighted_pillar_score(scores, config)
+    assert score == 50.0
+    assert details["_not_instrumented"] is True
+
+
+def test_weighted_pillar_score_with_data_not_flagged():
+    """As soon as any component has a real value, the flag clears itself —
+    no code change needed on the day a data source starts flowing."""
+    scores = {"a": 80, "b": None}
+    config = {"a": {"weight": 0.5}, "b": {"weight": 0.5}}
+    score, details = _weighted_pillar_score(scores, config)
+    assert details["_not_instrumented"] is False
+
+
+def test_compute_relationships_raw_no_data_is_not_instrumented():
+    """The reported #747 scenario: none of the relationships components have a
+    real data source today (no journal_entries, no buddy_freshness_days) -> the
+    pillar is flagged, not silently rendered as a real neutral score."""
+    config = {
+        "pillars": {
+            "relationships": {
+                "components": {
+                    "social_interaction_frequency": {"weight": 0.4},
+                    "interaction_quality": {"weight": 0.3},
+                    "buddy_engagement": {"weight": 0.15},
+                    "social_mood_correlation": {"weight": 0.15},
+                }
+            }
+        }
+    }
+    raw, details = compute_relationships_raw({}, config)
+    assert raw == 50.0
+    assert details["_not_instrumented"] is True
+
+
+def test_compute_relationships_raw_with_data_is_instrumented():
+    """Once a real relationship signal shows up (e.g. journal_entries carries a
+    social_connection_score), the pillar scores normally and is no longer flagged."""
+    config = {
+        "pillars": {
+            "relationships": {
+                "components": {
+                    "social_interaction_frequency": {"weight": 0.4},
+                    "interaction_quality": {"weight": 0.3},
+                    "buddy_engagement": {"weight": 0.15},
+                    "social_mood_correlation": {"weight": 0.15},
+                }
+            }
+        }
+    }
+    data = {"journal_entries": [{"social_connection_score": 7.0}]}
+    raw, details = compute_relationships_raw(data, config)
+    assert details["_not_instrumented"] is False
+    assert raw != 50.0 or details["_confidence"] > 0  # a real (if partial) reading, not the bare placeholder
+
+
+def test_compute_character_sheet_propagates_not_instrumented_and_note():
+    """End-to-end: compute_character_sheet's pillar_results carry the flag +
+    the config-sourced note for a pillar with a note configured, and nothing
+    extra for a pillar that's genuinely instrumented."""
+    config = {
+        "pillars": {
+            "sleep": {"weight": 0.5, "components": {"duration_vs_target": {"weight": 1.0, "target_hours": 7.5}}},
+            "relationships": {
+                "weight": 0.5,
+                "not_instrumented_note": "No relationship data source feeds this pillar yet — tracked as future work (#747).",
+                "components": {"social_interaction_frequency": {"weight": 1.0}},
+            },
+        },
+        "leveling": {},
+        "tiers": [{"name": "Foundation", "min_level": 1, "max_level": 100}],
+        "xp_bands": [{"min_raw_score": 0, "xp": 0}],
+        "cross_pillar_effects": [],
+    }
+    data = {"date": "2026-07-08", "sleep": {"sleep_duration_hours": 7.5, "sleep_performance": 90}}
+    record = compute_character_sheet(data, None, {"sleep": [], "relationships": []}, config)
+
+    rel = record["pillar_relationships"]
+    assert rel["not_instrumented"] is True
+    assert rel["not_instrumented_note"] == "No relationship data source feeds this pillar yet — tracked as future work (#747)."
+
+    sleep_p = record["pillar_sleep"]
+    assert sleep_p["not_instrumented"] is False
+    assert sleep_p["not_instrumented_note"] is None
 
 
 # ── F-02: XP decay ──
@@ -575,6 +670,9 @@ def test_reported_scenario_mind_lags_and_movement_sinks():
     assert mind_p["components"]["journal_consistency"]["score"] == 0.0
     # Movement collapsed after workouts stopped on day 13
     assert move_p["raw_score"] == 0.0
+    # #747: the scenario never feeds a relationships signal (no journal_entries) —
+    # the pillar is flagged not-instrumented, not silently reported as a real 50.
+    assert record["pillar_relationships"]["not_instrumented"] is True
     # Levels no longer march in lockstep: mind trails sleep, movement fell behind
     assert mind_p["level"] < sleep_p["level"]
     assert move_p["level"] < sleep_p["level"]
