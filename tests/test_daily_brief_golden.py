@@ -38,7 +38,11 @@ PROFILE = {
     "fat_target_g": 60,
     "carb_target_g": 125,
     "goal_weight_lbs": 185,
-    "journey_start_date": "2026-06-08",
+    # Far past on purpose: html_builder's BoD confidence badge computes days_of_data
+    # from wall-clock *now* minus this date, so a recent date makes the golden
+    # time-dependent (it flipped LOW->MEDIUM when the real experiment crossed n=30).
+    # ~2 years back keeps the badge pinned at HIGH forever -> deterministic snapshot.
+    "journey_start_date": "2024-06-08",
     "journey_start_weight_lbs": 311.62,
     "day_grade_weights": {
         "sleep_quality": 0.2,
