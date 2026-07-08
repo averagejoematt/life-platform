@@ -19,6 +19,16 @@ Repeatable playbooks the agent invokes by name:
 - [`deploy.md`](commands/deploy.md) — the deploy procedure (per-Lambda function-name map, the site-api multi-module caveat, layer-rebuild rules).
 - [`qa.md`](commands/qa.md) — QA modes (smoke / API freshness / visual / AI-vision).
 
+**3b. Subagent library — [`.claude/agents/`](agents/)**
+Reusable subagent definitions for the standing multi-agent fan-out pattern:
+[`worktree-implementer`](agents/worktree-implementer.md) (one issue → one worktree → one
+open PR, with the worktree-discipline incident classes baked in),
+[`finding-verifier`](agents/finding-verifier.md) (adversarial second pass on review
+findings — historical first-pass false-positive rate ~50%), and
+[`render-qa`](agents/render-qa.md) (Playwright render QA with the route-mock /
+service-worker gotchas encoded). Each prompt carries the recurring lessons so sessions
+stop re-improvising briefs from memory prose (#796).
+
 **4. Automation the agent relies on**
 - **Doc-sync pre-commit hook** (`scripts/install_hooks.sh` → `deploy/sync_doc_metadata.py`) — auto-updates doc headers (tool/Lambda/secret/alarm counts, version) on every commit, so docs can't silently drift from code.
 - **Self-healing remediation agent** (`.github/workflows/remediation-agent.yml`, ADR-064/065) — Claude on a schedule via GitHub Actions + Bedrock: triages alarms/CI/DLQ, auto-fixes the provably-safe class behind a deterministic merge gate, opens PRs for the rest. Read-only AWS role; the gate (not the model) holds merge authority.
