@@ -20,7 +20,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
-from v4_proof import load_scorecard, scorecard_block_html  # noqa: E402  — #729/#730 static proof
+from v4_proof import (  # noqa: E402  — #729/#730/#804 static proof
+    coaching_read_block_html,
+    load_coaching_read,
+    load_scorecard,
+    scorecard_block_html,
+)
 
 OUT = Path("site/coaching")
 
@@ -157,6 +162,12 @@ def main() -> None:
     # HTML (noscript) so a crawler / LLM / no-JS skeptic sees the falsifiable track
     # record, not an empty shell. JS still renders the rich interactive scorecard.
     scorecard_proof = scorecard_block_html(load_scorecard())
+    # #804 (R22-UX-02): bake the board's actual read — the weekly priority + each
+    # coach's live read — into the "read" landing (the default section) so a no-JS
+    # visitor / crawler / LLM / the first seconds before scripts load sees the site's
+    # core differentiator (the coach voices), not an empty shell. JS still renders the
+    # rich interactive read. Falls back to the committed snapshot when offline.
+    read_proof = coaching_read_block_html(load_coaching_read())
 
     write(
         OUT / "index.html",
@@ -165,10 +176,16 @@ def main() -> None:
             desc="What the AI board is saying about the data right now — the read, by coach, the disagreements, and the weekly lab notes.",
             canon="",
             start="read",
-            proof="",
+            proof=read_proof,
         ),
     )
     for key, label, desc in SECTIONS:
+        if key == "read":
+            proof = read_proof
+        elif key == "scorecard":
+            proof = scorecard_proof
+        else:
+            proof = ""
         write(
             OUT / key / "index.html",
             SHELL.format(
@@ -176,7 +193,7 @@ def main() -> None:
                 desc=desc,
                 canon=f"{key}/",
                 start=key,
-                proof=scorecard_proof if key == "scorecard" else "",
+                proof=proof,
             ),
         )
     print(f"✅ wrote site/coaching/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))

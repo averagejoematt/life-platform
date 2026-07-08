@@ -208,6 +208,115 @@ class TestCockpitInjection:
         assert "hub-hint-x" in html
 
 
+class TestCoachingReadBlock:
+    """#804 (R22-UX-02) — the coaching page's static proof: the board's read baked
+    into /coaching/ so a no-JS visitor / crawler / LLM sees the coach voices, not a
+    shell."""
+
+    READ = {
+        "weekly_priority": {"text": "Restart your logging this week — the system runs blind without it.", "coach_name": "Dr. Kai Nakamura"},
+        "coaches": [
+            {
+                "name": "Dr. Nathan Reeves",
+                "title": "Psychiatrist — Behavioral Patterns",
+                "coach_id": "mind",
+                "position_summary": "Food logging ceased on June 24th — twelve days of silence.",
+            },
+            {
+                "name": "Dr. Victor Reyes",
+                "title": "Longevity & Body Composition",
+                "coach_id": "physical",
+                "position_summary": "Twelve days without logged meals created a blind spot.",
+            },
+        ],
+        "as_of": "2026-07-07",
+    }
+
+    def test_bakes_priority_and_each_coach_read(self):
+        html = v4_proof.coaching_read_block_html(self.READ)
+        # the AC: actual coach voices are carried in the served no-JS HTML.
+        assert "Restart your logging this week" in html
+        assert "Dr. Kai Nakamura" in html
+        assert "Dr. Nathan Reeves" in html and "Psychiatrist" in html
+        assert "twelve days of silence" in html
+        assert "Dr. Victor Reyes" in html
+        assert "as of 2026-07-07" in html
+        assert html.startswith("<noscript>") and html.endswith("</noscript>")
+
+    def test_priority_only_still_renders(self):
+        html = v4_proof.coaching_read_block_html(
+            {"weekly_priority": {"text": "One clear call.", "coach_name": ""}, "coaches": [], "as_of": "2026-07-07"}
+        )
+        assert "One clear call." in html
+        assert "Each coach" not in html  # no roster section when no coach has a read
+
+    def test_coaches_only_still_renders(self):
+        html = v4_proof.coaching_read_block_html(
+            {"weekly_priority": {}, "coaches": [{"name": "Dr. X", "title": "", "position_summary": "A read."}], "as_of": "2026-07-07"}
+        )
+        assert "A read." in html and "Dr. X" in html
+        assert "The one priority" not in html  # no priority block when text is absent
+
+    def test_missing_data_omits_block_never_fabricates(self):
+        # ADR-104: no content -> no block; the JS view still renders.
+        assert v4_proof.coaching_read_block_html({}) == ""
+        assert v4_proof.coaching_read_block_html(None) == ""
+        assert v4_proof.coaching_read_block_html({"weekly_priority": {}, "coaches": []}) == ""
+
+    def test_escapes_html_in_coach_content(self):
+        html = v4_proof.coaching_read_block_html(
+            {"weekly_priority": {"text": "<b>hi</b> & bye", "coach_name": "A & B"}, "coaches": [], "as_of": "2026-07-07"}
+        )
+        assert "&lt;b&gt;hi&lt;/b&gt;" in html and "&amp;" in html
+        assert "<b>hi</b>" not in html
+
+    def test_loader_parses_live_api_shape(self, monkeypatch):
+        monkeypatch.setattr(
+            v4_proof,
+            "_fetch_json",
+            lambda path, timeout=8: {
+                "_meta": {"generated_at": "2026-07-08T01:31:08+00:00"},
+                "weekly_priority": {"text": " the call ", "coach_name": "Dr. Kai Nakamura", "generated_at": "2026-07-07T14:03:02+00:00"},
+                "coaches": [
+                    {"coach_id": "mind", "name": "Dr. Nathan Reeves", "title": "Psychiatrist", "position_summary": " a read "},
+                    {"coach_id": "sleep", "name": "Dr. Lisa Park", "title": "Sleep", "position_summary": ""},  # empty -> dropped
+                ],
+            },
+        )
+        out = v4_proof.load_coaching_read()
+        assert out["weekly_priority"] == {"text": "the call", "coach_name": "Dr. Kai Nakamura"}
+        # honest absence — the coach with an empty read is omitted, never fabricated.
+        assert [c["coach_id"] for c in out["coaches"]] == ["mind"]
+        assert out["coaches"][0]["position_summary"] == "a read"
+        # honest stamp prefers the priority's own generation date.
+        assert out["as_of"] == "2026-07-07"
+        assert out["source"] == "live"
+
+    def test_loader_falls_back_to_snapshot_offline(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
+        monkeypatch.setattr(v4_proof, "_snapshot", lambda: {"coaching_read": self.READ})
+        assert v4_proof.load_coaching_read() == self.READ
+
+
+class TestCoachingReadCommitted:
+    """#804 — the DELIVERED /coaching/ HTML carries the board's read: curl-visible, no JS."""
+
+    def _html(self, rel):
+        return (Path(__file__).resolve().parent.parent / "site" / "coaching" / rel).read_text(encoding="utf-8")
+
+    def test_index_carries_the_baked_read(self):
+        html = self._html("index.html")
+        assert "<noscript>" in html
+        assert "The board's read on the data" in html
+        assert "as of 20" in html  # a dated honesty stamp
+        # the differentiator: the committed snapshot has coach reads, so the roster ships.
+        assert "Each coach" in html
+
+    def test_read_section_carries_the_baked_read(self):
+        # the "read" landing (the default section URL) also ships the proof.
+        assert "The board's read on the data" in self._html("read/index.html")
+
+
 class TestFallback:
     def test_scorecard_falls_back_to_snapshot_offline(self, monkeypatch):
         monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
