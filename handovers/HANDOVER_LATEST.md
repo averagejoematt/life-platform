@@ -1,4 +1,4 @@
-# HANDOVER — high-value pay-down: 12 issues shipped end-to-end (3 Now), live alarms == code — 2026-07-07
+# HANDOVER — high-value pay-down: 13 issues shipped end-to-end (entire Now milestone incl. #780 SEC-02), live alarms == code — 2026-07-07
 
 > Instruction: "read memory and handover to put a plan together to efficiently pay down as
 > much of the high value open issues in git as possible in this session. I authorize you to
@@ -76,11 +76,28 @@ visual QA (see status block for final verdict).
 - CFN adopts an existing same-name alarm silently (PutMetricAlarm upsert) — used
   deliberately for `life-platform-recursive-loop`.
 
-## Next picks
+## #780 SEC-02 — DONE this session (Matthew was at his laptop)
 
-- **#780 SEC-02 — STILL THE TOP PRIORITY, needs Matthew at a laptop** (~10 min together):
-  rotate the MCP Function URL + he re-pastes it into the claude.ai connector; runbook in
-  private memory security-r22-mcp-token-exposure. Everything else in Now milestone is DONE.
+Rotated the MCP Function URL live (delete+recreate → new url-id; old host 403-dead, new
+host enforces the Bearer boundary), Matthew re-pasted the new URL into the claude.ai
+connector and reconnected (verified). PR #857: `lambdas/mcp_url.resolve_mcp_url()` — canary
++ qa-smoke now DISCOVER the URL at runtime via `lambda:GetFunctionUrlConfig` (both roles
+granted, scoped to the MCP fn ARN), so no URL is committed and future rotations are
+self-healing; CDK env vars + McpFunctionUrl CfnOutput removed; ARCHITECTURE/INFRASTRUCTURE/
+OPERATOR_GUIDE + integration-test host + setup_waf.sh redacted. Deployed
+LifePlatformOperational + LifePlatformMcp. **End-to-end proof: the i14 canary-MCP
+integration test now PASSES** (live canary discovered the new URL, derived the Bearer,
+reached the MCP endpoint). Gotcha: the #809 `life-platform-recursive-loop` alarm couldn't
+be adopted by CFN while a live orphan of the same name existed — CFN early-validation
+refuses ("already exists"); had to delete the live orphan, then CDK created it fresh (the
+"CFN upserts by name" assumption is FALSE for change-set validation). Residual (durable
+follow-up, not filed): the URL-possession auth model is the root weakness — either a real
+per-request gate claude.ai can satisfy, or a CI check that fails on any committed
+`*.lambda-url.*.on.aws` MCP host. Full detail in private memory
+security-r22-mcp-token-exposure.
+
+## Next picks (Now milestone is now EMPTY)
+
 - **#804** static-render /coaching/ (the #855 cockpit-proof pattern now makes this
   mechanical) · **#803** chronicle cadence/gap · **#808** Haiku spend attribution (top AI
   line) · **#812/#813** fable AI items (golden-harness generalization; prediction-
