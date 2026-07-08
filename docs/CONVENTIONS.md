@@ -82,15 +82,19 @@ output may already be live — leaving `main` both behind production and red.
 
 Source: #216, then the 2026-06-29 recurrence (`feedback_squash_merge_drops_unpushed_commits`).
 
-## 4. CI gate ordering — a red gate masks the ones after it
+## 4. CI gate ordering — one job, independently-reporting gates
 
-CI's `Lint + Syntax Check` job runs its gates **sequentially**:
-`flake8 (enforced subset) → black → ruff → mypy → py_compile`. A failure at one step
-stops the job, so later gates never run and their violations accumulate silently. The
-`Unit Tests` job `needs` Lint, so a **red Lint skips the entire test suite**. One
-unformatted file can therefore mask weeks of ruff/mypy/test debt that surface in layers
-as you fix upward — expect to peel several layers, re-checking the next gate after each
-fix.
+CI's `Lint + Syntax Check` job runs its gates in order —
+`flake8 (enforced subset) → black → ruff → mypy → py_compile → lambda_map coverage →
+content-policy → doc-drift` — but since #749 every gate after flake8 carries
+`if: always()`, so **each gate runs and reports even when an earlier one is red**: one
+push surfaces ALL violations at once. (Before #749 the steps were strictly sequential —
+the first red stopped the job and MASKED every later gate, so debt surfaced in layers,
+one push per layer. That masked-gate class bit twice on 2026-07-08 alone.) Gating is
+unchanged: any red gate still fails the Lint job, and `test-critical` (→ `plan` →
+`deploy`) `needs` Lint, so a **red Lint still blocks the deploy chain** — it just no
+longer hides the other gates' findings. NB: `always()` steps also run after a
+cancellation; with `cancel-in-progress: false` that only happens on a manual cancel.
 
 **Run the exact gates before pushing** (over `lambdas/ mcp/ cdk/ tests/ scripts/ deploy/`):
 ```bash
@@ -158,6 +162,21 @@ deploy): statistical-rigor tests, narrative/AI-quality judgement, doc-drift, and
 content/data-correctness. Adding a file to the lane = add `pytestmark =
 pytest.mark.deploy_critical` **and** a row here; keep the two in sync. Confirm the lane
 after any change: `python3 -m pytest tests/ -m "deploy_critical and not integration" -q`.
+
+### 4b. Visual-QA fires independently of the pipeline (#749)
+
+The reader-facing regression net (Playwright sweep + Bedrock vision QA + the accuracy
+gate) exists in **two** places:
+
+- **Pipeline copy** (`ci-cd.yml` job `visual-qa`, `needs: deploy`) — still GATES the
+  pipeline post-deploy; the site auto-rollback keys off its failure.
+- **Standalone copy** (`.github/workflows/visual-qa.yml`) — `workflow_dispatch` + daily
+  20:07 UTC cron against the LIVE site. Gates nothing, rolls back nothing; a failure
+  reds the run + posts to the SNS digest. This is what keeps the net firing when the
+  pipeline copy is skipped (red upstream job, or a push with nothing to deploy).
+
+The two step lists must stay in sync — change one, change both. Run it on demand:
+`gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`).
 
 ## 5. The CDK asset-staging trap — a 200 invoke is not proof of a good deploy
 
