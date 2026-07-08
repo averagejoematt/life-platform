@@ -815,6 +815,38 @@ aws ce get-cost-and-usage \
   --query 'ResultsByTime[0].Groups[].{Service:Keys[0],Cost:Metrics.UnblendedCost.Amount}' --output table
 ```
 
+### Per-feature AI spend attribution (#808 · R22-COST-02)
+
+When Bedrock is the swing factor, `bedrock_client._emit_usage_metrics()` already meters
+every Claude call per-feature to `LifePlatform/AI` (`EstimatedCostUSD` + token counts,
+dimensioned by `LambdaFunction`). `scripts/ai_spend_attribution.py` is the read-only
+reporting surface over those metrics — it ranks features by $, back-solves each feature's
+model from the emitted cost, and reconciles against the authoritative per-model totals
+(`AWS/Bedrock` token metrics — the same source `cost_governor` trusts).
+
+```bash
+python3 scripts/ai_spend_attribution.py                 # current month-to-date
+python3 scripts/ai_spend_attribution.py --month 2026-06 # a specific calendar month
+python3 scripts/ai_spend_attribution.py --days 14       # trailing-window run-rate
+python3 scripts/ai_spend_attribution.py --json          # machine-readable
+```
+
+Run it as the **drift-check** whenever an `ai-tokens-*` alarm fires or before targeting a
+cost-reduction (e.g. #409 batch pricing): if a "cheap tier" (Haiku) feature has crept to
+the top of the ranking, that's the batch / prompt-diet target.
+
+Two known interpretation notes:
+- **`mixed` rows** — a Lambda that called >1 model in the window (daily-brief and the coach
+  pipeline blend a Sonnet narrative pass with Haiku extraction passes) can't be split by the
+  per-feature EMF (it carries a `LambdaFunction` dimension but no model), so its Haiku portion
+  is folded into that one row. Use the authoritative per-model footer for the true split, or a
+  short `--days` window (recent Haiku-only activity back-solves cleanly). Exact per-feature
+  **and** per-model $ would need a `Model` dimension on the emit — a recurring CloudWatch
+  metric cost, so it's a deliberate costed follow-up, not on by default.
+- **Coverage < 100%** — the self-reported per-feature total under-counts vs the authoritative
+  AWS/Bedrock total (calls that don't reach the EMF chokepoint); the footer prints the ratio.
+  The **ranking** (relative shares) is the deliverable, not the absolute self-reported total.
+
 ## MCP Tool Usage Telemetry
 
 MCP tool invocations emit to CloudWatch namespace **`LifePlatform/MCP`** with metrics `ToolInvocations`, `ToolErrors`, `ToolDuration`, `AuthFailures` (dimensioned by `ToolName`).
