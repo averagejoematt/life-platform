@@ -22,6 +22,12 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
   4. BUCKET-POLICY DELETE-PROTECTION — the `ProtectDataFromDeployScripts` Deny statement
      that guards raw data (raw/*, config/*, uploads/*, …) is verified live against the
      source of truth (deploy/bucket_policy.json). A loosened or dropped Deny is loud.
+  5. SITE/MAIN SHA ANCESTRY (#751) — the live https://averagejoematt.com/version.json
+     build SHA must be an ancestor of (or equal to) origin/main HEAD. CI's I22
+     (tests/test_integration_aws.py::test_i22_site_version_sha_on_main) checks this
+     right after a deploy; this is the STANDING scheduled version that catches
+     out-of-band drift BETWEEN deploys (no new always-on infra — read-only HTTPS GET
+     + local `git merge-base --is-ancestor`).
 
 Output: a findings record written to s3://<bucket>/drift-log/{latest,<date>}.json
 (mirrors the Coherence Sentinel's coherence-log pattern) so the remediation agent can
@@ -300,6 +306,73 @@ def _protect_prefixes(policy):
     return out
 
 
+def _fetch_live_version(url):
+    """GET /version.json and parse it. Raises on any network/parse failure — the
+    caller turns that into a soft 'error' status, never a crash."""
+    import urllib.request
+
+    with urllib.request.urlopen(url, timeout=10) as r:  # noqa: S310 — fixed https URL
+        return json.loads(r.read())
+
+
+def _git_fetch_main():
+    """Best-effort `git fetch origin main` so the local ref is current. Non-fatal:
+    a stale-but-present ref is still useful, so failures are swallowed."""
+    import subprocess
+
+    subprocess.run(["git", "fetch", "origin", "main", "--quiet"], check=True, capture_output=True, cwd=_ROOT, timeout=30)
+
+
+def _merge_base_is_ancestor(sha, ref="origin/main"):
+    """Return the `git merge-base --is-ancestor` CompletedProcess (returncode 0 = sha
+    is an ancestor of/equal to ref; 1 = exists but diverged; 128 = sha unknown)."""
+    import subprocess
+
+    return subprocess.run(["git", "merge-base", "--is-ancestor", sha, ref], cwd=_ROOT, capture_output=True, timeout=30)
+
+
+def check_site_sha_ancestry():
+    """#751: the LIVE site's /version.json build SHA must be an ancestor of (or equal
+    to) origin/main HEAD. CI's I22 (tests/test_integration_aws.py) catches this right
+    after a deploy, but only runs on a deploy and needs a full-history checkout. This is
+    the STANDING scheduled check that catches drift BETWEEN deploys — e.g. a manual
+    site sync from a stale/unmerged branch, or a rollback that never got a matching
+    merge. Read-only: one HTTPS GET + a local `git merge-base --is-ancestor`."""
+    url = os.environ.get("SITE_VERSION_URL", "https://averagejoematt.com/version.json")
+    try:
+        version_data = _fetch_live_version(url)
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"fetch {url}: {e}"}
+
+    live_sha = (version_data.get("build") or "").strip()
+    if not live_sha:
+        return {"status": "error", "detail": "version.json has no 'build' field"}
+
+    try:
+        _git_fetch_main()
+    except Exception:  # noqa: BLE001 — non-fatal; fall back to whatever ref is local
+        pass
+
+    try:
+        result = _merge_base_is_ancestor(live_sha)
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"merge-base check: {e}", "live_sha": live_sha}
+
+    if result.returncode == 0:
+        return {"status": "clean", "live_sha": live_sha}
+    if result.returncode == 128:
+        return {
+            "status": "drift",
+            "live_sha": live_sha,
+            "detail": f"live SHA {live_sha!r} not found in git history at all — deployed from an unmerged branch or a different clone",
+        }
+    return {
+        "status": "drift",
+        "live_sha": live_sha,
+        "detail": f"live SHA {live_sha!r} exists but is not an ancestor of origin/main — site has diverged from main",
+    }
+
+
 def check_doc_literals():
     """#791: live counts vs the documented literals in sync_doc_metadata.PLATFORM_FACTS.
 
@@ -357,6 +430,7 @@ def run_sweep():
         "orphan_functions": check_orphan_functions(),
         "bucket_policy": check_bucket_policy(),
         "doc_literals": check_doc_literals(),
+        "site_sha_ancestry": check_site_sha_ancestry(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -391,6 +465,7 @@ def _summary(status, checks):
         ("orphan_functions", "orphan function(s)"),
         ("bucket_policy", "delete-protection gap"),
         ("doc_literals", "doc-literal drift"),
+        ("site_sha_ancestry", "live site SHA not on main"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -433,6 +508,8 @@ def print_summary(record):
                 detail = f" — {[i.get('function') for i in c.get('incomplete', [])]}"
             elif name == "doc_literals":
                 detail = f" — {[(m['fact'], m['documented'], 'live', m['live']) for m in c.get('mismatches', [])]}"
+            elif name == "site_sha_ancestry":
+                detail = f" — {c.get('detail', '')}"
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")
