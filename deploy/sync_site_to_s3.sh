@@ -71,6 +71,10 @@ if [ "${1:-}" != "--dry-run" ]; then
   # the baked read every deploy. Best-effort — load_coaching_read() falls back to the
   # committed snapshot when the live API is unreachable, so the read never blanks.
   python3 "$(dirname "$0")/../scripts/v4_build_coaching.py" || echo "  ⚠️  coaching build skipped (offline?) — keeping existing baked read"
+  # #803: regenerate the story shells so the chronicle's <noscript> carries the
+  # week-gap note + any pending-installment disclosure (a held week must say why
+  # instead of going silent). Best-effort — keeps the existing shells if offline.
+  python3 "$(dirname "$0")/../scripts/v4_build_dispatches.py" || echo "  ⚠️  dispatches build skipped (offline?) — keeping existing story shells"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.
