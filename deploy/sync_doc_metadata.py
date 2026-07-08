@@ -398,6 +398,25 @@ def _count_adrs() -> int | None:
         return None
 
 
+def _auto_discover_adr_max() -> int | None:
+    """Highest `ADR-NNN` number referenced anywhere in docs/DECISIONS.md.
+
+    Distinct from _count_adrs() (which counts `## ADR-` headings, i.e. the
+    number of records — some ADR numbers are skipped/merged so the count and
+    the max diverge, see #817). This backs the "(ADR-001…NNN)" range literal
+    quoted outside DECISIONS.md itself (e.g. .claude/README.md), which needs
+    the max number, not the record count.
+    """
+    decisions = DOCS / "DECISIONS.md"
+    if not decisions.exists():
+        return None
+    try:
+        nums = [int(n) for n in re.findall(r"ADR-(\d{3})", decisions.read_text(encoding="utf-8"))]
+        return max(nums) if nums else None
+    except Exception:
+        return None
+
+
 def _count_test_functions() -> int | None:
     """Count `def test_` functions across tests/*.py.
 
@@ -492,6 +511,13 @@ def _apply_auto_discovered(facts: dict) -> dict:
         facts["version"] = version
         facts["date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
+    adr_max = _auto_discover_adr_max()
+    if adr_max is not None:
+        adr_max_str = f"{adr_max:03d}"
+        if facts.get("adr_max") != adr_max_str:
+            print(f"  [auto] adr_max: {facts.get('adr_max')} → {adr_max_str} (highest ADR-NNN in docs/DECISIONS.md, #817)")
+        facts["adr_max"] = adr_max_str
+
     # Recompute derived facts
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
@@ -519,6 +545,7 @@ PLATFORM_FACTS = {
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 9,
     "iam_roles": 43,
+    "adr_max": "132",  # fallback: auto-discovered from docs/DECISIONS.md (#817, _auto_discover_adr_max)
     # Secret state
     "api_keys_status": "PERMANENTLY DELETED 2026-03-14",
     # Cost
@@ -665,6 +692,21 @@ RULES = [
         "CLAUDE.md",
         r"~\d+ tools across \d+\+ domain modules",
         "~{tool_count} tools across 30+ domain modules",
+    ),
+    # ── .claude/README.md ────────────────────────────────────────────────────
+    # The "how this platform is built with Claude" doc — its headline ADR range
+    # + MCP tool count are quoted for a human reviewer, not read by an agent
+    # session, so they rotted silently until #817 (found ADR-001…079 and 133
+    # tools vs. the real ADR-132-ish / ~143 via the AST counter).
+    (
+        ".claude/README.md",
+        r"\(ADR-\d{3}…\d{3}\)",
+        "(ADR-001…{adr_max})",
+    ),
+    (
+        ".claude/README.md",
+        r"\d+ tools that let Claude query",
+        "{tool_count} tools that let Claude query",
     ),
 ]
 

@@ -254,8 +254,12 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | Test count | `PLATFORM_STATS["test_count"]` in `lambdas/web/site_api_common.py`, auto-bumped by the sync + the pre-commit hook |
 | Live site build | `curl -s https://averagejoematt.com/version.json` → compare `build` to `git rev-parse --short HEAD`; a mismatch means the viewer's device is stale |
 
-The pre-commit hook runs `deploy/sync_doc_metadata.py --apply`, which may leave files
-unstaged — fold them into the commit (`git add … && git commit --amend --no-edit
+The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
+`deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it
+touches (`docs/`, `CLAUDE.md`, `.claude/README.md`,
+`lambdas/web/site_api_common.py`). If you run the script by hand outside a commit
+(or add a new doc to its `RULES` table that falls outside that stage glob), fold
+the changes into the commit yourself (`git add … && git commit --amend --no-edit
 --no-verify`) or `test_platform_stats_truth.py` reds CI.
 
 ---
