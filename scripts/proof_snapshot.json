@@ -1,5 +1,5 @@
 {
-  "_note": "Offline fallback for scripts/v4_proof.py (#729/#730). Refresh by re-running the builders online; the live API is preferred at build time. as_of/evaluator_live_since are honest stamps.",
+  "_note": "Offline fallback for scripts/v4_proof.py (#729/#730/#788/#804). Refresh by re-running the builders online; the live API is preferred at build time. as_of/evaluator_live_since are honest stamps.",
   "scorecard": {
     "total": 385,
     "confirmed": 0,
@@ -17,14 +17,57 @@
     "tier": "Foundation",
     "as_of": "2026-07-06",
     "pillars": {
-      "sleep": {"raw_score": 82.9, "tier": "Momentum"},
-      "movement": {"raw_score": 25.8, "tier": "Foundation"},
-      "nutrition": {"raw_score": 1.6, "tier": "Foundation"},
-      "metabolic": {"raw_score": 59.4, "tier": "Foundation"},
-      "mind": {"raw_score": 15.9, "tier": "Foundation"},
-      "relationships": {"raw_score": 50.0, "tier": "Foundation"},
-      "consistency": {"raw_score": 32.5, "tier": "Foundation"}
+      "sleep": {
+        "raw_score": 82.9,
+        "tier": "Momentum"
+      },
+      "movement": {
+        "raw_score": 25.8,
+        "tier": "Foundation"
+      },
+      "nutrition": {
+        "raw_score": 1.6,
+        "tier": "Foundation"
+      },
+      "metabolic": {
+        "raw_score": 59.4,
+        "tier": "Foundation"
+      },
+      "mind": {
+        "raw_score": 15.9,
+        "tier": "Foundation"
+      },
+      "relationships": {
+        "raw_score": 50.0,
+        "tier": "Foundation"
+      },
+      "consistency": {
+        "raw_score": 32.5,
+        "tier": "Foundation"
+      }
     },
+    "source": "snapshot"
+  },
+  "coaching_read": {
+    "weekly_priority": {
+      "text": "Matthew, you logged nine strength sessions totaling 1,108 minutes, stayed mobile at 4,592 steps per day, and maintained a recovery score of 68% and resting heart rate of 57 bpm—all of this in the middle of an aggressive deficit. That's real work. The weight is moving (7.3 lb/week), your autonomic nervous system is stable, and your sleep quality hasn't fractured despite the circadian drift. Here's what matters next: you need to restart your logging—food, training, and one journal entry—this week. Not because you've failed, but because you've built a system too efficient to run blind. The passive metrics can't tell me whether you're sustainable or autopilot. The wearables don't know if you're genuinely hungry or just numb to the deficit. Only you do. I need you back in the loop so I can see what your body is actually telling you.",
+      "coach_name": "Dr. Kai Nakamura"
+    },
+    "coaches": [
+      {
+        "name": "Dr. Nathan Reeves",
+        "title": "Psychiatrist — Behavioral Patterns",
+        "coach_id": "mind",
+        "position_summary": "At day 21, the coach's prediction about novelty fading has materialized. The subject's food logging ceased on June 24th—twelve days of silence—while wearables continued reporting stable physiology: HR"
+      },
+      {
+        "name": "Dr. Victor Reyes",
+        "title": "Longevity & Body Composition",
+        "coach_id": "physical",
+        "position_summary": "Twelve days without logged meals or training data has created an interpretive blind spot. While wearables show stable recovery (68%), HRV (46 ms), and resting heart rate (57 bpm), the coach cannot ass"
+      }
+    ],
+    "as_of": "2026-07-07",
     "source": "snapshot"
   },
   "chronicle": [
@@ -44,13 +87,13 @@
       "date": "2026-06-11",
       "title": "The Empty Journal",
       "url": "/journal/posts/week-02/",
-      "label": "Prologue \u00b7 Part II"
+      "label": "Prologue · Part II"
     },
     {
       "date": "2026-06-07",
       "title": "The Body Votes First",
       "url": "/journal/posts/week-01/",
-      "label": "Prologue \u00b7 Part I"
+      "label": "Prologue · Part I"
     }
   ]
 }

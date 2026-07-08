@@ -64,6 +64,13 @@ if [ "${1:-}" != "--dry-run" ]; then
   # into /now/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
   # effort; keeps the last baked block if the live API is unreachable.
   python3 "$(dirname "$0")/../scripts/v4_build_cockpit_proof.py" || echo "  ⚠️  cockpit proof skipped (offline?) — keeping existing baked block"
+  # #804: regenerate the /coaching/ shells with the board's live read baked into the
+  # "read" landing's <noscript> (weekly priority + each coach's read) — the #729/#730/
+  # #788 treatment for the core differentiator. The generator is the source of truth
+  # for the coaching shells (editing the HTML alone drifts); running it here refreshes
+  # the baked read every deploy. Best-effort — load_coaching_read() falls back to the
+  # committed snapshot when the live API is unreachable, so the read never blanks.
+  python3 "$(dirname "$0")/../scripts/v4_build_coaching.py" || echo "  ⚠️  coaching build skipped (offline?) — keeping existing baked read"
   # #498: data_sources.json is GENERATED from lambdas/source_registry.py — never hand-edit.
   python3 "$(dirname "$0")/../scripts/v4_build_data_sources.py" || echo "  ⚠️  data_sources build skipped — keeping existing site/data/data_sources.json"
   # #544: /method/registry/ is GENERATED from lambdas/methods_registry.py — never hand-edit.

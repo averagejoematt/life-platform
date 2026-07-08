@@ -28,6 +28,7 @@ bakes last-known-good numbers rather than blanks):
   - scorecard: GET /api/predictions        (overall confirmed/refuted/pending/decided)
   - chronicle: GET /journal/posts.json      (the dated weekly post list)
   - cockpit:   GET /api/character           (the live level + tier + pillar scores — #788)
+  - coaching:  GET /api/coaching-dashboard   (the board's read — weekly priority + each coach's read — #804)
   - fallback:  scripts/proof_snapshot.json
 """
 from __future__ import annotations
@@ -154,6 +155,51 @@ def load_chronicle() -> list:
         out.sort(key=lambda p: p.get("date", ""), reverse=True)
         return out
     return _snapshot().get("chronicle", [])
+
+
+def load_coaching_read() -> dict:
+    """The board's live read from /api/coaching-dashboard, else the committed snapshot.
+
+    /api/coaching-dashboard is the SAME body the coaching page's default "read" view
+    renders (coaching.js::renderReadToday). We keep only what that view shows: the
+    integrator's weekly priority (text + coach_name) and each coach's own read
+    (position_summary). A coach with an empty position_summary is dropped — never a
+    fabricated read (ADR-104 behavioral-absence). If the live API is unreachable we
+    fall back to the last-known-good snapshot so an offline/CI build still bakes real
+    coach voices rather than a blank shell.
+    """
+    d = _fetch_json("/api/coaching-dashboard")
+    if isinstance(d, dict) and (d.get("weekly_priority") or d.get("coaches")):
+        wp = d.get("weekly_priority") or {}
+        coaches = []
+        for c in d.get("coaches", []) or []:
+            summary = str(c.get("position_summary") or "").strip()
+            if not summary:
+                continue  # honest absence — a coach with no live read is omitted
+            coaches.append(
+                {
+                    "name": c.get("name", ""),
+                    "title": c.get("title", ""),
+                    "coach_id": c.get("coach_id", ""),
+                    "position_summary": summary,
+                }
+            )
+        text = str(wp.get("text") or "").strip()
+        if not text and not coaches:
+            # dashboard responded but carries no readable content — fall through to snapshot
+            return _snapshot().get("coaching_read", {})
+        # honest stamp: prefer the priority's own generation date, else the payload's
+        generated = str(wp.get("generated_at") or d.get("_meta", {}).get("generated_at") or "")
+        return {
+            "weekly_priority": {
+                "text": text,
+                "coach_name": str(wp.get("coach_name") or "").strip(),
+            },
+            "coaches": coaches,
+            "as_of": generated[:10] or _today(),
+            "source": "live",
+        }
+    return _snapshot().get("coaching_read", {})
 
 
 def load_chronicle_pending() -> dict:
@@ -327,6 +373,56 @@ def cockpit_block_html(ch: dict) -> str:
     lines.append(
         "<p>The live view (today's board read, trends, time travel) needs JavaScript. "
         'What a level means: <a href="/method/character/">the method</a>.</p>'
+    )
+    lines.append("</section></noscript>")
+    return "".join(lines)
+
+
+def coaching_read_block_html(read: dict) -> str:
+    """The coaching page's static proof (#804 · R22-UX-02): the board's read — the
+    integrator's weekly priority + each named coach's own read — baked into
+    /coaching/'s served HTML as <noscript>, the same #729/#730/#788 treatment.
+
+    /coaching/ is the platform's core differentiator ("watch AI coaches argue about
+    your data") yet shipped as a pure JS shell — only genesisStamp resolved without
+    JS, so a crawler / LLM / no-JS visitor / the first seconds before scripts load saw
+    an empty page. This bakes the ACTUAL coach voices the "read" view renders.
+
+    Only content the page's own JS shows is baked (from /api/coaching-dashboard — the
+    same body renderReadToday reads); a coach with no live read is omitted, never a
+    fabricated read (ADR-104/105). No data at all -> "" and the shell ships unchanged.
+    """
+    if not read:
+        return ""
+    wp = read.get("weekly_priority") or {}
+    priority = str(wp.get("text") or "").strip()
+    coaches = read.get("coaches") or []
+    if not priority and not coaches:
+        return ""
+    as_of = read.get("as_of", "")
+
+    lines = [
+        '<noscript><section class="proof-static dx-prose" aria-label="The board\'s read">',
+        f'<p class="label">The board\'s read on the data — as of {_esc(as_of)}</p>',
+    ]
+    if priority:
+        coach_name = str(wp.get("coach_name") or "").strip()
+        who = f" · {_esc(coach_name)}" if coach_name else ""
+        lines.append(f'<p class="label">The one priority{who}</p>')
+        lines.append(f"<blockquote>{_esc(priority)}</blockquote>")
+    if coaches:
+        lines.append('<p class="label">Each coach\'s read</p>')
+        rows = []
+        for c in coaches:
+            name = _esc(c.get("name", "") or c.get("coach_id", ""))
+            title = c.get("title", "")
+            who = f"{name}" + (f" · {_esc(title)}" if title else "")
+            rows.append(f"<li><strong>{who}</strong> — {_esc(c['position_summary'])}</li>")
+        lines.append(f'<ul>{"".join(rows)}</ul>')
+    lines.append(
+        "<p>The live board (today's read, the disagreements, each coach on top of the "
+        'actual numbers) needs JavaScript. <a href="/coaching/by-coach/">By coach</a> · '
+        '<a href="/coaching/team/">who they are</a>.</p>'
     )
     lines.append("</section></noscript>")
     return "".join(lines)
