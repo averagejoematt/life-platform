@@ -83,15 +83,80 @@ def test_orphan_allowlist_excludes_cdk_bootstrap():
     assert not "life-platform-whoop".startswith(ds._ORPHAN_ALLOW_PREFIXES)
 
 
+# ── site/main SHA ancestry (#751) ────────────────────────────────────────────
+
+
+class _FakeCompleted:
+    def __init__(self, returncode):
+        self.returncode = returncode
+
+
+def test_site_sha_ancestry_clean_when_sha_is_ancestor(monkeypatch):
+    monkeypatch.setattr(ds, "_fetch_live_version", lambda url: {"build": "abc1234"})
+    monkeypatch.setattr(ds, "_git_fetch_main", lambda: None)
+    monkeypatch.setattr(ds, "_merge_base_is_ancestor", lambda sha, ref="origin/main": _FakeCompleted(0))
+    res = ds.check_site_sha_ancestry()
+    assert res == {"status": "clean", "live_sha": "abc1234"}
+
+
+def test_site_sha_ancestry_drift_when_sha_diverged(monkeypatch):
+    monkeypatch.setattr(ds, "_fetch_live_version", lambda url: {"build": "deadbee"})
+    monkeypatch.setattr(ds, "_git_fetch_main", lambda: None)
+    monkeypatch.setattr(ds, "_merge_base_is_ancestor", lambda sha, ref="origin/main": _FakeCompleted(1))
+    res = ds.check_site_sha_ancestry()
+    assert res["status"] == "drift"
+    assert "diverged" in res["detail"]
+
+
+def test_site_sha_ancestry_drift_when_sha_unknown(monkeypatch):
+    monkeypatch.setattr(ds, "_fetch_live_version", lambda url: {"build": "0000000"})
+    monkeypatch.setattr(ds, "_git_fetch_main", lambda: None)
+    monkeypatch.setattr(ds, "_merge_base_is_ancestor", lambda sha, ref="origin/main": _FakeCompleted(128))
+    res = ds.check_site_sha_ancestry()
+    assert res["status"] == "drift"
+    assert "not found in git history" in res["detail"]
+
+
+def test_site_sha_ancestry_error_on_fetch_failure(monkeypatch):
+    def _boom(url):
+        raise RuntimeError("timed out")
+
+    monkeypatch.setattr(ds, "_fetch_live_version", _boom)
+    res = ds.check_site_sha_ancestry()
+    assert res["status"] == "error"
+    assert "timed out" in res["detail"]
+
+
+def test_site_sha_ancestry_error_when_build_field_missing(monkeypatch):
+    monkeypatch.setattr(ds, "_fetch_live_version", lambda url: {})
+    res = ds.check_site_sha_ancestry()
+    assert res["status"] == "error"
+    assert "build" in res["detail"]
+
+
+def test_site_sha_ancestry_survives_git_fetch_failure(monkeypatch):
+    # A stale local ref is still useful — a `git fetch` failure (offline runner, rate
+    # limit) must not turn into a hard error.
+    def _boom():
+        raise RuntimeError("network unreachable")
+
+    monkeypatch.setattr(ds, "_fetch_live_version", lambda url: {"build": "abc1234"})
+    monkeypatch.setattr(ds, "_git_fetch_main", _boom)
+    monkeypatch.setattr(ds, "_merge_base_is_ancestor", lambda sha, ref="origin/main": _FakeCompleted(0))
+    res = ds.check_site_sha_ancestry()
+    assert res["status"] == "clean"
+
+
 # ── sweep status aggregation + summary (AC1/AC4) ─────────────────────────────
 
 
-def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None):
+def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None):
     monkeypatch.setattr(ds, "check_cfn_drift", lambda *a, **k: cfn)
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
     monkeypatch.setattr(ds, "check_bucket_policy", lambda: bucket)
     monkeypatch.setattr(ds, "check_doc_literals", lambda: doc or {"status": "clean", "mismatches": []})
+    monkeypatch.setattr(ds, "check_site_sha_ancestry", lambda: site or {"status": "clean", "live_sha": "deadbeef"})
 
 
 def test_sweep_clean(monkeypatch):
@@ -145,6 +210,20 @@ def test_sweep_doc_literal_drift(monkeypatch):
     rec = ds.run_sweep()
     assert rec["status"] == "drift"
     assert "doc-literal" in rec["summary"]
+
+
+def test_sweep_site_sha_drift(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean"},
+        site={"status": "drift", "live_sha": "deadbee", "detail": "live SHA 'deadbee' exists but is not an ancestor of origin/main"},
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "live site SHA not on main" in rec["summary"]
 
 
 # ── report seam (AC4) ────────────────────────────────────────────────────────
