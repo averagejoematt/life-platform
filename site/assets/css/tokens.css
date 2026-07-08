@@ -1287,6 +1287,18 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .coach-mark .portrait { inline-size: 100%; block-size: 100%; }
 .portrait .pt-frame { opacity: 0.35; }
 .portrait .pt-hatch { color: var(--coach, var(--ember)); opacity: 0.75; }
+/* Hover (#594) — 1.2° tilt + 0.8px eye shift, 200ms, CSS transitions only (never
+   a continuous cursor-follow). The tilt lives on the portrait ROOT rather than
+   the literal `head` recipe layer, or `.pt-breath` (below): `.pt-breath` already
+   drives its own always-on translateY `animation`, and a `:hover` transform on
+   that SAME element/property would just lose to the running animation, not
+   compose with it — so the "head-group" here is the whole mark, and only the
+   independently-animated eyes layers (opacity-only blink, no transform of their
+   own) get their own, non-conflicting shift. The transition itself sits outside
+   the reduced-motion guard (harmless with no motion to trigger it, same as the
+   .ask-chip color transitions above); the actual :hover transform values are
+   inside it, alongside the semantic states below. */
+.portrait { transition: transform 0.2s var(--ease-out); transform-origin: 50% 55%; }
 /* Portrait motion — all inside the reduced-motion wrapper: draw-in reuses the
    sigilDraw grammar; the blink period is per-coach (portraits.js seeds
    --pt-blink from FNV-1a, 4–8s); breath is a 4.5s micro-translate. Fail-open:
@@ -1302,6 +1314,45 @@ a.vg-lit:hover { background: var(--ember-wash); }
   .portrait .pt-breath { transform-box: fill-box; transform-origin: 50% 65%;
     animation: ptBreath 4.5s var(--ease-inout, ease-in-out) infinite; }
   @keyframes ptBreath { 50% { transform: translateY(0.7px); } }
+
+  .portrait:hover { transform: rotate(1.2deg); }
+  .portrait:hover .pt-eyes-open, .portrait:hover .pt-eyes-closed {
+    transform-box: fill-box; transition: transform 0.2s var(--ease-out); transform: translateX(0.8px);
+  }
+
+  /* Semantic states (#594) — data-portrait-state set by portraits.js
+     (wireSpeakingAudio/markStanceChange) or passed at render time (writing).
+     Same restrained ring-pulse idiom as the freshness dot above ([data-fresh-ts]
+     .fr-live / fr-pulse) — box-shadow only, never a bespoke glow, "earned" per
+     §8.5: speaking rides real audio playback, writing rides real authorship,
+     stance-change rides a real new stance_history entry. */
+  .portrait[data-portrait-state="speaking"] { animation: ptSpeakPulse var(--dur) var(--ease-inout) infinite; border-radius: 50%; }
+  @keyframes ptSpeakPulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--coach, var(--ember)) 45%, transparent); }
+    50% { box-shadow: 0 0 0 4px transparent; }
+  }
+  /* period = var(--dur) = 0.36s = exactly two of the JS mouth-toggle's 180ms
+     ticks, so the pulse crests on the same cadence as the mouth motion without
+     inventing a new number — not frame-locked to it (independent timers). */
+
+  /* Elena's chronicle byline while she carries authorship of the piece: slow
+     (6s), textural, NO transform/scale (earned glow / no gloss, §8.5) — ambient,
+     never attention-grabbing. */
+  .portrait[data-portrait-state="writing"] { animation: ptWriteShimmer 6s var(--ease-inout) infinite; border-radius: 50%; }
+  @keyframes ptWriteShimmer {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--coach, var(--ember)) 18%, transparent); }
+    50% { box-shadow: 0 0 0 3px color-mix(in oklch, var(--coach, var(--ember)) 5%, transparent); }
+  }
+
+  /* A coach's read on Matthew just moved — the instrument recalibrating. ONE
+     sweep (iteration-count 1, not infinite); portraits.js clears the attribute
+     after it plays so a later re-render can't replay it without a genuinely
+     new stance_history entry. */
+  .portrait[data-portrait-state="stance-change"] { animation: ptStanceSweep 1.1s var(--ease-out) 1; border-radius: 50%; }
+  @keyframes ptStanceSweep {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--coach, var(--ember)) 55%, transparent); }
+    45% { box-shadow: 0 0 0 6px transparent; }
+  }
 }
 
 /* ── Pillar identity colors (§8.6) — the character sheet's seven pillars.

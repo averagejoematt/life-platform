@@ -13,9 +13,28 @@
   reuses sigilDraw, blink period is seeded per coach (FNV-1a → 4–8s, inline
   --pt-blink), breath is a 4.5s micro-translate; `prefers-reduced-motion` gets
   the full static portrait (eyes-open visible via inline attrs, not JS).
+
+  Semantic states (#594) — `data-portrait-state` on the root <svg>, ambient CSS
+  in tokens.css §Coach-portraits, all inside the same reduced-motion guard:
+    - "writing"      — passed as a render opt (opts.state), pure CSS, no JS.
+    - "speaking"      — wireSpeakingAudio() below drives the mouth-rest/mouth-a
+      toggle from a Panel-page <audio> element's play/pause/ended. Only
+      mouth-rest + mouth-a exist in ANY commissioned recipe (config/portraits/
+      *.json never got a third "mouth-b" frame) — this toggles the two real
+      ones, it never fabricates a third shape.
+    - "stance-change" — markStanceChange() below detects (client-side, via
+      localStorage) that a coach's stance_history grew, and sets the attribute
+      for exactly one non-looping CSS sweep, then clears it.
+  Every JS entry point here re-checks prefers-reduced-motion itself (a CSS
+  @media guard alone cannot stop a running setInterval).
 */
 import { fnv1a, mulberry32, seedOf } from "/assets/js/sigils.js";
 import { PORTRAITS, ALIASES } from "/assets/js/portrait_data.js";
+
+const reducedMotion = () => {
+  try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
+  catch (e) { return true; } // no matchMedia (very old/non-browser env) — fail toward NOT starting motion
+};
 
 const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 const r2 = (n) => Math.round(n * 100) / 100;
@@ -75,7 +94,7 @@ function seededFrame(seed) {
     cls   — extra classes on the root svg (e.g. "portrait-lg").
     size  — rendered px hint; the frame composes only at ≥ 40 (below that it's noise).
 */
-export function renderPortrait(recipe, coach, { title, cls = "", size } = {}) {
+export function renderPortrait(recipe, coach, { title, cls = "", size, state } = {}) {
   if (!recipe || !recipe.layers || !recipe.layers.head) return null;
   const id = String(recipe.persona_id || seedOf(coach));
   const seed = fnv1a(id);
@@ -108,7 +127,8 @@ export function renderPortrait(recipe, coach, { title, cls = "", size } = {}) {
     if (pal[t]) vars += `;--pt-${t}:${escAttr(pal[t])}`;
     else if (t === "accent") vars += `;--pt-accent:var(--coach, currentColor)`;
   }
-  return `<svg class="portrait${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 100 120" style="${vars}" ${a11y}>${body}</svg>`;
+  const stateAttr = state ? ` data-portrait-state="${escAttr(state)}"` : "";
+  return `<svg class="portrait${cls ? " " + escAttr(cls) : ""}" viewBox="0 0 100 120" style="${vars}" ${a11y}${stateAttr}>${body}</svg>`;
 }
 
 /*
@@ -120,4 +140,86 @@ export function portrait(coach, opts = {}) {
   const key = seedOf(coach);
   const recipe = PORTRAITS[key] || PORTRAITS[ALIASES[key]];
   return recipe ? renderPortrait(recipe, coach, opts) : null;
+}
+
+/*
+  wireSpeakingAudio(audioEl, portraitEls) — the Panel page's "speaking" state
+  (#594). Toggles each portrait's mouth-rest/mouth-a layers (the only two real
+  mouth frames any recipe has — see the file header) at a ~180ms cadence for as
+  long as `audioEl` is actually playing, and sets/clears `data-portrait-state`
+  in step (tokens.css supplies the accompanying ring-pulse, keyed to the SAME
+  attribute — no separate CSS trigger to keep in sync). `portraitEls` should be
+  ONLY the portrait(s) credited on that one episode (e.g. Elena + the guest
+  coach) — never every portrait on the page.
+*/
+function setMouthFrame(portraitEl, showAlt) {
+  const rest = portraitEl.querySelector('[data-l="mouth-rest"]');
+  const alt = portraitEl.querySelector('[data-l="mouth-a"]');
+  if (rest) rest.style.opacity = showAlt ? "0" : "1";
+  if (alt) alt.style.opacity = showAlt ? "1" : "0";
+}
+const _speakingTimers = new WeakMap();
+export function wireSpeakingAudio(audioEl, portraitEls) {
+  const els = (portraitEls || []).filter(Boolean);
+  if (!audioEl || !els.length) return;
+  const stop = () => {
+    const t = _speakingTimers.get(audioEl);
+    if (t != null) { clearInterval(t); _speakingTimers.delete(audioEl); }
+    els.forEach((el) => { el.removeAttribute("data-portrait-state"); setMouthFrame(el, false); });
+  };
+  const start = () => {
+    // JS-side reduced-motion check: a CSS @media guard alone can't stop this
+    // setInterval from running, so the interval itself must never be created.
+    if (reducedMotion() || _speakingTimers.has(audioEl)) return;
+    let alt = false;
+    els.forEach((el) => el.setAttribute("data-portrait-state", "speaking"));
+    const timer = setInterval(() => {
+      alt = !alt;
+      els.forEach((el) => setMouthFrame(el, alt));
+    }, 180);
+    _speakingTimers.set(audioEl, timer);
+  };
+  audioEl.addEventListener("play", start);
+  audioEl.addEventListener("pause", stop);
+  audioEl.addEventListener("ended", stop);
+}
+
+/*
+  markStanceChange(portraitEl, coachId, stanceHistory) — the "stance-change"
+  state (#594): a ONE-TIME, non-looping re-draw sweep when a coach's
+  stance_history gains an entry ("the instrument recalibrating"). Detected
+  client-side by diffing (length, newest `as_of`) against the last-seen value
+  for that coach, persisted in localStorage — the same fail-soft
+  seen/dismissed-once pattern already used elsewhere on the site (e.g.
+  cockpit.js's level-up ribbon, evidence.js's intro card), chosen over
+  sessionStorage so a reader who comes back a day later — after the stance
+  really did change while they were away — still sees the sweep once.
+  Never fires on the very first time a coach's history is observed at all
+  (nothing to compare against yet — that's not a "change").
+*/
+const STANCE_SEEN_KEY = "ajm-portrait-stance-seen";
+function readStanceSeen() {
+  try { return JSON.parse(localStorage.getItem(STANCE_SEEN_KEY) || "{}"); }
+  catch (e) { return {}; }
+}
+function writeStanceSeen(map) {
+  try { localStorage.setItem(STANCE_SEEN_KEY, JSON.stringify(map)); }
+  catch (e) { /* private mode / quota — fail quiet, just re-checks every visit */ }
+}
+export function markStanceChange(portraitEl, coachId, stanceHistory) {
+  if (!portraitEl || !coachId || reducedMotion()) return;
+  const hist = Array.isArray(stanceHistory) ? stanceHistory : [];
+  if (!hist.length) return;
+  const latest = String((hist[0] && hist[0].as_of) || "");
+  const fingerprint = `${hist.length}:${latest}`;
+  const seen = readStanceSeen();
+  const prior = seen[coachId];
+  if (prior === fingerprint) return; // nothing new since we last recorded this coach
+  seen[coachId] = fingerprint;
+  writeStanceSeen(seen);
+  if (prior === undefined) return; // first-ever observation of this coach — nothing "changed" yet
+  portraitEl.setAttribute("data-portrait-state", "stance-change");
+  const clear = () => portraitEl.removeAttribute("data-portrait-state");
+  portraitEl.addEventListener("animationend", clear, { once: true });
+  setTimeout(clear, 1500); // belt-and-braces (backgrounded tab, animationend can be throttled/skipped)
 }
