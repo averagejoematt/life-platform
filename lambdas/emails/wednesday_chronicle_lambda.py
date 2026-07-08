@@ -934,6 +934,7 @@ WHAT NOT TO DO:
 - Don't break the fourth wall about being an AI. You are Elena.
 - Don't use emoji or markdown headers. Write clean prose.
 - GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
+- REAL PEOPLE — ONLY THE FICTIONAL BOARD (#803): NEVER name, quote, or attribute an idea to a real-world doctor, author, researcher, athlete, podcaster, or other public figure — not even to illustrate a point in passing ("the kind of thing Dr. So-and-So talks about"). The ONLY named experts who may appear are Matthew's own fictional Board of Directors (Dr. Sarah Chen, Dr. Lisa Park, Dr. Marcus Webb, Dr. Nathan Reeves, Margaret Calloway, Dr. Henning Brandt, plus whoever this week's config lists). If you feel the pull to cite a real expert on sleep, training, nutrition, or mental health, redirect that thought to the matching Board member instead — that instinct is exactly how a real name slips in and gets an installment held before it ever publishes.
 - SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — marijuana, cannabis, weed, alcohol, drinking, nicotine, vaping, pornography, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
 
 FORMAT:
@@ -1032,6 +1033,7 @@ WHAT NOT TO DO:
 - Don't break the fourth wall about being an AI. You are Elena.
 - Don't use emoji or markdown headers. Write clean prose.
 - GENOME PRIVACY: NEVER reference specific gene names (FTO, MTHFR, APOE, etc.), rsID numbers, or genotype strings (e.g. "A;T", "C;C") in your writing. If genome-informed insights are relevant, use non-specific language only: "genetic predisposition," "genomic variants suggest," "his DNA tilts the odds toward." Raw identifiers are private medical data.
+- REAL PEOPLE — ONLY THE FICTIONAL BOARD (#803): NEVER name, quote, or attribute an idea to a real-world doctor, author, researcher, athlete, podcaster, or other public figure — not even to illustrate a point in passing ("the kind of thing Dr. So-and-So talks about"). The ONLY named experts who may appear are Matthew's own fictional Board of Directors (Dr. Sarah Chen, Dr. Lisa Park, Dr. Marcus Webb, Dr. Nathan Reeves, Margaret Calloway, Dr. Henning Brandt, plus whoever this week's config lists). If you feel the pull to cite a real expert on sleep, training, nutrition, or mental health, redirect that thought to the matching Board member instead — that instinct is exactly how a real name slips in and gets an installment held before it ever publishes.
 - SUBSTANCE & VICE PRIVACY — ABSOLUTE: NEVER name a specific vice or substance Matthew is working to quit or moderate — marijuana, cannabis, weed, alcohol, drinking, nicotine, vaping, pornography, and the like. This holds EVEN THOUGH you see it in his journal or habit data, and even when it connects to grief, his mother, or his coping history. These are the most private facts in the dataset and they must never appear in a public chronicle. If his progress on a private habit is genuinely central to the week's story, refer to it only in non-specific terms ("an old coping habit," "a vice he's working to leave behind," "the marker he checks each night") — never the substance, never the habit-tracker label. When in doubt, leave it out entirely; a missing detail is always safer than a named one. Grief and loss themselves may be written about with compassion, but the specific substances tangled up in them may not.
 
 FORMAT:
@@ -2371,6 +2373,41 @@ def store_installment(
         logger.warning(f"Failed to store installment: {e}")
 
 
+def _set_chronicle_pending(week_num, reason, display):
+    """Record a non-blocking 'pending installment' marker on generated/journal/posts.json
+    so the Chronicle listing can say WHY no new week landed instead of just going stale
+    (#803 — the same silent-skip fix already shipped for the Panel podcast, see
+    coach_panel_podcast_lambda._set_pending, 2026-06-20). Called when a week's draft is
+    generated and then withheld (budget guard, privacy gate) rather than published — the
+    week number can legitimately advance past a held week, so the marker also tells a
+    reader whose numbering was skipped and why, rather than leaving a silent gap.
+
+    A successful publish rewrites posts.json via publish_to_journal() (which never writes
+    a `pending` key), so the marker clears itself the next time a week actually ships.
+    Fail-open: surfacing a pending state must never break the run."""
+    try:
+        try:
+            doc = json.loads(s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")["Body"].read())
+        except Exception:
+            doc = {"posts": []}
+        doc["pending"] = {
+            "week": week_num,
+            "reason": reason,
+            "display": display,
+            "noted_at": datetime.now(timezone.utc).isoformat(),
+        }
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key="generated/journal/posts.json",
+            Body=json.dumps(doc, indent=2).encode("utf-8"),
+            ContentType="application/json",
+            CacheControl="max-age=300",
+        )
+        logger.info(f"[chronicle] pending marker set: week={week_num} reason={reason}")
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"[chronicle] _set_chronicle_pending failed (non-fatal): {e}")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # FEAT-12: PREVIEW EMAIL
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2705,6 +2742,12 @@ def lambda_handler(event, context):
         # podcast for weeks (2026-06-19). Revert to allow("chronicle") at the next layer bump.
         if current_tier() >= 2:
             logger.info("Budget tier >= 2 — Wednesday chronicle paused this week (no Bedrock spend)")
+            _set_chronicle_pending(
+                None,
+                "budget_tier",
+                "This week's chronicle is paused — the platform's AI budget guard is protecting monthly spend. "
+                "It resumes automatically once usage drops below the threshold.",
+            )
             return {"statusCode": 200, "body": "skipped: budget tier"}
     except ImportError:
         pass
@@ -2927,6 +2970,18 @@ def lambda_handler(event, context):
         privacy_guard.assert_clean(f"{title}\n{stats_line}\n{raw_installment}", context=f"chronicle week {week_num}")
     except privacy_guard.PrivacyViolation as e:
         logger.error(f"[privacy] BLOCKED chronicle week {week_num} — {e}")
+        # #803: this used to be a silent no-op — nothing was ever written anywhere, so
+        # the reader-facing "come back weekly" promise broke with zero trace beyond a
+        # CloudWatch log line. Record a non-content marker so the site can say Week
+        # {week_num} was attempted and withheld, instead of the numbering just skipping
+        # ahead unexplained next time a clean draft ships.
+        _set_chronicle_pending(
+            week_num,
+            "privacy_hold",
+            f"Week {week_num}'s installment was generated but withheld before publishing — it didn't clear "
+            "the platform's automatic safety check that keeps real people's names and private details out "
+            "of the public write-up. No content was published or stored for this week.",
+        )
         return {
             "statusCode": 200,
             "body": json.dumps({"status": "privacy_hold", "week": week_num, "violations": [t for _, t in e.violations]}),
