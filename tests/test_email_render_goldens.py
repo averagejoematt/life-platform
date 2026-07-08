@@ -156,6 +156,8 @@ def _render_weekly_digest():
         "trends": {"day_grade": "→", "sleep": "↑", "weight": "↓"},
         "sleep_debt": {"debt_hrs": 3.2},
         "projection": {"eta": "2027-02-01", "rate_per_week": -1.2, "weeks": 40, "status": "on_track"},
+        # #753: MCP write-audit trail digest line
+        "mcp_mutations_line": "12 MCP mutations this week (top tools: log_supplement (6), manage_reading (4), set_reward (2))",
         "dates": {"this_start": "2026-06-01", "this_end": "2026-06-07"},
     }
     return m.build_html(data, _DIGEST_COMMENTARY, _DIGEST_PROFILE)

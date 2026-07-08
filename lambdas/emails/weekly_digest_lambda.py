@@ -36,7 +36,7 @@ import os
 import statistics
 import urllib.error
 import urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
@@ -851,6 +851,49 @@ def _count_real_subscribers() -> int:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def get_mcp_mutations_digest_line(start_date: str, end_date: str):
+    """#753: "N MCP mutations this week (top tools: …)" from the mcp-audit/ S3 trail.
+
+    Every MCP write-tool call is audited to mcp-audit/YYYY/MM/DD/HHMMSS-<tool>-<uuid8>.json
+    (mcp/audit.py). The tool name is embedded in the KEY, so this aggregates with
+    s3:ListBucket alone — no GetObject. Non-fatal: returns None on any error so an
+    audit-trail hiccup can never break the digest.
+    """
+    try:
+        s3 = boto3.client("s3", region_name=_REGION)
+        bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        counts: Counter = Counter()
+        day = datetime.fromisoformat(start_date).date()
+        last = datetime.fromisoformat(end_date).date()
+        while day <= last:
+            prefix = f"mcp-audit/{day:%Y/%m/%d}/"
+            token = None
+            while True:
+                kwargs = {"Bucket": bucket, "Prefix": prefix}
+                if token:
+                    kwargs["ContinuationToken"] = token
+                resp = s3.list_objects_v2(**kwargs)
+                for obj in resp.get("Contents", []):
+                    base = obj["Key"].rsplit("/", 1)[-1]
+                    if not base.endswith(".json"):
+                        continue
+                    parts = base[: -len(".json")].split("-")
+                    if len(parts) >= 3:  # HHMMSS-<tool>-<uuid8>; tool names have no hyphens
+                        counts["-".join(parts[1:-1])] += 1
+                token = resp.get("NextContinuationToken")
+                if not token:
+                    break
+            day += timedelta(days=1)
+        total = sum(counts.values())
+        if total == 0:
+            return "0 MCP mutations this week"
+        top = ", ".join(f"{tool} ({n})" for tool, n in counts.most_common(3))
+        return f"{total} MCP mutation{'s' if total != 1 else ''} this week (top tools: {top})"
+    except Exception as e:
+        logger.info(f"[#753] MCP mutations digest line unavailable: {e}")
+        return None
+
+
 def gather_all():
     today = datetime.now(timezone.utc).date()
     # This week = yesterday back 7 days; prior week = 8-14 days back
@@ -1028,6 +1071,7 @@ def gather_all():
         "character_sheet": character_sheet,
         "character_sheet_prior": character_sheet_prior,
         "acwr_data": acwr_data,  # BS-09
+        "mcp_mutations_line": get_mcp_mutations_digest_line(w1_start, w1_end),  # #753
         "dates": {"this_start": w1_start, "this_end": w1_end, "prior_start": w2_start, "prior_end": w2_end},
     }, profile
 
@@ -1848,6 +1892,18 @@ def build_html(data, commentary, profile):
         pr_rows += row("Avg Per Day", fmt(td.get("avg_per_day")))
     productivity_section = section("Productivity", "✅", tbl(pr_rows)) if pr_rows else ""
 
+    # ── MCP write-audit trail (#753, owner-private ops line) ──
+    mcp_audit_html = ""
+    _mline = data.get("mcp_mutations_line")
+    if _mline:
+        mcp_audit_html = (
+            '<div style="background:#f8f8fc;border:1px solid #e8e8f0;border-radius:8px;'
+            'padding:10px 16px;margin-bottom:20px;font-size:12px;color:#555;">'
+            '<span style="font-weight:700;">MCP audit</span> &nbsp;·&nbsp; '
+            f"{_mline}"
+            "</div>"
+        )
+
     # ── Open Insights ──
     insights_html = ""
     oi = data.get("open_insights", [])
@@ -1927,6 +1983,7 @@ def build_html(data, commentary, profile):
 {cgm_section}
 {journal_section}
 {productivity_section}
+{mcp_audit_html}
 </div>
 <div style="background:#f8f8fc;padding:16px 32px;border-top:1px solid #e8e8f0;">
 <p style="color:#999;font-size:11px;margin:0;">Life Platform v4.0 · Whoop · Eight Sleep · Withings · Strava · MacroFactor · Habitify · Notion · Apple Health · Todoist · AWS us-west-2</p>
