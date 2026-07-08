@@ -1013,6 +1013,12 @@ jobs:
     if: needs.deploy.result == 'success'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # I22 resolves the LIVE site's build SHA (older than HEAD by design —
+          # version.json is stamped at sync time) via merge-base --is-ancestor;
+          # the default depth-1 clone can't see any older commit, so I22 was
+          # structurally unable to pass in CI. Full history fixes it (2026-07-08).
+          fetch-depth: 0
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
