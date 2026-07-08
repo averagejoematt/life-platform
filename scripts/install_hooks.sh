@@ -4,8 +4,10 @@
 # Installs a pre-commit hook that:
 #   1. Format gate (#785/CLAUDE-02): black --check + ruff on staged Python — matches
 #      CI's Lint job so an unformatted/unsorted file can't red main after the fact
-#   2. Auto-updates ARCHITECTURE.md Lambda + tool counts (Item 3)
-#   3. Stages the updated ARCHITECTURE.md so the count is always correct in commits
+#   2. Runs `deploy/sync_doc_metadata.py --apply` (Item 3) — the single source of
+#      truth for platform facts across ALL docs (ARCHITECTURE.md, CLAUDE.md,
+#      .claude/README.md, PLATFORM_STATS, ...), not just ARCHITECTURE.md
+#   3. Stages whatever the sync touched so counts are always correct in commits
 #
 # Run once after cloning or when hooks need to be refreshed.
 #
@@ -13,6 +15,9 @@
 #
 # v1.0.0 — 2026-03-10 (Item 3, board review sprint v3.5.0)
 # v1.1.0 — 2026-07-06 (#785: pre-commit black+ruff format gate)
+# v1.2.0 — 2026-07-08 (#818: hook now calls sync_doc_metadata.py --apply directly,
+#          matching docs/CONVENTIONS.md — the update_architecture_header.sh
+#          indirection is retired, it was a same-behavior wrapper)
 
 set -euo pipefail
 
@@ -27,7 +32,7 @@ fi
 
 cat > "$HOOK_FILE" << 'EOF'
 #!/usr/bin/env bash
-# pre-commit hook — format gate + auto-update ARCHITECTURE.md header counts
+# pre-commit hook — format gate + auto-update doc-sync literals
 # Installed by: bash scripts/install_hooks.sh
 
 PROJ_ROOT="$(git rev-parse --show-toplevel)"
@@ -54,15 +59,22 @@ else
   echo "[pre-commit] ⚠ black/ruff not installed — skipping format gate" >&2
 fi
 
-if [[ -f "$PROJ_ROOT/scripts/update_architecture_header.sh" ]]; then
-  echo "[pre-commit] Updating ARCHITECTURE.md header..."
-  bash "$PROJ_ROOT/scripts/update_architecture_header.sh" 2>&1 | sed 's/^/  /'
+# ── Doc-sync (#818: hook runs sync_doc_metadata.py directly — this IS the
+#    documented behavior in docs/CONVENTIONS.md, no wrapper indirection) ──────
+if [[ -f "$PROJ_ROOT/deploy/sync_doc_metadata.py" ]]; then
+  echo "[pre-commit] Running sync_doc_metadata.py --apply..."
+  python3 "$PROJ_ROOT/deploy/sync_doc_metadata.py" --apply 2>&1 | sed 's/^/  /'
 
-  # Stage the updated file if it was changed
-  if git diff --name-only "$PROJ_ROOT/docs/ARCHITECTURE.md" | grep -q "ARCHITECTURE.md"; then
-    git add "$PROJ_ROOT/docs/ARCHITECTURE.md"
-    echo "[pre-commit] ARCHITECTURE.md staged with updated counts."
+  # Stage whatever the sync touched (it may write any of these, not just
+  # ARCHITECTURE.md — see the RULES table in sync_doc_metadata.py)
+  SYNCED_CHANGED=$(git -C "$PROJ_ROOT" diff --name-only -- docs/ CLAUDE.md .claude/README.md lambdas/web/site_api_common.py || true)
+  if [[ -n "$SYNCED_CHANGED" ]]; then
+    git -C "$PROJ_ROOT" add $SYNCED_CHANGED
+    echo "[pre-commit] Staged doc-sync updates:"
+    echo "$SYNCED_CHANGED" | sed 's/^/    /'
   fi
+else
+  echo "[pre-commit] ⚠ deploy/sync_doc_metadata.py not found — skipping doc-sync" >&2
 fi
 
 exit 0
@@ -70,7 +82,7 @@ EOF
 
 chmod +x "$HOOK_FILE"
 echo "✅  Pre-commit hook installed: $HOOK_FILE"
-echo "    On every commit: ARCHITECTURE.md Lambda + tool counts auto-update."
+echo "    On every commit: doc-sync literals (Lambda/tool/ADR counts, versions) auto-update."
 echo ""
 echo "    To test immediately:"
-echo "      bash scripts/update_architecture_header.sh"
+echo "      python3 deploy/sync_doc_metadata.py --apply"
