@@ -19,6 +19,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 import forecast_engine_lambda as eng  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 RECOVERY_CFG = eng.METRICS[0]
 
@@ -63,24 +64,6 @@ class TestBuildCalibrationItem:
         assert "#forecast-" in calib["sk"]
 
 
-class _FakeTable:
-    """Query returns canned rows; put_item/update_item are captured for assertions."""
-
-    def __init__(self, rows):
-        self.rows = rows
-        self.puts = []
-        self.updates = []
-
-    def query(self, **kw):
-        return {"Items": self.rows}
-
-    def put_item(self, Item):
-        self.puts.append(Item)
-
-    def update_item(self, **kw):
-        self.updates.append(kw)
-
-
 class TestResolveMatured:
     def _forecast_row(self, target, metric="recovery_pct", h=1, resolved=None):
         cfg = next(c for c in eng.METRICS if c["metric"] == metric)
@@ -91,7 +74,7 @@ class TestResolveMatured:
         return row
 
     def test_resolves_when_actual_exists(self, monkeypatch):
-        fake = _FakeTable([self._forecast_row("2026-07-04")])
+        fake = FakeDdbTable(rows=[self._forecast_row("2026-07-04")])
         monkeypatch.setattr(eng, "table", fake)
         actuals = {"whoop": {"2026-07-04": {"recovery_score": 71.0}}}
         res = eng.resolve_matured("2026-07-04", actuals)
@@ -104,7 +87,7 @@ class TestResolveMatured:
         assert fake.updates[0]["ExpressionAttributeValues"][":c"] is True
 
     def test_outside_interval_marks_uncovered(self, monkeypatch):
-        fake = _FakeTable([self._forecast_row("2026-07-04")])
+        fake = FakeDdbTable(rows=[self._forecast_row("2026-07-04")])
         monkeypatch.setattr(eng, "table", fake)
         actuals = {"whoop": {"2026-07-04": {"recovery_score": 40.0}}}
         res = eng.resolve_matured("2026-07-04", actuals)
@@ -115,7 +98,7 @@ class TestResolveMatured:
             self._forecast_row("2026-07-03", resolved="2026-07-03"),
             self._forecast_row("2026-07-04"),  # no actual available
         ]
-        fake = _FakeTable(rows)
+        fake = FakeDdbTable(rows=rows)
         monkeypatch.setattr(eng, "table", fake)
         res = eng.resolve_matured("2026-07-04", {"whoop": {}})
         assert res == []
@@ -124,7 +107,7 @@ class TestResolveMatured:
 
 class TestComputeCoverage:
     def test_no_resolutions_returns_none(self, monkeypatch):
-        monkeypatch.setattr(eng, "table", _FakeTable([]))
+        monkeypatch.setattr(eng, "table", FakeDdbTable(rows=[]))
         assert eng.compute_coverage("2026-07-04") is None
 
     def test_coverage_math_overall_and_per_horizon(self, monkeypatch):
@@ -137,7 +120,7 @@ class TestComputeCoverage:
             }
 
         rows = [row(1, True), row(1, True), row(1, False), row(7, True)]
-        monkeypatch.setattr(eng, "table", _FakeTable(rows))
+        monkeypatch.setattr(eng, "table", FakeDdbTable(rows=rows))
         cov = eng.compute_coverage("2026-07-04")
         assert cov["n_resolved"] == 4 and cov["n_covered"] == 3
         assert cov["coverage_pct"] == 75.0

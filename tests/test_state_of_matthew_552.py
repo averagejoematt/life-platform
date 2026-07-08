@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "compute"))
 import bedrock_client  # noqa: E402
 import budget_guard  # noqa: E402
 import state_of_matthew_lambda as eng  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -376,22 +377,18 @@ class TestBuildSummaryItem:
         assert item["hypotheses"] is None  # graceful degrade preserved into storage
 
 
-class _FakeTable:
-    """Query/get_item return canned rows in call order; put_item captured."""
+def _FakeTable(query_responses=None, get_item_response=None):
+    """Query/get_item return canned rows in call order; put_item captured
+    (via the base class's default .puts log)."""
+    queue = list(query_responses or [])
 
-    def __init__(self, query_responses=None, get_item_response=None):
-        self.query_responses = list(query_responses or [])
-        self.get_item_response = get_item_response
-        self.puts = []
+    def _query_hook(_table, **kw):
+        return queue.pop(0) if queue else {"Items": []}
 
-    def query(self, **kw):
-        return self.query_responses.pop(0) if self.query_responses else {"Items": []}
+    def _get_item_hook(_table, key, **kw):
+        return {"Item": get_item_response} if get_item_response else {}
 
-    def get_item(self, **kw):
-        return {"Item": self.get_item_response} if self.get_item_response else {}
-
-    def put_item(self, Item):
-        self.puts.append(Item)
+    return FakeDdbTable(query_hook=_query_hook, get_item_hook=_get_item_hook)
 
 
 class TestFetchSeams:

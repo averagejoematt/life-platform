@@ -21,6 +21,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
+
 import mcp.tools_lifestyle as tl  # noqa: E402
 
 STOP = "run the full 21 days regardless of interim trend; abort only if recovery < 40% for 3 consecutive days"
@@ -30,20 +32,6 @@ DESIGN = {
     "stopping_rule": STOP,
     "criterion": {"metric": "deep_pct", "direction": "higher", "min_effect": 2},
 }
-
-
-class _FakeTable:
-    def __init__(self):
-        self.put_items = []
-
-    def get_item(self, **kw):
-        return {}
-
-    def query(self, **kw):
-        return {"Items": []}
-
-    def put_item(self, Item):
-        self.put_items.append(Item)
 
 
 class _FakeS3:
@@ -58,7 +46,7 @@ class _FakeS3:
 
 
 def _run(monkeypatch, design, s3):
-    table = _FakeTable()
+    table = FakeDdbTable()
     monkeypatch.setattr(tl, "table", table)
     monkeypatch.setattr(tl, "s3_client", s3)
     args = {"name": "Prereg Test", "hypothesis": "deep sleep rises", "start_date": "2026-07-10"}
@@ -84,7 +72,7 @@ def test_artifact_written_with_design(monkeypatch):
     assert "before any results existed" in body["contract"]
 
     # The DDB record carries the key + public URL; the response returns the URL.
-    item = table.put_items[0]
+    item = table.puts[0]
     assert item["prereg_key"] == put["Key"]
     assert item["prereg_url"] == "https://averagejoematt.com/experiments/prereg/prereg-test_2026-07-10.json"
     assert resp["pre_registration_url"] == item["prereg_url"]
@@ -96,20 +84,20 @@ def test_no_design_means_no_artifact(monkeypatch):
     resp, table = _run(monkeypatch, None, s3)
     assert s3.puts == []
     assert resp["pre_registration_url"] is None
-    assert "prereg_key" not in table.put_items[0]
+    assert "prereg_key" not in table.puts[0]
 
 
 def test_s3_failure_is_failsoft_and_honest(monkeypatch):
     s3 = _FakeS3(fail=True)
     resp, table = _run(monkeypatch, DESIGN, s3)
     # Experiment still exists...
-    assert len(table.put_items) == 1
+    assert len(table.puts) == 1
     assert resp["created"] is True
     # ...but nothing pretends there is a public proof.
     assert resp["pre_registration_url"] is None
     assert "could NOT be written" in resp["pre_registration_warning"]
-    assert "prereg_key" not in table.put_items[0]
-    assert "prereg_url" not in table.put_items[0]
+    assert "prereg_key" not in table.puts[0]
+    assert "prereg_url" not in table.puts[0]
 
 
 def test_design_without_stopping_rule_rejected(monkeypatch):

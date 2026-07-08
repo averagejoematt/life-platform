@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
 import budget_guard  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_coach as api  # noqa: E402
 
 
@@ -122,11 +123,7 @@ def test_team_stage_mix_is_honest():
 
 
 def test_predictions_overall_accuracy_pct_null_when_nothing_resolved(monkeypatch):
-    class _EmptyTable:
-        def query(self, **kw):
-            return {"Items": []}
-
-    monkeypatch.setattr(api, "table", _EmptyTable())
+    monkeypatch.setattr(api, "table", FakeDdbTable(rows=[]))
     data = _body(api.handle_predictions({}))
     o = data["overall"]
     assert o["decided"] == 0
@@ -136,26 +133,23 @@ def test_predictions_overall_accuracy_pct_null_when_nothing_resolved(monkeypatch
 
 
 def test_predictions_overall_accuracy_pct_rounds_when_some_resolved(monkeypatch):
-    calls = []
+    def _query_hook(table, **kw):
+        # scan_coaches iterates in a fixed order (sleep first) — hand the first
+        # coach queried a mix of graded calls, every other coach comes back empty.
+        # (query_calls already includes THIS call — appended before the hook runs.)
+        if len(table.query_calls) == 1:
+            return {
+                "Items": [
+                    {"status": "confirmed", "created_date": "2026-07-01", "claim_natural": "a"},
+                    {"status": "confirmed", "created_date": "2026-07-02", "claim_natural": "b"},
+                    {"status": "confirmed", "created_date": "2026-07-03", "claim_natural": "c"},
+                    {"status": "refuted", "created_date": "2026-07-04", "claim_natural": "d"},
+                    {"status": "pending", "created_date": "2026-07-05", "claim_natural": "e"},
+                ]
+            }
+        return {"Items": []}
 
-    class _FakeTable:
-        def query(self, **kw):
-            calls.append(kw)
-            # scan_coaches iterates in a fixed order (sleep first) — hand the first
-            # coach queried a mix of graded calls, every other coach comes back empty.
-            if len(calls) == 1:
-                return {
-                    "Items": [
-                        {"status": "confirmed", "created_date": "2026-07-01", "claim_natural": "a"},
-                        {"status": "confirmed", "created_date": "2026-07-02", "claim_natural": "b"},
-                        {"status": "confirmed", "created_date": "2026-07-03", "claim_natural": "c"},
-                        {"status": "refuted", "created_date": "2026-07-04", "claim_natural": "d"},
-                        {"status": "pending", "created_date": "2026-07-05", "claim_natural": "e"},
-                    ]
-                }
-            return {"Items": []}
-
-    monkeypatch.setattr(api, "table", _FakeTable())
+    monkeypatch.setattr(api, "table", FakeDdbTable(query_hook=_query_hook))
     data = _body(api.handle_predictions({}))
     o = data["overall"]
     assert o["confirmed"] == 3

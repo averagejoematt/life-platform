@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 import exercise_history as eh
 import pytest
+from fakes import FakeDdbTable
 
 
 @pytest.fixture(autouse=True)
@@ -118,11 +119,7 @@ def test_load_recent_history_skips_legacy_aggregates():
         _ddb_item("2026-05-24", [{"template_id": "X", "sets": [{"weight_kg": Decimal("50"), "reps": Decimal("10")}]}]),
     ]
 
-    class _FakeTable:
-        def query(self, **_kwargs):
-            return {"Items": items}
-
-    with patch.object(eh, "_table", return_value=_FakeTable()):
+    with patch.object(eh, "_table", return_value=FakeDdbTable(rows=items)):
         idx = eh.load_recent_history(lookback_days=30, today=date(2026, 5, 31))
     assert "X" in idx
     assert idx["X"][0]["top_weight_kg"] == 50.0
@@ -134,11 +131,7 @@ def test_load_recent_history_orders_sessions_most_recent_first():
         _ddb_item("2026-05-24", [{"template_id": "X", "sets": [{"weight_kg": Decimal("50"), "reps": Decimal("10")}]}]),
     ]
 
-    class _FakeTable:
-        def query(self, **_kwargs):
-            return {"Items": items}
-
-    with patch.object(eh, "_table", return_value=_FakeTable()):
+    with patch.object(eh, "_table", return_value=FakeDdbTable(rows=items)):
         idx = eh.load_recent_history(lookback_days=60, today=date(2026, 5, 31))
     assert idx["X"][0]["date"] == "2026-05-24"
     assert idx["X"][1]["date"] == "2026-05-10"
@@ -149,11 +142,7 @@ def test_load_recent_history_decimals_become_floats_for_arithmetic():
         _ddb_item("2026-05-24", [{"template_id": "X", "sets": [{"weight_kg": Decimal("57.5"), "reps": Decimal("8")}]}]),
     ]
 
-    class _FakeTable:
-        def query(self, **_kwargs):
-            return {"Items": items}
-
-    with patch.object(eh, "_table", return_value=_FakeTable()):
+    with patch.object(eh, "_table", return_value=FakeDdbTable(rows=items)):
         idx = eh.load_recent_history(lookback_days=30, today=date(2026, 5, 31))
     set0 = idx["X"][0]["sets"][0]
     assert isinstance(set0["weight_kg"], float) and set0["weight_kg"] == 57.5

@@ -13,6 +13,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_stats_refresh_lambda as srl  # noqa: E402
 
 
@@ -32,16 +33,6 @@ def test_recovery_status_never_colors_a_missing_reading():
     assert srl._recovery_status(None) is None
 
 
-class _FakeTable:
-    """Minimal DynamoDB Table double returning a fixed, newest-first item list."""
-
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **_kw):
-        return {"Items": self._items}
-
-
 def test_get_latest_finalized_skips_unscored_today(monkeypatch):
     # phase_filter.with_phase_filter is imported inside the function; stub it to passthrough
     import types
@@ -49,8 +40,8 @@ def test_get_latest_finalized_skips_unscored_today(monkeypatch):
     monkeypatch.setitem(sys.modules, "phase_filter", types.SimpleNamespace(with_phase_filter=lambda kw: kw))
     # newest-first: today's record exists but recovery_score is unscored (null),
     # yesterday's is finalized at 30.
-    table = _FakeTable(
-        [
+    table = FakeDdbTable(
+        rows=[
             {"sk": "DATE#2026-06-28", "recovery_score": None},
             {"sk": "DATE#2026-06-27", "recovery_score": 30},
         ]
@@ -66,5 +57,5 @@ def test_get_latest_finalized_empty_when_none_scored(monkeypatch):
     import types
 
     monkeypatch.setitem(sys.modules, "phase_filter", types.SimpleNamespace(with_phase_filter=lambda kw: kw))
-    table = _FakeTable([{"sk": "DATE#2026-06-28", "recovery_score": None}])
+    table = FakeDdbTable(rows=[{"sk": "DATE#2026-06-28", "recovery_score": None}])
     assert srl._get_latest_finalized(table, "whoop", "recovery_score") == {}

@@ -24,6 +24,8 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable, json_safe_put_hook, make_session_update_hook  # noqa: E402
+
 
 def _ai():
     from web import site_api_ai_lambda as ai
@@ -31,40 +33,12 @@ def _ai():
     return ai
 
 
-class _FakeTable:
+def _FakeTable():
     """Minimal single-table stand-in: enough of put/get/update/query for the
-    session + episodic-write paths the follow-up handler exercises."""
-
-    def __init__(self):
-        self.store = {}
-
-    @staticmethod
-    def _k(key):
-        return (key["pk"], key["sk"])
-
-    def put_item(self, Item):
-        self.store[self._k(Item)] = json.loads(json.dumps(Item, default=str))
-
-    def get_item(self, Key):
-        item = self.store.get(self._k(Key))
-        return {"Item": item} if item is not None else {}
-
-    def update_item(self, Key, UpdateExpression, ExpressionAttributeValues, ConditionExpression=None, ExpressionAttributeNames=None):
-        item = self.store.get(self._k(Key))
-        if item is None:  # attribute_exists(pk) fails
-            raise Exception("ConditionalCheckFailedException")
-        cap = float(ExpressionAttributeValues[":cap"])
-        ip = ExpressionAttributeValues[":ip"]
-        if float(item.get("followup_count", 0)) >= cap or item.get("ip_hash") != ip:
-            raise Exception("ConditionalCheckFailedException")
-        pid = ExpressionAttributeNames["#pid"]
-        item["followup_count"] = float(item.get("followup_count", 0)) + 1
-        item.setdefault("threads", {}).setdefault(pid, [])
-        item["threads"][pid].extend(ExpressionAttributeValues[":turn"])
-        return {}
-
-    def query(self, **kwargs):
-        return {"Items": []}
+    session + episodic-write paths the follow-up handler exercises. Enforces
+    the per-session follow-up cap + IP binding (attribute_exists(pk) failing
+    when the session is missing) — see make_session_update_hook."""
+    return FakeDdbTable(put_item_hook=json_safe_put_hook, update_item_hook=make_session_update_hook(enforce_cap=True))
 
 
 def _wire(ai, monkeypatch, table, bedrock_text="Steady progress — keep the routine consistent."):

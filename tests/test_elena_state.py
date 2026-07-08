@@ -23,6 +23,8 @@ from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHRONICLE_SRC = open(os.path.join(ROOT, "lambdas/emails/wednesday_chronicle_lambda.py")).read()
 APPROVE_SRC = open(os.path.join(ROOT, "lambdas/emails/chronicle_approve_lambda.py")).read()
@@ -39,24 +41,6 @@ def _updater():
 
         importlib.reload(esu)
         return esu
-
-
-class FakeTable:
-    def __init__(self):
-        self.puts = []
-        self.updates = []
-
-    def put_item(self, Item):
-        self.puts.append(Item)
-
-    def update_item(self, **kwargs):
-        self.updates.append(kwargs)
-
-    def get_item(self, Key):
-        return {}
-
-    def query(self, **kwargs):
-        return {"Items": []}
 
 
 # ── E1: the sanitize discipline ───────────────────────────────────────────────
@@ -114,7 +98,7 @@ def _base_state():
 
 def test_callback_due_window_clamps():
     esu = _updater()
-    fake = FakeTable()
+    fake = FakeDdbTable()
     esu.table = fake
     extraction = {
         "callbacks_made": [
@@ -134,7 +118,7 @@ def test_invented_slugs_are_noops():
     """callbacks_paid / threads_resolved may only reference CURRENT STATE slugs —
     the LLM can't invent a payoff for a promise that was never made."""
     esu = _updater()
-    fake = FakeTable()
+    fake = FakeDdbTable()
     esu.table = fake
     extraction = {
         "callbacks_paid": [{"slug": "never-made", "payoff_note": "x"}],
@@ -148,7 +132,7 @@ def test_invented_slugs_are_noops():
 
 def test_real_slugs_are_paid_and_resolved():
     esu = _updater()
-    fake = FakeTable()
+    fake = FakeDdbTable()
     esu.table = fake
     extraction = {
         "callbacks_paid": [{"slug": "bloodwork", "payoff_note": "labs landed"}],
@@ -166,7 +150,7 @@ def test_real_slugs_are_paid_and_resolved():
 
 def test_motifs_merge_with_counts():
     esu = _updater()
-    fake = FakeTable()
+    fake = FakeDdbTable()
     esu.table = fake
     esu.apply_extraction({"motifs": ["the machine hums", "a new refrain"]}, "2026-07-01", 5, _base_state())
     motif_item = next(i for i in fake.puts if i.get("sk") == "MOTIF#state")
@@ -177,7 +161,7 @@ def test_motifs_merge_with_counts():
 
 def test_stance_written_with_receipts_and_flag():
     esu = _updater()
-    fake = FakeTable()
+    fake = FakeDdbTable()
     esu.table = fake
     extraction = {
         "stance": {
@@ -201,7 +185,7 @@ def test_stance_written_with_receipts_and_flag():
 
 def test_updater_refuses_unpublished_installments():
     esu = _updater()
-    esu.table = FakeTable()
+    esu.table = FakeDdbTable()
     with mock.patch.object(esu, "_get_item", return_value={"status": "draft", "content_markdown": "x", "week_number": 5}):
         out = esu.lambda_handler({"date": "2026-07-01"}, None)
     assert out["statusCode"] == 200 and out.get("skipped") == "status=draft"

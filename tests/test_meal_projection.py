@@ -11,6 +11,7 @@ import os
 
 import meal_projection as mp  # conftest puts lambdas/ on sys.path
 import pytest
+from fakes import FakeDdbTable
 
 FIXTURE = os.path.join(os.path.dirname(__file__), "fixtures", "food_log_2026-06-15_18.json")
 USER = "matthew"
@@ -18,29 +19,22 @@ RAW_PK = f"USER#{USER}#SOURCE#macrofactor"
 MEALS_PK = f"USER#{USER}#SOURCE#macrofactor_meals"
 
 
-class FakeTable:
-    """Minimal DynamoDB Table stub: records puts/deletes, answers begins_with queries."""
+def FakeTable():
+    """FakeDdbTable configured to answer begins_with queries the way this
+    writer needs: put_item/delete_item use the shared (pk, sk)-keyed store
+    (.puts/.deletes log every call) unmodified; only query() is bespoke.
 
-    def __init__(self):
-        self.store = {}  # (pk, sk) -> item
-        self.put_calls = []
-        self.delete_calls = []
+    Only used for _existing_meal_sks: pk == MEALS_PK, sk begins_with
+    DATE#<date>#MEAL#. Emulate by returning stored meal sks for the queried
+    pk/date prefix. Deriving the prefix from the KeyConditionExpression is
+    awkward; instead match all meal-partition rows (the writer only ever
+    queries the meals pk for one date)."""
 
-    def put_item(self, Item):
-        self.put_calls.append(Item)
-        self.store[(Item["pk"], Item["sk"])] = Item
-
-    def delete_item(self, Key):
-        self.delete_calls.append(Key)
-        self.store.pop((Key["pk"], Key["sk"]), None)
-
-    def query(self, **kwargs):
-        # only used for _existing_meal_sks: pk == MEALS_PK, sk begins_with DATE#<date>#MEAL#
-        # emulate by returning stored meal sks for the queried pk/date prefix.
-        # Deriving the prefix from the KeyConditionExpression is awkward; instead match
-        # all meal-partition rows (the writer only ever queries the meals pk for one date)
-        items = [{"sk": sk} for (pk, sk) in self.store if pk == MEALS_PK]
+    def _query_hook(table, **_kwargs):
+        items = [{"sk": sk} for (pk, sk) in table.store if pk == MEALS_PK]
         return {"Items": items}
+
+    return FakeDdbTable(query_hook=_query_hook)
 
 
 @pytest.fixture(scope="module")
@@ -60,13 +54,13 @@ def test_never_writes_raw_partition(days):
     t = FakeTable()
     for date in days:
         mp.write_day_projection(t, date, _groups(days, date), user=USER, now_iso="2026-06-19T00:00:00Z")
-    assert t.put_calls, "expected writes"
-    for item in t.put_calls:
+    assert t.puts, "expected writes"
+    for item in t.puts:
         assert item["pk"] == MEALS_PK
         assert item["pk"] != RAW_PK
         assert item["sk"].startswith("DATE#")
         assert "#MEAL#" in item["sk"]
-    for key in t.delete_calls:
+    for key in t.deletes:
         assert key["pk"] == MEALS_PK and key["pk"] != RAW_PK
 
 
@@ -127,5 +121,5 @@ def test_dry_run_writes_nothing(days):
     t = FakeTable()
     res = mp.write_day_projection(t, "2026-06-15", _groups(days, "2026-06-15"), user=USER, dry_run=True)
     assert res["dry_run"] and res["wrote"] == 0
-    assert not t.put_calls and not t.delete_calls
+    assert not t.puts and not t.deletes
     assert res["meals"] > 0  # but it computed the items for preview

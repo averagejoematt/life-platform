@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import (
     site_api_data as data,  # noqa: E402
     site_api_vitals as vitals,  # noqa: E402
@@ -171,16 +172,11 @@ def test_vitals_bad_date():
 def test_latest_item_asof_queries_on_or_before(monkeypatch):
     from web import site_api_common as common
 
-    captured = {}
-
-    class _FakeTable:
-        def query(self, **kwargs):
-            captured["kwargs"] = kwargs
-            return {"Items": [{"sk": "DATE#2026-06-18", "weight_lbs": 250}]}
-
-    monkeypatch.setattr(common, "table", _FakeTable())
+    table = FakeDdbTable(rows=[{"sk": "DATE#2026-06-18", "weight_lbs": 250}])
+    monkeypatch.setattr(common, "table", table)
     out = common._latest_item_asof("withings", "2026-06-20", include_pilot=True)
     assert out["weight_lbs"] == 250
     # the key condition bounds the upper SK at DATE#{date} and scans newest-first
-    assert captured["kwargs"]["ScanIndexForward"] is False
-    assert captured["kwargs"]["Limit"] == 1
+    captured_kwargs = table.query_calls[-1]
+    assert captured_kwargs["ScanIndexForward"] is False
+    assert captured_kwargs["Limit"] == 1

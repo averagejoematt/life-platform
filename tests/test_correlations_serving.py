@@ -21,15 +21,8 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_data as sad  # noqa: E402
-
-
-class _FakeTable:
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **kwargs):
-        return {"Items": self._items}
 
 
 def _body(resp):
@@ -74,7 +67,7 @@ _RECORD = {
 
 
 def _pairs(event=None):
-    sad.table = _FakeTable([_RECORD])
+    sad.table = FakeDdbTable(rows=[_RECORD])
     resp = sad.handle_correlations(event)
     assert resp["statusCode"] == 200
     return _body(resp)

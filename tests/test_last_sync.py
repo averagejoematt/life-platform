@@ -19,6 +19,7 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_data as sad  # noqa: E402
 
 COCKPIT_JS = open(os.path.join(_REPO, "site/assets/js/cockpit.js")).read()
@@ -26,17 +27,16 @@ COCKPIT_CSS = open(os.path.join(_REPO, "site/assets/css/cockpit.css")).read()
 
 
 def _with_fake_table(monkeypatch, per_source_items):
-    class _T:
-        def query(self, **kwargs):
-            expr = kwargs.get("KeyConditionExpression")
-            # boto3 conditions carry the pk value in the expression tree.
-            pk = expr._values[0]._values[1] if hasattr(expr, "_values") else ""
-            for sid, items in per_source_items.items():
-                if pk.endswith(f"SOURCE#{sid}"):
-                    return {"Items": items}
-            return {"Items": []}
+    def _query_hook(_table, **kwargs):
+        expr = kwargs.get("KeyConditionExpression")
+        # boto3 conditions carry the pk value in the expression tree.
+        pk = expr._values[0]._values[1] if hasattr(expr, "_values") else ""
+        for sid, items in per_source_items.items():
+            if pk.endswith(f"SOURCE#{sid}"):
+                return {"Items": items}
+        return {"Items": []}
 
-    monkeypatch.setattr(sad, "table", _T())
+    monkeypatch.setattr(sad, "table", FakeDdbTable(query_hook=_query_hook))
 
 
 def test_last_sync_reads_real_write_stamps(monkeypatch):

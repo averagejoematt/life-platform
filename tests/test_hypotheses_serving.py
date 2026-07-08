@@ -20,15 +20,8 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "web"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_intelligence as sai  # noqa: E402
-
-
-class _FakeTable:
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **kwargs):
-        return {"Items": self._items}
 
 
 def _body(resp):
@@ -70,7 +63,7 @@ _ITEMS = [
 
 
 def _hyps():
-    sai.table = _FakeTable(_ITEMS)
+    sai.table = FakeDdbTable(rows=_ITEMS)
     resp = sai.handle_hypotheses()
     assert resp["statusCode"] == 200
     return _body(resp)["hypotheses"]
@@ -89,7 +82,7 @@ def test_verdict_trail_served():
 
 
 def test_verdict_trail_null_before_first_check():
-    sai.table = _FakeTable([{**_ITEMS[0], "last_checked": None, "last_evidence": None, "status": "pending", "check_count": 0}])
+    sai.table = FakeDdbTable(rows=[{**_ITEMS[0], "last_checked": None, "last_evidence": None, "status": "pending", "check_count": 0}])
     h = _body(sai.handle_hypotheses())["hypotheses"][0]
     assert h["last_checked"] is None and h["last_evidence"] is None
 

@@ -32,6 +32,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 sys.path.insert(0, os.path.join(_REPO, "lambdas", "coach"))
 
 import coach_narrative_orchestrator as orch  # noqa: E402
+from fakes import FakeDdbTable, raise_hook  # noqa: E402
 
 
 def _orch_state():
@@ -76,20 +77,11 @@ class TestCoachRouting:
 class TestGatherJournalMoodSignal:
     def test_insufficient_entries_returns_none(self, monkeypatch):
         entries = [_journal_item("2026-07-01", "morning", enriched_mood=3.0)]
-
-        class FakeTable:
-            def query(self, **kwargs):
-                return {"Items": entries}
-
-        monkeypatch.setattr(orch, "table", FakeTable())
+        monkeypatch.setattr(orch, "table", FakeDdbTable(rows=entries))
         assert orch._gather_journal_mood_signal() is None
 
     def test_no_entries_returns_none(self, monkeypatch):
-        class FakeTable:
-            def query(self, **kwargs):
-                return {"Items": []}
-
-        monkeypatch.setattr(orch, "table", FakeTable())
+        monkeypatch.setattr(orch, "table", FakeDdbTable())
         assert orch._gather_journal_mood_signal() is None
 
     def test_aggregates_trend_emotions_and_social(self, monkeypatch):
@@ -110,11 +102,7 @@ class TestGatherJournalMoodSignal:
                 )
             )
 
-        class FakeTable:
-            def query(self, **kwargs):
-                return {"Items": entries}
-
-        monkeypatch.setattr(orch, "table", FakeTable())
+        monkeypatch.setattr(orch, "table", FakeDdbTable(rows=entries))
         signal = orch._gather_journal_mood_signal()
         assert signal is not None
         assert signal["entries_analyzed"] == 8
@@ -128,11 +116,7 @@ class TestGatherJournalMoodSignal:
         assert signal["notable_quote"] == "Quote from day 7."
 
     def test_fail_soft_on_query_error(self, monkeypatch):
-        class FakeTable:
-            def query(self, **kwargs):
-                raise RuntimeError("ddb unavailable")
-
-        monkeypatch.setattr(orch, "table", FakeTable())
+        monkeypatch.setattr(orch, "table", FakeDdbTable(query_hook=raise_hook))
         assert orch._gather_journal_mood_signal() is None
 
 

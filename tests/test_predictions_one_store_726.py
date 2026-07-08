@@ -22,6 +22,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
+
 
 def _function_strings(path, func_name):
     """All string literals inside func_name's body, excluding its docstring."""
@@ -84,15 +86,14 @@ class TestGetPredictionsBehavior:
         recs = self._fake_records()
         queried_pks = []
 
-        class _FakeTable:
-            def query(self, **kw):
-                # Key("pk").eq(v) → the eq value sits in the condition's child values.
-                cond = kw["KeyConditionExpression"]
-                pk_val = cond._values[0]._values[1]
-                queried_pks.append(pk_val)
-                return {"Items": recs if pk_val == "COACH#sleep_coach" else []}
+        def _query_hook(_table, **kw):
+            # Key("pk").eq(v) → the eq value sits in the condition's child values.
+            cond = kw["KeyConditionExpression"]
+            pk_val = cond._values[0]._values[1]
+            queried_pks.append(pk_val)
+            return {"Items": recs if pk_val == "COACH#sleep_coach" else []}
 
-        monkeypatch.setattr(tci, "table", _FakeTable())
+        monkeypatch.setattr(tci, "table", FakeDdbTable(query_hook=_query_hook))
         return tci.tool_get_predictions(args), queried_pks
 
     def test_maps_prediction_records(self, monkeypatch):

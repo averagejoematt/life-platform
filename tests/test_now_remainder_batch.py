@@ -40,6 +40,7 @@ import habitify_lambda as hab  # noqa: E402
 import ingestion_framework as fw  # noqa: E402
 import ingestion_validator as iv  # noqa: E402
 import measurements_ingestion_lambda as meas  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 _INGESTION_STACK_SRC = open(os.path.join(_REPO, "cdk/stacks/ingestion_stack.py")).read()
 
@@ -85,16 +86,11 @@ def test_habitify_today_pending_stays_pending():
 # ==============================================================================
 
 
-class _FakeSuppTable:
-    def __init__(self, existing=None):
-        self.existing = existing
-        self.put = None
+def _FakeSuppTable(existing=None):
+    def _get_item_hook(_table, key, **_kw):
+        return {"Item": existing} if existing else {}
 
-    def get_item(self, Key):
-        return {"Item": self.existing} if self.existing else {}
-
-    def put_item(self, Item):
-        self.put = Item
+    return FakeDdbTable(get_item_hook=_get_item_hook)
 
 
 def test_supplement_bridge_preserves_same_day_manual_log(monkeypatch):
@@ -110,8 +106,8 @@ def test_supplement_bridge_preserves_same_day_manual_log(monkeypatch):
     items = [{"habits": {supplement_name: Decimal("1")}}]
     hab.supplement_bridge(items, "2026-07-04")
 
-    assert fake.put is not None
-    names = [e["name"] for e in fake.put["supplements"]]
+    assert fake.puts
+    names = [e["name"] for e in fake.puts[-1]["supplements"]]
     assert "Magnesium" in names, "manual entry destroyed — the E-5 clobber"
     # the bridge's OWN old entries are replaced, not duplicated
     assert names.count(supplement_name) <= 1 or "Creatine" not in names or names.count("Creatine") == 1
@@ -122,7 +118,7 @@ def test_supplement_bridge_no_existing_record(monkeypatch):
     monkeypatch.setattr(hab, "_table", fake)
     supplement_name = next(iter(hab.SUPPLEMENT_MAP))
     hab.supplement_bridge([{"habits": {supplement_name: Decimal("1")}}], "2026-07-04")
-    assert fake.put is not None and len(fake.put["supplements"]) == 1
+    assert fake.puts and len(fake.puts[-1]["supplements"]) == 1
 
 
 # ==============================================================================
@@ -277,19 +273,14 @@ _CSV_TWO_SESSIONS = (
 )
 
 
-class _FakeMeasTable:
-    def __init__(self, existing_dates=()):
-        self.existing = list(existing_dates)
-        self.puts = []
+def _FakeMeasTable(existing_dates=()):
+    def _query_hook(_table, **_kw):
+        return {"Items": [{"sk": f"DATE#{d}"} for d in existing_dates]}
 
-    def query(self, **kwargs):
-        return {"Items": [{"sk": f"DATE#{d}"} for d in self.existing]}
-
-    def get_item(self, Key):
+    def _get_item_hook(_table, key, **_kw):
         return {"Item": {"height_inches": 69}}
 
-    def put_item(self, Item):
-        self.puts.append(Item)
+    return FakeDdbTable(query_hook=_query_hook, get_item_hook=_get_item_hook)
 
 
 class _FakeS3:
