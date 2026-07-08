@@ -938,8 +938,23 @@ def email_daily_brief() -> list[iam.PolicyStatement]:
 
 
 def email_weekly_digest() -> list[iam.PolicyStatement]:
-    """Weekly digest: DDB read, S3 config, ai-keys, SES, writes clinical.json to S3."""
-    return _email_base(needs_s3_write=["dashboard/clinical.json"])
+    """Weekly digest: DDB read, S3 config, ai-keys, SES, writes clinical.json to S3.
+
+    #753: scoped ListBucket on mcp-audit/* — the "N MCP mutations this week" line
+    aggregates the write-audit trail from object KEYS alone (tool name is embedded
+    in the key by mcp/audit.py), so no GetObject on the prefix is needed.
+    """
+    return _email_base(
+        needs_s3_write=["dashboard/clinical.json"],
+        extra_statements=[
+            iam.PolicyStatement(
+                sid="S3ListMcpAudit",
+                actions=["s3:ListBucket"],
+                resources=[BUCKET_ARN],
+                conditions={"StringLike": {"s3:prefix": ["mcp-audit/*"]}},
+            )
+        ],
+    )
 
 
 def email_monthly_digest() -> list[iam.PolicyStatement]:
@@ -2292,8 +2307,11 @@ def mcp_server() -> list[iam.PolicyStatement]:
             # #728: generated/experiments/prereg/* — create_experiment freezes the
             # pre-registration artifact (public, timestamped, immutable-by-contract).
             # Write-only; the delete-protection bucket policy still applies to generated/*.
+            # #753: mcp-audit/* — the write-audit trail (mcp/audit.py) appends one JSON
+            # record per mutating tool call. PutObject only, no Delete — combined with
+            # the bucket-policy Deny (deploy/bucket_policy.json) the prefix is append-only.
             actions=["s3:PutObject"],
-            resources=_s3("config/*", "generated/experiments/prereg/*"),
+            resources=_s3("config/*", "generated/experiments/prereg/*", "mcp-audit/*"),
         ),
         iam.PolicyStatement(
             sid="Secrets",

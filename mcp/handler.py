@@ -25,6 +25,7 @@ import time
 import urllib.parse
 import uuid
 
+from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
 from mcp.core import decimal_to_float, get_api_key, oauth_code_consume, oauth_code_store
 from mcp.registry import TOOLS
@@ -60,6 +61,21 @@ def handle_tools_list(_params):
     return {"tools": [t["schema"] for t in TOOLS.values()]}
 
 
+def _audit_tool_call(name, arguments, status, duration_ms):
+    """#753: record a mutating tool call to the mcp-audit/ S3 trail.
+
+    Fail-open at BOTH layers — record_mutation never raises by contract, and
+    this wrapper catches anyway so an audit bug can never fail or block the
+    actual tool call. Runs AFTER the tool has executed, so the audit path adds
+    zero latency before the mutation and cannot prevent it.
+    """
+    try:
+        if mcp_audit.is_write_tool(name):
+            mcp_audit.record_mutation(name, arguments, status, duration_ms)
+    except Exception as e:  # noqa: BLE001 — fail-open is the contract (#753)
+        logger.warning(f"[#753] audit hook failed for '{name}' (tool call unaffected): {e}")
+
+
 def handle_tools_call(params):
     name = params.get("name")
     arguments = params.get("arguments", {})
@@ -87,6 +103,8 @@ def handle_tools_call(params):
                 result = _future.result(timeout=_TOOL_TIMEOUT_SECS)
             except concurrent.futures.TimeoutError:
                 _emit_tool_metric(name, _TOOL_TIMEOUT_SECS * 1000, success=False)
+                # #753: a timed-out write may or may not have landed — audit it.
+                _audit_tool_call(name, arguments, "timeout", _TOOL_TIMEOUT_SECS * 1000)
                 logger.warning(f"Tool '{name}' exceeded {_TOOL_TIMEOUT_SECS}s soft timeout")
                 return {
                     "content": [
@@ -106,9 +124,11 @@ def handle_tools_call(params):
                     ]
                 }
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=True)
+        _audit_tool_call(name, arguments, "success", (time.time() - _t0) * 1000)  # #753
         return {"content": [{"type": "text", "text": json.dumps(result, default=str)}]}
     except Exception as e:
         _emit_tool_metric(name, (time.time() - _t0) * 1000, success=False)
+        _audit_tool_call(name, arguments, "error", (time.time() - _t0) * 1000)  # #753
         # R31: Return structured error instead of propagating the exception.
         logger.error(f"Tool '{name}' raised an exception", exc_info=True)
         error_response = mcp_error(
