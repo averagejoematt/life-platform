@@ -46,7 +46,7 @@ def test_no_verb_in_both_sets():
 
 def test_known_write_tools_classify_write():
     for name in (
-        "log_supplement",
+        "log_decision",
         "update_protocol",
         "delete_platform_memory",
         "create_experiment",
@@ -126,13 +126,13 @@ def test_args_hash_non_json_types_via_str():
 def test_record_mutation_key_and_body():
     fake_s3 = MagicMock()
     with patch.object(audit, "_S3_CLIENT", fake_s3):
-        audit.record_mutation("log_supplement", {"name": "creatine"}, "success", duration_ms=123.456)
+        audit.record_mutation("log_decision", {"name": "creatine"}, "success", duration_ms=123.456)
     assert fake_s3.put_object.call_count == 1
     kwargs = fake_s3.put_object.call_args.kwargs
     assert kwargs["Bucket"] == os.environ["S3_BUCKET"]
-    assert re.fullmatch(r"mcp-audit/\d{4}/\d{2}/\d{2}/\d{6}-log_supplement-[0-9a-f]{8}\.json", kwargs["Key"])
+    assert re.fullmatch(r"mcp-audit/\d{4}/\d{2}/\d{2}/\d{6}-log_decision-[0-9a-f]{8}\.json", kwargs["Key"])
     body = json.loads(kwargs["Body"])
-    assert body["tool"] == "log_supplement"
+    assert body["tool"] == "log_decision"
     assert body["status"] == "success"
     assert body["args_sha256"] == audit.args_hash({"name": "creatine"})
     assert body["duration_ms"] == 123.5
@@ -149,7 +149,7 @@ def test_record_mutation_never_raises_on_s3_failure():
     fake_s3.put_object.side_effect = RuntimeError("S3 is down")
     with patch.object(audit, "_S3_CLIENT", fake_s3):
         # must NOT raise
-        audit.record_mutation("log_supplement", {"name": "x"}, "success")
+        audit.record_mutation("log_decision", {"name": "x"}, "success")
 
 
 def test_dispatch_survives_audit_blowup_and_returns_tool_result():
@@ -159,10 +159,10 @@ def test_dispatch_survives_audit_blowup_and_returns_tool_result():
     h._WRITE_TOOL_CALLS.clear()
     fake_fn = MagicMock(return_value={"ok": True, "logged": "yes"})
     with (
-        patch.dict(TOOLS["log_supplement"], {"fn": fake_fn}),
+        patch.dict(TOOLS["log_decision"], {"fn": fake_fn}),
         patch.object(audit, "record_mutation", side_effect=RuntimeError("audit exploded")),
     ):
-        result = h.handle_tools_call({"name": "log_supplement", "arguments": {"name": "creatine", "dose": 5}})
+        result = h.handle_tools_call({"name": "log_decision", "arguments": {"name": "creatine", "dose": 5}})
     assert fake_fn.call_count == 1
     payload = json.loads(result["content"][0]["text"])
     assert payload == {"ok": True, "logged": "yes"}
@@ -172,13 +172,13 @@ def test_dispatch_audits_write_tool_success():
     h._WRITE_TOOL_CALLS.clear()
     fake_fn = MagicMock(return_value={"ok": True})
     with (
-        patch.dict(TOOLS["log_supplement"], {"fn": fake_fn}),
+        patch.dict(TOOLS["log_decision"], {"fn": fake_fn}),
         patch.object(audit, "record_mutation") as rec,
     ):
-        h.handle_tools_call({"name": "log_supplement", "arguments": {"name": "creatine"}})
+        h.handle_tools_call({"name": "log_decision", "arguments": {"name": "creatine"}})
     assert rec.call_count == 1
     args = rec.call_args.args
-    assert args[0] == "log_supplement"
+    assert args[0] == "log_decision"
     assert args[1] == {"name": "creatine"}
     assert args[2] == "success"
 
@@ -187,10 +187,10 @@ def test_dispatch_audits_write_tool_error_status():
     h._WRITE_TOOL_CALLS.clear()
     fake_fn = MagicMock(side_effect=RuntimeError("boom"))
     with (
-        patch.dict(TOOLS["log_supplement"], {"fn": fake_fn}),
+        patch.dict(TOOLS["log_decision"], {"fn": fake_fn}),
         patch.object(audit, "record_mutation") as rec,
     ):
-        result = h.handle_tools_call({"name": "log_supplement", "arguments": {"name": "creatine"}})
+        result = h.handle_tools_call({"name": "log_decision", "arguments": {"name": "creatine"}})
     assert rec.call_count == 1
     assert rec.call_args.args[2] == "error"
     # the structured error response still comes back (R31 contract intact)
@@ -229,7 +229,7 @@ def _weekly_digest_module():
 def test_digest_line_counts_and_top_tools():
     m = _weekly_digest_module()
     keys_by_day = {
-        "mcp-audit/2026/06/01/": ["120001-log_supplement-aaaaaaaa.json", "120500-log_supplement-bbbbbbbb.json"],
+        "mcp-audit/2026/06/01/": ["120001-log_decision-aaaaaaaa.json", "120500-log_decision-bbbbbbbb.json"],
         "mcp-audit/2026/06/02/": ["093000-manage_reading-cccccccc.json"],
     }
     fake_s3 = MagicMock()
@@ -240,7 +240,7 @@ def test_digest_line_counts_and_top_tools():
     fake_s3.list_objects_v2.side_effect = fake_list
     with patch.object(m.boto3, "client", return_value=fake_s3):
         line = m.get_mcp_mutations_digest_line("2026-06-01", "2026-06-02")
-    assert line == "3 MCP mutations this week (top tools: log_supplement (2), manage_reading (1))"
+    assert line == "3 MCP mutations this week (top tools: log_decision (2), manage_reading (1))"
 
 
 def test_digest_line_zero_mutations_is_explicit():
