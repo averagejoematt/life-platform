@@ -514,6 +514,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/856"
         }
       ]
+    },
+    {
+      "id": "2026-07-08-scorecard-first-grades",
+      "date": "2026-07-08",
+      "title": "The prediction scorecard grades for the first time — the bug was a second referee",
+      "shipped": "Eight backlog issues closed in one parallel sweep, led by the one that mattered most: the coaches' prediction scorecard, publicly stuck at '0 graded yet' since mid-June, finally turned. A live run decided 17 predictions (2 confirmed, 15 refuted — an honest 12% hit-rate now baked into the page). The coaching page also joined the static-render program (coach voices in the HTML, no JavaScript required), a new /method/verify/ page publishes the cross-device disagreement a skeptic can check (54.1% same-day resting-heart-rate agreement across 1,193 nights — imperfection is the credibility), and the chronicle now names its missing Week 2 instead of silently skipping it.",
+      "gotcha": "The scorecard wasn't stuck because grading was hard — it was stuck because two graders existed. A general computation engine ran fifteen minutes before the dedicated evaluator every day and marked every elapsed prediction 'inconclusive' first, so the real evaluator never once saw an ungraded, elapsed prediction. The alarm shipped earlier this week could only say 'nothing is being graded' — finding the duplicate referee took reading 390 live prediction records and tracing who wrote each verdict.",
+      "honest_miss": "A 12% hit-rate is not a flattering first number, and most of the backlog graded 'inconclusive' because predictions written in June carried no machine-checkable threshold at all — those expire unresolved rather than getting retroactive credit. Separately, the chronicle's gap note initially didn't ship: the generator was fixed but the deploy script never ran it. Caught only by checking the live page, not the code review.",
+      "prs": [
+        {
+          "label": "PR #864",
+          "url": "https://github.com/averagejoematt/life-platform/pull/864"
+        },
+        {
+          "label": "PR #860",
+          "url": "https://github.com/averagejoematt/life-platform/pull/860"
+        },
+        {
+          "label": "PR #865",
+          "url": "https://github.com/averagejoematt/life-platform/pull/865"
+        },
+        {
+          "label": "PR #863",
+          "url": "https://github.com/averagejoematt/life-platform/pull/863"
+        }
+      ]
     }
   ]
 }

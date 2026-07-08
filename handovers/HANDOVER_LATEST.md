@@ -1,108 +1,108 @@
-# HANDOVER — high-value pay-down: 13 issues shipped end-to-end (entire Now milestone incl. #780 SEC-02), live alarms == code — 2026-07-07
+# HANDOVER — Next-milestone pay-down: 8 issues shipped end-to-end, scorecard off 0-graded-ever, CI un-redded — 2026-07-07
 
-> Instruction: "read memory and handover to put a plan together to efficiently pay down as
-> much of the high value open issues in git as possible in this session. I authorize you to
-> do edits, deploys, merges." Plan: 8 parallel worktree subagents (opus/sonnet) on 10 issues
-> + driver-inline #809/#797; #780 excluded (needs Matthew at a laptop to re-paste the
-> rotated MCP URL into the claude.ai connector — offer stands).
+> Instruction: "Look at open issues list and efficiently pay down as much as you can from
+> the ready to work high valued items" → mid-session: "i authorize the merges and deploys -
+> ship it all." Now milestone was empty; picks came from Next per the prior handover.
+> Plan: 6 parallel worktree subagents (#804 opus, #803 sonnet, #808 opus, #813 fable,
+> #735 sonnet, #769 sonnet) + driver-inline #736/#796.
 
-## What shipped (12 issues, PRs #848–#856; all MERGED + DEPLOYED + LIVE-VERIFIED)
+## What shipped (8 issues, PRs #858–#865; all MERGED + DEPLOYED + LIVE-VERIFIED)
 
-- **#788+#807** (PR #855, Now) — /now/ static-rendered: baked `<noscript>` cockpit proof
-  (level+tier, Body/Mind/Consistency, six pillar rows, as-of stamp) via new
-  `scripts/v4_build_cockpit_proof.py`, wired into `sync_site_to_s3.sh`; JS-parity
-  `_js_round()` (Python banker's rounding diverges at .5). First-visit level explainer,
-  localStorage-dismissed. Live: `Character level 12 · Foundation` in the delivered HTML.
-- **#789** (PR #850, Now) — home-page "Is he okay this week?" friends/family surface:
-  deterministic plain-language read from the already-fetched /api/character +
-  /api/journey (zero new calls, zero AI); ADR-104 absent states ("not measured this
-  week"), post-reset refusal state, as-of stamp. Live on /.
-- **#790** (PR #853, Now) — COST-01: 48 per-lambda ingestion-error alarms retired
-  (`error_alarm=False` in compute+email stacks) per ADR-116; **premise correction: the
-  audit's "no DLQ" count was stale — all 49 already had `dlq=local_dlq` in CDK AND live**
-  (driver-verified live config). ~$4.80/mo off the fixed floor. alarm_count 113→65.
-- **#809** (PR #856 + live ops) — the 113(65)-vs-122 live-vs-CDK gap CLOSED: driver audit
-  found 9 orphan alarms (2026-05-25 pre-CDK script batch; table in the #809 comment).
-  Dispositions: 5 async ops lambdas got `dlq=local_dlq` (ADR-116 pattern) + orphan alarms
-  deleted; journal-enrichment already had DLQ → deleted; site-api-ai is SYNC → real CDK
-  alarm `site-api-ai-errors` (≥3/hr); mcp `life-platform-recursive-loop` adopted in place
-  (CFN upserts by name); redundant `mcp-canary-latency-15min` deleted. **Live count now
-  exactly 67 == CDK 67.**
-- **#811** (PR #852) — SEC-04: `wrap_untrusted_reader_text()` (ai_context.py; preamble +
-  fence, tag-forgery stripped case-insensitively) at every prompt-construction site:
-  /api/ask, /api/board_ask, board follow-ups, stored INTERACTION# episodic replay, weekly
-  compression. Render-time wrapping so pre-fix stored records are covered. 10 new tests.
-- **#799** (PR #854) — CI import gate `tests/test_lambda_map_imports.py` (deploy_critical):
-  I7 = every mapped handler's un-guarded imports resolve inside the real build_bundle.py
-  bundle; I8 = cdk_only annotations correlate with a real sibling dep. Only explicit
-  ImportError catches count as guards (the I4 broad try/except would make it vacuous).
-- **#794** (PR #849) — site-api dual ownership resolved: ground truth was that #781 already
-  unified packaging; fixed the STORY (stale layer comments, ADR-112, deploy.md, CLAUDE.md)
-  + `tests/test_deploy_bundle_paths.py` enforces both channels stay on build_bundle.py.
-- **#798** (PR #848) — `.claude/commands/wrap.md` + `reconcile-branch.md` — the two
-  most-repeated rituals as commands (this wrap used /wrap's steps).
-- **#805+#806** (PR #851) — jargon/framing copy sweep: pillars introduced in plain
-  language, co-movement/couplings/correlatively de-jargoned, "argues about it" → "offers
-  different takes" across home + coaching/method shells AND their generators
-  (v4_build_coaching/evidence — the shells are generator output, editing HTML alone drifts).
-- **#797** (driver, wrap-time) — session state single-written: MEMORY.md Active Work
-  archived 21 terminal entries to `project_shipped_archive.md`, CLAUDE.md status block
-  shrunk to a pointer paragraph; wrap-time rule recorded in both.
+- **#813** (PR #864, fable) — **the scorecard graded for the first time ever.** Root
+  cause was a *duplicate grader*: `coach_computation_engine` Component 6 ran 15 min
+  before the real evaluator daily and terminally wrote `inconclusive` at the un-clamped
+  window, so `coach_prediction_evaluator` never saw an elapsed prediction. Plus 4 more
+  compounding defects (pre-C-3 `threshold=None` specs, `SUBDOMAIN_TO_DOMAIN` gaps
+  silently tripling sleep windows, sleep metrics mapped to whoop instead of eightsleep,
+  predictions emitted over dead sources — now write-time liveness-gated, and the
+  extraction allowlist is derived from the registry so it can't drift). Post-deploy live
+  run: **decided 17 (2 confirmed / 15 refuted), days_since_last_decided 999 → 0**, ~88
+  genuinely decidable through late July; the baked scorecard proof now reads
+  "17 graded · 12% hit-rate". Full triage table in the PR + #813 comment.
+- **#804** (PR #860) — /coaching/ static-rendered via the #855 pattern: integrator
+  weekly priority + each coach's `position_summary` from `/api/coaching-dashboard`
+  baked into `<noscript>` on /coaching/ + /coaching/read/ (`v4_proof.load_coaching_read`,
+  ADR-104 absent-coach omission, committed-snapshot offline fallback), regenerated
+  every deploy by `sync_site_to_s3.sh` → `v4_build_coaching.py`.
+- **#803** (PR #863) — chronicle: Week 2 was generated 06-24, sat unapproved
+  (PREVIEW_MODE), then was deleted by the 06-27/28 privacy purge; current week blocked
+  since 07-03 by the fail-closed privacy gate (Elena cited "paul conti" — no real-people
+  rule existed). Fixes: REAL-PEOPLE prompt guardrail, `_set_chronicle_pending()` marker
+  (mirrors the podcast pending fix), `_week_gap_note()` baked into the chronicle
+  noscript ("Week 2 — no installment ran…" is LIVE). Watch the 07-08 Wednesday run.
+- **#808** (PR #861) — `scripts/ai_spend_attribution.py` over the existing
+  `LifePlatform/AI` EMF (prices imported from bedrock_client; reconciles vs AWS/Bedrock
+  authoritative). Live June ranking confirms Haiku $24.47 > Sonnet $15.52 and the Haiku
+  dollars hide INSIDE multi-model features — **#409 batch pricing should target the
+  coach pipeline + daily-brief extraction passes**, not the tiny structured tools.
+  Per-model EMF dimension deliberately NOT added (recurring cost — Matthew's call).
+- **#769** (PR #862) — evening ritual C-floor (ADR-124): HMAC-signed one-tap links in
+  `evening_nudge_lambda` (new `lambdas/ritual_link.py`, secret
+  `life-platform/ritual-token-secret` — created live this session) → `/api/ritual_log`
+  (last-tap-wins per metric, DDB-rate-limited) + aggregate-only `/api/fulfillment_ritual`
+  (nulls for dark days). 33 tests.
+- **#735** (PR #865) — `/method/verify/`: cross-device disagreement published via new
+  `/api/device_agreement` (live: 1,193 overlapping nights, 54.1% RHR agreement — the
+  imperfection IS the credibility), scrubbed raw samples, honest "not yet linked" device
+  profiles (real URLs need Matthew — TODO(#735) markers in `evidence_meta.js`).
+- **#736** (PR #858, driver) — build beat is now a wrap-GATE: beat or explicit
+  `**Build beat:** none — <reason>` line in every handover; wrap.md + checklist + CLAUDE.md.
+- **#796** (PR #859, driver) — `.claude/agents/`: worktree-implementer / finding-verifier
+  / render-qa, with the recurring incident classes baked into the prompts.
 
-## Deploys (authorized in-session)
+## Repairs made en route (not from the issue list)
 
-`cdk deploy --all` exit 0 (all stacks UPDATE_COMPLETE; the 48+ alarm deletes + DLQ wiring
-+ 2 new alarms + full-tree code asset fleet-wide incl. site-api with #852) ·
-`sync_site_to_s3.sh` ×2 (second post-wrap so version.json == HEAD) · orphan-alarm CLI
-deletes. Verified: smoke_test_site **67/67** · full suite **3901 passed** (only the 1
-known live-AWS failure, test_ddb_key_contracts; i16 lives in the ignored integration
-file) · /api/status 200 · live alarms 67 == synth 67 · /now/ noscript proof live ·
-visual QA (see status block for final verdict).
+- **CI had been red since yesterday's #857**: unsorted imports in canary/qa_smoke
+  lambdas failed the ruff gate, which MASKED a daily-brief golden failure behind it.
+  Fixed imports; then defused the golden itself — `html_builder`'s BoD confidence badge
+  computes `days_of_data` from wall-clock now, so the "frozen" golden flipped
+  LOW→MEDIUM the day the real experiment crossed n=30. Fix: fixture
+  `journey_start_date` pinned to 2024-06-08 (badge permanently HIGH → deterministic).
+  **CI/CD on main is green again** (first full green since 07-07 ~17:00).
+- **#803's gap note initially didn't ship**: `sync_site_to_s3.sh` never ran
+  `v4_build_dispatches.py`. Wired it in (best-effort pattern like the other builders);
+  live-verified after re-sync.
+
+## Deploys (authorized in-session: "i authorize the merges and deploys - ship it all")
+
+`cdk deploy --all` exit 0 (8/8 stacks; fleet code asset picks up shared
+`measurable_metrics.py`) · `deploy_site_api.sh` (status 200) · `sync_site_to_s3.sh` ×2 ·
+secret `life-platform/ritual-token-secret` created · one live
+`coach-prediction-evaluator` invoke (17 decided). Verified: full suite locally **4011
+passed** (4 pre-existing fails at merge time; the 2 golden ones then FIXED, remaining 2
+are live-AWS-only: test_ddb_key_contracts, i16) · smoke **67/67** · visual QA **34/34,
+0 failed, 5 warnings** · CI/CD green on main · version.json == deploy HEAD ·
+live checks: /api/device_agreement 200 with real data, coach names in delivered
+/coaching/ HTML, chronicle gap note live, /method/verify/ 200.
 
 ## Gotchas (this session)
 
-- **Agent-worktree edits can leak into the main tree** (macOS case-twin, known): #799's
-  CONVENTIONS.md edit appeared staged in MY tree mid-merge-train. Preserved to scratchpad,
-  cleaned, and the agent's own PR carried the same hunk — no loss. Check `git status`
-  before every merge-train step when agents are live.
-- **`gh pr merge` in a broken `&&` chain can still fire**: #851 got merged by a failed-
-  looking chain (checkout aborted → later commands ran on the branch). Merged content was
-  verified correct after the fact. Keep merge commands OUT of long chains.
-- Three agents died mid-run on transient `Connection closed` API errors — `SendMessage`
-  to the same agentId resumes them with worktree+context intact; all three finished.
-- The empty-reconcile case: a copy-only PR merges main with 0 literal changes —
-  `git commit -m reconcile` exits nonzero and kills the chain. Guard with
-  `git diff --cached --quiet ||`.
-- CFN adopts an existing same-name alarm silently (PutMetricAlarm upsert) — used
-  deliberately for `life-platform-recursive-loop`.
+- **The case-twin leak struck again** (#808's script appeared untracked in the MAIN
+  tree): preserved to scratchpad, cleaned; the agent's PR carried the real copy.
+- **A red lint gate masks unit-test failures for DAYS** (sequential CI gates): the
+  golden drift was invisible until the ruff fix landed. After un-redding a gate, always
+  re-check the next gate.
+- **Golden tests must not depend on wall-clock now**: any fixture date used in a
+  now-minus-date computation is a time bomb — pin it far past.
+- **Worktree merge trains**: #860/#863 shared `v4_proof.py`; both-added-functions merge
+  + `git reset --soft origin/main` linearize + force-push made the squash clean.
+- **An agent wiring a builder into the BUILD script is not enough** — the deploy script
+  must also RUN that builder (the #803 gap-note miss). Render-verify live after deploy.
 
-## #780 SEC-02 — DONE this session (Matthew was at his laptop)
+## Build beat: 2026-07-08-scorecard-first-grades
 
-Rotated the MCP Function URL live (delete+recreate → new url-id; old host 403-dead, new
-host enforces the Bearer boundary), Matthew re-pasted the new URL into the claude.ai
-connector and reconnected (verified). PR #857: `lambdas/mcp_url.resolve_mcp_url()` — canary
-+ qa-smoke now DISCOVER the URL at runtime via `lambda:GetFunctionUrlConfig` (both roles
-granted, scoped to the MCP fn ARN), so no URL is committed and future rotations are
-self-healing; CDK env vars + McpFunctionUrl CfnOutput removed; ARCHITECTURE/INFRASTRUCTURE/
-OPERATOR_GUIDE + integration-test host + setup_waf.sh redacted. Deployed
-LifePlatformOperational + LifePlatformMcp. **End-to-end proof: the i14 canary-MCP
-integration test now PASSES** (live canary discovered the new URL, derived the Bearer,
-reached the MCP endpoint). Gotcha: the #809 `life-platform-recursive-loop` alarm couldn't
-be adopted by CFN while a live orphan of the same name existed — CFN early-validation
-refuses ("already exists"); had to delete the live orphan, then CDK created it fresh (the
-"CFN upserts by name" assumption is FALSE for change-set validation). Residual (durable
-follow-up, not filed): the URL-possession auth model is the root weakness — either a real
-per-request gate claude.ai can satisfy, or a CI check that fails on any committed
-`*.lambda-url.*.on.aws` MCP host. Full detail in private memory
-security-r22-mcp-token-exposure.
+## Next picks
 
-## Next picks (Now milestone is now EMPTY)
+- **Next milestone remainder:** #812 golden-harness generalization + harvest loop
+  (fable, big) · #793 split site-api lambdas out of Operational (infra, attended) ·
+  #740 essay (awaits Matthew's edit pass) · #734 audio debrief · #741 career artifact ·
+  #739 surge-mode ceiling (needs Matthew to set $X) · #409 batch pricing — now
+  correctly aimed by #861 at the coach pipeline + daily-brief extraction.
+- **Watch:** 07-08 Wednesday chronicle run (privacy guardrail should clear the hold);
+  evaluator daily runs (~71 more predictions decide through late July); first evening
+  nudge with ritual links (needs `evening-nudge` env nothing — deployed).
+- **Matthew:** /method/verify/ device-profile URLs (TODO markers) · per-model EMF
+  dimension (recurring-cost decision) · #417 re-stamp timing/format · Ingestion/HAE
+  deploy call · REVIEW_BUNDLE_2026-07-06.md untracked (commit or delete).
 
-- **#804** static-render /coaching/ (the #855 cockpit-proof pattern now makes this
-  mechanical) · **#803** chronicle cadence/gap · **#808** Haiku spend attribution (top AI
-  line) · **#812/#813** fable AI items (golden-harness generalization; prediction-
-  gradability triage — scorecard still 0-graded-ever).
-- Older Matthew decisions: #417 re-stamp timing/format · Ingestion/HAE deploy call ·
-  #740 edit pass · untracked docs/reviews/REVIEW_BUNDLE_2026-07-06.md (commit or delete).
-
-Prior session archived at `handovers/HANDOVER_2026-07-06_mobile-bug-bash.md`.
+Prior session archived at `handovers/HANDOVER_2026-07-07_high-value-paydown.md`.
