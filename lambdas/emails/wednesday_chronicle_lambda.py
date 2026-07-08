@@ -1116,6 +1116,17 @@ def _recap_contains_raw_vitals(text):
     return bool(_RECAP_VITAL_RE.search(text or ""))
 
 
+def installment_grounding_findings(elena_prompt, user_message, text):
+    """#537/ADR-104 chronicle gate core: every number in the installment must exist
+    somewhere in what Elena was given (her prompt + the data packet / user message).
+    This is the exact findings function the live regen-once loop applies; extracted
+    (#812) so the golden-surface eval harness replays fixtures through the ACTUAL
+    gate path. Returns grounded_generation findings ([] = grounded)."""
+    import grounded_generation as _gg
+
+    return _gg.grounding_findings(text, allowed=_gg.allowed_numbers(elena_prompt, user_message))
+
+
 def _published_installments(data):
     """Published installments only, newest-first — the recap's grounding spine.
     A draft that hasn't cleared the approve gate is NOT yet part of the public story."""
@@ -2865,13 +2876,30 @@ def lambda_handler(event, context):
         import grounded_generation as _gg
 
         _allowed = _gg.allowed_numbers(elena_prompt, user_message)
-        _findings_fn = lambda t: _gg.grounding_findings(t, allowed=_allowed)  # noqa: E731
+        _draft_before_gate = raw_installment  # #812/#744: keep the pre-gate draft for retention
+        _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t)  # noqa: E731
         _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, api_key)  # noqa: E731
         raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
         if _corrected:
             logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
         elif _residual:
             logger.warning(f"[ADR-104] chronicle keeps {len(_residual)} residual grounding findings (best draft)")
+        if _corrected or _residual:
+            # #812/#744: a fired chronicle gate is labeled eval data — retain the pair.
+            try:
+                import eval_retention
+
+                eval_retention.retain(
+                    "chronicle",
+                    "flagged_corrected" if _corrected else "flagged_kept_best",
+                    draft=_draft_before_gate,
+                    final=raw_installment,
+                    findings=_findings_fn(_draft_before_gate),  # the DRAFT's findings — they define a canary's expected checks
+                    allowed=_allowed,
+                    extra={"week_number": week_num},
+                )
+            except Exception:  # noqa: BLE001 — retention is never load-bearing
+                pass
     except ImportError:
         pass  # gate module unavailable — serve as before
     except Exception as _gg_e:

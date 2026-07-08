@@ -1,0 +1,146 @@
+[
+ {
+  "id": "som_canary_fabricated_brier",
+  "surface": "state_of_matthew",
+  "mutation": "SEEDED FAULT (synthetic): invents a Brier score (0.18) and an accuracy figure (82) that appear nowhere in the state payload — the fabricated-statistic class.",
+  "inputs": {
+   "state": {
+    "as_of": "2026-07-05",
+    "forecast": {
+     "issued_date": "2026-07-05",
+     "model": "ewma-v1",
+     "confidence": 0.8,
+     "expectations": [
+      {
+       "metric": "recovery_pct",
+       "point": 73.6,
+       "lo": 47.5,
+       "hi": 99.8,
+       "unit": "%",
+       "horizon_days": 1,
+       "frame": "tomorrow"
+      },
+      {
+       "metric": "weight_lbs",
+       "point": 300.9,
+       "lo": 299.3,
+       "hi": 302.5,
+       "unit": "lb",
+       "horizon_days": 1,
+       "frame": "tomorrow morning"
+      }
+     ]
+    },
+    "hypotheses": {
+     "active_count": 13,
+     "total": 16
+    },
+    "coaches": {
+     "disagreement_count": 2
+    },
+    "calibration": null,
+    "highlight": null
+   }
+  },
+  "mutated_output": "The forecast engine expects recovery near 73.6% tomorrow. Across the graded record the platform's Brier score sits at 0.18 with 82% of forecasts landing inside their bands.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ },
+ {
+  "id": "som_canary_causal_claim",
+  "surface": "state_of_matthew",
+  "mutation": "SEEDED FAULT (synthetic): asserts causation with a banned connective ('because') between deficit and recovery — the causal-overreach class ADR-105 bans on this surface.",
+  "inputs": {
+   "state": {
+    "as_of": "2026-07-05",
+    "forecast": {
+     "issued_date": "2026-07-05",
+     "model": "ewma-v1",
+     "confidence": 0.8,
+     "expectations": [
+      {
+       "metric": "recovery_pct",
+       "point": 73.6,
+       "lo": 47.5,
+       "hi": 99.8,
+       "unit": "%",
+       "horizon_days": 1,
+       "frame": "tomorrow"
+      },
+      {
+       "metric": "weight_lbs",
+       "point": 300.9,
+       "lo": 299.3,
+       "hi": 302.5,
+       "unit": "lb",
+       "horizon_days": 1,
+       "frame": "tomorrow morning"
+      }
+     ]
+    },
+    "hypotheses": {
+     "active_count": 13,
+     "total": 16
+    },
+    "coaches": {
+     "disagreement_count": 2
+    },
+    "calibration": null,
+    "highlight": null
+   }
+  },
+  "mutated_output": "Recovery is projected at 73.6% tomorrow because the caloric deficit has suppressed overnight repair; weight should read near 300.9 lb.",
+  "expect_checks": [
+   "causal_language"
+  ]
+ },
+ {
+  "id": "som_canary_invented_trend",
+  "surface": "state_of_matthew",
+  "mutation": "SEEDED FAULT (synthetic): invents a 'climbed from 61.2 to 73.6' recovery trend — the from-X-to-Y fabrication class (61.2 exists nowhere in the state).",
+  "inputs": {
+   "state": {
+    "as_of": "2026-07-05",
+    "forecast": {
+     "issued_date": "2026-07-05",
+     "model": "ewma-v1",
+     "confidence": 0.8,
+     "expectations": [
+      {
+       "metric": "recovery_pct",
+       "point": 73.6,
+       "lo": 47.5,
+       "hi": 99.8,
+       "unit": "%",
+       "horizon_days": 1,
+       "frame": "tomorrow"
+      },
+      {
+       "metric": "weight_lbs",
+       "point": 300.9,
+       "lo": 299.3,
+       "hi": 302.5,
+       "unit": "lb",
+       "horizon_days": 1,
+       "frame": "tomorrow morning"
+      }
+     ]
+    },
+    "hypotheses": {
+     "active_count": 13,
+     "total": 16
+    },
+    "coaches": {
+     "disagreement_count": 2
+    },
+    "calibration": null,
+    "highlight": null
+   }
+  },
+  "mutated_output": "Recovery has climbed from 61.2 to 73.6 over the week, and weight is expected near 300.9 lb tomorrow morning.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ }
+]

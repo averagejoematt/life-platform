@@ -52,6 +52,14 @@ ROLES = {
         "permissions_file": "github-actions-remediation-role.permissions.json",
         "inline_policy_name": "remediation-permissions",
     },
+    # #812: the least-privilege golden-eval role — weekly advisory Haiku voice
+    # judge + CloudWatch LifePlatform/GoldenBrief emit + monthly EVALRET# harvest
+    # read. Trust is main-only from day one (no repo-wide subject to tighten later).
+    "github-actions-golden-eval-role": {
+        "trust_file": "github-actions-golden-eval-role.trust.json",
+        "permissions_file": "github-actions-golden-eval-role.permissions.json",
+        "inline_policy_name": "golden-eval-permissions",
+    },
 }
 
 PROVIDER_FILE = "github-oidc-provider.json"
@@ -116,7 +124,22 @@ def verify(iam):
 
     # 2. Each role: trust policy + inline permissions policy.
     for role_name, spec in ROLES.items():
-        role = iam.get_role(RoleName=role_name)["Role"]
+        try:
+            role = iam.get_role(RoleName=role_name)["Role"]
+        except iam.exceptions.NoSuchEntityException:
+            # A checked-in identity that doesn't exist live: either it was deleted
+            # out-of-band (investigate!) or it is staged and not yet applied (the
+            # #812 golden-eval role ships as JSON first — see infra/iam/README.md).
+            checks += 1
+            findings.append(
+                {
+                    "target": f"{role_name}",
+                    "status": "MISSING",
+                    "checked_in": f"{spec['trust_file']} + {spec['permissions_file']}",
+                    "live": "role does not exist — staged-not-applied, or deleted out-of-band",
+                }
+            )
+            continue
 
         checks += 1
         trust_ci = _load_json(os.path.join(_IAM_DIR, spec["trust_file"]))

@@ -1,16 +1,20 @@
-# Golden-brief eval harness (#742, R21 epic #720/E6) — the falsifiable-honesty layer.
+# Golden-brief + golden-surface eval harness (#742 coach briefs; #812 every AI surface) —
+# the falsifiable-honesty layer.
 #
-# The DETERMINISTIC verdict already gates every deploy: tests/test_golden_brief_eval.py
-# carries the `deploy_critical` marker, so it runs in the main pipeline's deploy-critical
-# lane on every push and BLOCKS deploy if a golden output false-flags or a seeded-fault
-# canary slips the gate. This workflow is the WEEKLY complement: it re-runs the harness on
-# a schedule (catching drift even in weeks with no gate/prompt change) and surfaces the
-# advisory Haiku voice-rubric trend.
+# The DETERMINISTIC verdicts already gate every deploy: tests/test_golden_brief_eval.py and
+# tests/test_golden_surface_eval.py carry the `deploy_critical` marker, so they run in the
+# main pipeline's deploy-critical lane on every push and BLOCK deploy if a golden output
+# false-flags or a seeded-fault canary slips a gate. This workflow is the WEEKLY complement:
+# it re-runs both harnesses on a schedule (catching drift even in weeks with no gate/prompt
+# change) and surfaces the advisory Haiku voice-rubric trend.
 #
-# By default the scheduled run is deterministic + free (no AWS, no Bedrock). The advisory
-# `--judge`/`--emit` path (Bedrock spend + CloudWatch LifePlatform/GoldenBrief metrics) is
-# manual-dispatch only, pending a dedicated least-privilege role (bedrock:InvokeModel on the
-# Haiku profile + cloudwatch:PutMetricData) — see ADR-127. It is fail-soft either way.
+# The scheduled run is deterministic + free (no AWS, no Bedrock). The advisory
+# `--judge`/`--emit` path (Bedrock spend + CloudWatch LifePlatform/GoldenBrief metrics) runs
+# weekly via the dedicated least-privilege `github-actions-golden-eval-role` (#812 —
+# bedrock:InvokeModel on the Haiku profile + namespace-conditioned PutMetricData only; see
+# infra/iam/README.md). Until that role is applied in IAM the judge step degrades softly
+# (continue-on-error on the credential step) and the deterministic verdict is unaffected.
+# See ADR-127.
 name: Golden-brief eval
 
 on:
@@ -26,7 +30,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write   # only used by the optional judge/emit step
+  id-token: write   # only used by the advisory judge/emit step
 
 env:
   AWS_REGION: us-west-2
@@ -34,7 +38,7 @@ env:
 
 jobs:
   golden-brief:
-    name: Golden-brief falsifiability check
+    name: Golden falsifiability check (briefs + all surfaces)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -52,22 +56,28 @@ jobs:
           echo "::group::Golden-brief deterministic harness"
           python3 tests/golden_brief_eval.py | tee /tmp/golden.txt
           echo "::endgroup::"
-          # first line is the ops-email line — surface it in the run summary
+          echo "::group::Golden-surface deterministic harness (#812)"
+          python3 tests/golden_surface_eval.py | tee /tmp/golden_surfaces.txt
+          echo "::endgroup::"
+          # first lines are the ops-email lines — surface them in the run summary
           head -1 /tmp/golden.txt >> "$GITHUB_STEP_SUMMARY"
+          head -1 /tmp/golden_surfaces.txt >> "$GITHUB_STEP_SUMMARY"
 
       - name: Self-tests
-        run: python3 -m pytest tests/test_golden_brief_eval.py -q
+        run: python3 -m pytest tests/test_golden_brief_eval.py tests/test_golden_surface_eval.py -q
 
-      # ── advisory voice trend + metrics — manual dispatch only ──────────────
+      # ── advisory voice trend + metrics — weekly on schedule, or manual dispatch ──
       - name: Configure AWS (judge/emit)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_judge }}
+        id: judge-creds
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_judge) }}
+        continue-on-error: true   # role is staged until applied (infra/iam/README.md) — degrade softly
         uses: aws-actions/configure-aws-credentials@50ac8dd1e1b10d09dac7b8727528b91bed831ac0 # v3.0.1
         with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-golden-eval-role
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Advisory voice rubric + metric emit
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_judge }}
+        if: ${{ steps.judge-creds.outcome == 'success' }}
         continue-on-error: true   # advisory: never fails the run (harness is fail-soft too)
         run: |
           echo "::group::Advisory Haiku voice rubric + CloudWatch emit"

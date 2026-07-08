@@ -317,6 +317,27 @@ def _call_notes_model(prompt, api_key):
 _NOTE_FIELDS = ("ai_present", "ai_cautionary", "ai_affirming")
 
 
+def note_contradiction_hits(analysis, metrics_record):
+    """SS-10 deterministic core: the contradiction hits for one generated note
+    against one computed_metrics record — exactly the composition the live
+    `_grounding_contradictions` applies (build_canonical_facts → the shared TIGHT
+    guard over the three note fields). Extracted (#812) so the golden-surface
+    eval harness replays fixtures through the ACTUAL gate path. Raises loudly on
+    import/shape problems — the live caller wraps it fail-soft."""
+    try:
+        from intelligence.grounding_guard import hard_canonical_contradictions
+    except ImportError:  # pragma: no cover — flat sys.path (tests / bundle root)
+        from grounding_guard import hard_canonical_contradictions
+
+    from canonical_facts import build_canonical_facts
+
+    facts = {k: v for k, v in build_canonical_facts(metrics_record).items() if k != "as_of"}
+    hits = []
+    for f in _NOTE_FIELDS:
+        hits.extend(hard_canonical_contradictions(analysis.get(f) or "", facts))
+    return hits
+
+
 def _grounding_contradictions(analysis):
     """SS-10 — deterministic canonical-facts contradiction count for a generated note.
 
@@ -330,13 +351,6 @@ def _grounding_contradictions(analysis):
     blocks the note outright, only triggers the one corrective rewrite below.
     """
     try:
-        try:
-            from intelligence.grounding_guard import hard_canonical_contradictions
-        except ImportError:  # pragma: no cover — flat sys.path (tests)
-            from grounding_guard import hard_canonical_contradictions
-
-        from canonical_facts import build_canonical_facts
-
         resp = table.query(
             KeyConditionExpression=Key("pk").eq("USER#matthew#SOURCE#computed_metrics"),
             ScanIndexForward=False,
@@ -345,10 +359,7 @@ def _grounding_contradictions(analysis):
         items = resp.get("Items", [])
         if not items:
             return 0, ""
-        facts = {k: v for k, v in build_canonical_facts(items[0]).items() if k != "as_of"}
-        hits = []
-        for f in _NOTE_FIELDS:
-            hits.extend(hard_canonical_contradictions(analysis.get(f) or "", facts))
+        hits = note_contradiction_hits(analysis, items[0])
         return len(hits), "; ".join(h["detail"] for h in hits[:3])
     except Exception as e:  # noqa: BLE001 — check is best-effort by design
         logger.info(f"[grounding] check unavailable ({type(e).__name__}) — note served unchecked")
@@ -379,6 +390,7 @@ def generate_field_notes(iso_week):
     # never regress to a worse draft, never loop chasing stochastic output).
     n_bad, detail = _grounding_contradictions(analysis)
     if n_bad:
+        _draft_note = {f: analysis.get(f) for f in _NOTE_FIELDS}  # #812/#744: pre-rewrite note for retention
         logger.info(f"[grounding] {n_bad} contradiction(s) in {iso_week}: {detail} — one corrective rewrite")
         fix_prompt = (
             prompt
@@ -386,16 +398,31 @@ def generate_field_notes(iso_week):
             + f"record: {detail}. Rewrite the full JSON response. Never state a recovery/HRV/RHR/weight "
             + "number that is not in the data above; when unsure, describe the pattern without a number."
         )
+        _corrected = False
         try:
             retry = _call_notes_model(fix_prompt, api_key)
             n_retry, _ = _grounding_contradictions(retry)
             if n_retry < n_bad:
                 logger.info(f"[grounding] rewrite kept ({n_bad} → {n_retry})")
                 analysis = retry
+                _corrected = True
             else:
                 logger.warning(f"[grounding] rewrite not better ({n_bad} → {n_retry}) — keeping the original")
         except Exception as e:  # noqa: BLE001 — regen is best-effort
             logger.warning(f"[grounding] rewrite failed ({type(e).__name__}) — keeping the original")
+        try:  # #812/#744: a fired note gate is labeled eval data — retain the pair (fail-soft)
+            import eval_retention
+
+            eval_retention.retain(
+                "field_notes",
+                "flagged_corrected" if _corrected else "flagged_kept_best",
+                draft=json.dumps(_draft_note),
+                final=json.dumps({f: analysis.get(f) for f in _NOTE_FIELDS}),
+                findings=[{"type": "contradiction", "detail": detail}],
+                extra={"week": iso_week, "n_contradictions": n_bad},
+            )
+        except Exception:  # noqa: BLE001 — retention is never load-bearing
+            pass
 
     now = datetime.now(timezone.utc).isoformat()
 

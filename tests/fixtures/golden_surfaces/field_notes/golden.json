@@ -1,0 +1,41 @@
+[
+ {
+  "id": "fn_real_2026_w27",
+  "surface": "field_notes",
+  "provenance": "REAL recorded note: DDB pk=USER#matthew#SOURCE#field_notes sk=WEEK#2026-W27 (verbatim). metrics_record RECONSTRUCTED to the note's cited vitals (the then-current record is not retained; the note passed the live gate against it).",
+  "inputs": {
+   "metrics_record": {
+    "date": "2026-07-07",
+    "hrv_ms": 47.1,
+    "recovery_pct": 73.6,
+    "rhr_bpm": 62,
+    "latest_weight": 300.8,
+    "weekly_rate_lbs": -4.7
+   }
+  },
+  "reference_output": {
+   "ai_present": "Week 2026-W27 delivered solid sleep consistency. You logged all 7 nights with an average of 7.4 hours—slightly down from W26's 7.7 hours, but still within your reliable range. HRV increased to 47.1 ms, matching your best performance from W18 and representing a meaningful recovery in nervous system resilience. This is the highest HRV reading in your recent trajectory and suggests your body is in a genuinely recovered state. The sleep foundation remains steady. However, habit tracking data is incomplete this week—you scored only 6 of 7 days, leaving a gap in the behavioral picture. No weight readings were recorded this week, so I cannot assess momentum on that metric. Character progression data is also absent. These gaps make it difficult to see the full weekly story beyond sleep.",
+   "ai_cautionary": "The absence of weight data this week interrupts the tracking pattern you've maintained. Over W25 and W26, you demonstrated consistent weighing discipline with 5-7 readings per week, even as the rate of loss moderated from 8.8 lbs to 4.7 lbs. A full week without weight entries—even as sleep and HRV remain strong—suggests a possible shift in logging rigor or measurement access. This is worth examining: are you deprioritizing the scale, or is something else at play? Given that sleep quality has peaked, it would be valuable to reconnect the full dataset (nutrition, training, weight) to see whether this week represents genuine progress or simply incomplete instrumentation.",
+   "ai_affirming": "Your HRV of 47.1 ms is genuinely excellent—it equals your best single-week performance and represents a full recovery from the dip you experienced in W24. Combined with 7 consecutive nights of sleep averaging 7.4 hours, your nervous system is in a strong position. The trend line from W24 (40.2 ms) → W25 (44.7 ms) → W26 (44.1 ms) → W27 (47.1 ms) shows not just recovery but sustained upward momentum. This suggests the adjustments you made after W24's cautionary signals have taken root. Sleep consistency continues to be a genuine strength."
+  }
+ },
+ {
+  "id": "fn_authored_grounded_note",
+  "surface": "field_notes",
+  "provenance": "AUTHORED: a grounded note citing exactly the record's vitals — pins that citing true values (even in a trend sentence) never false-fires.",
+  "inputs": {
+   "metrics_record": {
+    "date": "2026-07-01",
+    "hrv_ms": 38.7,
+    "recovery_pct": 55,
+    "rhr_bpm": 64,
+    "latest_weight": 301.0
+   }
+  },
+  "reference_output": {
+   "ai_present": "Recovery sat at 55% this week with HRV at 38.7 ms — modest numbers that match a heavy training block.",
+   "ai_cautionary": "Resting heart rate held at 64 bpm; if it climbs while recovery stays at 55, back off the volume before the data forces you to.",
+   "ai_affirming": "Weight at 301.0 held steady through a week where the easy move was to stop weighing in."
+  }
+ }
+]

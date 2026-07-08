@@ -1,0 +1,92 @@
+[
+ {
+  "id": "memoir_authored_reckons_with_miss",
+  "surface": "memoir",
+  "provenance": "AUTHORED (no real memoir exists yet — the quarterly lambda has not produced its first record). Facts dict is real-shaped per coach_memoir_lambda._render_facts_for_prompt; the text cites the refuted deep_sleep call by name.",
+  "inputs": {
+   "facts": {
+    "quarter": "2026-Q2",
+    "total_evaluations": 14,
+    "by_outcome": {
+     "confirmed": 5,
+     "refuted": 7,
+     "inconclusive": 2
+    },
+    "hit_rate_pct": 41.7,
+    "decided_count": 12,
+    "calibration": null,
+    "misses": [
+     {
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep",
+      "claim": "deep sleep would rebound above 1.4h within a week"
+     }
+    ],
+    "hits": [
+     {
+      "metric": "recovery_pct",
+      "claim": "recovery would hold above 60% through the deficit"
+     }
+    ],
+    "stance_start": {
+     "headline_read": "sleep architecture is the limiting factor"
+    },
+    "stance_end": {
+     "headline_read": "consistency, not architecture, is the limiting factor",
+     "how_my_read_changed": "the data refuted my deep-sleep rebound call"
+    },
+    "learnings_raw": [
+     {
+      "status": "refuted",
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep"
+     },
+     {
+      "status": "confirmed",
+      "metric": "recovery_pct",
+      "subdomain": "recovery"
+     }
+    ]
+   }
+  },
+  "reference_output": "Fourteen graded calls this quarter, and the ledger reads 5 confirmed against 7 refuted — a 41.7% hit rate across the 12 that decided. The one I keep returning to is deep_sleep: I said it would rebound, and I was wrong. I opened the quarter convinced sleep architecture was the limiting factor; I close it believing consistency is. That correction cost me 7 refuted calls to learn."
+ },
+ {
+  "id": "memoir_authored_clean_quarter",
+  "surface": "memoir",
+  "provenance": "AUTHORED — the no-refuted-learnings path: nothing to cite, so the miss gate has nothing to demand.",
+  "inputs": {
+   "facts": {
+    "quarter": "2026-Q2",
+    "total_evaluations": 3,
+    "by_outcome": {
+     "confirmed": 3
+    },
+    "hit_rate_pct": 100.0,
+    "decided_count": 3,
+    "calibration": null,
+    "misses": [],
+    "hits": [
+     {
+      "metric": "recovery_pct",
+      "claim": "recovery would hold above 60%"
+     }
+    ],
+    "stance_start": {
+     "headline_read": "steady"
+    },
+    "stance_end": {
+     "headline_read": "steady"
+    },
+    "learnings_raw": [
+     {
+      "status": "confirmed",
+      "metric": "recovery_pct",
+      "subdomain": "recovery"
+     }
+    ]
+   }
+  },
+  "reference_output": "Three calls, three confirmed — a 100% hit rate on a small book of 3. I will not pretend a perfect quarter at this sample size is mastery; it is mostly a quarter of conservative calls that the data happened to reward."
+ }
+]

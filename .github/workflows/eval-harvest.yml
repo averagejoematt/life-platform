@@ -1,0 +1,66 @@
+# Eval-fixture harvest (#812, consumes the #744 retention stream) — the monthly loop
+# that turns live ADR-104 gate events (retained at DDB EVALRET#<surface> by
+# lambdas/eval_retention.py) into new golden/canary FIXTURE CANDIDATES for
+# tests/fixtures/golden_surfaces/.
+#
+# Deterministic end to end (ADR-105: no LLM in the loop — cost $0): every candidate is
+# validated by replaying it through the harness before it is proposed, and an uncatchable
+# canary or a still-flagging golden is rejected. Candidates are uploaded as a run ARTIFACT
+# for HUMAN review — never auto-committed: retained drafts can contain reader questions and
+# unpublished narrative, and the repo is public, so promotion
+# (scripts/harvest_eval_fixtures.py --promote) is a reviewed, attended step.
+#
+# Auth: the least-privilege github-actions-golden-eval-role (dynamodb:Query LeadingKeys
+# EVALRET#* — read-only; see infra/iam/README.md). Until that role is applied in IAM this
+# workflow fails at the credential step — loudly and harmlessly (nothing downstream
+# depends on it).
+name: Eval-fixture harvest
+
+on:
+  schedule:
+    - cron: '23 16 3 * *'   # monthly, 3rd at 16:23 UTC (fixed UTC — no DST drift)
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+
+jobs:
+  harvest:
+    name: Harvest live gate events into fixture candidates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install boto3 botocore
+
+      - name: Configure AWS (read-only harvest role)
+        uses: aws-actions/configure-aws-credentials@50ac8dd1e1b10d09dac7b8727528b91bed831ac0 # v3.0.1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-golden-eval-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Harvest + validate candidates (deterministic)
+        run: |
+          python3 scripts/harvest_eval_fixtures.py --days 35 --out /tmp/eval_fixture_candidates.json | tee /tmp/harvest.txt
+          head -2 /tmp/harvest.txt >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Candidates are in the run artifact. Review for privacy/quality, then promote locally:" >> "$GITHUB_STEP_SUMMARY"
+          echo '`python3 scripts/harvest_eval_fixtures.py --promote <downloaded file>`' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload candidate artifact (for human review — never auto-committed)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eval-fixture-candidates
+          path: /tmp/eval_fixture_candidates.json
+          retention-days: 60

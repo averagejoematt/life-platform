@@ -1,0 +1,28 @@
+[
+ {
+  "id": "chron_canary_invented_weight_trend",
+  "surface": "chronicle",
+  "mutation": "SEEDED FAULT (synthetic): 'down from 306.2' — the starting weight 306.2 appears nowhere in the packet; the invented-trend class the chronicle gate exists to kill.",
+  "inputs": {
+   "elena_prompt": "You are Elena, the platform's narrative journalist. Write the weekly installment strictly from the data packet; never invent a number.",
+   "user_message": "DATA PACKET — week ending 2026-07-07: Weight: 300.8 lbs | Week Grade: avg 43 | T0 Streak: 0 days. Whoop recovery latest 73.6%. HRV 34.1 ms. Weekly rate -4.7 lb/week. Nights logged: 7. Deficit days: 5."
+  },
+  "mutated_output": "The scale told a kind story this week: 300.8, down from 306.2, the sharpest single-week drop of the run.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ },
+ {
+  "id": "chron_canary_fabricated_glucose",
+  "surface": "chronicle",
+  "mutation": "SEEDED FAULT (synthetic): invents a glucose average (94 mg/dL) absent from the packet — the plausible-but-unsourced vital class.",
+  "inputs": {
+   "elena_prompt": "You are Elena, the platform's narrative journalist. Write the weekly installment strictly from the data packet; never invent a number.",
+   "user_message": "DATA PACKET — week ending 2026-07-07: Weight: 300.8 lbs | Week Grade: avg 43 | T0 Streak: 0 days. Whoop recovery latest 73.6%. HRV 34.1 ms. Weekly rate -4.7 lb/week. Nights logged: 7. Deficit days: 5."
+  },
+  "mutated_output": "Glucose behaved — a 94 mg/dL average across the week — while the weight settled at 300.8.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ }
+]

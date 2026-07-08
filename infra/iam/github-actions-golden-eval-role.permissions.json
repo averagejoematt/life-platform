@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "HaikuJudge",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": [
+        "arn:aws:bedrock:*:205930651321:inference-profile/us.anthropic.claude-haiku-*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-*"
+      ]
+    },
+    {
+      "Sid": "GoldenBriefMetrics",
+      "Effect": "Allow",
+      "Action": "cloudwatch:PutMetricData",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "cloudwatch:namespace": "LifePlatform/GoldenBrief"
+        }
+      }
+    },
+    {
+      "Sid": "EvalRetentionRead",
+      "Effect": "Allow",
+      "Action": "dynamodb:Query",
+      "Resource": "arn:aws:dynamodb:us-west-2:205930651321:table/life-platform",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "dynamodb:LeadingKeys": ["EVALRET#*"]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,167 @@
+[
+ {
+  "id": "memoir_canary_fabricated_hit_rate",
+  "surface": "memoir",
+  "mutation": "SEEDED FAULT (synthetic): states a 72% hit rate and 19 graded calls — neither number exists in the facts; the self-flattering fabricated-record class.",
+  "inputs": {
+   "facts": {
+    "quarter": "2026-Q2",
+    "total_evaluations": 14,
+    "by_outcome": {
+     "confirmed": 5,
+     "refuted": 7,
+     "inconclusive": 2
+    },
+    "hit_rate_pct": 41.7,
+    "decided_count": 12,
+    "calibration": null,
+    "misses": [
+     {
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep",
+      "claim": "deep sleep would rebound above 1.4h within a week"
+     }
+    ],
+    "hits": [
+     {
+      "metric": "recovery_pct",
+      "claim": "recovery would hold above 60% through the deficit"
+     }
+    ],
+    "stance_start": {
+     "headline_read": "sleep architecture is the limiting factor"
+    },
+    "stance_end": {
+     "headline_read": "consistency, not architecture, is the limiting factor",
+     "how_my_read_changed": "the data refuted my deep-sleep rebound call"
+    },
+    "learnings_raw": [
+     {
+      "status": "refuted",
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep"
+     },
+     {
+      "status": "confirmed",
+      "metric": "recovery_pct",
+      "subdomain": "recovery"
+     }
+    ]
+   }
+  },
+  "mutated_output": "Nineteen graded calls this quarter and a 72% hit rate — my best stretch yet. Even my deep_sleep call, which the record marks refuted, was directionally right.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ },
+ {
+  "id": "memoir_canary_dodges_the_miss",
+  "surface": "memoir",
+  "mutation": "SEEDED FAULT (synthetic): a humblebrag reel — real refuted learnings exist (deep_sleep) but the memoir never names a miss nor uses any miss-acknowledgment language.",
+  "inputs": {
+   "facts": {
+    "quarter": "2026-Q2",
+    "total_evaluations": 14,
+    "by_outcome": {
+     "confirmed": 5,
+     "refuted": 7,
+     "inconclusive": 2
+    },
+    "hit_rate_pct": 41.7,
+    "decided_count": 12,
+    "calibration": null,
+    "misses": [
+     {
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep",
+      "claim": "deep sleep would rebound above 1.4h within a week"
+     }
+    ],
+    "hits": [
+     {
+      "metric": "recovery_pct",
+      "claim": "recovery would hold above 60% through the deficit"
+     }
+    ],
+    "stance_start": {
+     "headline_read": "sleep architecture is the limiting factor"
+    },
+    "stance_end": {
+     "headline_read": "consistency, not architecture, is the limiting factor",
+     "how_my_read_changed": "the data refuted my deep-sleep rebound call"
+    },
+    "learnings_raw": [
+     {
+      "status": "refuted",
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep"
+     },
+     {
+      "status": "confirmed",
+      "metric": "recovery_pct",
+      "subdomain": "recovery"
+     }
+    ]
+   }
+  },
+  "mutated_output": "A quarter of growth: 5 confirmed calls, a 41.7% hit rate on 12 decided, and a sharper read than I started with. The recovery_pct call held above 60% exactly as I said it would, and the panel's respect for the sleep lane grew accordingly.",
+  "expect_checks": [
+   "miss_dodged"
+  ]
+ },
+ {
+  "id": "memoir_canary_empty",
+  "surface": "memoir",
+  "mutation": "SEEDED FAULT (synthetic): an empty generation — the gate must refuse to publish nothing.",
+  "inputs": {
+   "facts": {
+    "quarter": "2026-Q2",
+    "total_evaluations": 14,
+    "by_outcome": {
+     "confirmed": 5,
+     "refuted": 7,
+     "inconclusive": 2
+    },
+    "hit_rate_pct": 41.7,
+    "decided_count": 12,
+    "calibration": null,
+    "misses": [
+     {
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep",
+      "claim": "deep sleep would rebound above 1.4h within a week"
+     }
+    ],
+    "hits": [
+     {
+      "metric": "recovery_pct",
+      "claim": "recovery would hold above 60% through the deficit"
+     }
+    ],
+    "stance_start": {
+     "headline_read": "sleep architecture is the limiting factor"
+    },
+    "stance_end": {
+     "headline_read": "consistency, not architecture, is the limiting factor",
+     "how_my_read_changed": "the data refuted my deep-sleep rebound call"
+    },
+    "learnings_raw": [
+     {
+      "status": "refuted",
+      "metric": "deep_sleep_hours",
+      "subdomain": "deep_sleep"
+     },
+     {
+      "status": "confirmed",
+      "metric": "recovery_pct",
+      "subdomain": "recovery"
+     }
+    ]
+   }
+  },
+  "mutated_output": "",
+  "expect_checks": [
+   "empty_output"
+  ]
+ }
+]

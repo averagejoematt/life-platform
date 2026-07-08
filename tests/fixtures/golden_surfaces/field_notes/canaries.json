@@ -1,0 +1,46 @@
+[
+ {
+  "id": "fn_canary_wrong_recovery",
+  "surface": "field_notes",
+  "mutation": "SEEDED FAULT (synthetic): states recovery 25% against a canonical 55% — the hard vital-contradiction class (the live RHR-53-vs-64 incident shape).",
+  "inputs": {
+   "metrics_record": {
+    "date": "2026-07-01",
+    "hrv_ms": 38.7,
+    "recovery_pct": 55,
+    "rhr_bpm": 64,
+    "latest_weight": 301.0
+   }
+  },
+  "mutated_output": {
+   "ai_present": "A rough week: recovery is only 25% and the body is telling you to stop.",
+   "ai_cautionary": "",
+   "ai_affirming": ""
+  },
+  "expect_checks": [
+   "grounding_contradiction"
+  ]
+ },
+ {
+  "id": "fn_canary_wrong_rhr_spelled",
+  "surface": "field_notes",
+  "mutation": "SEEDED FAULT (synthetic): states resting heart rate 'fifty-three' (spelled out) against a canonical 64 bpm — pins the spelled-number normalization in the guard.",
+  "inputs": {
+   "metrics_record": {
+    "date": "2026-07-01",
+    "hrv_ms": 38.7,
+    "recovery_pct": 55,
+    "rhr_bpm": 64,
+    "latest_weight": 301.0
+   }
+  },
+  "mutated_output": {
+   "ai_present": "",
+   "ai_cautionary": "Your resting heart rate of fifty-three is drifting away from baseline.",
+   "ai_affirming": ""
+  },
+  "expect_checks": [
+   "grounding_contradiction"
+  ]
+ }
+]

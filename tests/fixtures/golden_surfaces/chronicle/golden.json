@@ -1,0 +1,22 @@
+[
+ {
+  "id": "chron_real_2026-06-30",
+  "surface": "chronicle",
+  "provenance": "REAL published installment excerpt (verbatim): DDB pk=USER#matthew#SOURCE#chronicle sk=DATE#2026-06-30 (status=published). user_message data packet RECONSTRUCTED to the week's record (stats_line: Weight: 300.8 lbs | Week Grade: avg 57 | T0 Streak: 0 days).",
+  "inputs": {
+   "elena_prompt": "You are Elena, the platform's narrative journalist. Write the weekly installment strictly from the data packet; never invent a number.",
+   "user_message": "DATA PACKET — week ending 2026-06-30: Weight: 300.8 lbs | Week Grade: avg 57 | T0 Streak: 0 days\nDay grades Mon/Tue: 86, 85. Monday activity: morning + afternoon walks, 7 miles total, Zone 2. No workouts logged after Tuesday; no nutrition data after Monday; no journal entries."
+  },
+  "reference_output": "That's the last thing Matthew did that the system could call unambiguous. A Tuesday, before dawn, in the rain — the kind of Seattle June that doesn't apologize for itself. He'd logged a solid double on Monday too: a morning walk, an afternoon walk, seven miles total, heart rate steady in Zone 2 exactly where his protocol wants it. The week's first two days graded out at 86 and 85 respectively, which, in the context of this experiment, represents something close to Matthew at his best. Then Wednesday arrived, and something — the data won't say what — went quiet.\n\nNo workouts logged after Tuesday. No nutrition data after Monday. No journal entries at all, which is not new, but feels different this week because the silence isn't just the blank page of a man who hasn't found his morning routine yet. It's the silence of a man who has gone somewhere the instruments can't follow."
+ },
+ {
+  "id": "chron_authored_week4_shape",
+  "surface": "chronicle",
+  "provenance": "AUTHORED in installment voice against the real 2026-07-07 week record's numbers (stats_line + computed vitals) — every figure exists in the packet.",
+  "inputs": {
+   "elena_prompt": "You are Elena, the platform's narrative journalist. Write the weekly installment strictly from the data packet; never invent a number.",
+   "user_message": "DATA PACKET — week ending 2026-07-07: Weight: 300.8 lbs | Week Grade: avg 43 | T0 Streak: 0 days. Whoop recovery latest 73.6%. HRV 34.1 ms. Weekly rate -4.7 lb/week. Nights logged: 7. Deficit days: 5."
+  },
+  "reference_output": "The scale said 300.8 this week, and the week grade — an average of 43 — said everything else. Seven nights logged, five of them in deficit, and a recovery reading of 73.6% that suggests the engine is coping even while the streak counter sits at zero. The story of this week is not the number that moved; it is the discipline that did not."
+ }
+]

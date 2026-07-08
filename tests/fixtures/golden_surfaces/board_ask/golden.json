@@ -1,0 +1,32 @@
+[
+ {
+  "id": "board_real_sleep_coach",
+  "surface": "board_ask",
+  "provenance": "REAL recorded answer (verbatim, grounded=true live): DDB pk=COACH#sleep_coach sk=INTERACTION#2026-07-06#cc3b7de4. system_context RECONSTRUCTED (the live system prompt is assembled at runtime and not retained).",
+  "inputs": {
+   "system_context": "You are answering a public reader question in your own professional voice. Ground every number in the stance below; if you have no number for a claim, describe the pattern qualitatively.\nSTANCE: sleep architecture sound; overnight recovery constrained during the deficit (energy-scarcity read held at 70% confidence); a nine-day logging gap cuts through the record.",
+   "question": "What does the board think about Matthew's sleep lately?"
+  },
+  "reference_output": "I can only speak to what the data shows me, which right now is incomplete—there's a nine-day logging gap that cuts directly through where I'd want to read his sleep consistency and how it tracked against his caloric intake. That gap matters because my working hypothesis rests on the idea that his sleep *architecture* is sound (it has been), but his overnight recovery—HRV suppression, parasympathetic tone, next-day readiness—is being constrained by energy scarcity, not sleep failure. What I can tell you: when the data did flow, his sleep efficiency remained high and his REM-to-deep-sleep ratio stayed within reasonable bounds. The recent recovery score drift downward is concerning, moderately confident it's signal rather than noise, but I need continuous caloric and sleep data running in parallel to call whether that's a substrate problem (which is my 70% lean) or something genuinely shifting in his sleep structure. Ask me again once we have a full two-week window with no gaps—then I can show you whether normalizing calories actually restores his overnight HRV curve."
+ },
+ {
+  "id": "board_real_training_coach",
+  "surface": "board_ask",
+  "provenance": "REAL recorded answer (verbatim, grounded=true live): DDB pk=COACH#training_coach sk=INTERACTION#2026-07-06#cc3b7de4. system_context RECONSTRUCTED (the live system prompt is assembled at runtime and not retained).",
+  "inputs": {
+   "system_context": "You are answering a public reader question in your own professional voice. Ground every number in the stance below; if you have no number for a claim, describe the pattern qualitatively.\nSTANCE: sleep architecture sound; overnight recovery constrained during the deficit (energy-scarcity read held at 70% confidence); a nine-day logging gap cuts through the record.",
+   "question": "What does the board think about Matthew's sleep lately?"
+  },
+  "reference_output": "That's the sleep coach's lane—I read her brief daily, and her signal right now is that his sleep duration is short of where she wants it for the load he's carrying, which complicates recovery interpretation on my end. What I *can* say from a training readiness angle: if sleep isn't anchoring recovery, I have to assume his ability to tolerate volume progression is tighter than the aerobic numbers alone would suggest. The nine-day logging silence she mentioned makes it harder for both of us to separate \"he's undersleeping\" from \"the data just went quiet.\" Once that resumes, I'll have better footing to say whether the step volatility I'm watching is a fueling or a recovery constraint—or just noise."
+ },
+ {
+  "id": "board_authored_numeric",
+  "surface": "board_ask",
+  "provenance": "AUTHORED against a real-shaped stance block (numbers from the 2026-07-05 computed record) — pins that citing exactly the stance numbers never false-fires.",
+  "inputs": {
+   "system_context": "You are answering a public reader question in your own professional voice. Ground every number in the stance below; if you have no number for a claim, describe the pattern qualitatively.\nSTANCE: latest Whoop recovery 73.6%; HRV 34.1 ms; weight 300.8 lb; weekly rate -4.7 lb/week.",
+   "question": "How is Matthew actually recovering right now?"
+  },
+  "reference_output": "Honestly? Middling. Recovery came back at 73.6% and HRV sits at 34.1 ms — workable, not strong. The weight side is moving (300.8 lb, about -4.7 a week), and that pace is exactly why I watch the recovery number more closely than he'd like me to."
+ }
+]
