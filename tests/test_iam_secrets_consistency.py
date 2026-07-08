@@ -85,6 +85,7 @@ KNOWN_SECRETS = [
     "life-platform/subscriber-token-secret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens, dedicated (was sha256(anthropic-api-key)).
     "life-platform/google-tts",  # 2026-06-14: Google Cloud Chirp 3: HD API key for the podcasts (chronicle-podcast + coach-panel-podcast). Created as a prerequisite.
     "life-platform/pexels",  # 2026-06-29: Pexels API key for editorial cover imagery (wednesday-chronicle + coach-panel-podcast). Created with the editorial-image feature.
+    "life-platform/ritual-token-secret",  # #769 (ADR-124): dedicated HMAC signing key for the evening-ritual one-tap links (mint: evening-nudge, verify: site-api). Must be created in Secrets Manager before deploy.
     "life-platform",  # Wildcard prefix — pipeline_health_check reads all secrets to verify they exist
 ]
 
@@ -220,8 +221,10 @@ def test_s4_known_secrets_count_matches_architecture():
     # 2026-06-14: added life-platform/google-tts (Chirp 3: HD voices for the podcasts).
     # 2026-06-29: added life-platform/pexels (editorial cover imagery) — registered in
     #   KNOWN_SECRETS here as part of the audit CI-unmasking (it was in IAM, not the registry).
-    # Total = 20 actual secrets + 1 wildcard = 21.
-    EXPECTED_COUNT = 21
+    # 2026-07-07 (#769, ADR-124): added life-platform/ritual-token-secret — dedicated HMAC
+    #   key for the evening-ritual one-tap links (mint: evening-nudge, verify: site-api).
+    # Total = 21 actual secrets + 1 wildcard = 22.
+    EXPECTED_COUNT = 22
     actual = len(KNOWN_SECRETS)
     assert actual == EXPECTED_COUNT, (
         f"S4 FAIL: KNOWN_SECRETS has {actual} entries, expected {EXPECTED_COUNT}. "

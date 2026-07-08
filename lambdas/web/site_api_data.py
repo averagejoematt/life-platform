@@ -1102,6 +1102,83 @@ def handle_vice_streaks() -> dict:
     )
 
 
+def handle_fulfillment_ritual() -> dict:
+    """
+    GET /api/fulfillment_ritual
+    ADR-124 (#769) publish surface for the C-floor two-scalar evening ritual
+    (connection today 0-4, mood valence 0-4 — captured via the evening-nudge
+    one-tap links, see lambdas/web/site_api_social.py::_handle_ritual_log).
+
+    Aggregate-only per the ADR-124 publication posture:
+      1. The aggregate always publishes, bad weeks included.
+      2. A dark day renders as honest absence (null), never a fabricated neutral
+         (ADR-104) — the 7-day trend below is null-filled, not zero-filled.
+      3. No labels, no free text — there are none in this record to begin with.
+    This endpoint is the ONLY read surface for the evening_ritual partition —
+    individual full daily history is never otherwise exposed publicly.
+    Cache: 900s (15 min).
+    """
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    window_start = _experiment_date(90)
+
+    pk = f"{USER_PREFIX}evening_ritual"
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot-phase ritual records
+                "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{window_start}", f"DATE#{today}"),
+                "ScanIndexForward": True,
+            }
+        )
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    by_date = {}
+    for it in items:
+        d = it.get("date") or str(it.get("sk", "")).replace("DATE#", "")
+        if d:
+            by_date[d] = it
+
+    # 7-day trend — the last 7 calendar days ending today. A day with no record
+    # (or a record missing one of the two scalars) renders that field as null —
+    # honest absence, never a fabricated neutral (ADR-104).
+    trend = []
+    for i in range(6, -1, -1):
+        d = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=i)).strftime("%Y-%m-%d")
+        rec = by_date.get(d) or {}
+        trend.append(
+            {
+                "date": d,
+                "connection": rec.get("connection"),
+                "mood_valence": rec.get("mood_valence"),
+            }
+        )
+
+    # Check-in count — any queried-window day with at least one scalar logged.
+    logged_dates = sorted(d for d, rec in by_date.items() if rec.get("connection") is not None or rec.get("mood_valence") is not None)
+    logged_set = set(logged_dates)
+    check_in_count = len(logged_dates)
+
+    # Current streak — the contiguous run of logged days ending at the most
+    # recent one (not necessarily today — the evening nudge hasn't always fired
+    # yet when this is read). A day with no log breaks the run; nothing is
+    # backfilled or assumed.
+    streak = 0
+    if logged_dates:
+        cursor = datetime.strptime(logged_dates[-1], "%Y-%m-%d")
+        while cursor.strftime("%Y-%m-%d") in logged_set:
+            streak += 1
+            cursor -= timedelta(days=1)
+
+    return _ok(
+        {
+            "trend_7d": trend,
+            "check_in_count": check_in_count,
+            "streak_days": streak,
+            "as_of_date": today,
+        },
+        cache_seconds=900,
+    )
+
+
 def handle_habits() -> dict:
     """
     GET /api/habits
