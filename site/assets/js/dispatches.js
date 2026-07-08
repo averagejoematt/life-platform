@@ -472,6 +472,33 @@ async function loadFull(btn, target, excerptEl) {
   }
 }
 
+// #803: an honest "why didn't this week land" notice for the chronicle list — a
+// currently-withheld week (the `pending` marker wednesday_chronicle_lambda writes
+// when a draft is generated and then held by the budget guard or privacy gate,
+// mirrors the Panel podcast's episodes.json pending marker) and/or a break in the
+// "Week N" numbering (e.g. Week 1 -> Week 3, no Week 2). Never invents a cause
+// beyond what the data says; returns "" when there's nothing to report.
+function chronicleNoteHTML(data, entries) {
+  const bits = [];
+  if (data && data.pending && data.pending.display) {
+    bits.push(`<li class="dx-empty">${esc(data.pending.display)}</li>`);
+  }
+  const weeks = [...new Set(entries.map((e) => {
+    const m = /^Week (\d+)$/.exec(e.label || "");
+    return m ? Number(m[1]) : null;
+  }).filter((n) => n != null))].sort((a, b) => a - b);
+  if (weeks.length >= 2) {
+    const missing = [];
+    for (let n = weeks[0]; n <= weeks[weeks.length - 1]; n++) if (!weeks.includes(n)) missing.push(n);
+    if (missing.length) {
+      const names = missing.map((n) => `Week ${n}`).join(", ");
+      const plural = missing.length > 1 ? "s" : "";
+      bits.push(`<li class="dx-empty">${esc(names)} — no installment${plural} ran. A draft can be withheld before publishing (for example, if it doesn't clear the platform's privacy safety check).</li>`);
+    }
+  }
+  return bits.join("");
+}
+
 function selectEntry(s, id, silent) {
   document.querySelectorAll(".dx-item").forEach((b) => b.classList.toggle("is-active", String(b.dataset.id) === String(id)));
   if (!silent) { try { history.replaceState({ sec: s.key, id }, "", `/story/${s.key}/#${id}`); } catch (e) {} }
@@ -485,9 +512,11 @@ async function selectSection(key, preId, push = true) {
   const listEl = $("[data-dx-list]");
   if (s.kind === "about" || s.kind === "timeline") { listEl.innerHTML = `<li class="dx-empty">${esc(s.kicker)}</li>`; renderRead(s, null); return; }
   listEl.innerHTML = `<li class="dx-empty"><span class="shimmer">Loading…</span></li>`;
-  const entries = entriesFor(s, await secFetch(s));
+  const data = await secFetch(s);
+  const entries = entriesFor(s, data);
   if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing published here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = ""; return; }
-  listEl.innerHTML = entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
+  const noteHTML = s.key === "chronicle" ? chronicleNoteHTML(data, entries) : "";
+  listEl.innerHTML = noteHTML + entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}${isNewSince(e.date) ? ` <span class="dx-new label">new</span>` : ""}</span><span class="dx-item-d label">${esc(e.date || "")}</span></button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
   selectEntry(s, initId, true);

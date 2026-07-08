@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
-from v4_proof import chronicle_list_html, load_chronicle  # noqa: E402  — #730 static proof
+from v4_proof import chronicle_list_html, load_chronicle, load_chronicle_pending  # noqa: E402  — #730/#803 static proof
 
 OUT = Path("site/story")
 
@@ -139,7 +139,9 @@ def main() -> None:
     # #730: bake the dated chronicle post list into the served HTML (noscript) so the
     # best writing is crawlable/greppable, not locked behind JS. Shown on the hub
     # (which defaults to the chronicle view) and the /story/chronicle/ sub-page.
-    chronicle_proof = chronicle_list_html(load_chronicle())
+    # #803: also bakes an honest "why didn't this week land" disclosure — a currently
+    # withheld week and/or a break in the Week-N numbering — instead of a silent skip.
+    chronicle_proof = chronicle_list_html(load_chronicle(), pending=load_chronicle_pending())
 
     # hub (defaults to chronicle)
     write(

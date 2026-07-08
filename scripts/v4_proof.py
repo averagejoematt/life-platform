@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import re
 import urllib.request
 from pathlib import Path
 
@@ -155,6 +156,18 @@ def load_chronicle() -> list:
     return _snapshot().get("chronicle", [])
 
 
+def load_chronicle_pending() -> dict:
+    """The chronicle's own 'pending installment' marker (#803), mirroring the Panel
+    podcast's `episodes.json` pending marker. wednesday_chronicle_lambda writes this
+    onto /journal/posts.json when a week's draft is generated and then withheld
+    (budget guard, privacy gate) rather than published, so a stale-looking chronicle
+    can say why instead of going silent. Cleared automatically the next time a week
+    actually publishes (publish_to_journal never writes a `pending` key)."""
+    d = _fetch_json("/journal/posts.json")
+    pending = d.get("pending") if isinstance(d, dict) else None
+    return pending if isinstance(pending, dict) else {}
+
+
 # ── render helpers (return "" rather than fabricate on missing data) ─────────
 
 
@@ -194,8 +207,39 @@ def scorecard_block_html(sc: dict) -> str:
     )
 
 
-def chronicle_list_html(posts: list, limit: int = 20) -> str:
-    """A dated, crawlable chronicle post list (#730). Newest first."""
+_WEEK_LABEL_RE = re.compile(r"^Week (\d+)$")
+
+
+def _week_gap_note(posts: list) -> str:
+    """Honest acknowledgement of a break in the "Week N" serial (#803, ADR-104
+    behavioral-absence semantics): if published posts jump e.g. Week 1 -> Week 3, say
+    so instead of leaving a reader to wonder what happened to Week 2. Prologue entries
+    aren't numbered weeks and are excluded from the sequence. Never invents a specific
+    cause — returns "" when there's no gap or too few numbered weeks to judge one."""
+    weeks = set()
+    for p in posts:
+        m = _WEEK_LABEL_RE.match(p.get("label", "") or "")
+        if m:
+            weeks.add(int(m.group(1)))
+    if len(weeks) < 2:
+        return ""
+    lo, hi = min(weeks), max(weeks)
+    missing = [n for n in range(lo, hi + 1) if n not in weeks]
+    if not missing:
+        return ""
+    names = ", ".join(f"Week {n}" for n in missing)
+    plural = "s" if len(missing) > 1 else ""
+    return (
+        f"<p>{_esc(names)} — no installment{plural} ran. A draft can be written and then withheld before "
+        "publishing (for example, if it doesn't clear the platform's privacy safety check); the numbering "
+        "moves on rather than being silently renumbered.</p>"
+    )
+
+
+def chronicle_list_html(posts: list, limit: int = 20, pending: dict | None = None) -> str:
+    """A dated, crawlable chronicle post list (#730). Newest first. #803 adds two honest
+    disclosures on top: a currently-withheld week (`pending`, from load_chronicle_pending)
+    and any break in the "Week N" numbering found in `posts` itself."""
     if not posts:
         return ""
     rows = []
@@ -206,9 +250,12 @@ def chronicle_list_html(posts: list, limit: int = 20) -> str:
         label = p.get("label", "")
         suffix = f" · {_esc(label)}" if label else ""
         rows.append(f'<li><a href="{url}"><time datetime="{date}">{date}</time> — {title}</a>{suffix}</li>')
+    pending_note = f"<p>{_esc(pending['display'])}</p>" if pending and pending.get("display") else ""
+    gap_note = _week_gap_note(posts)
     return (
         '<noscript><section class="proof-static dx-prose" aria-label="Chronicle posts">'
         f'<p class="label">The weekly chronicle — {len(posts)} posts, newest first (as of {_esc(_today())})</p>'
+        f"{pending_note}{gap_note}"
         f'<ul>{"".join(rows)}</ul>'
         "</section></noscript>"
     )
