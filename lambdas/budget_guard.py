@@ -80,6 +80,11 @@ _FEATURE_CUTOFF = {
     # raised to 2 with the rest of the reader narrative band. narrate() falls back
     # to a deterministic templated narrative when paused.
     "state_of_matthew": 2,
+    # daily_debrief (#734): the daily ~2-minute "state of Matthew" audio briefing.
+    # A reader-narrative surface that degrades to a deterministic template (still
+    # publishes audio at $0 AI cost), so it pauses in lockstep with state_of_matthew
+    # — after all internal AI, before the two irreducible reader promises.
+    "daily_debrief": 2,
     # chronicle: the weekly Story installment + its Friday Panel podcast (the
     # podcast's only input). Kept at 2 in lockstep with the Panel lambda's own
     # SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs $75.

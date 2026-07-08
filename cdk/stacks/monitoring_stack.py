@@ -96,7 +96,7 @@ class MonitoringStack(Stack):
         # invoked emits no metric, so its "≥1 problem" alarm (treat_missing=NB) sits OK
         # forever — the watchdog itself goes dark (the 44-day-Garmin class, one level up).
         # Give each daily detector a HEARTBEAT: BREACHING when its own gauge is ABSENT
-        # for `days` consecutive days. Mirrors panelcast-no-episode-7d exactly —
+        # for `days` consecutive days. The absence-is-failure pattern —
         # SampleCount<1 over N full days = "the producer did not run". Requiring N
         # consecutive days avoids a false fire from the in-progress UTC period (the
         # reason the problem alarms can't simply flip to BREACHING at evaluation=1).
@@ -481,37 +481,34 @@ class MonitoringStack(Stack):
         _ingest_auth_dead.add_alarm_action(cw_actions.SnsAction(topic))
 
         # ══════════════════════════════════════════════════════════════
-        # Panelcast liveness — "the weekly show went silent" (2026-06-14)
-        # The Panel publishes every Friday and emits LifePlatform/Podcast
-        # PanelcastPublished=1 on each successful publish. This is the ONLY
-        # alarm in this stack with treat_missing_data=BREACHING: absence IS
-        # the failure signal. 7 consecutive days with no datapoint fires URGENT.
-        # The weekly cadence means a healthy gap is only 6 empty days, so 7
-        # straight empty days = a genuinely missed week. A held episode
-        # (panelcast-holds/) does NOT emit, so a long HOLD streak surfaces here.
-        # NB: CloudWatch caps EvaluationPeriods*Period at 604800s (7d) for
-        # period>=3600, so 7*86400 is the hard ceiling — can't widen the window
-        # at daily granularity.
-        _panelcast_silent = cloudwatch.Alarm(
-            self,
-            "PanelcastWentSilent",
-            alarm_name="panelcast-no-episode-7d",
-            metric=cloudwatch.Metric(
-                namespace="LifePlatform/Podcast",
-                metric_name="PanelcastPublished",
-                period=Duration.seconds(86400),
-                statistic="Sum",
-            ),
-            evaluation_periods=7,
-            datapoints_to_alarm=7,
-            threshold=1,
-            comparison_operator=LT,
-            treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
+        # RETIRED 2026-07-08 (#734): panelcast-no-episode-7d.
+        # The Panel is now EVENT-DRIVEN (ships only when a chronicle publishes),
+        # so a quiet week is a LEGITIMATE silence, not a failure — the old
+        # treat_missing_data=BREACHING absence alarm would fire red exactly when
+        # Matthew disengages and no week earns an episode, which is precisely the
+        # false page #734 removes. The PanelcastPublished heartbeat metric is still
+        # emitted on publish (for dashboards); it is simply no longer alarmed on
+        # absence. The distribution-liveness signal moves to the DAILY debrief's
+        # no-INVOCATIONS alarm below (a broken cron is a real failure; a budget-skip
+        # day still invokes + publishes a template episode, so it never false-fires).
+
+        # Daily-debrief liveness (#734) — the debrief runs every day at 19:00 UTC.
+        # This watches INVOCATIONS (not published-episode absence): it fires only if
+        # the schedule itself stops firing the Lambda for 24h — a genuine outage —
+        # and a budget-skip / template-fallback day is still an invocation, so a
+        # quiet-but-healthy day is never red. Mirrors daily-brief-no-invocations-24h.
+        _alarm(
+            "DailyDebriefNoInvocations",
+            "daily-debrief-no-invocations-24h",
+            "AWS/Lambda",
+            "Invocations",
+            86400,
+            "Sum",
+            1,
+            LT,
+            {"FunctionName": "daily-debrief"},
+            to_digest=True,
         )
-        # 2026-06-19: URGENT → DIGEST. A silent show is worth surfacing but is never
-        # an actionable page (a deliberate HOLD trips it identically to a real outage),
-        # so it belongs in the daily digest, not the urgent topic.
-        _panelcast_silent.add_alarm_action(cw_actions.SnsAction(digest))
 
         # AI token budget alarms — consolidated 2026-03-10 (COST-A)
         # Removed 11 per-Lambda alarms ($1.10/mo). Kept: daily-brief
@@ -778,9 +775,10 @@ class MonitoringStack(Stack):
 
         # HAE webhook liveness: the Health Auto Export webhook (CGM/water/BP/State of
         # Mind) is near-real-time and streams continuously, so <1 invocation in 24h =
-        # a dead webhook. treat_missing=BREACHING (absence IS the failure), matching
-        # panelcast-no-episode-7d. Digest — a quiet webhook is worth surfacing but is
-        # rarely a same-hour page.
+        # a dead webhook. treat_missing=BREACHING (absence IS the failure) — the
+        # absence-is-failure pattern, apt here because the HAE webhook (unlike the
+        # now-event-driven Panel) genuinely streams continuously. Digest — a quiet
+        # webhook is worth surfacing but is rarely a same-hour page.
         _hae_silent = cloudwatch.Alarm(
             self,
             "HaeWebhookNoInvocations",

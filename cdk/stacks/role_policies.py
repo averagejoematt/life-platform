@@ -965,6 +965,21 @@ def email_chronicle_podcast() -> list[iam.PolicyStatement]:
     )
 
 
+def email_daily_debrief() -> list[iam.PolicyStatement]:
+    """Daily debrief (#734): DDB read (computed_metrics/habit_scores), Bedrock (one
+    Haiku call, granted by _email_base), Google Chirp 3: HD voice
+    (life-platform/google-tts), write generated/podcast/debrief/*, and emit the
+    DebriefPublished heartbeat metric. Budget-tier SSM read granted by
+    create_platform_lambda. No SES — the debrief is an audio/RSS artifact, not email."""
+    return _email_base(
+        needs_s3_write=["generated/podcast/debrief/*"],
+        extra_secrets=["life-platform/google-tts"],
+        extra_statements=[
+            iam.PolicyStatement(sid="PublishedMetric", actions=["cloudwatch:PutMetricData"], resources=["*"]),
+        ],
+    )
+
+
 def email_coach_panel_podcast() -> list[iam.PolicyStatement]:
     """The Panel (two-host show): DDB read (chronicle + COACH#/OUTPUT#), S3 read
     posts.json, Bedrock (Haiku) script-gen, Google Chirp 3: HD voices
@@ -1245,10 +1260,12 @@ def email_chronicle_approve() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="InvokeEmailSender",
             actions=["lambda:InvokeFunction"],
-            # chronicle-email-sender + (#537) elena-state-updater on publish
+            # chronicle-email-sender + (#537) elena-state-updater + (#734) the
+            # event-driven Panel podcast, all async-invoked on publish
             resources=[
                 f"arn:aws:lambda:{REGION}:{ACCT}:function:chronicle-email-sender",
                 f"arn:aws:lambda:{REGION}:{ACCT}:function:elena-state-updater",
+                f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-panel-podcast",
             ],
         ),
         iam.PolicyStatement(

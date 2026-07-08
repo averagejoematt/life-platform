@@ -171,18 +171,44 @@ class EmailStack(Stack):
             **shared,
         )
 
-        # "The Panel" — weekly two-host show (Elena + a rotating coach). Runs at
-        # 16:20 UTC, ~40 min after the chronicle podcast, so posts.json + the
-        # week's COACH#/OUTPUT# are settled. Bedrock script-gen + Google Chirp 3: HD.
+        # DAILY DEBRIEF (#734, epic #721) — the ~2-minute "state of Matthew" audio
+        # briefing. Reads the already-computed daily-brief facts, ONE grounded Haiku
+        # call (ADR-104, template fallback), Google Chirp 3: HD → MP3 under
+        # generated/podcast/debrief/ + a podcast RSS feed. Daily 19:00 UTC (noon PT /
+        # 11 AM PST) — after the morning compute + daily-brief window, so it narrates
+        # the freshest complete day. Fixed UTC (no DST drift). 300s: one Haiku call +
+        # a short single-voice TTS synth; 512 MB is ample. Narration is budget-gated
+        # (budget_guard "daily_debrief", tier ≥ 2 → template), so the show never goes
+        # dark for cost — it degrades to the deterministic narrative at $0 AI spend.
+        create_platform_lambda(
+            self,
+            "DailyDebrief",
+            function_name="daily-debrief",
+            handler="emails.daily_debrief_lambda.lambda_handler",
+            source_file="lambdas/emails/daily_debrief_lambda.py",
+            schedule="cron(0 19 * * ? *)",
+            timeout_seconds=300,
+            memory_mb=512,
+            environment=_email_env,
+            custom_policies=rp.email_daily_debrief(),
+            **shared,
+        )
+
+        # "The Panel" — two-host show (Elena + a rotating coach). EVENT-DRIVEN since
+        # #734: the standing Friday cron was RETIRED (it fired every week regardless of
+        # engagement and tripped the panelcast-no-episode alarm the moment Matthew
+        # disengaged). It now ships only when a week EARNS an episode — chronicle-approve
+        # async-invokes it on publish (mirrors its chronicle-email-sender / elena-state-
+        # updater triggers). The Panel's own reset-proof week-selection + idempotency +
+        # publish-or-HOLD are unchanged. Still manually invokable ({} / {"force": true} /
+        # {"dry_run": true}) and driven by the hold-sweep rule below. Bedrock script-gen +
+        # Google Chirp 3: HD. 900s: Sonnet writer + Haiku judge + Gemini synth.
         coach_panel_podcast = create_platform_lambda(
             self,
             "CoachPanelPodcast",
             function_name="coach-panel-podcast",
             handler="emails.coach_panel_podcast_lambda.lambda_handler",
             source_file="lambdas/emails/coach_panel_podcast_lambda.py",
-            # Fri 17:00 UTC (10am PT) — chronicle drops Wed; the Panel reviews the
-            # settled week on Friday. 900s: Sonnet writer + Haiku judge + Gemini synth.
-            schedule="cron(0 17 ? * FRI *)",
             timeout_seconds=900,
             memory_mb=512,
             environment=_email_env,

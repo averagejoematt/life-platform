@@ -22,7 +22,7 @@ import budget_guard  # noqa: E402
 
 # The audience bands, as the ladder intends them (pause-tier per feature).
 _INTERNAL = ("ensemble", "coherence_semantic", "chronicle_editor")
-_READER_NARRATIVE = ("coach_narrative", "state_of_matthew", "chronicle")
+_READER_NARRATIVE = ("coach_narrative", "state_of_matthew", "daily_debrief", "chronicle")
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 
 
