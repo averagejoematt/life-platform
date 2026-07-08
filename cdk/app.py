@@ -8,6 +8,7 @@ Stack architecture:
   compute     → 5 compute Lambdas + EventBridge rules
   email       → 8 email/digest Lambdas + EventBridge rules
   operational → Operational Lambdas (anomaly, freshness, canary, dlq-consumer, etc.)
+  serve       → Public serving path: site-api + site-api-ai Lambdas + Function URLs (#793)
   mcp         → MCP Lambda + Function URLs (local + remote)
   web         → CloudFront (3 distributions) + ACM certificates
   monitoring  → CloudWatch alarms + ops dashboard + SLO alarms
@@ -19,6 +20,7 @@ Deployment:
   cdk deploy LifePlatformCompute
   cdk deploy LifePlatformEmail
   cdk deploy LifePlatformOperational
+  cdk deploy LifePlatformServe
   cdk deploy LifePlatformMcp
   cdk deploy LifePlatformWeb         # requires us-east-1 cert ARNs
   cdk deploy LifePlatformMonitoring
@@ -35,6 +37,7 @@ from stacks.ingestion_stack import IngestionStack
 from stacks.mcp_stack import McpStack
 from stacks.monitoring_stack import MonitoringStack
 from stacks.operational_stack import OperationalStack
+from stacks.serve_stack import ServeStack
 from stacks.web_stack import WebStack
 
 app = cdk.App()
@@ -107,6 +110,12 @@ operational = OperationalStack(
     digest_topic=core.digest_topic,
 )
 # operational stack wired ✅
+#
+# ── Serve stack (#793): the public serving path, split from Operational so ops
+# deploy holds can't freeze the reader-facing API (and vice versa). Standalone —
+# imports table/bucket/digest-topic by name/ARN, no cross-stack CFN references.
+serve = ServeStack(app, "LifePlatformServe", env=env)
+# serve stack wired ✅
 #
 mcp = McpStack(app, "LifePlatformMcp", env=env, table=core.table, bucket=core.bucket)
 # mcp stack wired ✅

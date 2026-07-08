@@ -69,10 +69,11 @@ def test_cdk_lambda_helpers_uses_build_bundle_for_default_asset():
 
 
 def _create_platform_lambda_calls_for(function_names):
-    """AST-parse operational_stack.py; return {function_name: keyword-arg-names}
-    for each create_platform_lambda(...) call whose function_name matches."""
-    src = _read("cdk", "stacks", "operational_stack.py")
-    tree = ast.parse(src, filename="operational_stack.py")
+    """AST-parse serve_stack.py (#793: the serving lambdas moved out of
+    operational_stack); return {function_name: keyword-arg-names} for each
+    create_platform_lambda(...) call whose function_name matches."""
+    src = _read("cdk", "stacks", "serve_stack.py")
+    tree = ast.parse(src, filename="serve_stack.py")
     found = {}
     for node in ast.walk(tree):
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda"):
@@ -95,7 +96,7 @@ def test_site_api_lambdas_use_default_shared_bundle_asset():
     assert set(calls) == {
         "life-platform-site-api",
         "life-platform-site-api-ai",
-    }, f"Expected both site-api Lambda definitions in operational_stack.py, found: {sorted(calls)}"
+    }, f"Expected both site-api Lambda definitions in serve_stack.py, found: {sorted(calls)}"
     for name, kwarg_names in calls.items():
         assert "code" not in kwarg_names, (
             f"{name}'s create_platform_lambda() call now passes code= — this would let CDK ship a "
@@ -138,6 +139,7 @@ def test_no_stale_site_api_sole_ownership_claims():
     haystacks = {
         "deploy/deploy_site_api.sh": _read("deploy", "deploy_site_api.sh"),
         "cdk/stacks/operational_stack.py": _read("cdk", "stacks", "operational_stack.py"),
+        "cdk/stacks/serve_stack.py": _read("cdk", "stacks", "serve_stack.py"),
         "docs/DECISIONS.md": _read("docs", "DECISIONS.md"),
     }
     banned_phrases = [
