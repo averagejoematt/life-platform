@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 import calibration_core  # #538: shared Brier + reliability scorer (layer module)
 from boto3.dynamodb.conditions import Key
 
-from mcp.core import USER_PREFIX, decimal_to_float, table
+from mcp.core import decimal_to_float, table
 
 logger = logging.getLogger(__name__)
 
@@ -141,21 +141,6 @@ def tool_get_predictions(args):
         "store": "COACH#/PREDICTION# (canonical, evaluator-graded — same store the public site reads)",
         "predictions": all_predictions[:limit],
     }
-
-
-def tool_get_coach_disagreements(args):
-    """Find current inter-coach disagreements from the integrator synthesis."""
-    try:
-        resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
-        item = decimal_to_float(resp.get("Item", {}))
-        disagreements = item.get("disagreements", [])
-        return {
-            "count": len(disagreements),
-            "generated_at": item.get("generated_at"),
-            "disagreements": disagreements,
-        }
-    except Exception as ex:
-        return {"error": str(ex)}
 
 
 def tool_get_coach_track_record(args):
@@ -325,71 +310,3 @@ def tool_evaluate_prediction(args):
             pass
 
     return {"error": f"Prediction {prediction_id} not found in any coach thread"}
-
-
-def tool_get_coaching_summary(args):
-    """High-level coaching dashboard data — all coaches' current state."""
-    coaches = []
-    for cid in COACH_IDS:
-        try:
-            # ADR-058: phase=pilot hidden by default.
-            from mcp.core import _apply_phase_filter
-
-            resp = table.query(
-                **_apply_phase_filter(
-                    {
-                        "KeyConditionExpression": Key("pk").eq("USER#matthew") & Key("sk").begins_with(f"SOURCE#coach_thread#{cid}#"),
-                        "ScanIndexForward": False,
-                        "Limit": 1,
-                    }
-                )
-            )
-            items = resp.get("Items", [])
-            if items:
-                entry = decimal_to_float(items[0])
-                pred_count = len(entry.get("predictions", []))
-                pending = sum(1 for p in entry.get("predictions", []) if p.get("status") == "pending")
-                coaches.append(
-                    {
-                        "coach_id": cid,
-                        "coach_name": COACH_NAMES.get(cid, cid),
-                        "position_summary": entry.get("position_summary", ""),
-                        "emotional_investment": entry.get("emotional_investment", "observing"),
-                        "prediction_count": pred_count,
-                        "pending_predictions": pending,
-                        "last_updated": entry.get("date"),
-                        "open_questions": entry.get("open_questions", []),
-                    }
-                )
-            else:
-                coaches.append(
-                    {
-                        "coach_id": cid,
-                        "coach_name": COACH_NAMES.get(cid, cid),
-                        "position_summary": "No thread data yet",
-                        "emotional_investment": "detached",
-                        "prediction_count": 0,
-                    }
-                )
-        except Exception:
-            pass
-
-    # Sort by emotional investment (most invested first)
-    investment_order = {"concerned": 0, "invested": 1, "excited": 2, "engaged": 3, "observing": 4, "detached": 5}
-    coaches.sort(key=lambda c: investment_order.get(c.get("emotional_investment", ""), 5))
-
-    # Get integrator priority
-    priority = None
-    try:
-        int_resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
-        int_item = decimal_to_float(int_resp.get("Item", {}))
-        if int_item.get("analysis"):
-            priority = int_item["analysis"]
-    except Exception:
-        pass
-
-    return {
-        "coaches": coaches,
-        "weekly_priority": priority,
-        "total_coaches": len(coaches),
-    }

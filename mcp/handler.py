@@ -363,8 +363,6 @@ _WRITE_TOOL_RATE_WINDOW_SECS = 60  # rolling window
 
 _RATE_LIMITED_TOOLS = {
     "create_todoist_task",
-    "delete_todoist_task",
-    "log_supplement",
     "write_platform_memory",
     "delete_platform_memory",
     # ADR-066: fat tool — cap covers worst-case write loop (commit/archive).

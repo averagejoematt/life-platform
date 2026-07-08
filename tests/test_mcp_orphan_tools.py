@@ -2,16 +2,19 @@
 tests/test_mcp_orphan_tools.py — Phase 4.8 (2026-05-16): enforce MCP registry
 wiring discipline.
 
-Every `def tool_*` function in `mcp/tools_*.py` must be either:
-  (a) Registered in `mcp/registry.py` (the canonical wire), OR
-  (b) Explicitly listed in `KNOWN_ORPHANS` below with a TODO action
+Every `def tool_*` function in `mcp/tools_*.py` must be registered in
+`mcp/registry.py` (the canonical wire). Internal view implementations that a
+registered dispatcher routes to are named with a leading underscore (no
+`tool_` prefix) so the wire stays unambiguous: `tool_*` == MCP-callable.
 
-Audit at time of writing: 186 tool_ defined, 116 registered → 70 orphans.
-Most look like work-in-progress (real tools written but never wired).
+History (the AUDITED_AT ratchet — see docs/MCP_TOOL_AUDIT.md):
+  2026-05-16  70 orphans allowlisted at birth (186 defined / 116 registered)
+  2026-05-17  64 (V2 P4.1 — tools_calendar.py deleted, ADR-030)
+  2026-07-08   0 (#395 ER-04 — every orphan deleted, renamed to a view
+               implementation, or registered; allowlist retired EMPTY)
 
-The KNOWN_ORPHANS allowlist preserves them without losing visibility — the
-test passes today, but adding a NEW orphan will fail CI. As each item is
-either registered or deleted, remove it from KNOWN_ORPHANS.
+The allowlist is intentionally empty and should stay that way: a new orphan
+fails CI immediately. Register the tool or delete the function.
 
 Run:  python3 -m pytest tests/test_mcp_orphan_tools.py -v
 """
@@ -47,125 +50,39 @@ def _registered_tools():
     return found
 
 
-# Tools known to be defined but not registered. Each entry is technical debt:
-# either register the tool in registry.py or delete the function from tools_*.py.
-# Updating this list is fine — but adding NEW entries should be rare (means
-# the test detected a new orphan that the contributor didn't intend).
-KNOWN_ORPHANS = {
-    # Sick days (4 orphans)
-    "tool_clear_sick_day",
-    "tool_get_sick_days",
-    "tool_log_sick_day",
-    # CGM / glucose (4 orphans)
-    "tool_get_cgm_dashboard",
-    "tool_get_fasting_glucose_validation",
-    "tool_get_glucose_exercise_correlation",
-    "tool_get_glucose_sleep_correlation",
-    # Character / level (4 orphans)
-    "tool_get_character_sheet",
-    "tool_get_level_history",
-    "tool_get_non_scale_victories",
-    "tool_get_pillar_detail",
-    # Habits (7 orphans — tier_report registered)
-    "tool_get_habit_adherence",
-    "tool_get_habit_dashboard",
-    "tool_get_habit_health_correlations",
-    "tool_get_habit_stacks",
-    "tool_get_habit_streaks",
-    "tool_get_keystone_habits",
-    "tool_get_group_trends",
-    # Health dashboards + correlations (10 orphans)
-    "tool_get_aggregated_summary",
-    "tool_get_alcohol_sleep_correlation",
-    "tool_get_blood_pressure_correlation",
-    "tool_get_body_composition_snapshot",
-    "tool_get_caffeine_sleep_correlation",
-    "tool_get_exercise_sleep_correlation",
-    "tool_get_exposure_correlation",
-    "tool_get_health_dashboard",
-    "tool_get_health_risk_profile",
-    "tool_get_health_trajectory",
-    # Labs (4 orphans)
-    "tool_get_lab_results",
-    "tool_get_lab_trends",
-    "tool_get_out_of_range_history",
-    "tool_get_next_lab_priorities",
-    # Nutrition (5 orphans)
-    "tool_get_hydration_score",
-    "tool_get_macro_targets",
-    "tool_get_meal_timing",
-    "tool_get_micronutrient_report",
-    "tool_get_nutrition_biometrics_correlation",
-    # Strength + training (4 orphans)
-    "tool_get_personal_records",
-    "tool_get_training_load",
-    "tool_get_training_periodization",
-    "tool_get_training_recommendation",
-    "tool_get_exercise_variety",
-    # Movement + lifestyle (7 orphans; tool_get_calendar_events removed V2 P4.1)
-    "tool_get_daily_summary",
-    "tool_get_day_type_analysis",
-    "tool_get_energy_balance",
-    "tool_get_energy_expenditure",
-    "tool_get_movement_score",
-    "tool_get_ruck_log",
-    "tool_get_exposure_log",
-    # Mind / social (7 orphans)
-    "tool_get_gait_analysis",
-    "tool_get_journal_correlations",
-    "tool_get_meditation_correlation",
-    "tool_get_mood_trend",
-    "tool_get_seasonal_patterns",
-    "tool_get_social_isolation_risk",
-    "tool_get_state_of_mind_trend",
-    # Misc (8 orphans)
-    "tool_get_latest",
-    "tool_get_nutrition_summary",
-    "tool_get_supplement_correlation",  # tool_get_schedule_load removed V2 P4.1
-    "tool_get_weather_correlation",
-    "tool_log_exposure",
-    "tool_log_ruck",
-    "tool_remove_board_member",
-    "tool_update_board_member",
-}
+# #395 (2026-07-08): the allowlist ended the ER-04 story EMPTY — all 64 entries
+# were deleted or converted to underscore-named view implementations behind
+# registered dispatchers. Every removal cites the 30-day usage telemetry
+# snapshotted in docs/MCP_TOOL_AUDIT.md. Do not repopulate this set.
+KNOWN_ORPHANS: set[str] = set()
+
+# The ratchet: total orphan count may only go DOWN. Reached zero 2026-07-08 (#395).
+AUDITED_AT = 0
 
 
 def test_no_unexpected_orphans():
-    """Every tool_ function must be registered OR in KNOWN_ORPHANS."""
+    """Every tool_ function must be registered — the allowlist is empty (#395)."""
     defined = _defined_tools()
     registered = _registered_tools()
     orphans = defined - registered
     new_orphans = orphans - KNOWN_ORPHANS
 
     assert not new_orphans, (
-        f"Found {len(new_orphans)} NEW orphan tool(s):\n"
+        f"Found {len(new_orphans)} orphan tool(s):\n"
         + "\n".join(f"  - {t}" for t in sorted(new_orphans))
-        + "\n\nFix: either register in mcp/registry.py or add to KNOWN_ORPHANS "
-        "in this test (with a plan to register or delete)."
-    )
-
-
-def test_known_orphans_still_orphans():
-    """KNOWN_ORPHANS shouldn't drift — if one gets registered or deleted,
-    remove it from the list to keep the allowlist tight."""
-    defined = _defined_tools()
-    registered = _registered_tools()
-    current_orphans = defined - registered
-
-    stale = KNOWN_ORPHANS - current_orphans
-    assert not stale, (
-        f"KNOWN_ORPHANS has {len(stale)} entry(ies) that are no longer orphans "
-        "(either registered or deleted). Remove these from the list:\n" + "\n".join(f"  - {t}" for t in sorted(stale))
+        + "\n\nFix: either register in mcp/registry.py, or (if it is an internal "
+        "view implementation behind a registered dispatcher) rename it with a "
+        "leading underscore and no tool_ prefix. The KNOWN_ORPHANS allowlist "
+        "was retired empty by #395 — do not repopulate it."
     )
 
 
 def test_orphan_count_doesnt_grow():
-    """Catch accidental regression — total orphan count shouldn't increase."""
+    """Catch accidental regression — the orphan count ratchet sits at zero."""
     defined = _defined_tools()
     registered = _registered_tools()
     orphans = defined - registered
-    AUDITED_AT = 64  # 2026-05-17 — V2 P4.1: tools_calendar.py deleted (ADR-030 retired Google Calendar), 2 entries removed
     assert len(orphans) <= AUDITED_AT, (
-        f"Orphan count is {len(orphans)} (was {AUDITED_AT} at audit). "
-        "Each new orphan is tech debt — either register it or delete the function."
+        f"Orphan count is {len(orphans)} (ratchet is {AUDITED_AT}, reached 2026-07-08 "
+        "via #395). Each orphan is tech debt — either register it or delete the function."
     )

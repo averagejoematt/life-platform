@@ -242,11 +242,11 @@ def _gate_signals() -> dict:
     Defensive: thin data returns {'error': ...}; we surface availability, never block hard."""
     out = {}
     try:
-        from mcp.tools_nutrition import tool_get_deficit_sustainability, tool_get_metabolic_adaptation
+        from mcp.tools_nutrition import _get_metabolic_adaptation, tool_get_deficit_sustainability
 
         ds = tool_get_deficit_sustainability({})
         out["deficit_sustainability"] = {"available": "error" not in ds, "note": ds.get("error")} if isinstance(ds, dict) else {}
-        ma = tool_get_metabolic_adaptation({})
+        ma = _get_metabolic_adaptation({})
         out["metabolic_adaptation"] = {"available": "error" not in ma, "note": ma.get("error")} if isinstance(ma, dict) else {}
     except Exception as e:  # noqa: BLE001 — gates are advisory; never break the firewall view
         out["gate_error"] = str(e)

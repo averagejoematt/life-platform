@@ -85,7 +85,7 @@ def test_has_workout_true_with_hevy_low_steps(monkeypatch):
         }
 
     monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
-    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
+    out = tl._get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
 
     row = next(r for r in out["daily"] if r["date"] == "2026-06-18")
     assert row["has_workout"] is True, row
@@ -111,7 +111,7 @@ def test_no_sedentary_on_hevy_days_jun16_19(monkeypatch):
         }
 
     monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
-    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-19"})
+    out = tl._get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-19"})
 
     assert out["summary"]["sedentary_days"] == 0, out["summary"]
     for d in ("2026-06-16", "2026-06-17", "2026-06-18", "2026-06-19"):
@@ -131,7 +131,7 @@ def test_hevy_only_day_appears_when_no_apple_record(monkeypatch):
         }
 
     monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
-    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
+    out = tl._get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
 
     row = next((r for r in out["daily"] if r["date"] == "2026-06-18"), None)
     assert row is not None, "Hevy-only day must not silently vanish"
@@ -426,7 +426,7 @@ def test_step_completeness_flag_surfaces_jun5_13_gap(monkeypatch):
         return {"apple_health": ah, "strava": [], "hevy": []}
 
     monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
-    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-14"})
+    out = tl._get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-14"})
 
     summary = out["summary"]
     # All nine 6/5–6/13 days surface as step-incomplete.
@@ -454,7 +454,7 @@ def test_missing_apple_steps_never_sedentary_with_hevy(monkeypatch):
         }
 
     monkeypatch.setattr(tl, "parallel_query_sources", fake_sources)
-    out = tl.tool_get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
+    out = tl._get_movement_score({"start_date": "2026-06-01", "end_date": "2026-06-18"})
     row = next(r for r in out["daily"] if r["date"] == "2026-06-18")
     assert row["has_workout"] is True and row.get("sedentary_flag") is not True, row
     assert row["step_data_complete"] is False, row
