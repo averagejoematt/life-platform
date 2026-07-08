@@ -49,6 +49,7 @@ from stacks.constants import (
     S3_BUCKET as _CONSTANTS_BUCKET,  # CONF-01
 )
 from stacks.lambda_helpers import create_platform_lambda
+from stacks.secrets_helpers import site_api_origin_secret_value
 
 BUCKET = _CONSTANTS_BUCKET
 
@@ -328,8 +329,11 @@ class WebStack(Stack):
         # traffic volume. Secondary: add WAF rate limiting after go-live.
 
         # Function URL (AuthType NONE — CloudFront is the only public caller).
-        # No direct URL exposure: CloudFront strips and adds a secret origin header
-        # (add that hardening in a follow-up once the cert is live).
+        # #815: the origin-secret header hardening below is live for
+        # LambdaApiOrigin/AiLambdaOrigin (site-api / site-api-ai). This
+        # email-subscriber origin is NOT covered — out of scope for #815 (its
+        # Lambda has no matching SEC-04-style guard); a future story can extend
+        # the same X-AMJ-Origin header + site_api_common-style check here.
         # ══════════════════════════════════════════════════════════════
         # OG Image Lambda — life-platform-og-image (WR-17)
         # Dynamic SVG social preview image with live stats.
@@ -389,6 +393,14 @@ class WebStack(Stack):
         # ADR-036 fix: AI Lambda split — separate origin for /api/ask and /api/board_ask
         # Set context "site_api_ai_fn_url_domain" from LifePlatformOperational output SiteApiAiFunctionUrlDomain
         ai_fn_url_domain = self.node.try_get_context("site_api_ai_fn_url_domain") or fn_url_domain
+
+        # #815 (R22-SEC-03): the header CloudFront injects on the site-api /
+        # site-api-ai origins so the (previously inert) SEC-04 Lambda guard can
+        # 403 direct Function-URL requests that bypass CloudFront. Same secret
+        # value, same helper serve_stack.py calls for the Lambdas' env var — see
+        # stacks/secrets_helpers.py.
+        site_api_origin_secret = site_api_origin_secret_value(self)
+        SITE_API_ORIGIN_HEADER_NAME = "X-AMJ-Origin"
 
         # ══════════════════════════════════════════════════════════════
         # R17-15: Security headers via CloudFront ResponseHeadersPolicy.
@@ -505,6 +517,8 @@ class WebStack(Stack):
                         ),
                     ),
                     # Origin 3: site-api Lambda Function URL (read-only, cacheable)
+                    # #815: OriginCustomHeaders injects X-AMJ-Origin so site_api_lambda's
+                    # SEC-04 guard can 403 requests that bypass CloudFront (direct Function URL).
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=fn_url_domain,
                         id="LambdaApiOrigin",
@@ -514,9 +528,16 @@ class WebStack(Stack):
                             origin_protocol_policy="https-only",
                             origin_ssl_protocols=["TLSv1.2"],
                         ),
+                        origin_custom_headers=[
+                            cloudfront.CfnDistribution.OriginCustomHeaderProperty(
+                                header_name=SITE_API_ORIGIN_HEADER_NAME,
+                                header_value=site_api_origin_secret,
+                            )
+                        ],
                     ),
                     # Origin 4: site-api-ai Lambda Function URL (AI endpoints, no cache)
                     # ADR-036 fix: separate origin isolates AI concurrency from data endpoints
+                    # #815: same X-AMJ-Origin guard header as LambdaApiOrigin above.
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=ai_fn_url_domain,
                         id="AiLambdaOrigin",
@@ -526,6 +547,12 @@ class WebStack(Stack):
                             origin_protocol_policy="https-only",
                             origin_ssl_protocols=["TLSv1.2"],
                         ),
+                        origin_custom_headers=[
+                            cloudfront.CfnDistribution.OriginCustomHeaderProperty(
+                                header_name=SITE_API_ORIGIN_HEADER_NAME,
+                                header_value=site_api_origin_secret,
+                            )
+                        ],
                     ),
                     # Origin 5: email-subscriber Lambda Function URL (write, no cache)
                     cloudfront.CfnDistribution.OriginProperty(
