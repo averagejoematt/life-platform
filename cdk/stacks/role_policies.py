@@ -1603,6 +1603,13 @@ def operational_canary() -> list[iam.PolicyStatement]:
                 _secret_arn("life-platform/ai-keys"),
             ],
         ),
+        iam.PolicyStatement(
+            # SEC-02 (#780): discover the MCP Function URL at runtime instead of a
+            # committed env var (the URL is the auth boundary; the repo is public).
+            sid="DiscoverMcpUrl",
+            actions=["lambda:GetFunctionUrlConfig"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:life-platform-mcp"],
+        ),
         # ADR-062: canary's AI health-check now invokes Bedrock (was direct
         # Anthropic API). Catches the Bedrock access/throttle failure modes.
         _bedrock_statement(),
@@ -1671,6 +1678,13 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
             # check_lambda_secrets: enumerate Lambda env vars to find stale SECRET_NAME values
             actions=["lambda:ListFunctions"],
             resources=["*"],
+        ),
+        iam.PolicyStatement(
+            # SEC-02 (#780): discover the MCP Function URL at runtime instead of a
+            # committed env var (the URL is the auth boundary; the repo is public).
+            sid="DiscoverMcpUrl",
+            actions=["lambda:GetFunctionUrlConfig"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:life-platform-mcp"],
         ),
         iam.PolicyStatement(
             sid="SES",

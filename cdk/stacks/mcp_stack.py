@@ -111,8 +111,12 @@ class McpStack(Stack):
 
         # Function URL: deliberately NOT CDK-managed.
         # Existing URL has 4 resource-based policy statements including duplicates;
-        # importing would create conflicting permissions. The URL never changes.
-        # URL: https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/
+        # importing would create conflicting permissions.
+        # SEC-02 (#780): the URL is the possession-based auth boundary and the repo
+        # is public — it is NOT committed here. Read it live when needed:
+        #   aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2
+        # Rotating = delete + recreate the URL config (new url-id); runbook in the
+        # private security memory. Consumers discover it at runtime (mcp_url.py).
 
         # ── Dedicated Cache Warmer Lambda (R9 hardening) ──────────────────────
         # Separated from MCP request-serving Lambda so a 90s warm run does not
@@ -225,9 +229,6 @@ class McpStack(Stack):
 
         cdk.CfnOutput(self, "McpFunctionArn", value=mcp.function_arn, description="MCP server Lambda ARN")
         cdk.CfnOutput(self, "McpWarmerArn", value=warmer.function_arn, description="MCP cache warmer Lambda ARN")
-        cdk.CfnOutput(
-            self,
-            "McpFunctionUrl",
-            value="https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/",
-            description="MCP server Function URL (unmanaged)",
-        )
+        # SEC-02 (#780): the MCP Function URL is intentionally NOT emitted as a CfnOutput —
+        # it is the possession-based auth boundary and this repo is public. Read it live:
+        #   aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2

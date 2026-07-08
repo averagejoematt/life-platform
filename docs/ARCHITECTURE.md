@@ -1,6 +1,6 @@
 # Life Platform — Architecture
 
-Last updated: 2026-07-07 (v8.6.0 — 143 tools, 43-module MCP package, 20 data sources, 93 Lambdas, 9 secrets, 67 alarms, 8 CDK stacks deployed).
+Last updated: 2026-07-08 (v8.6.0 — 143 tools, 43-module MCP package, 20 data sources, 93 Lambdas, 9 secrets, 67 alarms, 8 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared-layer version: see the discovery command in [CONVENTIONS.md](CONVENTIONS.md#facts-that-drift-run-the-command-never-quote-a-number) (don't hand-write it — it drifts). **91 ADRs** (ADR-001 → ADR-103; newest: ADR-101 distribution-before-monetization, ADR-102 single-table-DynamoDB-kept-on-purpose, ADR-103 complexity-posture ledger). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
@@ -70,7 +70,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | DynamoDB table | NoSQL database | `life-platform` (deletion protection + PITR enabled) |
 | S3 bucket | Object storage + static website | `matthew-life-platform` (static hosting on `dashboard/*`) |
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
-| Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` (OAuth 2.1 auto-approve + HMAC Bearer) |
+| Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
 | Secrets Manager | Credential store | **9 active secrets** at $0.40/month each = **~$3.60/month**
 | SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
@@ -223,7 +223,7 @@ SK: DATE#YYYY-MM-DD
 ### MCP Server
 
 **Lambda:** `life-platform-mcp` | **Tools:** 127 | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** 26 (`mcp/tools_*.py` + helpers)
-**Remote MCP:** `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/`
+**Remote MCP:** `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>`
 **Auth:** OAuth 2.1 auto-approve + HMAC Bearer (remote). Source of truth for tool count: AST parse of top-level `TOOLS` dict keys via `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (see CLAUDE.md — `grep '"name":'` over-counts nested schema fields).
 
 Cold start: ~700–800ms. Warm: 23–30ms. Cached tools: <100ms.

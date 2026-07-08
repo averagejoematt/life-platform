@@ -670,7 +670,7 @@ def test_i12_mcp_tool_call_response_shape():
     event = {
         "requestContext": {
             "http": {"method": "POST", "path": "/"},
-            "domainName": "c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws",
+            "domainName": "mcp-endpoint.lambda-url.us-west-2.on.aws",  # SEC-02 #780: synthetic host; real URL is not committed
         },
         "headers": {"authorization": f"Bearer {bearer}"},
         "body": json.dumps(payload),

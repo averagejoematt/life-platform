@@ -24,6 +24,8 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from boto3.dynamodb.conditions import Key
 
+from mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
@@ -56,7 +58,6 @@ dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(TABLE_NAME)
 s3 = boto3.client("s3", region_name=REGION)
 ses = boto3.client("sesv2", region_name=REGION)
-MCP_FUNCTION_URL = os.environ.get("MCP_FUNCTION_URL", "")
 MCP_SECRET_NAME = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 
@@ -419,8 +420,9 @@ def check_mcp_tool_calls():
     """
     checks = []
 
-    if not MCP_FUNCTION_URL:
-        return [Check("mcp:config", "MCP Integration").warn("MCP_FUNCTION_URL not configured — skipping")]
+    mcp_function_url = resolve_mcp_url()
+    if not mcp_function_url:
+        return [Check("mcp:config", "MCP Integration").warn("MCP Function URL unresolved — skipping")]
 
     # Fetch MCP API key
     sm = boto3.client("secretsmanager", region_name=REGION)
@@ -446,7 +448,7 @@ def check_mcp_tool_calls():
             }
         ).encode("utf-8")
         req = urllib.request.Request(
-            MCP_FUNCTION_URL,
+            mcp_function_url,
             data=payload,
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {bearer_token}"},
             method="POST",

@@ -8,7 +8,7 @@
 # Attaches WebACL to the AMJ CloudFront distribution (E3S424OXQZ8NBE).
 #
 # WAF cannot attach directly to Lambda Function URLs. MCP endpoint
-# (c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws) is
+# (the MCP Lambda Function URL — read live via get-function-url-config; not committed, SEC-02 #780) is
 # protected by API key auth — not publicly advertised. TB7-26 satisfied.
 #
 # Cost: ~$6/month (1 WebACL + 2 rules + request volume negligible at current scale)
@@ -178,7 +178,7 @@ echo "  Rule 2 — GlobalRateLimit:   all paths blocked at >1000 req/5min per IP
 echo ""
 echo "MCP endpoint note:"
 echo "  Lambda Function URLs cannot attach to WAF directly."
-echo "  MCP endpoint (c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws)"
+echo "  MCP endpoint (Lambda Function URL — see get-function-url-config)"
 echo "  is protected by API key authentication. Not publicly advertised."
 echo "  TB7-26 satisfied: public-facing API surface is now WAF-protected."
 echo ""
