@@ -9,7 +9,6 @@
         "lambda:UpdateFunctionConfiguration",
         "lambda:GetFunctionConfiguration",
         "lambda:GetFunction",
-        "lambda:ListFunctions",
         "lambda:InvokeFunction",
         "lambda:WaitForFunctionUpdated",
         "lambda:ListLayerVersions",
@@ -25,6 +24,14 @@
         "arn:aws:lambda:us-east-1:205930651321:function:*",
         "arn:aws:lambda:us-east-1:205930651321:layer:*"
       ]
+    },
+    {
+      "Sid": "LambdaListAccountLevel",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:ListFunctions"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "S3DeployArtifacts",
