@@ -74,7 +74,7 @@ COACH_IDS = [
 # drift silently broke prediction grading. Single source now; MEASURABLE_METRICS is
 # DERIVED from this map, so the extractor's allowlist and the evaluator's source-map
 # cannot diverge. See lambdas/measurable_metrics.py.
-from measurable_metrics import METRIC_SOURCES  # noqa: E402
+from measurable_metrics import METRIC_SOURCES, infer_direction  # noqa: E402
 
 # Domain-appropriate minimum evaluation windows (days).
 # Predictions with shorter windows are clamped to these minimums.
@@ -92,8 +92,25 @@ DOMAIN_MIN_WINDOWS = {
     "labs": 60,
 }
 
-# Map subdomains to their domain category for window enforcement
+# Map subdomains to their domain category for window enforcement.
+# #813: coach_state_updater derives a prediction's subdomain by scanning the
+# metric hint for these keywords: sleep, hrv, recovery, weight, calories,
+# protein, glucose, training, mood, stress — falling back to "general". That
+# emitted vocabulary MUST be covered here, or every prediction silently falls
+# to the "training" default and its window is clamped to 21 days (a sleep
+# prediction's 7-day minimum tripled). tests/test_prediction_triage_813.py
+# pins writer-vocabulary coverage.
 SUBDOMAIN_TO_DOMAIN = {
+    # coach_state_updater's emitted vocabulary (#813) — "weight", "mood" and
+    # "stress" already appear in the per-coach sections below.
+    "sleep": "sleep",
+    "hrv": "hrv",
+    "recovery": "recovery",
+    "calories": "nutrition",
+    "protein": "nutrition",
+    "glucose": "glucose",
+    "training": "training",
+    "general": "training",  # conservative default, but now explicit
     # sleep_coach
     "sleep_quality": "sleep",
     "sleep_duration": "sleep",
@@ -255,14 +272,36 @@ def _fetch_range(source, start_date, end_date):
         return []
 
 
+def _was_terminalized_by_duplicate_grader(item):
+    """#813: True for status='inconclusive' records graded by coach_computation_engine's
+    now-removed duplicate grader — those were killed at the raw stated window (before
+    this evaluator's domain-clamped window elapsed) and with threshold=None could only
+    ever be inconclusive, so they never got a real grading pass.
+
+    Deterministic discriminator: THIS evaluator always stamps algo_version into
+    outcome_notes; the duplicate grader never did. One-way — once re-graded here (any
+    outcome), algo_version is present and the record is terminal again.
+    """
+    if item.get("status") != "inconclusive":
+        return False
+    try:
+        notes = json.loads(item.get("outcome_notes") or "{}")
+    except (ValueError, TypeError):
+        return False
+    return isinstance(notes, dict) and "algo_version" not in notes
+
+
 def _fetch_predictions():
     """
     Fetch all evaluable predictions across all coaches.
 
     Queries each coach's PREDICTION# prefix and filters to statuses
-    in EVALUABLE_STATUSES. Skips qualitative evaluation types.
+    in EVALUABLE_STATUSES — plus the #813 reclaim: 'inconclusive' records
+    terminalized by the removed duplicate grader get one real grading pass.
+    Skips qualitative evaluation types.
     """
     predictions = []
+    reclaimed = 0
     for coach_id in COACH_IDS:
         try:
             kwargs = {
@@ -278,14 +317,19 @@ def _fetch_predictions():
                 for item in items:
                     status = item.get("status", "")
                     eval_type = item.get("evaluation", {}).get("type", "")
-                    if status in EVALUABLE_STATUSES and eval_type != "qualitative":
+                    if eval_type == "qualitative":
+                        continue
+                    if status in EVALUABLE_STATUSES:
+                        predictions.append(item)
+                    elif _was_terminalized_by_duplicate_grader(item):
+                        reclaimed += 1
                         predictions.append(item)
                 if "LastEvaluatedKey" not in resp:
                     break
                 kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
         except Exception as e:
             logger.warning("Failed to fetch predictions for %s: %s", coach_id, e)
-    logger.info("Total evaluable predictions fetched: %d", len(predictions))
+    logger.info("Total evaluable predictions fetched: %d (%d reclaimed from the duplicate grader, #813)", len(predictions), reclaimed)
     return predictions
 
 
@@ -592,9 +636,34 @@ def _evaluate_machine(pred, eval_spec, data_cache, today_str):
     if not metric_key:
         return None
 
-    actual_value = _resolve_metric_value(metric_key, data_cache, today_str)
     threshold = eval_spec.get("threshold")
     condition = eval_spec.get("condition")
+
+    # ── #813: legacy null-threshold rescue ────────────────────────────────────
+    # Every machine-type spec written before the C-3 emission fix (2026-06-28)
+    # carries threshold=None + condition='gt' regardless of the claim ('gt' was a
+    # constant, not a signal). A threshold-less comparison can only ever grade
+    # inconclusive, which is how the corpus starved the scorecard. When the claim
+    # text yields a deterministic direction, re-route to the directional (EWMA)
+    # evaluator — the same grading path C-3 gives new predictions. No inferable
+    # direction → inconclusive with an explicit reason (expiry will retire it).
+    if threshold is None:
+        direction = infer_direction(None, pred.get("claim_natural") or "")
+        if direction:
+            rescued_spec = dict(eval_spec)
+            rescued_spec["condition"] = direction
+            result = _evaluate_directional(pred, rescued_spec, data_cache, today_str)
+            if result:
+                result["reason"] = "[null-threshold machine spec re-routed to directional] " + result.get("reason", "")
+            return result
+        return {
+            "status": "inconclusive",
+            "reason": ("Machine spec has threshold=None (pre-C-3 emission bug) and the claim " "has no inferable direction"),
+            "actual_value": None,
+            "beats_null": False,
+        }
+
+    actual_value = _resolve_metric_value(metric_key, data_cache, today_str)
 
     if actual_value is None:
         return {

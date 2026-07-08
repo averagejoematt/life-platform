@@ -45,6 +45,7 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+USER_ID = os.environ.get("USER_ID", "matthew")
 
 ANTHROPIC_API = "https://api.anthropic.com/v1/messages"
 AI_MODEL_HAIKU = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
@@ -76,6 +77,8 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # DERIVED so they cannot diverge. See lambdas/measurable_metrics.py.
 from measurable_metrics import (
     MEASURABLE_METRICS,  # noqa: E402,F401
+    METRIC_SOURCES,  # noqa: E402
+    infer_direction as _infer_direction,  # noqa: E402  (#813: shared with the evaluator)
     normalize_metric_hint as _normalize_metric_hint,  # noqa: E402
 )
 
@@ -103,66 +106,9 @@ def _parse_confidence(raw) -> float:
         return 0.5
 
 
-# Direction keyword maps for the gradability inference (Scorecard / C-3). The
-# extractor now emits `direction` directly; these are the deterministic fallback
-# when it doesn't, so a metric-backed claim still routes to the directional
-# evaluator (EWMA trend) instead of dying as threshold=None machine→inconclusive.
-_DIR_UP_WORDS = (
-    "improve",
-    "increase",
-    "rise",
-    "rising",
-    "higher",
-    "climb",
-    "go up",
-    "goes up",
-    "recover",
-    "rebound",
-    "gain",
-    "grow",
-    "strengthen",
-    "trend up",
-    "bounce back",
-)
-_DIR_DOWN_WORDS = (
-    "drop",
-    "decrease",
-    "decline",
-    "fall",
-    "lower",
-    "reduce",
-    "shrink",
-    "lose",
-    "loss",
-    "go down",
-    "goes down",
-    "come down",
-    "dip",
-    "trend down",
-    "ease",
-)
-
-
-def _infer_direction(extractor_direction, claim_natural: str) -> str | None:
-    """Resolve a prediction's expected direction → 'up' | 'down' | None.
-
-    Prefers the extractor's explicit `direction`; falls back to keyword
-    inference from the claim. Used to route metric-backed predictions to the
-    directional (EWMA) evaluator so they can actually be graded.
-    """
-    d = (extractor_direction or "").strip().lower()
-    if d in ("up", "rise", "increase", "higher"):
-        return "up"
-    if d in ("down", "fall", "decrease", "lower"):
-        return "down"
-    c = (claim_natural or "").lower()
-    up = any(w in c for w in _DIR_UP_WORDS)
-    down = any(w in c for w in _DIR_DOWN_WORDS)
-    if up and not down:
-        return "up"
-    if down and not up:
-        return "down"
-    return None  # ambiguous or none → caller keeps it qualitative
+# Direction inference (Scorecard / C-3) moved to measurable_metrics.infer_direction
+# (#813) so the writer and the evaluator's legacy-backlog rescue share ONE keyword
+# map — imported above as _infer_direction.
 
 
 def _build_prediction_eval_spec(metric_hint, direction, window_days):
@@ -192,6 +138,67 @@ def _build_prediction_eval_spec(metric_hint, direction, window_days):
         "null_hypothesis": None,
         "beats_null_if": None,
     }
+
+
+# ── #813: write-time data-liveness gate ──────────────────────────────────────
+# A prediction is only machine-gradable if its metric's source is actually
+# producing data — the #813 triage found whole metric families (blood_glucose_*
+# with the CGM sensor inactive, body_fat_pct with no DEXA scan in the window)
+# whose predictions could only ever expire inconclusive. Emitting them as
+# gradable inflates the pending count and stalls the public scorecard, so a
+# metric with fewer than _LIVENESS_MIN_POINTS values over the last
+# _LIVENESS_LOOKBACK_DAYS days falls back to qualitative at write time.
+# _LIVENESS_MIN_POINTS matches the evaluator's EWMA minimum (a directional
+# grade needs >= 5 points). Fail-OPEN on read errors: an AWS hiccup must never
+# silently downgrade a whole run's predictions to qualitative.
+_LIVENESS_LOOKBACK_DAYS = 30
+_LIVENESS_MIN_POINTS = 5
+
+
+def _metric_has_recent_data(metric_key, liveness_cache):
+    """True when metric_key's mapped source shows >= _LIVENESS_MIN_POINTS numeric
+    values in the last _LIVENESS_LOOKBACK_DAYS days (or liveness can't be read)."""
+    base = metric_key or ""
+    for suffix in ("_7day_avg", "_14day_avg", "_30day_avg"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+            break
+    source = METRIC_SOURCES.get(base)
+    if not source:
+        return False  # unmapped is ungradable by definition
+    if base in liveness_cache:
+        return liveness_cache[base]
+    try:
+        end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        start = (datetime.now(timezone.utc) - timedelta(days=_LIVENESS_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+        kwargs = {
+            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+            "ExpressionAttributeValues": {
+                ":pk": f"USER#{USER_ID}#SOURCE#{source}",
+                ":s": "DATE#" + start,
+                ":e": "DATE#" + end,
+            },
+        }
+        n = 0
+        while True:
+            resp = table.query(**with_phase_filter(kwargs))
+            for item in resp.get("Items", []):
+                val = item.get(base)
+                if val is not None:
+                    try:
+                        float(val)
+                        n += 1
+                    except (TypeError, ValueError):
+                        pass
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+        alive = n >= _LIVENESS_MIN_POINTS
+    except Exception as e:
+        logger.warning("Metric liveness check failed for %s (%s) — failing open: %s", metric_key, source, e)
+        alive = True
+    liveness_cache[base] = alive
+    return alive
 
 
 # Maximum opening history to keep in voice state
@@ -428,6 +435,12 @@ def _load_voice_spec(coach_id):
 # EXTRACTION PROMPT
 # ══════════════════════════════════════════════════════════════════════════════
 
+# #813: the metric allowlist shown to the extractor is DERIVED from the registry.
+# It was previously a hardcoded copy that (a) could drift from METRIC_SOURCES and
+# (b) did drift semantically — it advertised keys whose registry mapping pointed at
+# a source that never carries the field. One join, zero drift.
+_METRIC_ALLOWLIST_PROMPT = ", ".join(sorted(MEASURABLE_METRICS))
+
 EXTRACTION_SYSTEM_PROMPT = (
     "You are a metadata extraction engine for an AI coaching system. "
     "Your job is to analyze a coach's generated output and extract "
@@ -464,10 +477,8 @@ EXTRACTION_SYSTEM_PROMPT = (
     "   - claim_natural: the prediction in natural language\n"
     "   - metric_hint: which MEASURABLE metric would confirm/refute this. "
     "MUST be one of these exact strings (or null if none fits — do NOT "
-    "invent prose descriptions): hrv, recovery_score, resting_heart_rate, "
-    "sleep_duration_hours, sleep_score, deep_pct, rem_pct, weight_lbs, "
-    "total_calories_kcal, total_protein_g, steps, blood_glucose_avg, "
-    "blood_glucose_std_dev, body_fat_pct. You may also append _7day_avg, "
+    "invent prose descriptions): " + _METRIC_ALLOWLIST_PROMPT + ". "
+    "You may also append _7day_avg, "
     "_14day_avg, or _30day_avg to any of those (e.g. hrv_7day_avg). If "
     "the coach's claim doesn't map cleanly to one of these, return null — "
     "the system will track it as qualitative instead of pretending it can "
@@ -508,10 +519,8 @@ EXTRACTION_SYSTEM_PROMPT = (
     "   - commitment_natural: the recommended action in natural language\n"
     "   - action_check: which MEASURABLE metric would show the subject followed "
     "through — MUST be one of the exact allowlisted keys used for metric_hint "
-    "above (hrv, recovery_score, resting_heart_rate, sleep_duration_hours, "
-    "sleep_score, deep_pct, rem_pct, weight_lbs, total_calories_kcal, "
-    "total_protein_g, steps, blood_glucose_avg, blood_glucose_std_dev, "
-    "body_fat_pct, with optional _7day_avg/_14day_avg/_30day_avg), or null when "
+    "above (" + _METRIC_ALLOWLIST_PROMPT + ", "
+    "with optional _7day_avg/_14day_avg/_30day_avg), or null when "
     "the action can't be machine-checked (the coach must ask him directly).\n"
     "   - direction: 'up' or 'down' — which way action_check moves if he DID the "
     "thing (earlier bedtime -> resting_heart_rate 'down'; protein target -> "
@@ -1107,6 +1116,7 @@ def lambda_handler(event, context):
     predictions_made = extraction.get("predictions_made", [])
     _gradable_n = 0  # SS-06: track directional (gradable) vs qualitative for the run metric
     _qualitative_n = 0
+    _liveness_cache = {}  # #813: one data-liveness read per source per run
     for pred in predictions_made:
         claim = pred.get("claim_natural", "")
         if not claim:
@@ -1124,6 +1134,18 @@ def lambda_handler(event, context):
                 raw_metric_hint,
                 coach_id,
             )
+        # #813: reject metrics whose source has no recent data — a gradable spec
+        # over a dead source can only ever expire inconclusive and stalls the
+        # public scorecard. Qualitative is the honest classification.
+        if metric_hint and not _metric_has_recent_data(metric_hint, _liveness_cache):
+            logger.info(
+                "Prediction metric %r has <%d values in the last %d days — marking qualitative for coach=%s",
+                metric_hint,
+                _LIVENESS_MIN_POINTS,
+                _LIVENESS_LOOKBACK_DAYS,
+                coach_id,
+            )
+            metric_hint = ""
         timeframe_hint = pred.get("timeframe_hint", "")
         confidence_stated = pred.get("confidence_stated")
         # C-3 gradability: resolve the expected direction so a metric-backed claim

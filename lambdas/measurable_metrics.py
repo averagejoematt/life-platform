@@ -18,15 +18,21 @@ from __future__ import annotations
 
 # Metric key → the DynamoDB source partition the evaluator reads it from.
 # Keep additions here; the allowlist + the suffix-aggregate logic follow automatically.
+# INVARIANT (#813): the key must be the EXACT attribute name on that source's DATE#
+# records — the evaluator reads record[metric_key] verbatim. The #813 triage found
+# sleep_score/deep_pct/rem_pct mapped to whoop, whose records carry none of those
+# fields (whoop has sleep_quality_score + *_sleep_hours); the fields live on
+# eightsleep records, so every sleep-architecture prediction resolved to "no data"
+# forever. Verify against a live record before adding a mapping.
 METRIC_SOURCES = {
     "hrv": "whoop",
     "hrv_7day_avg": "whoop",
     "recovery_score": "whoop",
     "resting_heart_rate": "whoop",
     "sleep_duration_hours": "whoop",
-    "sleep_score": "whoop",
-    "deep_pct": "whoop",
-    "rem_pct": "whoop",
+    "sleep_score": "eightsleep",  # #813: field exists on eightsleep records, NOT whoop
+    "deep_pct": "eightsleep",  # #813: same
+    "rem_pct": "eightsleep",  # #813: same
     "weight_lbs": "withings",
     "total_calories_kcal": "macrofactor",
     "total_protein_g": "macrofactor",
@@ -95,3 +101,73 @@ def normalize_metric_hint(hint):
         if needle in h or needle in h_spaced:
             return target
     return None
+
+
+# ── Direction inference (#813 — shared by the writer AND the evaluator) ─────────
+# The writer (coach_state_updater) uses this to route metric+direction claims to
+# the gradable `directional` evaluator at emission. The evaluator uses the SAME
+# inference to deterministically rescue the legacy machine-type backlog (specs
+# written before C-3 with threshold=None + condition='gt' regardless of the claim
+# — 'gt' was a constant, not a signal, so the claim text is the only honest
+# direction source). One list, one function — the two sides cannot drift.
+DIR_UP_WORDS = (
+    "improve",
+    "increase",
+    "rise",
+    "rising",
+    "higher",
+    "climb",
+    "go up",
+    "goes up",
+    "recover",
+    "rebound",
+    "gain",
+    "grow",
+    "strengthen",
+    "trend up",
+    "trending up",
+    "upward",
+    "bounce back",
+)
+DIR_DOWN_WORDS = (
+    "drop",
+    "decrease",
+    "decline",
+    "fall",
+    "lower",
+    "reduce",
+    "shrink",
+    "lose",
+    "loss",
+    "go down",
+    "goes down",
+    "come down",
+    "dip",
+    "trend down",
+    "trending down",
+    "downward",
+    "ease",
+)
+
+
+def infer_direction(extractor_direction, claim_natural):
+    """Resolve a prediction's expected direction → 'up' | 'down' | None.
+
+    Prefers the extractor's explicit `direction`; falls back to deterministic
+    keyword inference from the claim text. Ambiguous (both directions present)
+    or directionless claims return None — the caller keeps them qualitative
+    rather than guessing (ADR-105: deterministic computation only).
+    """
+    d = (extractor_direction or "").strip().lower()
+    if d in ("up", "rise", "increase", "higher"):
+        return "up"
+    if d in ("down", "fall", "decrease", "lower"):
+        return "down"
+    c = (claim_natural or "").lower()
+    up = any(w in c for w in DIR_UP_WORDS)
+    down = any(w in c for w in DIR_DOWN_WORDS)
+    if up and not down:
+        return "up"
+    if down and not up:
+        return "down"
+    return None  # ambiguous or none → caller keeps it qualitative
