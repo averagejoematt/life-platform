@@ -181,3 +181,102 @@ class TestEnforceQualityGate:
         assert output == "draft"
         assert report["passed"] is True
         regenerate_fn.assert_not_called()
+
+
+class TestEnforceQualityGateRetention:
+    """#744: `_enforce_quality_gate` is the ORIGINAL surface #744 named (the
+    highest-fire-rate ADR-104-adjacent gate, ADR-108) and #812's retention
+    wiring (`eval_retention.py`) missed it. These pin that a fired verdict now
+    reaches `eval_retention.retain("coach_brief", ...)` — and that a clean
+    first-attempt pass, or a fail-open, does NOT retain anything (retention is
+    only for a gate that actually fired a real verdict)."""
+
+    def test_first_attempt_pass_retains_nothing(self, monkeypatch):
+        retain = MagicMock()
+        monkeypatch.setattr(ai_calls, "_retain_coach_brief_flag", retain)
+        client = _lambda_client_returning({"passed": True, "score": 92})
+        ai_calls._enforce_quality_gate(client, "sleep_coach", "good draft", {}, MagicMock())
+        retain.assert_not_called()
+
+    def test_fail_open_retains_nothing(self, monkeypatch):
+        retain = MagicMock()
+        monkeypatch.setattr(ai_calls, "_retain_coach_brief_flag", retain)
+        client = MagicMock()
+        client.invoke.side_effect = RuntimeError("unreachable")
+        ai_calls._enforce_quality_gate(client, "physical_coach", "draft", {}, MagicMock())
+        retain.assert_not_called()
+
+    def test_fired_then_corrected_retains_the_pair(self, monkeypatch):
+        retain = MagicMock()
+        monkeypatch.setattr(ai_calls, "_retain_coach_brief_flag", retain)
+        client = _lambda_client_returning(
+            {"passed": False, "score": 62, "suggestions": ["too generic"]},
+            {"passed": True, "score": 90},
+        )
+        output, report = ai_calls._enforce_quality_gate(client, "nutrition_coach", "first draft", {}, lambda note: "regenerated draft")
+        assert output == "regenerated draft"
+        retain.assert_called_once_with("nutrition_coach", "flagged_corrected", "first draft", "regenerated draft", report)
+
+    def test_fired_then_held_retains_the_pair(self, monkeypatch):
+        retain = MagicMock()
+        monkeypatch.setattr(ai_calls, "_retain_coach_brief_flag", retain)
+        client = _lambda_client_returning(
+            {"passed": False, "score": 62},
+            {"passed": False, "score": 62},
+        )
+        output, report = ai_calls._enforce_quality_gate(client, "glucose_coach", "first draft", {}, lambda note: "still bad draft")
+        assert output is None
+        retain.assert_called_once_with("glucose_coach", "flagged_dropped", "first draft", "still bad draft", report)
+
+    def test_fired_then_regeneration_exception_retains_the_original_draft(self, monkeypatch):
+        retain = MagicMock()
+        monkeypatch.setattr(ai_calls, "_retain_coach_brief_flag", retain)
+        client = _lambda_client_returning({"passed": False, "score": 62})
+        ai_calls._enforce_quality_gate(client, "training_coach", "first draft", {}, MagicMock(side_effect=RuntimeError("timeout")))
+        retain.assert_called_once()
+        args = retain.call_args[0]
+        assert args[0] == "training_coach"
+        assert args[1] == "flagged_dropped"
+        assert args[2] == "first draft"  # original draft — no regeneration ever produced a replacement
+        assert args[3] == "first draft"  # output_text was never reassigned
+
+
+class TestRetainCoachBriefFlag:
+    """Pins the eval_retention wiring itself: findings translated from the gate
+    report's own vocabulary, fail-soft on any error."""
+
+    def test_translates_report_findings_and_calls_retain(self, monkeypatch):
+        import eval_retention
+
+        retained = {}
+
+        def _fake_retain(surface, verdict, draft=None, final=None, findings=None, allowed=None, facts=None, extra=None):
+            retained.update(surface=surface, verdict=verdict, draft=draft, final=final, findings=findings, extra=extra)
+            return True
+
+        monkeypatch.setattr(eval_retention, "retain", _fake_retain)
+        report = {
+            "score": 62,
+            "anti_pattern_violations": [{"phrase": "As an AI coach"}],
+            "decision_class_violations": [{"expected_max": "observational", "excerpt": "stop lifting"}],
+            "cross_coach_similarity_flags": [{"similar_to": "mind_coach", "reason": "same opening line"}],
+        }
+        ai_calls._retain_coach_brief_flag("sleep_coach", "flagged_corrected", "draft text", "final text", report)
+        assert retained["surface"] == "coach_brief"
+        assert retained["verdict"] == "flagged_corrected"
+        assert retained["draft"] == "draft text"
+        assert retained["final"] == "final text"
+        assert {"type": "anti_pattern", "detail": "As an AI coach"} in retained["findings"]
+        assert {"type": "decision_class", "detail": "stop lifting"} in retained["findings"]
+        assert {"type": "cross_coach_similarity", "detail": "same opening line"} in retained["findings"]
+        assert retained["extra"] == {"coach_id": "sleep_coach", "score": 62}
+
+    def test_never_raises_on_retention_failure(self, monkeypatch):
+        import eval_retention
+
+        def _boom(*a, **kw):
+            raise RuntimeError("simulated DDB outage")
+
+        monkeypatch.setattr(eval_retention, "retain", _boom)
+        # Must not raise — retention is never load-bearing for the coach pipeline.
+        ai_calls._retain_coach_brief_flag("sleep_coach", "flagged_dropped", "d", "f", {"score": 62})

@@ -1,4 +1,5 @@
-"""eval_retention.py — retain the honesty layer's own eval dataset (#812, minimal #744).
+"""eval_retention.py — retain the honesty layer's own eval dataset (#812, minimal #744;
+extended to the coach_brief surface #744 originally named — see SURFACES below).
 
 Every ADR-104 gate verdict and regeneration pair used to be a log line and then
 gone — the AI Practitioner blind spot from R21 (#744): the platform generates
@@ -7,7 +8,8 @@ corrected/refused final) and throws it away. This module is the minimal retentio
 that the #812 harvest loop consumes: when a grounding gate FIRES on any surface,
 the pair is persisted to DynamoDB so `scripts/harvest_eval_fixtures.py` can turn
 it into new golden/canary candidates for the per-surface eval packs
-(`tests/fixtures/golden_surfaces/`).
+(`tests/fixtures/golden_surfaces/`) — except `coach_brief`, which is retained but
+not yet harvested (no harness adapter exists for it; see SURFACES docstring).
 
 Design:
 - Records live at pk `EVALRET#<surface>`, sk `TS#<utc-iso>#<uuid8>` — registered
@@ -17,7 +19,8 @@ Design:
   consumes recent months and the dataset regrows continuously.
 - Only FLAGGED events are retained (the gate fires rarely); clean passes are
   already persisted by each surface's own record (board interactions, chronicle
-  installments, SoM briefs, field notes) and need no second copy.
+  installments, SoM briefs, field notes, coach-state-updater's published brief
+  text) and need no second copy.
 - The payload is stored as ONE JSON string field — no float→Decimal dance, and
   the harvest reads it back with plain json.loads.
 - `retain()` is FAIL-SOFT by contract: it must never raise into a generation
@@ -42,9 +45,25 @@ PK_PREFIX = "EVALRET#"
 RECORD_TYPE = "eval_retention"
 TTL_DAYS = 180
 
-# The five reader-facing surfaces the ADR-104 gate protects (#812). Kept as a
-# tuple so the harvest and the tests iterate one canonical list.
-SURFACES = ("board_ask", "chronicle", "memoir", "state_of_matthew", "field_notes")
+# The five #812 surfaces wired to the deterministic golden_surface_eval harness
+# (tests/golden_surface_eval.py) — a flagged event here can be replayed and
+# auto-turned into a canary/golden candidate by scripts/harvest_eval_fixtures.py.
+#
+# "coach_brief" (#744) is the ORIGINAL surface this issue named: the daily-brief
+# coach pipeline's quality gate (`ai_calls._enforce_quality_gate`, ADR-108/#390),
+# the highest-fire-rate ADR-104-adjacent gate in the platform (10.2% of 206
+# logged verdicts over 30 days, per ADR-108) — and the one #812's retention
+# wiring did not reach (that PR wired the 5 *newer* golden_surface_eval surfaces
+# only). It has NO golden_surface_eval harness adapter yet (its own eval harness
+# is tests/golden_brief_eval.py, hand-curated, not harvest-fed) — retained here
+# so the verdict/regeneration pairs stop being discarded, even though
+# `scripts/harvest_eval_fixtures.py` doesn't build replay candidates from it yet
+# (see that script's `_split_harness_ready` — coach_brief records are counted
+# and reported, not silently dropped, but not auto-harvested until a coach_brief
+# harness adapter exists — future work, not this story).
+#
+# Kept as a tuple so the harvest and the tests iterate one canonical list.
+SURFACES = ("board_ask", "chronicle", "memoir", "state_of_matthew", "field_notes", "coach_brief")
 
 _TEXT_CAP = 6000  # chars per retained draft/final — plenty for any surface
 _ALLOWED_CAP = 500  # distinct numbers kept from the allow-list

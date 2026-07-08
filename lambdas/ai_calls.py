@@ -1079,6 +1079,41 @@ def _quality_gate_correction_note(report):
     return "\n".join(lines)
 
 
+def _retain_coach_brief_flag(coach_id, verdict, draft, final, report):
+    """#744: persist a fired coach-quality-gate verdict (draft + findings +
+    disposition) as eval data via the SAME `eval_retention.py` mechanism #812
+    wired for the other 5 surfaces. `ai_calls._enforce_quality_gate` is the
+    ORIGINAL surface #744 named — the highest-fire-rate ADR-104-adjacent gate
+    in the platform (10.2% of 206 logged verdicts over 30 days, ADR-108) — and
+    #812 did not reach it (it wired the 5 newer golden_surface_eval surfaces
+    only). Fail-soft: never affects the coach pipeline.
+    """
+    try:
+        import eval_retention
+
+        findings = []
+        for v in report.get("anti_pattern_violations") or []:
+            phrase = v.get("phrase") if isinstance(v, dict) else v
+            if phrase:
+                findings.append({"type": "anti_pattern", "detail": phrase})
+        for v in report.get("decision_class_violations") or []:
+            if isinstance(v, dict):
+                findings.append({"type": "decision_class", "detail": v.get("excerpt", "")})
+        for flag in report.get("cross_coach_similarity_flags") or []:
+            if isinstance(flag, dict):
+                findings.append({"type": "cross_coach_similarity", "detail": flag.get("reason", "")})
+        eval_retention.retain(
+            "coach_brief",
+            verdict,
+            draft=draft or "",
+            final=final or "",
+            findings=findings,
+            extra={"coach_id": coach_id, "score": report.get("score")},
+        )
+    except Exception:  # noqa: BLE001 — retention is never load-bearing
+        pass
+
+
 def _enforce_quality_gate(
     lambda_client, coach_id, output_text, generation_brief, regenerate_fn, max_regenerations=_QUALITY_GATE_MAX_REGENERATIONS
 ):
@@ -1095,8 +1130,15 @@ def _enforce_quality_gate(
 
     Never fails open on an actual sub-threshold verdict from a gate that
     responded — only on gate infra errors (see `_invoke_quality_gate_sync`).
+
+    #744: when the gate actually FIRES on the original draft (a real verdict,
+    not a fail-open), the draft/final/findings/disposition are retained via
+    `eval_retention.retain("coach_brief", ...)` — this was the surface #744
+    named and #812's retention wiring missed (see `_retain_coach_brief_flag`).
     """
+    original_draft = output_text
     report = _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief)
+    fired = not report.get("passed", True)
     attempts = 0
     while not report.get("passed", True) and attempts < max_regenerations:
         attempts += 1
@@ -1131,8 +1173,12 @@ def _enforce_quality_gate(
             )
         except Exception as e:
             print(f"[COACH-QUALITY-GATE:{coach_id}] CloudWatch held-metric emit failed (non-fatal): {e}")
+        if fired:
+            _retain_coach_brief_flag(coach_id, "flagged_dropped", original_draft, output_text, report)
         return None, report
 
+    if fired:
+        _retain_coach_brief_flag(coach_id, "flagged_corrected" if attempts else "flagged_kept_best", original_draft, output_text, report)
     return output_text, report
 
 
