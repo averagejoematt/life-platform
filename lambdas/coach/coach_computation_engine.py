@@ -11,7 +11,9 @@ Components:
   3. Seasonality flags — population-level seasonal adjustments
   4. Autocorrelation warnings — flag likely noise in autocorrelated metrics
   5. Statistical guardrails — data availability tags + decision class ceiling
-  6. Prediction evaluation — machine-evaluable predictions with Bayesian update
+  6. Prediction evaluation — REMOVED (#813): grading is owned solely by
+     coach-prediction-evaluator (this engine's duplicate grader terminalized
+     predictions before the real evaluator could grade them)
 
 DynamoDB writes:
   PK: COACH#computation   SK: RESULTS#{YYYY-MM-DD}
@@ -52,9 +54,12 @@ ALGO_VERSION = "1.0"
 LOOKBACK_DAYS = 30
 from constants import EXPERIMENT_START_DATE as EXPERIMENT_START  # ADR-058
 
-# Metrics by source for EWMA processing
+# Metrics by source for EWMA processing.
+# #813: whoop records carry NO sleep_score/deep_pct/rem_pct attributes (those live
+# on eightsleep records, mapped below) — the whoop entries for them only ever
+# produced empty series. Keep each metric under the source that actually has it.
 SOURCE_METRICS = {
-    "whoop": ["hrv", "recovery_score", "resting_heart_rate", "sleep_duration_hours", "sleep_score", "deep_pct", "rem_pct"],
+    "whoop": ["hrv", "recovery_score", "resting_heart_rate", "sleep_duration_hours"],
     "withings": ["weight_lbs"],
     "macrofactor": ["total_calories_kcal", "total_protein_g"],
     "apple_health": ["steps", "blood_glucose_avg", "blood_glucose_std_dev", "som_avg_valence"],
@@ -93,13 +98,10 @@ METRIC_DOMAIN = {
     "moving_time_seconds": "training",
 }
 
-# Coach IDs for prediction scanning. CANONICAL: must equal the operational
-# coaches in config/personas.json / persona_registry.OPERATIONAL_COACH_IDS
-# (enforced by tests/test_persona_registry.py). The previous list
-# (dr_johansson/fitness_coach/body_comp_coach/lifestyle_coach/recovery_coach)
-# was divergent — 5 of its 8 ids had no COACH# partition, so _fetch_predictions
-# silently scanned non-existent keys and missed predictions from training,
-# physical, glucose, labs and explorer coaches (CC-00 fix).
+# Coach IDs. CANONICAL: must equal the operational coaches in
+# config/personas.json / persona_registry.OPERATIONAL_COACH_IDS (enforced by
+# tests/test_persona_registry.py). Historically used by the removed duplicate
+# prediction grader (#813); kept as the module's canonical coach list.
 COACH_IDS = [
     "sleep_coach",
     "training_coach",
@@ -164,16 +166,6 @@ s3 = boto3.client("s3", region_name=_REGION)
 
 
 from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
-
-
-def _to_decimal(val):
-    """Convert a numeric value to Decimal for DynamoDB writes."""
-    if val is None:
-        return None
-    try:
-        return Decimal(str(round(float(val), 6)))
-    except Exception:
-        return None
 
 
 def _safe_float(item, field, default=None):
@@ -248,28 +240,6 @@ def _fetch_all_source_data(start_date, end_date):
         data[source] = records
         logger.info("Fetched %d records from %s", len(records), source)
     return data
-
-
-def _fetch_predictions():
-    """Fetch all pending machine-evaluable predictions across all coaches."""
-    predictions = []
-    for coach_id in COACH_IDS:
-        try:
-            kwargs = {
-                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
-                "ExpressionAttributeValues": {
-                    ":pk": f"COACH#{coach_id}",
-                    ":prefix": "PREDICTION#",
-                },
-            }
-            resp = table.query(**with_phase_filter(kwargs))
-            items = [_decimal_to_float(i) for i in resp.get("Items", [])]
-            for item in items:
-                if item.get("status") == "pending":
-                    predictions.append(item)
-        except Exception as e:
-            logger.warning("Failed to fetch predictions for %s: %s", coach_id, e)
-    return predictions
 
 
 def _load_ewma_params():
@@ -656,242 +626,19 @@ def _compute_statistical_guardrails(all_data):
 
 
 # =============================================================================
-# COMPONENT 6: PREDICTION EVALUATION
+# COMPONENT 6: PREDICTION EVALUATION — REMOVED (#813)
 # =============================================================================
-
-
-def _resolve_metric_value(metric_key, all_data):
-    """
-    Resolve a metric key (e.g. 'hrv_7day_avg') to a current numeric value.
-    Supports both raw metric names and computed aggregates.
-    """
-    # Handle computed metrics like 'hrv_7day_avg'
-    if metric_key.endswith("_7day_avg"):
-        base_metric = metric_key.replace("_7day_avg", "")
-        return _compute_metric_average(base_metric, all_data, days=7)
-    if metric_key.endswith("_14day_avg"):
-        base_metric = metric_key.replace("_14day_avg", "")
-        return _compute_metric_average(base_metric, all_data, days=14)
-    if metric_key.endswith("_30day_avg"):
-        base_metric = metric_key.replace("_30day_avg", "")
-        return _compute_metric_average(base_metric, all_data, days=30)
-
-    # Raw metric — get most recent value
-    for source, metrics in SOURCE_METRICS.items():
-        if metric_key in metrics:
-            records = all_data.get(source, [])
-            series = _extract_metric_series(records, metric_key)
-            if series:
-                return series[-1][1]  # Most recent value
-    return None
-
-
-def _compute_metric_average(base_metric, all_data, days):
-    """Compute the average of the last N days for a base metric."""
-    for source, metrics in SOURCE_METRICS.items():
-        if base_metric in metrics:
-            records = all_data.get(source, [])
-            series = _extract_metric_series(records, base_metric)
-            if not series:
-                return None
-            recent = [v for _, v in series[-days:]]
-            if not recent:
-                return None
-            return sum(recent) / len(recent)
-    return None
-
-
-def _evaluate_condition(actual, condition, threshold):
-    """Evaluate a prediction condition against a threshold."""
-    if actual is None or threshold is None:
-        return None  # Inconclusive
-    cond_map = {
-        "gt": actual > threshold,
-        "gte": actual >= threshold,
-        "lt": actual < threshold,
-        "lte": actual <= threshold,
-        "eq": abs(actual - threshold) < 0.01,
-    }
-    return cond_map.get(condition)
-
-
-def _evaluate_predictions(predictions, all_data, today_str):
-    """
-    Evaluate machine-evaluable predictions whose evaluation window has elapsed.
-
-    For each eligible prediction:
-      1. Check if evaluation window has elapsed
-      2. Fetch current metric value
-      3. Evaluate against threshold and condition
-      4. Compare against null hypothesis
-      5. Determine outcome status
-      6. Prepare Bayesian confidence update (alpha/beta)
-
-    Returns list of evaluation result dicts.
-    """
-    today = datetime.strptime(today_str, "%Y-%m-%d")
-    evaluations = []
-
-    for pred in predictions:
-        eval_spec = pred.get("evaluation", {})
-        if eval_spec.get("type") != "machine":
-            continue
-
-        # Check evaluation window
-        created_date = pred.get("created_date")
-        window_days = eval_spec.get("evaluation_window_days")
-        if not created_date or not window_days:
-            continue
-
-        try:
-            created_dt = datetime.strptime(created_date, "%Y-%m-%d")
-        except (ValueError, TypeError):
-            continue
-
-        eval_deadline = created_dt + timedelta(days=int(window_days))
-        if today < eval_deadline:
-            continue  # Window hasn't elapsed yet
-
-        # Resolve metric value
-        metric_key = eval_spec.get("metric")
-        if not metric_key:
-            continue
-
-        actual_value = _resolve_metric_value(metric_key, all_data)
-        threshold = eval_spec.get("threshold")
-        condition = eval_spec.get("condition")
-
-        result = _evaluate_condition(actual_value, condition, threshold)
-
-        # Determine outcome status
-        if result is None:
-            status = "inconclusive"
-            beats_null = False
-        elif result:
-            status = "confirmed"
-            # Check if it beats the null hypothesis
-            null_text = eval_spec.get("null_hypothesis", "")
-            # If there is a null hypothesis, only count as beating null
-            # if the prediction meaningfully exceeds what was expected
-            beats_null = bool(null_text)  # Default: if we confirmed AND had a null, we beat it
-        else:
-            status = "refuted"
-            beats_null = False
-
-        # Bayesian update direction
-        # Only update confidence if the prediction beat the null or was refuted
-        bayesian_update = None
-        if status == "confirmed" and beats_null:
-            bayesian_update = "success"  # alpha += 1
-        elif status == "refuted":
-            bayesian_update = "failure"  # beta += 1
-        # 'inconclusive' or 'confirmed but matches null' = no update
-
-        coach_id = pred.get("coach_id")
-        subdomain = pred.get("subdomain")
-        prediction_id = pred.get("prediction_id") or pred.get("sk", "").replace("PREDICTION#", "")
-
-        evaluation = {
-            "prediction_id": prediction_id,
-            "coach_id": coach_id,
-            "subdomain": subdomain,
-            "metric": metric_key,
-            "threshold": threshold,
-            "condition": condition,
-            "actual_value": round(actual_value, 4) if actual_value is not None else None,
-            "status": status,
-            "beats_null": beats_null,
-            "bayesian_update": bayesian_update,
-            "created_date": created_date,
-            "evaluated_date": today_str,
-            "evaluation_window_days": window_days,
-        }
-        evaluations.append(evaluation)
-
-        # Write the update back to the prediction record
-        _update_prediction_outcome(pred, evaluation)
-
-        # Update Bayesian confidence if applicable
-        if bayesian_update and coach_id and subdomain:
-            _update_bayesian_confidence(coach_id, subdomain, bayesian_update)
-
-    return evaluations
-
-
-def _update_prediction_outcome(prediction, evaluation):
-    """Update a prediction record with its evaluation outcome."""
-    try:
-        pk = prediction.get("pk") or f"COACH#{prediction.get('coach_id', '')}"
-        sk = prediction.get("sk") or f"PREDICTION#{prediction.get('prediction_id', '')}"
-
-        table.update_item(
-            Key={"pk": pk, "sk": sk},
-            UpdateExpression=("SET #status = :status, outcome = :outcome, " "outcome_date = :odate, outcome_notes = :notes"),
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":status": evaluation["status"],
-                ":outcome": evaluation["status"],
-                ":odate": evaluation["evaluated_date"],
-                ":notes": json.dumps(
-                    {
-                        "actual_value": evaluation["actual_value"],
-                        "beats_null": evaluation["beats_null"],
-                        "bayesian_update": evaluation["bayesian_update"],
-                    }
-                ),
-            },
-        )
-        logger.info("Updated prediction %s -> %s", evaluation["prediction_id"], evaluation["status"])
-    except Exception as e:
-        logger.error("Failed to update prediction %s: %s", evaluation.get("prediction_id"), e)
-
-
-def _update_bayesian_confidence(coach_id, subdomain, update_type):
-    """
-    Update the Bayesian confidence (Beta distribution) for a coach's subdomain.
-
-    Beta(alpha, beta): alpha += 1 for success, beta += 1 for failure.
-    Uninformed prior: Beta(1, 1).
-    """
-    pk = f"COACH#{coach_id}"
-    sk = f"CONFIDENCE#{subdomain}"
-
-    try:
-        # Read current confidence
-        resp = table.get_item(Key={"pk": pk, "sk": sk})
-        item = resp.get("Item")
-
-        if item:
-            alpha = float(item.get("alpha", 1))
-            beta_val = float(item.get("beta_param", 1))
-        else:
-            alpha = 1.0
-            beta_val = 1.0
-
-        if update_type == "success":
-            alpha += 1
-        elif update_type == "failure":
-            beta_val += 1
-
-        mean_confidence = alpha / (alpha + beta_val)
-        sample_size = int(alpha + beta_val - 2)
-
-        table.put_item(
-            Item={
-                "pk": pk,
-                "sk": sk,
-                "alpha": _to_decimal(alpha),
-                "beta_param": _to_decimal(beta_val),
-                "mean_confidence": _to_decimal(mean_confidence),
-                "sample_size": Decimal(str(sample_size)),
-                "subdomain": subdomain,
-                "coach_id": coach_id,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
-        logger.info("Updated confidence for %s/%s: Beta(%.0f,%.0f) = %.2f", coach_id, subdomain, alpha, beta_val, mean_confidence)
-    except Exception as e:
-        logger.error("Failed to update Bayesian confidence for %s/%s: %s", coach_id, subdomain, e)
+# This engine used to run a SECOND, divergent prediction grader here: it graded
+# machine-type predictions at the raw stated window (no domain-minimum clamp, no
+# expiry, no LEARNING# record, no liveness marker) and wrote status=inconclusive
+# terminally — 15 minutes BEFORE coach-prediction-evaluator's daily run. Because
+# every pre-C-3 machine spec carries threshold=None, this path could only ever
+# produce inconclusive, and it terminalized each prediction the moment its stated
+# window elapsed, so the real evaluator never saw an elapsed prediction: the
+# public scorecard sat at 0-graded-ever. Grading is now owned SOLELY by
+# lambdas/coach/coach_prediction_evaluator.py (one deterministic chokepoint,
+# ADR-105). The results package keeps a "prediction_evaluations": [] key for
+# shape stability with stored COMPUTED# records.
 
 
 # =============================================================================
@@ -1135,16 +882,9 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error("Component 5 (statistical guardrails) failed: %s", e)
 
-    # Component 6: Prediction Evaluation
+    # Component 6: Prediction Evaluation — REMOVED (#813). Grading is owned
+    # solely by coach-prediction-evaluator; see the tombstone comment above.
     pred_evals = []
-    try:
-        predictions = _fetch_predictions()
-        logger.info("Pending predictions found: %d", len(predictions))
-        if predictions:
-            pred_evals = _evaluate_predictions(predictions, all_data, today_str)
-            logger.info("Predictions evaluated: %d", len(pred_evals))
-    except Exception as e:
-        logger.error("Component 6 (prediction evaluation) failed: %s", e)
 
     # ── Component 7: Narrative arc transition detection ────────────────
     arc_transition = None
