@@ -50,6 +50,9 @@ CF_DIST_ID = os.environ.get("CF_DIST_ID", "E3S424OXQZ8NBE")
 CHRONICLE_EMAIL_SENDER_ARN = os.environ.get("CHRONICLE_EMAIL_SENDER_ARN", "")
 # #537: Elena's post-publish state extraction (name, not ARN — same account/region).
 ELENA_STATE_UPDATER_NAME = os.environ.get("ELENA_STATE_UPDATER_NAME", "elena-state-updater")
+# #734: the weekly Panel podcast is EVENT-DRIVEN — a published chronicle is the
+# "this week earned an episode" trigger (the old standing Friday cron was retired).
+COACH_PANEL_PODCAST_NAME = os.environ.get("COACH_PANEL_PODCAST_NAME", "coach-panel-podcast")
 
 CHRONICLE_PK = f"USER#{USER_ID}#SOURCE#chronicle"
 
@@ -320,6 +323,24 @@ def _invoke_elena_state_updater(date_str: str) -> None:
         logger.warning("Failed to invoke elena-state-updater (non-fatal): %s", exc)
 
 
+def _invoke_coach_panel_podcast() -> None:
+    """#734: async-invoke the weekly Panel podcast now that a chronicle has
+    published — the event-driven replacement for the retired Friday cron ("ships
+    only when a week earns an episode"). Sends an empty-shaped event so the Panel's
+    own reset-proof week-selection (_select_week_post: latest current-cycle post by
+    date) runs UNCHANGED and it self-gates (idempotent + publish-or-HOLD). Fail-soft:
+    a missed invoke just means no episode this cycle, never a broken approval."""
+    try:
+        lam.invoke(
+            FunctionName=COACH_PANEL_PODCAST_NAME,
+            InvocationType="Event",  # async
+            Payload=json.dumps({"source": "chronicle-approve"}).encode(),
+        )
+        logger.info("Invoked coach-panel-podcast (async, event-driven)")
+    except Exception as exc:
+        logger.warning("Failed to invoke coach-panel-podcast (non-fatal): %s", exc)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTO-PUBLISH SWEEP (SS-01) — the self-sustaining fail-safe: a chronicle draft must
 # never stay dark just because the approve link wasn't clicked. A daily schedule
@@ -380,6 +401,7 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
             logger.warning("sweep: auto-publish failed for %s: %s", date_str, exc)
     if published and not dry_run:
         _invoke_email_sender()  # one subscriber-delivery trigger for the batch
+        _invoke_coach_panel_podcast()  # #734: a published week earns a Panel episode
     logger.info("chronicle auto-publish sweep: %d draft(s) handled (hours=%s, dry_run=%s)", len(published), hours, dry_run)
     return published
 
@@ -488,6 +510,7 @@ def _handle(event: dict) -> dict:
         _mark_published(date_str)
         _invoke_email_sender()
         _invoke_elena_state_updater(date_str)  # #537: published → update her memory
+        _invoke_coach_panel_podcast()  # #734: a published week earns a Panel episode
 
         return _html_response(
             200,
