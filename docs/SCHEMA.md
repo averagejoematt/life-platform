@@ -110,9 +110,9 @@ Where multiple sources measure the same thing:
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`
 
-Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `weight_episodes`, `training_reference`, and `macrofactor_meals` are derived/computed partitions, not raw ingested data (the last is a recomputable projection over the raw `macrofactor` food log — see below).
+Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `weight_episodes`, `training_reference`, and `macrofactor_meals` are derived/computed partitions, not raw ingested data (the last is a recomputable projection over the raw `macrofactor` food log — see below). `evening_ritual` is reader/self-reported, not device-ingested — see below.
 
 Ingestion methods: API polling (scheduled Lambda), S3 file triggers (manual export), **webhook** (Health Auto Export push — also handles BP and State of Mind), **MCP tool write** (supplements), **on-demand fetch + scheduled Lambda** (weather)
 
@@ -1131,6 +1131,44 @@ Note: S3 raw backup at `raw/weather/YYYY/MM/DD.json` (Lambda path only).
 Note: Idempotent ingestion — deduplicates by timestamp on re-ingestion. Requires a separate HAE automation with Data Type = "State of Mind" (same URL + auth as existing health metrics automation).
 
 Access via `get_state_of_mind_trend` MCP tool.
+
+---
+
+### evening_ritual (#769 — the C-floor two-scalar fulfillment ritual, ADR-124)
+
+**SOT for:** the connection/mood micro-ritual described in ADR-124 ("A as primary + C as
+the floor" — the backstop channel that keeps the fulfillment stream alive on days the
+richer State of Mind gesture doesn't happen).
+
+**Data source:** the evening-nudge email (`lambdas/emails/evening_nudge_lambda.py`) mints
+two one-tap links per day (connection today, mood valence); tapping one hits
+`GET /api/ritual_log` on the site-api Lambda (`lambdas/web/site_api_social.py::_handle_ritual_log`),
+which writes directly to this partition. No app, no free text — two scalars, one tap each.
+
+**Key:** `pk = USER#matthew#SOURCE#evening_ritual`, `sk = DATE#YYYY-MM-DD`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connection` | number | Felt-connection scalar for the day, 0 (not at all) – 4 (deeply) |
+| `connection_logged_at` | string | ISO-8601 UTC timestamp of the tap that set `connection` |
+| `mood_valence` | number | Mood-valence scalar for the day, 0 (rough) – 4 (great) |
+| `mood_valence_logged_at` | string | ISO-8601 UTC timestamp of the tap that set `mood_valence` |
+| `source` | string | Always `"evening_nudge_link"` |
+
+**Idempotency:** last-tap-wins, per metric independently — a `connection` tap never
+disturbs an already-logged `mood_valence` (and vice versa), and re-tapping the same or a
+different value for the same metric+day just overwrites it (plain `SET`, no
+read-modify-write). A tap link is only valid for its exact (date, metric, value) —
+forged/tampered links are rejected via an HMAC-SHA256 token (`lambdas/ritual_link.py`,
+same pattern as the subscriber-token / chronicle-approve signed-link precedent).
+
+**Publication posture (ADR-124 — build only, no new decisions):** individual daily
+records in this partition are **never** publicly readable. The only public read surface
+is `GET /api/fulfillment_ritual` (`lambdas/web/site_api_data.py::handle_fulfillment_ritual`),
+which returns aggregate-only: a 7-day trend (dark days render as `null` — honest absence
+per ADR-104, never a fabricated neutral), a cumulative check-in count, and the current
+streak. The aggregate always publishes, bad weeks included — a channel that goes quiet
+when the story is bad is not evidence.
 
 ---
 

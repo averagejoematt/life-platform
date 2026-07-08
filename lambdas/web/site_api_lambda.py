@@ -105,6 +105,7 @@ from web.site_api_data import (
     handle_domains,
     handle_experiments,
     handle_forecast,
+    handle_fulfillment_ritual,
     handle_genome_risks,
     handle_glucose,
     handle_habit_registry,
@@ -182,6 +183,7 @@ from web.site_api_social import (
     _handle_experiment_vote,
     _handle_nudge,
     _handle_predict_week,
+    _handle_ritual_log,
     _handle_submit_finding,
     _handle_verify_subscriber,
     handle_challenge_catalog,
@@ -335,6 +337,7 @@ ROUTES = {
     "/api/supplements": handle_supplements,
     "/api/habits": handle_habits,
     "/api/vice_streaks": handle_vice_streaks,
+    "/api/fulfillment_ritual": handle_fulfillment_ritual,  # #769 (ADR-124): C-floor aggregate-only publish surface
     "/api/journey_timeline": handle_journey_timeline,
     "/api/journey_waveform": handle_journey_waveform,
     # Sprint 11: glucose + sleep intelligence pages
@@ -461,6 +464,7 @@ _SIMPLE_ROUTES = {
     "/api/experiment_follow": ({"POST"}, _handle_experiment_follow),
     "/api/experiment_suggest": ({"POST"}, _handle_experiment_suggest),
     "/api/challenge_checkin": ({"POST"}, _handle_challenge_checkin),
+    "/api/ritual_log": ({"GET", "OPTIONS"}, _handle_ritual_log),  # #769 (ADR-124): one-tap evening ritual
     "/api/challenge_vote": ({"POST"}, _handle_challenge_vote),
     "/api/challenge_follow": ({"POST"}, _handle_challenge_follow),
     "/api/experiment_detail": (None, _handle_experiment_detail),

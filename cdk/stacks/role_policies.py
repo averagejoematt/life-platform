@@ -1033,7 +1033,11 @@ def email_partner() -> list[iam.PolicyStatement]:
 
 
 def email_evening_nudge() -> list[iam.PolicyStatement]:
-    """Evening nudge: DDB read (supplements, notion, apple_health, state_of_mind), SES. No ai-keys needed."""
+    """Evening nudge: DDB read (supplements, notion, apple_health, state_of_mind), SES. No ai-keys needed.
+
+    #769 (ADR-124): added GetSecretValue on the ritual-token secret — the nudge mints the
+    signed one-tap links (connection/mood_valence) that site-api later verifies.
+    """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
@@ -1054,6 +1058,11 @@ def email_evening_nudge() -> list[iam.PolicyStatement]:
             sid="DLQ",
             actions=["sqs:SendMessage"],
             resources=[DLQ_ARN],
+        ),
+        iam.PolicyStatement(
+            sid="RitualTokenSecret",  # #769 (ADR-124): HMAC signing key for evening-ritual one-tap links.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ritual-token-secret")],
         ),
     ]
 
@@ -2020,6 +2029,7 @@ def site_api() -> list[iam.PolicyStatement]:
                         "RATE#*",  # shared rate_limiter.py (per-endpoint per-IP counters)
                         "USER#matthew#SOURCE#experiment_suggestions",  # reader experiment suggestions
                         "USER#matthew#SOURCE#challenges",  # challenge daily check-ins
+                        "USER#matthew#SOURCE#evening_ritual",  # #769 (ADR-124): one-tap ritual taps
                     ],
                 },
             },
@@ -2059,6 +2069,11 @@ def site_api() -> list[iam.PolicyStatement]:
             sid="SubscriberTokenSecret",  # #106 (2026-05-30): HMAC signing key for subscriber tokens.
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
+        ),
+        iam.PolicyStatement(
+            sid="RitualTokenSecret",  # #769 (ADR-124): HMAC signing key for evening-ritual one-tap links.
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[_secret_arn("life-platform/ritual-token-secret")],
         ),
         # Inference receipt (2026-06-13): read-only token metrics + budget tier.
         # CloudWatch read APIs don't support resource-level scoping.

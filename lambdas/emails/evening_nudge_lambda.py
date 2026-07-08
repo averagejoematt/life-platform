@@ -8,11 +8,17 @@ Sources checked:
   - Supplements (has any batch been logged today?)
   - Journal (has morning or evening entry been created today?)
   - How We Feel / State of Mind (has a check-in arrived via webhook today?)
+  - Evening ritual (#769, ADR-124): the C-floor two-scalar micro-ritual —
+    connection today (0-4) and mood valence (0-4), delivered as one-tap links
+    (see _build_ritual_section). Treated the same as the other three checks
+    for whether the email sends at all, so the ritual survives a week where
+    everything else is quiet — the whole point of the C floor (ADR-124).
 
 Only sends email when at least one source is missing.
-No email on days when all three are complete — don't nag unnecessarily.
+No email on days when all four are complete — don't nag unnecessarily.
 
 v1.0.0 — 2026-03-15 (R54)
+v1.1.0 — 2026-07-07 (#769): added the evening-ritual one-tap section.
 """
 
 import logging
@@ -22,6 +28,7 @@ from decimal import Decimal
 
 import boto3
 from pacific_time import pacific_today
+from ritual_link import sign_ritual_token
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -31,12 +38,25 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 RECIPIENT = os.environ["EMAIL_RECIPIENT"]
 SENDER = os.environ["EMAIL_SENDER"]
 USER_ID = os.environ.get("USER_ID", "matthew")
+SITE_URL = os.environ.get("SITE_URL", "https://averagejoematt.com")
+RITUAL_TOKEN_SECRET_NAME = os.environ.get("RITUAL_TOKEN_SECRET_NAME", "life-platform/ritual-token-secret")
 
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
 ses = boto3.client("sesv2", region_name=_REGION)
+secretsmanager = boto3.client("secretsmanager", region_name=_REGION)
+
+_ritual_secret_cache: str | None = None
+
+# 0-4 ordinal labels shown next to each tap button — the whole construct is
+# "two scalars, no free text" (ADR-124), so the labels are display-only.
+RITUAL_LABELS = {
+    "connection": ["Not at all", "A little", "Some", "A lot", "Deeply"],
+    "mood_valence": ["Rough", "Low", "Okay", "Good", "Great"],
+}
+RITUAL_METRIC_TITLES = {"connection": "Felt connected today?", "mood_valence": "Mood today?"}
 
 
 def _d2f(obj):
@@ -111,7 +131,79 @@ def _check_how_we_feel(date_str: str) -> tuple[bool, str]:
     return False, "No How We Feel check-in today"
 
 
-def _build_html(today_str: str, missing: list[dict], complete: list[dict]) -> str:
+def _check_evening_ritual(date_str: str) -> tuple[list[str], str]:
+    """Returns (missing_metrics, detail). missing_metrics is a subset of
+    ["connection", "mood_valence"] — only the metrics not yet logged today,
+    so a partially-completed ritual only re-prompts for what's left."""
+    item = _fetch_date("evening_ritual", date_str)
+    connection = item.get("connection") if item else None
+    mood_valence = item.get("mood_valence") if item else None
+    missing_metrics = []
+    if connection is None:
+        missing_metrics.append("connection")
+    if mood_valence is None:
+        missing_metrics.append("mood_valence")
+    if not missing_metrics:
+        return [], f"Connection {int(connection)}/4 · Mood {int(mood_valence)}/4"
+    if len(missing_metrics) == 1:
+        return missing_metrics, "Partially logged — one tap left"
+    return missing_metrics, "Not logged yet"
+
+
+def _get_ritual_secret() -> str | None:
+    """Fail-soft: a missing/unreadable secret just skips the tap-link section
+    for today rather than breaking the whole nudge email."""
+    global _ritual_secret_cache
+    if _ritual_secret_cache:
+        return _ritual_secret_cache
+    try:
+        _ritual_secret_cache = secretsmanager.get_secret_value(SecretId=RITUAL_TOKEN_SECRET_NAME)["SecretString"]
+        return _ritual_secret_cache
+    except Exception as e:
+        logger.warning(f"[nudge] ritual token secret unavailable (skipping tap links): {e}")
+        return None
+
+
+def _ritual_link(secret: str, date_str: str, metric: str, value: int) -> str:
+    token = sign_ritual_token(secret, date_str, metric, value)
+    return f"{SITE_URL}/api/ritual_log?date={date_str}&metric={metric}&value={value}&token={token}"
+
+
+def _ritual_metric_block(secret: str, date_str: str, metric: str) -> str:
+    labels = RITUAL_LABELS[metric]
+    buttons = "".join(
+        f'<a href="{_ritual_link(secret, date_str, metric, v)}" '
+        'style="display:inline-block;width:16%;margin:0 1%;padding:8px 0;background:#2d2d44;color:#fff;'
+        'text-decoration:none;text-align:center;border-radius:6px;font-size:12px;font-weight:700;">'
+        f"{v}</a>"
+        for v in range(len(labels))
+    )
+    caption = " · ".join(f"{i}={label}" for i, label in enumerate(labels))
+    return f"""
+        <p style="font-size:12px;color:#374151;font-weight:600;margin:10px 0 4px;">{RITUAL_METRIC_TITLES[metric]}</p>
+        <div>{buttons}</div>
+        <p style="font-size:10px;color:#9ca3af;margin:2px 0 0;">{caption}</p>"""
+
+
+def _build_ritual_section(date_str: str, missing_metrics: list[str]) -> str:
+    """One-tap section HTML, or "" if nothing's missing or the secret's unavailable
+    (fail-soft — see _get_ritual_secret)."""
+    if not missing_metrics:
+        return ""
+    secret = _get_ritual_secret()
+    if not secret:
+        return ""
+    blocks = "".join(_ritual_metric_block(secret, date_str, m) for m in missing_metrics)
+    return f"""
+    <div style="padding:4px 24px 16px;">
+      <div style="background:#eef2ff;border-radius:8px;padding:12px 14px;">
+        <p style="font-size:12px;color:#4338ca;font-weight:700;margin:0 0 4px;">🌙 Evening ritual — one tap each, no typing</p>
+        {blocks}
+      </div>
+    </div>"""
+
+
+def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritual_html: str = "") -> str:
     missing_rows = ""
     for m in missing:
         missing_rows += f"""
@@ -160,6 +252,8 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict]) -> st
         {missing_rows}
       </table>
     </div>
+
+    {ritual_html}
 
     {'<div style="padding:4px 24px 16px;"><table style="width:100%;border-collapse:collapse;border-top:1px solid #f3f4f6;">' + complete_rows + '</table></div>' if complete_rows else ''}
 
@@ -222,13 +316,26 @@ def lambda_handler(event, context):
                 logger.warning(f"[nudge] Check '{check['name']}' failed: {e}")
                 missing.append({"name": check["name"], "icon": check.get("icon", ""), "detail": "Check failed"})
 
+        # #769 (ADR-124): the evening-ritual C floor — checked and (if incomplete)
+        # rendered as its own tap-button section, not a generic text row. Folded
+        # into `missing`/`complete` too so it participates in the same "send if
+        # anything's incomplete" gate as the other three checks — the ritual
+        # must survive a quiet week, which means it has to keep showing up.
+        ritual_missing, ritual_detail = _check_evening_ritual(today)
+        ritual_entry = {"name": "Evening Ritual", "icon": "🌙", "detail": ritual_detail}
+        if ritual_missing:
+            missing.append(ritual_entry)
+        else:
+            complete.append(ritual_entry)
+        ritual_html = _build_ritual_section(today, ritual_missing)
+
         logger.info(f"[nudge] Missing: {[m['name'] for m in missing]} | Complete: {[c['name'] for c in complete]}")
 
         if not missing:
             logger.info("[nudge] All sources complete — no email needed today")
             return {"statusCode": 200, "body": "All complete — no nudge sent"}
 
-        html = _build_html(today, missing, complete)
+        html = _build_html(today, missing, complete, ritual_html)
         subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"
 
         ses.send_email(

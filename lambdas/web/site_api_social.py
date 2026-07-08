@@ -28,6 +28,7 @@ import json
 import os
 import re
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -1280,6 +1281,137 @@ def _handle_challenge_checkin(event: dict) -> dict:
             "total_checkins": total,
             "duration_days": duration,
             "completion_pct": round(total / duration * 100) if duration else 0,
+        },
+        cache_seconds=0,
+    )
+
+
+# ── #769 (ADR-124): evening-ritual one-tap write path ──────────────────────────
+# The C floor of the fulfillment capture channel — the evening nudge mints two
+# tappable links (connection 0-4, mood valence 0-4); tapping one hits this GET
+# endpoint directly from the email client, no app-switching, no free text.
+
+_RITUAL_TOKEN_SECRET_NAME = os.environ.get("RITUAL_TOKEN_SECRET_NAME", "life-platform/ritual-token-secret")
+_ritual_token_secret_cache = None
+RITUAL_LOG_RATE_LIMIT = 20  # per IP per hour — generous (legitimate re-taps happen), still floods-abuse-proof
+
+
+def _get_ritual_token_secret() -> str:
+    """Fetch the dedicated ritual-link HMAC secret from Secrets Manager.
+
+    Same shape as `_get_token_secret` (subscriber tokens): a dedicated random
+    key, never derived from another credential, so its compromise/rotation is
+    isolated from every other signed surface.
+    """
+    global _ritual_token_secret_cache
+    if _ritual_token_secret_cache:
+        return _ritual_token_secret_cache
+    try:
+        sm = boto3.client("secretsmanager", region_name="us-west-2")
+        _ritual_token_secret_cache = sm.get_secret_value(SecretId=_RITUAL_TOKEN_SECRET_NAME)["SecretString"]
+        return _ritual_token_secret_cache
+    except Exception as e:
+        logger.error(f"[ritual_log] Signing secret unavailable: {e}")
+        raise RuntimeError("Ritual token signing secret unavailable") from e
+
+
+def _handle_ritual_log(event: dict) -> dict:
+    """GET /api/ritual_log — one-tap write for the evening ritual (#769, ADR-124).
+
+    Query params: date=YYYY-MM-DD, metric=connection|mood_valence, value=0-4, token=<hex32>.
+    The token is an HMAC-SHA256 over (date, metric, value) minted by evening_nudge_lambda
+    with the dedicated ritual-token secret (lambdas/ritual_link.py) — forging a different
+    value for the same link requires the secret, matching the chronicle-approve /
+    subscriber-token precedent (signed link, no separate auth scheme).
+
+    Idempotency: last-tap-wins. A second tap (retry, or Matthew changing his mind from the
+    same email) overwrites the metric + its logged_at — no read-modify-write, no dedup list,
+    just a plain SET on the day's record. Two independent metrics on the same day are two
+    independent SETs, so tapping connection doesn't disturb an already-logged mood_valence.
+
+    Rate limit: RITUAL_LOG_RATE_LIMIT per IP per hour (DynamoDB-backed, matches nudge/checkin).
+    """
+    from ritual_link import RITUAL_METRICS, RITUAL_VALUE_MAX, RITUAL_VALUE_MIN, verify_ritual_token
+
+    qs = event.get("queryStringParameters") or {}
+    date_str = (qs.get("date") or "").strip()
+    metric = (qs.get("metric") or "").strip().lower()
+    value_raw = (qs.get("value") or "").strip()
+    token = (qs.get("token") or "").strip()
+
+    if metric not in RITUAL_METRICS:
+        return _error(400, f"metric must be one of: {sorted(RITUAL_METRICS)}")
+
+    try:
+        value = int(value_raw)
+    except (TypeError, ValueError):
+        return _error(400, "value must be an integer")
+    if not (RITUAL_VALUE_MIN <= value <= RITUAL_VALUE_MAX):
+        return _error(400, f"value must be between {RITUAL_VALUE_MIN} and {RITUAL_VALUE_MAX}")
+
+    try:
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return _error(400, "date must be YYYY-MM-DD")
+
+    # Defense in depth beyond the signature: a link is only ever minted for "today"
+    # (Pacific), so bound how stale a tap can be — a week of headroom covers an
+    # unread nudge email without leaving the window open indefinitely.
+    today_pt = datetime.now(PT).date()
+    if date_obj > today_pt or (today_pt - date_obj).days > 7:
+        return _error(400, "date outside the allowed window")
+
+    try:
+        secret = _get_ritual_token_secret()
+    except RuntimeError:
+        return _error(503, "Ritual logging temporarily unavailable")
+
+    if not verify_ritual_token(secret, date_str, metric, value, token):
+        return _error(403, "Invalid or tampered link")
+
+    # Rate limit: RITUAL_LOG_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
+    # cold starts; in-memory fallback only). Public GET, so it needs the same
+    # DDB-backed protection as every other write endpoint in this module.
+    ip = _extract_client_ip(event)
+    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    if _RATE_LIMITER_READY:
+        allowed, _rem, _retry = _ddb_rate_check(
+            table, endpoint="ritual_log", ip_hash=ip_hash, limit=RITUAL_LOG_RATE_LIMIT, window_seconds=3600, fail_open=True
+        )
+        if not allowed:
+            return {
+                "statusCode": 429,
+                "headers": {**CORS_HEADERS, "Retry-After": "3600", "Cache-Control": "no-store"},
+                "body": json.dumps({"error": "Too many taps recently. Try again in a bit."}),
+            }
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        table.update_item(
+            Key={"pk": f"{USER_PREFIX}evening_ritual", "sk": f"DATE#{date_str}"},
+            UpdateExpression="SET #m = :v, #ts = :ts, #src = :src",
+            ExpressionAttributeNames={
+                "#m": metric,
+                "#ts": f"{metric}_logged_at",
+                "#src": "source",
+            },
+            ExpressionAttributeValues={
+                ":v": Decimal(value),
+                ":ts": now_iso,
+                ":src": "evening_nudge_link",
+            },
+        )
+    except Exception as e:
+        logger.error(f"[ritual_log] DDB update failed: {e}")
+        return _error(500, "Failed to record tap")
+
+    logger.info(f"[ritual_log] date={date_str} metric={metric} value={value} ip_hash={ip_hash}")
+    return _ok(
+        {
+            "logged": True,
+            "date": date_str,
+            "metric": metric,
+            "value": value,
         },
         cache_seconds=0,
     )
