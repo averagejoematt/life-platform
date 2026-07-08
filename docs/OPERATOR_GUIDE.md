@@ -183,7 +183,7 @@ V2 P4.1 finding: only ~11 of 133 tools used in the last 30 days. Most cold tools
 | https://averagejoematt.com/api/healthz | Health check endpoint (JSON) |
 | AWS Console → CloudWatch → Dashboards → `life-platform-ops` | Ops metrics |
 | AWS Console → SQS → `life-platform-ingestion-dlq` | Dead letter queue (retention 14d) |
-| MCP Lambda URL | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
+| MCP Lambda URL | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` |
 
 ---
 

@@ -238,7 +238,8 @@ class OperationalStack(Stack):
             timeout_seconds=60,
             memory_mb=256,
             environment={
-                "MCP_FUNCTION_URL": "https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/",
+                # SEC-02 (#780): MCP_FUNCTION_URL is discovered at runtime (mcp_url.resolve_mcp_url)
+                # via lambda:GetFunctionUrlConfig — not committed here (repo is public, URL is the boundary).
                 "MCP_SECRET_NAME": "life-platform/mcp-api-key",
             },
             custom_policies=rp.operational_canary(),
@@ -338,7 +339,7 @@ class OperationalStack(Stack):
             environment={
                 "EMAIL_RECIPIENT": "awsdev@mattsusername.com",
                 "EMAIL_SENDER": "awsdev@mattsusername.com",
-                "MCP_FUNCTION_URL": "https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/",
+                # SEC-02 (#780): MCP_FUNCTION_URL discovered at runtime (mcp_url.resolve_mcp_url) — not committed.
                 "MCP_SECRET_NAME": "life-platform/mcp-api-key",
             },
             custom_policies=rp.operational_qa_smoke(),

@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-07-07 (v8.6.0 — 93 Lambdas, 9 active secrets, 143 MCP tools, ~67 alarms)
+> Last updated: 2026-07-08 (v8.6.0 — 93 Lambdas, 9 active secrets, 143 MCP tools, ~67 alarms)
 
 ---
 
@@ -54,7 +54,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Lambda | `life-platform-mcp` (768 MB, python3.12) |
-| Function URL (remote) | `https://c5hljblvma4u2xd6wf6oe4clk40unthu.lambda-url.us-west-2.on.aws/` |
+| Function URL (remote) | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` |
 | Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
 | Tools | **133** across **29** tool modules (`mcp/tools_*.py`) |

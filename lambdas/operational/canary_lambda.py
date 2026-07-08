@@ -45,6 +45,8 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 
+from mcp_url import resolve_mcp_url  # SEC-02 #780: discover the URL at runtime, not a committed env var
+
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
     from platform_logger import get_logger
@@ -58,7 +60,6 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ["S3_BUCKET"]
-MCP_URL = os.environ.get("MCP_FUNCTION_URL", "")  # set from deploy script
 MCP_SECRET = os.environ.get("MCP_SECRET_NAME", "life-platform/mcp-api-key")
 
 # Reentry sweep (2026-05-03): Anthropic API canary — catches the "API access
@@ -233,8 +234,9 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
     Send a lightweight MCP ping to the Function URL.
     Uses the tools/list method (low cost, no data read) to verify Lambda is alive.
     """
-    if not MCP_URL:
-        return None, "MCP_FUNCTION_URL not configured — skipping", 0.0
+    mcp_url = resolve_mcp_url()
+    if not mcp_url:
+        return None, "MCP Function URL unresolved — skipping", 0.0
 
     api_key = get_mcp_api_key()
     if not api_key:
@@ -256,7 +258,7 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
     t0 = time.monotonic()
     try:
         req = urllib.request.Request(
-            MCP_URL,
+            mcp_url,
             data=payload,
             headers={
                 "Content-Type": "application/json",
