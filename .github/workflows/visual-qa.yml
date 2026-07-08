@@ -1,0 +1,108 @@
+# Standalone Visual + AI-vision QA (#749)
+#
+# The reader-facing regression net (Playwright browser sweep + Claude/Bedrock
+# semantic vision QA + the deterministic accuracy gate), runnable INDEPENDENTLY
+# of the deploy pipeline. Sweeps the LIVE site (https://averagejoematt.com), so
+# it needs no build/deploy context — only read access + Bedrock.
+#
+# Why this exists (issue #749, the "masked gate" class): in ci-cd.yml the
+# visual-qa job sits behind lint → test-critical → plan → deploy, so any
+# unrelated red upstream — or simply "no deployable change in this push" —
+# meant the reader-facing net never fired (offline most of the time across two
+# audits). This workflow makes it fire:
+#   • on demand (workflow_dispatch — e.g. after a manual site/site-api deploy,
+#     or while main is red and the pipeline copy is skipped), and
+#   • daily on a schedule, so drift on the live site (stale data renders, chart
+#     regressions from generated/ content, upstream data shape changes) is
+#     caught even on days with no push at all.
+#
+# The pipeline copy in ci-cd.yml (job `visual-qa`, needs: deploy) is unchanged
+# and still GATES the pipeline post-deploy; this standalone run gates nothing —
+# a failure reds this run and notifies SNS (the remediation agent also triages
+# failed runs). Steps mirror the pipeline job exactly (same pinned Playwright,
+# same OIDC role github-actions-deploy-role, same scripts) so a red here means
+# the same thing as a red there. The AI-vision layer self-skips (warning) when
+# bedrock:InvokeModel is absent or the budget guard is at tier 3.
+#
+# Cron: fixed UTC (repo convention — no DST drift). 20:07 UTC ≈ 12:07/13:07 PT,
+# after the 11 AM PT compute/email/OG-image cycle has refreshed the day's data,
+# and offset from the taken workflow slots (14:45, 15:17, 16:23 UTC).
+
+name: Visual QA (standalone)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 20 * * *'   # daily 20:07 UTC (fixed UTC — no DST drift)
+
+# Never two sweeps at once (screenshot artifacts + Bedrock spend); a pipeline
+# visual-qa run is a different workflow and may overlap harmlessly (read-only).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest
+
+permissions:
+  id-token: write   # OIDC token for AWS (Bedrock vision QA + SNS notify)
+  contents: read
+
+jobs:
+  visual-qa:
+    name: Visual + AI-vision QA (live site)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Playwright + Chromium
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.58.0
+          python -m playwright install --with-deps chromium
+
+      - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run visual + AI-vision QA sweep
+        run: |
+          python3 tests/visual_qa.py --screenshot --ai-qa
+
+      - name: Accuracy gate (per-page resolves + no impossible numbers)
+        if: always()
+        run: |
+          python3 tests/accuracy_audit.py --live
+
+      - name: Upload screenshots + report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visual-qa-standalone-screenshots
+          path: qa-screenshots/
+          retention-days: 14
+
+      - name: Notify failure (SNS digest)
+        if: failure()
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="STANDALONE VISUAL-QA FAILURE — the live-site reader-facing sweep found a regression (no deploy involved).
+          Trigger: ${{ github.event_name }}
+          Run: $RUN_URL
+
+          Screenshots + report are attached to the run as the visual-qa-standalone-screenshots artifact.
+          This run gates nothing and rolls back nothing — investigate and fix forward."
+          aws sns publish \
+            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
+            --subject "Life Platform standalone visual-QA FAILED" \
+            --message "$MESSAGE" \
+            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — the run failure is still visible in Actions"

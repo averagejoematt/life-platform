@@ -107,15 +107,26 @@ jobs:
           flake8 lambdas/ mcp/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Install black + ruff
+        # if: always() (here + on every gate below) — #749: the lint gates used to
+        # run strictly sequentially, so the FIRST red gate stopped the job and MASKED
+        # every gate after it (fix black → discover ruff was also red → fix → discover
+        # mypy → …, one push per layer). always() makes each gate run and report
+        # independently in ONE run, so all violations surface at once. Gating is
+        # unchanged: any red gate still fails the job (each step's own non-zero exit),
+        # which still skips test-critical → plan → deploy.
+        if: always()
         run: pip install black==25.9.0 ruff==0.14.0
 
       - name: Format gate (black — ENFORCED, config in pyproject.toml)
+        if: always()
         run: black --check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
       - name: Lint gate (ruff — ENFORCED; import-sort via ruff's isort rules)
+        if: always()
         run: ruff check lambdas/ mcp/ cdk/ tests/ scripts/ deploy/
 
       - name: Mypy gate (ENFORCED — clean-module set, ADR-080)
+        if: always()
         run: |
           pip install mypy==2.1.0
           echo "::group::Mypy on the clean-module set (tier-1 core + split AI modules + tier-2 web/)"
@@ -138,6 +149,7 @@ jobs:
 
       - name: Syntax check (py_compile)
         # Catches broken syntax that flake8 misses (e.g. invalid f-strings, truncated files)
+        if: always()
         run: |
           echo "::group::Syntax checking lambdas/ and mcp/"
           FAILED=0
@@ -163,6 +175,7 @@ jobs:
         # — Dependabot (.github/dependabot.yml) opens the fix PRs, so a sudden
         # unfixable transitive CVE never red-walls deploys. (Lambda runtime is
         # stdlib-only, so there is no lambdas/ requirements to scan.)
+        if: always()
         run: |
           pip install pip-audit 2>/dev/null
           FOUND=0
@@ -183,6 +196,7 @@ jobs:
         # lambdas/<domain>/), so this check silently passed and let unmapped
         # Lambdas slip through (the qa-smoke / lambda_map drift class). Now uses
         # a recursive find and FAILS the build — a Lambda source must be mapped.
+        if: always()
         run: |
           MISSING=0
           while IFS= read -r f; do
@@ -202,6 +216,7 @@ jobs:
         # Scans public-facing surfaces (site/, email lambdas, mcp/) for blocked terms
         # from seeds/content_filter.json — the same list the runtime filter enforces.
         # Catches personal-content leaks before they reach the public repo.
+        if: always()
         run: python3 scripts/content_policy_scan.py
 
       - name: Doc-drift gate (ENFORCED — #389)
@@ -210,6 +225,7 @@ jobs:
         # against what AST/regex discovery finds in the source right now. Writes
         # nothing; a mismatch means a fact changed (new tool, new Lambda, new ADR,
         # new test) and nobody reran `sync_doc_metadata.py --apply` before merging.
+        if: always()
         run: python3 deploy/sync_doc_metadata.py --check
 
   # ════════════════════════════════════════════════════════════════
@@ -949,6 +965,10 @@ jobs:
   # or when the budget guard is at tier 3 — so it cannot false-block. It was
   # not yet tuned under load; watch the first AI-active runs after a budget
   # reset and relax thresholds in tests/visual_ai_qa.py if it over-fires.
+  # #749: the SAME sweep is also runnable standalone — .github/workflows/
+  # visual-qa.yml (workflow_dispatch + daily 20:07 UTC) — so the reader-facing
+  # net fires even when this pipeline copy is skipped (red upstream job, or a
+  # push with nothing to deploy). Keep the two step lists in sync.
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA
@@ -1105,7 +1125,6 @@ jobs:
   # Job 6: Auto-rollback on smoke failure (TB7-25)
   # Fires when smoke-test fails AFTER a successful deploy.
   # Rolls back each deployed function to its previous S3 artifact.
-  # Note: Does NOT roll back shared layer rebuilds (manual step).
   # ════════════════════════════════════════════════════════════════
   rollback-on-smoke-failure:
     name: Auto-rollback (smoke failure)
@@ -1169,33 +1188,21 @@ jobs:
           fi
 
           echo "✅ All Lambdas rolled back. Investigate smoke test failure before re-deploying."
-          echo ""
-          echo "Note: If shared layer was also rebuilt, layer rollback is MANUAL."
-          echo "  Run: bash deploy/build_layer.sh (from previous commit) + attach"
 
       # #418/ADR-117: every rollback event must produce a notification (no silent
-      # revert), and the shared-layer rollback — which stays manual by design (a
-      # layer republish/attach is a CDK operation, too risky to auto-fire) — must
-      # be an EXPLICIT runbook line in that notification, not a buried log echo.
-      - name: Notify Lambda/MCP rollback (+ shared-layer runbook)
+      # revert). (#749/actionlint: the old shared-layer runbook branch here keyed on
+      # needs.plan.outputs.layer_changed — an output that no longer exists since the
+      # layer was retired (#781), so it could never fire. Removed as dead code; a
+      # fleet deploy rolls back per-function like any other code deploy.)
+      - name: Notify Lambda/MCP rollback
         if: always()
         run: |
           COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          LAYER_NOTE=""
-          if [ "${{ needs.plan.outputs.layer_changed }}" = "true" ]; then
-            LAYER_NOTE="
-          ⚠️  SHARED LAYER was rebuilt in this deploy — Lambda CODE was rolled back
-              but the layer was NOT. Roll the layer back MANUALLY:
-                1. git checkout <previous-good-sha>
-                2. bash deploy/build_layer.sh
-                3. cd cdk && npx cdk deploy --all   (republish + re-attach to consumers)
-                4. verify: aws lambda list-layer-versions --layer-name life-platform-shared-utils"
-          fi
           MESSAGE="AUTO-ROLLBACK (smoke failure) — Lambda/MCP code reverted to previous S3 artifact.
           Commit: $SHORT (${{ github.ref_name }})
           Run: $RUN_URL
-          Rollback job result: ${{ job.status }}$LAYER_NOTE
+          Rollback job result: ${{ job.status }}
 
           Investigate the smoke-test failure before re-deploying."
           aws sns publish \
@@ -1300,22 +1307,13 @@ jobs:
           SHORT_COMMIT="${COMMIT:0:7}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # #418/ADR-117: if this deploy rebuilt the shared layer, surface the
-          # manual layer-rollback runbook here (the layer has no auto-rollback net).
-          LAYER_NOTE=""
-          if [ "${{ needs.plan.outputs.layer_changed }}" = "true" ] && [ "${{ needs.deploy.result }}" = "success" ]; then
-            LAYER_NOTE="
-
-          ⚠️  SHARED LAYER was rebuilt this deploy and has NO auto-rollback. If the
-              failure is layer-related, roll it back manually:
-                git checkout <previous-good-sha> && bash deploy/build_layer.sh
-                cd cdk && npx cdk deploy --all"
-          fi
-
+          # (#749/actionlint: the old shared-layer runbook branch keyed on
+          # needs.plan.outputs.layer_changed — removed with the layer (#781);
+          # it compared an undefined output and could never fire.)
           MESSAGE="CI/CD FAILURE
           Commit: $SHORT_COMMIT (${{ github.ref_name }})
           Run: $RUN_URL
-          Triggered by: ${{ github.actor }}$LAYER_NOTE
+          Triggered by: ${{ github.actor }}
 
           Check GitHub Actions for details."
 
