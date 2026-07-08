@@ -540,6 +540,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/863"
         }
       ]
+    },
+    {
+      "id": "2026-07-08-daily-debrief-and-serve-split",
+      "date": "2026-07-08",
+      "title": "The platform gets a daily voice — and the site's API gets its own house",
+      "shipped": "Four of the hardest open issues closed in one autonomous session. The headline: a daily two-minute audio debrief is live — every evening a grounded script is written from the day's measured numbers (with a fail-closed fallback that cannot fabricate a figure), synthesized to audio, and published to a podcast RSS feed for about ten cents a month. The weekly panel show stopped pretending to be weekly: it now fires only when a chronicle actually publishes, and the alarm that had been red since late June — complaining about silence that was really just honesty — was retired. Under the hood, the public API was moved into its own infrastructure stack via CloudFormation's new refactor tooling with zero downtime, and the honesty harness that guarded one AI surface now guards all six, with seeded faults proving each gate actually fires.",
+      "gotcha": "Deploying the moved API stack meant preserving two URLs that CloudFront points at — delete and recreate the function and the subdomain silently changes, severing the site. CloudFormation's stack-refactor path preserved them, but only after three undocumented hurdles: log-retention helpers can't cross stacks, the destination stack must exist first as an empty shell, and the deploy role was missing one obscure read permission — the first attempt rolled back cleanly mid-flight while the site kept serving.",
+      "honest_miss": "The fourth issue closed with a 'no': batch inference pricing promised ~50% off the AI bill, but AWS requires 100 records per batch job per model and this platform's entire scheduled fleet makes ~62 calls a day across all models combined — real saving today: zero. The seam ships dormant with a live trip-wire that flips the verdict if volume ever clears the floor. Also humbling: the first CI run in days to exercise the post-deploy gates found two latent bugs in the gates themselves — an IAM grant that had never actually worked, and a version check that a too-shallow git clone made structurally unpassable.",
+      "prs": [
+        {
+          "label": "PR #866",
+          "url": "https://github.com/averagejoematt/life-platform/pull/866"
+        },
+        {
+          "label": "PR #867",
+          "url": "https://github.com/averagejoematt/life-platform/pull/867"
+        },
+        {
+          "label": "PR #868",
+          "url": "https://github.com/averagejoematt/life-platform/pull/868"
+        },
+        {
+          "label": "PR #869",
+          "url": "https://github.com/averagejoematt/life-platform/pull/869"
+        }
+      ]
     }
   ]
 }
