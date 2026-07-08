@@ -12,7 +12,7 @@ import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { instrumentMark } from "/assets/js/sigils.js";
-import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
+import { portrait, wireSpeakingAudio } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 semantic states
 import { icon } from "/assets/js/icons.js";
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 
@@ -157,6 +157,21 @@ async function renderRead(s, id) {
     const byline = (ent.guest_id && ent.guest_name)
       ? `Elena + <a href="/coaching/coaches/#${esc(ent.guest_id)}">${esc(ent.guest_name)}</a>`
       : esc(ent.byline || "Elena + a coach");
+    // #594 "speaking" — the two hosts CREDITED on this one episode, never every
+    // portrait on the page. wireSpeakingAudio() below ties their mouth-cycle +
+    // pulse to this <audio>'s own play/pause/ended (they're both marked as
+    // "speaking" for the whole clip — the synthesized audio has no per-speaker
+    // timestamps to attribute individual turns to, see renderTranscript above).
+    const elenaHost = portrait({ persona_id: "elena_voss", name: "Elena Voss" }, { size: 32 }) || "";
+    const guestHost = (ent.guest_id && ent.guest_name)
+      ? (portrait({ coach_id: ent.guest_id, name: ent.guest_name }, { size: 32 }) || "")
+      : "";
+    const hostsHTML = (elenaHost || guestHost)
+      ? `<div class="panel-hosts" aria-hidden="true">` +
+        (elenaHost ? `<span class="panel-host">${elenaHost}</span>` : "") +
+        (guestHost ? `<span class="panel-host">${guestHost}</span>` : "") +
+        `</div>`
+      : "";
     // The Panel ledger — the running scoreboard of coach bets + outcomes (proof-of-honesty).
     const lg = await tryJSON("/api/panel_ledger");
     let ledgerHTML = "";
@@ -193,11 +208,16 @@ async function renderRead(s, id) {
       `<p class="dx-kicker label">the podcast · weekly review · two AI voices</p>` +
       `<h2 class="dx-title">${esc(ent.title)}</h2>` +
       (ent.date ? `<p class="dx-stats label">${esc(ent.date)}</p>` : "") +
-      `<div class="dx-listen"><audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
+      `<div class="dx-listen">${hostsHTML}<audio controls preload="none" src="${esc(ent.url)}"></audio><span class="label">listen · ${byline} (~${mins} min)</span></div>` +
       (ent.excerpt ? `<p class="dx-prose">${esc(ent.excerpt)}</p>` : "") +
       chronLink +
       ledgerHTML +
       (ent.transcript_url ? `<section class="dx-transcript" data-transcript hidden></section>` : "");
+    // #594 — wire the credited hosts' "speaking" state to THIS episode's own
+    // <audio> element (scoped to this reader, not a page-wide listener).
+    const _panelAudio = read.querySelector(".dx-listen audio");
+    const _panelHosts = Array.from(read.querySelectorAll(".panel-host .portrait"));
+    if (_panelAudio && _panelHosts.length) wireSpeakingAudio(_panelAudio, _panelHosts);
     // Transcript + in-page chapters (the host's questions). No audio timestamps
     // exist (single-pass synthesis), so chapters jump within the read, not the audio.
     if (ent.transcript_url) renderTranscript(ent.transcript_url, read.querySelector("[data-transcript]"));
@@ -384,8 +404,10 @@ async function renderRead(s, id) {
     : "";
   // Elena's byline mark (#587): her commissioned portrait beside the chronicle kicker —
   // portrait-or-nothing here (no sigil existed in this spot before; degrades to plain text).
+  // #594: "writing" — a slow ambient shimmer for as long as this IS her authored piece;
+  // no head movement, pure CSS (tokens.css), no JS wiring needed for this one.
   const elenaMark = s.key === "chronicle"
-    ? (portrait({ persona_id: "elena_voss", name: "Elena Voss" }, { size: 26 }) || "")
+    ? (portrait({ persona_id: "elena_voss", name: "Elena Voss" }, { size: 26, state: "writing" }) || "")
     : "";
   read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +

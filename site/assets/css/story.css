@@ -481,6 +481,11 @@ body { overflow-x: hidden; }
 /* Chronicle audio (the AI-voiced podcast) */
 .dx-listen { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-3) 0; flex-wrap: wrap; }
 .dx-listen audio { height: 36px; max-width: 100%; }
+/* #594 — the two hosts credited on a Panel episode, decorative only (the byline
+   text beside them already carries the names for a11y/screen readers). */
+.panel-hosts { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
+.panel-host { display: inline-flex; inline-size: 32px; block-size: 32px; }
+.panel-host .portrait { inline-size: 100%; block-size: 100%; }
 
 /* ── The Coaches (CC-01/02) — per-coach page in the reader pane ───────────── */
 .dx-disclosure { display: block; margin-top: var(--sp-2); color: var(--ink-faint); font-style: italic; max-width: var(--measure); }

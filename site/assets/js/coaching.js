@@ -21,7 +21,7 @@
 import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
-import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
+import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 stance-change sweep
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
 
@@ -424,6 +424,12 @@ async function renderByCoach(read, id) {
   h += disclose("who this coach is · their voice", coachCharacterHTML(coach.character));
   read.innerHTML = h;
   enhanceCoachNames(read);
+  // #594 "stance-change" — a ONE-TIME sweep when this coach's stance_history has
+  // grown since our last recorded visit (id is the stable route/API key already
+  // used for /api/coach/${id} above, not the display name). No-op when this
+  // coach has no commissioned portrait (sigil-only fallback, nothing to sweep).
+  const _bcPortrait = read.querySelector(".coach-head .portrait");
+  if (_bcPortrait) markStanceChange(_bcPortrait, id, coach.stance_history);
 }
 
 // ── THE TEAM — roster / personalities / config (demoted reference) ──
