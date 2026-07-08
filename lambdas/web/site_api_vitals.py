@@ -379,6 +379,15 @@ def handle_character(date: str | None = None) -> dict:
                 # because the day carried no signal.
                 "data_coverage": (float(pd["data_coverage"]) if pd.get("data_coverage") is not None else None),
                 "coverage_hold": bool(pd.get("coverage_hold", False)),
+                # #747: engine-computed, deterministic (ADR-105) — True only when
+                # every weighted component had zero data today. Distinct from
+                # coverage_hold (a real pillar having a thin day): this means the
+                # pillar has no data source feeding it at all. Front end renders
+                # a labeled "not yet instrumented" state instead of the bare
+                # neutral raw_score; clears itself the day a component gets a
+                # real value, no front-end change required.
+                "not_instrumented": bool(pd.get("not_instrumented", False)),
+                "not_instrumented_note": pd.get("not_instrumented_note"),
                 "absent_behaviors": [str(b) for b in (pd.get("absent_behaviors") or [])],
                 "drivers": {
                     "top": [str(x) for x in (_drivers.get("top") or [])],
@@ -395,11 +404,25 @@ def handle_character(date: str | None = None) -> dict:
 
     # DPR-1.16 + Day-Grade Replay: deltas vs the PRIOR computed day (record-over-record,
     # robust to compute lag/gaps), not calendar yesterday.
-    composite = sum(p["raw_score"] for p in pillars) / max(len(pillars), 1)
+    # #747: a not-yet-instrumented pillar's placeholder neutral score must not quietly
+    # drag the whole-life composite toward 50 — exclude it, same as an absent reading.
+    _composite_scores = [p["raw_score"] for p in pillars if not p.get("not_instrumented")]
+    composite = (
+        sum(_composite_scores) / len(_composite_scores)
+        if _composite_scores
+        else sum(p["raw_score"] for p in pillars) / max(len(pillars), 1)
+    )
     composite_delta_1d = None
     if prior_record:
         _yd_scores = [float(prior_record.get(f"pillar_{p}", {}).get("raw_score", 0)) for p in PILLAR_ORDER]
-        _yd_composite = sum(_yd_scores) / max(len(_yd_scores), 1)
+        _yd_composite_scores = [
+            float(prior_record.get(f"pillar_{p}", {}).get("raw_score", 0))
+            for p in PILLAR_ORDER
+            if not prior_record.get(f"pillar_{p}", {}).get("not_instrumented")
+        ]
+        _yd_composite = (
+            sum(_yd_composite_scores) / len(_yd_composite_scores) if _yd_composite_scores else sum(_yd_scores) / max(len(_yd_scores), 1)
+        )
         composite_delta_1d = round(composite - _yd_composite, 1)
         # per-pillar day-over-day score move (aligned by PILLAR_ORDER)
         for _pp, _yd_s in zip(pillars, _yd_scores):
