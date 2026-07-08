@@ -411,7 +411,7 @@ def _sweep_stale_drafts(hours: float, max_days: float = 10.0, dry_run: bool = Fa
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     """Approve/request-changes (Function-URL GET) — or a scheduled auto-publish sweep."""
     logger.info("chronicle-approve: invoked")
     # SS-01 — scheduled sweep (EventBridge sends {"sweep": true} or source=aws.events).

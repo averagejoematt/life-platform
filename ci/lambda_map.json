@@ -1,5 +1,5 @@
 {
-  "_comment": "Lambda source file \u2192 AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
+  "_comment": "Lambda source file → AWS function name mapping for CI/CD. Used by .github/workflows/ci-cd.yml",
   "_updated": "2026-03-28 v4.3.1",
   "acwr_compute": {
     "lambdas/acwr_compute_lambda.py": {
@@ -21,7 +21,7 @@
     "lambdas/circadian_compliance_lambda.py": {
       "function": "circadian-compliance",
       "handler": "circadian_compliance_lambda.lambda_handler",
-      "note": "BS-SL2: Circadian Compliance Score \u2014 pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge.",
+      "note": "BS-SL2: Circadian Compliance Score — pre-sleep behavioral score (0-100). Runs 7:00 PM PT daily. Writes to circadian partition. Surfaces in Evening Nudge.",
       "stack": "LifePlatformCompute"
     }
   },
@@ -29,17 +29,17 @@
     "lambdas/email_subscriber_lambda.py": {
       "function": "email-subscriber",
       "handler": "email_subscriber_lambda.lambda_handler",
-      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL \u2014 wired to API Gateway /api/subscribe.",
+      "note": "BS-03: subscribe/confirm/unsubscribe. DDB subscribers partition. SES double opt-in. No Function URL — wired to API Gateway /api/subscribe.",
       "stack": "LifePlatformOperational"
     }
   },
   "lambda_edge": {
-    "_comment": "Lambda@Edge functions \u2014 deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
+    "_comment": "Lambda@Edge functions — deployed in us-east-1, manually managed outside CDK. NOT auto-deployed via CI/CD pipeline. Metrics aggregated to us-east-1 per AWS requirement.",
     "functions": {
       "lambdas/cf-auth/index.mjs": {
         "cloudfront_distribution": "EM5NPX6NJN095",
         "function": "life-platform-cf-auth",
-        "note": "Manually deployed \u2014 NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
+        "note": "Manually deployed — NOT CDK-managed. Lambda@Edge requires us-east-1 and cannot be deployed from us-west-2 CDK stacks. Secret: life-platform/cf-auth (must exist in us-east-1). Alarm: life-platform-cf-auth-errors (us-east-1 CloudWatch).",
         "protects": "dash.averagejoematt.com",
         "region": "us-east-1"
       },
@@ -363,11 +363,14 @@
     },
     "lambdas/web/subscriber_onboarding_lambda.py": {
       "function": "subscriber-onboarding"
+    },
+    "lambdas/emails/daily_debrief_lambda.py": {
+      "function": "daily-debrief"
     }
   },
   "lambdas/emails/chronicle_podcast_lambda.py": "chronicle-podcast",
   "mcp": {
-    "_comment": "MCP server is special \u2014 requires full mcp/ package; lives at project root not lambdas/",
+    "_comment": "MCP server is special — requires full mcp/ package; lives at project root not lambdas/",
     "function": "life-platform-mcp",
     "package_dir": "mcp/",
     "source": "mcp_server.py",
@@ -416,7 +419,7 @@
     ]
   },
   "_retired_sleep_reconciler": {
-    "_comment": "sleep-reconciler RETIRED 2026-07-05 (#487 / ADR-113). Dead per-field merge (read fields that never existed) + 1\u20132 nights stale, zero compute consumers. Lambda + EventBridge rule + IAM role + /api/sleep_reconciliation removed. LifePlatformCompute needs a deploy to drop the live function."
+    "_comment": "sleep-reconciler RETIRED 2026-07-05 (#487 / ADR-113). Dead per-field merge (read fields that never existed) + 1–2 nights stale, zero compute consumers. Lambda + EventBridge rule + IAM role + /api/sleep_reconciliation removed. LifePlatformCompute needs a deploy to drop the live function."
   },
   "_retired_hevy_webhook": {
     "_comment": "hevy-webhook FunctionURL RETIRED 2026-07-06 (#756 / ADR-103 retire-candidate, R21 kill list #8). Hevy publishes no webhooks so the standing public FunctionURL served nothing. Lambda + FunctionURL + error alarm + IAM policy (ingestion_hevy_webhook) removed from cdk/stacks/ingestion_stack.py + role_policies.py. lambdas/ingestion/hevy_webhook_lambda.py is kept in git (moved to skip_deploy above) for revival if Hevy ever ships webhooks. LifePlatformIngestion needs a deploy to drop the live function + FunctionURL."

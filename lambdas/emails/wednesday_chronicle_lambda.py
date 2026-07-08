@@ -2718,7 +2718,7 @@ def _run_margaret_edit_pass(raw_installment, week_num, date_str, elena_prompt, a
         return raw_installment
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     logger.info("Wednesday Chronicle v1.1.0 (Board Centralization) — The Measured Life — starting...")
 
     # Phase 3 bootstrap/regenerate: {"recap_only": true} builds + commits the

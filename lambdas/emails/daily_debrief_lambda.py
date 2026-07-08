@@ -384,7 +384,7 @@ def _publish(date_str: str, narrative: str, excerpt: str) -> dict:
     return {"statusCode": 200, "body": json.dumps({"date": date_str, "published": True, "bytes": len(audio)})}
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     event = event or {}
     force = bool(event.get("force"))
     dry_run = bool(event.get("dry_run"))

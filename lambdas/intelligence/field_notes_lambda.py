@@ -446,7 +446,7 @@ def generate_field_notes(iso_week):
     return {"status": "ok", "week": iso_week, "chars": len(item.get("ai_present", ""))}
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict, context) -> dict:
     manual_week = event.get("manual_week")
     if manual_week:
         iso_week = manual_week

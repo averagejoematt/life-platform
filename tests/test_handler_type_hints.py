@@ -25,7 +25,11 @@ LAMBDAS_DIR = os.path.join(ROOT, "lambdas")
 # Baseline at Phase 4.12 audit (2026-05-16): 71 untyped handlers existed.
 # Phase 4.12 commit typed 4 (alert_digest, pipeline_health_check, canary,
 # plus implicit examples) — leaving 67. Update this baseline as more get typed.
-BASELINE_UNTYPED = 67
+# 2026-07-08 (#734 session): tolerance had silently absorbed 2 new untyped
+# handlers before daily-debrief tipped the gate; typed the 4 session-touched
+# handlers (daily_debrief, chronicle_approve, wednesday_chronicle, field_notes)
+# and ratcheted 67 → 66.
+BASELINE_UNTYPED = 66
 TOLERANCE = 2
 
 UNTYPED_PATTERN = re.compile(r"^def lambda_handler\(event,\s*context\):", re.MULTILINE)
