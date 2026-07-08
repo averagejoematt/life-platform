@@ -126,7 +126,7 @@ def test_args_hash_non_json_types_via_str():
 def test_record_mutation_key_and_body():
     fake_s3 = MagicMock()
     with patch.object(audit, "_S3_CLIENT", fake_s3):
-        audit.record_mutation("log_decision", {"name": "creatine"}, "success", duration_ms=123.456)
+        audit.record_mutation("log_decision", {"decision": "rest day advised"}, "success", duration_ms=123.456)
     assert fake_s3.put_object.call_count == 1
     kwargs = fake_s3.put_object.call_args.kwargs
     assert kwargs["Bucket"] == os.environ["S3_BUCKET"]
@@ -134,7 +134,7 @@ def test_record_mutation_key_and_body():
     body = json.loads(kwargs["Body"])
     assert body["tool"] == "log_decision"
     assert body["status"] == "success"
-    assert body["args_sha256"] == audit.args_hash({"name": "creatine"})
+    assert body["args_sha256"] == audit.args_hash({"decision": "rest day advised"})
     assert body["duration_ms"] == 123.5
     assert "timestamp" in body
     # raw args must NOT appear in the record
@@ -162,7 +162,7 @@ def test_dispatch_survives_audit_blowup_and_returns_tool_result():
         patch.dict(TOOLS["log_decision"], {"fn": fake_fn}),
         patch.object(audit, "record_mutation", side_effect=RuntimeError("audit exploded")),
     ):
-        result = h.handle_tools_call({"name": "log_decision", "arguments": {"name": "creatine", "dose": 5}})
+        result = h.handle_tools_call({"name": "log_decision", "arguments": {"decision": "rest day advised", "action": "followed"}})
     assert fake_fn.call_count == 1
     payload = json.loads(result["content"][0]["text"])
     assert payload == {"ok": True, "logged": "yes"}
@@ -175,11 +175,11 @@ def test_dispatch_audits_write_tool_success():
         patch.dict(TOOLS["log_decision"], {"fn": fake_fn}),
         patch.object(audit, "record_mutation") as rec,
     ):
-        h.handle_tools_call({"name": "log_decision", "arguments": {"name": "creatine"}})
+        h.handle_tools_call({"name": "log_decision", "arguments": {"decision": "rest day advised"}})
     assert rec.call_count == 1
     args = rec.call_args.args
     assert args[0] == "log_decision"
-    assert args[1] == {"name": "creatine"}
+    assert args[1] == {"decision": "rest day advised"}
     assert args[2] == "success"
 
 
@@ -190,7 +190,7 @@ def test_dispatch_audits_write_tool_error_status():
         patch.dict(TOOLS["log_decision"], {"fn": fake_fn}),
         patch.object(audit, "record_mutation") as rec,
     ):
-        result = h.handle_tools_call({"name": "log_decision", "arguments": {"name": "creatine"}})
+        result = h.handle_tools_call({"name": "log_decision", "arguments": {"decision": "rest day advised"}})
     assert rec.call_count == 1
     assert rec.call_args.args[2] == "error"
     # the structured error response still comes back (R31 contract intact)
