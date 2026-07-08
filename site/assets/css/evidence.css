@@ -163,6 +163,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-flagmark { color: var(--ember); font-weight: var(--weight-med); }
 .rd-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, transparent); }
 
+/* #735 /verify/ — raw-payload sample block (identifiers stripped) */
+.rd-code { margin-top: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-xs); background: var(--surface-sunken);
+  font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); line-height: var(--lh-relaxed); overflow-x: auto;
+  white-space: pre; }
+
 /* Protocol / experiment cards */
 .rd-cards { display: grid; gap: var(--bento-gap); margin-top: var(--sp-3); }
 @media (min-width: 720px) { .rd-cards { grid-template-columns: 1fr 1fr; } }
