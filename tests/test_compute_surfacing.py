@@ -21,21 +21,11 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import (
     site_api_common as common,  # noqa: E402
     site_api_data as data,  # noqa: E402
 )
-
-
-class _FakeTable:
-    """Returns a fixed item list for query(); _latest_item asks for newest-1."""
-
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **_kw):
-        return {"Items": self._items}
-
 
 # ── circadian ────────────────────────────────────────────────────────────────
 
@@ -55,7 +45,7 @@ def test_circadian_populated_shape(monkeypatch):
         },
         "run_id": "abc123",
     }
-    monkeypatch.setattr(common, "table", _FakeTable([item]))
+    monkeypatch.setattr(common, "table", FakeDdbTable(rows=[item]))
 
     resp = data.handle_circadian()
     assert resp["statusCode"] == 200
@@ -74,7 +64,7 @@ def test_circadian_populated_shape(monkeypatch):
 
 
 def test_circadian_no_data(monkeypatch):
-    monkeypatch.setattr(common, "table", _FakeTable([]))
+    monkeypatch.setattr(common, "table", FakeDdbTable(rows=[]))
     resp = data.handle_circadian()
     assert resp["statusCode"] == 200
     body = __import__("json").loads(resp["body"])
@@ -160,7 +150,7 @@ def test_forecast_populated_shape(monkeypatch):
         "run_id": "r1",
         "phase": "experiment",
     }
-    monkeypatch.setattr(data, "table", _FakeTable([item]))
+    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[item]))
 
     resp = data.handle_forecast()
     assert resp["statusCode"] == 200
@@ -178,7 +168,7 @@ def test_forecast_populated_shape(monkeypatch):
 
 
 def test_forecast_empty(monkeypatch):
-    monkeypatch.setattr(data, "table", _FakeTable([]))
+    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[]))
     resp = data.handle_forecast()
     body = __import__("json").loads(resp["body"])
     assert body["available"] is False

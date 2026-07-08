@@ -19,20 +19,20 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 import eval_retention as er  # noqa: E402
 import pytest  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 
-class _Table:
-    def __init__(self, fail=False):
-        self.items = []
-        self.fail = fail
+def _Table(fail=False):
+    """put_item feeds straight back into `.rows` (query()'s default source),
+    matching the original accumulate-and-reread-it-all shape; `fail` simulates
+    a DDB outage on write."""
 
-    def put_item(self, Item):
-        if self.fail:
+    def _put_hook(table, item, **_kw):
+        if fail:
             raise RuntimeError("simulated DDB outage")
-        self.items.append(Item)
+        table.rows.append(item)
 
-    def query(self, **kw):
-        return {"Items": list(self.items)}
+    return FakeDdbTable(put_item_hook=_put_hook)
 
 
 @pytest.fixture
@@ -79,7 +79,7 @@ def test_build_record_caps_text():
 # ── fail-soft: retain never raises ───────────────────────────────────────────
 def test_retain_writes(table):
     assert er.retain("memoir", "flagged_dropped", draft="d", findings=[{"type": "memoir_gate", "detail": "empty"}]) is True
-    assert len(table.items) == 1
+    assert len(table.rows) == 1
 
 
 def test_retain_is_fail_soft_on_ddb_error(monkeypatch):
@@ -89,7 +89,7 @@ def test_retain_is_fail_soft_on_ddb_error(monkeypatch):
 
 def test_retain_is_fail_soft_on_bad_surface(table):
     assert er.retain("nope", "flagged") is False
-    assert table.items == []
+    assert table.rows == []
 
 
 # ── fetch round-trip (what the harvest consumes) ─────────────────────────────
@@ -105,8 +105,8 @@ def test_fetch_round_trip(table):
 def test_fetch_skips_stale_and_unparseable(table):
     er.retain("chronicle", "flagged_kept_best", draft="recent")
     old = er.build_record("chronicle", "flagged_kept_best", draft="ancient", now=datetime(2020, 1, 1, tzinfo=timezone.utc))
-    table.items.append(old)
-    table.items.append({"pk": "EVALRET#chronicle", "sk": "TS#corrupt", "created_at": "not-a-date", "payload_json": "{"})
+    table.rows.append(old)
+    table.rows.append({"pk": "EVALRET#chronicle", "sk": "TS#corrupt", "created_at": "not-a-date", "payload_json": "{"})
     got = er.fetch("chronicle", since_days=35)
     assert [g["draft"] for g in got] == ["recent"]
 

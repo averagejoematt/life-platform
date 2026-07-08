@@ -21,21 +21,10 @@ os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
 os.environ.setdefault("EMAIL_SENDER", "test@example.com")
 
 from emails import evening_nudge_lambda as nudge  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 from ritual_link import verify_ritual_token  # noqa: E402
 
 SECRET = "test-nudge-ritual-secret"
-
-
-class _FakeTable:
-    def __init__(self, items=None):
-        self._items = items or {}
-
-    def get_item(self, Key):
-        item = self._items.get((Key["pk"], Key["sk"]))
-        return {"Item": item} if item else {}
-
-    def query(self, **_kw):
-        return {"Items": []}
 
 
 def _set_ritual_record(monkeypatch, connection=None, mood_valence=None):
@@ -45,7 +34,9 @@ def _set_ritual_record(monkeypatch, connection=None, mood_valence=None):
     if mood_valence is not None:
         rec["mood_valence"] = mood_valence
     today = nudge.pacific_today()
-    ft = _FakeTable({(nudge.USER_PREFIX + "evening_ritual", "DATE#" + today): rec} if rec else {})
+    store_items = [{"pk": nudge.USER_PREFIX + "evening_ritual", "sk": "DATE#" + today, **rec}] if rec else []
+    # query() always answers empty here — only get_item (keyed by pk/sk) is used.
+    ft = FakeDdbTable(rows=[], store_items=store_items)
     monkeypatch.setattr(nudge, "table", ft)
     return today
 

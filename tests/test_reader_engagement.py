@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_social as social  # noqa: E402
 
 
@@ -27,31 +28,29 @@ def _event(body=None, qs=None):
     }
 
 
-class _FakeTable:
+def _FakeTable():
     """DynamoDB Table double: put_item honors attribute_not_exists, update_item ADDs,
-    query returns rows whose sk begins with the requested prefix."""
+    query returns every VOTES#predict_week row (the handler filters by choice)."""
 
-    def __init__(self):
-        self.items = {}  # (pk, sk) -> item
-
-    def put_item(self, Item=None, ConditionExpression=None, **_kw):
-        key = (Item["pk"], Item["sk"])
-        if ConditionExpression and "attribute_not_exists" in str(ConditionExpression) and key in self.items:
+    def _put_hook(table, item, ConditionExpression=None, **_kw):
+        key = table._key_of(item)
+        if ConditionExpression and "attribute_not_exists" in str(ConditionExpression) and key in table.store:
             raise Exception("ConditionalCheckFailedException: exists")
-        self.items[key] = dict(Item)
+        table.store[key] = dict(item)
 
-    def update_item(self, Key=None, UpdateExpression=None, ExpressionAttributeValues=None, **_kw):
-        key = (Key["pk"], Key["sk"])
-        it = self.items.setdefault(key, {"pk": Key["pk"], "sk": Key["sk"], "vote_count": 0})
+    def _update_hook(table, Key=None, ExpressionAttributeValues=None, **_kw):
+        key = table._key_of(Key)
+        it = table.store.setdefault(key, {"pk": Key["pk"], "sk": Key["sk"], "vote_count": 0})
         it["vote_count"] = int(it.get("vote_count", 0)) + int(ExpressionAttributeValues.get(":one", 1))
         for token, field in ((":w", "week_id"), (":m", "metric"), (":c", "choice")):
             if token in ExpressionAttributeValues:
                 it[field] = ExpressionAttributeValues[token]
         return {"Attributes": it}
 
-    def query(self, KeyConditionExpression=None, **_kw):
-        # crude: return every VOTES#predict_week row (handler filters by choice)
-        return {"Items": [v for (pk, sk), v in self.items.items() if pk == "VOTES#predict_week"]}
+    def _query_hook(table, **_kw):
+        return {"Items": [v for (pk, sk), v in table.store.items() if pk == "VOTES#predict_week"]}
+
+    return FakeDdbTable(put_item_hook=_put_hook, update_item_hook=_update_hook, query_hook=_query_hook)
 
 
 _SUBJECT = {"week_id": "2026-W26", "metrics": {"weight": "scale weight", "recovery": "avg recovery"}, "result": None}
@@ -75,7 +74,7 @@ def test_predict_week_happy_path_increments_and_dedupes(monkeypatch):
     body = json.loads(r["body"])
     assert body["tallies"]["down"] == 1
     # the dedup row keys on a hashed IP, never the raw address
-    rate_rows = [sk for (pk, sk) in social.table.items if pk == "VOTES#rate_limit"]
+    rate_rows = [sk for (pk, sk) in social.table.store if pk == "VOTES#rate_limit"]
     assert rate_rows and "203.0.113.7" not in rate_rows[0]
     # a second identical prediction is rejected
     assert social._handle_predict_week(ev)["statusCode"] == 429

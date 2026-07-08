@@ -22,26 +22,17 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas"))  # canonical_facts / coherenc
 
 import field_notes_lambda as fnl  # noqa: E402
 import pytest  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 _FACTS_RECORD = {"date": "2026-07-01", "recovery_pct": 55, "hrv_ms": 38.7, "rhr_bpm": 64, "latest_weight": 301.0}
 
 
-class _Table:
+def _Table(facts_record=_FACTS_RECORD):
     """Double for the two table touches these paths make: the computed_metrics
-    query (grounding) and the existing-note get_item / put_item (generate)."""
-
-    def __init__(self, facts_record=_FACTS_RECORD):
-        self._facts = facts_record
-        self.put_items = []
-
-    def query(self, **_kw):
-        return {"Items": [dict(self._facts)]} if self._facts else {"Items": []}
-
-    def get_item(self, **_kw):
-        return {}
-
-    def put_item(self, Item=None, **_kw):
-        self.put_items.append(Item)
+    query (grounding) and the existing-note get_item / put_item (generate).
+    `seed_store=False` keeps the facts row query()-only — get_item (existing
+    note lookup) stays unconditionally empty, as the original stub was."""
+    return FakeDdbTable(rows=[dict(facts_record)] if facts_record else [], seed_store=False)
 
 
 @pytest.fixture()
@@ -71,7 +62,7 @@ def test_contradiction_triggers_one_kept_rewrite(wired, monkeypatch):
     fnl.generate_field_notes("2026-W27")
     assert len(calls) == 2
     assert "CORRECTION REQUIRED" in calls[1]
-    assert wired.put_items and "64 bpm" in wired.put_items[0]["ai_present"]
+    assert wired.puts and "64 bpm" in wired.puts[0]["ai_present"]
 
 
 def test_worse_rewrite_keeps_original(wired, monkeypatch):
@@ -85,7 +76,7 @@ def test_worse_rewrite_keeps_original(wired, monkeypatch):
     fnl.generate_field_notes("2026-W27")
     assert len(calls) == 2
     # not improved (1 → 1) — the original ships, never a regression loop
-    assert "53 bpm" in wired.put_items[0]["ai_present"]
+    assert "53 bpm" in wired.puts[0]["ai_present"]
 
 
 def test_grounded_note_generates_once(wired, monkeypatch):

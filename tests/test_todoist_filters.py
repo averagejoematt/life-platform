@@ -25,6 +25,7 @@ os.environ.setdefault("DYNAMODB_TABLE", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 
 import todoist_lambda as tl  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 # ── 1 & 2: ingestion endpoint + pagination ─────────────────────────────────────
 
@@ -121,19 +122,11 @@ def test_mcp_list_all_tasks_routes_filter_to_filter_endpoint(monkeypatch):
 import daily_insight_compute_lambda as di  # noqa: E402
 
 
-class _FakeTable:
-    def __init__(self, todoist_item):
-        self._item = todoist_item
-
-    def query(self, **kwargs):
-        return {"Items": [self._item]}
-
-
 def _run_fatigue(monkeypatch, *, active, overdue, due_today, habit_pct):
     monkeypatch.setattr(
         di,
         "table",
-        _FakeTable({"active_count": active, "overdue_count": overdue, "due_today_count": due_today}),
+        FakeDdbTable(rows=[{"active_count": active, "overdue_count": overdue, "due_today_count": due_today}]),
     )
     # 7 days of habit records at a fixed T0 completion rate.
     habit_7d = [{"tier0_pct": habit_pct} for _ in range(7)]

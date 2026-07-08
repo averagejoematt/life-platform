@@ -17,6 +17,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import (
     site_api_common as common,  # noqa: E402
     site_api_data as data,  # noqa: E402
@@ -47,14 +48,6 @@ def test_blocked_vices_filtered_from_habit_names():
 # ── habits sourced from Habitify ─────────────────────────────────────────────
 
 
-class _FakeTable:
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **_kw):
-        return {"Items": self._items}
-
-
 def test_habits_from_habitify_filters_and_groups(monkeypatch):
     _set_filter()
     item = {
@@ -67,7 +60,7 @@ def test_habits_from_habitify_filters_and_groups(monkeypatch):
             "No porn": {"group": "Discipline", "periodicity": "daily"},
         },
     }
-    monkeypatch.setattr(data, "table", _FakeTable([item]))
+    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[item]))
     habits = data._habits_from_habitify()
     names = {h["name"] for h in habits}
     assert names == {"Morning sunlight", "Creatine 5g"}, "blocked vices must not appear"
@@ -77,7 +70,7 @@ def test_habits_from_habitify_filters_and_groups(monkeypatch):
 
 
 def test_habits_from_habitify_empty_when_no_record(monkeypatch):
-    monkeypatch.setattr(data, "table", _FakeTable([]))
+    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[]))
     assert data._habits_from_habitify() == []
 
 

@@ -33,6 +33,7 @@ os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("AWS_REGION", "us-west-2")
 
 from ai_context import UNTRUSTED_CLOSE, UNTRUSTED_OPEN, UNTRUSTED_PREAMBLE, wrap_untrusted_reader_text  # noqa: E402
+from fakes import FakeDdbTable, json_safe_put_hook, make_session_update_hook  # noqa: E402
 
 
 def _ai():
@@ -80,35 +81,16 @@ def test_wrapper_handles_none_and_non_str():
 # ── Offline harness (pattern: test_board_followup_sessions.py) ─────────────
 
 
-class _FakeTable:
-    def __init__(self, query_items=None):
-        self.store = {}
-        self.query_items = query_items or []
-
-    @staticmethod
-    def _k(key):
-        return (key["pk"], key["sk"])
-
-    def put_item(self, Item):
-        self.store[self._k(Item)] = json.loads(json.dumps(Item, default=str))
-
-    def get_item(self, Key):
-        item = self.store.get(self._k(Key))
-        return {"Item": item} if item is not None else {}
-
-    def update_item(self, Key, UpdateExpression, ExpressionAttributeValues, ConditionExpression=None, ExpressionAttributeNames=None):
-        item = self.store.get(self._k(Key))
-        if item is None:
-            raise Exception("ConditionalCheckFailedException")
-        item["followup_count"] = float(item.get("followup_count", 0)) + 1
-        pid = (ExpressionAttributeNames or {}).get("#pid")
-        if pid:
-            item.setdefault("threads", {}).setdefault(pid, [])
-            item["threads"][pid].extend(ExpressionAttributeValues[":turn"])
-        return {}
-
-    def query(self, **kwargs):
-        return {"Items": self.query_items}
+def _FakeTable(query_items=None):
+    """Same shape as tests/test_board_followup_sessions.py's fake, except this
+    caller doesn't enforce the follow-up cap/IP binding, and query() serves
+    canned `query_items` (stored-record replay) instead of always-empty."""
+    return FakeDdbTable(
+        rows=query_items or [],
+        seed_store=False,  # query_items are synthetic query results, not get_item-able rows
+        put_item_hook=json_safe_put_hook,
+        update_item_hook=make_session_update_hook(enforce_cap=False),
+    )
 
 
 def _wire(ai, monkeypatch, table, bedrock_text="Steady progress. Keep the routine consistent."):

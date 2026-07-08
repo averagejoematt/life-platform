@@ -34,6 +34,7 @@ import character_engine as ce  # noqa: E402
 import daily_metrics_compute_lambda as dmc  # noqa: E402
 import hypothesis_engine_lambda as hyp  # noqa: E402
 import weight_trend  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 # #581: evidence.js split into a router + per-family evidence_*.js modules — concatenate
 # the whole graph so a moved renderer (e.g. renderPhysical/renderResults) still gets found.
@@ -84,14 +85,8 @@ def test_onset_consistency_ignores_workout_subrecords(monkeypatch):
         {"sk": "DATE#2026-07-01", "sleep_onset_minutes": 1390},
     ]
 
-    captured = {}
-
-    class _T:
-        def query(self, **kwargs):
-            captured.update(kwargs)
-            return {"Items": items}
-
-    monkeypatch.setattr(wl, "_table", _T())
+    table = FakeDdbTable(rows=items)
+    monkeypatch.setattr(wl, "_table", table)
     result = wl._compute_sleep_consistency("2026-07-04", 1385)
     # 4 nights (current + 3 stored), workouts skipped → a real StdDev, not None
     assert result is not None
@@ -99,6 +94,7 @@ def test_onset_consistency_ignores_workout_subrecords(monkeypatch):
 
     assert result == round(statistics.stdev([1385, 1380, 1400, 1390]), 1)
     # The key range is the actual 7-day window (between, not open-ended lt)
+    captured = table.query_calls[-1]
     assert "sk" in str(captured.get("ProjectionExpression", ""))
 
 
@@ -113,11 +109,7 @@ def test_onset_consistency_excludes_own_date_record(monkeypatch):
         {"sk": "DATE#2026-07-02", "sleep_onset_minutes": 1400},
     ]
 
-    class _T:
-        def query(self, **kwargs):
-            return {"Items": items}
-
-    monkeypatch.setattr(wl, "_table", _T())
+    monkeypatch.setattr(wl, "_table", FakeDdbTable(rows=items))
     import statistics
 
     assert wl._compute_sleep_consistency("2026-07-04", 1385) == round(statistics.stdev([1385, 1380, 1400]), 1)

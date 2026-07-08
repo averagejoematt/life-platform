@@ -380,16 +380,12 @@ def test_reconcile_does_not_flag_deduped_gps_drop_twin():
 from types import SimpleNamespace  # noqa: E402
 
 import ingestion_framework as framework  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 
-class _FakeTable:
+def _FakeTable(present_dates):
     """Minimal DDB stand-in: query() returns a fixed set of present dates."""
-
-    def __init__(self, present_dates):
-        self._present = present_dates
-
-    def query(self, **_kwargs):
-        return {"Items": [{"sk": f"DATE#{d}"} for d in self._present]}
+    return FakeDdbTable(rows=[{"sk": f"DATE#{d}"} for d in present_dates])
 
 
 class _NullLogger:

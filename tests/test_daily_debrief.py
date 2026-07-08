@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.join(_REPO, "lambdas", "emails"))
 import bedrock_client  # noqa: E402
 import budget_guard  # noqa: E402
 import daily_debrief_lambda as dd  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Fakes
@@ -48,20 +49,15 @@ class _FakeBedrock:
         return {"content": [{"type": "text", "text": self._text}]}
 
 
-class _FakeTable:
+def _FakeTable(items=None, latest_date="2026-07-07"):
     """Serves computed_metrics + habit_scores get_item; latest-date query."""
+    items = items or {}
 
-    def __init__(self, items=None, latest_date="2026-07-07"):
-        self._items = items or {}
-        self._latest = latest_date
+    def _get_item_hook(_table, key, **_kw):
+        source = key["pk"].split("SOURCE#")[-1]
+        return {"Item": items.get(source)} if items.get(source) else {}
 
-    def get_item(self, Key):
-        pk = Key["pk"]
-        source = pk.split("SOURCE#")[-1]
-        return {"Item": self._items.get(source)} if self._items.get(source) else {}
-
-    def query(self, **kwargs):
-        return {"Items": [{"date": self._latest, "sk": f"DATE#{self._latest}"}]}
+    return FakeDdbTable(rows=[{"date": latest_date, "sk": f"DATE#{latest_date}"}], get_item_hook=_get_item_hook)
 
 
 class _FakeS3:

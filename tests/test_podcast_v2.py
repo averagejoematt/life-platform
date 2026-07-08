@@ -21,6 +21,7 @@ os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "FAKE")
 os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
 
 import podcast_script_v2 as psv2  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 
 class _Log:
@@ -30,15 +31,8 @@ class _Log:
 
 
 def _deps(invoke, dispute=""):
-    class _T:
-        def get_item(self, **kw):
-            return {}
-
-        def query(self, **kw):
-            return {"Items": []}
-
     return {
-        "table": _T(),
+        "table": FakeDdbTable(),
         "s3": None,
         "bucket": "b",
         "user_id": "matthew",

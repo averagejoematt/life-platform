@@ -19,15 +19,8 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
 from web import site_api_data as data  # noqa: E402
-
-
-class _FakeTable:
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **_kw):
-        return {"Items": self._items}
 
 
 def _today():
@@ -48,7 +41,7 @@ def _item(date_str, connection=None, mood_valence=None):
 
 
 def _body(monkeypatch, items):
-    monkeypatch.setattr(data, "table", _FakeTable(items))
+    monkeypatch.setattr(data, "table", FakeDdbTable(rows=items))
     r = data.handle_fulfillment_ritual()
     assert r["statusCode"] == 200
     return json.loads(r["body"])

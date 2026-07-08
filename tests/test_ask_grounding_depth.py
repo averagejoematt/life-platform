@@ -15,6 +15,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas"))
 
+from fakes import FakeDdbTable  # noqa: E402
+
 _AI_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lambdas/web/site_api_ai_lambda.py")
 AI_SRC = open(_AI_PATH).read()
 
@@ -122,12 +124,8 @@ def test_fetch_computed_reads_fail_soft(monkeypatch):
 
     monkeypatch.setattr(ai, "_latest_item", _boom)
 
-    class _T:
-        def get_item(self, **k):
-            raise RuntimeError("ddb down")
+    def _boom_hook(*a, **k):
+        raise RuntimeError("ddb down")
 
-        def query(self, **k):
-            raise RuntimeError("ddb down")
-
-    monkeypatch.setattr(ai, "table", _T())
+    monkeypatch.setattr(ai, "table", FakeDdbTable(query_hook=_boom_hook, get_item_hook=_boom_hook))
     assert ai._ask_fetch_computed_reads() == {}

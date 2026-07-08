@@ -23,27 +23,25 @@ sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 sys.path.insert(0, os.path.join(ROOT, "lambdas", "emails"))
 
 import freshness_checker_lambda as fc  # noqa: E402
+from fakes import FakeDdbTable  # noqa: E402
 
 NOW = datetime(2026, 6, 20, 17, 0, tzinfo=timezone.utc)
 
 
-class FakeTable:
-    """Returns canned DATE# items newest-first (matches ScanIndexForward=False)."""
-
-    def __init__(self, rows):
-        # rows: list of (date_str, steps_or_None, active_cal_or_None)
-        self._items = [
-            {
-                "sk": f"DATE#{d}",
-                **({"steps": s} if s is not None else {}),
-                **({"active_calories": a} if a is not None else {}),
-            }
-            for d, s, a in sorted(rows, key=lambda r: r[0], reverse=True)
-        ]
-
-    def query(self, **kwargs):
-        limit = kwargs.get("Limit", len(self._items))
-        return {"Items": self._items[:limit]}
+def FakeTable(rows):
+    """Builds a FakeDdbTable serving canned DATE# items newest-first (matches
+    ScanIndexForward=False); `rows` is a list of (date_str, steps_or_None,
+    active_cal_or_None) tuples. FakeDdbTable.query()'s Limit slicing covers
+    the rest."""
+    items = [
+        {
+            "sk": f"DATE#{d}",
+            **({"steps": s} if s is not None else {}),
+            **({"active_calories": a} if a is not None else {}),
+        }
+        for d, s, a in sorted(rows, key=lambda r: r[0], reverse=True)
+    ]
+    return FakeDdbTable(rows=items)
 
 
 def _healthy_rows():

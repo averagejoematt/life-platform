@@ -40,6 +40,7 @@ import coach_computation_engine as engine  # noqa: E402
 import coach_prediction_evaluator as ev  # noqa: E402
 import coach_state_updater as updater  # noqa: E402
 import measurable_metrics as mm  # noqa: E402
+from fakes import FakeDdbTable, raise_hook  # noqa: E402
 
 # ── Root cause 4a: metric → source mappings point at sources that HAVE the field ──
 
@@ -214,12 +215,8 @@ class TestEvaluateAllEndToEnd:
 # ── Root cause 4b: write-time data-liveness gate ─────────────────────────────────
 
 
-class _StubTable:
-    def __init__(self, items):
-        self._items = items
-
-    def query(self, **kwargs):
-        return {"Items": self._items}
+def _StubTable(items):
+    return FakeDdbTable(rows=items)
 
 
 class TestWriteTimeLivenessGate:
@@ -249,26 +246,16 @@ class TestWriteTimeLivenessGate:
         assert updater._metric_has_recent_data("not_a_metric", {}) is False
 
     def test_read_error_fails_open(self, monkeypatch):
-        class _Boom:
-            def query(self, **kwargs):
-                raise RuntimeError("throttled")
-
-        monkeypatch.setattr(updater, "table", _Boom())
+        monkeypatch.setattr(updater, "table", FakeDdbTable(query_hook=raise_hook))
         assert updater._metric_has_recent_data("hrv", {}) is True
 
     def test_result_is_cached_per_base_metric(self, monkeypatch):
-        calls = []
-
-        class _Counting(_StubTable):
-            def query(self, **kwargs):
-                calls.append(1)
-                return super().query(**kwargs)
-
-        monkeypatch.setattr(updater, "table", _Counting([{"hrv": 40 + i} for i in range(6)]))
+        table = FakeDdbTable(rows=[{"hrv": 40 + i} for i in range(6)])
+        monkeypatch.setattr(updater, "table", table)
         cache = {}
         assert updater._metric_has_recent_data("hrv", cache) is True
         assert updater._metric_has_recent_data("hrv", cache) is True
-        assert len(calls) == 1
+        assert len(table.query_calls) == 1
 
 
 # ── The extraction prompt's allowlist is derived, not a drifting copy ────────────
