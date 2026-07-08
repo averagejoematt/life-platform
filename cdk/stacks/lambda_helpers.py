@@ -248,13 +248,18 @@ def create_platform_lambda(
 
     # Budget guardrail: every CDK-owned-role Lambda can read the budget tier
     # (budget_guard.py) so the cost-governor's tier drives graceful AI
-    # degradation + the bedrock_client Tier-3 hard stop. Tiny read on one SSM
-    # param. Skipped for imported roles (from_role_arn can't be modified by CDK).
+    # degradation + the bedrock_client Tier-3 hard stop. Tiny read on two SSM
+    # params (#822 added budget-breakdown, the display-only projection detail
+    # behind the daily brief's headroom line — read via the same budget_guard
+    # module). Skipped for imported roles (from_role_arn can't be modified by CDK).
     if existing_role_arn is None:
         role.add_to_policy(
             iam.PolicyStatement(
                 actions=["ssm:GetParameter"],
-                resources=["arn:aws:ssm:*:*:parameter/life-platform/budget-tier"],
+                resources=[
+                    "arn:aws:ssm:*:*:parameter/life-platform/budget-tier",
+                    "arn:aws:ssm:*:*:parameter/life-platform/budget-breakdown",
+                ],
             )
         )
 

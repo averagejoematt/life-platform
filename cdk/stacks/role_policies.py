@@ -1577,7 +1577,12 @@ def operational_cost_governor() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="BudgetTierParam",
             actions=["ssm:GetParameter", "ssm:PutParameter"],
-            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                # #822: the projection breakdown persisted alongside the tier so
+                # the daily brief can render its budget-headroom line.
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-breakdown",
+            ],
         ),
         iam.PolicyStatement(
             sid="Alert",

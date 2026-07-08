@@ -1882,6 +1882,19 @@ def lambda_handler(event, context):
     except Exception as _vf_err:
         logger.warning("vacation fund compute failed (non-fatal): " + str(_vf_err))
 
+    # Budget-headroom readout (#822): one code-derived line from the cost
+    # governor's persisted projection breakdown (SSM /life-platform/budget-
+    # breakdown), so a dev-sprint burn that threatens the $75 ceiling is
+    # visible in the brief — not just as a tier flip after the fact.
+    # Fail-soft: missing/stale/malformed breakdown → the line is simply absent.
+    _budget_headroom_line = None
+    try:
+        import budget_guard
+
+        _budget_headroom_line = budget_guard.format_headroom_line(budget_guard.read_breakdown()) or None
+    except Exception as _bh_err:
+        logger.warning("budget headroom line failed (non-fatal): " + str(_bh_err))
+
     try:
         html = html_builder.build_html(
             data,
@@ -1916,6 +1929,7 @@ def lambda_handler(event, context):
             labs_coach_v2_text=labs_coach_v2_text,
             explorer_coach_v2_text=explorer_coach_v2_text,
             vacation_fund=_vacation_fund,
+            budget_headroom_line=_budget_headroom_line,
         )
     except Exception as e:
         logger.error("build_html crashed, sending minimal brief: " + str(e))
