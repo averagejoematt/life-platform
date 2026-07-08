@@ -45,3 +45,26 @@ GARTH_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYE
 PRIVACY_MODE = os.environ.get("PRIVACY_MODE", "false").lower() == "true"
 CF_AUTH_LAMBDA_VERSION = int(os.environ.get("CF_AUTH_LAMBDA_VERSION", "2"))
 CF_AUTH_VERSION_ARN = f"arn:aws:lambda:us-east-1:{ACCT}:function:life-platform-cf-auth:{CF_AUTH_LAMBDA_VERSION}"
+
+# ── #815 (R22-SEC-03): site-api origin-header guard secret ──
+# Wires the previously-inert SEC-04 control (lambdas/web/site_api_common.py /
+# site_api_lambda.py): when non-empty, site-api and site-api-ai 403 any request
+# missing/mismatching the "X-AMJ-Origin" header. CloudFront (web_stack.py,
+# us-east-1) must inject the header on the LambdaApiOrigin/AiLambdaOrigin origins
+# and serve_stack.py (us-west-2) must set the identical value as the Lambdas'
+# SITE_API_ORIGIN_SECRET env var — see stacks/secrets_helpers.py, which both
+# stacks call so the value can never drift between the two channels.
+#
+# Not security-critical (defense-in-depth on an intentionally-public read-only
+# API — CLAUDE.md "Site API is primarily read-only") — its value is expected to
+# be visible in the synthesized CloudFormation template / CloudFront console,
+# same posture as any other origin-verification header secret.
+#
+# Lives at this path in Secrets Manager (us-west-2 — co-located with every
+# other life-platform/ secret) as a PLAIN STRING secret (not JSON), regardless
+# of which stack/region resolves it: CloudFormation's
+# {{resolve:secretsmanager:...}} dynamic reference honors an explicit-region ARN,
+# same cross-region trick CF_AUTH_VERSION_ARN above uses. The partial ARN (no
+# random Secrets-Manager suffix) is intentional — Secret.from_secret_partial_arn
+# resolves it without needing the suffix known at synth time.
+SITE_API_ORIGIN_SECRET_ARN = f"arn:aws:secretsmanager:us-west-2:{ACCT}:secret:life-platform/site-api-origin-secret"

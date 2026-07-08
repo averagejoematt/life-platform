@@ -1,20 +1,31 @@
 #!/usr/bin/env python3
 """
-tests/test_function_url_origin_header_validation.py — SEC-04
+tests/test_function_url_origin_header_validation.py — SEC-04 / #815 (R22-SEC-03)
 
 Verifies that site_api_lambda enforces the X-AMJ-Origin header check when
 SITE_API_ORIGIN_SECRET is configured. CloudFront injects this header on every
-origin request (set as a custom origin header in the distribution config).
+origin request (set as a custom origin header in the distribution config —
+wired for both the LambdaApiOrigin and AiLambdaOrigin origins by #815).
 Requests that bypass CloudFront and hit the Function URL directly will lack
 the header and must be rejected 403.
+
+site_api_ai_lambda.py gained the identical guard in #815 (it previously had
+none — it now imports the same SITE_API_ORIGIN_SECRET from site_api_common).
+It is checked source-grep style (no import), matching the established
+convention for this file in test_ai_endpoint_hardening.py — a full behavioral
+harness would need to mock its much larger dependency surface (bedrock,
+privacy_guard, source_registry, phase_filter, rate limiter, ...) for no extra
+signal over asserting the guard's presence/ordering/comparison method.
 
 Run: python3 -m pytest tests/test_function_url_origin_header_validation.py -v
 
 v1.0.0 — 2026-03-21 (SEC-04)
+v1.1.0 — 2026-07-08 (#815): site-api-ai source-grep coverage + CDK wiring note.
 """
 
 import importlib
 import os
+import re
 import sys
 import types
 import unittest.mock as mock
@@ -144,6 +155,68 @@ class TestOriginHeaderValidationEnabled:
 
         body = json.loads(resp["body"])
         assert "error" in body or "message" in body or body  # any non-empty JSON
+
+
+# ── site-api-ai (#815) — source-grep style, matches test_ai_endpoint_hardening.py ──
+
+_HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_AI_SRC_PATH = os.path.join(_HERE, "lambdas", "web", "site_api_ai_lambda.py")
+with open(_AI_SRC_PATH, encoding="utf-8") as _f:
+    _AI_SRC = _f.read()
+
+
+def _ai_handler_body(name: str) -> str:
+    m = re.search(rf"\ndef {re.escape(name)}\(.*?\n(?=\ndef |\Z)", _AI_SRC, re.S)
+    assert m, f"handler {name} not found in site_api_ai_lambda.py"
+    return m.group(0)
+
+
+class TestOriginHeaderValidationSiteApiAi:
+    """#815: site_api_ai_lambda gained the same SEC-04 guard site_api_lambda had.
+
+    Before #815 it had none at all — CloudFront's AiLambdaOrigin header would
+    have been wired for nothing. These pin presence + ordering + the
+    constant-time comparison so the guard can't silently regress or get
+    reordered behind a routing branch that would leak a partial response.
+    """
+
+    def test_imports_shared_secret_constant(self):
+        """Must import the SAME SITE_API_ORIGIN_SECRET site_api_common defines —
+        not a second os.environ.get, which would risk drifting from site_api_lambda."""
+        m = re.search(r"from web\.site_api_common import \((.*?)\)", _AI_SRC, re.S)
+        assert m, "expected a from web.site_api_common import (...) block"
+        assert "SITE_API_ORIGIN_SECRET" in m.group(1)
+
+    def test_handler_checks_origin_header(self):
+        body = _ai_handler_body("lambda_handler")
+        assert "SITE_API_ORIGIN_SECRET" in body
+        assert "x-amj-origin" in body.lower()
+        assert "_hmac.compare_digest" in body, "must use constant-time comparison, not =="
+
+    def test_options_preflight_precedes_origin_check(self):
+        """CORS preflight must bypass the guard — CloudFront doesn't send the
+        custom origin header on its own OPTIONS passthrough."""
+        body = _ai_handler_body("lambda_handler")
+        options_at = body.find('method == "OPTIONS"')
+        origin_check_at = body.find("SITE_API_ORIGIN_SECRET")
+        assert options_at != -1 and origin_check_at != -1
+        assert options_at < origin_check_at, "OPTIONS bypass must precede the origin-header check"
+
+    def test_origin_check_precedes_routing(self):
+        """The guard must run before any endpoint dispatch (board_ask/ask/explain),
+        so a bypassing request never reaches AI inference or DDB rate-limit writes."""
+        body = _ai_handler_body("lambda_handler")
+        origin_check_at = body.find("SITE_API_ORIGIN_SECRET")
+        first_route_at = body.find('path == "/api/board_ask"')
+        assert origin_check_at != -1 and first_route_at != -1
+        assert origin_check_at < first_route_at, "origin-header check must precede route dispatch"
+
+    def test_rejects_with_403(self):
+        body = _ai_handler_body("lambda_handler")
+        # the guard's own if-block must return a 403, not merely reference the constant
+        m = re.search(r"if SITE_API_ORIGIN_SECRET:.*?return _error\((\d+),", body, re.S)
+        assert m, "origin-header guard must return via _error(...)"
+        assert m.group(1) == "403"
 
 
 if __name__ == "__main__":

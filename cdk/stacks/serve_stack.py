@@ -38,6 +38,7 @@ from aws_cdk import (
 
 from stacks import role_policies as rp
 from stacks.lambda_helpers import create_platform_lambda
+from stacks.secrets_helpers import site_api_origin_secret_value
 
 REGION = "us-west-2"
 ACCT = "205930651321"
@@ -59,6 +60,12 @@ class ServeStack(Stack):
         local_table = dynamodb.Table.from_table_name(self, "LifePlatformTable", LIFE_PLATFORM_TABLE)
         local_bucket = s3.Bucket.from_bucket_name(self, "LifePlatformBucket", LIFE_PLATFORM_BUCKET)
         local_digest_topic = sns.Topic.from_topic_arn(self, "DigestTopic", DIGEST_TOPIC_ARN)
+
+        # #815 (R22-SEC-03): one read, reused for both Lambdas below. web_stack.py
+        # calls the SAME helper (own construct instance, same underlying secret
+        # ARN) to set the matching CloudFront custom origin header — see
+        # stacks/secrets_helpers.py for why this can never drift between the two.
+        site_api_origin_secret = site_api_origin_secret_value(self)
 
         # ── Site API Lambda — life-platform-site-api (R17-09: moved from web_stack us-east-1)
         # Read-only. DynamoDB same-region (eliminates cross-region latency).
@@ -83,6 +90,7 @@ class ServeStack(Stack):
                 "S3_BUCKET": "matthew-life-platform",
                 "S3_REGION": "us-west-2",
                 "CORS_ORIGIN": "https://averagejoematt.com",
+                "SITE_API_ORIGIN_SECRET": site_api_origin_secret,  # #815 R22-SEC-03
             },
             # #794: CDK owns this function's definition (role, env, alarms); the
             # code asset is the shared staged full-tree bundle (build_bundle.py
@@ -129,6 +137,7 @@ class ServeStack(Stack):
                 "S3_BUCKET": "matthew-life-platform",
                 "S3_REGION": "us-west-2",
                 "CORS_ORIGIN": "https://averagejoematt.com",
+                "SITE_API_ORIGIN_SECRET": site_api_origin_secret,  # #815 R22-SEC-03
             },
             # #794: same staged full-tree bundle as site-api above — no layer (ADR-131).
         )

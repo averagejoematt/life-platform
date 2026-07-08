@@ -39,7 +39,10 @@ from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
 from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
-from web.site_api_common import _scrub_blocked_terms as _scrub_blocked_terms_base  # canonical shared helpers (#368)
+from web.site_api_common import (
+    SITE_API_ORIGIN_SECRET,  # #815 R22-SEC-03: shared with site_api_lambda's SEC-04 guard
+    _scrub_blocked_terms as _scrub_blocked_terms_base,  # canonical shared helpers (#368)
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -1033,6 +1036,14 @@ def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     # CORS preflight
     if method == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
+
+    # #815 R22-SEC-03: same SEC-04 origin-header guard as site_api_lambda — reject
+    # requests that didn't come through CloudFront (when the secret is configured).
+    if SITE_API_ORIGIN_SECRET:
+        req_headers = event.get("headers") or {}
+        incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
+        if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
+            return _error(403, "Forbidden")
 
     # ── POST /api/board_ask ────────────────────────────────
     if path == "/api/board_ask":
