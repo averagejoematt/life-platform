@@ -1089,3 +1089,86 @@ def _build_explorer_data(data):
         "active_experiments": data.get("active_experiments", 0),
         "experiment_names": data.get("experiment_names", []),
     }
+
+
+# ── Grounding receipts (#743) ──────────────────────────────────────────────
+# board_ask answers are genuinely grounded — every persona turn is built from
+# a live-probed generation brief (site_api_ai_lambda._ask_fetch_context, the
+# same `ctx` that _board_facts_block renders into the CURRENT DATA prompt
+# block) — but the reader never saw the receipt. This turns that brief into a
+# terse, PURE, code-derived summary for a reader-facing footer.
+#
+# Hard AC: every value here is read directly off `ctx` — the exact dict handed
+# to the prompt builder — never off the model's response text. This function
+# never calls the model, never touches grounded_generation's gate, and is not
+# in the ADR-104 enforcement path at all: it runs whether or not the answer
+# passed the gate, because it describes what the coach was GIVEN to read, not
+# what the coach SAID. Tolerant of a partial/empty ctx (any missing probe is
+# simply skipped) so a thin data day degrades to a shorter receipt, never an
+# error.
+#
+# Priority order below is fixed so the terse cap (default 6) keeps the probes
+# most readers recognize first; anything past the cap is simply omitted, not
+# reordered.
+def board_grounding_receipts(ctx, limit=6):
+    """Terse, code-derived "what the coach read" receipts for a board_ask footer.
+
+    `ctx` is the generation-brief dict from _ask_fetch_context (board_ask's
+    CURRENT DATA source) — same object, not a re-derived copy. Returns a list
+    of ``{"label": str, "value": str}`` in a fixed priority order, capped at
+    `limit`. Returns `[]` for an empty/None ctx — never raises.
+    """
+    if not isinstance(ctx, dict) or not ctx:
+        return []
+    reads = ctx.get("reads") or {}
+    if not isinstance(reads, dict):
+        reads = {}
+    receipts = []
+
+    recovery = ctx.get("recovery_pct")
+    if isinstance(recovery, (int, float)):
+        receipts.append({"label": "recovery", "value": f"{recovery:.0f}%"})
+
+    protein = reads.get("protein") or {}
+    if isinstance(protein, dict) and isinstance(protein.get("avg_7d_g"), (int, float)):
+        receipts.append({"label": "protein", "value": f"7d avg {protein['avg_7d_g']:.0f}g"})
+
+    sleep_hours = ctx.get("sleep_hours")
+    if isinstance(sleep_hours, (int, float)):
+        receipts.append({"label": "sleep", "value": f"{sleep_hours:.1f}h last night"})
+
+    hrv = ctx.get("hrv_ms")
+    if isinstance(hrv, (int, float)):
+        receipts.append({"label": "HRV", "value": f"{hrv:.0f}ms"})
+
+    weekly_rate = reads.get("weekly_rate_lbs")
+    if isinstance(weekly_rate, (int, float)):
+        receipts.append({"label": "weight trend", "value": f"{weekly_rate:+.1f} lb/wk"})
+
+    presence = reads.get("presence") or {}
+    if isinstance(presence, dict) and presence.get("class") not in (None, "", "present"):
+        gap = presence.get("gap_days")
+        gap_str = f" {gap:.0f}d" if isinstance(gap, (int, float)) else ""
+        receipts.append({"label": "presence", "value": f"quiet{gap_str}"})
+
+    tier0_streak = ctx.get("tier0_streak")
+    if isinstance(tier0_streak, (int, float)) and tier0_streak > 0:
+        receipts.append({"label": "habit streak", "value": f"{tier0_streak:.0f}d"})
+
+    level = ctx.get("character_level")
+    if isinstance(level, (int, float)):
+        tier = ctx.get("character_tier") or "Foundation"
+        receipts.append({"label": "level", "value": f"{level:.0f} ({tier})"})
+
+    return receipts[:limit]
+
+
+def board_grounding_footer(ctx, limit=6):
+    """Render `board_grounding_receipts` as the reader-facing footer string,
+    e.g. "grounded in: recovery 48% · protein 7d avg 132g · presence quiet 9d".
+    "" when there's nothing to show (an empty/partial brief) — the caller
+    should omit the footer entirely rather than render an empty prefix."""
+    receipts = board_grounding_receipts(ctx, limit=limit)
+    if not receipts:
+        return ""
+    return "grounded in: " + " · ".join(f"{r['label']} {r['value']}" for r in receipts)

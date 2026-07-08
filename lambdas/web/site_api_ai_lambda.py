@@ -33,7 +33,10 @@ from decimal import Decimal
 
 import boto3
 import privacy_guard  # deterministic real-name + vice scrub (layer module)
-from ai_context import wrap_untrusted_reader_text  # R22-SEC-04 (#811): delimit untrusted reader text
+from ai_context import (
+    board_grounding_receipts,
+    wrap_untrusted_reader_text,
+)  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts
 from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
@@ -773,10 +776,17 @@ def _coach_system(pid: str) -> str:
     ).replace("{name}", c["name"])
 
 
-def _board_facts_block() -> str:
+def _board_facts_block(ctx: dict = None) -> str:
     """The shared CURRENT DATA block — the same sanitized aggregates /api/ask
-    grounds on, formatted once per request and injected into every persona turn."""
-    ctx = _ask_fetch_context()
+    grounds on, formatted once per request and injected into every persona turn.
+
+    #743: accepts a pre-fetched `ctx` (the exact generation brief) so a caller
+    that also needs `board_grounding_receipts(ctx)` for the reader-facing
+    footer shares ONE fetch instead of two — the receipt must describe the
+    SAME brief the prompt was built from, not a second, possibly-different read.
+    """
+    if ctx is None:
+        ctx = _ask_fetch_context()
     lines = []
     if ctx.get("weight_lbs") is not None:
         lines.append(f"weight: {ctx['weight_lbs']:.1f} lb")
@@ -1493,7 +1503,11 @@ def _handle_board_ask(event: dict) -> dict:
     # entry — they don't share preamble (voice/focus differ too much).
     # One facts fetch per request; per-coach stance rides in the user turn so
     # the persona system block stays byte-stable for the prompt cache.
-    facts = _board_facts_block()
+    _brief_ctx = _ask_fetch_context()
+    facts = _board_facts_block(_brief_ctx)
+    # #743: the reader-facing grounding receipt — code-derived straight off the
+    # SAME brief every persona turn was built from, never off the model's text.
+    grounding = board_grounding_receipts(_brief_ctx)
     responses = {}
     threads: dict = {}  # #546: opening transcript per coach that actually answered
     for pid in personas:
@@ -1608,7 +1622,9 @@ def _handle_board_ask(event: dict) -> dict:
 
     # #546: mint a short-lived session so the reader can follow up with any coach
     # that answered. Fail-soft — a session-write hiccup never blocks the answers.
-    resp_body = {"responses": responses}
+    # #743: grounding receipts ride alongside every answer in this round — same
+    # brief for all personas in one request, so one array covers the whole set.
+    resp_body = {"responses": responses, "grounding": grounding}
     session_token = _create_board_session(ip_hash, threads)
     if session_token:
         resp_body["session_token"] = session_token
@@ -1686,7 +1702,11 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
         return {"statusCode": 503, "headers": CORS_HEADERS, "body": json.dumps({"error": "AI service unavailable"})}
 
     # Fresh grounding context (the facts may have moved since the thread opened).
-    facts = _board_facts_block()
+    _brief_ctx = _ask_fetch_context()
+    facts = _board_facts_block(_brief_ctx)
+    # #743: the receipt for THIS turn — a follow-up re-fetches, so it can differ
+    # from the opening turn's receipt (the data may have moved since then).
+    grounding = board_grounding_receipts(_brief_ctx)
     stance = _coach_stance_bits(persona)
     memory = _coach_memory_bits(persona)
     context_block = (
@@ -1800,5 +1820,13 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "no-store"},
-        "body": json.dumps({"persona": persona, "response": _txt, "session_token": token, "followups_remaining": remaining}),
+        "body": json.dumps(
+            {
+                "persona": persona,
+                "response": _txt,
+                "session_token": token,
+                "followups_remaining": remaining,
+                "grounding": grounding,  # #743
+            }
+        ),
     }
