@@ -854,6 +854,30 @@ def _coach_recent_interactions(pid: str, limit: int = 2) -> str:
         return ""
 
 
+def board_grounding_findings(system_text: str, message_text: str, answer_text: str, prior_answers: str = "") -> list:
+    """ADR-104 board gate core — the exact allowed-set + findings composition BOTH
+    board endpoints apply (initial ask and per-turn follow-up): every number the
+    coach states must exist in its system context, the reader messages, or (for
+    follow-ups) its own prior answers. Extracted so the #812 golden-surface eval
+    harness replays fixtures through the ACTUAL gate path, not a re-implementation.
+    Returns grounded_generation findings ([] = grounded)."""
+    import grounded_generation as _gg
+
+    allowed = _gg.allowed_numbers(system_text, message_text, prior_answers or None)
+    return _gg.grounding_findings(answer_text, allowed=allowed)
+
+
+def _retain_board_flag(pid: str, verdict: str, draft: str, final: str, findings: list, extra: dict = None) -> None:
+    """#812/#744: persist a fired board gate (draft + findings + disposition) as
+    eval data for the harvest loop. Fail-soft — never affects the reader path."""
+    try:
+        import eval_retention
+
+        eval_retention.retain("board_ask", verdict, draft=draft, final=final, findings=findings, extra={"persona": pid, **(extra or {})})
+    except Exception:  # noqa: BLE001 — retention is never load-bearing
+        pass
+
+
 def _write_board_interaction(pid: str, question: str, answer: str, grounded: bool) -> None:
     """#531: episodic write-back — a public board answer enters the coach's OWN
     memory (PK=COACH#{pid}, SK=INTERACTION#{date}#{qhash}) so the weekly
@@ -1522,9 +1546,9 @@ def _handle_board_ask(event: dict) -> dict:
             try:
                 import grounded_generation as _gg
 
-                _allowed = _gg.allowed_numbers(_sys_txt, user_msg)
-                _gf = _gg.grounding_findings(_txt, allowed=_allowed)
+                _gf = board_grounding_findings(_sys_txt, user_msg, _txt)
                 if _gf:
+                    _draft = _txt  # #812/#744: keep the flagged draft for retention
                     logger.warning(f"[board_ask] {pid} ungrounded: {[f['detail'] for f in _gf][:3]}")
                     _grounded = False
                     _refusal = (
@@ -1544,7 +1568,7 @@ def _handle_board_ask(event: dict) -> dict:
                         _retry = _bedrock_invoke(_corr_body)
                         _emit_token_metrics(_retry.get("usage", {}), endpoint="api_board_ask")
                         _txt2 = _scrub_blocked_terms("".join(b["text"] for b in _retry.get("content", []) if b.get("type") == "text"))
-                        if _txt2.strip() and not _gg.grounding_findings(_txt2, allowed=_allowed):
+                        if _txt2.strip() and not board_grounding_findings(_sys_txt, user_msg, _txt2):
                             _txt = _txt2
                             _grounded = True
                             logger.info(f"[board_ask] {pid} corrected once — grounded on retry")
@@ -1553,6 +1577,7 @@ def _handle_board_ask(event: dict) -> dict:
                     except Exception as _rt_e:
                         logger.warning(f"[board_ask] {pid} correction retry failed: {_rt_e}")
                         _txt = _refusal
+                    _retain_board_flag(pid, "flagged_corrected" if _grounded else "flagged_refused", _draft, _txt, _gf)
             except ImportError:
                 pass  # helper not bundled — serve as before
             except Exception as _gg_e:
@@ -1716,9 +1741,9 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
         import grounded_generation as _gg
 
         _msg_text = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
-        _allowed = _gg.allowed_numbers(_sys_txt, _msg_text, prior_answers)
-        _gf = _gg.grounding_findings(_txt, allowed=_allowed)
+        _gf = board_grounding_findings(_sys_txt, _msg_text, _txt, prior_answers=prior_answers)
         if _gf:
+            _draft = _txt  # #812/#744: keep the flagged draft for retention
             logger.warning(f"[board_ask] follow-up {persona} ungrounded: {[f['detail'] for f in _gf][:3]}")
             _grounded = False
             _refusal = (
@@ -1738,7 +1763,7 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
                 )
                 _emit_token_metrics(_retry.get("usage", {}), endpoint="api_board_ask")
                 _txt2 = _scrub_blocked_terms("".join(b["text"] for b in _retry.get("content", []) if b.get("type") == "text"))
-                if _txt2.strip() and not _gg.grounding_findings(_txt2, allowed=_allowed):
+                if _txt2.strip() and not board_grounding_findings(_sys_txt, _msg_text, _txt2, prior_answers=prior_answers):
                     _txt = _txt2
                     _grounded = True
                     logger.info(f"[board_ask] follow-up {persona} corrected once — grounded on retry")
@@ -1747,6 +1772,9 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
             except Exception as _rt_e:
                 logger.warning(f"[board_ask] follow-up {persona} correction retry failed: {_rt_e}")
                 _txt = _refusal
+            _retain_board_flag(
+                persona, "flagged_corrected" if _grounded else "flagged_refused", _draft, _txt, _gf, extra={"endpoint": "board_followup"}
+            )
     except ImportError:
         pass  # helper not bundled — serve as before
     except Exception as _gg_e:

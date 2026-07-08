@@ -282,6 +282,7 @@ def _generate_memoir(persona, voice_rules, example, facts, quarter):
     if ok:
         return text, []
 
+    _draft = text  # #812/#744: keep the flagged draft for retention
     logger.info("[coach_memoir] gate failed (%s) — retrying stricter", reasons)
     stricter = (
         "STRICT REWRITE REQUIRED — your previous draft failed a fact-check: "
@@ -296,6 +297,21 @@ def _generate_memoir(persona, voice_rules, example, facts, quarter):
         return None, reasons
 
     ok, reasons2 = gate_check(text, facts)
+    try:  # #812/#744: a fired memoir gate is labeled eval data — retain the pair (fail-soft)
+        import eval_retention
+
+        eval_retention.retain(
+            "memoir",
+            "flagged_corrected" if ok else "flagged_dropped",
+            draft=_draft,
+            final=text if ok else "",
+            findings=[{"type": "memoir_gate", "detail": r} for r in reasons],
+            allowed=grounded_generation.allowed_numbers(facts),
+            facts={k: v for k, v in facts.items() if k != "learnings_raw"},
+            extra={"persona": persona.get("id") or persona.get("name"), "quarter": quarter},
+        )
+    except Exception:  # noqa: BLE001 — retention is never load-bearing
+        pass
     return (text, []) if ok else (None, reasons2)
 
 

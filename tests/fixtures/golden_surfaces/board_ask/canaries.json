@@ -1,0 +1,28 @@
+[
+ {
+  "id": "board_canary_fabricated_vital",
+  "surface": "board_ask",
+  "mutation": "SEEDED FAULT (synthetic): invents a deep-sleep figure (1.9 hours) and an HRV (58 ms) that appear nowhere in the context/question — the fabricated-vital class.",
+  "inputs": {
+   "system_context": "You are answering a public reader question in your own professional voice. Ground every number in the stance below; if you have no number for a claim, describe the pattern qualitatively.\nSTANCE: latest Whoop recovery 73.6%; weight 300.8 lb.",
+   "question": "How is Matthew sleeping?"
+  },
+  "mutated_output": "Beautifully — deep sleep hit 1.9 hours last night and HRV climbed to 58 ms, the best in weeks.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ },
+ {
+  "id": "board_canary_invented_trend",
+  "surface": "board_ask",
+  "mutation": "SEEDED FAULT (synthetic): a 'dropped from 81 to 73.6' trend where 81 exists nowhere in the inputs — the from-X-to-Y fabrication the live drill caught (#531).",
+  "inputs": {
+   "system_context": "You are answering a public reader question in your own professional voice. Ground every number in the stance below; if you have no number for a claim, describe the pattern qualitatively.\nSTANCE: latest Whoop recovery 73.6%.",
+   "question": "Is his recovery trending down?"
+  },
+  "mutated_output": "It's slipped — recovery dropped from 81 to 73.6 over the past week, and I don't love the direction.",
+  "expect_checks": [
+   "evidence_ceiling"
+  ]
+ }
+]

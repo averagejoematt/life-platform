@@ -1,13 +1,14 @@
 # `infra/iam/` — the OIDC automation identities, codified (#401 / ADR-120)
 
-This directory is the **reviewable, git-revertible source of truth** for the three
+This directory is the **reviewable, git-revertible source of truth** for the
 hand-managed AWS identities that gate all automated access to the cloud:
 
 | Identity | What it gates | Assumed by |
 | --- | --- | --- |
 | `github-actions-deploy-role` | ALL CI/CD deploys (lambda, layer, CDK, site, smoke, visual-QA, rollback, notify) | every job in `.github/workflows/ci-cd.yml` |
 | `github-actions-remediation-role` | the self-healing agent's read-only diagnosis + Bedrock + scoped audit-log writes | `.github/workflows/remediation-agent.yml` |
-| `token.actions.githubusercontent.com` OIDC provider | the GitHub → AWS identity federation both roles trust | AWS STS `AssumeRoleWithWebIdentity` |
+| `github-actions-golden-eval-role` | the eval harness's advisory Haiku judge + `LifePlatform/GoldenBrief` metric emit + read-only `EVALRET#*` harvest reads (#812) | `.github/workflows/golden-brief-eval.yml`, `.github/workflows/eval-harvest.yml` |
+| `token.actions.githubusercontent.com` OIDC provider | the GitHub → AWS identity federation the roles trust | AWS STS `AssumeRoleWithWebIdentity` |
 
 Before #401 these existed **only** as live IAM config — no source of truth, no review
 trail, and trusted from `repo:averagejoematt/life-platform:*` (assumable from ANY branch
@@ -23,6 +24,16 @@ future trust change into a reviewable PR with `git revert` as the rollback.
 - `github-actions-deploy-role.permissions.json` — deploy role inline policy `life-platform-cicd-permissions`
 - `github-actions-remediation-role.trust.json` — remediation role assume-role (trust) policy
 - `github-actions-remediation-role.permissions.json` — remediation role inline policy `remediation-permissions`
+
+### Staged, NOT yet applied — the golden-eval role (#812)
+- `github-actions-golden-eval-role.trust.json` — trust policy (main-only subject from day one; no
+  repo-wide grant to tighten later)
+- `github-actions-golden-eval-role.permissions.json` — inline policy `golden-eval-permissions`
+  (least-privilege: `bedrock:InvokeModel` on the Haiku profile only, `cloudwatch:PutMetricData`
+  namespace-conditioned to `LifePlatform/GoldenBrief`, `dynamodb:Query` LeadingKeys-scoped to
+  `EVALRET#*`). Until applied, `verify_oidc_iam.py` reports it as `MISSING` (expected) and the
+  two workflows that use it degrade gracefully (judge step is `continue-on-error`; the harvest
+  run fails visibly). **Apply runbook below.**
 
 ### Proposed, NOT yet applied (the staged tighten — see the runbook below)
 - `proposed/github-actions-deploy-role.trust.main-only.json`
@@ -122,3 +133,26 @@ default branch (main), with no environment, so its tightened subject is just:
 - **Wire these identities into the weekly drift sentinel (S-E6-01).** `deploy/verify_oidc_iam.py`
   is the drift detector; add a `--strict` call to it as a step in `deploy/drift_sentinel.py`
   (or the remediation workflow) so out-of-band trust changes are caught weekly.
+
+---
+
+## Runbook — creating the golden-eval role (#812, staged)
+
+One-time, attended (matthew-admin). Creates a NEW role — nothing existing changes, so the
+blast radius of a mistake is zero (the two consuming workflows are advisory/harvest only).
+
+```bash
+aws iam create-role --role-name github-actions-golden-eval-role \
+  --assume-role-policy-document file://infra/iam/github-actions-golden-eval-role.trust.json \
+  --description "Least-privilege eval-harness role: weekly Haiku voice judge + GoldenBrief metrics + EVALRET# harvest reads (#812)"
+
+aws iam put-role-policy --role-name github-actions-golden-eval-role \
+  --policy-name golden-eval-permissions \
+  --policy-document file://infra/iam/github-actions-golden-eval-role.permissions.json
+
+python3 deploy/verify_oidc_iam.py   # expect CLEAN (the MISSING finding disappears)
+```
+
+Validate by dispatching `.github/workflows/golden-brief-eval.yml` with `run_judge: true` and
+watching the judge step emit `LifePlatform/GoldenBrief` metrics, then dispatching
+`.github/workflows/eval-harvest.yml` and confirming the candidate artifact uploads.

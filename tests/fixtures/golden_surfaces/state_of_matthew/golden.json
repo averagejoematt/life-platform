@@ -1,0 +1,220 @@
+[
+ {
+  "id": "som_real_2026_07_05",
+  "surface": "state_of_matthew",
+  "provenance": "REAL recorded pair: DDB pk=USER#matthew#SOURCE#state_of_matthew sk=DATE#2026-07-05 — the record's own state sections + the narrative Haiku wrote and the live gate passed on 2026-07-05.",
+  "inputs": {
+   "state": {
+    "as_of": "2026-07-05",
+    "forecast": {
+     "coverage": null,
+     "model": "ewma-v1",
+     "expectations": [
+      {
+       "hi": 99.8,
+       "unit": "%",
+       "lo": 47.5,
+       "metric": "recovery_pct",
+       "horizon_days": 1.0,
+       "point": 73.6,
+       "frame": "tomorrow"
+      },
+      {
+       "hi": 100.0,
+       "unit": "%",
+       "lo": 41.2,
+       "metric": "recovery_pct",
+       "horizon_days": 7.0,
+       "point": 73.6,
+       "frame": "in 7 days"
+      },
+      {
+       "hi": 8.9,
+       "unit": "h",
+       "lo": 6.2,
+       "metric": "sleep_hours",
+       "horizon_days": 1.0,
+       "point": 7.6,
+       "frame": "tonight"
+      },
+      {
+       "hi": 8.9,
+       "unit": "h",
+       "lo": 6.2,
+       "metric": "sleep_hours",
+       "horizon_days": 7.0,
+       "point": 7.6,
+       "frame": "in 7 days"
+      },
+      {
+       "hi": 302.5,
+       "unit": "lb",
+       "lo": 299.3,
+       "metric": "weight_lbs",
+       "horizon_days": 1.0,
+       "point": 300.9,
+       "frame": "tomorrow morning"
+      },
+      {
+       "hi": 305.0,
+       "unit": "lb",
+       "lo": 296.8,
+       "metric": "weight_lbs",
+       "horizon_days": 7.0,
+       "point": 300.9,
+       "frame": "in 7 days"
+      }
+     ],
+     "issued_date": "2026-07-05",
+     "confidence": 0.8,
+     "resolutions_this_run": []
+    },
+    "hypotheses": {
+     "active": [
+      {
+       "n_comparison": null,
+       "n_condition": null,
+       "confidence": "medium",
+       "ci95_low": null,
+       "hypothesis_id": "hyp_caloric_deficit_boundary_rem",
+       "effect_size": null,
+       "hypothesis": "Calorie intake remaining below 1,350 calories for 2+ consecutive days triggers a compensatory REM sleep rebound of ≥0.3 hours above the rolling average on the first recovery day, followed by a rapid REM decline if the deficit persists beyond 3 days.",
+       "ci95_high": null,
+       "status": "pending"
+      },
+      {
+       "n_comparison": null,
+       "n_condition": null,
+       "confidence": "high",
+       "ci95_low": null,
+       "hypothesis_id": "hyp_rhr_elevation_cascade",
+       "effect_size": null,
+       "hypothesis": "Resting heart rate elevation of ≥5 bpm above the rolling 7-day mean predicts recovery score decline of ≥12 points within 24 hours, suggesting emerging systemic stress or overtraining before it manifests in HRV alone.",
+       "ci95_high": null,
+       "status": "pending"
+      },
+      {
+       "n_comparison": null,
+       "n_condition": null,
+       "confidence": "medium",
+       "ci95_low": null,
+       "hypothesis_id": "hyp_protein_deficit_rem_compression",
+       "effect_size": null,
+       "hypothesis": "When protein intake falls below 130g AND active_cal < 500 on the same day, REM sleep hours compress by ≥0.5 hours the following night, signaling insufficient anabolic recovery stimulus.",
+       "ci95_high": null,
+       "status": "pending"
+      },
+      {
+       "n_comparison": null,
+       "n_condition": null,
+       "confidence": "low",
+       "ci95_low": null,
+       "hypothesis_id": "hyp_sleep_onset_lag_carbs",
+       "effect_size": null,
+       "hypothesis": "Low carbohydrate intake (<110g) on a given day predicts increased sleep onset latency (≥60 minutes) 1–2 nights later, independent of calorie restriction.",
+       "ci95_high": null,
+       "status": "pending"
+      },
+      {
+       "n_comparison": null,
+       "n_condition": null,
+       "confidence": "high",
+       "ci95_low": null,
+       "hypothesis_id": "hyp_sedentary_recovery_collapse",
+       "effect_size": null,
+       "hypothesis": "Extended sedentary periods (≤600 active calories for 2+ consecutive days) predict a sharp recovery score decline of ≥15 points and HRV drop of ≥5 points within 1 day, even with adequate sleep quality.",
+       "ci95_high": null,
+       "status": "pending"
+      }
+     ],
+     "recently_resolved": [],
+     "total": 13.0,
+     "active_count": 13.0,
+     "by_status": {
+      "pending": 13.0
+     }
+    },
+    "coaches": {
+     "disagreement_count": 2.0,
+     "generated_at": "2026-07-05T14:03:09.796913+00:00",
+     "disagreements": [
+      {
+       "coaches": [
+        "explorer_coach",
+        "nutrition_coach"
+       ],
+       "topic": "Whether the nine-day logging gap signals imminent loss of control or is acceptable within a sustainable deficit",
+       "resolution": "Both are partially right, and the difference matters. Your *past* shows you can sustain aggressive deficits—you did 305→190 in 8 months. Explorer Coach's historical prediction isn't wrong, but it's abstract. Nutrition Coach's mechanical proof is concrete. The real signal isn't whether you *will* lose control; it's that you've stopped collecting the data that would tell you *if* you are. That's not the same as losing control, but it's the moment before it becomes invisible. Restart logging not because the deficit is failing, but because silent execution of aggressive deficits is how you lose the early warning system. You learned this last time."
+      },
+      {
+       "coaches": [
+        "glucose_coach",
+        "labs_coach"
+       ],
+       "topic": "Whether Matthew should replace the CGM immediately or wait for a natural sensor rotation",
+       "resolution": "Labs Coach is right about priority and timeline. A blood panel at week 8 (after a full month of sustained deficit) will tell you far more about metabolic adaptation than 14 days of CGM would. However, Glucose Coach is also right that the narrative thread broke when the sensor failed. Restart CGM logging *now* for continuity and pattern recognition, but the clinical validation happens at labs in 5–6 weeks, not sooner. Both matter; labs matter more; but don't choose between them—do both on their proper timeline."
+      }
+     ]
+    },
+    "calibration": null,
+    "highlight": {
+     "kind": "coach_disagreement",
+     "detail": {
+      "coaches": [
+       "explorer_coach",
+       "nutrition_coach"
+      ],
+      "topic": "Whether the nine-day logging gap signals imminent loss of control or is acceptable within a sustainable deficit",
+      "resolution": "Both are partially right, and the difference matters. Your *past* shows you can sustain aggressive deficits—you did 305→190 in 8 months. Explorer Coach's historical prediction isn't wrong, but it's abstract. Nutrition Coach's mechanical proof is concrete. The real signal isn't whether you *will* lose control; it's that you've stopped collecting the data that would tell you *if* you are. That's not the same as losing control, but it's the moment before it becomes invisible. Restart logging not because the deficit is failing, but because silent execution of aggressive deficits is how you lose the early warning system. You learned this last time."
+     }
+    }
+   }
+  },
+  "reference_output": "The forecast model holds recovery steady at 73.6% for both tomorrow and the week ahead, with sleep projected at 7.6 hours across the same windows and weight near 300.9 lb. Thirteen pre-registered hypotheses remain pending—several flagging sedentary patterns and caloric extremes as risk signals—while the AI coaches surface a more urgent concern: a nine-day logging gap during an aggressive deficit. The disagreement centers not on whether control is lost, but on whether silent execution of that deficit has already disabled the early warning system. Both coaches agree that restart of continuous logging (including glucose monitoring) now, paired with a blood panel at week eight, restores the data visibility that enabled your past success."
+ },
+ {
+  "id": "som_authored_small_state",
+  "surface": "state_of_matthew",
+  "provenance": "AUTHORED against a reduced real-shaped state (numbers from the 2026-07-05 record) — exercises the sparse-sections path.",
+  "inputs": {
+   "state": {
+    "as_of": "2026-07-05",
+    "forecast": {
+     "issued_date": "2026-07-05",
+     "model": "ewma-v1",
+     "confidence": 0.8,
+     "expectations": [
+      {
+       "metric": "recovery_pct",
+       "point": 73.6,
+       "lo": 47.5,
+       "hi": 99.8,
+       "unit": "%",
+       "horizon_days": 1,
+       "frame": "tomorrow"
+      },
+      {
+       "metric": "weight_lbs",
+       "point": 300.9,
+       "lo": 299.3,
+       "hi": 302.5,
+       "unit": "lb",
+       "horizon_days": 1,
+       "frame": "tomorrow morning"
+      }
+     ]
+    },
+    "hypotheses": {
+     "active_count": 13,
+     "total": 16
+    },
+    "coaches": {
+     "disagreement_count": 2
+    },
+    "calibration": null,
+    "highlight": null
+   }
+  },
+  "reference_output": "The forecast engine expects recovery near 73.6% tomorrow and weight near 300.9 lb, with 13 of 16 tracked hypotheses currently active. The coaching panel carries 2 open disagreements this week; the calibration scoreboard has nothing graded yet, so no claim is made about forecast reliability."
+ }
+]

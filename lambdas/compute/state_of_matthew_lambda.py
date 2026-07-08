@@ -308,6 +308,16 @@ def _causal_language(text: str) -> list:
     return [w for w in BANNED_CAUSAL if re.search(r"\b" + re.escape(w) + r"\b", low)]
 
 
+def narration_gate(state: dict, text: str) -> tuple:
+    """(grounding_findings, causal_hits) — the exact ADR-104 gate narrate()
+    applies to the one weekly narration: every number must exist in the
+    narration payload, and no banned causal connective may appear. Extracted
+    (#812) so the golden-surface eval harness replays fixtures through the
+    ACTUAL gate path. ([], []) = the narrative would ship."""
+    allowed = allowed_numbers(_narration_payload(state))
+    return grounding_findings(text, facts=None, allowed=allowed), _causal_language(text)
+
+
 def deterministic_fallback_narrative(state: dict) -> str:
     """A template narrative built directly from already-computed fields — used
     when Haiku is paused/unavailable/ungrounded. Cannot fabricate a number
@@ -361,11 +371,23 @@ def narrate(state: dict) -> dict:
     if not text:
         return {"narrative": deterministic_fallback_narrative(state), "narrated": False, "model": None, "reason": "empty_response"}
 
-    allowed = allowed_numbers(_narration_payload(state))
-    findings = grounding_findings(text, facts=None, allowed=allowed)
-    causal_hits = _causal_language(text)
+    findings, causal_hits = narration_gate(state, text)
     if findings or causal_hits:
         logger.warning(f"[state-of-matthew] ADR-104 grounding gate failed (findings={findings}, causal={causal_hits}) — falling back")
+        try:  # #812/#744: a fired gate is labeled eval data — retain the pair (fail-soft)
+            import eval_retention
+
+            eval_retention.retain(
+                "state_of_matthew",
+                "flagged_fallback",
+                draft=text,
+                final=deterministic_fallback_narrative(state),
+                findings=findings + [{"type": "causal_language", "detail": f"banned causal connective {w!r}"} for w in causal_hits],
+                allowed=allowed_numbers(_narration_payload(state)),
+                extra={"as_of": state.get("as_of")},
+            )
+        except Exception:  # noqa: BLE001 — retention is never load-bearing
+            pass
         return {"narrative": deterministic_fallback_narrative(state), "narrated": False, "model": MODEL, "reason": "grounding_gate"}
 
     return {"narrative": text, "narrated": True, "model": MODEL, "reason": None}

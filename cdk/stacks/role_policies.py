@@ -2146,6 +2146,20 @@ def site_api_ai() -> list[iam.PolicyStatement]:
                 },
             },
         ),
+        # #812/#744: eval retention — when the board_ask ADR-104 gate fires, the
+        # flagged draft + findings + disposition are persisted as eval data
+        # (lambdas/eval_retention.py, pk EVALRET#board_ask). PutItem only, scoped
+        # to that one partition; the write is fail-soft in code either way.
+        iam.PolicyStatement(
+            sid="DynamoDBEvalRetentionWrite",
+            actions=["dynamodb:PutItem"],
+            resources=[TABLE_ARN],
+            conditions={
+                "ForAllValues:StringLike": {
+                    "dynamodb:LeadingKeys": ["EVALRET#*"],
+                },
+            },
+        ),
         # #546: short-lived board follow-up sessions (opaque token, TTL ≤ 1h, no
         # PII). PutItem mints a thread; UpdateItem appends a follow-up turn +
         # bumps the counter under the atomic ≤3 cap. Scoped to the BOARDSESS#*

@@ -173,6 +173,12 @@ _PK_RULES: list = [
     # it's a long-run scoreboard that must survive a reset, even though the OUTPUT#
     # records it samples FROM (pk COACH#*, above) are themselves experiment-scoped.
     (lambda pk, sk: pk.startswith("VOICEFIDELITY#"), CROSS_PHASE),
+    # #812/#744: retained ADR-104 gate verdict/regeneration pairs — the honesty
+    # layer's own eval dataset (eval_retention.py, harvested monthly into the
+    # golden-surface fixture packs). Same rationale as VOICEFIDELITY# above: it
+    # measures the honesty MACHINERY's behavior, not a property of the current
+    # experiment run, so it survives a reset. Records carry their own ~180d TTL.
+    (lambda pk, sk: pk.startswith("EVALRET#"), CROSS_PHASE),
     # Reading / Mind pillar (ADR-097). Durable identity data — a person's library and
     # reading history must survive an experiment reset, so it is CROSS_PHASE (never
     # tagged, never wiped, never phase-filtered). Covers BOOK#<id> and every READING#
