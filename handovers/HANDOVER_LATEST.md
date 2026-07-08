@@ -74,10 +74,12 @@ daily-debrief fleet-wide) · golden-eval IAM role created per infra/iam runbook
 (episode published) · temp refactor policy attached+removed. **No sync_site_to_s3 run —
 no site/ changes this session.** Verified: suite **4060 passed + isolation re-run, 0 real
 fails** · smoke **67/67** · `verify_oidc_iam` CLEAN · /api/vitals 200 · alarm swap live ·
-visual QA **34/34 passed, 0 failed** (11 warnings, daily-data class) · a
-full-pipeline `workflow_dispatch` (deploy_all=true) was dispatched on the fixed
-workflow as the conclusive end-to-end green — run 28961253962; confirm it if
-this handover is read before it finished.
+visual QA **34/34 passed, 0 failed** (11 warnings, daily-data class) · **conclusive
+end-to-end green: full-pipeline `workflow_dispatch` run 28962059847** — every job incl.
+Deploy + the I1/I2/I5 integration gates passed on the fixed workflow; live build ==
+main tip (95693ff). (An earlier dispatch, 28961253962, failed on the site-sync CLOBBER
+GUARD — correctly: I pushed wrap site/ commits while it ran from an older checkout.
+The guard works; don't dispatch deploy_all with pushes still planned.)
 
 ## Gotchas (this session — new ones only)
 
