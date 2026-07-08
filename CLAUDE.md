@@ -168,8 +168,10 @@ Regenerates constants, bumps the layer, deploys Core/Compute/Email, phase-tags D
 block below — it never stacks. Full session history lives in `handovers/` (one file per
 session, `HANDOVER_LATEST.md` = the live driver) and the pre-2026-07 diary is archived at
 `handovers/archive/CLAUDE_MD_SESSION_DIARY_2026-07-03.md`. Durable lessons go to the
-memory system or the convention sections above, not into this block. **If the session's
-work is merged + deployed, distill ONE public build beat per
-`docs/content/BUILD_DISPATCH_CHECKLIST.md` (#380) — merged work only, never plans.**
+memory system or the convention sections above, not into this block. **Build-beat wrap
+gate (#736): every wrap either distills ONE public build beat per
+`docs/content/BUILD_DISPATCH_CHECKLIST.md` (#380 — merged+deployed work only, never
+plans) or writes an explicit `**Build beat:** none — <reason>` line in the handover;
+silent omission is not an outcome.**
 
 **Verified:** 2026-07-07 (high-value pay-down; deploys/merges authorized) — **13 issues SHIPPED+DEPLOYED+LIVE** (PRs #848–#857), incl. **the entire Now milestone**: #780 #788 #789 #790 + #794/#797/#798/#799/#805/#806/#807/#809/#811. Headlines: **#780 MCP URL rotated + scrubbed + runtime-discovery** (old URL dead 403, canary discovers new URL live via lambda:GetFunctionUrlConfig — i14 passes end-to-end, Matthew reconnected the connector) · /now/ static-rendered · "Is he okay this week?" home surface · 48 alarms retired + orphans reconciled → **live alarms 67 == CDK 67** · board_ask injection delimiters · lambda_map import CI gate. Suite green (only the 1 known live-AWS ingest-freshness fail) · smoke 67/67 · visual QA 34/34 · version.json == HEAD. **Narrative, gotchas, next picks: `handovers/HANDOVER_LATEST.md` (#797 — keep this block a pointer, ≤ this size).** Now milestone is EMPTY; next session picks from Next (#804 static /coaching/ — now mechanical · #803 chronicle · #808 Haiku attribution · #812/#813 fable).

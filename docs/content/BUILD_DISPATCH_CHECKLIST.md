@@ -9,10 +9,15 @@ infrastructure, no extra performance from Matthew.
 ## When to write one
 
 At session close, **after** the wrap's verification step — and only when the
-session's work is **merged to main AND deployed** (or the session shipped
-nothing public-worthy, in which case: write nothing; an empty week is honest).
-A PR that's open, a deploy that's staged, a plan for next session: none of that
-is a beat. **If it isn't merged and live, it doesn't exist here.**
+session's work is **merged to main AND deployed**. A PR that's open, a deploy
+that's staged, a plan for next session: none of that is a beat. **If it isn't
+merged and live, it doesn't exist here.**
+
+**The gate is beat-or-explicit-skip, never silence (#736).** If the session
+shipped nothing eligible, the wrap's handover records
+`**Build beat:** none — <one-clause reason>` instead. An empty week is honest;
+an unexplained empty slot is not — the skip line is what keeps the cadence
+auditable across `handovers/`.
 
 ## The template (three beats, ~60–120 words each)
 
