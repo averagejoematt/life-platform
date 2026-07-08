@@ -15,9 +15,14 @@ Architecture (verified against live API + OpenAPI 2026-05-25):
         → events come back as {type, workout: {...full workout...}}
           type ∈ {"updated", "deleted"}
         → for type=updated: normalize + idempotent upsert + raw S3 archive
-        → for type=deleted: write a tombstone DDB record (if we can locate the date)
-        → walk pages 1..page_count
-        → on full success, set since = poll-start-time (next run picks up here)
+          (a start-time edit RELOCATES the record — the old-date sk is cleaned
+          up inside write_normalized, #475)
+        → for type=deleted: write a DELETE#WORKOUT#{id} tombstone marker
+        → resolve_tombstones() consumes unresolved markers every run (#475):
+          the workout record is deleted, the marker stamped resolved (audit)
+        → walk pages 1..page_count (capped at MAX_PAGES_PER_RUN)
+        → on a COMPLETE, error-free walk, set since = poll-start-time; a
+          truncated walk keeps the old since so nothing is silently skipped
 
 Idempotent: same workout id → upsert, no dupe. Page-based pagination
 (NOT cursor) because Hevy's API uses that shape.
@@ -44,6 +49,7 @@ from hevy_common import (
     fetch_events_page,
     load_since,
     normalize_workout,
+    resolve_tombstones,
     save_since,
     write_normalized,
 )
@@ -131,22 +137,22 @@ def _record_health(*, attempted: bool, succeeded: bool, exc) -> None:
 
 
 def _tombstone_deleted(workout_id: str) -> None:
-    """Best-effort tombstone for a deleted-event. We don't have the date
-    without the full record, so this records a delete marker that the next
-    audit pass can reconcile."""
-    try:
-        _table.put_item(
-            Item={
-                "pk": f"USER#{USER_ID}#SOURCE#{SOURCE}",
-                "sk": f"DELETE#WORKOUT#{workout_id}",
-                "tombstone": True,
-                "tombstoned_at": datetime.now(timezone.utc).isoformat(),
-                "tombstoned_reason": "hevy_event_delete",
-            }
-        )
-        logger.info("hevy delete marker written for %s", workout_id)
-    except Exception as e:
-        logger.warning("hevy delete-marker write failed for %s: %s", workout_id, e)
+    """Durable tombstone for a deleted-event. The marker is the retryable state;
+    hevy_common.resolve_tombstones() — called at the end of every run (#475 /
+    C-7, the consumer the old 'next audit pass' comment promised) — deletes the
+    matching WORKOUT# record(s) and stamps the marker resolved. A failed write
+    RAISES so the run counts an error and the cursor does not advance past the
+    delete event (retried next poll)."""
+    _table.put_item(
+        Item={
+            "pk": f"USER#{USER_ID}#SOURCE#{SOURCE}",
+            "sk": f"DELETE#WORKOUT#{workout_id}",
+            "tombstone": True,
+            "tombstoned_at": datetime.now(timezone.utc).isoformat(),
+            "tombstoned_reason": "hevy_event_delete",
+        }
+    )
+    logger.info("hevy delete marker written for %s", workout_id)
 
 
 def lambda_handler(event: dict, context: Any) -> dict:
@@ -164,6 +170,7 @@ def lambda_handler(event: dict, context: Any) -> dict:
     failed_ids: list[str] = []
     pages_walked = 0
     total_pages_observed = 0
+    truncated = False
 
     try:
         page = 1
@@ -180,7 +187,9 @@ def lambda_handler(event: dict, context: Any) -> dict:
             for ev in events_list:
                 ev_type = ev.get("type") or "updated"
                 wo = ev.get("workout") or {}
-                wid = str(wo.get("id") or "")
+                # Deleted events may carry the id at event level ({type, id,
+                # deleted_at}) rather than a full workout object — accept both.
+                wid = str(wo.get("id") or ev.get("id") or "")
                 if not wid:
                     logger.warning("hevy event missing workout id: %s", ev)
                     continue
@@ -217,12 +226,32 @@ def lambda_handler(event: dict, context: Any) -> dict:
                 logger.info("hevy backfill reached page_count=%d, stop", total_pages_observed)
                 break
             page += 1
+            if page > MAX_PAGES_PER_RUN:
+                # #475 / C-7 leg 3: the walk is TRUNCATED — pages remain beyond
+                # the cap and the feed is newest-first, so events older than
+                # what we walked are still unprocessed. Advancing the cursor
+                # here silently skipped them forever.
+                truncated = True
+                logger.warning(
+                    "hevy backfill hit MAX_PAGES_PER_RUN=%d with page_count=%d — truncated walk",
+                    MAX_PAGES_PER_RUN,
+                    total_pages_observed,
+                )
+                break
 
-        # Save new high-water mark only if everything succeeded.
-        # On failures we keep the old since so next run retries the failed window.
-        if errors == 0:
+        # Save new high-water mark only on a COMPLETE, error-free walk.
+        # On failures or truncation we keep the old since so the next run
+        # retries the window (upserts are idempotent — no double-count).
+        if errors == 0 and not truncated:
             save_since(poll_started_at)
             logger.info("hevy backfill since advanced to %s", poll_started_at)
+        elif truncated:
+            logger.warning(
+                "hevy backfill truncated at %d/%d pages; since NOT advanced (#475). "
+                "Raise HEVY_BACKFILL_MAX_PAGES for a one-off catch-up if the backlog persists.",
+                pages_walked,
+                total_pages_observed,
+            )
         else:
             logger.warning(
                 "hevy backfill had %d error(s); since NOT advanced. Failed ids: %s",
@@ -237,18 +266,26 @@ def lambda_handler(event: dict, context: Any) -> dict:
         # paths engage — a swallowed fatal was how Hevy could die invisibly (#466).
         raise
 
+    # #475 / C-7: consume DELETE#WORKOUT# markers — this run's AND any unresolved
+    # backlog (self-healing). Runs after the walk so a delete event and its
+    # workout record written in the same run still reconcile. Never raises; a
+    # failure leaves the marker unresolved for the next poll and never blocks
+    # the cursor (marker state is independent of the events window).
+    tombstones = resolve_tombstones()
     _record_health(attempted=True, succeeded=(errors == 0), exc=None if errors == 0 else "parse")
 
     summary = {
         "source": "hevy",
         "initial_run": is_initial,
         "since": since,
-        "new_since": poll_started_at if errors == 0 else since,
+        "new_since": poll_started_at if errors == 0 and not truncated else since,
         "ingested": ingested,
         "deleted": deleted,
         "errors": errors,
         "pages_walked": pages_walked,
         "total_pages": total_pages_observed,
+        "truncated": truncated,
+        "tombstones": tombstones,
         "failed_ids": failed_ids[:10],
     }
     logger.info("hevy backfill complete: %s", json.dumps(summary, default=str))
