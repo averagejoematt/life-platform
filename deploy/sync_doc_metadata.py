@@ -517,7 +517,7 @@ PLATFORM_FACTS = {
     "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
     "alarm_count": 67,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK)
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
-    "cdk_stacks": 8,
+    "cdk_stacks": 9,
     "iam_roles": 43,
     # Secret state
     "api_keys_status": "PERMANENTLY DELETED 2026-03-14",

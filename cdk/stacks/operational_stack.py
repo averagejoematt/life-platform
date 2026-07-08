@@ -41,24 +41,13 @@ from aws_cdk import (
 from stacks import role_policies as rp
 from stacks.lambda_helpers import create_platform_lambda
 
-# ── R17-09 cross-region note ──────────────────────────────────────────────────
-# site-api Lambda lives here (us-west-2) so it shares a region with DynamoDB.
-# CloudFront (web_stack, us-east-1) references the Function URL as a custom
-# origin — cross-region Function URL origins are fully supported by CloudFront.
-# Migration from web_stack:
-#   1. Deploy LifePlatformOperational → capture SiteApiFunctionUrlDomain output
-#   2. Set context: cdk.json "site_api_fn_url_domain": "<captured-domain>"
-#   3. Run cdk deploy LifePlatformWeb (web_stack will import via context var)
-# ──────────────────────────────────────────────────────────────────────────────
-# ── #794: site-api ownership (resolves the "dual ownership" ambiguity) ────────
-# CDK (here) is the infrastructure owner: function definition, IAM role, env
-# vars, timeout/memory, concurrency, and the CloudWatch alarms below.
-# deploy/deploy_site_api.sh remains the sanctioned FAST CODE PATH for iterating
-# on lambdas/web/*.py without a full stack synth/deploy. Both channels stage
-# the identical package through the one bundle implementation,
-# deploy/build_bundle.py (see lambda_helpers.staged_tree_asset()) — so neither
-# side can silently ship a differently-shaped zip. See docs/DECISIONS.md
-# ADR-131 and tests/test_deploy_bundle_paths.py.
+# ── #793 (2026-07-08): the public serving path moved OUT of this stack ───────
+# site-api + site-api-ai (functions, Function URLs, roles, alarms, outputs) now
+# live in serve_stack.py (LifePlatformServe), moved via `cdk refactor` so the
+# physical functions and Function URLs were preserved. Ops-motivated deploy
+# holds on this stack no longer freeze the reader-facing API path. The R17-09
+# cross-region note and the #794 ownership rules travel with the code — see
+# serve_stack.py's module docstring.
 # ──────────────────────────────────────────────────────────────────────────────
 
 REGION = "us-west-2"
@@ -577,195 +566,7 @@ class OperationalStack(Stack):
         freshness_backstop.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
         freshness_backstop.add_ok_action(cw_actions.SnsAction(local_digest_topic))
 
-        # ── 10. Site API Lambda — life-platform-site-api (R17-09: moved from web_stack us-east-1)
-        # Read-only. DynamoDB same-region (eliminates cross-region latency).
-        # Function URL is a global HTTPS endpoint — CloudFront in us-east-1 can origin to it.
-        site_api_fn = create_platform_lambda(
-            self,
-            "SiteApiLambda",
-            function_name="life-platform-site-api",
-            source_file="lambdas/web/site_api_lambda.py",
-            handler="web.site_api_lambda.lambda_handler",
-            table=local_table,
-            bucket=local_bucket,
-            dlq=None,
-            alerts_topic=None,
-            custom_policies=rp.site_api(),
-            timeout_seconds=30,  # Phase 1.6 (2026-05-16): 15s→30s. Matches CloudFront default; complex /api/changes-since queries hit 15s ceiling.
-            memory_mb=256,
-            environment={
-                "USER_ID": "matthew",
-                "TABLE_NAME": "life-platform",
-                "AI_SECRET_NAME": "life-platform/site-api-ai-key",
-                "S3_BUCKET": "matthew-life-platform",
-                "S3_REGION": "us-west-2",
-                "CORS_ORIGIN": "https://averagejoematt.com",
-            },
-            # #794: CDK owns this function's definition (role, env, alarms); the
-            # code asset is the shared staged full-tree bundle (build_bundle.py
-            # via lambda_helpers.staged_tree_asset()) — the SAME bundle shape
-            # deploy_site_api.sh ships for hot deploys, so the two channels can
-            # never drift apart in package layout (ADR-131 / #781 retired the
-            # shared layer this comment used to reference).
-        )
-
-        site_api_url = site_api_fn.add_function_url(
-            auth_type=_lambda.FunctionUrlAuthType.NONE,
-            cors=_lambda.FunctionUrlCorsOptions(
-                allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
-                allowed_methods=[_lambda.HttpMethod.GET, _lambda.HttpMethod.POST],
-                allowed_headers=["Content-Type"],
-            ),
-        )
-
-        site_api_fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_url.url))
-
-        # ADR-036 fix: cap data Lambda concurrency to isolate from AI traffic spikes
-        # 2026-06-17: account concurrency quota raised to 100 (AWS case 177921309700709) — enabled.
-        site_api_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 5)
-
-        # ── 10b. Site API AI Lambda — /api/ask + /api/board_ask (split from site-api for blast radius isolation)
-        # Separate Lambda for AI endpoints: sequential Haiku calls can take 3-20s.
-        # Reserved concurrency=2 prevents AI traffic from starving data endpoints.
-        site_api_ai_fn = create_platform_lambda(
-            self,
-            "SiteApiAiLambda",
-            function_name="life-platform-site-api-ai",
-            source_file="lambdas/web/site_api_ai_lambda.py",
-            handler="web.site_api_ai_lambda.lambda_handler",
-            table=local_table,
-            bucket=local_bucket,
-            dlq=None,
-            alerts_topic=None,
-            custom_policies=rp.site_api_ai(),
-            timeout_seconds=30,  # AI calls take 3-5s each; board_ask chains up to 6
-            memory_mb=256,
-            environment={
-                "USER_ID": "matthew",
-                "TABLE_NAME": "life-platform",
-                "AI_SECRET_NAME": "life-platform/site-api-ai-key",
-                "S3_BUCKET": "matthew-life-platform",
-                "S3_REGION": "us-west-2",
-                "CORS_ORIGIN": "https://averagejoematt.com",
-            },
-            # #794: same staged full-tree bundle as site-api above — no layer (ADR-131).
-        )
-
-        # Cap AI Lambda concurrency — 2 concurrent is enough for personal site traffic
-        # 2026-06-17: account concurrency quota raised to 100 (AWS case 177921309700709) — enabled.
-        site_api_ai_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 2)
-
-        # ── #809: site-api-ai error alarm (adopted from the 2026-05-25 orphan batch) ──
-        # site-api-ai is SYNC (Function URL) — the ADR-116 DLQ path can't cover it,
-        # so it keeps a real Errors alarm. Threshold ≥3/hr like slo-mcp-availability:
-        # a single transient Bedrock hiccup surfaces to the reader as one failed ask,
-        # not an incident. Replaces the misnamed live orphan
-        # `life-platform-life-platform-site-api-ai-errors` (deleted after deploy).
-        site_api_ai_errors = cloudwatch.Alarm(
-            self,
-            "SiteApiAiErrorsAlarm",
-            alarm_name="site-api-ai-errors",
-            metric=cloudwatch.Metric(
-                namespace="AWS/Lambda",
-                metric_name="Errors",
-                dimensions_map={"FunctionName": "life-platform-site-api-ai"},
-                period=Duration.seconds(3600),
-                statistic="Sum",
-            ),
-            evaluation_periods=1,
-            threshold=3,
-            comparison_operator=cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        site_api_ai_errors.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
-
-        site_api_ai_url = site_api_ai_fn.add_function_url(
-            auth_type=_lambda.FunctionUrlAuthType.NONE,
-            cors=_lambda.FunctionUrlCorsOptions(
-                allowed_origins=["https://averagejoematt.com", "https://www.averagejoematt.com"],
-                allowed_methods=[_lambda.HttpMethod.POST],
-                allowed_headers=["Content-Type", "X-Subscriber-Token"],
-            ),
-        )
-
-        site_api_ai_fn_url_domain = cdk.Fn.select(2, cdk.Fn.split("/", site_api_ai_url.url))
-
-        # ── Site API CloudWatch alarms + dashboard (moved from web_stack — alarms must be same region as Lambda)
-        GTE = cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD
-
-        site_api_errors = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Errors",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="Sum",
-        )
-        site_api_invocations = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Invocations",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="Sum",
-        )
-        site_api_duration_p95 = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Duration",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="p95",
-        )
-        site_api_duration_p50 = cloudwatch.Metric(
-            namespace="AWS/Lambda",
-            metric_name="Duration",
-            dimensions_map={"FunctionName": "life-platform-site-api"},
-            period=Duration.minutes(5),
-            statistic="p50",
-        )
-
-        # ADR-050: site-api alarms route to digest. The canary covers true outages
-        # (CanaryS3Fail / CanaryDDBFail fire urgently); these are degradation signals.
-        _site_api_errors_alarm = cloudwatch.Alarm(
-            self,
-            "SiteApiErrors",
-            alarm_name="site-api-errors",
-            metric=site_api_errors,
-            threshold=1,
-            evaluation_periods=1,
-            comparison_operator=GTE,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        _site_api_errors_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
-
-        _site_api_latency_alarm = cloudwatch.Alarm(
-            self,
-            "SiteApiLatencyHigh",
-            alarm_name="site-api-p95-latency-high",
-            metric=site_api_duration_p95,
-            threshold=5000,
-            evaluation_periods=1,
-            comparison_operator=GTE,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        _site_api_latency_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
-
-        _site_api_spike_alarm = cloudwatch.Alarm(
-            self,
-            "SiteApiInvocationSpike",
-            alarm_name="site-api-invocation-spike",
-            metric=site_api_invocations,
-            threshold=200,
-            evaluation_periods=1,
-            comparison_operator=GTE,
-            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
-        )
-        _site_api_spike_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
-
-        # NOTE (2026-06-08): the "life-platform-site-api" CloudWatch Dashboard was
-        # removed from CDK after it was deleted out-of-band — CFN tried to UPDATE a
-        # non-existent dashboard and stuck LifePlatformOperational in
-        # UPDATE_ROLLBACK_FAILED. Site-api monitoring is covered by the
-        # life-platform-site-api-dashboard / -latency dashboards + the alarms above.
-        # Re-add a Dashboard construct here (fresh name) if a curated board is wanted.
+        # ── 10. (site-api / site-api-ai moved to serve_stack.py — #793, cdk refactor 2026-07-08)
 
         # ── 11. Site Stats Refresh — 4x/day: 8am, 12pm, 4pm, 8pm PT (15:00, 19:00, 23:00, 03:00 UTC)
         # Invokes ingestion Lambdas synchronously, reads fresh DynamoDB, updates vitals in
@@ -1041,27 +842,3 @@ class OperationalStack(Stack):
 
         cdk.CfnOutput(self, "FreshnessCheckerArn", value=freshness.function_arn, description="Freshness checker Lambda ARN")
         cdk.CfnOutput(self, "CanaryArn", value=canary.function_arn, description="Canary Lambda ARN")
-        cdk.CfnOutput(
-            self,
-            "SiteApiFunctionUrl",
-            value=site_api_url.url,
-            description="Lambda Function URL for life-platform-site-api (us-west-2) — R17-09",
-        )
-        cdk.CfnOutput(
-            self,
-            "SiteApiFunctionUrlDomain",
-            value=site_api_fn_url_domain,
-            description="Function URL domain (without https://) — use in web_stack CloudFront origin after R17-09 migration",
-        )
-        cdk.CfnOutput(
-            self,
-            "SiteApiAiFunctionUrl",
-            value=site_api_ai_url.url,
-            description="Lambda Function URL for life-platform-site-api-ai (us-west-2)",
-        )
-        cdk.CfnOutput(
-            self,
-            "SiteApiAiFunctionUrlDomain",
-            value=site_api_ai_fn_url_domain,
-            description="AI Lambda Function URL domain — use in web_stack CloudFront AiLambdaOrigin",
-        )

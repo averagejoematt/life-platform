@@ -9,7 +9,7 @@ gap with a read-only sweep that a human never has to remember to run.
 
 What it checks (all read-only; CloudFormation drift-detection API calls are free):
 
-  1. CFN DRIFT — `detect_stack_drift` across all 8 stacks, then reports every
+  1. CFN DRIFT — `detect_stack_drift` across all 9 stacks, then reports every
      MODIFIED / DELETED resource (`describe_stack_resource_drifts`). This is the live
      state vs. the deployed template, which `cdk diff` cannot see.
   2. POSTFLIGHT REUSE — the human-invoked-only checks from session_postflight:
@@ -49,7 +49,7 @@ REGION = os.environ.get("AWS_REGION", "us-west-2")
 BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# The 8 CDK stacks and the region each deploys to (Web is us-east-1 for CloudFront).
+# The 9 CDK stacks and the region each deploys to (Web is us-east-1 for CloudFront).
 # Source of truth: cdk/app.py.
 STACKS = {
     "LifePlatformCore": REGION,
@@ -57,6 +57,7 @@ STACKS = {
     "LifePlatformCompute": REGION,
     "LifePlatformEmail": REGION,
     "LifePlatformOperational": REGION,
+    "LifePlatformServe": REGION,
     "LifePlatformMcp": REGION,
     "LifePlatformMonitoring": REGION,
     "LifePlatformWeb": "us-east-1",
