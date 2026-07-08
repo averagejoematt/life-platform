@@ -1,0 +1,68 @@
+name: Fresh-Eyes Discovery
+
+# Weekly unattended fresh-eyes discovery (#823). Pre-computes the /uplevel
+# Phase-1 "fresh-eyes lens" board so a session starts from a ranked board
+# instead of spending its first ~30 min re-surveying the live site. Read-only:
+# screenshots the live site, reads it via Bedrock vision, dedups against the
+# open GitHub backlog, and emails a ranked <=5-item board. See
+# scripts/fresh_eyes_discovery.py for the pipeline and
+# tests/test_fresh_eyes_discovery.py for the offline-tested pure parts.
+#
+# Reuses the existing github-actions-remediation-role (Bedrock + SSM read + SES
+# already granted there, deploy/setup_remediation_role.sh) — this workflow
+# requests NO new IAM. Gated by SSM /life-platform/budget-tier (skips at >= 2).
+
+on:
+  schedule:
+    # Weekly, Sunday ~08:00 PT (15:00 UTC) — ahead of a Monday /uplevel session.
+    - cron: "0 15 * * 0"
+  workflow_dispatch: {} # manual test
+
+permissions:
+  contents: read
+  id-token: write # AWS OIDC
+
+concurrency:
+  group: fresh-eyes-discovery
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    name: Weekly fresh-eyes survey
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Playwright + Chromium + boto3
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.58.0 boto3==1.43.37
+          python -m playwright install --with-deps chromium
+
+      - name: Configure AWS credentials (OIDC → remediation role)
+        uses: aws-actions/configure-aws-credentials@254c19bd240aabef8777f48595e9d2d7b972184b # v6.2.1
+        with:
+          role-to-assume: arn:aws:iam::205930651321:role/github-actions-remediation-role
+          aws-region: us-west-2
+
+      - name: Run weekly fresh-eyes discovery
+        env:
+          AWS_REGION: us-west-2
+          S3_BUCKET: matthew-life-platform
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/fresh_eyes_discovery.py
+
+      - name: Upload screenshots (diagnostic)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fresh-eyes-screenshots
+          path: qa-screenshots-fresh-eyes/
+          retention-days: 14
+          if-no-files-found: ignore
