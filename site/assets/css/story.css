@@ -709,6 +709,9 @@ body { overflow-x: hidden; }
 .cv-text.cv-unavailable { color: var(--ink-faint); font-style: italic; }
 .cv-note { margin-top: var(--sp-4); color: var(--ink-muted); font-family: var(--font-serif); font-style: italic;
   font-size: var(--fs-quote); line-height: 1.5; max-width: var(--measure); border-left: 2px solid var(--rule); padding-left: var(--sp-4); }
+/* #743: the grounding receipt — what the coach actually read, code-derived,
+   never model-authored. Quiet meta line, not a callout — it's a receipt, not a claim. */
+.cv-grounding { display: block; margin-top: var(--sp-3); }
 @media (prefers-reduced-motion: no-preference) {
   html.mo .cv-text.is-answered { opacity: 0; animation: cvIn 0.6s var(--ease-out) forwards; animation-delay: var(--cv-delay, 0s); }
   @keyframes cvIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -64,7 +64,9 @@ def test_unknown_persona_is_400_before_model_spend():
 
 def test_grounding_in_every_persona_turn():
     body = re.search(r"def _handle_board_ask.*?(?=\ndef |\Z)", AI_SRC, re.S).group(0)
-    assert "_board_facts_block()" in body
+    # #743: facts block now takes the shared, once-fetched brief so the reader
+    # receipt (board_grounding_receipts) describes the SAME ctx the prompt used.
+    assert "_board_facts_block(_brief_ctx)" in body
     assert "CURRENT DATA" in body and "cite only these numbers" in body
     assert "_coach_stance_bits(" in body
 

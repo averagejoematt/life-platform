@@ -514,6 +514,18 @@ async function renderFieldNote(read, id) {
   enhanceCoachNames(read);
 }
 
+// #743: "grounded in: recovery 48% · protein 7d avg 132g · presence quiet 9d" —
+// the reader-facing receipt for what the coach actually read before answering.
+// `grounding` is the server's `[{label, value}, ...]` array — every value is
+// code-derived from the generation brief (site_api_ai_lambda / ai_context.py),
+// never authored by the model. "" (render nothing) when the brief was too thin
+// to produce any receipts — an empty footer would be worse than no footer.
+function groundingFooterHTML(grounding) {
+  if (!Array.isArray(grounding) || !grounding.length) return "";
+  const text = grounding.map((r) => `${esc(r.label)} ${esc(r.value)}`).join(" · ");
+  return `<footer class="cv-grounding label">grounded in: ${text}</footer>`;
+}
+
 // ── CONVENE THE BOARD (uplevel P2) — the live 6-persona panel, made visible.
 // /api/board_ask existed with ZERO front-end callers; this is the site's clearest
 // "watch the AI think" moment. Three of the six answer by default (latency + cost —
@@ -572,6 +584,12 @@ function attachFollowup(card, pid, sessionToken, getLeft, setLeft) {
       if (d && d.response) {
         const el = card.querySelector(".cv-text");
         el.innerHTML += `<span class="cv-fu-q">${esc(q)}</span>` + esc(String(d.response)).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+        // #743: a follow-up re-fetches its own brief (the data may have moved
+        // since the opening turn) — swap in the fresh receipt for this turn,
+        // pinned right after the (now-extended) answer text.
+        const oldFooter = card.querySelector(".cv-grounding");
+        if (oldFooter) oldFooter.remove();
+        el.insertAdjacentHTML("afterend", groundingFooterHTML(d.grounding));
         const left = Number.isFinite(d.followups_remaining) ? d.followups_remaining : Math.max(0, getLeft() - 1);
         setLeft(left);
         input.value = "";
@@ -678,6 +696,10 @@ function renderAskBoard(read) {
             // Personas emit light markdown bold — escape first, then render **…**
             // as <strong> so emphasis reads as emphasis, not raw asterisks.
             el.innerHTML = esc(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+            // #743: one shared receipt per round (every persona this request
+            // read the SAME brief), pinned right after the answer text so it
+            // stays there even once the follow-up form is appended below it.
+            el.insertAdjacentHTML("afterend", groundingFooterHTML(d.grounding));
             if (sessionToken) attachFollowup(card, pid, sessionToken, () => followupsLeft, (n) => { followupsLeft = n; });
           }
           el.classList.add("is-answered");
