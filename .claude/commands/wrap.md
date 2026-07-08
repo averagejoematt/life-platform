@@ -59,15 +59,22 @@ NOT git-tracked and is a separate step from the commit in (e).
   load-bearing repo-wide rule. The CLAUDE.md status block (step b) is a terse pointer,
   never the primary home for either.
 
-### (d) Distill ONE public build beat — only if work is merged AND deployed
+### (d) Build beat OR explicit skip — this step always produces one of the two (#736)
 
-Follow `docs/content/BUILD_DISPATCH_CHECKLIST.md` exactly:
+Follow `docs/content/BUILD_DISPATCH_CHECKLIST.md` exactly. This is a **wrap gate**: the
+wrap is incomplete until it has produced EITHER a beat OR an explicit skip line — silent
+omission is not an outcome.
 
-- **Gate:** only write a beat if this session's work is merged to `main` AND deployed
-  (verify: PRs actually merged, `main == live` for the touched surfaces). A PR that's
-  still open, a deploy that's staged, or a plan for next session is NOT eligible — write
-  nothing. An empty week is honest; do not force a beat to fill this slot.
-- If eligible: append one object to `beats` in `site/story/build/beats.json` with fields
+- **Eligibility:** only write a beat if this session's work is merged to `main` AND
+  deployed (verify: PRs actually merged, `main == live` for the touched surfaces). A PR
+  that's still open, a deploy that's staged, or a plan for next session is NOT eligible.
+- **If not eligible (or nothing public-worthy shipped): record the skip explicitly.**
+  The new `handovers/HANDOVER_LATEST.md` from step (a) must carry one line —
+  `**Build beat:** none — <one-clause reason>` (e.g. "PRs open, merges await Matthew").
+  An empty week is honest; an unexplained empty slot is not. Do not force a beat.
+- **If eligible:** add the beat (below) AND put `**Build beat:** <beat id>` in the
+  handover, so every handover records the gate's outcome either way.
+- The beat itself: append one object to `beats` in `site/story/build/beats.json` with fields
   `id`, `date`, `title`, `shipped`, `gotcha`, `honest_miss`, `prs` (schema + example in the
   checklist). Distill from the new `HANDOVER_LATEST.md` you just wrote in step (a).
 - **One beat max per session** even if several things shipped — pick the story, mention
@@ -102,3 +109,5 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
   everything else is archived under its dated name.
 - **Merged-work-only dispatch.** A build beat narrates what shipped and is live — never
   a plan, never an open PR.
+- **Beat or explicit skip, never silence (#736).** Every wrap's handover carries a
+  `**Build beat:** <id or "none — reason">` line; step (d) cannot be skipped implicitly.
