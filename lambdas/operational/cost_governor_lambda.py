@@ -18,6 +18,9 @@ Tiers (projected month-end total, $75 all-in ceiling):
   3 Hard stop ≥ $73   → + pause ALL Bedrock; daily brief goes data-only
 
 Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
+Also persists the projection breakdown (mtd/projected/ai+non-ai daily burn) to
+SSM /life-platform/budget-breakdown every enforcement run so the daily brief can
+render a one-line headroom readout (#822 — a dev sprint alone can trip the tier).
 Auto-resets to 0 at month rollover (estimate is month-to-date).
 
 IAM: ce:GetCostAndUsage, cloudwatch:GetMetricData, cloudwatch:PutMetricData,
@@ -44,6 +47,12 @@ except ImportError:
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 ACCT = os.environ.get("CDK_ACCOUNT", "205930651321")
 SSM_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
+# R22-COST-05 (#822): the tier alone tells you WHAT changed, not WHY there's no
+# headroom left. Only the tier survived each run (SSM); the projection/burn-rate
+# breakdown that produced it was logged and thrown away. Persisting it lets the
+# daily brief surface a one-line "a dev sprint alone can trip this" fact (see
+# budget_guard.read_breakdown / format_headroom_line, the consumer side).
+SSM_BREAKDOWN_PARAM = os.environ.get("BUDGET_BREAKDOWN_PARAM", "/life-platform/budget-breakdown")
 ALERTS_TOPIC = os.environ.get("ALERTS_TOPIC_ARN", f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts")
 MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "75"))
 # Phase B ships observe-only (emit metrics, don't set tier/alert). Phase C flips
@@ -298,6 +307,32 @@ def _write_tier(tier: int) -> None:
     _ssm.put_parameter(Name=SSM_TIER_PARAM, Value=str(tier), Type="String", Overwrite=True)
 
 
+def _write_breakdown(tier: int, mtd: float, projected: float, ai_daily: float, non_ai_daily: float, now: datetime) -> None:
+    """Persist the projection breakdown alongside the tier (#822).
+
+    Every field is code-derived from this same run's estimate (no user input,
+    no LLM). Written as a plain JSON string — this parameter is a display
+    artifact only, never read by budget_guard.allow()/current_tier() (the tier
+    param remains the sole gating input), so a malformed or stale breakdown
+    can never affect AI enforcement — only the brief's headroom line degrades.
+    """
+    payload = {
+        "tier": int(tier),
+        "mtd": round(mtd, 2),
+        "projected": round(projected, 2),
+        "ceiling": MONTHLY_CEILING,
+        "ai_daily": round(ai_daily, 2),
+        "non_ai_daily": round(non_ai_daily, 2),
+        "computed_at": now.isoformat(),
+    }
+    try:
+        _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
+    except Exception as e:
+        # Display-only artifact — never let a breakdown-write failure affect
+        # the tier decision above it (which has already been written by now).
+        logger.warning(f"Breakdown SSM write failed (non-fatal, display-only): {e}")
+
+
 _TIER_LABELS = {
     0: "Normal — all AI features active",
     1: "Caution — heavy coach AI paused (narrative/ensemble/chronicle)",
@@ -446,6 +481,11 @@ def lambda_handler(event, context):
         if tier != prev:
             _write_tier(tier)
             _alert(prev, tier, mtd, projected)
+
+        # #822: persist the projection breakdown EVERY enforcement run (not just
+        # on tier change) so the daily brief's headroom line reads THIS run's
+        # burn rates, not the ones from whenever the tier last flipped.
+        _write_breakdown(tier, mtd, projected, ai_daily, non_ai_daily, now)
 
         return {
             "statusCode": 200,

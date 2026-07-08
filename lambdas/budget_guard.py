@@ -37,14 +37,24 @@ notifications are the backstop for that rare window.
 This module is part of the shared Lambda layer.
 """
 
+import json
 import os
 import time
+from datetime import datetime, timezone
 
 import boto3
 
 _SSM_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
+# #822: the governor's projection breakdown (mtd / projected / ai + non-ai daily
+# burn), persisted alongside the tier. Display-only — NEVER an input to
+# allow()/current_tier(); a malformed or missing breakdown only costs the daily
+# brief its headroom line, never AI enforcement.
+_SSM_BREAKDOWN_PARAM = os.environ.get("BUDGET_BREAKDOWN_PARAM", "/life-platform/budget-breakdown")
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
 _CACHE_TTL_S = 300  # 5 min — matches the governor's hourly cadence well enough
+# A breakdown older than this is not worth showing (the governor runs every 8h,
+# so ~6 consecutive missed runs) — stale burn rates mislead more than no line.
+_BREAKDOWN_MAX_AGE_S = 48 * 3600
 
 # feature → tier at which it becomes DISABLED (current_tier >= cutoff → blocked).
 # Ordered by AUDIENCE band (ADR-125): internal (1) < reader-narrative (2) <
@@ -142,3 +152,68 @@ def allow(feature: str) -> bool:
 def hard_stopped() -> bool:
     """True when all Bedrock calls must be refused (Tier 3)."""
     return current_tier() >= _HARD_STOP_TIER
+
+
+# ── #822: budget-headroom readout (display-only) ──────────────────────────────
+# The tier alone says WHAT is paused, not WHY there's no slack. The governor
+# persists its projection breakdown; read_breakdown() + format_headroom_line()
+# turn it into the daily brief's one-liner, e.g.:
+#   Budget: tier 1 · projected $83 vs $75 ceiling · AI $1.79/day of the
+#   $2.68/day burn — near-zero slack for reader growth
+# Everything here is fail-soft to None: the brief renders without the line
+# rather than ever failing or showing stale/garbled numbers.
+
+
+def read_breakdown(max_age_s: int = _BREAKDOWN_MAX_AGE_S):
+    """The governor's persisted projection breakdown as a dict, or None.
+
+    None when the param is missing/unparseable/incomplete or older than
+    `max_age_s` (stale burn rates mislead more than no line). Never raises.
+    """
+    try:
+        raw = _client().get_parameter(Name=_SSM_BREAKDOWN_PARAM)["Parameter"]["Value"]
+        b = json.loads(raw)
+        for key in ("tier", "mtd", "projected", "ceiling", "ai_daily", "non_ai_daily", "computed_at"):
+            if key not in b:
+                return None
+        computed_at = datetime.fromisoformat(str(b["computed_at"]))
+        if computed_at.tzinfo is None:
+            computed_at = computed_at.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - computed_at).total_seconds() > max_age_s:
+            return None
+        return b
+    except Exception:
+        return None  # fail-soft: display-only, the brief just omits the line
+
+
+def format_headroom_line(breakdown) -> str:
+    """One-line budget-headroom readout from a read_breakdown() dict, or "".
+
+    All values code-derived (Decimal from DDB-sourced callers is coerced via
+    float()). The slack clause makes the #822 fact legible: when the projection
+    is at/over the ceiling — a dev sprint alone can do this — say so plainly,
+    because any concurrent reader growth then lands straight on tier 2.
+    """
+    if not breakdown:
+        return ""
+    try:
+        tier = int(breakdown["tier"])
+        projected = float(breakdown["projected"])
+        ceiling = float(breakdown["ceiling"])
+        ai_daily = float(breakdown["ai_daily"])
+        non_ai_daily = float(breakdown["non_ai_daily"])
+        total_daily = ai_daily + non_ai_daily
+        line = (
+            f"Budget: tier {tier} · projected ${projected:.0f} vs ${ceiling:.0f} ceiling"
+            f" · AI ${ai_daily:.2f}/day of the ${total_daily:.2f}/day burn"
+        )
+        slack = ceiling - projected
+        if slack <= 0:
+            line += " — near-zero slack for reader growth"
+        elif slack < 0.1 * ceiling:
+            line += f" — ${slack:.0f} slack, thin for reader growth"
+        else:
+            line += f" — ${slack:.0f} headroom"
+        return line
+    except Exception:
+        return ""  # fail-soft: a malformed field costs the line, nothing else

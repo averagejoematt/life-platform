@@ -1909,10 +1909,13 @@ def _brief_journal_coaches(
     return out
 
 
-def _brief_footer(compute_age_msg, compute_stale, data, date_str):
+def _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=None):
     """Section group of the daily brief (extracted from build_html, ADR-pending).
 
     Returns the HTML fragment for these sections; behavior-preserving extraction.
+    budget_headroom_line (#822): optional pre-formatted one-liner from
+    budget_guard.format_headroom_line — rendered as an ops line above the
+    footer credits; omitted entirely when None/empty (fail-soft upstream).
     """
     out = ""
     # --- Footer ---
@@ -1945,6 +1948,10 @@ def _brief_footer(compute_age_msg, compute_stale, data, date_str):
     # brief — a white strip at the bottom of every single email. Recolored to match
     # the rest of the dark palette rather than left as a stray light-mode leftover.
     out += '<div style="background:#16213e;padding:10px 24px;border-top:1px solid #2d2d5e;margin-top:12px;">'
+    # #822: budget-headroom readout — one code-derived ops line so a dev-sprint
+    # burn that threatens the $75 ceiling is visible where Matthew already looks.
+    if budget_headroom_line:
+        out += '<p style="color:#64748b;font-size:9px;margin:0 0 4px;text-align:center;">' + budget_headroom_line + "</p>"
     out += (
         '<p style="color:#64748b;font-size:9px;margin:0;text-align:center;">Life Platform v2.36 &middot; '
         + date_str
@@ -1991,6 +1998,7 @@ def build_html(
     labs_coach_v2_text=None,
     explorer_coach_v2_text=None,
     vacation_fund=None,
+    budget_headroom_line=None,
 ):
     """Build the full daily brief HTML email.
 
@@ -2038,5 +2046,5 @@ def build_html(
         training_coach_v2_text,
         weekly_habit_review,
     )
-    html += _brief_footer(compute_age_msg, compute_stale, data, date_str)
+    html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)
     return html
