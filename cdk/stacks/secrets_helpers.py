@@ -22,18 +22,21 @@ therefore multi-region: primary in us-west-2, replica in us-east-1 (same name,
 same value), and each stack resolves the copy in its own region.
 """
 
-from aws_cdk import Stack, aws_secretsmanager as secretsmanager
+from aws_cdk import SecretValue
 
-from stacks.constants import ACCT, SITE_API_ORIGIN_SECRET_NAME
+from stacks.constants import SITE_API_ORIGIN_SECRET_NAME
 
 
 def site_api_origin_secret_value(scope, construct_id: str = "SiteApiOriginSecret") -> str:
     """Return the SITE_API_ORIGIN_SECRET value as a deploy-time-resolved string token.
 
+    Referenced by NAME, not ARN: an ARN-based dynamic reference without the
+    random suffix fails ResourceNotFoundException when the secret name ends in
+    a hyphen + 6 chars ("…-secret" does — AWS partial-ARN matching quirk,
+    observed 2026-07-08). A name reference resolves in the stack's own region
+    (us-west-2 primary / us-east-1 replica) with no suffix ambiguity.
+
     Call once per stack (construct ids are scoped per-stack, so the default id
     is safe to reuse across ServeStack and WebStack without collision).
     """
-    region = Stack.of(scope).region
-    arn = f"arn:aws:secretsmanager:{region}:{ACCT}:secret:{SITE_API_ORIGIN_SECRET_NAME}"
-    secret = secretsmanager.Secret.from_secret_partial_arn(scope, construct_id, arn)
-    return secret.secret_value.unsafe_unwrap()
+    return SecretValue.secrets_manager(SITE_API_ORIGIN_SECRET_NAME).unsafe_unwrap()
