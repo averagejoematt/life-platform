@@ -10,6 +10,22 @@ export async function getJSON(p) { const r = await fetch(p, { headers: { accept:
 
 export async function tryJSON(p) { try { return await getJSON(p); } catch (e) { return null; } }
 
+// Reader-participation switch-on (2026-07): the sanctioned POST write surface
+// (votes/follows/checkins/suggestions/findings, all DDB-rate-limited server-side,
+// see CLAUDE.md "Site API is primarily read-only"). One shared fetch wrapper so
+// every write control handles the 429/5xx/network-fail states the same honest way
+// instead of three near-duplicate try/catches.
+export async function postJSON(path, body) {
+  try {
+    const r = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    let data = null;
+    try { data = await r.json(); } catch (e) { /* no body */ }
+    return { ok: r.ok, status: r.status, data: data || {} };
+  } catch (e) {
+    return { ok: false, status: 0, data: {} };
+  }
+}
+
 export const isBad = (v) => { if (v == null) return true; const s = String(v).trim(); return s === "" || /^\[.*\]$/.test(s) || s.toUpperCase() === "N/A"; };
 
 export const has = (v) => v != null && v !== "" && !(Array.isArray(v) && !v.length);
@@ -78,6 +94,95 @@ export function kvtable(o, f) {
   // Drop rows whose value renders empty ("—") so nested-null objects don't leave dash rows.
   const r = Object.entries(o || {}).filter(([k, v]) => !k.startsWith("_") && v != null).map(([k, v]) => [k, kvval(v, f, k)]).filter(([, val]) => val !== "—").map(([k, val]) => `<tr><td class="rd-name">${esc(ttl(k))}</td><td class="num">${esc(val)}</td></tr>`).join("");
   return r ? `<table class="rd-tbl"><tbody>${r}</tbody></table>` : "";
+}
+
+/* ── Reader participation controls — switch-on (2026-07) ──────────────────────
+   The catalog/library vote+follow markup + wiring is identical shape on the
+   Challenges and Experiments pages (both back onto sibling endpoint pairs:
+   challenge_vote/challenge_follow, experiment_vote/experiment_follow) — one
+   pair of helpers, two call sites. Honest by construction: a real 0 renders as
+   "0 votes", never hidden or padded; every write is server rate-limited so the
+   worst a reader can do is see "already voted" or a 500. */
+
+// One card's vote button + follow toggle+form. `count` may be null (unknown —
+// e.g. the votes endpoint didn't load); render "—" rather than fake a number.
+export function voteFollowRow(endpointBase, idKey, id, count) {
+  const shown = count == null ? "—" : String(count);
+  return `<div class="part-row">` +
+    `<button class="part-btn" type="button" data-vote-btn data-endpoint="/api/${esc(endpointBase)}_vote" data-idkey="${esc(idKey)}" data-id="${esc(id)}">Vote for this <span class="part-count" data-vote-count>${esc(shown)}</span></button>` +
+    `<button class="part-btn" type="button" data-follow-btn data-endpoint="/api/${esc(endpointBase)}_follow" data-idkey="${esc(idKey)}" data-id="${esc(id)}">Notify me</button>` +
+    `</div><p class="part-msg" data-vote-msg></p>` +
+    `<form class="part-form" data-follow-form hidden><label class="label" for="fe-${esc(id)}">Email</label>` +
+    `<input id="fe-${esc(id)}" type="email" placeholder="you@example.com" data-follow-email maxlength="200" autocomplete="email">` +
+    `<button class="part-btn" type="submit" data-follow-submit>Follow</button><p class="part-msg" data-follow-msg></p></form>`;
+}
+
+export function wireVoteButtons(root = document) {
+  root.querySelectorAll("[data-vote-btn]").forEach((btn) => {
+    if (btn.__wired) return;
+    btn.__wired = 1;
+    btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const { endpoint, idkey, id } = btn.dataset;
+      const card = btn.closest("article") || btn.parentElement;
+      const msgEl = card ? card.querySelector("[data-vote-msg]") : null;
+      const countEl = btn.querySelector("[data-vote-count]");
+      const { ok, status, data } = await postJSON(endpoint, { [idkey]: id });
+      if (ok) {
+        if (countEl && data && data.new_count != null) countEl.textContent = String(data.new_count);
+        btn.classList.add("is-done");
+        if (msgEl) { msgEl.textContent = "Thanks — your vote's counted."; msgEl.classList.remove("is-error"); }
+      } else {
+        btn.disabled = false;
+        const fallback = status === 429 ? "Already voted for this in the last 24 hours." : "Couldn't record that vote — try again.";
+        if (msgEl) { msgEl.textContent = (data && data.error) || fallback; msgEl.classList.add("is-error"); }
+      }
+    });
+  });
+}
+
+export function wireFollowForms(root = document) {
+  root.querySelectorAll("[data-follow-btn]").forEach((btn) => {
+    if (btn.__wired) return;
+    btn.__wired = 1;
+    btn.addEventListener("click", () => {
+      const card = btn.closest("article") || btn.parentElement;
+      const form = card ? card.querySelector("[data-follow-form]") : null;
+      if (form) { form.hidden = !form.hidden; if (!form.hidden) form.querySelector("[data-follow-email]").focus(); }
+    });
+  });
+  root.querySelectorAll("[data-follow-form]").forEach((form) => {
+    if (form.__wired) return;
+    form.__wired = 1;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const card = form.closest("article");
+      const voteBtn = card ? card.querySelector("[data-vote-btn]") : null;
+      const followBtn = card ? card.querySelector("[data-follow-btn]") : null;
+      const emailIn = form.querySelector("[data-follow-email]");
+      const msgEl = form.querySelector("[data-follow-msg]");
+      const submitBtn = form.querySelector("[data-follow-submit]");
+      const email = emailIn ? emailIn.value.trim() : "";
+      if (!email || !email.includes("@")) {
+        if (msgEl) { msgEl.textContent = "Enter a valid email."; msgEl.classList.add("is-error"); }
+        return;
+      }
+      const endpoint = (followBtn || voteBtn).dataset.endpoint;
+      const idkey = (followBtn || voteBtn).dataset.idkey;
+      const id = (followBtn || voteBtn).dataset.id;
+      submitBtn.disabled = true;
+      const { ok, data } = await postJSON(endpoint, { email, [idkey]: id });
+      submitBtn.disabled = false;
+      if (ok) {
+        if (msgEl) { msgEl.textContent = data.already_following ? "Already on the list." : "You're in — an email lands when it launches."; msgEl.classList.remove("is-error"); }
+        emailIn.value = "";
+      } else if (msgEl) {
+        msgEl.textContent = (data && data.error) || "Couldn't save that — try again.";
+        msgEl.classList.add("is-error");
+      }
+    });
+  });
 }
 
 /* ── Renderers (bound to real shapes) ─────────────────────────────────────── */

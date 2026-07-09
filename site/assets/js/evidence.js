@@ -16,7 +16,7 @@ import { enhanceProvenance } from "/assets/js/provenance_popover.js";
 import { renderSupplements, renderLabs, renderPhysical, renderTraining } from "/assets/js/evidence_body.js";
 import { wireCharacter, renderCharacter } from "/assets/js/evidence_character.js";
 import { wireDataFigure, moveTrendMarker } from "/assets/js/evidence_datafigure.js";
-import { renderDiscoveries, renderGenome, renderChallenges, renderProtocols, renderExperiments } from "/assets/js/evidence_discovery.js";
+import { renderDiscoveries, renderGenome, renderChallenges, renderProtocols, renderExperiments, wireChallenges, wireExperiments, wireDiscoveries } from "/assets/js/evidence_discovery.js";
 import { renderHabits, renderLedger } from "/assets/js/evidence_habits.js";
 import { renderResults, renderPostmortems, renderSurvival, renderMirror, renderScenarios, renderWrong, renderCycles, renderCorrelations, renderCalibration, renderPredictions, renderBenchmarks } from "/assets/js/evidence_intelligence.js";
 import { renderBoard, renderPlatform, renderCost, renderData, renderTools, renderInference, renderPipeline, renderAsk, renderExplorer, renderVerify, renderGeneric, ASK_CHIPS } from "/assets/js/evidence_meta.js";
@@ -90,6 +90,11 @@ const WIRE = {
   },
   results: () => wireDataFigure(),
   character: wireCharacter,
+  // Reader participation switch-on (2026-07): votes/follows/check-ins/suggestions/
+  // findings, all against the already-live, already-rate-limited write endpoints.
+  challenges: () => wireChallenges(),
+  experiments: () => wireExperiments(),
+  discoveries: () => wireDiscoveries(),
   physical: () => {
     // P0.2 — silhouette scrubs the trend marker in lockstep; P4 adds the inverse:
     // hovering the weight chart drives the silhouette to that day's weigh-in.

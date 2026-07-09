@@ -4,7 +4,7 @@
 */
 import { dumbbell, nDots } from "/assets/js/charts.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
-import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, evClass, kvtable } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, evClass, kvtable, postJSON, voteFollowRow, wireVoteButtons, wireFollowForms } from "/assets/js/evidence_shared.js";
 
 // One machine-bet card: domains + status badge in the header, the falsifiable
 // statement as the body, the verdict trail once graded, the founding evidence
@@ -87,16 +87,61 @@ export async function renderDiscoveries(d) {
       ? sec("Hypotheses under test", `<div class="rd-cards">${hyp.map((h) => card(h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`)
       : "";
   }
+  // Reader participation: submit a finding — a visitor-spotted correlation goes
+  // to Matthew's moderation queue (POST /api/submit_finding, S3-backed) and may
+  // get promoted to a Discovery above or seed a new Experiment.
+  const findingSec = sec("Submit a finding", `<p class="rd-meta label">Spotted a pattern the data should chase? Two metrics + what you noticed.</p>` +
+    `<form class="part-form" data-finding-form><label class="label" for="fd-a">Metric A</label><input id="fd-a" type="text" data-finding-a placeholder="e.g. Sleep hours" maxlength="100" required>` +
+    `<label class="label" for="fd-b">Metric B</label><input id="fd-b" type="text" data-finding-b placeholder="e.g. Next-day HRV" maxlength="100" required>` +
+    `<label class="label" for="fd-text">What did you notice?</label><textarea id="fd-text" data-finding-text placeholder="Describe the pattern" maxlength="500" required></textarea>` +
+    `<label class="label" for="fd-email">Email (optional — get notified if promoted)</label><input id="fd-email" type="email" data-finding-email maxlength="254">` +
+    `<button class="part-btn" type="submit">Submit finding</button><p class="part-msg" data-finding-msg></p></form>`);
   if (!fs && !is && !hs)
-    return empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
-  return fs + is + hs + note("Correlative leads, not conclusions — N=1, FDR-corrected where computed, and n is small this early in the cycle.");
+    return findingSec + empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
+  return fs + is + hs + findingSec + note("Correlative leads, not conclusions — N=1, FDR-corrected where computed, and n is small this early in the cycle.");
+}
+
+// Wired after renderDiscoveries mounts: the submit-a-finding form.
+export function wireDiscoveries(root = document) {
+  const form = root.querySelector("[data-finding-form]");
+  if (!form || form.__wired) return;
+  form.__wired = 1;
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const metric_a = form.querySelector("[data-finding-a]").value.trim();
+    const metric_b = form.querySelector("[data-finding-b]").value.trim();
+    const finding = form.querySelector("[data-finding-text]").value.trim();
+    const email = form.querySelector("[data-finding-email]").value.trim();
+    const msgEl = form.querySelector("[data-finding-msg]");
+    const btn = form.querySelector("button[type=submit]");
+    if (!metric_a || !metric_b) { msgEl.textContent = "Both metrics are required."; msgEl.classList.add("is-error"); return; }
+    if (finding.length < 10) { msgEl.textContent = "Describe the pattern in at least 10 characters."; msgEl.classList.add("is-error"); return; }
+    if (email && !email.includes("@")) { msgEl.textContent = "Enter a valid email or leave it blank."; msgEl.classList.add("is-error"); return; }
+    btn.disabled = true;
+    const { ok, status, data } = await postJSON("/api/submit_finding", { metric_a, metric_b, finding, email: email || undefined });
+    btn.disabled = false;
+    if (ok) {
+      msgEl.textContent = (data && data.message) || "Finding submitted — Matthew will review it.";
+      msgEl.classList.remove("is-error");
+      form.reset();
+    } else {
+      const fallback = status === 429 ? "Rate limit reached — 3 submissions per hour." : "Couldn't submit that — try again.";
+      msgEl.textContent = (data && data.error) || fallback;
+      msgEl.classList.add("is-error");
+    }
+  });
 }
 
 export function renderGenome(d) { const g = d.genome || d; const rs = g.risk_summary || {}; const cats = g.categories || {}; const head = figs([g.total_snps != null && fig(fmt(g.total_snps), "SNPs analysed"), rs.unfavorable != null && fig(rs.unfavorable, "unfavorable"), rs.favorable != null && fig(rs.favorable, "favorable")]); const cs = Object.keys(cats).length ? sec("Risk by category", kvtable(cats)) : ""; if (!head.includes("fig-v") && !cs) return empty("Genome not yet published."); return head + cs + note("Genotype is predisposition, not destiny — context for the biomarkers."); }
 
 export async function renderChallenges(d) {
-  const cur = await tryJSON("/api/current_challenge");
+  const [cur, catalog] = await Promise.all([tryJSON("/api/current_challenge"), tryJSON("/api/challenge_catalog")]);
   const cc = cur && cur.current_challenge;
+  // Reader participation switch-on (2026-07): live vote counts merged from
+  // /api/challenge_catalog (DDB-backed, not the /api/challenges snapshot).
+  const voteMap = catalog && catalog.challenges
+    ? Object.fromEntries(catalog.challenges.map((c) => [c.id, c.votes]))
+    : null;
   const list = d.challenges || [];
   const sm = d.summary || {};
   const banner = cc && cc.challenge ? `<div class="rd-obs"><p class="rd-primary">${esc(cc.challenge)}</p>${cc.detail ? `<p class="rd-why">${esc(cc.detail)}</p>` : ""}<p class="rd-meta label">day ${esc(cc.days_complete ?? 0)} of ${esc(cc.days_total ?? "—")}</p></div>` : "";
@@ -126,6 +171,13 @@ export async function renderChallenges(d) {
     }).join("");
     return `<div class="cg" role="img" aria-label="Daily check-ins, ${dur} days">${cells}</div>`;
   };
+  // Reader participation switch-on: a reader following along can log whether
+  // they did today's rep too — POST /api/challenge_checkin (public, rate-limited
+  // 1/IP/challenge/day). No fake counts: the button just confirms the tap landed.
+  const checkinControl = (c) => `<div class="part-row" data-checkin data-challenge-id="${esc(c.challenge_id || c.id)}">` +
+    `<button class="part-btn" type="button" data-checkin-btn="true">Doing this too? Log today — done</button>` +
+    `<button class="part-btn" type="button" data-checkin-btn="false">Log today — missed</button>` +
+    `</div><p class="part-msg" data-checkin-msg></p>`;
   const liveCard = (c) => {
     const done = !!c.completed_at || c.status === "completed";
     const active = !done && (c.status === "active" || !!c.activated_at);
@@ -133,20 +185,52 @@ export async function renderChallenges(d) {
     const progFigs = active && pr.duration_days
       ? `<p class="rd-meta label">${[pr.checkin_days != null && `${pr.checkin_days}/${pr.duration_days} days checked in`, pr.completion_pct != null && `${fmt(pr.completion_pct)}% complete`, pr.success_rate != null && `${fmt(pr.success_rate)}% success`].filter(Boolean).join("  ·  ")}</p>`
       : "";
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p></article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p>${active ? checkinControl(c) : ""}</article>`;
   };
   // P2.2 — catalog cards carry their evidence: the summary, the tier chip, and
   // the recommending board persona. The served `icon` field is emoji — never drawn (§8).
+  // Reader participation: a vote (want this next) + a follow (email when it launches),
+  // wired to the live challenge_vote/challenge_follow endpoints — real counts, no padding.
   const catCard = (c) => {
     const [tc, tl] = c.evidence_tier ? evClass(c.evidence_tier) : [null, null];
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${c.category ? `<span class="ch-ric">${domainIcon(c.category)}</span>` : ""}${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}${c.evidence_summary && !isBad(c.evidence_summary) ? `<p class="rd-line">${esc(c.evidence_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${[c.category, c.difficulty, c.duration_days && c.duration_days + "d", c.board_recommender && "recommended by " + c.board_recommender].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+    const votes = voteMap ? voteMap[c.id] : null;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${c.category ? `<span class="ch-ric">${domainIcon(c.category)}</span>` : ""}${esc(c.name)}</h3><span class="rd-badge">${esc(c.status)}</span></header>${c.one_liner ? `<p class="rd-why">${esc(c.one_liner)}</p>` : ""}${c.evidence_summary && !isBad(c.evidence_summary) ? `<p class="rd-line">${esc(c.evidence_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${[c.category, c.difficulty, c.duration_days && c.duration_days + "d", c.board_recommender && "recommended by " + c.board_recommender].filter(Boolean).map(esc).join("  ·  ")}</p>${voteFollowRow("challenge", "catalog_id", c.id, votes)}</article>`;
   };
   const liveSec = sec("Taken on", live.length ? `<div class="rd-cards">${live.map(liveCard).join("")}</div>` : empty("None taken on yet this cycle."));
   // "Available now" vs "Backlog" was a distinction without a difference — both are
   // catalog ideas not yet taken on. One backlog.
   const candidates = avail.concat(backlog);
   const backSec = candidates.length ? sec(`Backlog (${candidates.length})`, `<div class="rd-cards">${candidates.slice(0, 80).map(catCard).join("")}</div>`) : "";
-  return banner + head + liveSec + backSec + note("An N=1 instrument — reader participation is deferred.");
+  return banner + head + liveSec + backSec + note("An N=1 instrument — vote for what's next, or log along on the active one.");
+}
+
+// Wired after renderChallenges mounts (evidence.js WIRE.challenges): the generic
+// vote/follow controls (shared with Experiments) + the checkin buttons on the
+// live "Taken on" card.
+export function wireChallenges(root = document) {
+  wireVoteButtons(root);
+  wireFollowForms(root);
+  root.querySelectorAll("[data-checkin]").forEach((wrap) => {
+    if (wrap.__wired) return;
+    wrap.__wired = 1;
+    const msgEl = wrap.parentElement.querySelector("[data-checkin-msg]");
+    wrap.querySelectorAll("[data-checkin-btn]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const buttons = [...wrap.querySelectorAll("[data-checkin-btn]")];
+        buttons.forEach((b) => (b.disabled = true));
+        const completed = btn.dataset.checkinBtn === "true";
+        const { ok, status, data } = await postJSON("/api/challenge_checkin", { challenge_id: wrap.dataset.challengeId, completed });
+        if (ok) {
+          buttons.forEach((b) => b.classList.add("is-done"));
+          if (msgEl) { msgEl.textContent = `Logged — ${completed ? "done" : "missed"} today. Thanks for checking in.`; msgEl.classList.remove("is-error"); }
+        } else {
+          buttons.forEach((b) => (b.disabled = false));
+          const fallback = status === 429 ? "Already checked in for this challenge today." : "Couldn't log that — try again.";
+          if (msgEl) { msgEl.textContent = (data && data.error) || fallback; msgEl.classList.add("is-error"); }
+        }
+      });
+    });
+  });
 }
 
 export function renderProtocols(d) { const ps = (d.protocols || []).slice().sort((a, b) => (/(active|running|on)/i.test(a.status || "") ? 0 : 1) - (/(active|running|on)/i.test(b.status || "") ? 0 : 1)); if (!ps.length) return empty("No active protocols yet."); return figs([fig(ps.length, "active protocols")]) + `<div class="rd-cards">${ps.map((p) => `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(p.name)}</h3>${p.status ? `<span class="rd-badge">${esc(p.status)}</span>` : ""}</header>${p.why ? `<p class="rd-why">${esc(p.why)}</p>` : ""}${p.mechanism ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(p.mechanism)}</p>` : ""}<p class="rd-meta label">${[p.domain, p.tier && "tier " + esc(p.tier)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`).join("")}</div>` + note("Matthew's deliberate interventions, read-only. Not medical advice."); }
@@ -157,6 +241,13 @@ export async function renderExperiments(d) {
   // P2.1 — the arc header: what the whole experiment PROGRAM has learned so far
   // (the same synthesis the coaching page reads; it was never surfaced here).
   const syn = await tryJSON("/api/experiment_synthesis");
+  // Reader participation switch-on: live vote tallies from /api/experiment_library
+  // (DDB-backed; the /api/experiments library entries carry only a static seed
+  // count). Flatten the pillar grouping to one id→votes map.
+  const elib = await tryJSON("/api/experiment_library");
+  const voteMap = elib && elib.pillars
+    ? Object.fromEntries(elib.pillars.flatMap((p) => (p.experiments || []).map((e) => [e.id, e.votes])))
+    : null;
   const arcBand = syn && syn.throughline && !isBad(syn.throughline)
     ? `<div class="rd-obs"><p class="dx-kicker label">what the program has learned${syn.week_count ? ` · week ${esc(String(syn.week_count))}` : ""}</p><p class="rd-primary">${esc(syn.throughline)}</p>${syn.arc && !isBad(syn.arc) ? `<p class="rd-why">${esc(String(syn.arc).slice(0, 420))}${String(syn.arc).length > 420 ? "…" : ""}</p>` : ""}</div>`
     : "";
@@ -214,10 +305,55 @@ export async function renderExperiments(d) {
     const [tc, tl] = x.evidence_tier ? evClass(x.evidence_tier) : [null, null];
     const meta = [x.pillar, x.difficulty, x.evidence_citation && "src: " + x.evidence_citation].filter(Boolean).map(esc).join("  ·  ");
     const link = x.source_url ? ` · <a class="supp-ev-link" href="${esc(x.source_url)}" target="_blank" rel="noopener">evidence ↗</a>` : "";
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${meta}${link}</p></article>`;
+    // Reader participation: vote for which pipeline experiment runs next + get
+    // notified when it does — wired to experiment_vote/experiment_follow.
+    const votes = voteMap ? voteMap[x.id] : (x.votes != null ? x.votes : null);
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge">${esc(x.status)}</span></header>${x.hypothesis ? `<p class="rd-why">${esc(x.hypothesis)}</p>` : x.result_summary ? `<p class="rd-why">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${tc ? `<span class="supp-evlabel ${tc}">${esc(tl)}</span>  ·  ` : ""}${meta}${link}</p>${x.id ? voteFollowRow("experiment", "library_id", x.id, votes) : ""}</article>`;
   };
   const runSec = sec("Running now", running.length ? `<div class="rd-cards">${running.map(runCard).join("")}</div>` : empty("Nothing running yet this cycle — the experiment just started."));
   const pipeline = [...avail, ...backlog];
   const pipeSec = pipeline.length ? sec(`In the pipeline (${pipeline.length})`, `<div class="rd-cards">${pipeline.slice(0, 60).map(libCard).join("")}</div>`) : "";
-  return arcBand + head + runSec + pipeSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
+  // Reader participation: suggest the next experiment — a moderated idea queue
+  // (POST /api/experiment_suggest), not auto-published.
+  const suggestSec = sec("Suggest an experiment", `<p class="rd-meta label">What should the platform test next? Matthew reviews every idea before it enters the pipeline.</p>` +
+    `<form class="part-form" data-suggest-form><label class="label" for="sg-idea">Your idea</label>` +
+    `<textarea id="sg-idea" data-suggest-idea placeholder="e.g. cold shower before bed vs deep sleep %" maxlength="500" required></textarea>` +
+    `<label class="label" for="sg-source">Name or site (optional)</label><input id="sg-source" type="text" data-suggest-source maxlength="100">` +
+    `<button class="part-btn" type="submit">Send</button><p class="part-msg" data-suggest-msg></p></form>`);
+  return arcBand + head + runSec + pipeSec + suggestSec + note("N=1 instrument. “Running now” are live on the ledger; the pipeline is the experiment library — candidates not yet run.");
+}
+
+// Wired after renderExperiments mounts: the shared vote/follow controls on
+// pipeline cards + the suggest-an-experiment form submit handler.
+export function wireExperiments(root = document) {
+  wireVoteButtons(root);
+  wireFollowForms(root);
+  const form = root.querySelector("[data-suggest-form]");
+  if (form && !form.__wired) {
+    form.__wired = 1;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const idea = form.querySelector("[data-suggest-idea]").value.trim();
+      const source = form.querySelector("[data-suggest-source]").value.trim();
+      const msgEl = form.querySelector("[data-suggest-msg]");
+      const btn = form.querySelector("button[type=submit]");
+      if (idea.length < 10) {
+        msgEl.textContent = "A few more words — at least 10 characters.";
+        msgEl.classList.add("is-error");
+        return;
+      }
+      btn.disabled = true;
+      const { ok, status, data } = await postJSON("/api/experiment_suggest", { idea, source });
+      btn.disabled = false;
+      if (ok) {
+        msgEl.textContent = "Sent — thanks. Matthew reads every suggestion.";
+        msgEl.classList.remove("is-error");
+        form.reset();
+      } else {
+        const fallback = status === 429 ? "Too many suggestions from this connection — try again later." : "Couldn't send that — try again.";
+        msgEl.textContent = (data && data.error) || fallback;
+        msgEl.classList.add("is-error");
+      }
+    });
+  }
 }
