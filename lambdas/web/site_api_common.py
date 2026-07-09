@@ -116,11 +116,7 @@ PLATFORM_STATS = {
     "review_grade": "A",
     "active_secrets": 15,
     "site_pages": 77,
-<<<<<<< HEAD
-    "test_count": 2837,
-=======
-    "test_count": 2823,
->>>>>>> 1553b904 (feat(ops): surge-mode ceiling — budget floats $75→$100 on real reader traffic (#739))
+    "test_count": 2839,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
