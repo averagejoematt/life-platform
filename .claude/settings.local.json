@@ -184,7 +184,10 @@
       "Bash(python3 -m pytest tests/test_sync_doc_metadata_check.py tests/test_ci_pin_consistency.py -q)",
       "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/site-deploy.yml'\\)\\)\")",
       "Bash(python3 -m pytest tests/test_site_deploy_workflow.py -q)",
-      "Bash(aws budgets *)"
+      "Bash(aws budgets *)",
+      "Bash(python3 -m pytest tests/test_wiring_coverage.py tests/test_sync_doc_metadata_check.py -q)",
+      "Bash(python3 deploy/sync_doc_metadata.py --check)",
+      "Bash(python3 scripts/generate_mcp_tool_catalog.py)"
     ]
   },
   "enableAllProjectMcpServers": true,

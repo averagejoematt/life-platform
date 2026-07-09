@@ -21,7 +21,7 @@ Last updated: 2026-07-09 (v8.6.0 — 62 MCP tools, 33-module package, 94 Lambdas
 2. **safe_sync wrapper:** `source deploy/lib/safe_sync.sh` then call `safe_sync "$SRC" "$DST"` instead of raw `aws s3 sync --delete`. Blocks bucket-root targets and aborts if dryrun shows >100 deletions.
 3. **S3 versioning:** Enabled. Even if objects are deleted, they can be recovered by removing delete markers.
 
-**For site deploys:** Always use `bash deploy/sync_site_to_s3.sh`. It targets `s3://matthew-life-platform/site/` with correct cache-control headers.
+**For site deploys:** merging to main deploys the site through CI (`site-deploy.yml`, #750 — gates + auto-rollback). The manual path (`bash deploy/sync_site_to_s3.sh`) is the fallback for attended fixes; it targets `s3://matthew-life-platform/site/` with correct cache-control headers.
 
 **To recover from accidental S3 deletion:**
 ```bash

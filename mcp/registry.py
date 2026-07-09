@@ -139,7 +139,7 @@ TOOLS = {
         "fn": tool_get_date_range,
         "schema": {
             "name": "get_date_range",
-            "description": f"Get time-series records for a single source. Returns raw daily data for windows up to {RAW_DAY_LIMIT} days, monthly aggregates beyond that. Use get_aggregated_summary for multi-year trends.",
+            "description": f"Get time-series records for a single source. Returns raw daily data for windows up to {RAW_DAY_LIMIT} days, monthly aggregates beyond that.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

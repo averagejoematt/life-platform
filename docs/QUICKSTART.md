@@ -100,7 +100,7 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 | A shared layer module (see list below) | `bash deploy/build_layer.sh` FIRST, then redeploy dependents | Layer must propagate before Lambda code runs |
 | Any file in `mcp/` | See MCP Deploy below | `deploy_lambda.sh` strips the `mcp/` directory (ADR-031) |
 | CDK stack code (IAM, schedules, new Lambda) | `cd cdk && npx cdk deploy <StackName>` | Infra changes require CloudFormation |
-| Site HTML/CSS/JS | `bash deploy/sync_site_to_s3.sh` | Content-hashes assets + invalidates CloudFront |
+| Site HTML/CSS/JS | **merge to main** — CI deploys it (`site-deploy.yml`, #750) | Manual fallback: `bash deploy/sync_site_to_s3.sh` |
 
 ### `cdk deploy` vs `deploy_lambda.sh`
 

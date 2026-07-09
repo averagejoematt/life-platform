@@ -15,7 +15,7 @@ Last verified: 2026-07-04
 | **DynamoDB table `life-platform`** | Single-table store; billing PAY_PER_REQUEST | Imported via `Table.from_table_name()` — CDK would need ownership to manage it, risking accidental deletion on `cdk destroy` | AWS Console / initial setup | I4 (`test_i4_dynamodb_table_healthy`) — ACTIVE + deletion_protection + PITR checked post-deploy; GSI1/GSI2 asserted by same test |
 | **DynamoDB GSI1** (reading due-date sparse index) | `sk_due_date` GSI for reading domain | ADR-097 sparse index; CDK can't add GSIs to an imported table | AWS Console | I4 GSI assertion |
 | **DynamoDB GSI2** (reading overview index) | `sk_overview` GSI for book overview queries | Same as GSI1 | AWS Console | I4 GSI assertion |
-| **S3 bucket policy `matthew-life-platform`** | Denies `s3:DeleteObject` on `raw/*`, `config/*`, `uploads/*`, `generated/*` for `matthew-admin` role | Protects raw data; CDK would need to own the bucket to manage the policy | AWS Console / `seeds/seed_bucket_policy.json` | `ProtectDataFromDeployScripts` statement; weekly drift sentinel checks critical bucket settings |
+| **S3 bucket policy `matthew-life-platform`** | Denies `s3:DeleteObject` on `raw/*`, `config/*`, `uploads/*`, `generated/*` for `matthew-admin` role | Protects raw data; CDK would need to own the bucket to manage the policy | AWS Console / `deploy/bucket_policy.json` | `ProtectDataFromDeployScripts` statement; weekly drift sentinel checks critical bucket settings |
 | **S3 lifecycle configuration `matthew-life-platform`** | Per-prefix retention/expiration rules (deploys/, raw/, uploads/, generated/, config/, cloudtrail/, remediation-log/dispatch-dedupe/, mcp-audit/) | Bucket is imported via `Bucket.from_bucket_name()` — CDK cannot attach lifecycle rules to an imported bucket | `deploy/apply_s3_lifecycle.sh` (declarative FULL config — a put replaces every rule; #886) | Retention table in `docs/DATA_GOVERNANCE.md` mirrors the script; no automated drift assertion yet |
 | **SES email identity `lifeplatform@mattsusername.com`** | Verified sender for daily brief and digest emails | SES identities are verified at the address level; CDK manages configuration sets but not DKIM/SPF outside Route 53 | AWS Console | Manual quarterly check; SES bounce/complaint metrics in CloudWatch |
 | **Route 53 / DNS** | `averagejoematt.com` → CloudFront; MX records for SES | DNS is the root of trust — CDK would need to import the hosted zone; deliberate choice to keep DNS outside automated teardown | AWS Console (Route 53 hosted zone) | Monthly manual check; CloudFront availability alarm fires if DNS is broken |
@@ -56,7 +56,7 @@ aws dynamodb update-continuous-backups \
 ```bash
 aws s3api put-bucket-policy \
   --bucket matthew-life-platform \
-  --policy file://seeds/seed_bucket_policy.json
+  --policy file://deploy/bucket_policy.json
 ```
 
 ### SES identity verification lost
