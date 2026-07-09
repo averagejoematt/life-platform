@@ -284,6 +284,18 @@
         p.style.strokeDasharray = L;
         p.style.strokeDashoffset = L;
         p.getBoundingClientRect(); // force reflow so the transition runs
+        // #421 render-QA: clear the dash props once drawn. getTotalLength() is USER units,
+        // but on a vector-effect:non-scaling-stroke path Chromium applies the dash in SCREEN
+        // space — leave the dasharray in place and any chart rendered wider than its viewBox
+        // (desktop, preserveAspectRatio="none") paints only L/renderedWidth of the line.
+        // At offset 0 the line is fully drawn, so clearing is visually a no-op.
+        var undash = function () {
+          p.style.strokeDasharray = "";
+          p.style.strokeDashoffset = "";
+          p.removeEventListener("transitionend", undash);
+        };
+        p.addEventListener("transitionend", undash);
+        setTimeout(undash, 1500); // fallback if transitionend never fires
         requestAnimationFrame(function () {
           p.style.transition = "stroke-dashoffset 1.15s var(--ease-out)";
           p.style.strokeDashoffset = "0";

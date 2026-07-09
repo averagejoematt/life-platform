@@ -207,6 +207,7 @@ from web.site_api_vitals import (
     handle_vitals,
     handle_weight_progress,
 )
+from web.site_api_vitals_depth import handle_vitals_depth  # #421 — VO2max arc, walking HR, fitness age
 
 # ── Endpoint handlers ───────────────────────────────────────
 
@@ -305,6 +306,8 @@ def handle_methods() -> dict:
 
 ROUTES = {
     "/api/vitals": handle_vitals,
+    # #421 (VIT-02/03/04, PHY-06): vitals-depth arc metrics — VO2max trend, walking HR, fitness age
+    "/api/vitals_depth": handle_vitals_depth,
     # RQA-06/07 (#414): two computed views ported from the private MCP tools to the data door
     "/api/autonomic_balance": handle_autonomic_balance,
     "/api/zone2": handle_zone2_breakdown,
