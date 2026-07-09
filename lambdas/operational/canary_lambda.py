@@ -279,9 +279,11 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
             data = json.loads(body)
             tools = data.get("result", {}).get("tools", [])
             tool_count = len(tools)
-            # R16-F05: threshold updated to 80 — we have 87 tools; headroom for SIMP-1 cuts
-            if tool_count < 80:
-                return False, f"MCP tools/list returned only {tool_count} tools (expected ≥80)", latency
+            # ER-04 #395 (2026-07-08): registry audited down to 60 tools (docs/MCP_TOOL_AUDIT.md).
+            # Floor sits just below the audited count — a partial/broken deploy shows far fewer;
+            # any further audited prune must update this alongside the ledger.
+            if tool_count < 55:
+                return False, f"MCP tools/list returned only {tool_count} tools (expected ≥55)", latency
             return True, f"MCP reachable OK — {tool_count} tools listed ({latency:.0f}ms)", latency
         except (json.JSONDecodeError, AttributeError):
             # Response came back but wasn't parseable — Lambda alive but something wrong
