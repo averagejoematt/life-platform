@@ -150,13 +150,14 @@ def test_site_sha_ancestry_survives_git_fetch_failure(monkeypatch):
 # ── sweep status aggregation + summary (AC1/AC4) ─────────────────────────────
 
 
-def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None):
+def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc=None):
     monkeypatch.setattr(ds, "check_cfn_drift", lambda *a, **k: cfn)
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
     monkeypatch.setattr(ds, "check_bucket_policy", lambda: bucket)
     monkeypatch.setattr(ds, "check_doc_literals", lambda: doc or {"status": "clean", "mismatches": []})
     monkeypatch.setattr(ds, "check_site_sha_ancestry", lambda: site or {"status": "clean", "live_sha": "deadbeef"})
+    monkeypatch.setattr(ds, "check_oidc_iam", lambda: oidc or {"status": "clean"})
 
 
 def test_sweep_clean(monkeypatch):
@@ -266,3 +267,21 @@ def test_read_latest_fail_soft():
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ── OIDC/IAM identity drift (#687 S-E6-01) ───────────────────────────────────
+
+
+def test_oidc_iam_clean_on_zero_exit(monkeypatch):
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: _FakeCompleted(0))
+    assert ds.check_oidc_iam()["status"] == "clean"
+
+
+def test_oidc_iam_drift_surfaces_mismatch_lines(monkeypatch):
+    out = "DRIFT — 1 target(s) differ:\n  [DRIFT] github-actions-deploy-role:trust-policy\n"
+    fake = _FakeCompleted(1)
+    fake.stdout = out
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: fake)
+    res = ds.check_oidc_iam()
+    assert res["status"] == "drift"
+    assert any("deploy-role" in m for m in res["mismatches"])

@@ -53,7 +53,19 @@ here has not been applied yet.
 
 ---
 
-## The trust-tighten — STAGED, NOT EXECUTED (the follow-up)
+## The trust-tighten — EXECUTED 2026-07-09 (#687)
+
+> Applied attended 2026-07-09: both roles' live trust is now the main-only form and the
+> canonical `*.trust.json` files below carry it (`proposed/` removed). Validated live:
+> main-ref run assumed the deploy role (visual-qa dispatch green), a non-main branch
+> dispatch failed with `Not authorized to perform sts:AssumeRoleWithWebIdentity`, and
+> `verify_oidc_iam.py` reports CLEAN. A read-only `github-actions-diagnosis-role`
+> (Bedrock vision-QA only, main-only trust) was split out in the same pass; the three
+> vision-QA credential steps assume it instead of the deploy role. The weekly drift
+> sentinel now runs the verifier (`check_oidc_iam`). Rollback: `git revert` + re-apply
+> the reverted trust JSON via `aws iam update-assume-role-policy`.
+
+### Original staging notes (kept for context)
 
 `#401`'s acceptance criteria require the trust subject to be narrowed from repo-wide
 (`repo:...:*`) to **main branch / production environment only**, and that the tighten be

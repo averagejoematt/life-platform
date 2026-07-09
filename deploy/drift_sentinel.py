@@ -258,6 +258,30 @@ def check_orphan_functions():
 # ── 4. Bucket-policy delete-protection ───────────────────────────────────────
 
 
+def check_oidc_iam():
+    """The OIDC identities (deploy/remediation/golden-eval/diagnosis roles + provider)
+    must match the checked-in JSON under infra/iam/ exactly (#687 S-E6-01).
+
+    Delegates to deploy/verify_oidc_iam.py — the same read-only comparator CI's
+    post-deploy checks run — so an out-of-band trust or permission change is caught
+    within a week even if no deploy happens."""
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, os.path.join(_ROOT, "deploy", "verify_oidc_iam.py")],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"verify_oidc_iam: {e}"}
+    if proc.returncode == 0:
+        return {"status": "clean"}
+    drift_lines = [ln.strip() for ln in proc.stdout.splitlines() if "[DRIFT]" in ln]
+    return {"status": "drift", "detail": "OIDC/IAM identities differ from infra/iam/", "mismatches": drift_lines[:10]}
+
+
 def check_bucket_policy():
     """The live bucket policy must still Deny s3:DeleteObject on every protected prefix.
 
@@ -429,6 +453,7 @@ def run_sweep():
         **check_postflight(),
         "orphan_functions": check_orphan_functions(),
         "bucket_policy": check_bucket_policy(),
+        "oidc_iam": check_oidc_iam(),
         "doc_literals": check_doc_literals(),
         "site_sha_ancestry": check_site_sha_ancestry(),
     }

@@ -60,6 +60,14 @@ ROLES = {
         "permissions_file": "github-actions-golden-eval-role.permissions.json",
         "inline_policy_name": "golden-eval-permissions",
     },
+    # #687: the read-only diagnosis role split from the deploy role — CI jobs that
+    # only observe (Bedrock vision QA today) assume this instead of deploy-mutate.
+    # Main-only trust from day one. Grows only as diagnosis jobs migrate to it.
+    "github-actions-diagnosis-role": {
+        "trust_file": "github-actions-diagnosis-role.trust.json",
+        "permissions_file": "github-actions-diagnosis-role.permissions.json",
+        "inline_policy_name": "diagnosis-permissions",
+    },
 }
 
 PROVIDER_FILE = "github-oidc-provider.json"
