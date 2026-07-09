@@ -11,11 +11,15 @@ is the lagged secondary backstop + notice.
 Estimate = non-AI (Cost Explorer, all services EXCEPT Bedrock, month-to-date)
          + AI    (AWS/Bedrock per-model token metrics × Bedrock prices, ×buffer)
 
-Tiers (projected month-end total, $75 all-in ceiling):
-  0 Normal   < $55
-  1 Caution  $55-65   → pause heaviest coach AI (narrative/ensemble/chronicle)
-  2 Restrict $65-73   → + pause public website AI (/api/ask, /api/board_ask)
-  3 Hard stop ≥ $73   → + pause ALL Bedrock; daily brief goes data-only
+Tiers (projected month-end total vs the EFFECTIVE ceiling — base $85 since the
+ADR-133 amendment 2026-07-08, $100 in surge mode). The tier bands are fixed
+FRACTIONS of the ceiling (≈73%/87%/97%, the original $75 calibration in
+_TIER_THRESHOLDS, scaled by _tier_for):
+  0 Normal    < 73% of ceiling  ($62.33 at the $85 base)
+  1 Caution   73–87%            → pause heaviest coach AI (narrative/ensemble/chronicle)
+  2 Restrict  87–97%            → + pause public website AI (/api/ask, /api/board_ask)
+  3 Hard stop ≥ 97% of ceiling  ($82.73 at the $85 base) → + pause ALL Bedrock;
+                                  daily brief goes data-only
 
 Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
 Also persists the projection breakdown (mtd/projected/ai+non-ai daily burn) to
@@ -23,12 +27,13 @@ SSM /life-platform/budget-breakdown every enforcement run so the daily brief can
 render a one-line headroom readout (#822 — a dev sprint alone can trip the tier).
 Auto-resets to 0 at month rollover (estimate is month-to-date).
 
-SURGE MODE (ADR-133, #739): the $75 ceiling is calibrated for near-zero reader
+SURGE MODE (ADR-133, #739): the base ceiling is calibrated for near-zero reader
 traffic. Real reader arrival (e.g. a Reddit hit) would auto-outage the reader
 AI at the moment of success. When the traffic digest's trailing 7-day unique
 visitor count (LifePlatform/Traffic::UniqueVisitors7d, emitted weekly by
 traffic_digest_lambda) crosses SURGE_UNIQUES_THRESHOLD, the effective monthly
-ceiling floats from $75 to SURGE_CEILING_USD ($100) — see _effective_ceiling.
+ceiling floats from the $85 base to SURGE_CEILING_USD ($100) — see
+_effective_ceiling.
 Tier thresholds scale proportionally with whatever ceiling is in effect (see
 _tier_for). Surge is a pure function of reader traffic, never of spend — so a
 dev-caused spend spike can NOT trigger it (isolates cause from effect, per
@@ -67,7 +72,10 @@ SSM_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier
 # budget_guard.read_breakdown / format_headroom_line, the consumer side).
 SSM_BREAKDOWN_PARAM = os.environ.get("BUDGET_BREAKDOWN_PARAM", "/life-platform/budget-breakdown")
 ALERTS_TOPIC = os.environ.get("ALERTS_TOPIC_ARN", f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts")
-MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "75"))
+# Base $85 since 2026-07-08 (ADR-133 amendment; was $75 per ADR-063 — raised by
+# Matthew after tier-1 degradation from internal spend creep, $79.27 projected
+# vs the old $75).
+MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "85"))
 # ADR-133 (#739): surge-mode ceiling. When trailing 7-day unique visitors
 # (traffic_digest_lambda's UniqueVisitors7d metric) cross this threshold, the
 # effective ceiling floats from MONTHLY_CEILING to SURGE_CEILING_USD. The
@@ -94,7 +102,12 @@ _PRICES = {
 _DEFAULT_PRICE = _PRICES["fable"]  # unknown model → price as the most expensive tier
 _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never overshoot
 
-# Tier thresholds on PROJECTED month-end total (USD).
+# Tier thresholds on PROJECTED month-end total (USD), calibrated against the
+# ORIGINAL $75 ceiling (ADR-063). _tier_for scales them by
+# ceiling / _THRESHOLD_REFERENCE_CEILING, so the bands are fixed FRACTIONS of
+# whatever ceiling is in effect (≈73%/87%/97%) — at the $85 base they trip at
+# $62.33 / $73.67 / $82.73; at the $100 surge ceiling at $73.33 / $86.67 / $97.33.
+_THRESHOLD_REFERENCE_CEILING = 75.0
 _TIER_THRESHOLDS = [(73, 3), (65, 2), (55, 1)]  # checked high→low; else tier 0
 
 # June 2026 ONLY (auto-reverts 2026-07-01): the Coaching-door launch + a heavy
@@ -275,17 +288,20 @@ def _project_month_end(
     return mtd + daily_rate * days_remaining
 
 
-def _tier_for(projected: float, ceiling: float = MONTHLY_CEILING) -> int:
-    """Tier for `projected` against `ceiling`. The base thresholds in
-    _active_thresholds() are calibrated for the standing $75 ceiling; when a
-    different (e.g. surge, ADR-133) ceiling is in effect, they scale by the
-    same ratio so the tier BANDS (roughly 73%/87%/97% of ceiling) stay
-    proportionally identical — only the dollar amounts that trip them move.
-    ceiling defaults to MONTHLY_CEILING so existing single-arg callers (and
-    tests) are unaffected."""
+def _tier_for(projected: float, ceiling: float = None) -> int:
+    """Tier for `projected` against `ceiling` (default: the current base,
+    MONTHLY_CEILING). The thresholds in _active_thresholds() are calibrated
+    against the ORIGINAL $75 ceiling (_THRESHOLD_REFERENCE_CEILING); they scale
+    by ceiling/reference so the tier BANDS (≈73%/87%/97% of ceiling) stay
+    proportionally identical under ANY ceiling — the $85 base (ADR-133
+    amendment) or the $100 surge — only the dollar amounts that trip them move.
+    ceiling is resolved at call time (None sentinel) so tests can monkeypatch
+    MONTHLY_CEILING without hitting the frozen-default trap."""
+    if ceiling is None:
+        ceiling = MONTHLY_CEILING
     thresholds = _active_thresholds()
-    if ceiling != MONTHLY_CEILING:
-        ratio = ceiling / MONTHLY_CEILING
+    if ceiling != _THRESHOLD_REFERENCE_CEILING:
+        ratio = ceiling / _THRESHOLD_REFERENCE_CEILING
         thresholds = [(t * ratio, tier) for t, tier in thresholds]
     for threshold, tier in thresholds:
         if projected >= threshold:
@@ -298,17 +314,17 @@ def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
 
     Surge is a pure function of reader traffic — never of spend — so it can
     only be triggered BY readers arriving, not by a dev/internal spend spike
-    (#739 scope constraint: "the ceiling stays $75 when uniques are below
-    threshold regardless of projection"). `recent_uniques` is None when the
-    metric hasn't been read yet (e.g. transient CloudWatch error) — fails
-    closed to the normal $75 ceiling, never the surge one.
+    (#739 scope constraint: "the ceiling stays at the base when uniques are
+    below threshold regardless of projection"). `recent_uniques` is None when
+    the metric hasn't been read yet (e.g. transient CloudWatch error) — fails
+    closed to the normal base ceiling ($85), never the surge one.
     """
     if recent_uniques is not None and recent_uniques >= SURGE_UNIQUES_THRESHOLD:
         return SURGE_CEILING_USD, True
     return MONTHLY_CEILING, False
 
 
-def _decide_tier(projected: float, mtd: float, elapsed_days: float, ceiling: float = MONTHLY_CEILING) -> int:
+def _decide_tier(projected: float, mtd: float, elapsed_days: float, ceiling: float = None) -> int:
     """Tier from the projection, bounded by ACTUAL month-to-date spend.
 
     The projection is an early-warning signal, but it has two failure modes that
@@ -380,7 +396,7 @@ def _write_breakdown(
     ai_daily: float,
     non_ai_daily: float,
     now: datetime,
-    ceiling: float = MONTHLY_CEILING,
+    ceiling: float = None,
     surge_active: bool = False,
     recent_uniques=None,
 ) -> None:
@@ -397,6 +413,8 @@ def _write_breakdown(
     (may be SURGE_CEILING_USD), so the brief's headroom line is always honest
     about what limit is actually in effect.
     """
+    if ceiling is None:
+        ceiling = MONTHLY_CEILING
     payload = {
         "tier": int(tier),
         "mtd": round(mtd, 2),
@@ -425,7 +443,9 @@ _TIER_LABELS = {
 }
 
 
-def _alert(prev: int, new: int, mtd: float, projected: float, ceiling: float = MONTHLY_CEILING) -> None:
+def _alert(prev: int, new: int, mtd: float, projected: float, ceiling: float = None) -> None:
+    if ceiling is None:
+        ceiling = MONTHLY_CEILING
     direction = "raised" if new > prev else "lowered"
     urgent = new >= 3
     subj = f"{'🛑' if urgent else '⚠️'} Budget tier {direction} {prev}→{new}: {_TIER_LABELS[new]}"

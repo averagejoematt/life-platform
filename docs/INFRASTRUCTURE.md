@@ -11,7 +11,7 @@
 |-------|-------|
 | Account ID | `205930651321` |
 | Region | `us-west-2` (Oregon); us-east-1 for Lambda@Edge + OG image + email-subscriber |
-| Budget | $75/month all-in, **enforced** (ADR-063; alerts at 50/70/85/100%; cost-governor degrades AI by tier) |
+| Budget | $85/month all-in, **enforced** (ADR-063 + ADR-133 amendment — was $75, floats to $100 on reader-traffic surge; alerts at 50/70/85/100%; cost-governor degrades AI by tier) |
 | CloudTrail | `life-platform-trail` → S3 (data events enabled on `raw/` and `uploads/` S3 prefixes) |
 | Account Lambda concurrency quota | **10** (default; raise request filed 2026-05-19, AWS Support case 177921309700709) |
 

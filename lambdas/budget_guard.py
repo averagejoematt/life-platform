@@ -2,9 +2,10 @@
 budget_guard.py — read the budget tier and gate AI features (graceful degradation).
 
 The cost_governor Lambda writes a tier (0-3) to SSM /life-platform/budget-tier
-based on near-real-time spend vs the $75/mo ceiling. AI features call allow()
-to decide whether to run or degrade; bedrock_client.invoke() calls current_tier()
-as the Tier-3 hard backstop.
+based on near-real-time spend vs the monthly ceiling ($85 base since the
+ADR-133 amendment 2026-07-08; floats to $100 in reader-traffic surge mode).
+AI features call allow() to decide whether to run or degrade;
+bedrock_client.invoke() calls current_tier() as the Tier-3 hard backstop.
 
 Tiers (cumulative — higher tier disables more). The sacrifice order is by
 AUDIENCE, not by cost: internal/dev AI dies first, reader-facing product last
@@ -97,7 +98,7 @@ _FEATURE_CUTOFF = {
     "daily_debrief": 2,
     # chronicle: the weekly Story installment + its Friday Panel podcast (the
     # podcast's only input). Kept at 2 in lockstep with the Panel lambda's own
-    # SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs $75.
+    # SKIP_TIER=2. Weekly Bedrock cost is ~$1 — negligible vs the ceiling.
     "chronicle": 2,
     # ── Band 3: the two IRREDUCIBLE reader promises — pause LAST (ADR-100/125).
     #

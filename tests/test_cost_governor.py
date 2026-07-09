@@ -33,6 +33,11 @@ def _pin_normal_thresholds(gov, monkeypatch):
 
 
 # ── _tier_for: threshold mapping ─────────────────────────────────────────────
+# The dollar thresholds (55/65/73) are calibrated against the ORIGINAL $75
+# reference ceiling (_THRESHOLD_REFERENCE_CEILING) and scale as fixed fractions
+# (≈73%/87%/97%) of whatever ceiling is in effect. These boundary tests pin the
+# reference mapping (explicit ceiling=75.0); the $85-base default (ADR-133
+# amendment 2026-07-08) is pinned separately below.
 
 
 @pytest.mark.parametrize(
@@ -48,50 +53,85 @@ def _pin_normal_thresholds(gov, monkeypatch):
         (500, 3),
     ],
 )
-def test_tier_thresholds(gov, projected, expected):
+def test_tier_thresholds_at_reference_ceiling(gov, projected, expected):
+    assert gov._tier_for(projected, ceiling=75.0) == expected
+
+
+@pytest.mark.parametrize(
+    "projected,expected",
+    [
+        (0, 0),
+        (62.0, 0),  # under 55 × 85/75 ≈ 62.33
+        (62.34, 1),
+        (73.0, 1),  # under 65 × 85/75 ≈ 73.67
+        (73.67, 2),
+        (82.0, 2),  # under 73 × 85/75 ≈ 82.73
+        (82.74, 3),
+        (500, 3),
+    ],
+)
+def test_tier_thresholds_at_85_base_default(gov, projected, expected):
+    """The current $85 base (ADR-133 amendment) is the DEFAULT ceiling — the
+    bands re-derive proportionally: boundaries $62.33 / $73.67 / $82.73."""
+    assert gov.MONTHLY_CEILING == 85.0
     assert gov._tier_for(projected) == expected
 
 
 # ── _decide_tier: actual-spend cap ───────────────────────────────────────────
+# The incident tests below document $75-era events, so they pin the POLICY at
+# the ceiling they happened under (explicit ceiling=75.0); the policy itself
+# is ceiling-independent.
 
 
 def test_n08_regression_projection_overshoot_capped_to_tier1(gov):
     """The 2026-06-05/06 incident: $28.86 actual, $157 projected, day 6.
     Old behavior: tier 3 (all AI off). New: tier 1 (heaviest spender paused)."""
-    assert gov._decide_tier(projected=157.0, mtd=28.86, elapsed_days=5.8) == 1
+    assert gov._decide_tier(projected=157.0, mtd=28.86, elapsed_days=5.8, ceiling=75.0) == 1
 
 
 def test_early_month_projection_fully_ignored(gov):
     """Day 2, front-loaded fixed charges: $15 actual → $233 projected.
     Inside EARLY_MONTH_DAYS the projection gets no benefit of the doubt."""
-    assert gov._decide_tier(projected=233.0, mtd=15.56, elapsed_days=1.5) == 0
+    assert gov._decide_tier(projected=233.0, mtd=15.56, elapsed_days=1.5, ceiling=75.0) == 0
 
 
 def test_genuine_runaway_unlocks_higher_tiers(gov):
     """Real dollars unlock the harsh tiers: actual already past tier 2 ($65),
     projection past tier 3 → escalate the full way."""
-    assert gov._decide_tier(projected=120.0, mtd=66.0, elapsed_days=20.0) == 3
+    assert gov._decide_tier(projected=120.0, mtd=66.0, elapsed_days=20.0, ceiling=75.0) == 3
 
 
 def test_actual_at_ceiling_is_tier3_regardless_of_projection(gov):
-    assert gov._decide_tier(projected=74.0, mtd=74.0, elapsed_days=28.0) == 3
+    assert gov._decide_tier(projected=74.0, mtd=74.0, elapsed_days=28.0, ceiling=75.0) == 3
 
 
 def test_projection_below_actual_never_inflated_by_cap(gov):
     """min(), not max(): a calm projection with high-ish actual stays at the
     projection tier (late month, spend tapering)."""
-    assert gov._decide_tier(projected=54.0, mtd=56.0, elapsed_days=29.0) == 0
+    assert gov._decide_tier(projected=54.0, mtd=56.0, elapsed_days=29.0, ceiling=75.0) == 0
 
 
 def test_post_pause_stuck_projection_de_escalates(gov):
     """Failure mode 2: AI paused, projection frozen high for weeks. Tier must
     track actual spend (+1), not the stale projection — so it recovers."""
     # mid-month, actual well under tier 1, projection still screaming tier 3
-    assert gov._decide_tier(projected=150.0, mtd=40.0, elapsed_days=12.0) == 1
+    assert gov._decide_tier(projected=150.0, mtd=40.0, elapsed_days=12.0, ceiling=75.0) == 1
 
 
 def test_all_quiet_is_tier0(gov):
     assert gov._decide_tier(projected=30.0, mtd=10.0, elapsed_days=10.0) == 0
+
+
+def test_2026_07_08_incident_still_tier1_at_85_base(gov):
+    """The incident that motivated the $85 base raise (ADR-133 amendment):
+    $79.27 projected from internal spend creep, low actual mtd, day 8. HONEST
+    expectation: the raise does NOT clear tier 1 — $79.27 still exceeds the
+    tier-2 boundary ($73.67 at $85), capped to 1 by actual spend. The bands
+    degrade BEFORE the ceiling by design; the tier clears when the trailing
+    burn rate decays, not when the ceiling moves."""
+    assert gov._decide_tier(projected=79.27, mtd=25.0, elapsed_days=7.6) == 1
+    # It would take a projection under $62.33 (73% of $85) to reach tier 0.
+    assert gov._decide_tier(projected=62.0, mtd=25.0, elapsed_days=7.6) == 0
 
 
 # ── _project_month_end: BOTH AI + non-AI run-rates use a TRAILING window ────────
@@ -175,21 +215,21 @@ def test_non_ai_series_excludes_bedrock_edition_services(gov, monkeypatch):
 
 
 # ── ADR-133 (#739): surge-mode ceiling — rule + isolation from spend creep ────
-# The $75 ceiling floats to $100 when trailing 7-day unique visitors
-# (traffic_digest_lambda's UniqueVisitors7d CloudWatch metric) cross
-# SURGE_UNIQUES_THRESHOLD (900). Surge is a pure function of reader traffic —
-# it must never be triggerable by spend alone.
+# The $85 base ceiling (ADR-133 amendment) floats to $100 when trailing 7-day
+# unique visitors (traffic_digest_lambda's UniqueVisitors7d CloudWatch metric)
+# cross SURGE_UNIQUES_THRESHOLD (900). Surge is a pure function of reader
+# traffic — it must never be triggerable by spend alone.
 
 
 @pytest.mark.parametrize(
     "recent_uniques,expected_ceiling,expected_surge",
     [
-        (0, 75.0, False),
-        (899, 75.0, False),  # boundary: one under the threshold
+        (0, 85.0, False),
+        (899, 85.0, False),  # boundary: one under the threshold
         (900, 100.0, True),  # boundary: exactly at the threshold — crosses
         (901, 100.0, True),
         (5000, 100.0, True),  # a genuine viral spike
-        (None, 75.0, False),  # no signal yet (metric never emitted) → fails closed
+        (None, 85.0, False),  # no signal yet (metric never emitted) → fails closed to the BASE
     ],
 )
 def test_effective_ceiling_rule(gov, recent_uniques, expected_ceiling, expected_surge):
@@ -199,42 +239,42 @@ def test_effective_ceiling_rule(gov, recent_uniques, expected_ceiling, expected_
 
 
 def test_surge_engages_only_on_traffic_never_on_spend(gov):
-    """Constraint #3 (#739 scope): the ceiling stays $75 when uniques are below
-    threshold REGARDLESS of projection. A heavy, over-budget spend projection
-    with organic (sub-threshold) traffic must not float the ceiling."""
+    """Constraint #3 (#739 scope): the ceiling stays at the $85 base when
+    uniques are below threshold REGARDLESS of projection. A heavy, over-budget
+    spend projection with organic (sub-threshold) traffic must not float it."""
     ceiling, surge_active = gov._effective_ceiling(recent_uniques=288)  # real recent baseline
-    assert ceiling == 75.0
+    assert ceiling == 85.0
     assert surge_active is False
-    # Feed that ceiling into _decide_tier with a way-over-$75 projection — the
-    # tier still escalates (spend enforcement is untouched), but the CEILING
-    # itself never moved off $75 because of the projection.
+    # Feed that ceiling into _decide_tier with a way-over-budget projection —
+    # the tier still escalates (spend enforcement is untouched), but the
+    # CEILING itself never moved off the base because of the projection.
     tier = gov._decide_tier(projected=500.0, mtd=200.0, elapsed_days=20.0, ceiling=ceiling)
     assert tier == 3  # spend enforcement still works — this isn't a bypass
-    assert ceiling == 75.0  # the ceiling that produced it was never surged
+    assert ceiling == 85.0  # the ceiling that produced it was never surged
 
 
 def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
     """The tier BANDS (≈73%/87%/97% of ceiling) stay proportionally identical
-    under the surge ceiling — only the dollar amounts that trip them move."""
-    # At $75 (default ceiling), 55/65/73 are the exact boundaries (see
-    # test_tier_thresholds). At $100 they scale by 100/75.
-    ratio = 100.0 / 75.0
+    under the surge ceiling — only the dollar amounts that trip them move.
+    Thresholds scale from the $75 REFERENCE calibration, not from the base."""
+    ratio = 100.0 / 75.0  # ceiling / _THRESHOLD_REFERENCE_CEILING
     assert gov._tier_for(55 * ratio - 0.01, ceiling=100.0) == 0
     assert gov._tier_for(55 * ratio, ceiling=100.0) == 1
     assert gov._tier_for(65 * ratio, ceiling=100.0) == 2
     assert gov._tier_for(73 * ratio, ceiling=100.0) == 3
-    # A spend level that would be tier-3 at the normal $75 ceiling is only
-    # tier 1 once surge mode is active — this is the entire point of the story:
-    # reader-driven AI spend that would have hard-stopped at $75 now has room.
-    assert gov._tier_for(80.0) == 3  # normal $75 ceiling: $80 is over the top tier
-    assert gov._tier_for(80.0, ceiling=100.0) == 1  # $100 surge ceiling: same $80 is tier 1
+    # A projection over the hard-stop line at the $85 base gets ROOM once surge
+    # mode is active — this is the entire point of the story: reader-driven AI
+    # spend that would have hard-stopped now degrades gently instead.
+    assert gov._tier_for(83.0) == 3  # $85 base: $83 is past the $82.73 hard stop
+    assert gov._tier_for(83.0, ceiling=100.0) == 1  # $100 surge: same $83 is tier 1
 
 
-def test_decide_tier_default_ceiling_unchanged(gov):
-    """The default `ceiling=MONTHLY_CEILING` keeps every pre-existing 3-arg
-    call site (and the tests above pinned to it) byte-for-byte unchanged."""
+def test_decide_tier_default_ceiling_is_the_base(gov):
+    """The runtime-resolved default (`ceiling=None` → MONTHLY_CEILING) makes
+    every pre-existing 3-arg call site behave exactly like an explicit
+    ceiling=$85 call."""
     assert gov._decide_tier(projected=157.0, mtd=28.86, elapsed_days=5.8) == gov._decide_tier(
-        projected=157.0, mtd=28.86, elapsed_days=5.8, ceiling=75.0
+        projected=157.0, mtd=28.86, elapsed_days=5.8, ceiling=85.0
     )
 
 

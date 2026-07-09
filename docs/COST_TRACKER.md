@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-09 (v8.6.0)
 
-> Budget ceiling: **$75/month all-in** (raised from $25 with the Bedrock migration + automated guardrails, 2026-05-29). Design constraint: every feature must justify its cost.
+> Budget ceiling: **$85/month all-in** (base; raised $75→$85 on 2026-07-08 per the ADR-133 amendment, floats to $100 in reader-traffic surge mode; the original $25→$75 raise came with the Bedrock migration + automated guardrails, 2026-05-29). Design constraint: every feature must justify its cost.
 
 ---
 
@@ -12,7 +12,7 @@ Cross-functional sweep of the steady-state run-rate. **Real monthly bill (CE, un
 Mar **$20.04** → Apr **$35.01** → May **$48.19** (peak) → Jun MTD ~**$18.60** (partial).
 
 - **The bill is two things:** a **fixed floor (~$15–17/mo all-in, post-WAF)** — Secrets ~$6.45, CloudWatch alarms ~$4–5, **Cost-Explorer API ~$2–4**, KMS ~$1, Route 53 $0.50, Lambda/DDB/S3/CloudFront ~$0.50, +~10% tax — plus **variable Bedrock AI**, which is spiky and *development-driven* (marathon days $4–6, quiet days $0.80–1.10), not steady.
-- **Expected steady-state production run-rate: ~$25–40/mo.** The May $48 peak was the Bedrock-cutover/v4-launch build phase, not the designed steady state. Hard-capped at $75 by the **enforcing** governor (above).
+- **Expected steady-state production run-rate: ~$25–40/mo.** The May $48 peak was the Bedrock-cutover/v4-launch build phase, not the designed steady state. Hard-capped at $85 (base; $100 in surge — ADR-133) by the **enforcing** governor (above).
 - **WAF deleted** (~−$8/mo; June shows $0). Confirmed banked alongside the earlier ingestion-alarm consolidation (−$4.60) and V2 sweep (−$3.65).
 
 **Audit of reduction levers (what's left is small — the system is near its floor):**
@@ -31,7 +31,7 @@ Mar **$20.04** → Apr **$35.01** → May **$48.19** (peak) → Jun MTD ~**$18.6
 
 Rewritten from Cost Explorer + the cost-governor estimator. The prior "~$10/mo"
 figure was stale fiction (it predated Bedrock and three cost drivers the doc got
-wrong). Real run-rate is **~$33-36/mo** — comfortably under the $75 ceiling.
+wrong). Real run-rate is **~$33-36/mo** — comfortably under the $85 ceiling.
 
 | Service | Cost/Month | Notes |
 |---------|-----------|-------|
@@ -43,7 +43,7 @@ wrong). Real run-rate is **~$33-36/mo** — comfortably under the $75 ceiling.
 | **KMS** | ~$1.00 | DynamoDB CMK. |
 | **Route 53** | ~$0.50 | 1 hosted zone — flat fee. |
 | **Lambda / DynamoDB / S3 / CloudFront / SES** | ~$0.60 | All well-managed (on-demand DDB, 30-day log retention, S3 lifecycle). |
-| **Total** | **~$33-36/month** | ~48% of the $75 ceiling. |
+| **Total** | **~$33-36/month** | ~42% of the $85 ceiling. |
 
 ---
 
@@ -51,7 +51,7 @@ wrong). Real run-rate is **~$33-36/mo** — comfortably under the $75 ceiling.
 
 Three layers — see `lambdas/budget_guard.py`, `lambdas/operational/cost_governor_lambda.py`, ADR/plan for design:
 
-1. **AWS Budget** (`life-platform-monthly-75`, CDK CoreStack): one $75 budget, email
+1. **AWS Budget** (`life-platform-monthly-75`, CDK CoreStack — name historical): one $85 budget, email
    notifications at **50/70/85/100% (actual + 100% forecast)** → `awsdev@mattsusername.com`.
    Lagged backstop (Cost Explorer trails Bedrock 24-48h).
 2. **cost-governor** (hourly): estimates near-real-time spend (Cost Explorer non-AI +

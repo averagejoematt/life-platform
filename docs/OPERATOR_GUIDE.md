@@ -17,7 +17,7 @@ The Life Platform is a personal health intelligence system. It pulls data from ~
 - 16:30 UTC `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
 - 11:30 PT OG images
 
-AWS run-rate (real CE, 2026-06-08 sweep): steady-state **~$25-40/mo** against a **$75/mo enforced ceiling** (ADR-063; cost-governor degrades AI by tier). Bedrock AI is the swing factor and is in-budget. See `docs/COST_TRACKER.md`.
+AWS run-rate (real CE, 2026-06-08 sweep): steady-state **~$25-40/mo** against an **$85/mo enforced ceiling** (ADR-063 + ADR-133 amendment; $100 in reader-traffic surge mode; cost-governor degrades AI by tier). Bedrock AI is the swing factor and is in-budget. See `docs/COST_TRACKER.md`.
 
 All infrastructure is CDK-managed across 8 stacks (`cdk/stacks/`).
 

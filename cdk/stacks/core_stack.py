@@ -81,10 +81,19 @@ class CoreStack(Stack):
         # versions remain in AWS (the resource had RemovalPolicy.RETAIN) but
         # nothing references them.
 
-        # ── AWS Budget — single $75/mo all-in ceiling (replaces 2 stale $20 manual budgets) ──
+        # ── AWS Budget — single all-in monthly ceiling (replaces 2 stale $20 manual budgets) ──
+        # $85/mo base since 2026-07-08 (ADR-133 amendment; was $75 per ADR-063).
+        # The logical ID "MonthlyBudget75" and budget_name "life-platform-monthly-75"
+        # are HISTORICAL — deliberately NOT renamed, because budget_name is the
+        # CfnBudget replacement key (a rename would delete + recreate the budget
+        # and its notification history).
         # Lagged secondary backstop + notice; the real-time enforcer is the
         # cost_governor Lambda (token-metric estimate → SSM tier → bedrock_client gate).
         # Budgets data trails Bedrock spend 24-48h, so it's notice, not the hard stop.
+        # NB: this backstop stays at the $85 base even during ADR-133 surge mode
+        # ($100 effective) — in a surge the percentage alert emails just arrive a
+        # little earlier than the governor's tiers, which is acceptable for a
+        # notice-only channel.
         budget_email = ctx("budget_email") or "awsdev@mattsusername.com"
         _budget_notifications = []
         for _thr, _type in [(50, "ACTUAL"), (70, "ACTUAL"), (85, "ACTUAL"), (100, "ACTUAL"), (100, "FORECASTED")]:
@@ -111,7 +120,7 @@ class CoreStack(Stack):
                 budget_name="life-platform-monthly-75",
                 budget_type="COST",
                 time_unit="MONTHLY",
-                budget_limit=budgets.CfnBudget.SpendProperty(amount=75, unit="USD"),
+                budget_limit=budgets.CfnBudget.SpendProperty(amount=85, unit="USD"),
             ),
             notifications_with_subscribers=_budget_notifications,
         )

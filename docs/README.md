@@ -48,7 +48,7 @@ top and stop when you have what you need.
 | [TAG_CODES.md](TAG_CODES.md) | Decode the internal tag alphabet (PG/SIMP/IC/SEC/…) |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
 | [REMEDIATION_TAXONOMY.md](REMEDIATION_TAXONOMY.md) | Self-healing agent's classifier rubric |
-| [COST_TRACKER.md](COST_TRACKER.md) | The $75 budget + real run-rate |
+| [COST_TRACKER.md](COST_TRACKER.md) | The $85 budget + real run-rate |
 
 ## Development & process
 | [TESTING.md](TESTING.md) · [REVIEW_METHODOLOGY.md](REVIEW_METHODOLOGY.md) | Test layers · how audits run |
