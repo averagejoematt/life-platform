@@ -28,9 +28,13 @@ Confirmation token: 32-byte random hex, stored in DDB, expires 48h.
 Welcome email: Ava directive — warm, specific, on-brand.
 
 v1.0.0 — 2026-03-16 (BS-03)
+v1.1.0 — 2026-07-08 (#885): SEC-04 origin-header guard — 403 direct Function-URL
+         requests when SITE_API_ORIGIN_SECRET is configured (CloudFront injects
+         the X-AMJ-Origin header on the SubscriberLambdaOrigin origin).
 """
 
 import hashlib
+import hmac as _hmac
 import json
 import logging
 import os
@@ -39,6 +43,16 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import boto3
+
+# #885: the SAME SITE_API_ORIGIN_SECRET constant site_api_lambda / site_api_ai_lambda
+# enforce (SEC-04 / #815) — imported, not a second os.environ.get, so the env-var name
+# can never drift between the three guarded Function URLs (the convention
+# tests/test_function_url_origin_header_validation.py pins). Empty string when the
+# env var is unset → guard disabled (fail-open), so Lambda code deployed before the
+# CloudFront header / env var can't break subscriptions. Always importable: every
+# deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
+# guaranteed present alongside this module.
+from web.site_api_common import SITE_API_ORIGIN_SECRET
 
 try:
     from platform_logger import get_logger
@@ -471,6 +485,16 @@ def lambda_handler(event, context):
         # CORS preflight
         if method == "OPTIONS":
             return {"statusCode": 204, "headers": _cors_headers(), "body": ""}
+
+        # #885: SEC-04 origin-header guard (mirrors site_api_lambda / site_api_ai_lambda).
+        # CloudFront injects X-AMJ-Origin on the SubscriberLambdaOrigin origin
+        # (web_stack.py); requests that bypass CloudFront and hit the Function URL
+        # directly lack it and are rejected. Fail-open when the secret is unset.
+        if SITE_API_ORIGIN_SECRET:
+            req_headers = event.get("headers") or {}
+            incoming = req_headers.get("x-amj-origin") or req_headers.get("X-AMJ-Origin") or ""
+            if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
+                return _json_response(403, {"error": "Forbidden"})
 
         # Behind CloudFront, requestContext.http.sourceIp is the edge IP — varies
         # per request and would defeat IP-based rate-limiting. CloudFront forwards

@@ -269,6 +269,17 @@ class WebStack(Stack):
         # ══════════════════════════════════════════════════════════════
         _site_api_ctx_domain = self.node.try_get_context("site_api_fn_url_domain")
 
+        # #815 (R22-SEC-03) / #885: the header CloudFront injects on the site-api /
+        # site-api-ai / email-subscriber origins so the SEC-04 Lambda guard can
+        # 403 direct Function-URL requests that bypass CloudFront. Same secret
+        # value, same helper serve_stack.py calls for the site-api Lambdas' env
+        # var — see stacks/secrets_helpers.py (resolved by NAME from this stack's
+        # own region: us-east-1 replica of the multi-region secret). Read once
+        # here, used for the email-subscriber env var below (#885) and the three
+        # CloudFront origin custom headers.
+        site_api_origin_secret = site_api_origin_secret_value(self)
+        SITE_API_ORIGIN_HEADER_NAME = "X-AMJ-Origin"
+
         # ══════════════════════════════════════════════════════════════
         # Email Subscriber Lambda — BS-03
         # Handles POST /api/subscribe, GET /api/subscribe?action=confirm,
@@ -308,6 +319,7 @@ class WebStack(Stack):
                 "SITE_URL": "https://averagejoematt.com",
                 "DYNAMODB_REGION": "us-west-2",  # DDB table is in us-west-2; Lambda runs in us-east-1
                 "SES_REGION": "us-west-2",  # SES verified identity is in us-west-2
+                "SITE_API_ORIGIN_SECRET": site_api_origin_secret,  # #885: SEC-04 guard (fail-open when unset)
             },
         )
 
@@ -329,11 +341,11 @@ class WebStack(Stack):
         # traffic volume. Secondary: add WAF rate limiting after go-live.
 
         # Function URL (AuthType NONE — CloudFront is the only public caller).
-        # #815: the origin-secret header hardening below is live for
-        # LambdaApiOrigin/AiLambdaOrigin (site-api / site-api-ai). This
-        # email-subscriber origin is NOT covered — out of scope for #815 (its
-        # Lambda has no matching SEC-04-style guard); a future story can extend
-        # the same X-AMJ-Origin header + site_api_common-style check here.
+        # #815 hardened LambdaApiOrigin/AiLambdaOrigin (site-api / site-api-ai)
+        # with the X-AMJ-Origin secret header; #885 extended the same guard to
+        # this email-subscriber origin (SubscriberLambdaOrigin custom header +
+        # SITE_API_ORIGIN_SECRET env var above + the SEC-04-style check in
+        # web/email_subscriber_lambda.py).
         # ══════════════════════════════════════════════════════════════
         # OG Image Lambda — life-platform-og-image (WR-17)
         # Dynamic SVG social preview image with live stats.
@@ -394,13 +406,10 @@ class WebStack(Stack):
         # Set context "site_api_ai_fn_url_domain" from LifePlatformOperational output SiteApiAiFunctionUrlDomain
         ai_fn_url_domain = self.node.try_get_context("site_api_ai_fn_url_domain") or fn_url_domain
 
-        # #815 (R22-SEC-03): the header CloudFront injects on the site-api /
-        # site-api-ai origins so the (previously inert) SEC-04 Lambda guard can
-        # 403 direct Function-URL requests that bypass CloudFront. Same secret
-        # value, same helper serve_stack.py calls for the Lambdas' env var — see
-        # stacks/secrets_helpers.py.
-        site_api_origin_secret = site_api_origin_secret_value(self)
-        SITE_API_ORIGIN_HEADER_NAME = "X-AMJ-Origin"
+        # #815 (R22-SEC-03): site_api_origin_secret + SITE_API_ORIGIN_HEADER_NAME
+        # are read ONCE further up (before the email-subscriber Lambda, which
+        # needs the value as an env var per #885) and used on the LambdaApiOrigin /
+        # AiLambdaOrigin / SubscriberLambdaOrigin custom headers below.
 
         # ══════════════════════════════════════════════════════════════
         # R17-15: Security headers via CloudFront ResponseHeadersPolicy.
@@ -555,6 +564,8 @@ class WebStack(Stack):
                         ],
                     ),
                     # Origin 5: email-subscriber Lambda Function URL (write, no cache)
+                    # #885: same X-AMJ-Origin guard header as LambdaApiOrigin/AiLambdaOrigin
+                    # above — email_subscriber_lambda 403s direct Function-URL requests.
                     cloudfront.CfnDistribution.OriginProperty(
                         domain_name=subscriber_url_domain,
                         id="SubscriberLambdaOrigin",
@@ -564,6 +575,12 @@ class WebStack(Stack):
                             origin_protocol_policy="https-only",
                             origin_ssl_protocols=["TLSv1.2"],
                         ),
+                        origin_custom_headers=[
+                            cloudfront.CfnDistribution.OriginCustomHeaderProperty(
+                                header_name=SITE_API_ORIGIN_HEADER_NAME,
+                                header_value=site_api_origin_secret,
+                            )
+                        ],
                     ),
                     # Origin 6: S3 generated content (Lambda-written files)
                     # ADR-046: separate prefix prevents deploy --delete from removing
