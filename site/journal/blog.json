@@ -1,5 +1,15 @@
 {
-  "posts": [],
-  "_note": "In My Own Words — Matt's own blog. Intentionally empty until Matt publishes a post here (add entries to this array, or wire a writer). The AI-written weekly chronicle is a separate feed under the Chronicle tab (/journal/posts.json).",
-  "_schema": "Each post: {id, title, date, excerpt, url, word_count?, image_url?, image_credit?}. image_url/image_credit are optional atmospheric cover art (Part II); when present the reader renders a warm-duotone header band + attribution."
+  "posts": [
+    {
+      "id": "org-chart-of-one",
+      "label": "Essay",
+      "title": "The Org Chart of One Human and N Agents",
+      "date": "2026-07-08",
+      "excerpt": "At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file.",
+      "url": "/journal/essays/org-chart-of-one/",
+      "word_count": 1672
+    }
+  ],
+  "_note": "In My Own Words — Matt's own blog. Add entries to this array; each post's url points at a static permalink page under site/journal/essays/<slug>/. The AI-written weekly chronicle is a separate feed under the Chronicle tab (/journal/posts.json).",
+  "_schema": "Each post: {id, title, date, excerpt, url, word_count?, label?, image_url?, image_credit?}. label is an authored kicker (e.g. \"Essay\") — never a derived Week-N; image_url/image_credit are optional atmospheric cover art (when present the reader renders a warm-duotone header band + attribution)."
 }

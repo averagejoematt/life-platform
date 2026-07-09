@@ -26,6 +26,10 @@ from urllib.request import urlopen
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a
 # dead season-1 snapshot frozen at the pre-reset experiment; don't use it.
 SRC = "https://averagejoematt.com/journal/posts.json"
+# Matt-authored essays ("In my own words", #741) — a local committed manifest that
+# deploys with site/; read from the tree (not the live URL) so a new post lands in
+# the feed on the same deploy that publishes its permalink page.
+BLOG_SRC = Path(__file__).resolve().parent.parent / "site" / "journal" / "blog.json"
 BASE = "https://averagejoematt.com"
 OUT = Path("site/rss.xml")
 # L-06: some readers probe /feed.xml instead of /rss.xml — emit an identical alias.
@@ -62,6 +66,16 @@ def _freshness_check(posts: list[dict]) -> None:
         raise SystemExit(1)
 
 
+def _blog_posts() -> list[dict]:
+    """Matt-authored posts from the committed blog manifest (fail-soft: no file /
+    no posts → empty list — the chronicle feed still builds)."""
+    try:
+        data = json.loads(BLOG_SRC.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return [p for p in data.get("posts", []) if p.get("date") and p.get("title") and p.get("url")]
+
+
 def main() -> int:
     with urlopen(SRC, timeout=20) as r:
         data = json.load(r)
@@ -69,7 +83,11 @@ def main() -> int:
     posts = [p for p in posts if p.get("date") and p.get("title")]
     posts.sort(key=lambda p: p["date"], reverse=True)
 
+    # Freshness-guard the CHRONICLE feed only (it detects a dead source path);
+    # Matt's essays are occasional by nature and must never trip it — merge after.
     _freshness_check(posts)
+    posts += _blog_posts()
+    posts.sort(key=lambda p: p["date"], reverse=True)
 
     now = format_datetime(datetime.now(timezone.utc))
     items = []

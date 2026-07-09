@@ -123,6 +123,10 @@ function entriesFor(s, data) {
     const pre = ps.filter((p) => p.date && p.date < GENESIS).sort((a, b) => (a.date < b.date ? -1 : 1));
     const partOf = new Map(pre.map((p, i) => [p, ROMAN[i] || String(i + 1)]));
     const labelOf = (p) => {
+      // Chronicle-only derivation: "In my own words" (Matt's blog) carries its own
+      // authored kicker (e.g. "Essay") — a derived Week-N would misfile an essay
+      // into the chronicle's serial numbering (#741).
+      if (s.key !== "chronicle") return p.label || "";
       if (!p.date) return p.week ? `Week ${p.week}` : "";
       if (p.date < GENESIS) return pre.length > 1 ? `Prologue · Part ${partOf.get(p)}` : "Prologue";
       return `Week ${Math.max(1, Math.floor((Date.parse(p.date) - Date.parse(GENESIS)) / 6048e5) + 1)}`;
@@ -409,7 +413,7 @@ async function renderRead(s, id) {
   const elenaMark = s.key === "chronicle"
     ? (portrait({ persona_id: "elena_voss", name: "Elena Voss" }, { size: 26, state: "writing" }) || "")
     : "";
-  read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
+  read.innerHTML = art + `<p class="dx-kicker label">${s.key === "chronicle" ? `${elenaMark ? `<span class="coach-mark" style="--coach:#94a3b8">${elenaMark}</span>` : ""}chronicle · Elena Voss` : "journal"}${ent.label ? ` · ${esc(ent.label)}` : s.key === "chronicle" && ent.id ? ` · week ${esc(ent.id)}` : ""}${ent.date ? ` · ${esc(ent.date)}` : ""}</p>` +
     `<h2 class="dx-title">${esc(ent.title)}</h2>` + listen + (ent.meta ? `<p class="dx-stats label">${esc(ent.meta)}</p>` : "") +
     prevRail + `<p class="dx-prose dx-excerpt">${esc(ent.excerpt || "")}</p>` + readmore + dispatchFoot(s, ent, all);
   read.querySelectorAll(".dx-prevlink").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));

@@ -5,13 +5,20 @@
     <link>https://averagejoematt.com/story/chronicle/</link>
     <description>The weekly chronicle of an ordinary life, measured in full — every number, every week, including the weeks it dips. Written by Elena Voss.</description>
     <language>en-us</language>
-    <lastBuildDate>Wed, 08 Jul 2026 17:14:21 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 09 Jul 2026 04:44:02 +0000</lastBuildDate>
     <atom:link href="https://averagejoematt.com/rss.xml" rel="self" type="application/rss+xml"/>
     <image>
       <url>https://averagejoematt.com/assets/images/og-image.png</url>
       <title>The Measured Life — averagejoematt</title>
       <link>https://averagejoematt.com/story/chronicle/</link>
     </image>
+    <item>
+      <title>The Org Chart of One Human and N Agents</title>
+      <link>https://averagejoematt.com/journal/essays/org-chart-of-one/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/essays/org-chart-of-one/</guid>
+      <description>At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file.</description>
+      <pubDate>Wed, 08 Jul 2026 12:00:00 +0000</pubDate>
+    </item>
     <item>
       <title>The Wall</title>
       <link>https://averagejoematt.com/journal/posts/week-05/</link>
