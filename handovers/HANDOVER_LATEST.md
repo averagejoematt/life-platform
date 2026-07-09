@@ -1,125 +1,145 @@
-# HANDOVER — Backlog pay-down 64 → 18: 15 stories shipped by a 14-agent fleet, 30 epic/stale closures, everything deployed — 2026-07-08 (evening)
+# HANDOVER — The decision sprint: Matthew answered ~15 questions live, 12 PRs shipped on the answers, OIDC tightened attended, the essay published, the site now deploys itself — 2026-07-08/09 (overnight)
 
-> Instruction: "review handover, memory, and put an efficient plan to pay down as many
-> open issues in this session as possible. I pre-approve all edits, merges, deploys. You
-> can sub-agent out different models as necessary. Goal: reduce our 64 open issues to as
-> many as possible without sacrificing quality."
+> Instruction (evolving through the session): "is there any work we can be doing from the
+> open issues, or do they all require something from me? I approve you to do all merge and
+> deploys" → "merge or update the 2 open pull requests" → "organize [the Matthew-gated
+> issues] easiest to unblock and how I can answer" → two answer batches + live refinements
+> (Habitify-first capture, Strava correction, $85 ceiling) → "keep going on everything not
+> requiring me, then wrap; I'll unblock the optional questions next session."
 
 ## The shape of the session
 
-Three moves: (1) **audit before work** — 14 epics had zero open children and 3 stories
-were already live but never closed → 17 closures with evidence comments, no code;
-(2) **14 parallel worktree-implementer agents** (sonnet for S-effort, opus for the hard
-ones) shipped 15 stories as PRs #870–#884, merged serially by the driver with the
-doc-sync reconcile discipline; (3) one deploy pass + full verification, then 13 cascade
-epic closures. **64 open issues → 18.**
+The previous wrap said "remaining 18 issues are ALL gated — no unblocked work exists."
+This session's discovery: **most gates were one-sentence questions.** Ranking them
+easiest-to-answer and asking in plain language turned "all blocked" into 15 answers,
+which became 12 merged+deployed PRs (#887–#889, #892, #894–#901), one attended security
+execution (#687), and one published essay — in a single overnight sitting. The
+org-chart-of-one essay shipped *during* the session that demonstrated its thesis.
 
-## What shipped (15 stories, PRs #870–#884; all MERGED + DEPLOYED + VERIFIED)
+## What shipped (all MERGED + DEPLOYED + VERIFIED)
 
-- **#751** (PR #870) — main==live SHA ancestry check rides the weekly drift sentinel.
-- **#823** (PR #871) — weekly fresh-eyes discovery workflow (Sun 15:00 UTC): screenshots
-  the 4 doors, Haiku vision × 4 audiences, Sonnet synthesis, dedup vs open issues,
-  emailed ≤5-item board; budget-tier ≥2 skips. First live run should be sanity-checked
-  from the Actions tab.
-- **#822** (PR #872) — cost governor persists its projection breakdown to SSM
-  `/life-platform/budget-breakdown`; daily brief carries a one-line headroom readout.
-- **#821** (PR #873) — 8 distinct coach opening registers + banned-scaffold list; found
-  the root cause was our own prompt suggesting the same 3 opener stems to every coach.
-- **#749** (PR #874) — masked-gate class killed: every lint gate reports independently
-  (`if: always()`); standalone `visual-qa.yml` (dispatch + daily 20:07 UTC). Scope-(1)
-  fast deploy subset already existed (ADR-117) — receipts in the PR.
-- **#594** (PR #875) — portrait semantic states (speaking/writing/stance-change + hover),
-  all reduced-motion guarded. NB: recipes only have mouth-rest/mouth-a frames; speaking
-  uses the two real frames + ring pulse, never fabricated assets.
-- **#815** (PR #876) — origin-header guard LIVE: CloudFront injects `X-AMJ-Origin`,
-  both site-api lambdas enforce; direct Function-URL calls now 403 (verified), via-CF 200.
-  site-api-ai had NO guard at all — added.
-- **#744** (PR #877) — the real delta vs #869: `ai_calls._enforce_quality_gate` (the
-  highest-fire-rate gate) never retained its verdicts; now feeds EVALRET# as surface 6.
-- **#818+#817** (PR #878) — pre-commit hook actually runs `sync_doc_metadata.py --apply`
-  (one writer; `update_architecture_header.sh` deleted); `.claude/README.md` under
-  doc-sync (ADR range + tool count placeholders).
-- **#475** (PR #879) — Hevy lifecycle closed: tombstone consumer, start-time-edit
-  relocation, Pacific local-date keying (SCHEMA_VERSION 2), MAX_PAGES no longer advances
-  the cursor on truncation. **Migration RUN live: 97 records re-keyed, 0 collisions,
-  re-run shows 0 pending.** Watch the first real Hevy delete (event shape handled
-  defensively but unconfirmed).
-- **#753** (PR #880) — MCP write-audit trail: every mutation → `mcp-audit/YYYY/MM/DD/…`
-  (args hashed, never stored raw), fail-open at two layers; weekly digest line;
-  `mcp-audit/*` added to the bucket-policy delete deny (**applied live**).
-- **#747** (PR #881) — relationships pillar renders "not yet instrumented" (deterministic
-  flag from the zero-weight branch), excluded from the composite; self-clears when data
-  flows. Latent bug found but left unfixed (out of scope): the social journal-fetch
-  queries a wrong DDB key shape — worth a story.
-- **#743** (PR #882) — grounding receipts on board_ask: same brief object feeds prompt
-  AND receipt (can't drift); footer rendered site-side; receipts survive gate refusals.
-- **#824** (PR #883) — one shared `FakeDdbTable` (tests/fakes.py) with behavior hooks;
-  33 files migrated, 3 left deliberately (real query engines / load-bearing semantics).
-- **#395** (PR #884) — **MCP registry pruned 143 → 60** (net −17.6k LOC): live 30d
-  CloudWatch telemetry snapshot embedded in the new `docs/MCP_TOOL_AUDIT.md` AUDITED_AT
-  ledger; KNOWN_ORPHANS 64 → 0 (22 were live view-impls behind used dispatchers —
-  renamed `_`-prefixed, not deleted); no used tool removed. `docs/MCP_TOOL_CATALOG.md`
-  body still lists pruned tools (banner added) — regeneration is a follow-up. Matthew:
-  Claude Desktop/claude.ai clients lose the removed tool names (intended).
+- **Dependabot pair** — #847 (dev tooling; CI's own ruff→0.14.14 / playwright→1.61.0 pins
+  bumped across 4 workflows — the CQ-01 guard caught the drift) + #846 (action SHAs;
+  fixed two stale `# v3.0.1` comments on v6.2.2 pins).
+- **#885 (PR #887)** — email-subscriber Function URL origin guard: the last unguarded
+  CloudFront origin. Direct URL → 403, via CF → 200, live-verified.
+- **#886 (PR #888)** — `mcp-audit/` lifecycle (IA@30d, expire 90d). Agent also fixed a
+  real footgun: `apply_s3_lifecycle.sh` declared 1 rule while the bucket had 8 — a re-run
+  would have wiped 7. Now the declarative full config (9 rules), applied live.
+- **Driver fix** — prod MCP canary red since the #395 prune (asserted ≥80 tools, registry
+  60): floor → 55, deployed, verified ("60 tools listed, all_pass true"; 62 after #898).
+- **#739 (PR #889)** — surge ceiling: floats to **$100** (Matthew) at >900 trailing-7d
+  uniques (~4× real median — ADR-133, derived from live traffic-digest logs), edge-
+  triggered alert via SSM `/life-platform/surge-active`; **base ceiling $75 → $85**
+  (Matthew, mid-session — tier-1 was from internal creep at $79.27 projected). Tier bands
+  now scale as fractions of the effective ceiling; AWS Budgets bumped via CDK (name kept —
+  replacement key). NB: **$85 does NOT clear tier 1 immediately** — bands trip at ~73% by
+  design; it self-clears as dev burn decays.
+- **#746 (PR #892)** — manual-source reliability (channels = HAE/Notion/MCP, Matthew's
+  call): thresholds as `source_registry` facets (HAE per-datatype thresholds migrated in;
+  Notion 14d from real cadence), kind evening-nudge section, public "dark Nd" honesty
+  display.
+- **#422 (PR #898)** — habit causality, redesigned twice on Matthew's live input:
+  **Habitify `/notes` ingestion is the primary capture** (note at check-off/skip =
+  trigger/reward/why-missed, verbatim), MCP is a **reflection loop**
+  (`get_habit_reflection_queue` + `log_habit_reflection`, provenance-tagged, never nags).
+  Registry 60 → 62 (audit ratchet row added). Watch the first post-deploy Habitify ingest
+  (live `/notes` field names unverified — fail-open).
+- **#421 (PR #900)** — vitals depth: VO₂max trend (287 real Garmin records), walking HR
+  (775 Strava Walk activities — **Strava IS a live source**; the driver wrongly told the
+  agent otherwise and Matthew caught it), fitness age 59 (56–62, PhenoAge privacy
+  pattern, leak-grep test). Hourly habits + vascular age **deferred with receipts**
+  (Habitify timestamps are poll-observation times; no in-repo vascular formula).
+  Fleet-wide motion.js dash-truncation fix (also heals the live weight hero).
+- **#750 (PR #897)** — site deploys through CI on merge (separate `site-deploy.yml`, no
+  approval gate by design, rollback wired). **Earned its keep within the hour** — see
+  gotchas.
+- **#741 part (PR #899)** — the essay is **LIVE**:
+  `/journal/essays/org-chart-of-one/` — first "In my own words" post, RSS item #1,
+  `/method/build/` cross-link, HN block ready in the PR. #741 stays open for Matthew's
+  submission (referrer measurement already exists in the traffic digest).
+- **PR #901** — reader participation ON: votes/follows/check-ins/suggest-an-experiment/
+  submit-a-finding live against the long-hardened endpoints; the "deferred" footnote
+  retired. Discovery: **predict-the-week was already active** (weekly config upload
+  ritual) — the "dormant" note in memory was stale.
+- **#890 (PR #895)** — character-sheet journal fetch fixed (flat `DATE#` key could never
+  match templated `DATE#…#journal#…`): `themes` path revived via `merge_journal_view`;
+  the Relationships pillar may show its **first real signal** on the next compute.
+- **#891 (PR #894)** — `MCP_TOOL_CATALOG.md` regenerated from the registry via a new
+  idempotent zero-arg generator (`scripts/generate_mcp_tool_catalog.py`).
+- **#687 EXECUTED (attended, direct commits dcd4d17f)** — OIDC trust-tighten: both roles
+  main-only (deploy also `environment:production` per ADR-120); **negative test proven**
+  (branch dispatch → `Not authorized to perform sts:AssumeRoleWithWebIdentity`); new
+  **`github-actions-diagnosis-role`** (main-only trust, Bedrock-vision-QA-only) assumed by
+  all 3 vision-QA jobs; `proposed/` promoted to canonical; `verify_oidc_iam` CLEAN (9
+  targets); weekly drift sentinel gained `check_oidc_iam`. Full pipeline green
+  post-tighten (Deploy job = the environment subject).
+- **Also closed without code:** #740 (essay approved as-is + venue shortlist: blog → HN
+  same week; LeadDev/Pragmatic Engineer/AI-Eng-Summit as the submission options).
+- **Filed:** #893 (MCP auth beyond URL possession — R22 residual, Matthew-approved),
+  #902 (journal mood-scale mismatch — social_mood_correlation still dead), #903 (shed
+  diagnosis reads from the deploy role), #904 (gear page w/ affiliate links — Matthew's
+  idea).
+- **Tail fixes:** MANAGED_WHERE_LEDGER stale `seeds/` pointer → `deploy/bucket_policy.json`;
+  `get_date_range` description no longer references a pruned tool; QUICKSTART/RUNBOOK now
+  present CI as the primary site-deploy path.
 
-Also closed without code: **#552** (live, verified), **#592** (full cast verified),
-**#825** (defer verdict recorded) + **27 epics** (14 pre-audited + 13 cascade).
+## Deploys + verification
 
-## Driver-side fixes en route (committed direct to main)
-
-- **f602b55d + follow-up** — #876's secret helper failed twice at deploy:
-  (1) CloudFormation `{{resolve:secretsmanager:…}}` is REGION-LOCAL (a us-west-2 ARN from
-  the us-east-1 WebStack → ResourceNotFoundException) → secret is now multi-region
-  (primary us-west-2, replica us-east-1, same name/value); (2) partial-ARN resolution
-  breaks when the name ends in hyphen+6 chars (`…-secret` does!) → reference by NAME
-  (`SecretValue.secrets_manager(name)`), no suffix ambiguity.
-- **#884 × #880 semantic collision** — the audit tests used `log_supplement` as their
-  example write tool; the prune removed it (0 invocations/30d). Tests now use
-  `log_decision` with schema-correct arguments.
-
-## Deploys (all pre-authorized)
-
-Ordered for the guard: secret created + replicated → `cdk deploy LifePlatformWeb` →
-`cdk deploy --all` (9/9, ships pruned MCP + audit IAM + debrief fleet) → bucket policy
-applied → character_sheet.json config re-uploaded → Hevy migration (dry→apply→dry-0) →
-`sync_site_to_s3.sh` + fonts. **Verified:** suite **4207 passed / 0 failed** · smoke
-**67/67** · visual QA **34/34** (12 warnings, daily-data class) · `verify_oidc_iam`
-CLEAN · live build == main tip · direct-URL 403 / CF 200 / MCP boot 401-healthy.
-The 3 red "Plan deployments" CI runs mid-train were the R8-ST6 IAM-diff HOLD working as
-designed (new grants pending manual deploy — which then happened); post-deploy pushes
-plan clean.
+Ordered: LifePlatformWeb (subscriber guard) → lifecycle applied → canary → serial merge
+train with doc-sync reconciles → **site-api BEFORE site** (learned the hard way, see
+gotchas) → `cdk deploy --all` 9/9 → SSM `hevy/restamp_enabled=true` → site via its own CI.
+**Verified:** full ci-cd green on tip (post-tighten, every job) · site-deploy green
+(smoke + visual-QA 34/34) · direct-URL 403 / via-CF 200 · canary 62 tools · AWS budget
+$85 · essay 200 + RSS + build stamp == main tip · participation flows render-QA'd ·
+`verify_oidc_iam` CLEAN.
 
 ## Gotchas (new this session)
 
-- **`git stash` is ONE STACK shared across every worktree** — two agents raced
-  stash/pop and silently swapped working trees mid-task (both recovered, verified
-  byte-identical before push). Ban stash in concurrent-agent sessions; it's in the
-  worktree-implementer brief now — keep it there.
-- **CFN secretsmanager dynamic refs: region-local + the hyphen-6-char partial-ARN trap**
-  (see driver fixes above; full reflex in memory `reference_cfn_secret_dynamic_ref`).
-- **`pytest … | tail -1` eats the exit code** — a `&&` chain continued past failing
-  tests because tail succeeded; one bad push made before catching it (fixed on the same
-  branch before merge).
-- Agent worktrees + `cdk.out` staged copies still trip `test_hevy_compiler_isolation` —
-  prune worktrees + `rm -rf cdk/cdk.out` before full-suite-on-main (known class, hit again).
+- **Deploy the API before the front-end that calls it.** The new site-deploy CI shipped
+  the site while `/api/vitals_depth` wasn't deployed → visual-QA 404 → **auto-rollback
+  fired correctly on day one**. site-api first, then site.
+- **Superseded queued site-deploy runs** hit the clobber guard as red runs + SNS alerts;
+  fixed with an up-front ancestry check that skips cleanly (the newer commit's run
+  deploys a superset).
+- **A transient API outage killed all 7 in-flight agents simultaneously.** Worktrees and
+  branches survived; `SendMessage` resume-from-transcript recovered every one with zero
+  lost work. Also: two agents stalled because their render-QA subagents couldn't route
+  verdicts back — the driver must relay.
+- **IAM normalizes single-element `StringLike` lists to bare strings** — store the
+  normalized form in `infra/iam/*.json` or the verifier false-drifts.
+- **`gh issue create` has no `--json` flag** — it fails silently inside a piped one-liner;
+  three "filed" issues weren't. Check the URL output.
+- **The "all gated" framing goes stale fast** — asking the human ranked, simplified
+  questions with recommended answers unblocked 15 items in minutes. Cheapest tool in the
+  box.
+- The old HAE API (`a76xwxt2wa`) still takes ~4–5 successful POSTs/day — a straggler
+  device/automation. **Deletion approved but HELD** until it's repointed.
 
-**Build beat:** 2026-07-08-backlog-paydown-64-to-18
+**Build beat:** 2026-07-09-decision-sprint
 
-## The remaining 18 (all gated — nothing unblocked is left)
+## Residual — waiting on Matthew (he'll unblock next session)
 
-- **Matthew-decision:** #740 essay edit pass · #739 surge ceiling $ · #741 career-artifact
-  publish · #423 parked register (stays open by design).
-- **Attended-only (safety-flagged in-issue):** #687 OIDC trust-tighten · #755 DR restore
-  drill · #750 site deploys through CI.
-- **Data/decision-gated:** #748 (needs 4wk fulfillment data incl. a bad week) · #746
-  (capture-channel decision) · #422/#421 (ACs need real-world use within a week of landing).
-- **Epics riding those stories:** #723 #722 #719 #718 #717 #348 #342.
-- **Watch:** first fresh-eyes Sunday run · first standalone visual-qa daily run (20:07 UTC)
-  · first real Hevy delete consuming a tombstone · first mcp-audit records + weekly digest
-  line · budget breakdown appearing after the next cost-governor run · coach openers on
-  the next weekly expert-analysis regeneration.
-- **Story candidates found, unfiled:** social journal-fetch DDB key mismatch (#881's
-  finding) · email-subscriber Function URL unguarded (#876's finding) · MCP_TOOL_CATALOG
-  regeneration · audit-prefix lifecycle rule.
+1. **PRE-13 decisions** (audit delivered in-session): genome is public per-SNP incl.
+   APOE genotype; labs public at exact values incl. testosterone/PSA/cancer screening —
+   both contradict DATA_GOVERNANCE's "aggregates only". Recommended: genericize genome
+   to category counts, split labs (experiment-core exact, clinical-personal banded),
+   remove the latent adherence_pct code path, genericize quest names. One PR once
+   answered.
+2. **HN submission** (title + URL in PR #899) + the one-line call: update the essay's
+   snapshot-pinned "8 stacks, ~140 tools" to current (9/60) or leave.
+3. **/verify/ profile URLs** — Strava/Hevy/Garmin public profile links or "keep private".
+4. **HAE straggler** — repoint the device still on the old URL, then the API gets deleted.
+5. GitHub GC ticket — paused by Matthew's explicit choice.
 
-Prior session archived at `handovers/HANDOVER_2026-07-08_highest-complexity-paydown.md`.
+## Watch
+
+First 18:00 UTC Hevy re-stamp run (metrics `LifePlatform/HevyRoutine`, alarm
+`hevy-restamp-errors`; Hevy app should show the recommended branch) · first Habitify
+`/notes` ingest (field names unverified against live API) · Relationships pillar's first
+real `interaction_quality` signal on the next character-sheet compute · Sunday fresh-eyes
+run · surge metrics appearing after the next weekly traffic digest · first organic CI
+site deploy on a normal site/ merge · `mcp-audit/` records (still zero — fine unless MCP
+writes happened) · budget tier self-clearing below ~$62 projected.
+
+Prior session archived at `handovers/HANDOVER_2026-07-08_backlog-paydown-64-to-18.md`.
