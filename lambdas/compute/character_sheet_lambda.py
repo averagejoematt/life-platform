@@ -155,6 +155,32 @@ def fetch_journal_entries(date_str):
         return []
 
 
+def merge_journal_view(entries):
+    """Collapse a day's templated journal entries into the single dict shape
+    character_engine expects (`journal.get("themes")` in interaction_quality).
+
+    #890: notion journal rows are stored per-template under
+    `DATE#{date}#journal#{template}` sort keys — the flat `DATE#{date}` record
+    that `fetch_date("notion", ...)` used to look up never exists, so the
+    engine's themes path was permanently dead. Themes come from the enrichment
+    pipeline (`enriched_themes`; a plain `themes` field is accepted as a
+    fallback), deduped across the day's entries with first-seen order kept.
+
+    Returns None when the day has no themed entries, matching the old
+    "no journal record" falsy contract (the engine does `data.get("journal") or {}`).
+    """
+    themes = []
+    seen = set()
+    for entry in entries or []:
+        for theme in entry.get("enriched_themes") or entry.get("themes") or []:
+            if isinstance(theme, str) and theme not in seen:
+                seen.add(theme)
+                themes.append(theme)
+    if not themes:
+        return None
+    return {"themes": themes}
+
+
 def _safe_float(rec, field):
     """Extract a float from a record, returning None on failure."""
     if rec and field in rec:
@@ -185,8 +211,12 @@ def assemble_data(yesterday_str):
     data["whoop"] = whoop
     data["macrofactor"] = fetch_date("macrofactor", yesterday_str)
     data["apple"] = fetch_date("apple_health", yesterday_str)
-    data["journal"] = fetch_date("notion", yesterday_str)
+    # #890: notion journal rows live only under templated sort keys
+    # (DATE#{date}#journal#{template}) — the flat DATE#{date} lookup that
+    # fetch_date("notion", ...) performs can never match one, so derive the
+    # dict-shaped journal view from the day's entries instead.
     data["journal_entries"] = fetch_journal_entries(yesterday_str)
+    data["journal"] = merge_journal_view(data["journal_entries"])
     data["habit_scores"] = fetch_date("habit_scores", yesterday_str)
     # SoM daily aggregates (som_avg_valence) live on the apple_health record, not a
     # separate state_of_mind partition — reuse the already-fetched apple record.
