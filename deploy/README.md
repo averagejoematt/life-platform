@@ -68,7 +68,7 @@ bash deploy_lambda.sh daily-brief
 | `create_compute_staleness_alarm.sh` | Daily compute pipeline staleness alarm | Run once — alarm persists |
 | `create_lambda_edge_alarm.sh` | Lambda@Edge error alarm (us-east-1) | Run once — alarm persists |
 | `create_operational_dashboard.sh` | CloudWatch ops dashboard | Run once — dashboard persists |
-| `apply_s3_lifecycle.sh` | S3 lifecycle rules (raw data expiry) | Run once or after bucket changes |
+| `apply_s3_lifecycle.sh` | S3 lifecycle rules — declarative FULL bucket config (a run replaces every rule) | After changing any rule in the script |
 
 ### Operations
 

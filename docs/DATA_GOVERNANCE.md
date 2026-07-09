@@ -91,7 +91,16 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | `config/` (platform config: filters, schemas) | **Current: forever; non-current: 30 days (keep 3)** | P1.3 — `config-expire-noncurrent-30d` |
 | `deploys/` (Lambda deploy artifacts) | **30 days** | Pre-existing |
 | `cloudtrail/` (audit logs) | **90 days** | P2.5 / P7 — `cloudtrail-expire-90d` |
+| `mcp-audit/` (MCP write-audit trail, #753) | **90 days** (classed with `cloudtrail/` audit logs); Infrequent Access at 30 days | #886 — `mcp-audit-ia-30d-expire-90d` |
+| `remediation-log/` (automerge audit ledger, ADR-065) | **Forever**; only the `dispatch-dedupe/` sub-prefix (transient dedupe markers) expires at **1 day** | `remediation-dispatch-dedupe-expire-1d` |
 | `dashboard/`, `site/`, `blog/` | **Forever** (static content) | None — long-lived public assets |
+
+All lifecycle rules are declared in **`deploy/apply_s3_lifecycle.sh`** — the single source
+of truth for the bucket's lifecycle configuration (the bucket is CDK-imported via
+`Bucket.from_bucket_name`, so lifecycle lives outside IaC; see `docs/MANAGED_WHERE_LEDGER.md`).
+Lifecycle expiration is executed by the S3 service itself — no IAM principal is evaluated
+against the bucket policy — so it coexists with the `ProtectDataFromDeployScripts`
+`s3:DeleteObject` Deny on `matthew-admin` (`deploy/bucket_policy.json`).
 
 ### Cold tier (none)
 No Glacier or deep-archive tier is in use today. Could be added if compliance demands long-term retention with reduced costs.
@@ -189,6 +198,7 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-05-17 | Two-tier alerting (urgent + daily digest) reduces inbox noise | ADR-052 (v7.x) |
 | 2026-05-17 | Phase 6 multi-user / delete-user-data flow formally deferred | ADR-057 |
 | 2026-05-19 | Doc re-verified post V2 closure; data_export + delete_user_data lambdas confirmed present | This commit |
+| 2026-07-08 | `mcp-audit/` retention set: IA at 30d, expire at 90d — classed with `cloudtrail/` audit logs; `apply_s3_lifecycle.sh` made the declarative full-config source of truth | #886 |
 
 ---
 
