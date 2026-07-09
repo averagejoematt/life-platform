@@ -74,6 +74,62 @@ export function lineChart(data, { valueKey = "value", dateKey = "date", goal = n
     `<figcaption class="chart-cap label">${escAttr(label)}${goal != null ? ` · goal ${escAttr(goal)}${escAttr(unit)}` : ""}${_span ? ` · ${escAttr(_span)}` : ""} · ${pts.length} pts</figcaption></figure>`;
 }
 
+// #421 — arc-trend line for slow-moving, long-horizon metrics (VO2max, walking HR). Unlike
+// lineChart (index-positioned — it silently closes gaps), the x here is positioned by REAL DATE,
+// so an irregular / sparse cadence renders as honest horizontal GAPS ("gaps shown as gaps").
+// Faint raw dots + an optional centered moving-average trend line (edge-clamped, no lag). Refuses
+// <4 points → an honest empty caption. readings: [{date, value}]. One ember hue, never red.
+export function arcTrend(readings, { valueKey = "value", dateKey = "date", unit = "", label = "", height = 150, decimals = 1, smooth = true } = {}) {
+  const pts = (readings || [])
+    .map((r) => ({ v: Number(r[valueKey]), d: String(r[dateKey] || "") }))
+    .filter((p) => Number.isFinite(p.v) && /^\d{4}-\d{2}-\d{2}/.test(p.d))
+    .sort((a, b) => a.d.localeCompare(b.d));
+  const _r = (n) => { const q = Math.pow(10, decimals); return Math.round(n * q) / q; };
+  if (pts.length < 4) {
+    const n = pts.length, latest = n ? `Latest ${_r(pts[n - 1].v)}${unit}` : "";
+    const msg = n < 1 ? `${label || "The trend"} draws in as readings accrue.`
+      : `${latest} · ${n} reading${n === 1 ? "" : "s"} so far — the trend draws in at 4+.`;
+    return `<figure class="chart chart--empty"><figcaption class="chart-cap label">${escAttr(msg)}</figcaption></figure>`;
+  }
+  const W = 600, H = height, P = 10;
+  const t0 = Date.parse(pts[0].d), t1 = Date.parse(pts[pts.length - 1].d);
+  const span = Math.max(1, t1 - t0);
+  let min = Math.min(...pts.map((p) => p.v)), max = Math.max(...pts.map((p) => p.v));
+  const pad = Math.max(0.5, (max - min) * 0.12); min -= pad; max += pad;
+  const x = (iso) => P + ((Date.parse(iso) - t0) / span) * (W - 2 * P);
+  const y = (v) => P + (1 - (v - min) / (max - min)) * (H - 2 * P);
+  // Centered moving average — symmetric window, edge-clamped (honest smoothing, no lag).
+  const k = smooth ? Math.min(3, Math.floor((pts.length - 1) / 2)) : 0;
+  const trend = pts.map((_, i) => {
+    if (!k) return { v: pts[i].v, d: pts[i].d };
+    let s = 0, c = 0;
+    for (let j = Math.max(0, i - k); j <= Math.min(pts.length - 1, i + k); j++) { s += pts[j].v; c++; }
+    return { v: s / c, d: pts[i].d };
+  });
+  const dots = pts.map((p) => `<circle class="wt-raw" cx="${x(p.d).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="2.0"/>`).join("");
+  const line = trend.map((p, i) => `${i ? "L" : "M"}${x(p.d).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const last = pts[pts.length - 1];
+  // A multi-year arc labels its dates WITH the year — "Apr 25–May 19" on a 2022→2026 span
+  // reads as a 3-week window, which is exactly the dishonesty this chart exists to avoid.
+  const multiYear = pts[0].d.slice(0, 4) !== last.d.slice(0, 4);
+  const _sd = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    if (!m) return "";
+    return `${_MON[+m[2] - 1]} ${+m[3]}${multiYear ? " ’" + m[1].slice(2) : ""}`;
+  };
+  const span_lbl = `${_sd(pts[0].d)}–${_sd(last.d)}`;
+  const summary = `${label || "Trend"}: ${pts.length} readings ${span_lbl}, latest ${_r(last.v)}${unit} (range ${_r(Math.min(...pts.map((p) => p.v)))}–${_r(Math.max(...pts.map((p) => p.v)))}${unit}).`;
+  const cpts = pts.map((p) => ({ x: +(x(p.d) / W).toFixed(4), y: +(y(p.v) / H).toFixed(4), v: p.v, l: `${_sd(p.d)} · ${_r(p.v)}${unit}` }));
+  return `<figure class="chart wt-chart" data-wt-min="${min.toFixed(2)}" data-wt-max="${max.toFixed(2)}" data-wt-h="${H}" data-wt-p="${P}">` +
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${escAttr(summary)}" data-cpts="${escAttr(JSON.stringify(cpts))}">` +
+    `<path class="wt-trend" d="${line}" fill="none" vector-effect="non-scaling-stroke"/>${dots}` +
+    `<circle class="chart-dot" cx="${x(last.d).toFixed(1)}" cy="${y(trend[trend.length - 1].v).toFixed(1)}" r="3.5"/></svg>` +
+    `<figcaption class="chart-cap label">${escAttr(label || "Trend")} · ${escAttr(span_lbl)} · ${pts.length} readings` +
+    ` · <span class="wt-key"><i class="wt-swatch wt-swatch-raw"></i>faint dots = each reading</span>` +
+    ` <span class="wt-key"><i class="wt-swatch wt-swatch-trend"></i>line = smoothed arc</span>` +
+    ` · x positioned by real date, so gaps show as gaps</figcaption></figure>`;
+}
+
 // P0.1 — the trend-weight hero. Dual-layer: faint TRUE daily dots (scale noise) + a
 // confident ember TREND line (centered moving average, down-weights water/food noise).
 // HARD RULE 4: the goal NEVER anchors the y-axis (that flattens the real slope) — the axis
@@ -249,8 +305,10 @@ export function confLevel({ confidence = null, n = null, provisional = false, ci
     if (n >= 8) return { level: "medium", cls: "cf-med" };   // enough to be directional
     return { level: "low", cls: "cf-low" };
   }
+  // Guard null explicitly — Number(null) is 0 (finite!), which read "no confidence
+  // supplied" as cf-low and rendered a caller's ciWhisker band invisible (#421 QA).
   const c = Number(confidence);
-  if (Number.isFinite(c)) {
+  if (confidence != null && Number.isFinite(c)) {
     if (c >= 0.8) return { level: "high", cls: "cf-high" };
     if (c >= 0.5) return { level: "medium", cls: "cf-med" };
     return { level: "low", cls: "cf-low" };

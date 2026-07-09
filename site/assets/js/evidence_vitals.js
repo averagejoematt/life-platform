@@ -3,7 +3,7 @@
   the component rings, the small-multiples grid). Split out of evidence.js (#581) — no
   behavior change.
 */
-import { sparkline, ring, autonomicHero, autonomicQuadrant } from "/assets/js/charts.js";
+import { sparkline, ring, autonomicHero, autonomicQuadrant, arcTrend, ciWhisker, nDots } from "/assets/js/charts.js";
 import { esc, tryJSON, isBad, has, fmt, fig, figs, sec, empty } from "/assets/js/evidence_shared.js";
 
 // Live Pulse — current status narrative + daily vitals trends (the old /live).
@@ -142,9 +142,45 @@ export function vitalsNarrative(p, comps) {
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
 }
 
+// #421 (VIT-03) — VO2max arc. The longevity gold-standard fitness number, a slow-moving arc
+// metric beside the daily vitals. Real recorded Garmin estimates only; the date-positioned trend
+// shows gaps as gaps. Renders nothing (no placeholder) until real estimates exist.
+export function vitalsVo2max(vo) {
+  if (!vo || !vo.available) return "";
+  const dirWord = vo.trend === "improving" ? "climbing" : vo.trend === "declining" ? "declining" : "holding";
+  const deltaLbl = (vo.delta > 0 ? "+" : "") + fmt(vo.delta, 1);
+  return sec("VO₂max — the aerobic arc",
+    figs([fig(fmt(vo.current, 1), "now · ml/kg/min"), fig(fmt(vo.peak, 1), "recorded peak"), fig(deltaLbl, "arc-to-date")]) +
+    arcTrend(vo.series, { valueKey: "value", unit: " ml/kg/min", label: "VO₂max", height: 180, decimals: 1 }) +
+    `<p class="rd-meta label">The estimated maximal oxygen uptake from ${esc(vo.source)} — the single best-studied fitness-longevity number. This is an <strong>arc metric</strong>, not a daily dial: ${vo.n} recorded estimates, ${dirWord} (${esc(deltaLbl)} ml/kg/min across the record). The line is positioned by real date, so the sparse recent cadence reads as honest gaps — a device estimate, not a lab CPET, so read the multi-month direction, not any one reading.</p>`);
+}
+
+// #421 (VIT-02, PHY-06) — walking heart rate. A genuine walking-HR capture source: the average
+// HR of real Strava `Walk` activities. Not a continuous intraday curve (no such capture exists) —
+// a per-walk average trend, honestly labelled. Renders nothing until real walks with HR exist.
+export function vitalsWalkingHr(w) {
+  if (!w || !w.available) return "";
+  const total = w.n_total != null ? w.n_total : w.n;
+  return sec("Walking heart rate — what the heart does at a stroll",
+    figs([fig(fmt(w.current, 0), "latest walk · bpm"), fig(fmt(w.avg, 0), `${w.n}-walk avg`)]) +
+    arcTrend(w.series, { valueKey: "value", unit: " bpm", label: "Walking HR", height: 150, decimals: 0 }) +
+    `<p class="rd-meta label">The average heart rate of your ${esc(w.source)} — the daytime, at-a-stroll signal the overnight resting figure misses. Each dot is one walk (${w.n} in the last ${w.window_days} days, ${total} recorded all-time), positioned by real date so quiet stretches read as gaps. It's a per-walk <strong>average</strong>, not a continuous intraday curve — the platform has no continuous-HR capture, so we don't draw one.</p>`);
+}
+
+// #421 (VIT-04) — fitness age, a complementary bio-age lens MAPPED from VO2max. Follows the
+// Option A privacy pattern (like /api/phenoage): chronological age is never an input or output,
+// so no true age is served or derivable. Provider-scrape ages (Garmin/Withings) stay deferred.
+export function vitalsFitnessAge(fa) {
+  if (!fa || !fa.available) return "";
+  return sec("Fitness age — a complementary age lens",
+    ciWhisker(fa.estimate, fa.range_low, fa.range_high, { unit: " yrs", label: "Fitness age", caption: `≈ ${fa.estimate} (${fa.range_low}–${fa.range_high}), the age at which your VO₂max is the male-population median. The band is your own recent VO₂max spread — ${fa.n} reading${fa.n === 1 ? "" : "s"}, not a guessed interval.` }) +
+    `<div class="rd-meta label" style="margin-top:.4rem">${nDots(fa.n, { unit: "VO₂max readings" })} · basis VO₂max ${fmt(fa.basis_vo2max, 1)} ml/kg/min · as of ${esc(fa.as_of)}</div>` +
+    `<p class="rd-meta label">${esc(fa.method)} It's a complementary lens beside PhenoAge, not a replacement — and like every age on this site it follows the privacy line: your <strong>real age is never used or shown</strong>, and no age-gap is derivable. ${esc(fa.citation)}. Vascular age stays deferred — no validated formula in-repo, and the provider-scrape figure is gated on sign-off.</p>`);
+}
+
 export async function renderPulse(d) {
   const p = d.pulse || d;
-  const [ph, hb] = await Promise.all([tryJSON("/api/pulse_history"), tryJSON("/api/habits")]);
+  const [ph, hb, vd] = await Promise.all([tryJSON("/api/pulse_history"), tryJSON("/api/habits"), tryJSON("/api/vitals_depth")]);
   const hist = (ph && ph.pulse_history) || [];
   const _hh = (hb && hb.history && hb.history.length) ? hb.history[hb.history.length - 1] : null;
   const habitsToday = _hh && _hh.t0_total ? { done: _hh.t0_done, total: _hh.t0_total } : null;
@@ -165,6 +201,10 @@ export async function renderPulse(d) {
     `<div class="aq-wrap">${autonomicQuadrant(qpts)}</div>` +
     `<p class="rd-meta label">Day strain against recovery, the last ${qpts.length} days — recovered <em>and</em> training hard is flow; depleted and still pushing is stress. A snapshot of the spread, not a trajectory; no arrow drawn at this n.</p>`));
   parts.push(vitalsSmallMultiples(hist)); // P2.2 — small-multiples grid (replaces the 8 equal charts) + P2.5 remove
+  // #421 — vitals DEPTH: the slow-moving arc reads (each renders only when its real data exists).
+  parts.push(vitalsVo2max(vd && vd.vo2max)); // VIT-03 — VO2max arc
+  parts.push(vitalsWalkingHr(vd && vd.walking_hr)); // VIT-02 / PHY-06 — walking heart rate
+  parts.push(vitalsFitnessAge(vd && vd.fitness_age)); // VIT-04 — fitness age (Option A privacy)
   parts.push(vitalsBackgroundStrip(p)); // P2.3 — background vitals (honest empty until captured)
   parts.push(vitalsCaptureBacklog(p)); // P3.1–P3.6 — capture + relationships, honestly gated
   parts.push(vitalsHubLinks()); // P2.4 — hub links out to the domain pages
@@ -180,8 +220,7 @@ export function vitalsCaptureBacklog(p) {
   const cards = [
     `<div class="cap-card"><h4 class="cap-h">Blood pressure <span class="cap-tag">needs a cuff</span></h4><p class="rd-meta label">The most valuable missing daily vital for a heavy man mid-cut — and the one that should improve visibly. A morning cuff reading would add a BP trend here. Not captured yet.</p></div>`,
     `<div class="cap-card"><h4 class="cap-h">Hourly habit history <span class="cap-tag">upgrades the glyphs</span></h4><p class="rd-meta label">The glyph row shows "X of N today"; with hourly habit-completion history it would become "vs your average by this hour" — a real pace benchmark. Until that exists, the honest X-of-N stands (no faked hourly baseline).</p></div>`,
-    `<div class="cap-card"><h4 class="cap-h">Continuous / walking HR <span class="cap-tag">needs capture</span></h4><p class="rd-meta label">Feeds Zone-2 and the autonomic read with daytime heart rate, not just the overnight resting figure.</p></div>`,
-    `<div class="cap-card"><h4 class="cap-h">VO₂max trend <span class="cap-tag">arc cadence</span></h4><p class="rd-meta label">The longevity gold-standard fitness number — a slow-moving arc metric beside the daily vitals.</p></div>`,
+    `<div class="cap-card"><h4 class="cap-h">Continuous intraday HR <span class="cap-tag">needs capture</span></h4><p class="rd-meta label">Walking heart rate now ships above (per-walk averages from Strava). A <em>continuous</em> intraday curve — heart rate second-by-second through the day — still isn't in the feed; Garmin/Whoop store only summaries and zone-seconds, so we don't draw one.</p></div>`,
     `<div class="cap-card"><h4 class="cap-h">Subjective energy / mood <span class="cap-tag">needs capture</span></h4><p class="rd-meta label">A morning 1–5 "how do you actually feel" check-in — the ground-truth overlay the wearables miss, graded against the readiness read.</p></div>`,
     `<div class="cap-card"><h4 class="cap-h">Cross-metric relationships <span class="cap-tag">unlocks ${wks != null && wks > 0 ? "in ~" + wks + " days" : "at 2 weeks"}</span></h4><p class="rd-meta label">Which vitals move together — sleep→recovery, strain→next-day HRV — stays <strong>withheld</strong> until ~2 weeks of overlapping days (day ${dayNum != null ? dayNum : "?"} now). At n≈10 it's noise, not signal; when it opens it reuses the self-policing correlation board from Sleep — direction-only first, a coefficient only once the window is honest. No chip is drawn early.</p></div>`,
   ];
