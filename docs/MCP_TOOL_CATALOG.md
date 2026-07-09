@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-07-08 | **Total tools:** 60
+**Version:** v8.6.0 | **Last updated:** 2026-07-09 | **Total tools:** 60
 
 > Source of truth: the count of top-level `TOOLS` dict keys in `mcp/registry.py` → **60**, via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`). Do NOT count with `grep '"name":'` — it over-counts nested schema `"name"` fields (CLAUDE.md).
 >
