@@ -63,6 +63,7 @@ SOURCE_CLASS: dict[str, str] = {
     "apple_health": RAW_TIMESERIES,
     "eightsleep": RAW_TIMESERIES,
     "habitify": RAW_TIMESERIES,  # raw completion; habit_scores is the derived one
+    "habit_causality": RAW_TIMESERIES,  # #422: user-authored why/trigger/reward per habit-day — a logged fact, kept forever
     "todoist": RAW_TIMESERIES,
     "weather": RAW_TIMESERIES,
     "macrofactor": RAW_TIMESERIES,

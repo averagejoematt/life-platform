@@ -18,6 +18,7 @@ from mcp.tools_data import (
     tool_search_activities,
 )
 from mcp.tools_decisions import tool_get_decisions, tool_log_decision, tool_update_decision_outcome
+from mcp.tools_habits import tool_get_habit_reflection_queue, tool_log_habit_reflection
 from mcp.tools_health import tool_get_daily_metrics, tool_get_readiness_score, tool_get_weight_loss_progress
 
 # SPEC_HEVY_AND_NUTRITION_BRIDGE §2.6 — source-agnostic workout query layer
@@ -1652,6 +1653,57 @@ TOOLS = {
                     },
                 },
                 "required": [],
+            },
+        },
+    },
+    # ── #422 EVR-01/02: habit causality reflection loop (secondary capture channel) ──
+    "get_habit_reflection_queue": {
+        "fn": tool_get_habit_reflection_queue,
+        "schema": {
+            "name": "get_habit_reflection_queue",
+            "description": (
+                "#422: Recent habit-days still missing causality context — what to ask Matthew about. "
+                "Deterministically returns missed days with no recorded 'why' and completed days with no "
+                "trigger/reward, scoped to the last N days. Use this OPTIONALLY when Matthew is already "
+                "reflecting on his day/week: pick a couple, ask about them conversationally, then call "
+                "log_habit_reflection with his answer. Never nag or schedule — it only makes the ask possible. "
+                "Use for: 'ask me about my habits', 'what habit context am I missing?', end-of-day/week reflection."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Look back N days (default 7, max 31). Use 7 for a weekly view."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "log_habit_reflection": {
+        "fn": tool_log_habit_reflection,
+        "schema": {
+            "name": "log_habit_reflection",
+            "description": (
+                "#422: Log Matthew's reflection about a habit on a date — the richer, Claude-sourced context "
+                "layer that complements in-app Habitify notes. Record any of trigger (what cued it), reward "
+                "(what it paid back), why_missed (why a missed day slipped), or free-text context. Stored "
+                "verbatim, keyed to habit+date, tagged channel=claude_reflection so it coexists with (never "
+                "overwrites) Habitify-sourced notes. Renders on the habits page. "
+                "Use for: 'I missed meditation because I was traveling', 'the walk is triggered by my morning coffee'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "habit": {"type": "string", "description": "Habit name as it appears in the tracker (e.g. 'Meditate')."},
+                    "date": {"type": "string", "description": "Date the reflection is about (YYYY-MM-DD). Defaults to today."},
+                    "trigger": {"type": "string", "description": "What cued the habit (for completed days). Optional."},
+                    "reward": {"type": "string", "description": "What the habit paid back / how it felt. Optional."},
+                    "why_missed": {"type": "string", "description": "Why a missed day slipped (travel, illness, low day…). Optional."},
+                    "context": {
+                        "type": "string",
+                        "description": "Any free-text reflection. An explicit 'trigger:'/'reward:' prefix is lifted.",
+                    },
+                },
+                "required": ["habit"],
             },
         },
     },

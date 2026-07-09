@@ -2,7 +2,7 @@
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
-**Last updated:** 2026-07-09 (v8.6.0 — 60 MCP tools, 20 data sources, 94 Lambdas, 12 cached tools)
+**Last updated:** 2026-07-09 (v8.6.0 — 62 MCP tools, 20 data sources, 94 Lambdas, 12 cached tools)
 
 > Consolidated from SCHEMA.md + DATA_DICTIONARY.md (v3.7.32). For metric descriptions and feature guide, see PLATFORM_GUIDE.md.
 
@@ -110,7 +110,7 @@ Where multiple sources measure the same thing:
 
 ## Sources
 
-Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`
+Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `habit_causality`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`
 
 Note: `chronicling` is a historical/archived source — not actively ingesting. `hevy` became the **primary** strength-training source on 2026-05-25 (see ADR-060) — actively ingesting via hourly `hevy-backfill` poll of the Hevy events API; older Hevy records exist as legacy daily aggregates that the MCP `_expand_legacy_aggregate` bridge surfaces as virtual per-workout views. `macrofactor_export` is the explicit source label for workouts arriving via the manual MacroFactor Dropbox CSV export path (Tier 2 — see ADR-061). `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `hypotheses`, `weight_episodes`, `training_reference`, and `macrofactor_meals` are derived/computed partitions, not raw ingested data (the last is a recomputable projection over the raw `macrofactor` food log — see below). `evening_ritual` is reader/self-reported, not device-ingested — see below.
 
@@ -730,7 +730,7 @@ Note: Garmin auto-syncs activities to Strava. `garmin_activities` captures Garmi
 | Field | Type | Description |
 |-------|------|-------------|
 | `habits` | object | Map of habit name → count (Decimal: `1` = completed, `0` = not completed) |
-| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, etc. |
+| `habit_statuses` | object | Per-habit structured status map (TD-11): status, completed_at, etc. Since #422 also carries `notes` (list of verbatim in-app note strings for that day, clipped), `notes_at` (their created timestamps) and `note_channel: "habitify_note"` when the habit has notes — the PRIMARY habit-causality capture channel (a note on a done day = driver context; on a skipped/failed day = the why-missed reason). Stored raw — the `trigger:`/`reward:` line-prefix convention is interpreted on read by `lambdas/habit_causality.parse_note`, never inferred (ADR-104). |
 | `by_group` | object | Map of P40 group name → group stats object (see below) |
 | `total_completed` | number | Total habits completed that day |
 | `total_possible` | number | Total habits tracked that day |
@@ -1730,6 +1730,36 @@ Tracks platform-guided decisions and their outcomes. Builds trust-calibration da
 | `logged_at` | string | ISO timestamp |
 
 Access via `log_decision`, `get_decision_journal`, `get_decision_effectiveness` MCP tools.
+
+---
+
+## Habit Causality Partition (#422, EVR-01/02)
+
+**pk:** `USER#matthew#SOURCE#habit_causality`
+**sk:** `HABITDAY#<YYYY-MM-DD>#<habit-slug>` (slug via `habit_causality.slugify_habit`)
+
+The Claude-sourced half of the habit causality layer (SECONDARY channel — the primary is
+in-app Habitify notes, stored on the habitify record's `habit_statuses[name].notes`).
+Written by the `log_habit_reflection` MCP tool with `update_item` merge semantics; read
+back by `/api/habits` (merged with the Habitify channel, each value provenance-tagged) and
+by `get_habit_reflection_queue` (to skip habit-days already answered). RAW_TIMESERIES in
+the phase taxonomy — user-authored facts, kept forever.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `habit` | string | Habit name as tracked (verbatim) |
+| `date` | string | YYYY-MM-DD the reflection is about |
+| `slug` | string | Key-safe habit slug (SK suffix) |
+| `channel` | string | Always `claude_reflection` for this tool |
+| `source` | string | `habit_causality` |
+| `trigger` | string | What cued the habit (completed days) — verbatim, optional |
+| `reward` | string | What it paid back — verbatim, optional |
+| `why_missed` | string | Why a missed day slipped — verbatim, optional |
+| `context` | string | Free-text reflection (an explicit `trigger:`/`reward:` prefix is lifted deterministically) |
+| `updated_at` | string | ISO timestamp of last write |
+
+All values are stored verbatim and rendered only when present — a habit-day with no
+captured answer stays honestly empty on every surface (ADR-104, no inferred causes).
 
 ---
 

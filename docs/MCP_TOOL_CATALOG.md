@@ -1,6 +1,6 @@
 # Life Platform — MCP Tool Catalog
 
-**Version:** v8.6.0 | **Last updated:** 2026-07-09 | **Total tools:** 60
+**Version:** v8.6.0 | **Last updated:** 2026-07-09 | **Total tools:** 62
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -14,7 +14,7 @@
 
 ---
 
-## All 60 Tools — by module
+## All 62 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -40,6 +40,7 @@
 | `mcp/tools_hevy_routine.py` | 1 |
 | `mcp/tools_reading.py` | 8 |
 | `mcp/registry.py` | 1 |
+| `mcp/tools_habits.py` | 2 |
 
 ### Training Notes (`mcp/tools_training_notes.py`)
 
@@ -210,6 +211,13 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `list_available_tools` | domain=, keyword=, limit= | Discover MCP tools by domain or keyword. Use when you're unsure which specific tool matches a question. Returns tool names, domains, and short descriptions. Filter by domain (e.g. 'health', 'training', 'nutrition', 'sleep', 'journal', 'cgm', 'labs', 'habits', 'lifestyle', 'board', 'character', 'social', 'memory', 'measurements', 'strength', 'coach_intelligence', 'decisions', 'hypotheses', 'challenges') or keyword (matches tool name + description substring). |
+
+### mcp.tools_habits (`mcp/tools_habits.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_habit_reflection_queue` | days= | #422: Recent habit-days still missing causality context — what to ask Matthew about. Deterministically returns missed days with no recorded 'why' and completed days with no trigger/reward, scoped to the last N days. Use this OPTIONALLY when Matthew is already reflecting on his day/week: pick a couple, ask about them conversationally, then call log_habit_reflection with his answer. Never nag or schedule — it only makes the ask possible. Use for: 'ask me about my habits', 'what habit context am I missing?', end-of-day/week reflection. |
+| `log_habit_reflection` | habit, date=, trigger=, reward=, why_missed=, context= | #422: Log Matthew's reflection about a habit on a date — the richer, Claude-sourced context layer that complements in-app Habitify notes. Record any of trigger (what cued it), reward (what it paid back), why_missed (why a missed day slipped), or free-text context. Stored verbatim, keyed to habit+date, tagged channel=claude_reflection so it coexists with (never overwrites) Habitify-sourced notes. Renders on the habits page. Use for: 'I missed meditation because I was traveling', 'the walk is triggered by my morning coffee'. |
 
 ---
 

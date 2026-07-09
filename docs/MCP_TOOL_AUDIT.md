@@ -15,6 +15,7 @@ and `tests/test_mcp_registry.py` (`EXPECTED_MIN/MAX_TOOLS`, now 50–70).
 | 2026-05-16 | 116 | 70 | Allowlist born (Phase 4.8) |
 | 2026-05-17 | 116 | 64 | V2 P4.1 — tools_calendar.py deleted (ADR-030) |
 | **2026-07-08** | **143 → 60** | **64 → 0** | **#395 ER-04 prune — this record** |
+| 2026-07-08 | 60 → 62 | 0 | #422 addition — `get_habit_reflection_queue` + `log_habit_reflection` (habit causality reflection loop, `mcp/tools_habits.py`). Deliberate add, not drift; within the 50–70 band. |
 
 ---
 

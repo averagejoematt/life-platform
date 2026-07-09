@@ -54,10 +54,27 @@ except ImportError:
 
 from ingestion_framework import IngestionConfig, run_ingestion
 
+# #422: bounded, verbatim clip of a habit note (shared conventions module, bundled #781).
+try:
+    from habit_causality import clip_note
+except ImportError:  # pragma: no cover — the bundle always ships lambdas/ at root
+
+    def clip_note(text, _max=500):
+        s = (text or "").strip()
+        return s[:_max].rstrip() + "…" if len(s) > _max else s
+
+
 SECRET_NAME = os.environ.get("HABITIFY_SECRET_NAME", "life-platform/habitify")
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 USER_ID = os.environ.get("USER_ID", "matthew")
 BASE_URL = "https://api.habitify.me"
+
+# #422 EVR-01/02 — Habitify is the PRIMARY habit-causality capture channel: notes attached
+# to a habit at check-off / skip time in the app become driver context (on a done day) or
+# the "why missed" reason (on a skipped/failed day). Fetching notes is one extra GET per
+# tracked habit per ingested day; toggleable without a deploy if it ever pressures the API.
+FETCH_NOTES = os.environ.get("HABITIFY_FETCH_NOTES", "1").strip().lower() not in ("0", "false", "no", "")
+NOTES_MAX_PER_HABIT = 5
 MOOD_LABELS = {1: "Terrible", 2: "Bad", 3: "Okay", 4: "Good", 5: "Excellent"}
 P40_GROUPS = ["Data", "Discipline", "Growth", "Hygiene", "Nutrition", "Performance", "Recovery", "Supplements", "Wellbeing"]
 
@@ -144,6 +161,36 @@ def fetch_moods(api_key, target_date):
         return []
 
 
+def fetch_notes(api_key, habit_id, target_date):
+    """#422: per-habit notes for one date (GET /notes/{habit_id}?target_date=...).
+
+    Non-fatal by contract — notes are the causality layer, never worth failing the whole
+    habit ingest over. Returns ``[{"content": str, "created_at": str}]`` (verbatim, clipped),
+    filtered to notes actually created on ``target_date`` so a note is never smeared across
+    every day if the API ignores the date param.
+    """
+    date_str = f"{target_date}T00:00:00+00:00"
+    try:
+        raw_notes = api_get(f"/notes/{habit_id}", api_key, {"target_date": date_str})
+    except Exception as e:
+        logger.warning("Notes fetch failed for habit %s on %s (non-fatal): %s", habit_id, target_date, e)
+        return []
+    out = []
+    for n in raw_notes or []:
+        if not isinstance(n, dict):
+            continue
+        content = clip_note(n.get("content") or n.get("note") or "")
+        if not content:
+            continue
+        created = str(n.get("created_date") or n.get("created_at") or "")
+        if created and created[:10] != target_date:
+            continue
+        out.append({"content": content, "created_at": created})
+        if len(out) >= NOTES_MAX_PER_HABIT:
+            break
+    return out
+
+
 # ── SIMP-2 framework callbacks ────────────────────────────────────────────────
 
 
@@ -165,11 +212,27 @@ def fetch_day(credentials: dict, date_str: str) -> dict | None:
         logger.info("No journal data for %s", date_str)
         return None
     moods = fetch_moods(api_key, date_str)
+
+    # #422: per-habit notes → causality layer. One GET per tracked habit for this date;
+    # each is non-fatal, so a notes hiccup never blocks the completion record.
+    notes_by_name = {}
+    if FETCH_NOTES:
+        for entry in journal:
+            if entry.get("is_archived"):
+                continue
+            habit_id = entry.get("id")
+            if not habit_id:
+                continue
+            notes = fetch_notes(api_key, habit_id, date_str)
+            if notes:
+                notes_by_name[entry.get("name", "Unknown")] = notes
+
     return {
         "date": date_str,
         "area_map": area_map,
         "journal": journal,
         "moods": moods,
+        "notes": notes_by_name,
     }
 
 
@@ -180,6 +243,7 @@ def transform(raw: dict, date_str: str) -> list[dict]:
     area_map = raw["area_map"]
     journal = raw["journal"]
     moods = raw["moods"]
+    notes_by_name = raw.get("notes") or {}  # #422: {habit_name: [{content, created_at}]}
 
     habits = {}
     habit_statuses = {}  # TD-11 Phase 1: structured per-habit state alongside binary
@@ -239,6 +303,16 @@ def transform(raw: dict, date_str: str) -> list[dict]:
         # Persist the resolved group per-habit so read-only surfaces (the public
         # habits page) can render the registry grouped without re-deriving it.
         habit_statuses[name]["group"] = group or "Other"
+
+        # #422 EVR-01/02: attach the in-app note(s) verbatim. On a completed day these are
+        # driver context (trigger/reward); on a skipped/failed day the "why missed" reason.
+        # Stored raw — interpretation (the trigger:/reward: convention) is deterministic and
+        # lives in habit_causality.parse_note on the read side (ADR-104, no inference here).
+        note_entries = notes_by_name.get(name) or []
+        if note_entries:
+            habit_statuses[name]["notes"] = [ne["content"] for ne in note_entries]
+            habit_statuses[name]["notes_at"] = [ne.get("created_at", "") for ne in note_entries]
+            habit_statuses[name]["note_channel"] = "habitify_note"
         if group and group in P40_GROUPS:
             group_habits_possible.setdefault(group, []).append(name)
             if is_completed:
