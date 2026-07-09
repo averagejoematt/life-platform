@@ -1,0 +1,261 @@
+# Site deploy on merge (#750) — kill the manual-deploy drift class at the root.
+#
+# A push to main touching site/ deploys the public site THROUGH CI from the merged
+# main tree, then gates it with the smoke + visual/AI-QA nets and auto-rolls-back
+# on a red. Hand-deploys from a laptop checkout — the documented root of the
+# squash-drift/clobber class (R21 cicd-02) — are no longer the default path.
+#
+# Why a SEPARATE workflow (not a job in ci-cd.yml):
+#   • ci-cd.yml's deploy job sits behind `environment: production` (manual
+#     approval). A site deploy must NOT wait on that gate — "merged but not
+#     deployed" is exactly the drift class this kills. The site deploy is
+#     low-blast-radius (static files, canonical rollback script, no Lambda/IAM
+#     surface), so it ships on merge and relies on the post-deploy gates +
+#     auto-rollback instead of a human click.
+#   • ci-cd.yml's trigger paths never included site/**, so site-only pushes ran
+#     NO pipeline at all. Adding site/** there would drag every site push through
+#     lint/test/plan/cdk-diff — none of which touch the static site.
+#   • Precedent: v4-gate.yml and visual-qa.yml are already deliberately separate
+#     workflows for the same reason (different trust + dependency profile).
+#   The #393 site-deploy steps inside ci-cd.yml's deploy job (and its
+#   rollback-site-on-failure job) moved HERE — single owner, no double deploy.
+#
+# Deploy path is the CANONICAL one (do not reimplement syncing here):
+#   deploy/deploy_site.sh → deploy/sync_site_to_s3.sh — clobber guard, rss/sitemap/
+#   shell regeneration, PII surface guard (fail-closed), JS parse gate, full-graph
+#   content-hashing, build stamp (/version.json == merged SHA), cache headers,
+#   CloudFront invalidation. It never runs `aws s3 sync --delete` at bucket root
+#   (safe_sync semantics); the only extra step here is the explicit fonts sync
+#   (sync_site_to_s3.sh excludes assets/* non-CSS/JS by design — see CLAUDE.md).
+#
+# Rollback: smoke OR visual-QA red after a successful deploy → deploy/
+# rollback_site.sh HEAD~1 (re-hash + re-stamp version.json to the prior build,
+# re-invalidate) + SNS alert. Assumes squash-merge (one commit per PR) so the
+# previous good site == HEAD~1; for a multi-commit push roll back manually:
+# bash deploy/rollback_site.sh <ref>.
+#
+# First watched run: merge of this PR (it touches .github/workflows/site-deploy.yml,
+# which is in its own paths filter, so the workflow exercises itself end-to-end).
+
+name: Site deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/site-deploy.yml'   # workflow edits must exercise themselves
+  workflow_dispatch: {}   # manual re-deploy of the current main tree (e.g. after a generated/ data fix)
+
+# Never two site syncs racing (each pushes the whole tree + invalidates).
+# cancel-in-progress=false: a sync mid-flight should complete, not be killed halfway.
+concurrency:
+  group: site-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-west-2
+  AWS_ACCOUNT_ID: "205930651321"
+  SNS_TOPIC_ARN: arn:aws:sns:us-west-2:205930651321:life-platform-alerts-digest
+
+permissions:
+  id-token: write   # OIDC token for AWS
+  contents: read
+
+jobs:
+  # ════════════════════════════════════════════════════════════════
+  # Job 1: Deploy the site from the merged main tree
+  # ════════════════════════════════════════════════════════════════
+  deploy-site:
+    name: Deploy public site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy public site (canonical path)
+        run: |
+          echo "═══ Deploying public site from merged main (${GITHUB_SHA:0:7}) ═══"
+          # deploy_site.sh = validate → sync_site_to_s3.sh (clobber guard, shell
+          # regeneration, PII + JS gates, content-hash, build stamp, invalidation).
+          bash deploy/deploy_site.sh
+          echo "✅ Public site deployed via CI"
+
+      - name: Sync self-hosted fonts (explicit — excluded from the main sync)
+        run: |
+          # sync_site_to_s3.sh's asset steps only ship CSS/JS under assets/ and its
+          # "other files" step excludes assets/* entirely, so fonts need this
+          # explicit sync (the documented manual companion step — now automated).
+          # No --delete: additive only, can never remove live objects.
+          aws s3 sync site/assets/fonts/ \
+            "s3://matthew-life-platform/site/assets/fonts/" \
+            --content-type "font/woff2" \
+            --cache-control "max-age=31536000, public, immutable" \
+            --region ${{ env.AWS_REGION }}
+          echo "✅ Fonts synced"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 2a: HTTP/content smoke of the live site
+  # ════════════════════════════════════════════════════════════════
+  smoke:
+    name: Site smoke test
+    runs-on: ubuntu-latest
+    needs: deploy-site
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Wait for CloudFront invalidation to settle
+        run: sleep 60   # invalidation propagates in ~30s; don't smoke a stale edge
+
+      - name: Run site smoke test (pure HTTP — no AWS access)
+        run: |
+          bash deploy/smoke_test_site.sh
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 2b: Visual + AI-vision QA (Playwright → Claude). GATING.
+  # Mirrors the ci-cd.yml `visual-qa` job and visual-qa.yml — keep the
+  # three step lists in sync (same pinned Playwright, same role, same
+  # scripts) so a red here means the same thing as a red there.
+  # ════════════════════════════════════════════════════════════════
+  visual-qa:
+    name: Visual + AI-vision QA
+    runs-on: ubuntu-latest
+    needs: deploy-site
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Playwright + Chromium
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright==1.61.0
+          python -m playwright install --with-deps chromium
+
+      - name: Configure AWS credentials (OIDC — for Bedrock vision QA)
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run visual + AI-vision QA sweep
+        run: |
+          python3 tests/visual_qa.py --screenshot --ai-qa
+
+      - name: Accuracy gate (per-page resolves + no impossible numbers)
+        run: |
+          python3 tests/accuracy_audit.py --live
+
+      - name: Upload screenshots + report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: site-deploy-visual-qa-screenshots
+          path: qa-screenshots/
+          retention-days: 14
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 3: Auto-rollback on a failed post-deploy gate (#418/ADR-117
+  # semantics, moved here from ci-cd.yml with the site deploy itself).
+  # Fires on smoke OR visual-QA failure after a successful deploy.
+  # ════════════════════════════════════════════════════════════════
+  rollback-site-on-failure:
+    name: Auto-rollback site (smoke or visual-QA failure)
+    runs-on: ubuntu-latest
+    needs: [deploy-site, smoke, visual-qa]
+    if: >-
+      always() &&
+      needs.deploy-site.result == 'success' &&
+      (needs.smoke.result == 'failure' || needs.visual-qa.result == 'failure')
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 2  # need HEAD~1 to restore the previous good site build
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Roll back site to previous build + re-invalidate CDN
+        id: rollback
+        run: |
+          PRIOR=$(git rev-parse --short HEAD~1)
+          echo "⚠️  Post-deploy gate failed on a site deploy — rolling back site to $PRIOR"
+          # rollback_site.sh restores site/ from the ref, re-runs the canonical
+          # hashing+stamp build (ALLOW_STALE_SITE override for an intentional
+          # rollback), re-uploads, and invalidates CloudFront.
+          bash deploy/rollback_site.sh "HEAD~1"
+          echo "prior=$PRIOR" >> "$GITHUB_OUTPUT"
+          echo "✅ Site rolled back to $PRIOR — verify https://averagejoematt.com/version.json"
+
+      - name: Notify site rollback
+        if: always()
+        run: |
+          COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          GATE="smoke=${{ needs.smoke.result }} visual-qa=${{ needs.visual-qa.result }}"
+          MESSAGE="AUTO-ROLLBACK (site) — public site reverted after a failed post-deploy gate (site-deploy workflow).
+          Deployed commit: $SHORT (${{ github.ref_name }})
+          Rolled back to:  ${{ steps.rollback.outputs.prior || 'HEAD~1' }}
+          Failing gate:    $GATE
+          Rollback result: ${{ job.status }}
+          Run: $RUN_URL
+
+          Verify the site returned to the prior build: curl -s https://averagejoematt.com/version.json"
+          aws sns publish \
+            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
+            --subject "Life Platform SITE AUTO-ROLLBACK [$SHORT]" \
+            --message "$MESSAGE" \
+            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — site rollback still completed"
+          echo "✅ Site rollback notification sent"
+
+  # ════════════════════════════════════════════════════════════════
+  # Job 4: Notify when the DEPLOY itself fails (nothing shipped, or a
+  # partial sync). Gate failures are covered by the rollback job's alert.
+  # ════════════════════════════════════════════════════════════════
+  notify-deploy-failure:
+    name: Notify deploy failure
+    runs-on: ubuntu-latest
+    needs: deploy-site
+    if: always() && needs.deploy-site.result == 'failure'
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Post failure to SNS
+        run: |
+          COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="SITE DEPLOY FAILED (site-deploy workflow) — the CI site sync did not complete.
+          Commit: $SHORT (${{ github.ref_name }})
+          Run: $RUN_URL
+
+          If the sync died mid-flight the live site may be a mixed build — check
+          https://averagejoematt.com/version.json, then either re-run this workflow
+          (re-deploys merged main) or roll back: bash deploy/rollback_site.sh HEAD~1"
+          aws sns publish \
+            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
+            --subject "Life Platform SITE DEPLOY FAILED [$SHORT]" \
+            --message "$MESSAGE" \
+            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — the run failure is still visible in Actions"
