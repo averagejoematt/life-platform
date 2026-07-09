@@ -222,6 +222,62 @@ def test_applies_and_repushes_on_change(restamp):
     assert next(b for b in ir.branches if b.recommended).label == "easier"
 
 
+def test_restamp_repush_body_carries_new_recommended_branch_exercises(restamp):
+    """End-to-end (#417 2b): once restamp flips `recommended`, the body actually
+    PUT to Hevy carries the NEW recommended branch's own exercises — proving
+    the overnight re-stamp changes what the reader's Hevy app shows, not just
+    which line is starred in the notes."""
+    from routine_ir import ExerciseBlock, Set
+
+    branches = [
+        RoutineBranch(
+            label="as-written",
+            recommended=True,
+            order=0,
+            exercises=[ExerciseBlock(movement_key="bench", sets=[Set(type="normal", weight_kg=60.0, reps=5)])],
+        ),
+        RoutineBranch(
+            label="easier",
+            recommended=False,
+            order=1,
+            exercises=[ExerciseBlock(movement_key="machine_press", sets=[Set(type="normal", weight_kg=30.0, reps=10)])],
+        ),
+    ]
+    ir = RoutineSpec(
+        routine_id="r1",
+        target_date="2026-06-01",
+        archetype="upper",
+        version=1,
+        hevy_routine_id="hevy-1",
+        hevy_updated_at="2026-06-01T10:00:00Z",
+        exercises=list(branches[0].exercises),  # base mirrors the (currently recommended) as-written branch
+        branches=branches,
+    )
+
+    import hevy_write_client as wc
+
+    fake_resp = {"routine": {"id": "hevy-1", "updated_at": "2026-06-01T13:00:00Z"}}
+    template_ids = {"bench": "T1", "machine_press": "T2"}
+    with patch.object(restamp, "_ssm_get", side_effect=_enabled_ssm()):
+        with patch.object(restamp, "_find_pushed_routine", return_value=ir):
+            with patch.object(restamp, "_latest_recovery_score", return_value=20):  # red -> easier
+                with patch.object(wc, "update_routine_with_guard", return_value=fake_resp) as push:
+                    with patch("routine_repo.put_versioned"):
+                        with patch("hevy_template_cache.resolve_movement", side_effect=lambda k: template_ids[k]):
+                            with patch("routine_title.build_title_context", return_value=None):
+                                with patch("routine_title.format_why_note", return_value="why"):
+                                    result = restamp.lambda_handler({"target_date": "2026-06-01"}, None)
+
+    assert result["status"] == "ok"
+    assert result["recommended"] == "easier"
+    assert push.called
+    pushed_body = push.call_args[0][1]  # update_routine_with_guard(routine_id, body, expected_updated_at)
+    pushed_ids = [e["exercise_template_id"] for e in pushed_body["routine"]["exercises"]]
+    assert pushed_ids == ["T2"]  # easier's own exercise — now recommended, now pushed
+    # The notes menu still shows BOTH branches — self-selection preserved.
+    assert "AS-WRITTEN" in pushed_body["routine"]["notes"] and "EASIER" in pushed_body["routine"]["notes"]
+
+
 def test_conflict_fails_open(restamp):
     ir = RoutineSpec(
         routine_id="r1",

@@ -22,6 +22,9 @@ _ALLOWED_FILES = {
     os.path.join(ROOT, "tests", "test_hevy_write_client.py"),
     os.path.join(ROOT, "tests", "test_adherence_calc.py"),
     os.path.join(ROOT, "tests", "test_hevy_adherence_wiring.py"),
+    # #417 2b end-to-end restamp test asserts on the compiled wire body's
+    # exercise_template_id to prove the recommended-branch push actually works.
+    os.path.join(ROOT, "tests", "test_hevy_restamp.py"),
     os.path.join(ROOT, "tests", "test_tools_hevy_routine.py"),
     # adherence_calc reads template ids from Hevy responses — read-only, allowed.
     os.path.join(ROOT, "lambdas", "adherence_calc.py"),

@@ -25,6 +25,27 @@ from typing import Any, Callable
 from routine_ir import ExerciseBlock, RoutineBranch, RoutineSpec, Set
 
 
+def _primary_exercises(ir: RoutineSpec) -> list[ExerciseBlock]:
+    """Pick the exercise list pushed as the routine's own set/rep content (#417 2b).
+
+    Branchless routines (`ir.branches == []`) push `ir.exercises` unchanged —
+    byte-identical to pre-#417 behavior. When branches exist, the RECOMMENDED
+    branch's own `exercises` become the pushed exercise list, so the overnight
+    re-stamp (which only re-orders/re-flags `recommended`) changes what the
+    reader actually sees at the gym, not just a note. Every OTHER branch stays
+    visible only in the notes menu (`render_branches_note`) — never pushed as
+    the live set/rep list. Falls back to `ir.exercises` if the recommended
+    branch carries no exercises of its own (e.g. a branch-light placeholder
+    created before branches carried content).
+    """
+    if not ir.branches:
+        return ir.exercises
+    recommended = next((b for b in ir.branches if b.recommended), None)
+    if recommended is not None and recommended.exercises:
+        return recommended.exercises
+    return ir.exercises
+
+
 class MovementUnmappable(Exception):
     """Raised when a movement_key has no Hevy template_id and no resolver path."""
 
@@ -184,7 +205,7 @@ def to_create_body(
             "title": _resolve_title(ir, title_context),
             "folder_id": ir.hevy_folder_id,
             "notes": _compose_notes(ir, why_note),
-            "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
+            "exercises": [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)],
         },
     }
 
@@ -202,7 +223,7 @@ def to_update_body(
         "routine": {
             "title": _resolve_title(ir, title_context),
             "notes": _compose_notes(ir, why_note),
-            "exercises": [_exercise_to_wire(ex, template_resolver) for ex in ir.exercises],
+            "exercises": [_exercise_to_wire(ex, template_resolver) for ex in _primary_exercises(ir)],
         },
     }
 
