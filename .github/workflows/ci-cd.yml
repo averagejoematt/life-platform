@@ -10,9 +10,12 @@
 #   3. Plan — validates lambda_map.json, detects changed files, maps to Lambda functions
 #   4. Deploy — requires manual approval (GitHub Environment: production)
 #   5. Smoke test — invokes qa-smoke + canary, checks structured output
-#   6. Auto-rollback — Lambda/MCP (smoke failure, TB7-25) + SITE (smoke OR visual-QA
-#      failure, #418/ADR-117); shared-layer rollback surfaced as a runbook in the
-#      failure notification.
+#   6. Auto-rollback — Lambda/MCP (smoke failure, TB7-25); shared-layer rollback
+#      surfaced as a runbook in the failure notification. The SITE deploy +
+#      auto-rollback (#393/#418) moved to .github/workflows/site-deploy.yml
+#      (#750): the site ships on merge WITHOUT the production approval gate —
+#      "merged but not deployed" was the drift class — with its own smoke +
+#      visual-QA gates and rollback_site.sh auto-rollback.
 #   7. Notify — posts to SNS on any failure
 #
 # AWS auth: OIDC federation (no long-lived keys)
@@ -442,7 +445,6 @@ jobs:
       has_deploys: ${{ steps.plan.outputs.has_deploys }}
       fleet_changed: ${{ steps.plan.outputs.fleet_changed }}
       mcp_changed: ${{ steps.plan.outputs.mcp_changed }}
-      site_changed: ${{ steps.plan.outputs.site_changed }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -681,20 +683,12 @@ jobs:
           fi
           echo "mcp_changed=$MCP_CHANGED" >> "$GITHUB_OUTPUT"
 
-          # Public-site change detection (#393). The CHANGED set above is scoped to
-          # lambdas/mcp only, so site/ edits are invisible to the Lambda plan — detect
-          # them independently. A push touching site/ (or a manual deploy-all) triggers
-          # the gated CI site deploy so the product ships through the same pipeline as
-          # the backend, and the post-deploy visual/AI-QA gate fires on site-only pushes.
-          SITE_CHANGED="false"
-          if [ "${{ github.event.inputs.deploy_all }}" = "true" ]; then
-            SITE_CHANGED="true"
-            echo "⚡ Public site queued (manual deploy-all)"
-          elif git diff --name-only HEAD~1 HEAD -- site/ 2>/dev/null | grep -q .; then
-            SITE_CHANGED="true"
-            echo "⚡ Public site changed"
-          fi
-          echo "site_changed=$SITE_CHANGED" >> "$GITHUB_OUTPUT"
+          # Public-site deploys moved OUT of this pipeline (#750): a push touching
+          # site/ triggers .github/workflows/site-deploy.yml, which deploys the merged
+          # main tree WITHOUT the production approval gate (that gate was the
+          # merged-but-not-deployed drift class for the site) and runs its own smoke +
+          # visual-QA gates + rollback_site.sh auto-rollback. Single owner — no
+          # site_changed detection here anymore (#393's in-pipeline site deploy retired).
 
           DEPLOYS="[]"
 
@@ -712,7 +706,7 @@ jobs:
           echo "$DEPLOYS" | jq -r '.[] | "  → \(.function) (\(.source))"'
 
           HAS_DEPLOYS="false"
-          if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ] || [ "$SITE_CHANGED" = "true" ] || [ "$FLEET_CHANGED" = "true" ]; then
+          if [ "$COUNT" -gt 0 ] || [ "$MCP_CHANGED" = "true" ] || [ "$FLEET_CHANGED" = "true" ]; then
             HAS_DEPLOYS="true"
           fi
 
@@ -834,28 +828,13 @@ jobs:
             exit 1
           fi
 
-      # ── Public site deploy (#393) ──────────────────────────────────────────
-      # Ships the product through the SAME gated pipeline as the backend, ending
-      # hand-deploys from a local checkout. Runs only when site/ changed (or a
-      # manual deploy-all). Reuses this job's `environment: production` approval,
-      # so one click gates backend + site together. deploy_site.sh is the exact
-      # canonical human path (validate → sync_site_to_s3.sh → content-hash +
-      # build-stamp + PII guard + CloudFront invalidation). Because CI deploys the
-      # merged main tree, the "stale local checkout overwrites live" class is
-      # structurally impossible on this path. The post-deploy visual/AI-QA +
-      # accuracy gates (needs: deploy) fire next — including on site-only pushes.
-      - name: Set up Python (site build tooling)
-        if: needs.plan.outputs.site_changed == 'true'
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-
-      - name: Deploy public site
-        if: needs.plan.outputs.site_changed == 'true'
-        run: |
-          echo "═══ Deploying public site through CI ═══"
-          bash deploy/deploy_site.sh
-          echo "✅ Public site deployed via CI"
+      # ── Public site deploy: NOT here anymore (#750) ────────────────────────
+      # #393 shipped the site inside this approval-gated job; #750 moved it to
+      # .github/workflows/site-deploy.yml, which fires directly on any push to
+      # main touching site/** (this pipeline's trigger paths never included
+      # site/**, so site-only pushes ran no pipeline at all — the root of the
+      # manual-deploy drift class). Site deploys must not wait on the
+      # `environment: production` approval: merged-but-not-deployed IS the drift.
 
   # ════════════════════════════════════════════════════════════════
   # Job 5: Smoke test
@@ -1213,77 +1192,10 @@ jobs:
           echo "✅ Rollback notification sent"
 
   # ════════════════════════════════════════════════════════════════
-  # Job 6b: Auto-rollback the SITE on a failed post-deploy gate (#418/ADR-117)
-  # ════════════════════════════════════════════════════════════════
-  # The site + shared layer are the most-changed, most reader-hurting
-  # surfaces, yet only Lambda CODE had an auto-rollback net. This job
-  # closes the site half: when a CI SITE deploy is followed by a failed
-  # smoke test OR a failed visual/AI-QA gate, it reverts the site to the
-  # previous commit's build and re-invalidates CloudFront — via the (now
-  # CI-wired) deploy/rollback_site.sh, which re-hashes the asset graph +
-  # re-stamps version.json so /version.json returns to the prior build.
-  # Unlike the Lambda rollback (smoke-only), the site rollback ALSO fires
-  # on a visual-QA failure — that gate is the reader-facing safety net.
-  # NB: assumes a single squash-merge commit (main convention), so the
-  # previous good site == HEAD~1. If a push bundled several commits, roll
-  # back manually to the correct prior tag: bash deploy/rollback_site.sh <ref>.
-  rollback-site-on-failure:
-    name: Auto-rollback site (smoke or visual-QA failure)
-    runs-on: ubuntu-latest
-    needs: [plan, deploy, smoke-test, visual-qa]
-    if: >-
-      always() &&
-      needs.plan.outputs.site_changed == 'true' &&
-      needs.deploy.result == 'success' &&
-      (needs.smoke-test.result == 'failure' || needs.visual-qa.result == 'failure')
-    steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 2  # need HEAD~1 to restore the previous good site build
-
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@517a711dbcd0e402f90c77e7e2f81e849156e31d # v6.2.2
-        with:
-          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-deploy-role
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Roll back site to previous build + re-invalidate CDN
-        id: rollback
-        run: |
-          PRIOR=$(git rev-parse --short HEAD~1)
-          echo "⚠️  Post-deploy gate failed on a site deploy — rolling back site to $PRIOR"
-          # rollback_site.sh restores site/ from the ref, re-runs the canonical
-          # hashing+stamp build (ALLOW_STALE_SITE override for an intentional
-          # rollback), re-uploads, and invalidates CloudFront.
-          bash deploy/rollback_site.sh "HEAD~1"
-          echo "prior=$PRIOR" >> "$GITHUB_OUTPUT"
-          echo "✅ Site rolled back to $PRIOR — verify https://averagejoematt.com/version.json"
-
-      - name: Notify site rollback
-        if: always()
-        run: |
-          COMMIT="${{ github.sha }}"; SHORT="${COMMIT:0:7}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          GATE="smoke=${{ needs.smoke-test.result }} visual-qa=${{ needs.visual-qa.result }}"
-          MESSAGE="AUTO-ROLLBACK (site) — public site reverted after a failed post-deploy gate.
-          Deployed commit: $SHORT (${{ github.ref_name }})
-          Rolled back to:  ${{ steps.rollback.outputs.prior || 'HEAD~1' }}
-          Failing gate:    $GATE
-          Rollback result: ${{ job.status }}
-          Run: $RUN_URL
-
-          Verify the site returned to the prior build: curl -s https://averagejoematt.com/version.json"
-          aws sns publish \
-            --topic-arn "${{ env.SNS_TOPIC_ARN }}" \
-            --subject "Life Platform SITE AUTO-ROLLBACK [$SHORT]" \
-            --message "$MESSAGE" \
-            --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — site rollback still completed"
-          echo "✅ Site rollback notification sent"
-
+  # Job 6b (RETIRED here, #750): the site auto-rollback (#418/ADR-117)
+  # moved to .github/workflows/site-deploy.yml with the site deploy it
+  # protects — it fires there on a smoke OR visual-QA failure after a
+  # successful site deploy, via deploy/rollback_site.sh HEAD~1.
   # ════════════════════════════════════════════════════════════════
   # Job 7: Notify on failure
   # Runs if any upstream job fails. Posts to SNS life-platform-alerts.

@@ -60,6 +60,17 @@ Source: 2026-06-30 audit Tier-0 (`reference_deploy_from_main_not_worktree_branch
 **This reflex is now enforced, not just documented** — §6 automates exactly this
 check (plus its mirror-image: live code that outran the last `cdk deploy`).
 
+**The public site is now structurally exempt from this failure mode (#750):** a push
+to `main` touching `site/**` deploys the MERGED main tree automatically via
+`.github/workflows/site-deploy.yml` (OIDC deploy role → `deploy/deploy_site.sh` →
+`sync_site_to_s3.sh` + the explicit fonts sync), then gates it with
+`smoke_test_site.sh` + the visual/AI-QA sweep and auto-rolls-back via
+`deploy/rollback_site.sh HEAD~1` on a red — with SNS alerts either way. There is
+deliberately NO production-approval gate on that workflow (merged-but-not-deployed
+was the drift class itself). Manual `sync_site_to_s3.sh` remains sanctioned for
+attended work (its clobber guard still protects a stale checkout), but merge-to-main
+is the default ship path for the site.
+
 ## 3. Squash-merge drops unpushed commits — verify before merge, `cdk diff` before deploy
 
 A squash captures whatever is on the **remote PR branch** at merge time, not the local
