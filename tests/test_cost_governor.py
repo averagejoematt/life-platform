@@ -8,6 +8,7 @@ the early-month window). No AWS calls.
 from __future__ import annotations
 
 import importlib
+from datetime import datetime, timezone
 
 import pytest
 
@@ -151,8 +152,6 @@ class _FakeCE:
 
 
 def test_non_ai_series_excludes_bedrock_edition_services(gov, monkeypatch):
-    from datetime import datetime, timezone
-
     payload = {
         "ResultsByTime": [
             {
@@ -173,3 +172,103 @@ def test_non_ai_series_excludes_bedrock_edition_services(gov, monkeypatch):
     # No brittle exact-name CE filter anymore; we group by SERVICE and drop Bedrock in code.
     assert "Filter" not in fake.last_kwargs
     assert fake.last_kwargs.get("GroupBy")
+
+
+# ── ADR-133 (#739): surge-mode ceiling — rule + isolation from spend creep ────
+# The $75 ceiling floats to $100 when trailing 7-day unique visitors
+# (traffic_digest_lambda's UniqueVisitors7d CloudWatch metric) cross
+# SURGE_UNIQUES_THRESHOLD (900). Surge is a pure function of reader traffic —
+# it must never be triggerable by spend alone.
+
+
+@pytest.mark.parametrize(
+    "recent_uniques,expected_ceiling,expected_surge",
+    [
+        (0, 75.0, False),
+        (899, 75.0, False),  # boundary: one under the threshold
+        (900, 100.0, True),  # boundary: exactly at the threshold — crosses
+        (901, 100.0, True),
+        (5000, 100.0, True),  # a genuine viral spike
+        (None, 75.0, False),  # no signal yet (metric never emitted) → fails closed
+    ],
+)
+def test_effective_ceiling_rule(gov, recent_uniques, expected_ceiling, expected_surge):
+    ceiling, surge_active = gov._effective_ceiling(recent_uniques)
+    assert ceiling == expected_ceiling
+    assert surge_active is expected_surge
+
+
+def test_surge_engages_only_on_traffic_never_on_spend(gov):
+    """Constraint #3 (#739 scope): the ceiling stays $75 when uniques are below
+    threshold REGARDLESS of projection. A heavy, over-budget spend projection
+    with organic (sub-threshold) traffic must not float the ceiling."""
+    ceiling, surge_active = gov._effective_ceiling(recent_uniques=288)  # real recent baseline
+    assert ceiling == 75.0
+    assert surge_active is False
+    # Feed that ceiling into _decide_tier with a way-over-$75 projection — the
+    # tier still escalates (spend enforcement is untouched), but the CEILING
+    # itself never moved off $75 because of the projection.
+    tier = gov._decide_tier(projected=500.0, mtd=200.0, elapsed_days=20.0, ceiling=ceiling)
+    assert tier == 3  # spend enforcement still works — this isn't a bypass
+    assert ceiling == 75.0  # the ceiling that produced it was never surged
+
+
+def test_tier_for_scales_proportionally_with_surge_ceiling(gov):
+    """The tier BANDS (≈73%/87%/97% of ceiling) stay proportionally identical
+    under the surge ceiling — only the dollar amounts that trip them move."""
+    # At $75 (default ceiling), 55/65/73 are the exact boundaries (see
+    # test_tier_thresholds). At $100 they scale by 100/75.
+    ratio = 100.0 / 75.0
+    assert gov._tier_for(55 * ratio - 0.01, ceiling=100.0) == 0
+    assert gov._tier_for(55 * ratio, ceiling=100.0) == 1
+    assert gov._tier_for(65 * ratio, ceiling=100.0) == 2
+    assert gov._tier_for(73 * ratio, ceiling=100.0) == 3
+    # A spend level that would be tier-3 at the normal $75 ceiling is only
+    # tier 1 once surge mode is active — this is the entire point of the story:
+    # reader-driven AI spend that would have hard-stopped at $75 now has room.
+    assert gov._tier_for(80.0) == 3  # normal $75 ceiling: $80 is over the top tier
+    assert gov._tier_for(80.0, ceiling=100.0) == 1  # $100 surge ceiling: same $80 is tier 1
+
+
+def test_decide_tier_default_ceiling_unchanged(gov):
+    """The default `ceiling=MONTHLY_CEILING` keeps every pre-existing 3-arg
+    call site (and the tests above pinned to it) byte-for-byte unchanged."""
+    assert gov._decide_tier(projected=157.0, mtd=28.86, elapsed_days=5.8) == gov._decide_tier(
+        projected=157.0, mtd=28.86, elapsed_days=5.8, ceiling=75.0
+    )
+
+
+# ── _recent_unique_visitors: reads the traffic digest's CloudWatch metric ────
+
+
+class _FakeCW:
+    def __init__(self, datapoints):
+        self._datapoints = datapoints
+
+    def get_metric_statistics(self, **kwargs):
+        assert kwargs["Namespace"] == "LifePlatform/Traffic"
+        assert kwargs["MetricName"] == "UniqueVisitors7d"
+        return {"Datapoints": self._datapoints}
+
+
+def test_recent_unique_visitors_returns_latest_datapoint(gov, monkeypatch):
+    points = [
+        {"Timestamp": datetime(2026, 6, 29, tzinfo=timezone.utc), "Maximum": 165},
+        {"Timestamp": datetime(2026, 7, 6, tzinfo=timezone.utc), "Maximum": 288},
+    ]
+    monkeypatch.setattr(gov, "_cw", _FakeCW(points))
+    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) == 288
+
+
+def test_recent_unique_visitors_no_datapoints_returns_none(gov, monkeypatch):
+    monkeypatch.setattr(gov, "_cw", _FakeCW([]))
+    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None
+
+
+def test_recent_unique_visitors_read_failure_returns_none(gov, monkeypatch):
+    class _BrokenCW:
+        def get_metric_statistics(self, **kwargs):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(gov, "_cw", _BrokenCW())
+    assert gov._recent_unique_visitors(datetime(2026, 7, 8, tzinfo=timezone.utc)) is None

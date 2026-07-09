@@ -214,6 +214,12 @@ def format_headroom_line(breakdown) -> str:
             line += f" — ${slack:.0f} slack, thin for reader growth"
         else:
             line += f" — ${slack:.0f} headroom"
+        # ADR-133 (#739): surge mode floats the ceiling for real reader traffic.
+        # `surge_active` is optional (older breakdown payloads won't have it) —
+        # .get() keeps this line rendering even against a pre-surge JSON shape.
+        if breakdown.get("surge_active"):
+            uniques = breakdown.get("recent_uniques")
+            line += f" — SURGE mode ({uniques} uniques/7d, readers not spend)"
         return line
     except Exception:
         return ""  # fail-soft: a malformed field costs the line, nothing else

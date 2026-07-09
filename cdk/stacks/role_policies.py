@@ -1597,6 +1597,9 @@ def operational_cost_governor() -> list[iam.PolicyStatement]:
                 # #822: the projection breakdown persisted alongside the tier so
                 # the daily brief can render its budget-headroom line.
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-breakdown",
+                # ADR-133 (#739): edge-triggered surge-mode state, so the alert
+                # fires only on engage/disengage, not every enforcement run.
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/surge-active",
             ],
         ),
         iam.PolicyStatement(
