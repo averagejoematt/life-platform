@@ -1,571 +1,601 @@
 {
-  "updated_at": "2026-07-07T03:20:00Z",
-  "beats": [
+ "updated_at": "2026-07-07T03:20:00Z",
+ "beats": [
+  {
+   "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
+   "date": "2026-07-06",
+   "title": "Dating the past, so it stops pretending to be now",
+   "shipped": "The recap and each coach's read now carry the date they were actually written. The chronicle's 'previously on — where we are now' had frozen at Week 1 while a Week 3 post sat on the same page; it now reads 'where things stood as of Week 1 · Jun 20 — 3 weeks ago', with the current week shown right beside it. And because the eight coaches each regenerate on their own day, two could quote different 'current' recovery numbers side by side under a 'no invented numbers, real data' banner — every read now shows its own as-of date, so each number reads as that coach's most recent take rather than a shared 'today' that contradicts itself.",
+   "gotcha": "Both were pure front-end fixes: the APIs already returned the timestamps, nothing was showing them. The honest fix wasn't new data — it was surfacing the date that had been sitting in the payload all along.",
+   "honest_miss": "Stamping the date is honest but doesn't refresh the content — the recap still won't advance until the chronicle's weekly publish writes a new one. That underlying staleness is a separate fix.",
+   "prs": [
     {
-      "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
-      "date": "2026-07-06",
-      "title": "Dating the past, so it stops pretending to be now",
-      "shipped": "The recap and each coach's read now carry the date they were actually written. The chronicle's 'previously on — where we are now' had frozen at Week 1 while a Week 3 post sat on the same page; it now reads 'where things stood as of Week 1 · Jun 20 — 3 weeks ago', with the current week shown right beside it. And because the eight coaches each regenerate on their own day, two could quote different 'current' recovery numbers side by side under a 'no invented numbers, real data' banner — every read now shows its own as-of date, so each number reads as that coach's most recent take rather than a shared 'today' that contradicts itself.",
-      "gotcha": "Both were pure front-end fixes: the APIs already returned the timestamps, nothing was showing them. The honest fix wasn't new data — it was surfacing the date that had been sitting in the payload all along.",
-      "honest_miss": "Stamping the date is honest but doesn't refresh the content — the recap still won't advance until the chronicle's weekly publish writes a new one. That underlying staleness is a separate fix.",
-      "prs": [
-        {
-          "label": "PR #831",
-          "url": "https://github.com/averagejoematt/life-platform/pull/831"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-a-pulse-tied-to-a-real-clock",
-      "date": "2026-07-05",
-      "title": "A pulse tied to a real clock, not a decorative loop",
-      "shipped": "A small new rule now governs every 'live' indicator on the site: a thing only pulses while it's demonstrably still fresh, judged against that specific source's own real freshness window — never a fixed decorative animation. It replaced a flat 45-minute guess on the cockpit's sync line (each wearable now earns its own glow on its own real cadence), landed on the /data/ pipeline-status board, and gave a design-system component that had been written up but never actually used — a small 'source · updated Xm ago' byline — its first real page.",
-      "gotcha": "Grepping the whole codebase for that byline component turned up nothing: it had been fully specified in the design docs a couple weeks earlier, with example markup and everything, and simply never got wired to a page. It's a useful reminder that a documented design-system primitive isn't the same as an adopted one — the gap between the two doesn't show up until someone goes looking for the second thing and finds only the first.",
-      "honest_miss": "The design doc's own ambition was 'use it under every readout and chart' — this pass wires up three concrete surfaces, not the whole site, so most stat readouts still don't carry a freshness byline yet. And the pulse's exact feel (speed, glow intensity) hasn't had a second pair of eyes on the live site yet, just the numbers underneath it.",
-      "prs": [
-        {
-          "label": "PR #705",
-          "url": "https://github.com/averagejoematt/life-platform/pull/705"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-one-continuous-instrument",
-      "date": "2026-07-05",
-      "title": "The site became one continuous instrument",
-      "shipped": "Every page now opens with the same orientation banner and a clickable ribbon of the whole loop — Now, Data, Coaching, Protocols, Story — with the page you're on lit up. Move between them and the ribbon doesn't redraw: it slides, and the pages cross-fade into each other, using a browser feature (cross-document View Transitions) almost no site ships yet. The Cockpit's daily read is now signed and time-stamped (\"written 6:02 AM this morning\"), the coaches' disagreement renders as a real back-and-forth thread, and each coach's stance shows how long they've held it. Under the hood, six copies of the theme-toggle code collapsed into one.",
-      "gotcha": "The morph target — the ribbon and hero — was fading itself in on every page load, so the transition kept snapshotting a half-invisible banner and flashing blank on arrival. The fix was to just let the orientation banner paint instantly instead of animating it in; a persistent element that's supposed to feel continuous shouldn't be dressing itself up each time you land.",
-      "honest_miss": "The stance chips were specced to say \"held 6 days\" — but the underlying data is only written once a week, so a day count would have been invented precision. They say \"held since Jun 14 · ~3 weeks\" instead: a real date, honestly coarse. And the fifth piece — the cinematic Home constellation — was deliberately left for a fresh session rather than rushed at the end of a long one; it's the page every screenshot comes from, and it opens a data question (there's no real pillar-to-pillar correlation to weight its edges with yet) worth answering carefully.",
-      "prs": [
-        {
-          "label": "PR #700",
-          "url": "https://github.com/averagejoematt/life-platform/pull/700"
-        },
-        {
-          "label": "PR #701",
-          "url": "https://github.com/averagejoematt/life-platform/pull/701"
-        },
-        {
-          "label": "PR #702",
-          "url": "https://github.com/averagejoematt/life-platform/pull/702"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-calibration-scoreboard",
-      "date": "2026-07-05",
-      "title": "The platform grades its own predictions, in public",
-      "shipped": "Every forecast the system makes now gets scored against what actually happened. A new calibration scoreboard computes a Brier score and a reliability curve — stated confidence vs. how often it came true — for each coach and platform-wide, live at /method/calibration/. The same numbers feed the coach track record everywhere they appear, so a coach's confidence is legible next to how calibrated it's been. It shipped alongside two siblings: uncertainty now travels with every claim (the weight-loss rate carries a confidence interval and the goal date is an honest range, not a single promised day), and coach recommendations became tracked commitments the coach must revisit — 'did the wind-down I pushed on Tuesday happen? the data says no.'",
-      "gotcha": "The public API that serves all this isn't managed by our infrastructure-as-code — it's deployed by its own script, which updates the code but never the shared code library it depends on. So after we published a new version of that library, the API kept silently running the old one. The tell was subtle: a brand-new field returned null instead of erroring, and a new module failed to import only on that one service. It cost a confusing detour before we spotted that a 'successful' infra deploy had touched everything except the thing that mattered. Fix: teach the deploy script to pin the library version itself, from the single source of truth.",
-      "honest_miss": "The scoreboard is live but empty. The prediction ledger restarts at each genesis, and no forward call has come due yet — so every Brier score reads 'insufficient data' today. That's the honest state, not a bug: the board fills as the first predictions resolve against measured outcomes. Same story for the goal-date range — there aren't enough post-reset weigh-ins yet to draw a confident interval, so it stays suppressed rather than fake a finish line. The machinery is proven; the evidence has to accrue.",
-      "prs": [
-        {
-          "label": "PR #626",
-          "url": "https://github.com/averagejoematt/life-platform/pull/626"
-        },
-        {
-          "label": "PR #624",
-          "url": "https://github.com/averagejoematt/life-platform/pull/624"
-        },
-        {
-          "label": "PR #625",
-          "url": "https://github.com/averagejoematt/life-platform/pull/625"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-honesty-pair",
-      "date": "2026-07-04",
-      "title": "Levels that can go down",
-      "shipped": "The character sheet stopped lying. Unlogged behavior now scores zero instead of a neutral 50, thin-data days hold a pillar's level instead of climbing it, and a level-up needs the day's own raw score to support it — so after three weeks the pillars finally differ (sleep 19, mind 17, nutrition 1) instead of marching up in lockstep at 13. Each pillar now shows why: its top driver, what's dragging, and what's simply absent. Alongside it, every AI narrative surface gained a deterministic number gate — any number the model outputs must exist in the data it was given, or the answer regenerates once and then fails closed rather than serving an invented figure.",
-      "gotcha": "The engine was still reading pre-2024 Whoop field names, so sleep — the single best-instrumented pillar — had been permanently stuck below the data-coverage floor and silently frozen. The believability bug and a real data bug were hiding behind the same symptom.",
-      "honest_miss": "Before the gate, a shadow sweep of 112 stored coach narratives found 11 hard contradictions with the canonical facts (~10%). The gate kills invented numbers, but embellishment that uses no numbers at all is still open — that fabrication rate gets re-measured against the same baseline after a few daily coach cycles.",
-      "prs": [
-        {
-          "label": "PR #451",
-          "url": "https://github.com/averagejoematt/life-platform/pull/451"
-        },
-        {
-          "label": "PR #452",
-          "url": "https://github.com/averagejoematt/life-platform/pull/452"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-journal-pipeline-repair",
-      "date": "2026-07-04",
-      "title": "The journal pipeline was eating its own homework — repaired at every layer",
-      "shipped": "The platform's only free-text extraction — Haiku-enriched journal signals (mood, stress, themes, avoidance patterns) — was dead end-to-end: every re-ingestion from Notion silently wiped the enrichment, and the three consumers that should have read it were reading field names that never existed. Shipped in one batch: re-ingestion now preserves enrichment, edited entries re-enrich automatically, a Sunday sweep self-heals gaps, the mind coach and sentiment-trajectory tool finally receive real signals, and the full corpus was re-enriched for cents. 59 of 62 entries now carry structured signals; the other 3 are one-line stubs.",
-      "gotcha": "Dead code hides dead code. The wrong field names meant the trajectory tool always exited early — which masked a second bug further down: a helper called with two arguments that takes one. The moment the data existed, the tool would have crashed instead of working. The first test that fed it realistic data found it in seconds; the same crash pattern turned up in a second tool, now filed.",
-      "honest_miss": "A privacy hole was closed before it opened: the public API would have served per-day journal one-liners the moment journaling resumed — it only looked safe because the cache happened to be empty. And the deeper extraction rework (merged schema, verbatim quotes for grounding, raw-text archive) is still ahead; this batch only made the existing pipeline honest.",
-      "prs": [
-        {
-          "label": "PR #510",
-          "url": "https://github.com/averagejoematt/life-platform/pull/510"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-no-silent-failures",
-      "date": "2026-07-04",
-      "title": "No data source gets to die quietly anymore",
-      "shipped": "Five reliability fixes in one batch. The three data pipes that lived outside the standard framework — workout tracker, journal, and food-log inbox — now report a heartbeat on every run, so the dashboard can finally tell 'he didn't log' from 'the pipe broke three weeks ago' (the failure mode that once hid a 44-day outage). A workout-API failure now raises loudly instead of returning a polite fake success. A food-log export in an unrecognized format now archives the file and alarms instead of silently discarding it after marking it processed — the exact trap behind a 22-day data gap in May. And two alarms that cried wolf were fixed at the root: a task-tracker staleness check that false-fired 14 hours a day, and an activity reconciler that flagged evening walks as missing because it compared UTC windows against local-date storage.",
-      "gotcha": "The fleet-wide auth-health alarm claimed to cover every source, but the framework's copy of the circuit-breaker never emitted the metric — only two of ten sources actually reported. The comment describing the coverage was aspiration, not fact. Proving the fix honest took a live fire drill: swap in a broken API key, force a cold start, watch the failure register, restore, watch it reset.",
-      "honest_miss": "The drill stopped one failure short of actually paging — firing the real alarm would have held an urgent page red for six hours on a synthetic cause, so the alarm's own trigger threshold remains exercised only in tests. And the verification turned up a fresh misfire: the daily health check has been probing a credential that never existed, red every day since May. Filed, not yet fixed.",
-      "prs": [
-        {
-          "label": "PR #516",
-          "url": "https://github.com/averagejoematt/life-platform/pull/516"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-today-means-today",
-      "date": "2026-07-04",
-      "title": "'Today' now means today — six places the numbers stopped exaggerating",
-      "shipped": "The site was labeling an 8-day-old weigh-in 'today' and its day-over-day delta 'yesterday'. Now every weight label carries its real date ('latest · Jun 26'), all three surfaces that resolve 'current weight' share one function — which also fixed a fallback that could only ever find a same-day backup-scale reading — and the cockpit's sync strip shows when the scale last reported. The readiness dial's breakdown now shows the four inputs that actually produce the score, not a different model's components. The sleep page says so when recovery comes from an older night than the hours beside it. Two engines stopped reading field names no writer ever emits, a metabolic component that structurally couldn't score was removed instead of quietly dragging the pillar toward average, and Strava — live again since June 20 — is no longer declared 'paused', so a real outage would page again.",
-      "gotcha": "The sleep splice was subtler than filed: the API didn't just borrow recovery from an older night, it swapped in that night's entire record — so the 'two devices, one night' stage comparison could silently compare two different nights. And the nutrition review's CGM section turned out to be dead end-to-end: all five field reads matched nothing the pipeline writes, but the first dead read gated the rest, so it never crashed — it just never appeared, for months.",
-      "honest_miss": "Removing the fake metabolic component didn't make the pillar look better — it made the emptiness visible: honest coverage today is 0.15, because there are genuinely no recent CGM readings, no blood pressure, and the labs have decayed past their scoring window. That low number is the truth now on display until real inputs return. The training-balance input still reads 0 from a known scale mismatch in the fatigue model — separate story, still open.",
-      "prs": [
-        {
-          "label": "PR #520",
-          "url": "https://github.com/averagejoematt/life-platform/pull/520"
-        },
-        {
-          "label": "PR #521",
-          "url": "https://github.com/averagejoematt/life-platform/pull/521"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-review-paid-to-zero",
-      "date": "2026-07-04",
-      "title": "The data-health review's must-fix list hits zero",
-      "shipped": "The last seven stories from the 15-source data-health audit, closed in one batch — plus two deliberate subtractions. Habit days now finalize after midnight, so a day that was 48% done can never freeze in the record as 100% (yesterday's real record sat at 61 unresolved checks; one run after the fix, honestly settled). A manually-logged supplement now survives the hourly sync instead of being silently overwritten. The bed sensor logs in once per token lifetime instead of 18 password logins a day. The tape-measure upload pipe — dead for months with no trigger wired — works end-to-end again, proven by uploading a file and watching the record land. And two zombie processes were put down on purpose: a dormant XML importer that would have silently corrupted live health records if ever run, and a cron that had spent 18 days hammering an API that was rate-limiting it harder with every attempt.",
-      "gotcha": "A validation layer that checks the wrong field names isn't a safety net, it's a decoy: five of the schema checks could never fire because they watched names no writer ever produced, while the workout records it did check tripped 1,500 false warnings a fortnight. The whole spec had to be re-audited against what the pipeline actually writes — not what the docs said it writes.",
-      "honest_miss": "The daily health check went fully green today for the first time since May 25 — not because everything was finally fixed, but partly because one of its checks had been probing a credential that never existed. Some of that red was the instrument, not the system. And historical habit days that froze before the fix stay frozen unless individually replayed; the record is honest going forward, not retroactively.",
-      "prs": [
-        {
-          "label": "PR #523",
-          "url": "https://github.com/averagejoematt/life-platform/pull/523"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-one-mind-per-coach",
-      "date": "2026-07-04",
-      "title": "One mind per coach — and the narrator finally gets a notebook",
-      "shipped": "Each AI coach used to be three disconnected people: a rich daily-brief self, a one-line public-board self, and a separate observatory self. Now all three write from the same voice spec, the public board loads the coach's real compressed memory, and every board answer is written back into that coach's own memory — so a coach can reference what it told a reader last week instead of contradicting itself. Elena Voss, the journalist who writes the weekly chronicle, got a persistent notebook too: open story threads, promises to readers that come due as hard obligations three weeks later, running motifs, and an editorial stance that can only claim to have changed when it can show receipts.",
-      "gotcha": "The first two live tests failed — and the failure was the honest-numbers gate doing its job. The richer voice pushes coaches to state numeric confidence (\"I'd put this at 70%\") and cite sleep-stage figures, and the fail-closed gate correctly killed any number not present in the data, replacing good answers with refusals. The fix was a truce, not a retreat: confidence gets expressed in words on the public board, and a flagged answer now gets one corrective rewrite before falling back to the refusal. Also found: the weekly memory compressor had a hand-copied name table that had drifted to a retired cast — records were being bylined to coaches who no longer exist.",
-      "honest_miss": "The observatory pipeline still keeps its own persona dict for framing — the voice now matches, but true one-pipeline unification is future work. And \"grounded\" still means \"no invented figures\", not \"true\": one passing answer invented an 11-day history that slipped through the small-number allowance the gate deliberately permits. The coaches share a mind now; they don't yet share a fact-checker.",
-      "prs": [
-        {
-          "label": "PR #556",
-          "url": "https://github.com/averagejoematt/life-platform/pull/556"
-        },
-        {
-          "label": "PR #559",
-          "url": "https://github.com/averagejoematt/life-platform/pull/559"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-rest-reads-as-rest",
-      "date": "2026-07-04",
-      "title": "Rest finally reads as rest — the training-form number gets a real scale",
-      "shipped": "The platform's training stress balance was structurally wrong: its form bands assumed the classic sports-science scale while the loads underneath were raw kilojoules, so the number sat pinned at maximum fatigue — eight rest days publicly read as overtraining, and walking, the primary engine of this whole experiment, contributed zero load. One shared load model now scores everything on a TSS-like scale, walks count via a moving-time fallback, and five separate copies of the fatigue math were collapsed into it. Live result: TSB went from −87 (saturated) to −6 (neutral). The journal extractor also got a v2: entities, behaviors, and cause→effect claims — each backed by a verbatim quote a deterministic gate verifies against the entry before anything is stored.",
-      "gotcha": "Every place the number rendered had bands like ‘−30 to +20’ that were correct in spirit and impossible in practice — the inputs were on a scale roughly ten times larger. Nobody wrote a wrong band; the scale drifted underneath all of them. And the duration proxy created a brand-new trap: duplicate multi-device walk records were harmless when walks scored zero, but would silently double-count the moment walking earned load.",
-      "honest_miss": "Old records keep their old-scale values, so one correlation window straddles the discontinuity for about two weeks — that r is noise, and the record says so rather than pretending continuity. The quote-grounding gate dropped 11 of the extractor's proposed causal claims on the very first sweep: the model invents supporting quotes more often than you'd hope, which is exactly why the gate exists.",
-      "prs": [
-        {
-          "label": "PR #562",
-          "url": "https://github.com/averagejoematt/life-platform/pull/562"
-        },
-        {
-          "label": "PR #563",
-          "url": "https://github.com/averagejoematt/life-platform/pull/563"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-the-math-arrives",
-      "date": "2026-07-04",
-      "title": "The hypothesis engine earns its 'scientific method' badge — pre-registration, effect sizes, and a calibration ledger",
-      "shipped": "The platform's weekly hypothesis engine was branded scientific method but contained no math: an AI model eyeballed seven days of data and voted. Now every hypothesis is born with a frozen, machine-checkable test spec — which metric splits the days, which metric should move, in which direction, by how much — and that spec is pre-registered: written down before the data that will judge it exists. The weekly verdict is pure computation (effect size plus a bootstrap confidence interval from a new tested statistics module), the AI only narrates decisions already made, and every resolution lands in a permanent calibration ledger so 'do the engine's high-confidence bets actually confirm more often?' finally has an answer coming. Correlations across the site also now use autocorrelation-corrected sample sizes — daily bodies remember yesterday, so 20 days of data was never really 20 independent observations.",
-      "gotcha": "Physiological time series are autocorrelated, and honoring that is humbling: the strongest correlation on the board this week (habit completion vs day grade, r=0.88 over 20 days) shrinks to an effective sample of just 7.1 days once day-to-day memory is priced in. It survives correction — most pairs don't. The anticonservative version looked more impressive every single week.",
-      "honest_miss": "The first live run rejected 2 of 5 generated hypotheses for failing the new spec gate — the stricter contract costs candidates. And the five hypotheses formed under the old engine can never be graded by the new one (their criteria were prose, not specs); they'll expire undecided over the next month, which is the honest price of upgrading the method mid-experiment.",
-      "prs": [
-        {
-          "label": "PR #567",
-          "url": "https://github.com/averagejoematt/life-platform/pull/567"
-        },
-        {
-          "label": "PR #568",
-          "url": "https://github.com/averagejoematt/life-platform/pull/568"
-        },
-        {
-          "label": "PR #570",
-          "url": "https://github.com/averagejoematt/life-platform/pull/570"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-forecasts-on-the-record",
-      "date": "2026-07-04",
-      "title": "The platform starts betting on tomorrow — and the coaches start arguing on the record",
-      "shipped": "The platform now predicts its own future, in writing. A daily forecast engine issues frozen next-day and next-week expectations for recovery, sleep, and weight — each with an 80% interval — and when the real day arrives, every forecast grades itself into a permanent calibration ledger. Six forecasts a day are issuing; the first grades land tomorrow. Alongside it: a scenario explorer showing what actually followed days like these, with every thin cell hidden rather than dressed up, and the first genuine inter-coach dispute — the nutrition coach challenged the physical coach's recorded claim on caloric adequacy, each answering the other's actual words, and the rejoinder conceded a real point. Seven stories shipped in the batch; these three are the spine.",
-      "gotcha": "The deploy tooling bit three times in one session, the same way: the single-function hot deploy packages only the handler file, so a lambda importing a sibling module outside the shared layer works locally, passes CI, and dies on its first import in production. The nastiest variant: the deploy system's staged artifact in storage was a half-complete zip sitting under a valid content hash, so every deploy reported 'no changes' while the live function was missing modules — the fix was deleting the artifact itself to force a re-upload.",
-      "honest_miss": "The first live forecast run predicted a 106.1% recovery ceiling — mathematically faithful, physically impossible; intervals now clamp to reality, but it shipped for a day. The scenario explorer's honesty is mostly emptiness: of 40 lever-outcome cells, 38 are hidden because 32 days of this experiment cycle can't support them. And the question the forecasts exist to answer — do the 80% intervals actually cover 80%? — is still unanswerable; the ledger only starts accruing grades tomorrow.",
-      "prs": [
-        {
-          "label": "PR #572",
-          "url": "https://github.com/averagejoematt/life-platform/pull/572"
-        },
-        {
-          "label": "PR #599",
-          "url": "https://github.com/averagejoematt/life-platform/pull/599"
-        },
-        {
-          "label": "PR #602",
-          "url": "https://github.com/averagejoematt/life-platform/pull/602"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-the-coaches-get-faces",
-      "date": "2026-07-04",
-      "title": "The coaches get faces — and an approval gate that won't let an unsigned one ship",
-      "shipped": "Three of the AI coaching staff now have commissioned character portraits: the embedded journalist's byline on the chronicle, and the sleep and training coaches on the coaching page and its popovers. Each portrait is a hand-authored layered SVG recipe — flat-vector character illustration with an owned color palette — rendered by the same deterministic engine that draws the coaching sigils, blink and all. The approval gate is structural, not procedural: a recipe without a recorded human sign-off validates but never bundles into the shipped module, so nothing reaches a live page without explicit approval on a contact sheet. A disclosure line ships wherever portraits render: these are openly fictional AI personas.",
-      "gotcha": "The style spec written before any art existed did not survive contact with the art. The design ADR confidently said 'engraved stroke-only line work'; four review rounds later the approved style was full character illustration — the standard that stuck was borrowed from animated film: a reader should know who is who from silhouette alone. That became a mandatory test — render the whole cast as solid single-color shapes, no faces, and if you can't tell them apart, no amount of facial detail will save it. Separately, the first deploy silently showed zero portraits: the live engine serves coaches under different internal ids than the design docs use, and the fallback chain quietly rendered sigils exactly as designed — correct behavior, invisible failure. An alias map fixed it.",
-      "honest_miss": "Three faces out of a cast of roughly twenty — every other persona on the site still renders a geometric sigil where a portrait should eventually be. The alternate variants (glasses, headband) were drawn, staged, and not used. And the speaking-mouth animation frames exist in every recipe but nothing drives them yet.",
-      "prs": [
-        {
-          "label": "PR #607",
-          "url": "https://github.com/averagejoematt/life-platform/pull/607"
-        },
-        {
-          "label": "PR #608",
-          "url": "https://github.com/averagejoematt/life-platform/pull/608"
-        },
-        {
-          "label": "PR #612",
-          "url": "https://github.com/averagejoematt/life-platform/pull/612"
-        },
-        {
-          "label": "PR #614",
-          "url": "https://github.com/averagejoematt/life-platform/pull/614"
-        },
-        {
-          "label": "PR #615",
-          "url": "https://github.com/averagejoematt/life-platform/pull/615"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-04-the-full-cast",
-      "date": "2026-07-04",
-      "title": "The whole cast gets faces — seven portraits, one review round",
-      "shipped": "Every AI coach on the site now renders a commissioned portrait — or has a recorded reason not to. The roster audit came first: the 'roughly twenty' personas deduped to seventeen unique characters, because several of the 'different' experts turned out to be aliases of the same character under other internal names. Ten of the seventeen render as faces anywhere on the site; the pilot covered three, so this batch drew the remaining seven — nutrition, mind, longevity, glucose, labs, the explorer, and the head coach — as hand-authored SVG recipes, each claiming its own head shape, one silhouette-carried signature feature, and an owned palette. All seven were approved on a single contact sheet, in one review round.",
-      "gotcha": "At silhouette scale, the ears are the widest point of every human head. Render the cast as solid single-color shapes and every carefully drawn hairline, brow, and pair of glasses vanishes — the only features that survive are ones that beat the ear line (a beard wide enough to swallow it) or rise above the crown (a cloud of curls, a top-knot). The other lesson: reviewing your own renders is cheap. Three rounds of drawing the contact sheet, actually looking at it, and fixing what looked wrong ran before a human ever saw it — which is likely why the pilot needed four human review rounds and this batch needed one.",
-      "honest_miss": "One of the seventeen still can't have a face because no page renders him as anything but a name. Another is blocked outright: he's named after a real person, and a portrait under a real person's name fails the no-real-likeness rule either way — he needs a rename first. And the head coach's freshly signed portrait shipped to a view that no page links to anymore — drawn, approved, live, and unreachable until that surface is re-mounted. The speaking-mouth frames drawn into every recipe still have nothing driving them.",
-      "prs": [
-        {
-          "label": "PR #618",
-          "url": "https://github.com/averagejoematt/life-platform/pull/618"
-        },
-        {
-          "label": "PR #619",
-          "url": "https://github.com/averagejoematt/life-platform/pull/619"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-the-pipes-get-honest",
-      "date": "2026-07-05",
-      "title": "Three data pipes get more honest",
-      "shipped": "The nutrition page's expenditure panel was quietly serving nothing — a single renamed field meant every reader was looking for a number the importer never wrote. It's reconnected end-to-end, and when the tracker hasn't uploaded a real expenditure figure it now shows a clearly-labeled estimate (from body weight) instead of a blank. Separately, the health-export pipe that carries glucose and blood pressure now validates what it writes (an impossible reading is dropped, not stored), respects the units it's handed instead of assuming, and tells a continuous monitor apart from a fingerstick by reading cadence rather than a raw count — which had been mislabeling partial days. And the journal now syncs edits made to older entries, cleans up entries deleted upstream, and keeps a second copy of every entry's text so the database isn't the only place it lives.",
-      "gotcha": "The health-export function had no shared code layer attached — it carried its own dependencies bundled in. That meant the usual fast, single-file deploy would have silently shipped it without those dependencies and broken it on the next run. The fix was to flag it so it only ever ships through the full infrastructure deploy, and to leave that reason written down next to it so the trap doesn't get re-sprung.",
-      "honest_miss": "The journal's new second-copy archive can't be confirmed working end-to-end yet: the upstream journal API is currently returning an auth error (an expired token), so no entries are flowing through to exercise it. The code is live and loads cleanly — but 'it runs' isn't 'it's verified,' and that's an honest gap until the token is refreshed. A fourth planned piece — a large front-end refactor — was deliberately left for a supervised session rather than rushed.",
-      "prs": [
-        {
-          "label": "PR #633",
-          "url": "https://github.com/averagejoematt/life-platform/pull/633"
-        },
-        {
-          "label": "PR #649",
-          "url": "https://github.com/averagejoematt/life-platform/pull/649"
-        },
-        {
-          "label": "PR #664",
-          "url": "https://github.com/averagejoematt/life-platform/pull/664"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-the-coaches-get-a-real-gate",
-      "date": "2026-07-05",
-      "title": "The coach team's honesty check stops being decorative — and gets a public accountability layer to match",
-      "shipped": "The coach quality check used to score every generated brief and log the result — but nothing ever read the score, so a bad draft published anyway. It now runs before publishing, not after: a failing draft gets one corrected rewrite, and if that still fails, that coach sits out the day's brief entirely rather than ship something known-broken. The threshold wasn't guessed — it came from 206 real production verdicts over 30 days, which showed roughly 1 in 10 drafts fail on real anti-pattern and consistency checks even when the raw score looks fine. Alongside it: a public page listing the exact formula, time window, and known limitations behind every statistic the platform publishes; a self-graded blind test of whether the coaches actually sound different from each other; and a quarterly ritual where each coach writes about its own real prediction track record, good and bad. About two dozen smaller fixes — accessibility, page speed, data-pipe reliability — landed in the same pass.",
-      "gotcha": "Running many independent fixes at once through separate isolated copies of the codebase surfaced an unusual failure: a housekeeping git command that's supposed to be scoped to one copy of the code turned out to be shared across all of them, so two isolated copies briefly grabbed the same in-progress work from each other mid-task. Every instance was caught and cleanly untangled before anything merged, but it's now a hard rule for any future parallel work on this repo.",
-      "honest_miss": "One piece was deliberately left undone: formally adopting a webhook's cloud infrastructure into managed code would have meant swapping its live web address for a new one — breaking incoming health data until the source app on the phone got manually repointed. Rather than accept that gap as a side effect of an otherwise-safe batch of fixes, it's staying on hold until it can be done as its own deliberate, attended step.",
-      "prs": [
-        {
-          "label": "PR #654",
-          "url": "https://github.com/averagejoematt/life-platform/pull/654"
-        },
-        {
-          "label": "PR #659",
-          "url": "https://github.com/averagejoematt/life-platform/pull/659"
-        },
-        {
-          "label": "PR #660",
-          "url": "https://github.com/averagejoematt/life-platform/pull/660"
-        },
-        {
-          "label": "PR #662",
-          "url": "https://github.com/averagejoematt/life-platform/pull/662"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-charts-that-answer-back",
-      "date": "2026-07-05",
-      "title": "The data pages become an instrument — charts answer to touch, numbers show their work",
-      "shipped": "The evidence pages stopped being static readouts. Most series charts now respond when you touch or hover them — a focus dot and a tooltip walk the data, and they're keyboard-navigable too. Trends and projections gained an honest uncertainty layer: the weight forecast shows a goal-date range with a real confidence band instead of a single false-precision date, and correlations show how many overlapping days actually back them. And any stat with a documented method now opens a small popover — source, formula, window, sample size — pulled straight from the code's own method registry, so what you read can't drift from what the code does. Two new data-door views also went live (an autonomic-balance quadrant and a zone-2 cardio breakdown).",
-      "gotcha": "None of it could start until a single 3,000-line file that renders every data page was safely split into a router plus a dozen focused modules — the kind of refactor where one misplaced import silently freezes a page. The safeguard was a before/after harness that rendered all 40 pages against identical live data and diffed them byte-for-byte; 39 matched exactly and the 40th differed only by a random id, which is how we knew the split changed nothing but the file layout.",
-      "honest_miss": "Nine of twenty-four chart types still don't answer to touch — rings, radar, and a few bespoke shapes need their own interaction and were deliberately left. Some stat tiles show no provenance popover at all: that's honest, not broken — a number with no registry entry gets nothing rather than a made-up explanation. And the new 'thresholds from my own variance' work is live but intentionally inert until about a month of data accumulates, so today it reproduces the old fixed cutoffs exactly.",
-      "prs": [
-        {
-          "label": "PR #674",
-          "url": "https://github.com/averagejoematt/life-platform/pull/674"
-        },
-        {
-          "label": "PR #680",
-          "url": "https://github.com/averagejoematt/life-platform/pull/680"
-        },
-        {
-          "label": "PR #683",
-          "url": "https://github.com/averagejoematt/life-platform/pull/683"
-        },
-        {
-          "label": "PR #684",
-          "url": "https://github.com/averagejoematt/life-platform/pull/684"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-cards-that-travel-and-a-net-that-never-fired",
-      "date": "2026-07-05",
-      "title": "Share cards that travel, a safety net that had never fired, and a mood surface quietly reading the wrong table",
-      "shipped": "Thirteen changes landed in one coordinated deploy. The biggest thread: one code-drawn card engine now renders every off-site share card — the character sheet, each week's chronicle, and each coach's portrait — so the platform's ideas can leave the site as an image. A read-only 'meet the agents' feed went up at /story/agents/, rendering what the platform's own watchdogs actually caught, no new AI. On the plumbing side: dead-letter escalation that now counts real repeat failures instead of resetting them, and a CloudWatch cleanup that deleted 18 duplicate alarms (136→118) without dropping a single real failure signal.",
-      "gotcha": "Two bit hard. First, macOS treats Documents and documents as the same folder, so a few parallel build agents quietly wrote into the shared main copy instead of their own isolated one — caught before anything shipped, but a real reminder that 'isolated' has an operating-system asterisk. Second, and worse: the automated rollback that's supposed to revert a bad Lambda deploy had a one-line bug (a missing condition) that meant it had never actually fired. The net was there on paper the whole time and empty in practice.",
-      "honest_miss": "State of Mind — the mood check-ins — turned out to have been broken for months: eight different surfaces were reading an empty database table the ingest never writes to. Fixed now, but nobody noticed because the data was sparse enough that 'empty' looked normal. The real miss is that the fix only makes it *ready*; it flows when I actually start logging again. And two of the CI-safety changes can't be fully proven until a deliberately-broken build runs through the pipeline — the mechanism is in, the drill is pending.",
-      "prs": [
-        {
-          "label": "PR #694",
-          "url": "https://github.com/averagejoematt/life-platform/pull/694"
-        },
-        {
-          "label": "PR #691",
-          "url": "https://github.com/averagejoematt/life-platform/pull/691"
-        },
-        {
-          "label": "PR #686",
-          "url": "https://github.com/averagejoematt/life-platform/pull/686"
-        },
-        {
-          "label": "PR #688",
-          "url": "https://github.com/averagejoematt/life-platform/pull/688"
-        },
-        {
-          "label": "PR #689",
-          "url": "https://github.com/averagejoematt/life-platform/pull/689"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-05-a-watcher-that-caught-a-lost-workout",
-      "date": "2026-07-05",
-      "title": "A watcher that asks the source what it holds — and caught a workout we'd silently lost",
-      "shipped": "The platform learned to double-check its fitness providers against its own records. For a long time every health check watched only the database's latest date — blind to a reading that never arrived behind it (the platform once lost five afternoon walks with no alarm at all). Strava already had the fix: periodically ask the provider what it holds and compare. This session generalized that to Whoop — a daily, read-only, trailing-two-week diff that reports anything the provider has but we never stored. On its very first live run it flagged a workout the API held but our store had missed. In the same session, workout routines also gained first-class ‘branches’ — one routine that carries an easier and an as-written option instead of two separate pushes.",
-      "gotcha": "The shared-code layer bites the unwary. Common modules ship as a versioned Lambda layer, and the fleet attaches it by a hardcoded version string — so republishing new code isn't enough; you have to bump the version number or every function keeps running the old copy. Worse, the new routine format would crash any function still on the old layer the moment it tried to read a branched routine — so the deploy had to reach exactly the functions that read routines, and no fewer, before the first branched routine was ever written.",
-      "honest_miss": "The overnight re-stamp — the piece that would pre-highlight the branch matching last night's recovery — shipped turned OFF, on purpose. It's scheduled earlier in the morning than the recovery data actually refreshes, so as wired it would decide on stale numbers. Rather than fake it, it ships disabled until the timing is reconciled. And the Whoop gap it caught is only reported, not healed: the watcher's job is to see, not fix — whether that lost workout comes back is still the ingestion job's problem. Garmin, meanwhile, got no watcher at all — it's too rate-limited to reconcile honestly, so we wrote down that decision instead of pretending.",
-      "prs": [
-        {
-          "label": "PR #710",
-          "url": "https://github.com/averagejoematt/life-platform/pull/710"
-        },
-        {
-          "label": "PR #711",
-          "url": "https://github.com/averagejoematt/life-platform/pull/711"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-06-predictions-stamped-by-code",
-      "date": "2026-07-06",
-      "title": "The AI no longer writes its own report card",
-      "shipped": "The coaching engine makes forward calls about the data — and until this week, the model also wrote each prediction's ID and deadline. An audit found what you'd expect: years-off dates, duplicates, and 88 predictions that could never be graded. Now the model writes only the claim and its confidence; code stamps the ID, the date, and a strictly-future deadline, and a re-stated claim updates its original record instead of minting a daily duplicate. Verified by invoking the live analyzer and reading the fresh record back — clean ID, real deadline.",
-      "gotcha": "The deploy surfaced a second, quieter failure: a shared code layer had been published but never attached, so every function was silently one version behind — and the drift check wasn't tracking the one Lambda that mattered. Fresh layer, attached fleet-wide, missing consumer added to the map.",
-      "honest_miss": "The old corrupt predictions were still in the ledger when this shipped — voiding them (marked, never deleted) landed as the follow-up. And the honest scoreboard state is still zero graded: the first real number arrives only when deadlines start passing.",
-      "prs": [
-        {
-          "label": "PR #761",
-          "url": "https://github.com/averagejoematt/life-platform/pull/761"
-        },
-        {
-          "label": "PR #767",
-          "url": "https://github.com/averagejoematt/life-platform/pull/767"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-06-first-preregistered-experiment",
-      "date": "2026-07-06",
-      "title": "The first experiment is registered — and the prediction was published before day one",
-      "shipped": "The experiment registry was empty for 28 days; now every experiment freezes its design into a public, timestamped artifact at creation — hypothesis, success criterion, and a required plain-language stopping rule, published before any results exist. The first entry is live: a 28-day daily zone-2 cardio floor, predicting recovery rises at least 5 points over a 14-day baseline. The same batch put the stakes on the home page — sixteen prior attempts, 315 aimed at 185, a falsifiable finish line (185 held for 90 consecutive days) — and rebuilt /method/ as the skeptic's contract.",
-      "gotcha": "The CI gate that checks every function runs the same shared-code version went red mid-deploy — it raced the deploy itself. The version bump landed on main minutes before the sixteen consumer functions had the new layer attached, and the check fired in the gap. The fix was nothing: finish the attach, re-run. But a gate that can red on correct in-flight work will eventually train someone to ignore it.",
-      "honest_miss": "Pre-registration can't be applied retroactively — the 28 empty days stay empty, and the first entry only proves the mechanism from here forward. And the platform's other half still has no data: the fulfillment capture channel got its decision this session (State of Mind check-ins plus a two-tap evening ritual, publication posture fixed before any data flows), but a decision is not a datapoint — that stream is still at zero until the habit restarts.",
-      "prs": [
-        {
-          "label": "PR #765",
-          "url": "https://github.com/averagejoematt/life-platform/pull/765"
-        },
-        {
-          "label": "PR #764",
-          "url": "https://github.com/averagejoematt/life-platform/pull/764"
-        },
-        {
-          "label": "PR #763",
-          "url": "https://github.com/averagejoematt/life-platform/pull/763"
-        },
-        {
-          "label": "PR #762",
-          "url": "https://github.com/averagejoematt/life-platform/pull/762"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-06-one-deploy-channel",
-      "date": "2026-07-06",
-      "title": "Ninety functions, one bundle — the shared layer is gone",
-      "shipped": "For a year, shared code reached the platform's ~90 Lambda functions through three overlapping channels at once: a versioned AWS 'layer', full code bundles that silently shadowed it, and hand-built partial zips. Version drift between them caused four separate production incidents. Today the whole thing collapsed to one channel: every function now ships the complete shared codebase inside its own bundle, staged by a single 100-line script every deploy path shares. The version pin, the hand-curated module list, and the ritual deploy sequence are deleted. A CI check now enforces the simple invariant: nothing references the old layer, ever.",
-      "gotcha": "The audit that motivated this found the layer was already runtime-inert for most functions — the bundled copy won the import race, so the carefully-maintained version pin had been decorative for months. The scariest bugs are the ones that only matter sometimes: a handful of hot-deployed functions genuinely depended on the layer, which is exactly the inconsistency that bites at 2am. And the CI step that deploys the AI-tools server had been quietly rebuilding a known broken bundle shape the whole time — the collapse fixed a bug nobody had filed.",
-      "honest_miss": "The old layer versions are orphaned in AWS rather than deleted — nothing references them, but they linger. And the weekly drift report will now nag about a documentation number (110 alarms documented, 122 live) that this work made visible but deliberately didn't fix; that reconciliation is its own backlog item.",
-      "prs": [
-        {
-          "label": "PR #833",
-          "url": "https://github.com/averagejoematt/life-platform/pull/833"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-06-honest-numbers-bug-bash",
-      "date": "2026-07-06",
-      "title": "Nine small lies, fixed in one afternoon sweep",
-      "shipped": "A parallel bug-bash closed nine small honesty and reliability gaps found by last week's outside-consultant-style review. The public predictions API now says 'nothing graded yet' instead of a fabricated 0% hit rate. A coach's directional call that goes nowhere now counts against them — the scorecard was structurally impossible to lose. Journal mood-trend claims now carry their fit quality, so five noisy data points can't announce 'possible burnout' with a straight face. And when the monthly AI budget pauses a coach's weekly read, the site now stamps it 'as of / refresh paused' instead of serving stale words in the present tense.",
-      "gotcha": "The best find: the AI quality judge that reviews the site's public answers every week had never run — not once. It called an internal function with arguments that don't exist, and the error handler swallowed the failure silently every single week. The fix was three lines; the lesson is that a safety net you never hear from might not be attached to anything. It now emits a metric when it fails.",
-      "honest_miss": "The count of CloudWatch alarms in the docs said 110; the code actually defines 113 and the live account runs 122. The doc number is now computed from source instead of hand-typed, but the 113-vs-122 gap — nine alarms living in the cloud with no code behind them — is real, still open, and now on the backlog with its own ticket.",
-      "prs": [
-        {
-          "label": "PR #837",
-          "url": "https://github.com/averagejoematt/life-platform/pull/837"
-        },
-        {
-          "label": "PR #838",
-          "url": "https://github.com/averagejoematt/life-platform/pull/838"
-        },
-        {
-          "label": "PR #839",
-          "url": "https://github.com/averagejoematt/life-platform/pull/839"
-        },
-        {
-          "label": "PR #842",
-          "url": "https://github.com/averagejoematt/life-platform/pull/842"
-        },
-        {
-          "label": "PR #843",
-          "url": "https://github.com/averagejoematt/life-platform/pull/843"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-07-twelve-issue-paydown",
-      "date": "2026-07-07",
-      "title": "The flagship page stops shipping blank, and the monitoring bill meets its match",
-      "shipped": "Twelve backlog issues closed in one parallel sweep. The cockpit — the site's front door — now serves real numbers (character level, all seven pillar scores, an as-of date) even with JavaScript off, so link previews and crawlers finally see the instrument instead of shimmer placeholders. The home page gained a plain-language 'Is he okay this week?' read for family, computed from data already on the page. And 55 CloudWatch alarms were retired or reconciled against code — the live count now matches the codebase exactly, worth about $5.60/month back under the hard budget ceiling.",
-      "gotcha": "The cost audit that recommended keeping 48 per-lambda alarms did so because those lambdas 'had no dead-letter queue.' Live inspection showed every one already had the DLQ — the audit had counted a stale snapshot. The alarms were pure duplicate coverage; the receipts to prove it took longer than the deletion.",
-      "honest_miss": "The one security item that matters most — rotating the MCP endpoint URL that's committed in the public repo's history — still isn't done, because it breaks the AI connector until a human pastes the new URL in. It waits, again, for a laptop window.",
-      "prs": [
-        {
-          "label": "PR #855",
-          "url": "https://github.com/averagejoematt/life-platform/pull/855"
-        },
-        {
-          "label": "PR #850",
-          "url": "https://github.com/averagejoematt/life-platform/pull/850"
-        },
-        {
-          "label": "PR #853",
-          "url": "https://github.com/averagejoematt/life-platform/pull/853"
-        },
-        {
-          "label": "PR #856",
-          "url": "https://github.com/averagejoematt/life-platform/pull/856"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-08-scorecard-first-grades",
-      "date": "2026-07-08",
-      "title": "The prediction scorecard grades for the first time — the bug was a second referee",
-      "shipped": "Eight backlog issues closed in one parallel sweep, led by the one that mattered most: the coaches' prediction scorecard, publicly stuck at '0 graded yet' since mid-June, finally turned. A live run decided 17 predictions (2 confirmed, 15 refuted — an honest 12% hit-rate now baked into the page). The coaching page also joined the static-render program (coach voices in the HTML, no JavaScript required), a new /method/verify/ page publishes the cross-device disagreement a skeptic can check (54.1% same-day resting-heart-rate agreement across 1,193 nights — imperfection is the credibility), and the chronicle now names its missing Week 2 instead of silently skipping it.",
-      "gotcha": "The scorecard wasn't stuck because grading was hard — it was stuck because two graders existed. A general computation engine ran fifteen minutes before the dedicated evaluator every day and marked every elapsed prediction 'inconclusive' first, so the real evaluator never once saw an ungraded, elapsed prediction. The alarm shipped earlier this week could only say 'nothing is being graded' — finding the duplicate referee took reading 390 live prediction records and tracing who wrote each verdict.",
-      "honest_miss": "A 12% hit-rate is not a flattering first number, and most of the backlog graded 'inconclusive' because predictions written in June carried no machine-checkable threshold at all — those expire unresolved rather than getting retroactive credit. Separately, the chronicle's gap note initially didn't ship: the generator was fixed but the deploy script never ran it. Caught only by checking the live page, not the code review.",
-      "prs": [
-        {
-          "label": "PR #864",
-          "url": "https://github.com/averagejoematt/life-platform/pull/864"
-        },
-        {
-          "label": "PR #860",
-          "url": "https://github.com/averagejoematt/life-platform/pull/860"
-        },
-        {
-          "label": "PR #865",
-          "url": "https://github.com/averagejoematt/life-platform/pull/865"
-        },
-        {
-          "label": "PR #863",
-          "url": "https://github.com/averagejoematt/life-platform/pull/863"
-        }
-      ]
-    },
-    {
-      "id": "2026-07-08-daily-debrief-and-serve-split",
-      "date": "2026-07-08",
-      "title": "The platform gets a daily voice — and the site's API gets its own house",
-      "shipped": "Four of the hardest open issues closed in one autonomous session. The headline: a daily two-minute audio debrief is live — every evening a grounded script is written from the day's measured numbers (with a fail-closed fallback that cannot fabricate a figure), synthesized to audio, and published to a podcast RSS feed for about ten cents a month. The weekly panel show stopped pretending to be weekly: it now fires only when a chronicle actually publishes, and the alarm that had been red since late June — complaining about silence that was really just honesty — was retired. Under the hood, the public API was moved into its own infrastructure stack via CloudFormation's new refactor tooling with zero downtime, and the honesty harness that guarded one AI surface now guards all six, with seeded faults proving each gate actually fires.",
-      "gotcha": "Deploying the moved API stack meant preserving two URLs that CloudFront points at — delete and recreate the function and the subdomain silently changes, severing the site. CloudFormation's stack-refactor path preserved them, but only after three undocumented hurdles: log-retention helpers can't cross stacks, the destination stack must exist first as an empty shell, and the deploy role was missing one obscure read permission — the first attempt rolled back cleanly mid-flight while the site kept serving.",
-      "honest_miss": "The fourth issue closed with a 'no': batch inference pricing promised ~50% off the AI bill, but AWS requires 100 records per batch job per model and this platform's entire scheduled fleet makes ~62 calls a day across all models combined — real saving today: zero. The seam ships dormant with a live trip-wire that flips the verdict if volume ever clears the floor. Also humbling: the first CI run in days to exercise the post-deploy gates found two latent bugs in the gates themselves — an IAM grant that had never actually worked, and a version check that a too-shallow git clone made structurally unpassable.",
-      "prs": [
-        {
-          "label": "PR #866",
-          "url": "https://github.com/averagejoematt/life-platform/pull/866"
-        },
-        {
-          "label": "PR #867",
-          "url": "https://github.com/averagejoematt/life-platform/pull/867"
-        },
-        {
-          "label": "PR #868",
-          "url": "https://github.com/averagejoematt/life-platform/pull/868"
-        },
-        {
-          "label": "PR #869",
-          "url": "https://github.com/averagejoematt/life-platform/pull/869"
-        }
-      ]
+     "label": "PR #831",
+     "url": "https://github.com/averagejoematt/life-platform/pull/831"
     }
-  ]
+   ]
+  },
+  {
+   "id": "2026-07-05-a-pulse-tied-to-a-real-clock",
+   "date": "2026-07-05",
+   "title": "A pulse tied to a real clock, not a decorative loop",
+   "shipped": "A small new rule now governs every 'live' indicator on the site: a thing only pulses while it's demonstrably still fresh, judged against that specific source's own real freshness window — never a fixed decorative animation. It replaced a flat 45-minute guess on the cockpit's sync line (each wearable now earns its own glow on its own real cadence), landed on the /data/ pipeline-status board, and gave a design-system component that had been written up but never actually used — a small 'source · updated Xm ago' byline — its first real page.",
+   "gotcha": "Grepping the whole codebase for that byline component turned up nothing: it had been fully specified in the design docs a couple weeks earlier, with example markup and everything, and simply never got wired to a page. It's a useful reminder that a documented design-system primitive isn't the same as an adopted one — the gap between the two doesn't show up until someone goes looking for the second thing and finds only the first.",
+   "honest_miss": "The design doc's own ambition was 'use it under every readout and chart' — this pass wires up three concrete surfaces, not the whole site, so most stat readouts still don't carry a freshness byline yet. And the pulse's exact feel (speed, glow intensity) hasn't had a second pair of eyes on the live site yet, just the numbers underneath it.",
+   "prs": [
+    {
+     "label": "PR #705",
+     "url": "https://github.com/averagejoematt/life-platform/pull/705"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-one-continuous-instrument",
+   "date": "2026-07-05",
+   "title": "The site became one continuous instrument",
+   "shipped": "Every page now opens with the same orientation banner and a clickable ribbon of the whole loop — Now, Data, Coaching, Protocols, Story — with the page you're on lit up. Move between them and the ribbon doesn't redraw: it slides, and the pages cross-fade into each other, using a browser feature (cross-document View Transitions) almost no site ships yet. The Cockpit's daily read is now signed and time-stamped (\"written 6:02 AM this morning\"), the coaches' disagreement renders as a real back-and-forth thread, and each coach's stance shows how long they've held it. Under the hood, six copies of the theme-toggle code collapsed into one.",
+   "gotcha": "The morph target — the ribbon and hero — was fading itself in on every page load, so the transition kept snapshotting a half-invisible banner and flashing blank on arrival. The fix was to just let the orientation banner paint instantly instead of animating it in; a persistent element that's supposed to feel continuous shouldn't be dressing itself up each time you land.",
+   "honest_miss": "The stance chips were specced to say \"held 6 days\" — but the underlying data is only written once a week, so a day count would have been invented precision. They say \"held since Jun 14 · ~3 weeks\" instead: a real date, honestly coarse. And the fifth piece — the cinematic Home constellation — was deliberately left for a fresh session rather than rushed at the end of a long one; it's the page every screenshot comes from, and it opens a data question (there's no real pillar-to-pillar correlation to weight its edges with yet) worth answering carefully.",
+   "prs": [
+    {
+     "label": "PR #700",
+     "url": "https://github.com/averagejoematt/life-platform/pull/700"
+    },
+    {
+     "label": "PR #701",
+     "url": "https://github.com/averagejoematt/life-platform/pull/701"
+    },
+    {
+     "label": "PR #702",
+     "url": "https://github.com/averagejoematt/life-platform/pull/702"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-calibration-scoreboard",
+   "date": "2026-07-05",
+   "title": "The platform grades its own predictions, in public",
+   "shipped": "Every forecast the system makes now gets scored against what actually happened. A new calibration scoreboard computes a Brier score and a reliability curve — stated confidence vs. how often it came true — for each coach and platform-wide, live at /method/calibration/. The same numbers feed the coach track record everywhere they appear, so a coach's confidence is legible next to how calibrated it's been. It shipped alongside two siblings: uncertainty now travels with every claim (the weight-loss rate carries a confidence interval and the goal date is an honest range, not a single promised day), and coach recommendations became tracked commitments the coach must revisit — 'did the wind-down I pushed on Tuesday happen? the data says no.'",
+   "gotcha": "The public API that serves all this isn't managed by our infrastructure-as-code — it's deployed by its own script, which updates the code but never the shared code library it depends on. So after we published a new version of that library, the API kept silently running the old one. The tell was subtle: a brand-new field returned null instead of erroring, and a new module failed to import only on that one service. It cost a confusing detour before we spotted that a 'successful' infra deploy had touched everything except the thing that mattered. Fix: teach the deploy script to pin the library version itself, from the single source of truth.",
+   "honest_miss": "The scoreboard is live but empty. The prediction ledger restarts at each genesis, and no forward call has come due yet — so every Brier score reads 'insufficient data' today. That's the honest state, not a bug: the board fills as the first predictions resolve against measured outcomes. Same story for the goal-date range — there aren't enough post-reset weigh-ins yet to draw a confident interval, so it stays suppressed rather than fake a finish line. The machinery is proven; the evidence has to accrue.",
+   "prs": [
+    {
+     "label": "PR #626",
+     "url": "https://github.com/averagejoematt/life-platform/pull/626"
+    },
+    {
+     "label": "PR #624",
+     "url": "https://github.com/averagejoematt/life-platform/pull/624"
+    },
+    {
+     "label": "PR #625",
+     "url": "https://github.com/averagejoematt/life-platform/pull/625"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-honesty-pair",
+   "date": "2026-07-04",
+   "title": "Levels that can go down",
+   "shipped": "The character sheet stopped lying. Unlogged behavior now scores zero instead of a neutral 50, thin-data days hold a pillar's level instead of climbing it, and a level-up needs the day's own raw score to support it — so after three weeks the pillars finally differ (sleep 19, mind 17, nutrition 1) instead of marching up in lockstep at 13. Each pillar now shows why: its top driver, what's dragging, and what's simply absent. Alongside it, every AI narrative surface gained a deterministic number gate — any number the model outputs must exist in the data it was given, or the answer regenerates once and then fails closed rather than serving an invented figure.",
+   "gotcha": "The engine was still reading pre-2024 Whoop field names, so sleep — the single best-instrumented pillar — had been permanently stuck below the data-coverage floor and silently frozen. The believability bug and a real data bug were hiding behind the same symptom.",
+   "honest_miss": "Before the gate, a shadow sweep of 112 stored coach narratives found 11 hard contradictions with the canonical facts (~10%). The gate kills invented numbers, but embellishment that uses no numbers at all is still open — that fabrication rate gets re-measured against the same baseline after a few daily coach cycles.",
+   "prs": [
+    {
+     "label": "PR #451",
+     "url": "https://github.com/averagejoematt/life-platform/pull/451"
+    },
+    {
+     "label": "PR #452",
+     "url": "https://github.com/averagejoematt/life-platform/pull/452"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-journal-pipeline-repair",
+   "date": "2026-07-04",
+   "title": "The journal pipeline was eating its own homework — repaired at every layer",
+   "shipped": "The platform's only free-text extraction — Haiku-enriched journal signals (mood, stress, themes, avoidance patterns) — was dead end-to-end: every re-ingestion from Notion silently wiped the enrichment, and the three consumers that should have read it were reading field names that never existed. Shipped in one batch: re-ingestion now preserves enrichment, edited entries re-enrich automatically, a Sunday sweep self-heals gaps, the mind coach and sentiment-trajectory tool finally receive real signals, and the full corpus was re-enriched for cents. 59 of 62 entries now carry structured signals; the other 3 are one-line stubs.",
+   "gotcha": "Dead code hides dead code. The wrong field names meant the trajectory tool always exited early — which masked a second bug further down: a helper called with two arguments that takes one. The moment the data existed, the tool would have crashed instead of working. The first test that fed it realistic data found it in seconds; the same crash pattern turned up in a second tool, now filed.",
+   "honest_miss": "A privacy hole was closed before it opened: the public API would have served per-day journal one-liners the moment journaling resumed — it only looked safe because the cache happened to be empty. And the deeper extraction rework (merged schema, verbatim quotes for grounding, raw-text archive) is still ahead; this batch only made the existing pipeline honest.",
+   "prs": [
+    {
+     "label": "PR #510",
+     "url": "https://github.com/averagejoematt/life-platform/pull/510"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-no-silent-failures",
+   "date": "2026-07-04",
+   "title": "No data source gets to die quietly anymore",
+   "shipped": "Five reliability fixes in one batch. The three data pipes that lived outside the standard framework — workout tracker, journal, and food-log inbox — now report a heartbeat on every run, so the dashboard can finally tell 'he didn't log' from 'the pipe broke three weeks ago' (the failure mode that once hid a 44-day outage). A workout-API failure now raises loudly instead of returning a polite fake success. A food-log export in an unrecognized format now archives the file and alarms instead of silently discarding it after marking it processed — the exact trap behind a 22-day data gap in May. And two alarms that cried wolf were fixed at the root: a task-tracker staleness check that false-fired 14 hours a day, and an activity reconciler that flagged evening walks as missing because it compared UTC windows against local-date storage.",
+   "gotcha": "The fleet-wide auth-health alarm claimed to cover every source, but the framework's copy of the circuit-breaker never emitted the metric — only two of ten sources actually reported. The comment describing the coverage was aspiration, not fact. Proving the fix honest took a live fire drill: swap in a broken API key, force a cold start, watch the failure register, restore, watch it reset.",
+   "honest_miss": "The drill stopped one failure short of actually paging — firing the real alarm would have held an urgent page red for six hours on a synthetic cause, so the alarm's own trigger threshold remains exercised only in tests. And the verification turned up a fresh misfire: the daily health check has been probing a credential that never existed, red every day since May. Filed, not yet fixed.",
+   "prs": [
+    {
+     "label": "PR #516",
+     "url": "https://github.com/averagejoematt/life-platform/pull/516"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-today-means-today",
+   "date": "2026-07-04",
+   "title": "'Today' now means today — six places the numbers stopped exaggerating",
+   "shipped": "The site was labeling an 8-day-old weigh-in 'today' and its day-over-day delta 'yesterday'. Now every weight label carries its real date ('latest · Jun 26'), all three surfaces that resolve 'current weight' share one function — which also fixed a fallback that could only ever find a same-day backup-scale reading — and the cockpit's sync strip shows when the scale last reported. The readiness dial's breakdown now shows the four inputs that actually produce the score, not a different model's components. The sleep page says so when recovery comes from an older night than the hours beside it. Two engines stopped reading field names no writer ever emits, a metabolic component that structurally couldn't score was removed instead of quietly dragging the pillar toward average, and Strava — live again since June 20 — is no longer declared 'paused', so a real outage would page again.",
+   "gotcha": "The sleep splice was subtler than filed: the API didn't just borrow recovery from an older night, it swapped in that night's entire record — so the 'two devices, one night' stage comparison could silently compare two different nights. And the nutrition review's CGM section turned out to be dead end-to-end: all five field reads matched nothing the pipeline writes, but the first dead read gated the rest, so it never crashed — it just never appeared, for months.",
+   "honest_miss": "Removing the fake metabolic component didn't make the pillar look better — it made the emptiness visible: honest coverage today is 0.15, because there are genuinely no recent CGM readings, no blood pressure, and the labs have decayed past their scoring window. That low number is the truth now on display until real inputs return. The training-balance input still reads 0 from a known scale mismatch in the fatigue model — separate story, still open.",
+   "prs": [
+    {
+     "label": "PR #520",
+     "url": "https://github.com/averagejoematt/life-platform/pull/520"
+    },
+    {
+     "label": "PR #521",
+     "url": "https://github.com/averagejoematt/life-platform/pull/521"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-review-paid-to-zero",
+   "date": "2026-07-04",
+   "title": "The data-health review's must-fix list hits zero",
+   "shipped": "The last seven stories from the 15-source data-health audit, closed in one batch — plus two deliberate subtractions. Habit days now finalize after midnight, so a day that was 48% done can never freeze in the record as 100% (yesterday's real record sat at 61 unresolved checks; one run after the fix, honestly settled). A manually-logged supplement now survives the hourly sync instead of being silently overwritten. The bed sensor logs in once per token lifetime instead of 18 password logins a day. The tape-measure upload pipe — dead for months with no trigger wired — works end-to-end again, proven by uploading a file and watching the record land. And two zombie processes were put down on purpose: a dormant XML importer that would have silently corrupted live health records if ever run, and a cron that had spent 18 days hammering an API that was rate-limiting it harder with every attempt.",
+   "gotcha": "A validation layer that checks the wrong field names isn't a safety net, it's a decoy: five of the schema checks could never fire because they watched names no writer ever produced, while the workout records it did check tripped 1,500 false warnings a fortnight. The whole spec had to be re-audited against what the pipeline actually writes — not what the docs said it writes.",
+   "honest_miss": "The daily health check went fully green today for the first time since May 25 — not because everything was finally fixed, but partly because one of its checks had been probing a credential that never existed. Some of that red was the instrument, not the system. And historical habit days that froze before the fix stay frozen unless individually replayed; the record is honest going forward, not retroactively.",
+   "prs": [
+    {
+     "label": "PR #523",
+     "url": "https://github.com/averagejoematt/life-platform/pull/523"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-one-mind-per-coach",
+   "date": "2026-07-04",
+   "title": "One mind per coach — and the narrator finally gets a notebook",
+   "shipped": "Each AI coach used to be three disconnected people: a rich daily-brief self, a one-line public-board self, and a separate observatory self. Now all three write from the same voice spec, the public board loads the coach's real compressed memory, and every board answer is written back into that coach's own memory — so a coach can reference what it told a reader last week instead of contradicting itself. Elena Voss, the journalist who writes the weekly chronicle, got a persistent notebook too: open story threads, promises to readers that come due as hard obligations three weeks later, running motifs, and an editorial stance that can only claim to have changed when it can show receipts.",
+   "gotcha": "The first two live tests failed — and the failure was the honest-numbers gate doing its job. The richer voice pushes coaches to state numeric confidence (\"I'd put this at 70%\") and cite sleep-stage figures, and the fail-closed gate correctly killed any number not present in the data, replacing good answers with refusals. The fix was a truce, not a retreat: confidence gets expressed in words on the public board, and a flagged answer now gets one corrective rewrite before falling back to the refusal. Also found: the weekly memory compressor had a hand-copied name table that had drifted to a retired cast — records were being bylined to coaches who no longer exist.",
+   "honest_miss": "The observatory pipeline still keeps its own persona dict for framing — the voice now matches, but true one-pipeline unification is future work. And \"grounded\" still means \"no invented figures\", not \"true\": one passing answer invented an 11-day history that slipped through the small-number allowance the gate deliberately permits. The coaches share a mind now; they don't yet share a fact-checker.",
+   "prs": [
+    {
+     "label": "PR #556",
+     "url": "https://github.com/averagejoematt/life-platform/pull/556"
+    },
+    {
+     "label": "PR #559",
+     "url": "https://github.com/averagejoematt/life-platform/pull/559"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-rest-reads-as-rest",
+   "date": "2026-07-04",
+   "title": "Rest finally reads as rest — the training-form number gets a real scale",
+   "shipped": "The platform's training stress balance was structurally wrong: its form bands assumed the classic sports-science scale while the loads underneath were raw kilojoules, so the number sat pinned at maximum fatigue — eight rest days publicly read as overtraining, and walking, the primary engine of this whole experiment, contributed zero load. One shared load model now scores everything on a TSS-like scale, walks count via a moving-time fallback, and five separate copies of the fatigue math were collapsed into it. Live result: TSB went from −87 (saturated) to −6 (neutral). The journal extractor also got a v2: entities, behaviors, and cause→effect claims — each backed by a verbatim quote a deterministic gate verifies against the entry before anything is stored.",
+   "gotcha": "Every place the number rendered had bands like ‘−30 to +20’ that were correct in spirit and impossible in practice — the inputs were on a scale roughly ten times larger. Nobody wrote a wrong band; the scale drifted underneath all of them. And the duration proxy created a brand-new trap: duplicate multi-device walk records were harmless when walks scored zero, but would silently double-count the moment walking earned load.",
+   "honest_miss": "Old records keep their old-scale values, so one correlation window straddles the discontinuity for about two weeks — that r is noise, and the record says so rather than pretending continuity. The quote-grounding gate dropped 11 of the extractor's proposed causal claims on the very first sweep: the model invents supporting quotes more often than you'd hope, which is exactly why the gate exists.",
+   "prs": [
+    {
+     "label": "PR #562",
+     "url": "https://github.com/averagejoematt/life-platform/pull/562"
+    },
+    {
+     "label": "PR #563",
+     "url": "https://github.com/averagejoematt/life-platform/pull/563"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-the-math-arrives",
+   "date": "2026-07-04",
+   "title": "The hypothesis engine earns its 'scientific method' badge — pre-registration, effect sizes, and a calibration ledger",
+   "shipped": "The platform's weekly hypothesis engine was branded scientific method but contained no math: an AI model eyeballed seven days of data and voted. Now every hypothesis is born with a frozen, machine-checkable test spec — which metric splits the days, which metric should move, in which direction, by how much — and that spec is pre-registered: written down before the data that will judge it exists. The weekly verdict is pure computation (effect size plus a bootstrap confidence interval from a new tested statistics module), the AI only narrates decisions already made, and every resolution lands in a permanent calibration ledger so 'do the engine's high-confidence bets actually confirm more often?' finally has an answer coming. Correlations across the site also now use autocorrelation-corrected sample sizes — daily bodies remember yesterday, so 20 days of data was never really 20 independent observations.",
+   "gotcha": "Physiological time series are autocorrelated, and honoring that is humbling: the strongest correlation on the board this week (habit completion vs day grade, r=0.88 over 20 days) shrinks to an effective sample of just 7.1 days once day-to-day memory is priced in. It survives correction — most pairs don't. The anticonservative version looked more impressive every single week.",
+   "honest_miss": "The first live run rejected 2 of 5 generated hypotheses for failing the new spec gate — the stricter contract costs candidates. And the five hypotheses formed under the old engine can never be graded by the new one (their criteria were prose, not specs); they'll expire undecided over the next month, which is the honest price of upgrading the method mid-experiment.",
+   "prs": [
+    {
+     "label": "PR #567",
+     "url": "https://github.com/averagejoematt/life-platform/pull/567"
+    },
+    {
+     "label": "PR #568",
+     "url": "https://github.com/averagejoematt/life-platform/pull/568"
+    },
+    {
+     "label": "PR #570",
+     "url": "https://github.com/averagejoematt/life-platform/pull/570"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-forecasts-on-the-record",
+   "date": "2026-07-04",
+   "title": "The platform starts betting on tomorrow — and the coaches start arguing on the record",
+   "shipped": "The platform now predicts its own future, in writing. A daily forecast engine issues frozen next-day and next-week expectations for recovery, sleep, and weight — each with an 80% interval — and when the real day arrives, every forecast grades itself into a permanent calibration ledger. Six forecasts a day are issuing; the first grades land tomorrow. Alongside it: a scenario explorer showing what actually followed days like these, with every thin cell hidden rather than dressed up, and the first genuine inter-coach dispute — the nutrition coach challenged the physical coach's recorded claim on caloric adequacy, each answering the other's actual words, and the rejoinder conceded a real point. Seven stories shipped in the batch; these three are the spine.",
+   "gotcha": "The deploy tooling bit three times in one session, the same way: the single-function hot deploy packages only the handler file, so a lambda importing a sibling module outside the shared layer works locally, passes CI, and dies on its first import in production. The nastiest variant: the deploy system's staged artifact in storage was a half-complete zip sitting under a valid content hash, so every deploy reported 'no changes' while the live function was missing modules — the fix was deleting the artifact itself to force a re-upload.",
+   "honest_miss": "The first live forecast run predicted a 106.1% recovery ceiling — mathematically faithful, physically impossible; intervals now clamp to reality, but it shipped for a day. The scenario explorer's honesty is mostly emptiness: of 40 lever-outcome cells, 38 are hidden because 32 days of this experiment cycle can't support them. And the question the forecasts exist to answer — do the 80% intervals actually cover 80%? — is still unanswerable; the ledger only starts accruing grades tomorrow.",
+   "prs": [
+    {
+     "label": "PR #572",
+     "url": "https://github.com/averagejoematt/life-platform/pull/572"
+    },
+    {
+     "label": "PR #599",
+     "url": "https://github.com/averagejoematt/life-platform/pull/599"
+    },
+    {
+     "label": "PR #602",
+     "url": "https://github.com/averagejoematt/life-platform/pull/602"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-the-coaches-get-faces",
+   "date": "2026-07-04",
+   "title": "The coaches get faces — and an approval gate that won't let an unsigned one ship",
+   "shipped": "Three of the AI coaching staff now have commissioned character portraits: the embedded journalist's byline on the chronicle, and the sleep and training coaches on the coaching page and its popovers. Each portrait is a hand-authored layered SVG recipe — flat-vector character illustration with an owned color palette — rendered by the same deterministic engine that draws the coaching sigils, blink and all. The approval gate is structural, not procedural: a recipe without a recorded human sign-off validates but never bundles into the shipped module, so nothing reaches a live page without explicit approval on a contact sheet. A disclosure line ships wherever portraits render: these are openly fictional AI personas.",
+   "gotcha": "The style spec written before any art existed did not survive contact with the art. The design ADR confidently said 'engraved stroke-only line work'; four review rounds later the approved style was full character illustration — the standard that stuck was borrowed from animated film: a reader should know who is who from silhouette alone. That became a mandatory test — render the whole cast as solid single-color shapes, no faces, and if you can't tell them apart, no amount of facial detail will save it. Separately, the first deploy silently showed zero portraits: the live engine serves coaches under different internal ids than the design docs use, and the fallback chain quietly rendered sigils exactly as designed — correct behavior, invisible failure. An alias map fixed it.",
+   "honest_miss": "Three faces out of a cast of roughly twenty — every other persona on the site still renders a geometric sigil where a portrait should eventually be. The alternate variants (glasses, headband) were drawn, staged, and not used. And the speaking-mouth animation frames exist in every recipe but nothing drives them yet.",
+   "prs": [
+    {
+     "label": "PR #607",
+     "url": "https://github.com/averagejoematt/life-platform/pull/607"
+    },
+    {
+     "label": "PR #608",
+     "url": "https://github.com/averagejoematt/life-platform/pull/608"
+    },
+    {
+     "label": "PR #612",
+     "url": "https://github.com/averagejoematt/life-platform/pull/612"
+    },
+    {
+     "label": "PR #614",
+     "url": "https://github.com/averagejoematt/life-platform/pull/614"
+    },
+    {
+     "label": "PR #615",
+     "url": "https://github.com/averagejoematt/life-platform/pull/615"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-04-the-full-cast",
+   "date": "2026-07-04",
+   "title": "The whole cast gets faces — seven portraits, one review round",
+   "shipped": "Every AI coach on the site now renders a commissioned portrait — or has a recorded reason not to. The roster audit came first: the 'roughly twenty' personas deduped to seventeen unique characters, because several of the 'different' experts turned out to be aliases of the same character under other internal names. Ten of the seventeen render as faces anywhere on the site; the pilot covered three, so this batch drew the remaining seven — nutrition, mind, longevity, glucose, labs, the explorer, and the head coach — as hand-authored SVG recipes, each claiming its own head shape, one silhouette-carried signature feature, and an owned palette. All seven were approved on a single contact sheet, in one review round.",
+   "gotcha": "At silhouette scale, the ears are the widest point of every human head. Render the cast as solid single-color shapes and every carefully drawn hairline, brow, and pair of glasses vanishes — the only features that survive are ones that beat the ear line (a beard wide enough to swallow it) or rise above the crown (a cloud of curls, a top-knot). The other lesson: reviewing your own renders is cheap. Three rounds of drawing the contact sheet, actually looking at it, and fixing what looked wrong ran before a human ever saw it — which is likely why the pilot needed four human review rounds and this batch needed one.",
+   "honest_miss": "One of the seventeen still can't have a face because no page renders him as anything but a name. Another is blocked outright: he's named after a real person, and a portrait under a real person's name fails the no-real-likeness rule either way — he needs a rename first. And the head coach's freshly signed portrait shipped to a view that no page links to anymore — drawn, approved, live, and unreachable until that surface is re-mounted. The speaking-mouth frames drawn into every recipe still have nothing driving them.",
+   "prs": [
+    {
+     "label": "PR #618",
+     "url": "https://github.com/averagejoematt/life-platform/pull/618"
+    },
+    {
+     "label": "PR #619",
+     "url": "https://github.com/averagejoematt/life-platform/pull/619"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-the-pipes-get-honest",
+   "date": "2026-07-05",
+   "title": "Three data pipes get more honest",
+   "shipped": "The nutrition page's expenditure panel was quietly serving nothing — a single renamed field meant every reader was looking for a number the importer never wrote. It's reconnected end-to-end, and when the tracker hasn't uploaded a real expenditure figure it now shows a clearly-labeled estimate (from body weight) instead of a blank. Separately, the health-export pipe that carries glucose and blood pressure now validates what it writes (an impossible reading is dropped, not stored), respects the units it's handed instead of assuming, and tells a continuous monitor apart from a fingerstick by reading cadence rather than a raw count — which had been mislabeling partial days. And the journal now syncs edits made to older entries, cleans up entries deleted upstream, and keeps a second copy of every entry's text so the database isn't the only place it lives.",
+   "gotcha": "The health-export function had no shared code layer attached — it carried its own dependencies bundled in. That meant the usual fast, single-file deploy would have silently shipped it without those dependencies and broken it on the next run. The fix was to flag it so it only ever ships through the full infrastructure deploy, and to leave that reason written down next to it so the trap doesn't get re-sprung.",
+   "honest_miss": "The journal's new second-copy archive can't be confirmed working end-to-end yet: the upstream journal API is currently returning an auth error (an expired token), so no entries are flowing through to exercise it. The code is live and loads cleanly — but 'it runs' isn't 'it's verified,' and that's an honest gap until the token is refreshed. A fourth planned piece — a large front-end refactor — was deliberately left for a supervised session rather than rushed.",
+   "prs": [
+    {
+     "label": "PR #633",
+     "url": "https://github.com/averagejoematt/life-platform/pull/633"
+    },
+    {
+     "label": "PR #649",
+     "url": "https://github.com/averagejoematt/life-platform/pull/649"
+    },
+    {
+     "label": "PR #664",
+     "url": "https://github.com/averagejoematt/life-platform/pull/664"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-the-coaches-get-a-real-gate",
+   "date": "2026-07-05",
+   "title": "The coach team's honesty check stops being decorative — and gets a public accountability layer to match",
+   "shipped": "The coach quality check used to score every generated brief and log the result — but nothing ever read the score, so a bad draft published anyway. It now runs before publishing, not after: a failing draft gets one corrected rewrite, and if that still fails, that coach sits out the day's brief entirely rather than ship something known-broken. The threshold wasn't guessed — it came from 206 real production verdicts over 30 days, which showed roughly 1 in 10 drafts fail on real anti-pattern and consistency checks even when the raw score looks fine. Alongside it: a public page listing the exact formula, time window, and known limitations behind every statistic the platform publishes; a self-graded blind test of whether the coaches actually sound different from each other; and a quarterly ritual where each coach writes about its own real prediction track record, good and bad. About two dozen smaller fixes — accessibility, page speed, data-pipe reliability — landed in the same pass.",
+   "gotcha": "Running many independent fixes at once through separate isolated copies of the codebase surfaced an unusual failure: a housekeeping git command that's supposed to be scoped to one copy of the code turned out to be shared across all of them, so two isolated copies briefly grabbed the same in-progress work from each other mid-task. Every instance was caught and cleanly untangled before anything merged, but it's now a hard rule for any future parallel work on this repo.",
+   "honest_miss": "One piece was deliberately left undone: formally adopting a webhook's cloud infrastructure into managed code would have meant swapping its live web address for a new one — breaking incoming health data until the source app on the phone got manually repointed. Rather than accept that gap as a side effect of an otherwise-safe batch of fixes, it's staying on hold until it can be done as its own deliberate, attended step.",
+   "prs": [
+    {
+     "label": "PR #654",
+     "url": "https://github.com/averagejoematt/life-platform/pull/654"
+    },
+    {
+     "label": "PR #659",
+     "url": "https://github.com/averagejoematt/life-platform/pull/659"
+    },
+    {
+     "label": "PR #660",
+     "url": "https://github.com/averagejoematt/life-platform/pull/660"
+    },
+    {
+     "label": "PR #662",
+     "url": "https://github.com/averagejoematt/life-platform/pull/662"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-charts-that-answer-back",
+   "date": "2026-07-05",
+   "title": "The data pages become an instrument — charts answer to touch, numbers show their work",
+   "shipped": "The evidence pages stopped being static readouts. Most series charts now respond when you touch or hover them — a focus dot and a tooltip walk the data, and they're keyboard-navigable too. Trends and projections gained an honest uncertainty layer: the weight forecast shows a goal-date range with a real confidence band instead of a single false-precision date, and correlations show how many overlapping days actually back them. And any stat with a documented method now opens a small popover — source, formula, window, sample size — pulled straight from the code's own method registry, so what you read can't drift from what the code does. Two new data-door views also went live (an autonomic-balance quadrant and a zone-2 cardio breakdown).",
+   "gotcha": "None of it could start until a single 3,000-line file that renders every data page was safely split into a router plus a dozen focused modules — the kind of refactor where one misplaced import silently freezes a page. The safeguard was a before/after harness that rendered all 40 pages against identical live data and diffed them byte-for-byte; 39 matched exactly and the 40th differed only by a random id, which is how we knew the split changed nothing but the file layout.",
+   "honest_miss": "Nine of twenty-four chart types still don't answer to touch — rings, radar, and a few bespoke shapes need their own interaction and were deliberately left. Some stat tiles show no provenance popover at all: that's honest, not broken — a number with no registry entry gets nothing rather than a made-up explanation. And the new 'thresholds from my own variance' work is live but intentionally inert until about a month of data accumulates, so today it reproduces the old fixed cutoffs exactly.",
+   "prs": [
+    {
+     "label": "PR #674",
+     "url": "https://github.com/averagejoematt/life-platform/pull/674"
+    },
+    {
+     "label": "PR #680",
+     "url": "https://github.com/averagejoematt/life-platform/pull/680"
+    },
+    {
+     "label": "PR #683",
+     "url": "https://github.com/averagejoematt/life-platform/pull/683"
+    },
+    {
+     "label": "PR #684",
+     "url": "https://github.com/averagejoematt/life-platform/pull/684"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-cards-that-travel-and-a-net-that-never-fired",
+   "date": "2026-07-05",
+   "title": "Share cards that travel, a safety net that had never fired, and a mood surface quietly reading the wrong table",
+   "shipped": "Thirteen changes landed in one coordinated deploy. The biggest thread: one code-drawn card engine now renders every off-site share card — the character sheet, each week's chronicle, and each coach's portrait — so the platform's ideas can leave the site as an image. A read-only 'meet the agents' feed went up at /story/agents/, rendering what the platform's own watchdogs actually caught, no new AI. On the plumbing side: dead-letter escalation that now counts real repeat failures instead of resetting them, and a CloudWatch cleanup that deleted 18 duplicate alarms (136→118) without dropping a single real failure signal.",
+   "gotcha": "Two bit hard. First, macOS treats Documents and documents as the same folder, so a few parallel build agents quietly wrote into the shared main copy instead of their own isolated one — caught before anything shipped, but a real reminder that 'isolated' has an operating-system asterisk. Second, and worse: the automated rollback that's supposed to revert a bad Lambda deploy had a one-line bug (a missing condition) that meant it had never actually fired. The net was there on paper the whole time and empty in practice.",
+   "honest_miss": "State of Mind — the mood check-ins — turned out to have been broken for months: eight different surfaces were reading an empty database table the ingest never writes to. Fixed now, but nobody noticed because the data was sparse enough that 'empty' looked normal. The real miss is that the fix only makes it *ready*; it flows when I actually start logging again. And two of the CI-safety changes can't be fully proven until a deliberately-broken build runs through the pipeline — the mechanism is in, the drill is pending.",
+   "prs": [
+    {
+     "label": "PR #694",
+     "url": "https://github.com/averagejoematt/life-platform/pull/694"
+    },
+    {
+     "label": "PR #691",
+     "url": "https://github.com/averagejoematt/life-platform/pull/691"
+    },
+    {
+     "label": "PR #686",
+     "url": "https://github.com/averagejoematt/life-platform/pull/686"
+    },
+    {
+     "label": "PR #688",
+     "url": "https://github.com/averagejoematt/life-platform/pull/688"
+    },
+    {
+     "label": "PR #689",
+     "url": "https://github.com/averagejoematt/life-platform/pull/689"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-05-a-watcher-that-caught-a-lost-workout",
+   "date": "2026-07-05",
+   "title": "A watcher that asks the source what it holds — and caught a workout we'd silently lost",
+   "shipped": "The platform learned to double-check its fitness providers against its own records. For a long time every health check watched only the database's latest date — blind to a reading that never arrived behind it (the platform once lost five afternoon walks with no alarm at all). Strava already had the fix: periodically ask the provider what it holds and compare. This session generalized that to Whoop — a daily, read-only, trailing-two-week diff that reports anything the provider has but we never stored. On its very first live run it flagged a workout the API held but our store had missed. In the same session, workout routines also gained first-class ‘branches’ — one routine that carries an easier and an as-written option instead of two separate pushes.",
+   "gotcha": "The shared-code layer bites the unwary. Common modules ship as a versioned Lambda layer, and the fleet attaches it by a hardcoded version string — so republishing new code isn't enough; you have to bump the version number or every function keeps running the old copy. Worse, the new routine format would crash any function still on the old layer the moment it tried to read a branched routine — so the deploy had to reach exactly the functions that read routines, and no fewer, before the first branched routine was ever written.",
+   "honest_miss": "The overnight re-stamp — the piece that would pre-highlight the branch matching last night's recovery — shipped turned OFF, on purpose. It's scheduled earlier in the morning than the recovery data actually refreshes, so as wired it would decide on stale numbers. Rather than fake it, it ships disabled until the timing is reconciled. And the Whoop gap it caught is only reported, not healed: the watcher's job is to see, not fix — whether that lost workout comes back is still the ingestion job's problem. Garmin, meanwhile, got no watcher at all — it's too rate-limited to reconcile honestly, so we wrote down that decision instead of pretending.",
+   "prs": [
+    {
+     "label": "PR #710",
+     "url": "https://github.com/averagejoematt/life-platform/pull/710"
+    },
+    {
+     "label": "PR #711",
+     "url": "https://github.com/averagejoematt/life-platform/pull/711"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-06-predictions-stamped-by-code",
+   "date": "2026-07-06",
+   "title": "The AI no longer writes its own report card",
+   "shipped": "The coaching engine makes forward calls about the data — and until this week, the model also wrote each prediction's ID and deadline. An audit found what you'd expect: years-off dates, duplicates, and 88 predictions that could never be graded. Now the model writes only the claim and its confidence; code stamps the ID, the date, and a strictly-future deadline, and a re-stated claim updates its original record instead of minting a daily duplicate. Verified by invoking the live analyzer and reading the fresh record back — clean ID, real deadline.",
+   "gotcha": "The deploy surfaced a second, quieter failure: a shared code layer had been published but never attached, so every function was silently one version behind — and the drift check wasn't tracking the one Lambda that mattered. Fresh layer, attached fleet-wide, missing consumer added to the map.",
+   "honest_miss": "The old corrupt predictions were still in the ledger when this shipped — voiding them (marked, never deleted) landed as the follow-up. And the honest scoreboard state is still zero graded: the first real number arrives only when deadlines start passing.",
+   "prs": [
+    {
+     "label": "PR #761",
+     "url": "https://github.com/averagejoematt/life-platform/pull/761"
+    },
+    {
+     "label": "PR #767",
+     "url": "https://github.com/averagejoematt/life-platform/pull/767"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-06-first-preregistered-experiment",
+   "date": "2026-07-06",
+   "title": "The first experiment is registered — and the prediction was published before day one",
+   "shipped": "The experiment registry was empty for 28 days; now every experiment freezes its design into a public, timestamped artifact at creation — hypothesis, success criterion, and a required plain-language stopping rule, published before any results exist. The first entry is live: a 28-day daily zone-2 cardio floor, predicting recovery rises at least 5 points over a 14-day baseline. The same batch put the stakes on the home page — sixteen prior attempts, 315 aimed at 185, a falsifiable finish line (185 held for 90 consecutive days) — and rebuilt /method/ as the skeptic's contract.",
+   "gotcha": "The CI gate that checks every function runs the same shared-code version went red mid-deploy — it raced the deploy itself. The version bump landed on main minutes before the sixteen consumer functions had the new layer attached, and the check fired in the gap. The fix was nothing: finish the attach, re-run. But a gate that can red on correct in-flight work will eventually train someone to ignore it.",
+   "honest_miss": "Pre-registration can't be applied retroactively — the 28 empty days stay empty, and the first entry only proves the mechanism from here forward. And the platform's other half still has no data: the fulfillment capture channel got its decision this session (State of Mind check-ins plus a two-tap evening ritual, publication posture fixed before any data flows), but a decision is not a datapoint — that stream is still at zero until the habit restarts.",
+   "prs": [
+    {
+     "label": "PR #765",
+     "url": "https://github.com/averagejoematt/life-platform/pull/765"
+    },
+    {
+     "label": "PR #764",
+     "url": "https://github.com/averagejoematt/life-platform/pull/764"
+    },
+    {
+     "label": "PR #763",
+     "url": "https://github.com/averagejoematt/life-platform/pull/763"
+    },
+    {
+     "label": "PR #762",
+     "url": "https://github.com/averagejoematt/life-platform/pull/762"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-06-one-deploy-channel",
+   "date": "2026-07-06",
+   "title": "Ninety functions, one bundle — the shared layer is gone",
+   "shipped": "For a year, shared code reached the platform's ~90 Lambda functions through three overlapping channels at once: a versioned AWS 'layer', full code bundles that silently shadowed it, and hand-built partial zips. Version drift between them caused four separate production incidents. Today the whole thing collapsed to one channel: every function now ships the complete shared codebase inside its own bundle, staged by a single 100-line script every deploy path shares. The version pin, the hand-curated module list, and the ritual deploy sequence are deleted. A CI check now enforces the simple invariant: nothing references the old layer, ever.",
+   "gotcha": "The audit that motivated this found the layer was already runtime-inert for most functions — the bundled copy won the import race, so the carefully-maintained version pin had been decorative for months. The scariest bugs are the ones that only matter sometimes: a handful of hot-deployed functions genuinely depended on the layer, which is exactly the inconsistency that bites at 2am. And the CI step that deploys the AI-tools server had been quietly rebuilding a known broken bundle shape the whole time — the collapse fixed a bug nobody had filed.",
+   "honest_miss": "The old layer versions are orphaned in AWS rather than deleted — nothing references them, but they linger. And the weekly drift report will now nag about a documentation number (110 alarms documented, 122 live) that this work made visible but deliberately didn't fix; that reconciliation is its own backlog item.",
+   "prs": [
+    {
+     "label": "PR #833",
+     "url": "https://github.com/averagejoematt/life-platform/pull/833"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-06-honest-numbers-bug-bash",
+   "date": "2026-07-06",
+   "title": "Nine small lies, fixed in one afternoon sweep",
+   "shipped": "A parallel bug-bash closed nine small honesty and reliability gaps found by last week's outside-consultant-style review. The public predictions API now says 'nothing graded yet' instead of a fabricated 0% hit rate. A coach's directional call that goes nowhere now counts against them — the scorecard was structurally impossible to lose. Journal mood-trend claims now carry their fit quality, so five noisy data points can't announce 'possible burnout' with a straight face. And when the monthly AI budget pauses a coach's weekly read, the site now stamps it 'as of / refresh paused' instead of serving stale words in the present tense.",
+   "gotcha": "The best find: the AI quality judge that reviews the site's public answers every week had never run — not once. It called an internal function with arguments that don't exist, and the error handler swallowed the failure silently every single week. The fix was three lines; the lesson is that a safety net you never hear from might not be attached to anything. It now emits a metric when it fails.",
+   "honest_miss": "The count of CloudWatch alarms in the docs said 110; the code actually defines 113 and the live account runs 122. The doc number is now computed from source instead of hand-typed, but the 113-vs-122 gap — nine alarms living in the cloud with no code behind them — is real, still open, and now on the backlog with its own ticket.",
+   "prs": [
+    {
+     "label": "PR #837",
+     "url": "https://github.com/averagejoematt/life-platform/pull/837"
+    },
+    {
+     "label": "PR #838",
+     "url": "https://github.com/averagejoematt/life-platform/pull/838"
+    },
+    {
+     "label": "PR #839",
+     "url": "https://github.com/averagejoematt/life-platform/pull/839"
+    },
+    {
+     "label": "PR #842",
+     "url": "https://github.com/averagejoematt/life-platform/pull/842"
+    },
+    {
+     "label": "PR #843",
+     "url": "https://github.com/averagejoematt/life-platform/pull/843"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-07-twelve-issue-paydown",
+   "date": "2026-07-07",
+   "title": "The flagship page stops shipping blank, and the monitoring bill meets its match",
+   "shipped": "Twelve backlog issues closed in one parallel sweep. The cockpit — the site's front door — now serves real numbers (character level, all seven pillar scores, an as-of date) even with JavaScript off, so link previews and crawlers finally see the instrument instead of shimmer placeholders. The home page gained a plain-language 'Is he okay this week?' read for family, computed from data already on the page. And 55 CloudWatch alarms were retired or reconciled against code — the live count now matches the codebase exactly, worth about $5.60/month back under the hard budget ceiling.",
+   "gotcha": "The cost audit that recommended keeping 48 per-lambda alarms did so because those lambdas 'had no dead-letter queue.' Live inspection showed every one already had the DLQ — the audit had counted a stale snapshot. The alarms were pure duplicate coverage; the receipts to prove it took longer than the deletion.",
+   "honest_miss": "The one security item that matters most — rotating the MCP endpoint URL that's committed in the public repo's history — still isn't done, because it breaks the AI connector until a human pastes the new URL in. It waits, again, for a laptop window.",
+   "prs": [
+    {
+     "label": "PR #855",
+     "url": "https://github.com/averagejoematt/life-platform/pull/855"
+    },
+    {
+     "label": "PR #850",
+     "url": "https://github.com/averagejoematt/life-platform/pull/850"
+    },
+    {
+     "label": "PR #853",
+     "url": "https://github.com/averagejoematt/life-platform/pull/853"
+    },
+    {
+     "label": "PR #856",
+     "url": "https://github.com/averagejoematt/life-platform/pull/856"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-08-scorecard-first-grades",
+   "date": "2026-07-08",
+   "title": "The prediction scorecard grades for the first time — the bug was a second referee",
+   "shipped": "Eight backlog issues closed in one parallel sweep, led by the one that mattered most: the coaches' prediction scorecard, publicly stuck at '0 graded yet' since mid-June, finally turned. A live run decided 17 predictions (2 confirmed, 15 refuted — an honest 12% hit-rate now baked into the page). The coaching page also joined the static-render program (coach voices in the HTML, no JavaScript required), a new /method/verify/ page publishes the cross-device disagreement a skeptic can check (54.1% same-day resting-heart-rate agreement across 1,193 nights — imperfection is the credibility), and the chronicle now names its missing Week 2 instead of silently skipping it.",
+   "gotcha": "The scorecard wasn't stuck because grading was hard — it was stuck because two graders existed. A general computation engine ran fifteen minutes before the dedicated evaluator every day and marked every elapsed prediction 'inconclusive' first, so the real evaluator never once saw an ungraded, elapsed prediction. The alarm shipped earlier this week could only say 'nothing is being graded' — finding the duplicate referee took reading 390 live prediction records and tracing who wrote each verdict.",
+   "honest_miss": "A 12% hit-rate is not a flattering first number, and most of the backlog graded 'inconclusive' because predictions written in June carried no machine-checkable threshold at all — those expire unresolved rather than getting retroactive credit. Separately, the chronicle's gap note initially didn't ship: the generator was fixed but the deploy script never ran it. Caught only by checking the live page, not the code review.",
+   "prs": [
+    {
+     "label": "PR #864",
+     "url": "https://github.com/averagejoematt/life-platform/pull/864"
+    },
+    {
+     "label": "PR #860",
+     "url": "https://github.com/averagejoematt/life-platform/pull/860"
+    },
+    {
+     "label": "PR #865",
+     "url": "https://github.com/averagejoematt/life-platform/pull/865"
+    },
+    {
+     "label": "PR #863",
+     "url": "https://github.com/averagejoematt/life-platform/pull/863"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-08-daily-debrief-and-serve-split",
+   "date": "2026-07-08",
+   "title": "The platform gets a daily voice — and the site's API gets its own house",
+   "shipped": "Four of the hardest open issues closed in one autonomous session. The headline: a daily two-minute audio debrief is live — every evening a grounded script is written from the day's measured numbers (with a fail-closed fallback that cannot fabricate a figure), synthesized to audio, and published to a podcast RSS feed for about ten cents a month. The weekly panel show stopped pretending to be weekly: it now fires only when a chronicle actually publishes, and the alarm that had been red since late June — complaining about silence that was really just honesty — was retired. Under the hood, the public API was moved into its own infrastructure stack via CloudFormation's new refactor tooling with zero downtime, and the honesty harness that guarded one AI surface now guards all six, with seeded faults proving each gate actually fires.",
+   "gotcha": "Deploying the moved API stack meant preserving two URLs that CloudFront points at — delete and recreate the function and the subdomain silently changes, severing the site. CloudFormation's stack-refactor path preserved them, but only after three undocumented hurdles: log-retention helpers can't cross stacks, the destination stack must exist first as an empty shell, and the deploy role was missing one obscure read permission — the first attempt rolled back cleanly mid-flight while the site kept serving.",
+   "honest_miss": "The fourth issue closed with a 'no': batch inference pricing promised ~50% off the AI bill, but AWS requires 100 records per batch job per model and this platform's entire scheduled fleet makes ~62 calls a day across all models combined — real saving today: zero. The seam ships dormant with a live trip-wire that flips the verdict if volume ever clears the floor. Also humbling: the first CI run in days to exercise the post-deploy gates found two latent bugs in the gates themselves — an IAM grant that had never actually worked, and a version check that a too-shallow git clone made structurally unpassable.",
+   "prs": [
+    {
+     "label": "PR #866",
+     "url": "https://github.com/averagejoematt/life-platform/pull/866"
+    },
+    {
+     "label": "PR #867",
+     "url": "https://github.com/averagejoematt/life-platform/pull/867"
+    },
+    {
+     "label": "PR #868",
+     "url": "https://github.com/averagejoematt/life-platform/pull/868"
+    },
+    {
+     "label": "PR #869",
+     "url": "https://github.com/averagejoematt/life-platform/pull/869"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-08-backlog-paydown-64-to-18",
+   "date": "2026-07-08",
+   "title": "Fifteen issues shipped by a fleet of fourteen agents — the backlog drops from 64 to 18",
+   "shipped": "One instruction — pay down as many of the 64 open issues as possible without sacrificing quality — became the platform's widest session yet. An audit first: 14 epics whose work had already shipped, and 3 stories that were live but never closed, went out with evidence comments and zero code. Then fourteen agent worktrees ran in parallel, each owning one issue end-to-end, and fifteen stories merged: the private query interface was pruned from 143 tools to the 60 actually earning their keep (every removal citing 30 days of real usage telemetry in a dated audit ledger), every write into the life record now leaves a tamper-protected audit receipt, direct calls that bypass the site's front door now get refused at the curb, board answers show readers the exact numbers the coach was given, each of the eight coaches finally opens in their own voice, and 97 evening workouts that had been filed under the wrong day — a timezone artifact — were moved to the days they actually happened.",
+   "gotcha": "Two agents working in parallel discovered the hard way that git's stash is one shared stack across every worktree: a race silently swapped their in-progress edits into each other's trees. Both caught it, recovered byte-for-byte, and the ban is now written into every agent brief. And a security secret refused to deploy twice — CloudFormation resolves secrets only in the stack's own region, and then a naming quirk (any secret name ending in a hyphen plus six characters breaks partial lookup — '-secret' qualifies) meant referencing it by name, not ARN.",
+   "honest_miss": "The 18 issues left are the honest residue: every one is blocked on a human decision, an attended-only safety step, or data that hasn't existed long enough — none on effort. And one shipped feature carries a disclosure: the portrait 'speaking' animation was specced for three mouth frames, but the commissioned recipes only ever had two, so it ships with the two real ones rather than a fabricated third.",
+   "prs": [
+    {
+     "label": "PR #870",
+     "url": "https://github.com/averagejoematt/life-platform/pull/870"
+    },
+    {
+     "label": "PR #884",
+     "url": "https://github.com/averagejoematt/life-platform/pull/884"
+    },
+    {
+     "label": "PR #876",
+     "url": "https://github.com/averagejoematt/life-platform/pull/876"
+    },
+    {
+     "label": "PR #880",
+     "url": "https://github.com/averagejoematt/life-platform/pull/880"
+    },
+    {
+     "label": "PR #879",
+     "url": "https://github.com/averagejoematt/life-platform/pull/879"
+    }
+   ]
+  }
+ ]
 }
