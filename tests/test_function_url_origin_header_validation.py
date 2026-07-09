@@ -17,10 +17,19 @@ harness would need to mock its much larger dependency surface (bedrock,
 privacy_guard, source_registry, phase_filter, rate limiter, ...) for no extra
 signal over asserting the guard's presence/ordering/comparison method.
 
+email_subscriber_lambda.py gained the identical guard in #885 (CloudFront's
+SubscriberLambdaOrigin now injects the same header — web_stack.py, which also
+sets the Lambda's SITE_API_ORIGIN_SECRET env var from the same secrets_helpers
+read). It is covered behaviorally below — its dependency surface is small
+enough to mock (boto3 + env) — including the fail-open contract: env var unset
+→ all requests pass, so Lambda code deployed before the CloudFront header /
+env var can't break subscriptions.
+
 Run: python3 -m pytest tests/test_function_url_origin_header_validation.py -v
 
 v1.0.0 — 2026-03-21 (SEC-04)
 v1.1.0 — 2026-07-08 (#815): site-api-ai source-grep coverage + CDK wiring note.
+v1.2.0 — 2026-07-08 (#885): email-subscriber behavioral coverage.
 """
 
 import importlib
@@ -47,9 +56,8 @@ def _make_event(path: str, method: str = "GET", headers: dict | None = None) -> 
     }
 
 
-def _load_site_api(origin_secret: str = ""):
-    """Import site_api_lambda with all AWS calls patched out."""
-    # Patch boto3 so no real AWS calls are made
+def _fake_aws_modules() -> dict:
+    """A boto3 stand-in module dict so no real AWS calls are made at import."""
     fake_boto3 = types.ModuleType("boto3")
     fake_table = mock.MagicMock()
     fake_table.get_item.return_value = {"Item": {}}
@@ -60,16 +68,17 @@ def _load_site_api(origin_secret: str = ""):
     fake_boto3.client = mock.MagicMock()
     fake_conditions = types.ModuleType("boto3.dynamodb.conditions")
     fake_conditions.Key = mock.MagicMock()
+    return {
+        "boto3": fake_boto3,
+        "boto3.dynamodb": types.ModuleType("boto3.dynamodb"),
+        "boto3.dynamodb.conditions": fake_conditions,
+    }
 
+
+def _load_site_api(origin_secret: str = ""):
+    """Import site_api_lambda with all AWS calls patched out."""
     with (
-        mock.patch.dict(
-            "sys.modules",
-            {
-                "boto3": fake_boto3,
-                "boto3.dynamodb": types.ModuleType("boto3.dynamodb"),
-                "boto3.dynamodb.conditions": fake_conditions,
-            },
-        ),
+        mock.patch.dict("sys.modules", _fake_aws_modules()),
         mock.patch.dict(
             os.environ,
             {
@@ -217,6 +226,130 @@ class TestOriginHeaderValidationSiteApiAi:
         m = re.search(r"if SITE_API_ORIGIN_SECRET:.*?return _error\((\d+),", body, re.S)
         assert m, "origin-header guard must return via _error(...)"
         assert m.group(1) == "403"
+
+
+# ── email-subscriber (#885) — behavioral, like site_api_lambda above ──────────
+
+
+def _load_subscriber(origin_secret: str | None = ""):
+    """Import web.email_subscriber_lambda with all AWS calls patched out.
+
+    origin_secret=None means the env var is entirely UNSET (the pre-deploy /
+    partial-deploy state the fail-open contract protects); "" and unset must
+    behave identically (guard disabled).
+    """
+    env = {
+        "TABLE_NAME": "test-table",
+        "USER_ID": "matthew",
+        "S3_BUCKET": "test-bucket",
+    }
+    if origin_secret is not None:
+        env["SITE_API_ORIGIN_SECRET"] = origin_secret
+
+    with (
+        mock.patch.dict("sys.modules", _fake_aws_modules()),
+        mock.patch.dict(os.environ, env),
+    ):
+        if origin_secret is None:
+            os.environ.pop("SITE_API_ORIGIN_SECRET", None)
+        # Drop cached modules so they re-execute under the patched env. The
+        # secret constant lives in site_api_common and is imported into
+        # email_subscriber_lambda — both (flat + web.* namespaced) must reload,
+        # same order-dependence rationale as _load_site_api above.
+        for _name in list(sys.modules):
+            if "site_api" in _name or "email_subscriber" in _name:
+                del sys.modules[_name]
+        mod = importlib.import_module("web.email_subscriber_lambda")
+    return mod
+
+
+def _subscribe_event(method: str = "POST", headers: dict | None = None) -> dict:
+    return {
+        "rawPath": "/api/subscribe",
+        "requestContext": {"http": {"method": method, "sourceIp": "1.2.3.4"}},
+        "headers": headers or {},
+        "queryStringParameters": {},
+        "body": '{"email": "reader@example.org", "source": "test"}',
+    }
+
+
+class TestOriginHeaderSubscriberDisabled:
+    """#885 fail-open contract: env var unset or empty → ALL requests pass.
+
+    This is the deploy-ordering guarantee — email-subscriber Lambda code can
+    ship before CloudFront starts injecting the header without breaking
+    subscriptions.
+    """
+
+    def test_env_var_entirely_unset_allows_without_header(self):
+        mod = _load_subscriber(origin_secret=None)
+        resp = mod.lambda_handler(_subscribe_event(headers={}), None)
+        assert resp["statusCode"] != 403, "Guard must fail-open when SITE_API_ORIGIN_SECRET is unset"
+
+    def test_empty_secret_allows_without_header(self):
+        mod = _load_subscriber(origin_secret="")
+        resp = mod.lambda_handler(_subscribe_event(headers={}), None)
+        assert resp["statusCode"] != 403
+
+    def test_empty_secret_allows_with_stray_header(self):
+        mod = _load_subscriber(origin_secret="")
+        resp = mod.lambda_handler(_subscribe_event(headers={"x-amj-origin": "anything"}), None)
+        assert resp["statusCode"] != 403
+
+
+class TestOriginHeaderSubscriberEnabled:
+    """#885: secret configured → missing/wrong header 403s, correct header passes."""
+
+    SECRET = "test-cf-origin-secret-subscriber-885"
+
+    def setup_method(self):
+        self.mod = _load_subscriber(origin_secret=self.SECRET)
+
+    def test_missing_header_rejected(self):
+        resp = self.mod.lambda_handler(_subscribe_event(headers={}), None)
+        assert resp["statusCode"] == 403, "Direct Function-URL request (no X-AMJ-Origin) must be rejected 403"
+
+    def test_wrong_header_value_rejected(self):
+        resp = self.mod.lambda_handler(_subscribe_event(headers={"x-amj-origin": "wrong-value"}), None)
+        assert resp["statusCode"] == 403
+
+    def test_correct_header_passes(self):
+        resp = self.mod.lambda_handler(_subscribe_event(headers={"x-amj-origin": self.SECRET}), None)
+        assert resp["statusCode"] != 403, "Via-CloudFront request (correct X-AMJ-Origin) must not be rejected"
+
+    def test_correct_header_case_insensitive(self):
+        resp = self.mod.lambda_handler(_subscribe_event(headers={"X-AMJ-Origin": self.SECRET}), None)
+        assert resp["statusCode"] != 403
+
+    def test_options_preflight_bypasses_check(self):
+        """CORS preflight must not be blocked — the guard sits after the OPTIONS branch."""
+        resp = self.mod.lambda_handler(_subscribe_event(method="OPTIONS", headers={}), None)
+        assert resp["statusCode"] == 204
+
+    def test_get_confirm_without_header_rejected(self):
+        """The guard covers ALL routes (confirm/unsubscribe GETs too), not just POST subscribe."""
+        event = _subscribe_event(method="GET", headers={})
+        event["queryStringParameters"] = {"action": "confirm", "token": "x" * 64, "h": "abcdef"}
+        resp = self.mod.lambda_handler(event, None)
+        assert resp["statusCode"] == 403
+
+    def test_403_body_is_valid_json(self):
+        resp = self.mod.lambda_handler(_subscribe_event(headers={}), None)
+        assert resp["statusCode"] == 403
+        import json
+
+        body = json.loads(resp["body"])
+        assert body.get("error")
+
+    def test_uses_shared_secret_constant(self):
+        """Must import the SAME SITE_API_ORIGIN_SECRET site_api_common defines —
+        not a second os.environ.get, which would risk drifting the env-var name
+        (same convention pinned for site_api_ai_lambda above)."""
+        src_path = os.path.join(ROOT, "lambdas", "web", "email_subscriber_lambda.py")
+        with open(src_path, encoding="utf-8") as f:
+            src = f.read()
+        assert "from web.site_api_common import SITE_API_ORIGIN_SECRET" in src
+        assert "_hmac.compare_digest" in src, "must use constant-time comparison, not =="
 
 
 if __name__ == "__main__":

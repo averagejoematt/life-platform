@@ -3,10 +3,12 @@ cdk/stacks/secrets_helpers.py — synth-time secret-value token helper (#815 / R
 
 One factored read so the site-api origin-header guard secret (SEC-04,
 lambdas/web/site_api_common.py::SITE_API_ORIGIN_SECRET) can never drift between
-its two consumers:
+its consumers:
   - serve_stack.py (us-west-2)  → Lambda environment variable on site-api / site-api-ai
   - web_stack.py    (us-east-1) → CloudFront custom origin header on
-                                   LambdaApiOrigin / AiLambdaOrigin
+                                   LambdaApiOrigin / AiLambdaOrigin /
+                                   SubscriberLambdaOrigin (#885), plus the Lambda
+                                   environment variable on email-subscriber (#885)
 
 Both stacks call site_api_origin_secret_value() and get back the identical
 CloudFormation dynamic-reference token ("{{resolve:secretsmanager:...}}"),
