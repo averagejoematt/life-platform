@@ -21,6 +21,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3
+
+# #422: shared causality conventions (note parse + cross-page merge), bundled (#781).
+import habit_causality  # noqa: E402
 import stats_core  # shared layer (#529): the one sanctioned stats implementation (ADR-105)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
@@ -50,6 +53,7 @@ from web.site_api_common import (
     _load_supp_metadata,
     _ok,
     _query_source,
+    _scrub_blocked_terms,
     logger,
     table,
 )
@@ -57,6 +61,94 @@ from web.site_api_common import (
 # Module-owned S3 config caches (read by handle_protocols + handle_domains)
 _protocols_cache = None
 _domains_cache = None
+
+
+# ── #422 EVR-01/02/03: habit causality capture (drivers, why-missed, cross-page) ──────
+def _causality_entry(store: dict, habit: str) -> dict:
+    """Get/create the causality accumulator for one habit."""
+    return store.setdefault(
+        habit,
+        {"trigger": None, "reward": None, "context": [], "why_missed": []},
+    )
+
+
+def _absorb_habitify_notes(store: dict, habit: str, date_key: str, st: dict) -> None:
+    """Lift verbatim Habitify notes (primary channel) into the causality accumulator.
+
+    A note on a completed day is driver context; on a skipped/failed day it's the reason
+    the day slipped. Interpretation is the deterministic trigger:/reward: convention only
+    (habit_causality.parse_note) — nothing is inferred (ADR-104).
+    """
+    notes = st.get("notes") or []
+    if not notes:
+        return
+    status = st.get("status")
+    missed = status in ("failed", "skipped")
+    entry = _causality_entry(store, habit)
+    for raw_note in notes:
+        text = _scrub_blocked_terms((raw_note or "").strip())
+        if not text:
+            continue
+        parsed = habit_causality.parse_note(text)
+        if missed:
+            entry["why_missed"].append({"date": date_key, "reason": parsed["raw"] or text, "channel": "habitify_note"})
+        else:
+            if parsed["trigger"] and not entry["trigger"]:
+                entry["trigger"] = {"text": parsed["trigger"], "channel": "habitify_note"}
+            if parsed["reward"] and not entry["reward"]:
+                entry["reward"] = {"text": parsed["reward"], "channel": "habitify_note"}
+            body = parsed["raw"] or text
+            if body:
+                entry["context"].append({"date": date_key, "text": body, "channel": "habitify_note"})
+
+
+def _absorb_reflection(store: dict, rec: dict) -> None:
+    """Merge a Claude-sourced reflection record (secondary channel) — never overwrites a
+    Habitify-sourced trigger/reward already present; both channels coexist per habit."""
+    habit = rec.get("habit")
+    if not habit or _is_blocked_vice(habit):
+        return
+    date_key = rec.get("date") or ""
+    entry = _causality_entry(store, habit)
+    trig = _scrub_blocked_terms((rec.get("trigger") or "").strip())
+    rew = _scrub_blocked_terms((rec.get("reward") or "").strip())
+    why = _scrub_blocked_terms((rec.get("why_missed") or "").strip())
+    ctx = _scrub_blocked_terms((rec.get("context") or "").strip())
+    if trig and not entry["trigger"]:
+        entry["trigger"] = {"text": trig, "channel": "claude_reflection"}
+    if rew and not entry["reward"]:
+        entry["reward"] = {"text": rew, "channel": "claude_reflection"}
+    if why:
+        entry["why_missed"].append({"date": date_key, "reason": why, "channel": "claude_reflection"})
+    if ctx:
+        entry["context"].append({"date": date_key, "text": ctx, "channel": "claude_reflection"})
+
+
+def _query_reflection_records(start_date: str, end_date: str) -> list:
+    """Read the Claude-sourced causality store (habit_causality partition) for the window."""
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}habit_causality")
+                    & Key("sk").between(f"HABITDAY#{start_date}", f"HABITDAY#{end_date}~"),
+                }
+            )
+        )
+        return _decimal_to_float(resp.get("Items", []))
+    except Exception as e:  # pragma: no cover — live DDB only
+        logger.warning("[handle_habits] reflection read failed (non-fatal): %s", e)
+        return []
+
+
+def _causality_public(entry: dict) -> dict:
+    """Shape one habit's accumulated causality for the API (bounded, verbatim)."""
+    return {
+        "trigger": entry.get("trigger"),
+        "reward": entry.get("reward"),
+        "why_missed": entry.get("why_missed", [])[:8],
+        "context": entry.get("context", [])[:5],
+    }
 
 
 def handle_tools_baseline() -> dict:
@@ -1408,6 +1500,7 @@ def handle_habits() -> dict:
     )
     habitify_by_date = {}
     _habit_agg = {}  # P0.5: per-habit window adherence for the state taxonomy
+    _causality = {}  # #422: per-habit captured drivers + why-missed (both channels)
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
         by_group = hi.get("by_group", {})
@@ -1425,6 +1518,14 @@ def handle_habits() -> dict:
                 a["scheduled"] += 1
                 if st.get("status") == "completed":
                     a["completed"] += 1
+            # #422 EVR-01/02: lift in-app Habitify notes into captured causality. A note on a
+            # completed day is driver context (trigger/reward); on a missed day it's the why.
+            _absorb_habitify_notes(_causality, hname, date_key, st)
+
+    # #422: fold in the Claude-sourced reflection layer (secondary channel). Never
+    # overwrites Habitify-sourced triggers/rewards — both channels coexist per habit.
+    for _rec in _query_reflection_records(ninety_days_ago, today):
+        _absorb_reflection(_causality, _rec)
 
     history = []
     for item in items:
@@ -1457,6 +1558,44 @@ def handle_habits() -> dict:
         if group_data:
             day["groups"] = group_data
         history.append(day)
+
+    # ── #422 EVR-03: cross-page daily-completion signals feed habit GROUP scores ──────
+    # ONE signal per evidence page (habit_causality.CROSS_PAGE_SIGNALS), sourced from the
+    # pre-computed component scores on computed_metrics. A cross-page signal only FILLS a
+    # (date, group) the habit tracker left empty — a group the tracker already scored is
+    # never touched (double-count prevention), and borrowed groups are tagged so a
+    # cross-page fill is never rendered as a tracked score.
+    cross_page_days = 0
+    try:
+        cp_resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}computed_metrics")
+                    & Key("sk").between(f"DATE#{ninety_days_ago}", f"DATE#{today}"),
+                    "ScanIndexForward": True,
+                }
+            )
+        )
+        cross_signals_by_date = {}
+        for cm in _decimal_to_float(cp_resp.get("Items", [])):
+            cm_date = cm.get("date") or cm.get("sk", "").replace("DATE#", "")
+            sig = habit_causality.derive_cross_page_signals(cm.get("component_scores") or {})
+            if sig:
+                cross_signals_by_date[cm_date] = sig
+        if cross_signals_by_date:
+            tracker_by_date = {d["date"]: dict(d.get("groups") or {}) for d in history}
+            merged = habit_causality.merge_cross_page_group_scores(tracker_by_date, cross_signals_by_date)
+            for day in history:
+                m = merged.get(day["date"])
+                if not m:
+                    continue
+                if m["groups"]:
+                    day["groups"] = m["groups"]
+                if m["cross_page"]:
+                    day["groups_cross_page"] = m["cross_page"]  # provenance: which groups were borrowed
+                    cross_page_days += 1
+    except Exception as _cp_e:
+        logger.warning("[handle_habits] cross-page merge failed (non-fatal): %s", _cp_e)
 
     # Latest record for current streak
     history[-1] if history else {}
@@ -1592,9 +1731,18 @@ def handle_habits() -> dict:
             state = "holding"
         else:
             state = "needs_attention"
-        per_habit.append(
-            {"name": hname, "group": a["group"], "scheduled_days": sched, "completed_days": comp, "adherence_pct": pct, "state": state}
-        )
+        ph = {"name": hname, "group": a["group"], "scheduled_days": sched, "completed_days": comp, "adherence_pct": pct, "state": state}
+        # #422: attach captured causality (drivers + why-missed, both channels). Only
+        # present when a real note/reflection exists — the cell stays honestly empty
+        # otherwise (no inferred causes, ADR-104).
+        cz = _causality.get(hname)
+        if cz and (cz.get("trigger") or cz.get("reward") or cz.get("why_missed") or cz.get("context")):
+            ph["causality"] = _causality_public(cz)
+        per_habit.append(ph)
+
+    causality_captured = sum(
+        1 for v in _causality.values() if v.get("trigger") or v.get("reward") or v.get("why_missed") or v.get("context")
+    )
 
     return _ok(
         {
@@ -1611,6 +1759,10 @@ def handle_habits() -> dict:
             "keystone_group_pct": keystone_group_pct,
             # HAB-3: top 5 habit groups by |Pearson r| vs character score
             "keystone_correlations": keystone_correlations,
+            # #422 EVR-01/02/03: causality capture surface + cross-page provenance.
+            "causality_captured": causality_captured,
+            "cross_page_days": cross_page_days,
+            "cross_page_signals": {p: s["group"] for p, s in habit_causality.CROSS_PAGE_SIGNALS.items()},
         },
         cache_seconds=3600,
     )

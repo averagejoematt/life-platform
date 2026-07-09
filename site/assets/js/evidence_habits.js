@@ -73,33 +73,52 @@ export function habitFrictionChip(pct) {
   return `<span class="hb-fr ${t[1]}">${t[0]}</span>`;
 }
 
-// P1.3 — the three drivers behind a habit: trigger → friction → reward. Only friction is
-// measured today (it's the inverse of adherence, P1.2). Trigger and reward need a capture
-// step that doesn't exist yet — so they're shown as honestly empty, with the mechanism named,
-// not faked. An honest empty state IS the build here; a fabricated drivers table would not be.
+// P1.3 / #422 — the three drivers behind a habit: trigger → friction → reward. Friction is
+// measured (inverse of adherence, P1.2). Trigger and reward are now CAPTURED — verbatim from
+// an in-app Habitify note (at check-off) or a Claude reflection — and rendered when they exist;
+// a habit with no captured driver stays honestly empty (never a guessed cause, ADR-104). Each
+// captured value carries its channel so a reflection is never confused for an in-app note.
+function habitDrvVal(v) {
+  if (!v || !v.text) return `<span class="drv-empty">— not captured</span>`;
+  const src = v.channel === "claude_reflection" ? "reflection" : "note";
+  return `${esc(v.text)} <span class="drv-src label">${src}</span>`;
+}
 export function habitsDrivers(perHabit) {
-  const ranked = (perHabit || []).filter((h) => h.adherence_pct != null).sort((a, b) => (a.adherence_pct || 0) - (b.adherence_pct || 0)).slice(0, 5);
+  const hasDrv = (h) => h.causality && (h.causality.trigger || h.causality.reward);
+  const captured = (perHabit || []).filter(hasDrv);
+  const lowAdh = (perHabit || []).filter((h) => h.adherence_pct != null).sort((a, b) => (a.adherence_pct || 0) - (b.adherence_pct || 0));
+  // Captured drivers first, then fill with lowest-adherence habits (where a driver would move the needle most).
+  const seen = new Set();
+  const ranked = [];
+  for (const h of captured.concat(lowAdh)) { if (seen.has(h.name)) continue; seen.add(h.name); ranked.push(h); if (ranked.length >= 6) break; }
   const rows = ranked.length
-    ? `<table class="rd-tbl rd-drv"><thead><tr><th>habit</th><th>trigger</th><th>friction</th><th>reward</th></tr></thead><tbody>${ranked.map((h) => `<tr><td class="rd-name">${esc(ttl(h.name))}</td><td class="drv-empty">— not captured</td><td>${habitFrictionChip(h.adherence_pct) || "—"}</td><td class="drv-empty">— not captured</td></tr>`).join("")}</tbody></table>`
+    ? `<table class="rd-tbl rd-drv"><thead><tr><th>habit</th><th>trigger</th><th>friction</th><th>reward</th></tr></thead><tbody>${ranked.map((h) => `<tr><td class="rd-name">${esc(ttl(h.name))}</td><td>${habitDrvVal((h.causality || {}).trigger)}</td><td>${habitFrictionChip(h.adherence_pct) || "—"}</td><td>${habitDrvVal((h.causality || {}).reward)}</td></tr>`).join("")}</tbody></table>`
     : empty("Drivers populate once habits have adherence history.");
+  const capN = captured.length;
   return sec("Drivers — trigger · friction · reward",
-    rows + `<p class="rd-meta label">Friction is real — it's the inverse of how often the habit actually gets kept. Trigger (what cues it) and reward (what it pays back) aren't logged yet; they need a per-habit capture step, so they're shown honestly empty rather than guessed. The lowest-adherence habits are listed first — those are where a trigger or reward would move the needle most.</p>`);
+    rows + `<p class="rd-meta label">Friction is real — the inverse of how often the habit gets kept. Trigger (what cues it) and reward (what it pays back) are captured from in-app notes at check-off or from a Claude reflection${capN ? "" : " — none logged yet, so they read honestly empty rather than guessed"}. ${capN ? `${capN} habit${capN > 1 ? "s have" : " has"} a captured driver so far. ` : ""}The lowest-adherence habits are listed first — those are where a trigger or reward would move the needle most.</p>`);
 }
 
-// P1.4 — misses become narrative. The miss COUNT is real (scheduled − completed); the WHY
-// isn't captured, so each miss reason reads honestly empty. Surfacing the count without the
-// reason is the honest half-step — it shows where the narrative would attach once a reason
-// prompt exists, instead of inventing causes.
+// P1.4 / #422 — misses become narrative. The miss COUNT is real (scheduled − completed); the
+// WHY is captured from a note on a skipped/failed day or a Claude reflection, rendered verbatim
+// when it exists. Until a reason is captured for that habit the cell stays honestly empty — no
+// inferred causes (ADR-104). No red, no streak-shaming.
 export function habitsWhyMissed(perHabit) {
-  const missed = (perHabit || [])
-    .map((h) => ({ name: h.name, n: Math.max(0, (h.scheduled_days || 0) - (h.completed_days || 0)) }))
-    .filter((h) => h.n > 0)
-    .sort((a, b) => b.n - a.n)
-    .slice(0, 6);
-  if (!missed.length) return "";
-  const rows = missed.map((h) => `<div class="wm-row"><span class="wm-name">${esc(ttl(h.name))}</span><span class="wm-n mono">${h.n} missed</span><span class="wm-why drv-empty">reason not captured</span></div>`).join("");
+  const rows = (perHabit || [])
+    .map((h) => ({ name: h.name, n: Math.max(0, (h.scheduled_days || 0) - (h.completed_days || 0)), reasons: ((h.causality || {}).why_missed) || [] }))
+    .filter((h) => h.n > 0 || h.reasons.length)
+    .sort((a, b) => (b.reasons.length - a.reasons.length) || (b.n - a.n))
+    .slice(0, 8);
+  if (!rows.length) return "";
+  const html = rows.map((h) => {
+    const why = h.reasons.length
+      ? `<span class="wm-why">${h.reasons.slice(0, 3).map((r) => `${esc(r.reason)}<span class="drv-src label">${r.channel === "claude_reflection" ? "reflection" : "note"}${r.date ? " · " + esc(r.date) : ""}</span>`).join(" · ")}</span>`
+      : `<span class="wm-why drv-empty">reason not captured</span>`;
+    return `<div class="wm-row"><span class="wm-name">${esc(ttl(h.name))}</span><span class="wm-n mono">${h.n} missed</span>${why}</div>`;
+  }).join("");
+  const anyCaptured = rows.some((h) => h.reasons.length);
   return sec("When a habit slips — the misses, honestly",
-    `<div class="wm-list">${rows}</div><p class="rd-meta label">The miss count is real. The <em>reason</em> isn't logged yet — a one-tap "why" on a missed day would turn these counts into narrative (travel, illness, low day). Until that capture exists, the why stays blank rather than guessed. No red, no streak-shaming.</p>`);
+    `<div class="wm-list">${html}</div><p class="rd-meta label">The miss count is real. The <em>reason</em> comes from a "why" note on the missed day or a Claude reflection${anyCaptured ? "" : " — none captured yet, so the why stays blank rather than guessed"} (travel, illness, low day). No red, no streak-shaming.</p>`);
 }
 
 export function habitStateTaxonomy(perHabit, registryHabits) {
