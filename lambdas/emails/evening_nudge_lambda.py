@@ -29,6 +29,7 @@ from decimal import Decimal
 import boto3
 from pacific_time import pacific_today
 from ritual_link import sign_ritual_token
+from source_registry import manual_capture_sources
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -203,7 +204,114 @@ def _build_ritual_section(date_str: str, missing_metrics: list[str]) -> str:
     </div>"""
 
 
-def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritual_html: str = "") -> str:
+# ── #746: gentle "gone quiet" mentions for manual capture sources ─────────────
+# When a hand-filled source (the evening journal, or a manual Apple-Health stream
+# like CGM/BP/State of Mind/water) has been dark past its registry threshold, the
+# nudge mentions it gently — never a nag, never a device outage the nudge can't
+# fix. Scoped to the 'notion' + 'hae' channels: the journal + manual health streams
+# that fit a "before bed" capture ritual. MCP-logged one-offs (tape measurements,
+# food-delivery orders) are surfaced on the public board's degraded stamp instead —
+# a gap there isn't a nightly capture lapse. ADDITIVE ONLY: this section rides along
+# when the nudge is already sending; it never force-sends on its own, so a long-dark
+# source can't turn the nudge into a daily nag (#746).
+NUDGE_QUIET_CHANNELS = frozenset({"notion", "hae"})
+_HAE_LIVENESS_SK = "DATATYPE_LIVENESS"  # apple_health per-datatype liveness sentinel (freshness_checker writes it)
+
+
+def _quiet_detail(days: int) -> str:
+    """Kind, non-numeric-alarm phrasing for a gone-quiet source."""
+    if days >= 14:
+        weeks = days // 7
+        return f"Quiet {days} days (~{weeks} week{'s' if weeks != 1 else ''}) — no rush"
+    return f"Quiet {days} days — whenever you're ready"
+
+
+def select_quiet_manual_sources(manual_sources, latest_by_source, hae_liveness, today, nudge_channels=NUDGE_QUIET_CHANNELS):
+    """Pure: which manual capture sources are gently worth mentioning tonight.
+
+    manual_sources: source_registry.manual_capture_sources() — {key:{label,channel,stale_hours}}.
+    latest_by_source: {key: 'YYYY-MM-DD'|None} newest partition record per source.
+    hae_liveness: the stored apple_health per-datatype liveness list (or None) —
+        each {label, age_days, dark, manual}.
+    today: 'YYYY-MM-DD'.
+
+    Returns [{name, channel, days, detail}] sorted longest-dark first. A source with
+    NO history is skipped (no invented nag). Device streams (manual=False) and any
+    channel outside `nudge_channels` are excluded — a dead pipe is never a nudge."""
+    try:
+        today_d = datetime.strptime(today, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return []
+    out = []
+    for key, meta in manual_sources.items():
+        ch = meta.get("channel")
+        # 'hae' is handled below via per-stream liveness — the apple_health partition
+        # itself stays fresh on steps/water and would never look dark at partition level.
+        if ch not in nudge_channels or ch == "hae":
+            continue
+        last = latest_by_source.get(key)
+        if not last:
+            continue
+        try:
+            days = (today_d - datetime.strptime(str(last)[:10], "%Y-%m-%d").date()).days
+        except (ValueError, TypeError):
+            continue
+        if days > meta["stale_hours"] / 24.0:
+            out.append({"name": meta["label"], "channel": ch, "days": days, "detail": _quiet_detail(days)})
+    if "hae" in nudge_channels:
+        for d in hae_liveness or []:
+            if d.get("manual") and d.get("dark") and d.get("age_days") is not None:
+                days = int(d["age_days"])
+                out.append({"name": d.get("label", "Apple Health"), "channel": "hae", "days": days, "detail": _quiet_detail(days)})
+    out.sort(key=lambda e: e["days"], reverse=True)
+    return out
+
+
+def _latest_date_for(source: str) -> str | None:
+    """Newest YYYY-MM-DD among a source's DATE# records, or None. Fail-soft."""
+    try:
+        r = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": USER_PREFIX + source, ":pfx": "DATE#"},
+            ScanIndexForward=False,
+            Limit=1,
+            ProjectionExpression="sk",
+        )
+        items = r.get("Items", [])
+        return str(items[0]["sk"]).replace("DATE#", "")[:10] if items else None
+    except Exception as e:
+        logger.warning(f"[nudge] latest_date_for({source}) failed: {e}")
+        return None
+
+
+def _hae_liveness() -> list | None:
+    """The stored apple_health per-datatype liveness list (or None). Fail-soft."""
+    try:
+        rec = table.get_item(Key={"pk": USER_PREFIX + "apple_health", "sk": _HAE_LIVENESS_SK}).get("Item")
+        return _d2f(rec).get("datatypes") if rec else None
+    except Exception as e:
+        logger.warning(f"[nudge] hae_liveness read failed: {e}")
+        return None
+
+
+def _build_quiet_section(quiet: list) -> str:
+    """Gentle 'gone quiet' HTML, or "" when nothing qualifies."""
+    if not quiet:
+        return ""
+    rows = "".join(
+        f'<p style="font-size:12px;color:#6b7280;margin:4px 0;">' f'<strong style="color:#4b5563;">{q["name"]}</strong> — {q["detail"]}</p>'
+        for q in quiet
+    )
+    return f"""
+    <div style="padding:4px 24px 16px;">
+      <div style="background:#f0f9ff;border-radius:8px;padding:12px 14px;">
+        <p style="font-size:12px;color:#0369a1;font-weight:700;margin:0 0 4px;">🕰️ Gone quiet — no pressure</p>
+        {rows}
+      </div>
+    </div>"""
+
+
+def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritual_html: str = "", quiet_html: str = "") -> str:
     missing_rows = ""
     for m in missing:
         missing_rows += f"""
@@ -254,6 +362,8 @@ def _build_html(today_str: str, missing: list[dict], complete: list[dict], ritua
     </div>
 
     {ritual_html}
+
+    {quiet_html}
 
     {'<div style="padding:4px 24px 16px;"><table style="width:100%;border-collapse:collapse;border-top:1px solid #f3f4f6;">' + complete_rows + '</table></div>' if complete_rows else ''}
 
@@ -329,13 +439,31 @@ def lambda_handler(event, context):
             complete.append(ritual_entry)
         ritual_html = _build_ritual_section(today, ritual_missing)
 
-        logger.info(f"[nudge] Missing: {[m['name'] for m in missing]} | Complete: {[c['name'] for c in complete]}")
+        # #746: gentle staleness mentions for manual capture sources (journal +
+        # manual HAE streams) gone dark past their registry threshold. ADDITIVE —
+        # computed for the email body, but NOT part of the send gate below, so a
+        # long-dark source can't turn the nudge into a nightly nag (kind, not naggy).
+        quiet = []
+        try:
+            manual = manual_capture_sources()
+            latest_by_source = {
+                k: _latest_date_for(k) for k, m in manual.items() if m["channel"] in NUDGE_QUIET_CHANNELS and m["channel"] != "hae"
+            }
+            quiet = select_quiet_manual_sources(manual, latest_by_source, _hae_liveness(), today)
+        except Exception as e:
+            logger.warning(f"[nudge] quiet-source scan failed (non-fatal): {e}")
+        quiet_html = _build_quiet_section(quiet)
+
+        logger.info(
+            f"[nudge] Missing: {[m['name'] for m in missing]} | Complete: {[c['name'] for c in complete]} "
+            f"| Quiet: {[q['name'] for q in quiet]}"
+        )
 
         if not missing:
             logger.info("[nudge] All sources complete — no email needed today")
             return {"statusCode": 200, "body": "All complete — no nudge sent"}
 
-        html = _build_html(today, missing, complete, ritual_html)
+        html = _build_html(today, missing, complete, ritual_html, quiet_html)
         subject = f"Evening nudge · {len(missing)} thing(s) to log before bed"
 
         ses.send_email(

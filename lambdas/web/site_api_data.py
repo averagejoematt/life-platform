@@ -26,6 +26,7 @@ from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 from source_registry import (  # #392: canonical source classification (shared layer)
     DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
+    manual_capture_sources,
     public_board_sources,
     public_paused_sources,
     stale_hours_overrides,
@@ -134,6 +135,24 @@ def handle_platform_stats() -> dict:
 _FRESHNESS_SOURCES = public_board_sources()
 _FRESHNESS_STALE_HOURS = stale_hours_overrides(_FRESHNESS_SOURCES)
 _FRESHNESS_PAUSED = public_paused_sources()
+# #746: the manual capture channels (HAE / Notion / MCP) whose staleness is
+# surfaced as an honest "manual source dark N days" stamp — the behavioral-absence
+# semantics of ADR-104, the same honesty a device gap gets. A device pipe has no
+# capture_channel, so a dead sensor never mislabels as a "you forgot to log" nudge.
+_MANUAL_CAPTURE = manual_capture_sources()
+
+
+def _days_dark(last_update: str, now: datetime) -> int | None:
+    """Whole days between a source's newest YYYY-MM-DD record and `now`, floored at
+    0; None when there is no last_update. The "dark N days" figure for the public
+    degraded stamp — computed, never fabricated (ADR-104)."""
+    if not last_update:
+        return None
+    try:
+        last = datetime.strptime(last_update[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+    return max(0, (now.date() - last.date()).days)
 
 
 def _latest_date_str(source: str) -> str | None:
@@ -219,6 +238,18 @@ def handle_source_freshness() -> dict:
             "status": status,
             "is_behavioral": bool(meta.get("behavioral")),
         }
+        # #746: manual-capture degraded stamp. For a hand-filled source (HAE /
+        # Notion / MCP) that has gone quiet past its threshold, expose the honest
+        # "dark N days" count so the board can say "manual source dark N days" —
+        # the ADR-104 behavioral-absence treatment a device gap gets, never a
+        # fabricated value. Automatic pipes carry no capture_channel, so they're
+        # untouched here.
+        manual_meta = _MANUAL_CAPTURE.get(sid)
+        if manual_meta:
+            entry["capture_channel"] = manual_meta["channel"]
+            entry["manual"] = True
+            if status in ("stale", "behavioral-stale"):
+                entry["days_dark"] = _days_dark(last_update, now)
         # D-4 (#468): apple_health is one partition fed by many sensors, so its single
         # "fresh" hides a months-dark CGM/BP/SoM/workout stream. Surface the per-datatype
         # liveness the freshness-checker stores so the darkness is visible.
@@ -226,7 +257,12 @@ def handle_source_freshness() -> dict:
             dts = _apple_health_datatypes()
             if dts:
                 entry["datatypes"] = dts
-                entry["dark_datatypes"] = [d["label"] for d in dts if d.get("dark")]
+                # #746: dark HAE streams now carry their days-dark + manual flag, so
+                # the board can stamp "CGM dark 5d" and separate the hand-captured
+                # streams (CGM/BP/SoM/water) from a passive device-stream gap.
+                entry["dark_datatypes"] = [
+                    {"label": d["label"], "days_dark": d.get("age_days"), "manual": bool(d.get("manual"))} for d in dts if d.get("dark")
+                ]
         sources.append(entry)
         summary["total"] += 1
         if status == "fresh":

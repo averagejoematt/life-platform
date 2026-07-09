@@ -178,12 +178,34 @@ export function renderPipeline(d) {
     return `<p class="provenance${s.status !== "fresh" ? " pv-stale" : ""}"><span class="fr-dot"${freshAttrs} aria-hidden="true"></span>` +
       `<span class="pv-src">${esc(s.last_update || "—")}</span>${s.age_hours != null ? ` <span class="rd-unit">${Math.round(s.age_hours)}h</span>` : ""}</p>`;
   };
+  // #746: honest degraded stamp for a manual source (HAE / Notion / MCP) gone
+  // quiet past its threshold — "manual source dark N days", the same behavioral-
+  // absence honesty (ADR-104) a device gap gets. Never fabricated: days_dark is a
+  // real count from /api/source_freshness, only present on a stale manual source.
+  const statusCell = (s) => {
+    let txt = badge[s.status] || s.status;
+    if (s.manual && s.days_dark != null && s.days_dark > 0) txt += ` · dark ${s.days_dark}d`;
+    return esc(txt);
+  };
+  // #746: apple_health is one partition fed by many streams; a dark hand-captured
+  // stream (CGM/BP/State of Mind/water) is surfaced explicitly so a "fresh"
+  // partition can't hide it. Passive device streams (steps/workouts) are labelled
+  // as such — the nudge can't fix those, and honesty says which is which.
+  const feedsCell = (s) => {
+    let html = esc(s.desc || "");
+    const dark = s.dark_datatypes || [];
+    if (dark.length) {
+      const parts = dark.map((d) => `${esc(d.label)}${d.days_dark != null ? ` dark ${d.days_dark}d` : " dark"}${d.manual ? "" : " (device)"}`);
+      html += `<span class="rd-meta label" style="display:block">${parts.join(" · ")}</span>`;
+    }
+    return html;
+  };
   const by = {};
   for (const s of src) (by[s.category || "Other"] ||= []).push(s);
   const secs = Object.entries(by).map(([cat, rows]) => sec(cat,
     `<table class="rd-tbl"><thead><tr><th>source</th><th>what it feeds</th><th>last update</th><th>status</th></tr></thead><tbody>${rows
       .slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
-      .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${esc(s.desc || "")}</td><td class="num rd-range">${lastUpdateCell(s)}</td><td>${esc(badge[s.status] || s.status)}</td></tr>`).join("")}</tbody></table>`)).join("");
+      .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${feedsCell(s)}</td><td class="num rd-range">${lastUpdateCell(s)}</td><td>${statusCell(s)}</td></tr>`).join("")}</tbody></table>`)).join("");
   return figs([fig(sm.fresh ?? "—", "flowing"), fig(sm.paused ?? "—", "paused"), fig(sm.total ?? src.length, "live-monitored")]) + secs +
-    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made.</p>`;
+    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made, dark Nd = a manual source quiet that many days.</p>`;
 }
