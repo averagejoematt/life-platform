@@ -60,10 +60,15 @@ class RoutineBranch:
 
     `cue` is a one-line session cue rendered by the compiler into the pushed
     routine's notes (Hevy holds one exercise list per routine, so the branch
-    menu lives in the notes field — the only place the write client can carry
-    alternatives). `exercises` optionally carries a branch's own set/rep
-    content for the front-end / future per-branch push; the wire push renders
-    the shared base `RoutineSpec.exercises` plus the annotated branch menu.
+    menu — every branch's label/cue, recommended one starred — lives in the
+    notes field, the only place the write client can carry alternatives).
+    `exercises` carries a branch's own set/rep content; the compiler pushes
+    the RECOMMENDED branch's own `exercises` as the routine's live exercise
+    list (#417 2b) — so the overnight re-stamp's re-flag changes what the
+    reader's Hevy app actually shows, not just a note. Other branches stay
+    visible only in the notes menu, never pushed as the live set/rep list.
+    Falls back to `RoutineSpec.exercises` when the recommended branch carries
+    no exercises of its own (e.g. a branch-light placeholder).
     """
 
     label: str

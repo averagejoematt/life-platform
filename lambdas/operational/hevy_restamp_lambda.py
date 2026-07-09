@@ -4,7 +4,11 @@ hevy_restamp_lambda.py — Overnight branch re-stamp (#417 / TR-05).
 Runs AFTER the overnight wearable sync. Reads the night's recovery signal and
 RE-ORDERS / re-highlights which branch of the already-pushed routine is
 recommended — so the morning's plan reflects the night's data WITHOUT taking
-the choice away. It is a suggestion layer, nothing more.
+the choice away. It is a suggestion layer, nothing more. Since #417 2b, the
+compiler (`hevy_compiler._primary_exercises`) pushes the RECOMMENDED branch's
+own exercises as the routine's live set/rep list, so re-flagging here changes
+what the reader's Hevy app actually shows, not just which line is starred in
+the notes; every other branch still stays visible only in the notes menu.
 
 Hard invariants (the reason this Lambda is safe to schedule):
   * FAILS OPEN. Any error, missing data, disabled gate, or skipped run leaves
@@ -12,8 +16,10 @@ Hard invariants (the reason this Lambda is safe to schedule):
     returns a JSON status dict. There is no DLQ semantics here on purpose: a
     missed re-stamp is a no-op, not an incident.
   * NEVER adds or removes a branch. It only toggles `recommended` and re-orders
-    the branch list. Set/rep content is never touched. Self-selection is
-    preserved by construction — every branch stays visible and choosable.
+    the branch list. Set/rep content of every individual branch is never
+    touched — only WHICH already-authored branch becomes the pushed exercise
+    list can change. Self-selection is preserved by construction — every
+    branch stays visible and choosable via the notes menu.
   * Subtract-safe default. Absent / ambiguous recovery resolves to "the plan as
     written" (the authored recommendation is left in place, not escalated).
 
@@ -22,7 +28,11 @@ Gates (SSM, same shape as hevy-routine-cron):
   /life-platform/budget-tier             — >= 3     → no-op
   /life-platform/hevy/restamp_enabled    — not truthy → no-op (ships false)
 
-Ships DISABLED at the EventBridge level too (belt-and-suspenders, like the cron).
+The EventBridge rule (`hevy-restamp-daily`, cron(0 18 * * ? *)) is ENABLED as of
+PR #711's deferred decision 2a — 18:00 UTC runs after Whoop recovery refreshes
+(~17:30 UTC), so the re-stamp always sees fresh recovery. The SSM gate above
+still ships "false"; it is flipped true as a deliberate post-merge/post-deploy
+step so the enabled rule and this code both land before the first live run.
 """
 
 from __future__ import annotations

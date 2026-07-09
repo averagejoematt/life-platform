@@ -794,16 +794,16 @@ class OperationalStack(Stack):
         # which branch of the already-pushed routine is recommended, so the
         # morning's plan reflects the night's recovery. FAILS OPEN: a missed or
         # failed run leaves the last pushed routine fully usable. Never adds or
-        # removes a branch. SHIPS DISABLED at BOTH the EventBridge level AND SSM
-        # /life-platform/hevy/restamp_enabled (default "false") — belt-and-
-        # suspenders, same posture as the cron above.
+        # removes a branch.
         #
-        # Schedule (UTC-fixed, no DST): 12:45 UTC = 04:45 PST / 05:45 PDT — after
-        # the first early-morning wearable ingestion hour (12:00 UTC), before a
-        # morning gym trip. ⚠️ For the night's recovery to be fresh this early,
-        # the Whoop recovery pull (currently 17:30 UTC / 9:30 AM PT) must move
-        # earlier, OR this must run later — that timing coupling is Matthew's
-        # call before enabling. Until enabled, the re-stamp does not fire.
+        # Schedule (UTC-fixed, no DST): 18:00 UTC = 10:00 PST / 11:00 PDT — moved
+        # here (from the originally proposed 12:45 UTC) per Matthew's call on
+        # PR #711's deferred decision 2a: Whoop recovery refreshes ~17:30 UTC, so
+        # 12:45 UTC would have re-stamped on STALE recovery. 18:00 UTC runs after
+        # the recovery pull lands. ENABLED here; the SSM belt-and-suspenders gate
+        # (/life-platform/hevy/restamp_enabled, default "false") is flipped true
+        # as a separate post-merge step so the enabled rule and the new push
+        # format (#417 2b) arrive together.
         hevy_restamp = create_platform_lambda(
             self,
             "HevyRestamp",
@@ -834,9 +834,9 @@ class OperationalStack(Stack):
             self,
             "HevyRestampRule",
             rule_name="hevy-restamp-daily",
-            description="#417 TR-05 ships disabled; operator enables after confirming recovery freshness timing.",
-            schedule=events.Schedule.expression("cron(45 12 * * ? *)"),
-            enabled=False,
+            description="#417 TR-05: re-stamps on fresh Whoop recovery (~17:30 UTC refresh); enabled post PR #711 decision 2a.",
+            schedule=events.Schedule.expression("cron(0 18 * * ? *)"),
+            enabled=True,
         )
         hevy_restamp_rule.add_target(targets.LambdaFunction(hevy_restamp))
 
