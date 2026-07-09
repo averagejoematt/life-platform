@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en" data-door="story">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>The Org Chart of One Human and N Agents — averagejoematt</title>
+  <meta name="description" content="I run a production AWS platform with no team — one human plus N instances of Claude. The novel part is what it took to make it not fall over: an org chart, enforced by code.">
+  <link rel="canonical" href="https://averagejoematt.com/journal/essays/org-chart-of-one/">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="averagejoematt">
+  <meta property="og:url" content="https://averagejoematt.com/journal/essays/org-chart-of-one/">
+  <meta property="og:title" content="The Org Chart of One Human and N Agents">
+  <meta property="og:description" content="Roles, shift handovers, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn't bind something that reboots every session with no memory.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Org Chart of One Human and N Agents">
+  <meta name="twitter:description" content="Roles, shift handovers, an audit trail, and a short list of things the AI is never allowed to do — enforced by code.">
+  <meta name="twitter:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Measured Life">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "The Org Chart of One Human and N Agents",
+    "description": "How a one-person production platform is actually run: sessions as mortal employees, deterministic gates holding the keys, one human owning everything irreversible, and the failure log as the credibility.",
+    "datePublished": "2026-07-08",
+    "author": {"@type": "Person", "name": "Matt", "url": "https://averagejoematt.com/story/about/"},
+    "image": "https://averagejoematt.com/assets/images/og-home.png",
+    "publisher": {
+      "@type": "Organization",
+      "name": "The Measured Life",
+      "url": "https://averagejoematt.com",
+      "logo": {"@type": "ImageObject", "url": "https://averagejoematt.com/apple-touch-icon.png"}
+    },
+    "mainEntityOfPage": {"@type": "WebPage", "@id": "https://averagejoematt.com/journal/essays/org-chart-of-one/"},
+    "articleSection": "Build in public",
+    "isPartOf": {"@type": "Blog", "name": "In My Own Words", "url": "https://averagejoematt.com/story/journal/"}
+  }
+  </script>
+  <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/v4/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/v4/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/assets/css/fonts.css">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/story.css">
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
+  <style>
+    .reading-progress { position:fixed;top:0;left:0;right:0;height:2px;background:transparent;z-index:var(--z-overlay); }
+    .reading-progress__fill { height:100%;background:var(--ember);width:0%;transition:width 0.1s linear; }
+    .post-wrap { max-width:var(--container-read);margin:0 auto;padding-inline:var(--gutter); }
+    .post-header { padding:var(--sp-8) 0 var(--sp-6);border-bottom:var(--border-hair); }
+    .post-header__series { font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ember);margin-bottom:var(--sp-3); }
+    .post-header__title { font-family:var(--font-serif);font-size:var(--fs-h1);color:var(--ink);line-height:var(--lh-snug);font-weight:var(--weight-reg);font-style:italic;margin-bottom:var(--sp-4); }
+    .post-header__meta { display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-3);font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-muted); }
+    .post-header__stats { font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);letter-spacing:var(--tracking-label);margin-top:var(--sp-2); }
+    .post-body { padding:var(--sp-7) 0 var(--sp-8); }
+    .post-body .prose { font-family:var(--font-serif);max-width:none; }
+    .post-body .prose p { max-width:none;line-height:var(--lh-relaxed); }
+    .post-body .prose > p:first-of-type::first-letter { font-size:64px;line-height:0.8;float:left;margin-right:var(--sp-2);margin-top:6px;color:var(--ember);font-family:var(--font-serif); }
+    .post-body .prose blockquote { border-left:2px solid var(--ember);padding:var(--sp-3) var(--sp-5);background:var(--ember-wash);margin:var(--sp-6) 0;font-style:italic;color:var(--ink); }
+    .post-body .prose h2 { max-width:none; }
+    .post-body .prose hr { border:none;border-top:var(--border-hair);margin:var(--sp-7) 0; }
+    .post-body .prose strong { color:var(--ink);font-weight:var(--weight-med); }
+    .post-body .prose ol { max-width:none; }
+    .post-body .prose code { font-family:var(--font-mono);font-size:0.82em;color:var(--ink-muted);word-break:break-word; }
+    .post-receipts { font-family:var(--font-mono);font-size:var(--fs-label);color:var(--ink-faint);letter-spacing:var(--tracking-label);margin-top:var(--sp-6);border-top:var(--border-hair);padding-top:var(--sp-4); }
+    .post-receipts a { color:var(--ember);text-decoration:none;border-bottom:1px solid var(--ember-line); }
+    .post-cta { margin:var(--sp-6) 0 var(--sp-7);padding:var(--sp-6);border:var(--border-hair);border-radius:var(--radius);background:var(--ember-wash);text-align:center; }
+    .post-cta h2 { font-family:var(--font-serif);font-style:italic;font-weight:var(--weight-reg);font-size:var(--fs-h3);color:var(--ink);margin:0 0 var(--sp-2); }
+    .post-cta p { color:var(--ink-muted);font-size:var(--fs-small);margin:0 auto var(--sp-4);max-width:44ch; }
+    .post-cta a.cta-btn { display:inline-block;font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--page);background:var(--ember);padding:10px 20px;border-radius:var(--radius-sm);text-decoration:none; }
+    .post-cta a.cta-btn:hover { filter:brightness(1.08); }
+    .post-nav { padding:var(--sp-5) 0 var(--sp-8);border-top:var(--border-hair);display:flex;justify-content:space-between;gap:var(--sp-5);flex-wrap:wrap; }
+    .post-nav a { font-family:var(--font-serif);font-size:var(--fs-body);color:var(--ink);text-decoration:none;transition:color var(--dur-fast); }
+    .post-nav a:hover { color:var(--ember); }
+    .post-nav span { display:block;font-family:var(--font-mono);font-size:var(--fs-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-faint);margin-bottom:var(--sp-1); }
+  </style>
+</head>
+<body class="dx-page">
+<a class="skip" href="#post">Skip to the essay</a>
+<div class="reading-progress"><div class="reading-progress__fill" id="rp"></div></div>
+<header class="story-top">
+  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
+  <nav class="doors" aria-label="Doors">
+    <a href="/now/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+    <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
+    <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
+    <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
+    <a href="/story/" aria-current="page" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a>
+    <button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button>
+  </nav>
+</header>
+<main id="post">
+<div class="post-wrap">
+  <div class="post-header">
+    <div class="post-header__series">In My Own Words &middot; Essay &middot; By Matt</div>
+    <h1 class="post-header__title">The Org Chart of One Human and N Agents</h1>
+    <div class="post-header__meta">
+      <span>July 8, 2026</span>
+      <span>&middot;</span>
+      <span>8 min read</span>
+    </div>
+    <div class="post-header__stats">every claim receipt-backed against the repo &middot; platform numbers as of the 2026-07-06 snapshot</div>
+  </div>
+  <article class="post-body">
+    <div class="prose">
+      <p>At 07:45 every morning, an AI agent wakes up, reads my infrastructure's overnight alarms, diagnoses what broke, and — for a narrow class of provably-safe problems — fixes it and merges the fix before I've had coffee. The interesting part is not the agent. The interesting part is the sentence at the top of the merge gate's source file:</p>
+      <blockquote><p>"This gate is the ONLY thing that merges, and it is intentionally NOT an LLM — every decision here is deterministic and auditable." (<code>remediation/automerge.py:7</code>)</p></blockquote>
+      <p>That sentence is the whole org chart, compressed. I run a production AWS platform — 94 Lambda functions, 8 CDK stacks, ~140 API tools, a public website, a hard $75-a-month budget — with no team. The engineering headcount is one human who has a day job and a family, plus N instances of Claude, where N is however many sessions ran this week. The humans-to-agents ratio isn't the novel part anymore; half the industry is doing some version of that. The novel part is what it took to make it <em>not fall over</em>: it took an org chart. Roles, shift handovers, performance reviews, an audit trail, and a short list of things the AI is never allowed to do — enforced by code, because policy doesn't bind something that reboots every session with no memory.</p>
+
+      <h2>Sessions are employees who die at the end of every shift</h2>
+      <p>A Claude Code session is a competent engineer with total amnesia. It arrives knowing nothing about yesterday, works for a few hours, and then ceases to exist. Early on I treated that as a limitation to apologize for. The unlock was treating it as a constraint to design an organization around — the way real orgs design around the fact that employees quit, sleep, and forget.</p>
+      <p>So every session ends with a handover document, and every session begins by reading one. There are ~75 of them now, one per shift, spanning about five weeks (<code>handovers/</code>, 2026-05-31 &rarr; 2026-07-06), plus a single "live" status block in the repo's root instructions that each departing session <em>replaces</em> — never appends to — so the incoming worker reads one current state, not a sediment of stale ones (the wrap convention, <code>CLAUDE.md</code>). A handover reads like a shift log at a hospital: what shipped, what's verified, what's mid-flight, and — most load-bearing — the decisions the next worker must NOT make, because they're mine. A real example, verbatim carry-forward: <em>"Re-stamp (#417) SHIPS DISABLED — 2 decisions before enabling"</em> (<code>handovers/HANDOVER_2026-07-06_583-412_and-ci-health.md</code>). The code shipped; the switch waits for the human.</p>
+      <p>Durable lessons don't live in handovers — they get promoted to a memory system and a conventions file, the org's employee handbook. The handbook is written almost entirely in scar tissue. More on the scars below.</p>
+
+      <h2>The gates hold the keys, the models hold opinions</h2>
+      <p>The second structural rule: an LLM never holds authority — it holds a pen. Everywhere an action is irreversible or public-facing, the decision-maker is deterministic code, and the model is upstream of it as a proposer.</p>
+      <p>The morning remediation agent proposes fixes; the thing that merges is a gate that checks an exact-file allowlist, a denylist of substrings (anything touching auth, secrets, budget, deploy, or the gate itself), a 60-line diff cap, a lint-and-test run, and a three-merges-a-day cap — and writes every decision, merge or refusal, to an audit log in S3 (<code>remediation/automerge.py</code>; the agent itself runs on read-only credentials).</p>
+      <p>The AI that writes daily narrative about my health data cannot publish a number I didn't compute. A gate checks that every numeral in its output already exists in the input it was handed; invented endpoints die there. When we built that gate we measured first: roughly one narrative in ten (11 of 112 across 14 days) contained a hard numeric contradiction (ADR-104, <code>docs/DECISIONS.md</code>). That measurement is <em>published on the site</em>, which tells you the org's other rule: failures are inventory, not embarrassment.</p>
+      <p>Even spending is an org-chart problem. An hourly governor projects month-end cost and degrades AI features in tiers as the projection climbs — and after the one month we breached the ceiling ($79.80 in June 2026, caused by my own dev sessions, not by readers), the degradation <em>order</em> was inverted so that reader-facing AI is the last thing sacrificed (<code>lambdas/budget_guard.py</code>: "readers degrade LAST"). The postmortem conclusion wasn't "spend less"; it was "the org was protecting the wrong stakeholder."</p>
+      <p>And the one gate that never moved: production deploys require a human click. The agents can build, test, propose, and stage. The approval button is mine. Not because the models aren't capable — because <em>accountability doesn't compress</em>. Someone has to be the person who can be blamed, and an entity that vanishes at the end of its shift can't be it.</p>
+
+      <h2>What the throughput actually looks like</h2>
+      <p>In the three days before this essay's snapshot, the org merged 186 pull-request commits across 8 documented shifts (git log, 2026-07-03 &rarr; 2026-07-06), each one squash-merged with a <code>Fixes #N</code> back to a public backlog — the backlog itself lives on GitHub Issues because the previous Markdown backlog drifted 27% wrong before anyone noticed (ADR-099). The platform's own internal review calls this "~50 verified stories in 3 days" [CONFIRM: self-reported figure — directionally consistent with the git count, not independently reproduced]. The honest phrasing: throughput at a several-engineer clip, from one person's spare hours, with the verification burden moved onto machinery.</p>
+      <p>That machinery matters more than the count. Every deploy passes a CI chain that ends with a headless browser walking the live site and a <em>vision model</em> reading the screenshots for what a pixel-diff can't judge — a chart that rendered empty, a panel that overflowed — and a "high" verdict from that reviewer blocks the pipeline (<code>.github/workflows/ci-cd.yml</code>, gating since 2026-06-05). One of the org's employees is a QA reviewer whose entire job is to look at the screen.</p>
+
+      <h2>The failures are the credibility</h2>
+      <p>Everything above sounds like it worked on the first try. Here is the part that earns the right to the rest.</p>
+      <p><strong>Two agents built the same feature, and a third stomped main.</strong> In July I ran concurrent sessions in the same working directory. One session branched off the shared tree and squash-merged — silently dragging a <em>different agent's</em> half-finished work onto main under the wrong story number, while elsewhere two agents had each built a complete, competing implementation of the same story (PRs #703 and #704). The handover's own postmortem, verbatim: <em>"a concurrent session sharing the primary working dir means <code>git checkout -b</code> can inherit their committed work &rarr; it rides onto main on your squash. Use a worktree for your own work too when another session is live, not just for the subagents"</em> (<code>handovers/HANDOVER_2026-07-05_590-constellation.md</code>). That sentence went into the handbook; the next session's handover records zero stomps. This is what management looks like when your reports are processes: you can't coach the worker, so you coach the <em>workflow</em>.</p>
+      <p><strong>The AI violated the org's own constitution, at the worst possible spot.</strong> The platform's central public claim is falsifiable, graded predictions. A review found the model had been authoring its own prediction IDs and deadlines — years-off dates, duplicates, 88 predictions pending and zero ever graded, each one ungradeable by construction. That broke the org's oldest rule ("the model never authors its own metadata" — the generalization of ADR-106's <em>only code ships</em>) exactly where credibility depended on it. The fix took one shift: strip those fields from the model's reach and stamp them in code (#725, 2026-07-06). The disclosure is published on the site's trust page, because an org that markets its honesty gates and quietly patches its honesty failures is running theater.</p>
+      <p><strong>Green tests lied; the real flow didn't.</strong> A shipped feature computed workout adherence at 47.8% for a workout the human had fully completed — sixteen unit tests green, deploy healthy, number wrong (a template-keyed exercise class the tests never exercised). The lesson is now a standing convention: <em>"drive the real flow, not just tests"</em> — every shift's final verification invokes the actual production Lambda on actual data and reads the actual stored record (<code>handovers/HANDOVER_2026-07-06_583-412_and-ci-health.md</code>).</p>
+      <p><strong>Agent output is a lead list, not a truth feed.</strong> The org runs agent review panels over its own architecture. A large fraction of their findings don't survive verification — one audit's "cost leak" was intentional caching, most of another's accessibility claims were false positives. The handbook rule, verbatim: <em>"the report is a verified lead list, not a fix list — re-verify each before touching"</em> (<code>handovers/HANDOVER_2026-06-15_...EliteReview.md</code>). And the org's most honest sentence about itself, from its own review methodology: internal grades <em>"have only ever ratcheted upward, which is exactly what a self-authored rubric graded by the same kind of model that built the system would predict"</em> (<code>docs/REVIEW_METHODOLOGY.md</code>). The arbiter that counts is a stranger reading it cold.</p>
+
+      <h2>The transferable org chart</h2>
+      <p>Strip the health-platform specifics and five rules remain. They look suspiciously like things human organizations already learned, because they are:</p>
+      <ol>
+        <li><strong>Design for mortality.</strong> Workers forget everything; artifacts remember. The handover, the handbook, the one live status block. (Orgs: documentation and shift logs. We just stopped pretending we didn't need them.)</li>
+        <li><strong>Authority lives in deterministic code; models propose.</strong> Allowlists, diff caps, number-gates, spending tiers — auditable, boring, binding. (Orgs: separation of duties.)</li>
+        <li><strong>One human owns everything irreversible.</strong> Prod approval, data mutations, taste. Accountability doesn't compress. (Orgs: the signature line.)</li>
+        <li><strong>Verify in production reality, not in the test's model of it.</strong> Drive the real flow; put a vision-reviewer on the actual screen. (Orgs: "go and see.")</li>
+        <li><strong>Publish the failure log.</strong> The gate baselines, the breach month, the stomped main, the 88 corrupt predictions. An org run by entities that can hallucinate has exactly one durable asset: a public record of catching itself. (Orgs: incident culture — except public.)</li>
+      </ol>
+      <p>The platform this org built measures one ordinary human trying not to fail a seventeenth time. It may yet fail. The org chart, though, already works — and it is, I've come to think, the most transferable thing the whole experiment will produce.</p>
+      <p class="post-receipts">The receipts: every file path cited above is real and public — <a href="https://github.com/averagejoematt/life-platform" rel="noopener">github.com/averagejoematt/life-platform</a>. The machine this essay describes is documented at <a href="/method/build/">/method/build/</a>, and the platform it runs is live at <a href="/now/">/now/</a>.</p>
+    </div>
+  </article>
+  <aside class="post-cta">
+    <h2>Follow the experiment</h2>
+    <p>The platform this essay describes publishes its own weekly chronicle — the data, the coaches, and what actually moved. The down weeks included.</p>
+    <a class="cta-btn" href="/subscribe/">Follow by email</a>
+  </aside>
+  <nav class="post-nav">
+    <a href="/story/journal/"><span>&larr; In my own words</span>All of Matt's writing</a>
+    <a href="/method/build/"><span>The machine</span>How it's built &rarr;</a>
+  </nav>
+</div>
+</main>
+<footer class="site-foot">
+  <nav class="site-foot-cols" aria-label="Site map">
+    <div class="sf-col"><p class="sf-h label">The Story</p>
+      <a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>
+    <div class="sf-col"><p class="sf-h label">The Coaching</p>
+      <a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>
+    <div class="sf-col"><p class="sf-h label">The Data</p>
+      <a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>
+    <div class="sf-col"><p class="sf-h label">The Protocols</p>
+      <a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>
+    <div class="sf-col"><p class="sf-h label">Follow &amp; context</p>
+      <a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>
+  </nav>
+  <p class="sf-base label"><span>averagejoematt · the story</span><a href="/">← home</a></p>
+</footer>
+<script>
+  (function(){
+    var b=document.querySelector('.theme-toggle');
+    if(b){b.addEventListener('click',function(){
+      var r=document.documentElement;
+      var cur=r.dataset.theme||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');
+      var next=cur==='light'?'dark':'light';
+      r.dataset.theme=next;
+      try{localStorage.setItem('ajm-theme',next);}catch(e){}
+    });}
+    var rp=document.getElementById('rp');
+    window.addEventListener('scroll',function(){
+      if(!rp)return;
+      var pct=window.scrollY/(document.body.scrollHeight-window.innerHeight)*100;
+      rp.style.width=Math.min(pct,100)+'%';
+    });
+  })();
+</script>
+</body>
+</html>
