@@ -69,24 +69,11 @@ AH_ACTIVITY_WINDOW_DAYS = int(os.environ.get("AH_ACTIVITY_WINDOW_DAYS", "7"))
 # checker report last-seen PER datatype by which prefixed field last appeared on which
 # DATE# record. `fields` = any-of presence signals; `stale_days` = behavioral threshold
 # (a sensor-session lapse reports, it never pages). Lookback below covers the widest.
-HAE_DATATYPES = [
-    {"key": "cgm", "label": "CGM (glucose)", "fields": ["blood_glucose_avg", "blood_glucose_readings_count"], "stale_days": 3},
-    {
-        "key": "blood_pressure",
-        "label": "Blood pressure",
-        "fields": ["blood_pressure_systolic", "blood_pressure_diastolic"],
-        "stale_days": 14,
-    },
-    {
-        "key": "state_of_mind",
-        "label": "State of Mind",
-        "fields": ["som_avg_valence", "som_check_in_count", "som_mood_count"],
-        "stale_days": 14,
-    },
-    {"key": "workouts", "label": "Workouts / recovery", "fields": ["recovery_workout_minutes", "breathwork_minutes"], "stale_days": 10},
-    {"key": "water", "label": "Water", "fields": ["water_intake_ml", "water_intake_oz"], "stale_days": 3},
-    {"key": "steps", "label": "Steps / activity", "fields": ["steps"], "stale_days": 2},
-]
+# #746: the list now lives in the canonical source_registry (apple_health.hae_datatypes)
+# so every source threshold sits in one place; this is an alias, not a second copy.
+from source_registry import hae_datatype_thresholds  # noqa: E402
+
+HAE_DATATYPES = hae_datatype_thresholds()
 # Longest lookback needed to find a still-present-but-slow datatype (cap the scan).
 HAE_LIVENESS_WINDOW_DAYS = int(os.environ.get("HAE_LIVENESS_WINDOW_DAYS", "45"))
 _HAE_LIVENESS_SK = "DATATYPE_LIVENESS"  # sentinel SK on the apple_health partition (sorts before DATE#)
@@ -218,7 +205,17 @@ def compute_datatype_liveness(records, now, datatypes=None):
         else:
             age, dark = None, True
         out.append(
-            {"key": dt["key"], "label": dt["label"], "last_seen": last, "age_days": age, "dark": dark, "stale_days": dt["stale_days"]}
+            {
+                "key": dt["key"],
+                "label": dt["label"],
+                "last_seen": last,
+                "age_days": age,
+                "dark": dark,
+                "stale_days": dt["stale_days"],
+                # #746: hand-captured stream (CGM/BP/SoM/water) vs passive device
+                # stream (steps/workouts). Only manual streams are nudge-eligible.
+                "manual": bool(dt.get("manual")),
+            }
         )
     return out
 

@@ -97,6 +97,26 @@ DEFAULT_STALE_HOURS = 48
 #                  whose provider exposes a queryable record list AND that aren't
 #                  rate-limit-degraded qualify; garmin is EXPLICITLY excluded
 #                  (ADR-123). Default absent/False. Read by provider_reconcile_source_ids().
+#   capture_channel  the manual capture channel that fills this source by hand
+#                  (#746, Matthew's decision — the three manual channels are HAE,
+#                  Notion, MCP conversation): 'hae' (Health Auto Export webhook —
+#                  CGM / water / BP / State of Mind), 'notion' (journal), 'mcp'
+#                  (logged in an MCP conversation — measurements, food delivery).
+#                  Absent = an automatic pipe (worn device / scheduled API pull)
+#                  with no human in the capture loop. Only capture_channel sources
+#                  are eligible for the evening nudge's gentle "gone quiet" mention
+#                  and the public "manual source dark N days" degraded stamp — a
+#                  dead Whoop token is a device outage the nudge can't fix, so it
+#                  never lands here. Read by manual_capture_sources().
+#   hae_datatypes  (apple_health only) per-sub-datatype liveness thresholds for the
+#                  streams that all share the ONE apple_health partition, so a
+#                  partition-level "fresh" can hide a months-dark sensor (D-4/#468).
+#                  Migrated here from freshness_checker by #746 so every source
+#                  threshold lives in this one registry. Each: {key, label, fields
+#                  (any-of presence signals), stale_days, manual}. `manual` marks
+#                  the streams Matthew captures by hand (CGM/water/BP/State of Mind)
+#                  vs the passive device streams (steps/workouts) — only the manual
+#                  ones are nudge-eligible. Read by hae_datatype_thresholds().
 SOURCE_REGISTRY = {
     "whoop": {
         "label": "Whoop",
@@ -190,6 +210,56 @@ SOURCE_REGISTRY = {
             "scheme": "timestamped",
             "note": "sub-datatypes also land at raw/matthew/{cgm_readings,blood_pressure,state_of_mind,workouts}/",
         },
+        # #746: the manual HAE capture channel. The partition itself is passive
+        # (steps/water keep it alive), but the CGM/BP/State-of-Mind streams below
+        # are hand-captured — Matthew wears a sensor, takes a reading, logs a mood.
+        "capture_channel": "hae",
+        # #746 (migrated from freshness_checker HAE_DATATYPES, D-4/#468): per-stream
+        # liveness thresholds. Every HAE datatype lands in this SAME partition, so
+        # partition-level "fresh" hides a sensor that went dark weeks ago while
+        # steps/water keep writing. `fields` = any-of presence signals; `stale_days`
+        # = the stream's own capture cadence (tuned #468 against 45-day HAE
+        # telemetry); `manual` = Matthew captures it by hand (nudge-eligible) vs a
+        # passive device stream. A lapse reports honestly, it never pages.
+        "hae_datatypes": [
+            # CGM: a sensor session runs continuously for ~10-14d then needs a new
+            # sensor applied — 3d dark means the session lapsed and none was reapplied.
+            {
+                "key": "cgm",
+                "label": "CGM (glucose)",
+                "fields": ["blood_glucose_avg", "blood_glucose_readings_count"],
+                "stale_days": 3,
+                "manual": True,
+            },
+            # BP: spot-checked, not daily — a fortnight is a lenient "haven't cuffed in a while".
+            {
+                "key": "blood_pressure",
+                "label": "Blood pressure",
+                "fields": ["blood_pressure_systolic", "blood_pressure_diastolic"],
+                "stale_days": 14,
+                "manual": True,
+            },
+            # State of Mind: How-We-Feel check-ins are sporadic; 14d before it reads dark.
+            {
+                "key": "state_of_mind",
+                "label": "State of Mind",
+                "fields": ["som_avg_valence", "som_check_in_count", "som_mood_count"],
+                "stale_days": 14,
+                "manual": True,
+            },
+            # Workouts/recovery: passive Apple Watch capture — device stream, not hand-logged.
+            {
+                "key": "workouts",
+                "label": "Workouts / recovery",
+                "fields": ["recovery_workout_minutes", "breathwork_minutes"],
+                "stale_days": 10,
+                "manual": False,
+            },
+            # Water: logged in-app most days — 3d dark means the habit lapsed.
+            {"key": "water", "label": "Water", "fields": ["water_intake_ml", "water_intake_oz"], "stale_days": 3, "manual": True},
+            # Steps: passive device activity — a 413-dropped stream is a pipe fault, not a lapse.
+            {"key": "steps", "label": "Steps / activity", "fields": ["steps"], "stale_days": 2, "manual": False},
+        ],
     },
     "todoist": {
         "label": "Todoist",
@@ -275,6 +345,7 @@ SOURCE_REGISTRY = {
         "metrics": "Body tape measurements",
         "posture": "portfolio",
         "raw_layout": None,
+        "capture_channel": "mcp",  # #746: entered by hand in an MCP conversation
     },
     "food_delivery": {
         "label": "Food delivery",
@@ -291,6 +362,7 @@ SOURCE_REGISTRY = {
         "metrics": "Delivery-order behavioral signal (incl. longest-ever streak)",
         "posture": "portfolio",
         "raw_layout": None,
+        "capture_channel": "mcp",  # #746: logged by hand in an MCP conversation
     },
     "garmin": {
         "label": "Garmin",
@@ -326,7 +398,15 @@ SOURCE_REGISTRY = {
         "desc": "Journal entries",
         "category": "Inputs",
         "behavioral": True,  # journaling is the behavior
-        "stale_hours": None,
+        # #746: derived from the real journaling cadence in DDB — distinct entry
+        # days over Feb–May 2026 (…03-29, 04-01, 04-04, 05-02, 05-03, 05-16, 05-25)
+        # show a median gap of ~9-10 days with occasional ~26-28d stretches.
+        # 14 days is the "it's been about two weeks" mark the evening nudge uses
+        # for its gentle mention — lenient enough not to nag a normal fortnight
+        # gap. behavioral + monitored:False, so this NEVER pages; the threshold
+        # only drives the kind nudge (#746) and the public "dark N days" stamp.
+        "stale_hours": 14 * 24,
+        "capture_channel": "notion",
         # Visible to the operator MCP view only — never paged, not on the
         # public board (the board mirrors the checker's monitored set).
         "monitored": False,
@@ -521,6 +601,47 @@ def raw_layouts() -> dict:
     """{key: raw_layout} for sources with a raw-S3 archive — the X-9 three-
     generation reality, documented instead of guessed. No mass-move."""
     return {k: v["raw_layout"] for k, v in SOURCE_REGISTRY.items() if v.get("raw_layout")}
+
+
+# ── #746: manual-source reliability — staleness surfaced kindly ────────────────
+
+
+def manual_capture_sources(channel: str = None) -> dict:
+    """{key: {label, channel, stale_hours}} for the manual-capture sources — the
+    HAE / Notion / MCP-conversation channels Matthew fills by hand (#746,
+    Matthew's decision).
+
+    These are the ONLY sources eligible for the evening nudge's gentle "gone
+    quiet" mention and the public "manual source dark N days" degraded stamp. An
+    automatic pipe (worn device, scheduled pull) has no capture_channel, so a
+    device outage — a dead Whoop token the nudge can't fix — is structurally
+    excluded from both surfaces. Pass `channel` to filter to one lane
+    ('hae' | 'notion' | 'mcp'). `stale_hours` falls back to the registry default."""
+    out = {}
+    for k, v in SOURCE_REGISTRY.items():
+        ch = v.get("capture_channel")
+        if not ch or (channel and ch != channel):
+            continue
+        sh = v.get("stale_hours")
+        out[k] = {"label": v["label"], "channel": ch, "stale_hours": sh if sh is not None else DEFAULT_STALE_HOURS}
+    return out
+
+
+def hae_datatype_thresholds() -> list:
+    """Per-HAE-sub-datatype liveness thresholds (CGM/water/BP/State of Mind/
+    steps/workouts) — the streams that share the single apple_health partition, so
+    a partition-level "fresh" can hide a months-dark sensor (D-4/#468). Migrated
+    here from freshness_checker by #746 so every source threshold lives in this one
+    registry. Each: {key, label, fields, stale_days, manual}. The checker's
+    HAE_DATATYPES aliases this; compute_datatype_liveness reads it."""
+    return [dict(d) for d in SOURCE_REGISTRY["apple_health"].get("hae_datatypes", [])]
+
+
+def manual_hae_datatype_keys() -> set:
+    """The HAE sub-datatypes Matthew captures by hand (CGM/water/BP/State of Mind)
+    — nudge-eligible, unlike the passive device streams (steps/workouts) which a
+    reminder-to-log can't fix (#746)."""
+    return {d["key"] for d in SOURCE_REGISTRY["apple_health"].get("hae_datatypes", []) if d.get("manual")}
 
 
 def catalog_entries() -> list:
