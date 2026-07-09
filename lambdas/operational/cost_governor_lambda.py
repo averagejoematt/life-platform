@@ -11,17 +11,35 @@ is the lagged secondary backstop + notice.
 Estimate = non-AI (Cost Explorer, all services EXCEPT Bedrock, month-to-date)
          + AI    (AWS/Bedrock per-model token metrics × Bedrock prices, ×buffer)
 
-Tiers (projected month-end total, $75 all-in ceiling):
-  0 Normal   < $55
-  1 Caution  $55-65   → pause heaviest coach AI (narrative/ensemble/chronicle)
-  2 Restrict $65-73   → + pause public website AI (/api/ask, /api/board_ask)
-  3 Hard stop ≥ $73   → + pause ALL Bedrock; daily brief goes data-only
+Tiers (projected month-end total vs the EFFECTIVE ceiling — base $85 since the
+ADR-133 amendment 2026-07-08, $100 in surge mode). The tier bands are fixed
+FRACTIONS of the ceiling (≈73%/87%/97%, the original $75 calibration in
+_TIER_THRESHOLDS, scaled by _tier_for):
+  0 Normal    < 73% of ceiling  ($62.33 at the $85 base)
+  1 Caution   73–87%            → pause heaviest coach AI (narrative/ensemble/chronicle)
+  2 Restrict  87–97%            → + pause public website AI (/api/ask, /api/board_ask)
+  3 Hard stop ≥ 97% of ceiling  ($82.73 at the $85 base) → + pause ALL Bedrock;
+                                  daily brief goes data-only
 
 Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
 Also persists the projection breakdown (mtd/projected/ai+non-ai daily burn) to
 SSM /life-platform/budget-breakdown every enforcement run so the daily brief can
 render a one-line headroom readout (#822 — a dev sprint alone can trip the tier).
 Auto-resets to 0 at month rollover (estimate is month-to-date).
+
+SURGE MODE (ADR-133, #739): the base ceiling is calibrated for near-zero reader
+traffic. Real reader arrival (e.g. a Reddit hit) would auto-outage the reader
+AI at the moment of success. When the traffic digest's trailing 7-day unique
+visitor count (LifePlatform/Traffic::UniqueVisitors7d, emitted weekly by
+traffic_digest_lambda) crosses SURGE_UNIQUES_THRESHOLD, the effective monthly
+ceiling floats from the $85 base to SURGE_CEILING_USD ($100) — see
+_effective_ceiling.
+Tier thresholds scale proportionally with whatever ceiling is in effect (see
+_tier_for). Surge is a pure function of reader traffic, never of spend — so a
+dev-caused spend spike can NOT trigger it (isolates cause from effect, per
+ADR-125's audience-based degradation ladder). Surge state is persisted to SSM
+/life-platform/surge-active (for edge-triggered alerting) and reflected in the
+budget-breakdown JSON so the daily brief's headroom line can say so.
 
 IAM: ce:GetCostAndUsage, cloudwatch:GetMetricData, cloudwatch:PutMetricData,
      ssm:GetParameter, ssm:PutParameter, sns:Publish.
@@ -54,7 +72,20 @@ SSM_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier
 # budget_guard.read_breakdown / format_headroom_line, the consumer side).
 SSM_BREAKDOWN_PARAM = os.environ.get("BUDGET_BREAKDOWN_PARAM", "/life-platform/budget-breakdown")
 ALERTS_TOPIC = os.environ.get("ALERTS_TOPIC_ARN", f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts")
-MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "75"))
+# Base $85 since 2026-07-08 (ADR-133 amendment; was $75 per ADR-063 — raised by
+# Matthew after tier-1 degradation from internal spend creep, $79.27 projected
+# vs the old $75).
+MONTHLY_CEILING = float(os.environ.get("MONTHLY_CEILING_USD", "85"))
+# ADR-133 (#739): surge-mode ceiling. When trailing 7-day unique visitors
+# (traffic_digest_lambda's UniqueVisitors7d metric) cross this threshold, the
+# effective ceiling floats from MONTHLY_CEILING to SURGE_CEILING_USD. The
+# threshold is derived from the real recent baseline (165-288 uniques/week
+# observed 2026-06-29..2026-07-06) — see ADR-133 for the exact derivation.
+# Both are env-overridable so the numbers are a one-line adjustment, never a
+# code change.
+SURGE_UNIQUES_THRESHOLD = int(os.environ.get("SURGE_UNIQUES_THRESHOLD", "900"))
+SURGE_CEILING_USD = float(os.environ.get("SURGE_CEILING_USD", "100"))
+SSM_SURGE_PARAM = os.environ.get("SURGE_ACTIVE_PARAM", "/life-platform/surge-active")
 # Phase B ships observe-only (emit metrics, don't set tier/alert). Phase C flips
 # this to "false" via env to enable enforcement once the estimate is validated.
 OBSERVE_MODE = os.environ.get("OBSERVE_MODE", "true").lower() in ("1", "true", "yes")
@@ -71,7 +102,12 @@ _PRICES = {
 _DEFAULT_PRICE = _PRICES["fable"]  # unknown model → price as the most expensive tier
 _AI_SAFETY_BUFFER = 1.15  # bias the AI estimate high so we degrade early, never overshoot
 
-# Tier thresholds on PROJECTED month-end total (USD).
+# Tier thresholds on PROJECTED month-end total (USD), calibrated against the
+# ORIGINAL $75 ceiling (ADR-063). _tier_for scales them by
+# ceiling / _THRESHOLD_REFERENCE_CEILING, so the bands are fixed FRACTIONS of
+# whatever ceiling is in effect (≈73%/87%/97%) — at the $85 base they trip at
+# $62.33 / $73.67 / $82.73; at the $100 surge ceiling at $73.33 / $86.67 / $97.33.
+_THRESHOLD_REFERENCE_CEILING = 75.0
 _TIER_THRESHOLDS = [(73, 3), (65, 2), (55, 1)]  # checked high→low; else tier 0
 
 # June 2026 ONLY (auto-reverts 2026-07-01): the Coaching-door launch + a heavy
@@ -252,14 +288,43 @@ def _project_month_end(
     return mtd + daily_rate * days_remaining
 
 
-def _tier_for(projected: float) -> int:
-    for threshold, tier in _active_thresholds():
+def _tier_for(projected: float, ceiling: float = None) -> int:
+    """Tier for `projected` against `ceiling` (default: the current base,
+    MONTHLY_CEILING). The thresholds in _active_thresholds() are calibrated
+    against the ORIGINAL $75 ceiling (_THRESHOLD_REFERENCE_CEILING); they scale
+    by ceiling/reference so the tier BANDS (≈73%/87%/97% of ceiling) stay
+    proportionally identical under ANY ceiling — the $85 base (ADR-133
+    amendment) or the $100 surge — only the dollar amounts that trip them move.
+    ceiling is resolved at call time (None sentinel) so tests can monkeypatch
+    MONTHLY_CEILING without hitting the frozen-default trap."""
+    if ceiling is None:
+        ceiling = MONTHLY_CEILING
+    thresholds = _active_thresholds()
+    if ceiling != _THRESHOLD_REFERENCE_CEILING:
+        ratio = ceiling / _THRESHOLD_REFERENCE_CEILING
+        thresholds = [(t * ratio, tier) for t, tier in thresholds]
+    for threshold, tier in thresholds:
         if projected >= threshold:
             return tier
     return 0
 
 
-def _decide_tier(projected: float, mtd: float, elapsed_days: float) -> int:
+def _effective_ceiling(recent_uniques) -> tuple[float, bool]:
+    """(ceiling, surge_active) from the trailing 7-day unique-visitor count.
+
+    Surge is a pure function of reader traffic — never of spend — so it can
+    only be triggered BY readers arriving, not by a dev/internal spend spike
+    (#739 scope constraint: "the ceiling stays at the base when uniques are
+    below threshold regardless of projection"). `recent_uniques` is None when
+    the metric hasn't been read yet (e.g. transient CloudWatch error) — fails
+    closed to the normal base ceiling ($85), never the surge one.
+    """
+    if recent_uniques is not None and recent_uniques >= SURGE_UNIQUES_THRESHOLD:
+        return SURGE_CEILING_USD, True
+    return MONTHLY_CEILING, False
+
+
+def _decide_tier(projected: float, mtd: float, elapsed_days: float, ceiling: float = None) -> int:
     """Tier from the projection, bounded by ACTUAL month-to-date spend.
 
     The projection is an early-warning signal, but it has two failure modes that
@@ -278,8 +343,8 @@ def _decide_tier(projected: float, mtd: float, elapsed_days: float) -> int:
     preemptive degradation (tier 1 pauses the heaviest spender). Inside the
     first EARLY_MONTH_DAYS the projection gets no benefit of the doubt at all.
     """
-    projected_tier = _tier_for(projected)
-    actual_tier = _tier_for(mtd)
+    projected_tier = _tier_for(projected, ceiling)
+    actual_tier = _tier_for(mtd, ceiling)
     if elapsed_days < EARLY_MONTH_DAYS:
         tier = min(projected_tier, actual_tier)
     else:
@@ -307,7 +372,34 @@ def _write_tier(tier: int) -> None:
     _ssm.put_parameter(Name=SSM_TIER_PARAM, Value=str(tier), Type="String", Overwrite=True)
 
 
-def _write_breakdown(tier: int, mtd: float, projected: float, ai_daily: float, non_ai_daily: float, now: datetime) -> None:
+def _read_surge_active() -> bool:
+    """Previously-persisted surge state, for edge-triggered alerting (ADR-133).
+    Fails closed to False — a transient SSM read error never fabricates a
+    surge→normal transition alert that didn't happen."""
+    try:
+        return _ssm.get_parameter(Name=SSM_SURGE_PARAM)["Parameter"]["Value"] == "true"
+    except _ssm.exceptions.ParameterNotFound:
+        return False
+    except Exception as e:
+        logger.warning(f"Surge-state SSM read failed: {e}")
+        return False
+
+
+def _write_surge_active(active: bool) -> None:
+    _ssm.put_parameter(Name=SSM_SURGE_PARAM, Value="true" if active else "false", Type="String", Overwrite=True)
+
+
+def _write_breakdown(
+    tier: int,
+    mtd: float,
+    projected: float,
+    ai_daily: float,
+    non_ai_daily: float,
+    now: datetime,
+    ceiling: float = None,
+    surge_active: bool = False,
+    recent_uniques=None,
+) -> None:
     """Persist the projection breakdown alongside the tier (#822).
 
     Every field is code-derived from this same run's estimate (no user input,
@@ -315,15 +407,25 @@ def _write_breakdown(tier: int, mtd: float, projected: float, ai_daily: float, n
     artifact only, never read by budget_guard.allow()/current_tier() (the tier
     param remains the sole gating input), so a malformed or stale breakdown
     can never affect AI enforcement — only the brief's headroom line degrades.
+
+    `ceiling`/`surge_active`/`recent_uniques` reflect the surge-mode ceiling
+    rule (ADR-133, #739) — `ceiling` is the EFFECTIVE ceiling this run used
+    (may be SURGE_CEILING_USD), so the brief's headroom line is always honest
+    about what limit is actually in effect.
     """
+    if ceiling is None:
+        ceiling = MONTHLY_CEILING
     payload = {
         "tier": int(tier),
         "mtd": round(mtd, 2),
         "projected": round(projected, 2),
-        "ceiling": MONTHLY_CEILING,
+        "ceiling": ceiling,
         "ai_daily": round(ai_daily, 2),
         "non_ai_daily": round(non_ai_daily, 2),
         "computed_at": now.isoformat(),
+        "surge_active": bool(surge_active),
+        "recent_uniques": recent_uniques,
+        "surge_threshold": SURGE_UNIQUES_THRESHOLD,
     }
     try:
         _ssm.put_parameter(Name=SSM_BREAKDOWN_PARAM, Value=json.dumps(payload), Type="String", Overwrite=True)
@@ -341,7 +443,9 @@ _TIER_LABELS = {
 }
 
 
-def _alert(prev: int, new: int, mtd: float, projected: float) -> None:
+def _alert(prev: int, new: int, mtd: float, projected: float, ceiling: float = None) -> None:
+    if ceiling is None:
+        ceiling = MONTHLY_CEILING
     direction = "raised" if new > prev else "lowered"
     urgent = new >= 3
     subj = f"{'🛑' if urgent else '⚠️'} Budget tier {direction} {prev}→{new}: {_TIER_LABELS[new]}"
@@ -350,7 +454,7 @@ def _alert(prev: int, new: int, mtd: float, projected: float) -> None:
         f"{_TIER_LABELS[new]}\n\n"
         f"Month-to-date estimated total: ${mtd:.2f}\n"
         f"Projected month-end:           ${projected:.2f}\n"
-        f"Ceiling:                       ${MONTHLY_CEILING:.0f}\n\n"
+        f"Ceiling:                       ${ceiling:.0f}\n\n"
         f"Auto-resumes at month rollover. AI = Bedrock (per-model token metrics "
         f"× price, +{int((_AI_SAFETY_BUFFER - 1) * 100)}% buffer); non-AI = Cost Explorer."
     )
@@ -359,6 +463,64 @@ def _alert(prev: int, new: int, mtd: float, projected: float) -> None:
         logger.info(f"Tier-change alert sent: {prev}→{new}")
     except Exception as e:
         logger.warning(f"SNS publish failed: {e}")
+
+
+def _alert_surge(active: bool, recent_uniques, mtd: float, projected: float) -> None:
+    """Edge-triggered alert when surge mode engages or disengages (#739 scope
+    item 2: "alert Matthew when surge mode engages"). Reuses the same alerts
+    topic as the tier-change alert."""
+    if active:
+        subj = f"🚀 Surge mode ENGAGED — ceiling ${MONTHLY_CEILING:.0f} → ${SURGE_CEILING_USD:.0f}"
+        body = (
+            f"Trailing 7-day unique visitors ({recent_uniques}) crossed the surge "
+            f"threshold ({SURGE_UNIQUES_THRESHOLD}).\n\n"
+            f"Effective monthly ceiling floated: ${MONTHLY_CEILING:.0f} → ${SURGE_CEILING_USD:.0f} (ADR-133).\n"
+            f"Month-to-date estimated total: ${mtd:.2f}\n"
+            f"Projected month-end:           ${projected:.2f}\n\n"
+            f"This is reader traffic, not spend creep — the extra headroom exists "
+            f"specifically so the reader-facing AI doesn't outage at the moment of "
+            f"success. Auto-reverts to ${MONTHLY_CEILING:.0f} when uniques drop back "
+            f"below the threshold."
+        )
+    else:
+        subj = f"Surge mode ended — ceiling back to ${MONTHLY_CEILING:.0f}"
+        body = (
+            f"Trailing 7-day unique visitors ({recent_uniques}) dropped back below "
+            f"the surge threshold ({SURGE_UNIQUES_THRESHOLD}).\n\n"
+            f"Effective monthly ceiling reverted: ${SURGE_CEILING_USD:.0f} → ${MONTHLY_CEILING:.0f}."
+        )
+    try:
+        _sns.publish(TopicArn=ALERTS_TOPIC, Subject=subj[:99], Message=body)
+        logger.info(f"Surge-mode alert sent: active={active}")
+    except Exception as e:
+        logger.warning(f"Surge alert SNS publish failed: {e}")
+
+
+def _recent_unique_visitors(now: datetime, lookback_days: int = 14):
+    """Latest LifePlatform/Traffic::UniqueVisitors7d datapoint, or None.
+
+    traffic_digest_lambda emits this weekly (Mondays), so the lookback window
+    is wider than the metric's cadence to tolerate a missed run. Returns None
+    (not 0) when nothing has been emitted yet — _effective_ceiling treats
+    None as "no signal, stay at the normal ceiling", never as "0 traffic."
+    """
+    try:
+        resp = _cw.get_metric_statistics(
+            Namespace="LifePlatform/Traffic",
+            MetricName="UniqueVisitors7d",
+            StartTime=now - timedelta(days=lookback_days),
+            EndTime=now,
+            Period=86400,
+            Statistics=["Maximum"],
+        )
+        points = resp.get("Datapoints", [])
+        if not points:
+            return None
+        latest = max(points, key=lambda d: d["Timestamp"])
+        return int(latest["Maximum"])
+    except Exception as e:
+        logger.warning(f"traffic metric read failed (non-critical, fails closed to non-surge): {e}")
+        return None
 
 
 def _self_reported_cost_mtd(start: datetime, now: datetime) -> float:
@@ -435,10 +597,18 @@ def lambda_handler(event, context):
         non_ai_daily = non_ai_recent / trailing_days
         projected = _project_month_end(mtd, elapsed_days, days_in_month, non_ai_recent, ai_recent, trailing_days)
 
+        # ADR-133 (#739): surge-mode ceiling. Pure function of reader traffic
+        # (trailing 7d uniques) — never of spend — so it floats the ceiling up
+        # for readers arriving but can't be triggered by a dev/internal spend
+        # spike. Computed BEFORE _decide_tier so the effective ceiling — not
+        # always MONTHLY_CEILING — is what tiers are measured against.
+        recent_uniques = _recent_unique_visitors(now)
+        effective_ceiling, surge_active = _effective_ceiling(recent_uniques)
+
         # Projection escalates at most ONE tier above actual mtd spend (and not at
         # all in the early-month window) — see _decide_tier for the two failure
         # modes (front-loaded day-1 charges; post-pause projection that can't decay).
-        computed_tier = _decide_tier(projected, mtd, elapsed_days)
+        computed_tier = _decide_tier(projected, mtd, elapsed_days, effective_ceiling)
         prev = _read_tier()
 
         self_reported = _self_reported_cost_mtd(month_start, now)
@@ -446,7 +616,8 @@ def lambda_handler(event, context):
             f"Spend: non_ai=${non_ai:.2f} ai=${ai:.2f} (trailing_7d over {trailing_days:.1f}d: "
             f"non_ai ~${non_ai_daily:.2f}/day + ai ~${ai_daily:.2f}/day) mtd=${mtd:.2f} projected=${projected:.2f} "
             f"computed_tier={computed_tier} prev={prev} observe={OBSERVE_MODE} "
-            f"self_reported_mtd=${self_reported:.2f}"
+            f"self_reported_mtd=${self_reported:.2f} recent_uniques={recent_uniques} "
+            f"surge_active={surge_active} effective_ceiling=${effective_ceiling:.0f}"
         )
         _emit_metrics(mtd, projected, computed_tier, self_reported)
 
@@ -467,7 +638,9 @@ def lambda_handler(event, context):
                         "projected": round(projected, 2),
                         "computed_tier": computed_tier,
                         "active_tier": prev,
-                        "ceiling": MONTHLY_CEILING,
+                        "ceiling": effective_ceiling,
+                        "surge_active": surge_active,
+                        "recent_uniques": recent_uniques,
                     }
                 ),
             }
@@ -480,12 +653,22 @@ def lambda_handler(event, context):
 
         if tier != prev:
             _write_tier(tier)
-            _alert(prev, tier, mtd, projected)
+            _alert(prev, tier, mtd, projected, effective_ceiling)
+
+        # Edge-triggered surge alert (#739 scope item 2) — fires only on the
+        # engage/disengage transition, not every run, same pattern as the tier
+        # alert above.
+        prev_surge_active = _read_surge_active()
+        if surge_active != prev_surge_active:
+            _write_surge_active(surge_active)
+            _alert_surge(surge_active, recent_uniques, mtd, projected)
 
         # #822: persist the projection breakdown EVERY enforcement run (not just
         # on tier change) so the daily brief's headroom line reads THIS run's
-        # burn rates, not the ones from whenever the tier last flipped.
-        _write_breakdown(tier, mtd, projected, ai_daily, non_ai_daily, now)
+        # burn rates, not the ones from whenever the tier last flipped. Now also
+        # carries the surge state (ADR-133) so the headroom line is honest about
+        # which ceiling is actually in effect.
+        _write_breakdown(tier, mtd, projected, ai_daily, non_ai_daily, now, effective_ceiling, surge_active, recent_uniques)
 
         return {
             "statusCode": 200,
@@ -499,7 +682,9 @@ def lambda_handler(event, context):
                     "projected": round(projected, 2),
                     "tier": tier,
                     "prev_tier": prev,
-                    "ceiling": MONTHLY_CEILING,
+                    "ceiling": effective_ceiling,
+                    "surge_active": surge_active,
+                    "recent_uniques": recent_uniques,
                 }
             ),
         }

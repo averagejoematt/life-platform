@@ -55,7 +55,7 @@ See `docs/SECRETS_ROTATION.md` for rotation procedures.
   - `/api/ask`: 5/hr anon, 20/hr subscriber
   - `/api/board_ask`: 5/IP/hour
   - `/api/subscribe`: 60 req / 5 min / IP (DDB atomic counter)
-- ✅ **AI cost caps** — per-request `max_tokens` (300–600) + 500-char input cap + reserved concurrency=2; Bedrock spend visible per-endpoint via `LifePlatform/AI`; the $75 cost-governor pauses public AI at tier 2.
+- ✅ **AI cost caps** — per-request `max_tokens` (300–600) + 500-char input cap + reserved concurrency=2; Bedrock spend visible per-endpoint via `LifePlatform/AI`; the $85 cost-governor (ADR-133; $100 in surge mode) pauses public AI at the tier-3 hard stop (ADR-125).
 - ✅ **CORS pinned** to `https://averagejoematt.com` only
 - ✅ **CSP headers** on all responses (no `unsafe-eval`, `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net`)
 - ✅ **HSTS** max-age 1 year, includeSubDomains
@@ -125,7 +125,7 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 | Per-user secrets isolation | ADR-057 W-02 | Second user onboards |
 | IAM Access Analyzer findings not remediated | This doc | Annual security review |
 | No SIEM integration | This doc | Compliance requirement |
-| **GuardDuty + AWS Config not enabled** | **ADR-079** | Second/real user, commercial/compliance obligation, or budget headroom (cost ~$5–10/mo on a $75 ceiling; compensating controls: CloudTrail + cost-governor + least-priv IAM + MFA) |
+| **GuardDuty + AWS Config not enabled** | **ADR-079** | Second/real user, commercial/compliance obligation, or budget headroom (cost ~$5–10/mo on an $85 ceiling; compensating controls: CloudTrail + cost-governor + least-priv IAM + MFA) |
 
 ---
 

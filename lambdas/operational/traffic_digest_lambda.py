@@ -15,6 +15,11 @@ PRIVACY (matches the no-tracking ethos):
   • Output is aggregate counts only.
 
 Schedule: weekly (Mondays). Reuses the SES email pattern. No external deps.
+
+Also emits the 7-day unique/page-view counts as CloudWatch metrics
+(LifePlatform/Traffic::UniqueVisitors7d / PageViews7d) — the cost_governor
+Lambda reads the latest UniqueVisitors7d datapoint to decide whether reader
+traffic has crossed the surge-mode threshold (ADR-133, #739).
 """
 
 import gzip
@@ -285,6 +290,21 @@ def lambda_handler(event, context):
             agg["returning_visitors"],
             object_count,
         )
+
+        # Publish even on a genuinely quiet week (0 views) — a real 0 is a valid
+        # reading, and cost_governor's surge check needs a fresh datapoint every
+        # run to tell "quiet week" apart from "no data yet" (a missing/stale
+        # metric fails closed to non-surge, see cost_governor._recent_unique_visitors).
+        try:
+            cw.put_metric_data(
+                Namespace="LifePlatform/Traffic",
+                MetricData=[
+                    {"MetricName": "UniqueVisitors7d", "Value": agg["unique_visitors"], "Unit": "Count"},
+                    {"MetricName": "PageViews7d", "Value": agg["page_views"], "Unit": "Count"},
+                ],
+            )
+        except Exception as e:
+            logger.warning("traffic digest: PutMetricData failed (non-fatal): %s", e)
 
         if agg["page_views"] == 0:
             logger.info("no human page views in window (logs present, genuinely quiet) — skipping email")

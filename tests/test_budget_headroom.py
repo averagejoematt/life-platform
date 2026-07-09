@@ -92,6 +92,11 @@ def test_governor_persists_breakdown_payload(gov, monkeypatch):
         "ai_daily": 1.79,
         "non_ai_daily": 0.89,
         "computed_at": "2026-07-06T00:00:14+00:00",
+        # ADR-133 (#739): surge-mode fields, defaulted when the caller doesn't
+        # pass them (pre-surge call sites keep working unchanged).
+        "surge_active": False,
+        "recent_uniques": None,
+        "surge_threshold": gov.SURGE_UNIQUES_THRESHOLD,
     }
 
 
@@ -192,6 +197,22 @@ def test_format_is_decimal_safe():
     )
     line = budget_guard.format_headroom_line(b)
     assert "tier 2" in line and "$90 vs $75" in line and "$2.40/day of the $3.30/day burn" in line
+
+
+def test_format_surge_active_appends_surge_note():
+    """ADR-133 (#739): when the governor's breakdown marks surge_active, the
+    headroom line says so explicitly (readers, not spend)."""
+    b = _breakdown(ceiling=100.0, projected=60.0, surge_active=True, recent_uniques=1200)
+    line = budget_guard.format_headroom_line(b)
+    assert "vs $100 ceiling" in line
+    assert "SURGE mode (1200 uniques/7d, readers not spend)" in line
+
+
+def test_format_surge_absent_key_is_backward_compatible():
+    """A pre-surge breakdown payload (no surge_active/recent_uniques keys at
+    all) must still render — .get() keeps this fail-soft."""
+    line = budget_guard.format_headroom_line(TIER0)
+    assert "SURGE" not in line
 
 
 def test_format_none_and_malformed_are_empty():

@@ -791,7 +791,7 @@ aws dynamodb get-item --table-name life-platform \
 
 ## Cost Monitoring
 
-Monthly ceiling: **$75 all-in, enforced** (ADR-063; cost-governor degrades AI by tier). See `docs/COST_TRACKER.md` for the full breakdown.
+Monthly ceiling: **$85 all-in, enforced** (ADR-063 + ADR-133 amendment; $100 in reader-traffic surge mode; cost-governor degrades AI by tier). See `docs/COST_TRACKER.md` for the full breakdown.
 
 Real run-rate (CE, 2026-06-08 sweep): Mar $20.04 → Apr $35.01 → May $48.19 (peak, Bedrock $14.29) → steady-state **~$25-40/mo**. Bedrock is the swing factor (priced from CloudWatch token metrics); WAF deleted (~−$8/mo).
 
@@ -1257,19 +1257,19 @@ See ADR-058 in `docs/DECISIONS.md` for the design rationale.
 
 ## Budget Guardrails (ADR-063)
 
-The $75/month AWS budget is enforced by a two-component system:
+The monthly AWS budget — **$85 base** (ADR-133 amendment 2026-07-08; was $75), floating to **$100 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system:
 
 - **`life-platform-cost-governor`** Lambda (hourly) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
 - **`lambdas/budget_guard.py`** (shared-layer module) — calling code uses `allow(feature)` to gate AI by tier.
 
 **Tier behavior** (priority: protect daily brief longest):
 
-| Tier | Projected | What pauses |
+| Tier | Projected (vs effective ceiling) | What pauses (audience-ordered, ADR-125) |
 |---|---|---|
-| 0 | <70% of $75 | nothing — all AI runs normally |
-| 1 | 70–85% | coach narratives + ensemble + chronicle |
-| 2 | 85–95% | + website AI (`/api/ask`, `/api/board_ask`) — returns "paused" JSON |
-| 3 | ≥95% | hard cutoff — `bedrock_client.invoke()` raises `BudgetExceeded`; daily brief skips AI |
+| 0 | <73% of ceiling ($62.33 at the $85 base) | nothing — all AI runs normally |
+| 1 | 73–87% | internal/dev AI — ensemble, chronicle editor, coherence-semantic |
+| 2 | 87–97% | + reader narratives — coach commentary, State of Matthew, chronicle |
+| 3 | ≥97% ($82.73 at the $85 base) | hard cutoff — website AI returns "paused" JSON; `bedrock_client.invoke()` raises `BudgetExceeded`; daily brief skips AI |
 
 **Check current tier:**
 ```bash

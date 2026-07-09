@@ -120,11 +120,11 @@ GitHub Actions (`.github/workflows/ci-cd.yml`): Lint → Test → Plan → Deplo
 
 **Single chokepoint:** all Claude calls route through `lambdas/bedrock_client.invoke()` (ADR-062). Auth is IAM (`bedrock:InvokeModel` + `InvokeModelWithResponseStream`), no API key. Cross-region inference profiles required: `us.anthropic.claude-sonnet-4-6` (narrative) and `us.anthropic.claude-haiku-4-5-20251001-v1:0` (structured). Prompt caching uses `cache_control` blocks on the system message (~2048+ tokens to engage).
 
-**$75/month hard ceiling** (ADR-063): one AWS budget `life-platform-monthly-75` covers ALL spend. `cost_governor_lambda` (hourly) projects month-end spend (non-AI from Cost Explorer + Bedrock token usage × current price) and writes a tier 0–3 to SSM `/life-platform/budget-tier`. `lambdas/budget_guard.py` (layer module) gates AI features by tier:
-- **0** (<70%): all AI runs normally.
-- **1** (70–85%): coach narratives + ensemble paused.
-- **2** (85–95%): website AI (`/api/ask`, `/api/board_ask`) returns a friendly "paused" response.
-- **3** (≥95%): hard cutoff — even daily brief skips AI; `bedrock_client.invoke()` raises `BudgetExceeded`.
+**$85/month hard ceiling** (ADR-063, base raised $75→$85 by the ADR-133 amendment 2026-07-08; **floats to $100 in reader-traffic surge mode** — ≥900 trailing-7d uniques, ADR-133): one AWS budget covers ALL spend (`life-platform-monthly-75` — name is historical, deliberately not renamed). `cost_governor_lambda` (every 8h) projects month-end spend (non-AI from Cost Explorer + Bedrock token usage × current price) and writes a tier 0–3 to SSM `/life-platform/budget-tier`; tier bands are fixed fractions (≈73%/87%/97%) of the effective ceiling. `lambdas/budget_guard.py` (bundled module) gates AI features by tier (audience-ordered per ADR-125):
+- **0** (<73% of ceiling): all AI runs normally.
+- **1** (73–87%): internal/dev AI paused (ensemble, chronicle editor, coherence-semantic).
+- **2** (87–97%): + reader narratives paused (coach commentary, State of Matthew, chronicle).
+- **3** (≥97%): hard cutoff — website AI returns "paused", daily brief skips AI; `bedrock_client.invoke()` raises `BudgetExceeded`.
 
 Daily brief is "protect longest" by design. Manual reset for testing: `aws ssm put-parameter --name /life-platform/budget-tier --value 0 --type String --overwrite`.
 

@@ -1,7 +1,10 @@
 """Unit tests for the privacy-clean traffic digest parser/aggregator (CloudFront logs)."""
 
+import gzip
+import io
 import os
 import sys
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "operational"))
@@ -65,3 +68,81 @@ def test_empty_logs_safe():
         "top_pages": [],
         "top_referrers": [],
     }
+
+
+# ── ADR-133 (#739): the digest also emits UniqueVisitors7d / PageViews7d so
+# cost_governor_lambda can read the trailing 7-day baseline for the surge-mode
+# ceiling rule. lambda_handler pulls its own boto3 clients, so these tests
+# fake `td.boto3` wholesale.
+
+
+class _FakeS3:
+    def __init__(self, key, body_text):
+        self._key = key
+        self._body = gzip.compress(body_text.encode("utf-8"))
+
+    def get_paginator(self, name):
+        assert name == "list_objects_v2"
+        return self
+
+    def paginate(self, Bucket, Prefix):
+        yield {"Contents": [{"Key": self._key, "LastModified": datetime.now(timezone.utc)}]}
+
+    def get_object(self, Bucket, Key):
+        return {"Body": io.BytesIO(self._body)}
+
+
+class _FakeCW:
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+class _FakeSESv2:
+    def send_email(self, **kwargs):
+        pass
+
+
+class _FakeBoto3:
+    """Stands in for the `boto3` module `td.lambda_handler` calls `.client()` on."""
+
+    def __init__(self, s3, cw, ses):
+        self._clients = {"s3": s3, "cloudwatch": cw, "sesv2": ses}
+
+    def client(self, name, region_name=None):
+        return self._clients[name]
+
+
+def _metric_value(cw, metric_name):
+    for call in cw.calls:
+        for m in call["MetricData"]:
+            if m["MetricName"] == metric_name:
+                return m["Value"]
+    return None
+
+
+def test_lambda_handler_emits_unique_visitors_metric(monkeypatch):
+    monkeypatch.setattr(td, "LOG_BUCKET", "fake-log-bucket")
+    cw = _FakeCW()
+    fake = _FakeBoto3(_FakeS3("cf/log1.gz", SAMPLE), cw, _FakeSESv2())
+    monkeypatch.setattr(td, "boto3", fake)
+    resp = td.lambda_handler({}, None)
+    assert resp["statusCode"] == 200
+    assert _metric_value(cw, "UniqueVisitors7d") == 2  # matches test_aggregate_counts_and_returners
+    assert _metric_value(cw, "PageViews7d") == 4
+
+
+def test_lambda_handler_emits_zero_on_genuinely_quiet_week(monkeypatch):
+    """A real 0-view week still gets a datapoint — cost_governor must be able
+    to tell 'quiet week' apart from 'no data yet' (a stale/missing metric
+    fails closed to the non-surge ceiling)."""
+    monkeypatch.setattr(td, "LOG_BUCKET", "fake-log-bucket")
+    cw = _FakeCW()
+    fake = _FakeBoto3(_FakeS3("cf/log1.gz", HEADER), cw, _FakeSESv2())  # header only, no rows → 0 views
+    monkeypatch.setattr(td, "boto3", fake)
+    resp = td.lambda_handler({}, None)
+    assert resp["statusCode"] == 200
+    assert _metric_value(cw, "UniqueVisitors7d") == 0
+    assert _metric_value(cw, "PageViews7d") == 0
