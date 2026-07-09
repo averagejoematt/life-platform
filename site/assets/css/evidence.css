@@ -694,4 +694,31 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-srcs { margin: var(--sp-1) 0 0; padding-left: 1.1em; font-size: var(--fs-small); display: grid; gap: 3px; }
 .supp-srcs a { color: var(--ink-muted); }
 .supp-srcs a:hover { color: var(--ember); }
+
+/* ── Reader participation — votes, follows, check-ins, suggestions, findings
+   (switch-on, 2026-07). Reuses the .df-btn pill language rather than inventing
+   a new control; .ask-in-shaped inputs for the two forms. Real counts only —
+   "—" means unknown (endpoint didn't load), never a padded number. */
+.part-row { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); }
+.part-btn {
+  font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
+  color: var(--ember); background: var(--ember-wash); border: 1px solid var(--ember-line);
+  border-radius: 6px; padding: 6px 10px; cursor: pointer;
+}
+.part-btn:hover { background: var(--ember-soft); }
+.part-btn:disabled { opacity: 0.55; cursor: default; }
+.part-btn.is-done { color: var(--ink-muted); background: transparent; border-color: var(--rule); }
+.part-count { font-family: var(--font-mono); margin-left: 4px; }
+.part-msg { margin-top: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink-faint); min-height: 1em; }
+.part-msg.is-error { color: var(--ember); }
+.part-form { display: grid; gap: var(--sp-2); margin-top: var(--sp-2); max-width: 320px; }
+.part-form[hidden] { display: none; }
+.part-form input, .part-form textarea {
+  background: var(--surface); border: var(--border-hair); border-radius: var(--radius-sm);
+  color: var(--ink); padding: var(--sp-2) var(--sp-3); font: inherit; width: 100%;
+}
+.part-form textarea { min-height: 64px; resize: vertical; }
+.part-form input:focus-visible, .part-form textarea:focus-visible, .part-btn:focus-visible {
+  outline: 2px solid var(--ember); outline-offset: 1px;
+}
 .supp-snp { margin-top: var(--sp-2); color: var(--ink-faint); }
