@@ -65,6 +65,67 @@ here has not been applied yet.
 > sentinel now runs the verifier (`check_oidc_iam`). Rollback: `git revert` + re-apply
 > the reverted trust JSON via `aws iam update-assume-role-policy`.
 
+---
+
+## The read-only diagnosis shed — STAGED 2026-07-09 (#903), NOT yet applied
+
+> **Status: the checked-in JSON is AHEAD of live.** This PR removes the pure
+> read-only diagnosis surface from `github-actions-deploy-role.permissions.json`
+> (the `life-platform-cicd-permissions` inline policy). Until the attended
+> `aws iam put-role-policy` below runs, `python3 deploy/verify_oidc_iam.py --strict`
+> reports exactly ONE expected DRIFT on
+> `github-actions-deploy-role:life-platform-cicd-permissions`. This is the pending
+> apply, not an out-of-band change. (The weekly `check_oidc_iam` sentinel calls the
+> verifier without `--strict`, so it does not red on this staged gap.)
+
+**What #903 sheds from the deploy role** (each was verified to have NO consumer among
+the CI jobs that assume the deploy role — `plan`, `deploy`, `smoke-test`,
+`post-deploy-checks`, `rollback-on-smoke-failure`, `notify-failure` in `ci-cd.yml`, and
+the deploy-role steps of `site-deploy.yml`):
+
+| Statement | Why it can go | Where it lives now |
+| --- | --- | --- |
+| `IAMReadOnly` (removed) | No deploy-role job calls `iam:*`. `cdk diff` diffs CloudFormation templates, not live IAM. The only reader is `verify_oidc_iam.py`, run by `drift_sentinel.py` under the **remediation** role. | remediation-role (its diagnosis surface) |
+| `BedrockVisionQA` (removed) | The three vision-QA credential steps assume `github-actions-diagnosis-role` since #687; no deploy-role job invokes Bedrock. | diagnosis-role (its sole grant) |
+| `CloudWatch` metric reads — `GetMetricStatistics`, `ListMetrics`, `GetMetricData` (removed; `DescribeAlarms` KEPT) | `post-deploy-checks` I7 needs `cloudwatch:DescribeAlarms`; nothing on the deploy role reads metric data. | remediation-role `Diagnose` (already holds the full metric-read set) |
+
+**Kept (still consumed by a deploy-role job)** — `LambdaDeploy`/`LambdaListAccountLevel`
+(deploy + I1/I2), `S3DeployArtifacts` (deploy + I8), `DynamoDB` (plan assert + I4), `SNS`
+(notify/rollback), `SQS` (I9), `KMS DescribeKey` (plan assert), `EventBridge` (I6),
+`CloudWatch DescribeAlarms` (I7), `SecretsManager` (I5), `CloudFormationDiff` (plan `cdk
+diff`), `CDKBootstrapRoleAssume`, `CloudFrontInvalidate` (site-deploy).
+
+### ATTENDED APPLY runbook (#903 — execute under a watched CI run)
+
+> Precondition: attended, matthew-admin, with rollback ready. Same discipline as #687 —
+> validate that a NORMAL deploy still works after the perms are stripped.
+
+1. **Snapshot the current live policy** (rollback source):
+   ```bash
+   aws iam get-role-policy --role-name github-actions-deploy-role \
+     --policy-name life-platform-cicd-permissions \
+     --query PolicyDocument > /tmp/deploy-perms.rollback.json
+   ```
+2. **Apply the reduced policy** from the checked-in JSON:
+   ```bash
+   aws iam put-role-policy --role-name github-actions-deploy-role \
+     --policy-name life-platform-cicd-permissions \
+     --policy-document file://infra/iam/github-actions-deploy-role.permissions.json
+   ```
+3. **Confirm the verifier goes CLEAN:** `python3 deploy/verify_oidc_iam.py --strict` (the
+   one expected deploy-role DRIFT disappears).
+4. **Validate with a real CI run** — push a trivial `lambdas/` change (or `workflow_dispatch`)
+   and WATCH `plan → deploy (approve) → smoke → post-deploy-checks` complete. `post-deploy-checks`
+   (I5/I6/I7) is the load-bearing check that the KEPT reads (Secrets/EventBridge/DescribeAlarms)
+   still work; a stripped-too-much mistake surfaces there as an `AccessDenied`.
+5. **Rollback (if anything breaks):**
+   ```bash
+   aws iam put-role-policy --role-name github-actions-deploy-role \
+     --policy-name life-platform-cicd-permissions \
+     --policy-document file:///tmp/deploy-perms.rollback.json
+   # then git revert the #903 PR
+   ```
+
 ### Original staging notes (kept for context)
 
 `#401`'s acceptance criteria require the trust subject to be narrowed from repo-wide
@@ -138,10 +199,8 @@ default branch (main), with no environment, so its tightened subject is just:
 
 ### Also part of the full tighten (follow-up, not this codify PR)
 - **Split a read-only diagnosis role out of the deploy role** (AC: "a read-only diagnosis
-  role is split from the deploy role"). The deploy role currently also carries the broad
-  read-only diagnosis surface (`IAMReadOnly`, CloudWatch, CloudFormation describe, Bedrock
-  vision-QA). Separating deploy-mutate from read-only-diagnose is a live IAM change and
-  belongs with the watched tighten.
+  role is split from the deploy role"). The `github-actions-diagnosis-role` was created in
+  #687; **#903 completes the shed** — see the section below.
 - **Wire these identities into the weekly drift sentinel (S-E6-01).** `deploy/verify_oidc_iam.py`
   is the drift detector; add a `--strict` call to it as a step in `deploy/drift_sentinel.py`
   (or the remediation workflow) so out-of-band trust changes are caught weekly.
