@@ -1,6 +1,6 @@
 # Disaster Recovery
 
-**Last updated:** 2026-05-19 (v8.0.0)
+**Last updated:** 2026-07-10 (first DR drill exercised — #755; retired-layer backup step corrected)
 
 > What can go catastrophically wrong, and the recovery sequence for each. Not exhaustive — meant as a starter playbook.
 
@@ -261,9 +261,11 @@ aws cloudwatch list-dashboards --region us-west-2 --query 'DashboardEntries[].Da
     | tr '\t' '\n' \
     | xargs -I{} bash -c 'aws cloudwatch get-dashboard --dashboard-name "{}" --region us-west-2 > backups/dashboards/{}.json'
 
-# 3. Snapshot the layer
-aws lambda list-layer-versions --layer-name life-platform-shared-utils --region us-west-2 \
-    --query 'LayerVersions[0]' > backups/layer-snapshot.json
+# 3. Lambda code recovery is already covered — no layer snapshot needed.
+#    The shared layer (life-platform-shared-utils) was RETIRED 2026-07-06 (#781);
+#    shared modules now ship inside every function's own bundle. Per-function code
+#    is recoverable from s3://matthew-life-platform/deploys/<fn>/{latest,previous}.zip
+#    (see "What IS protected"), and the whole tree rebuilds from git + build_bundle.py.
 ```
 
 ---
@@ -275,8 +277,14 @@ Once per quarter, rehearse a scenario:
 - **Medium:** Restore one S3 object from versioning
 - **Hard:** Roll back a Lambda via the script + verify
 
-Document outcomes in `docs/INCIDENT_LOG.md` as "DR drill" entries.
+Document outcomes in `docs/INCIDENT_LOG.md` as "DR drill" entries and in the log below.
+
+### DR drills exercised
+
+| Date | Scope | Result | Gaps found |
+|---|---|---|---|
+| 2026-07-10 | **DDB PITR restore** (Scenario 1/2) — `restore-table-to-point-in-time --use-latest-restorable-time` into isolated `life-platform-dr-drill`; **+ S3 versioned restore** (Scenario 3) — prior version of `generated/public_stats.json` copied into isolated `backups/dr-drill/` prefix | ✅ **Both paths work.** Restored table ACTIVE in ~10 min (32,152 items ≈ prod's 32,162); spot-checked partition `USER#matthew#SOURCE#whoop / DATE#2026-07-01` matched prod exactly (recovery 88, hrv 52.87, rhr 56). S3 prior version restored to the drill prefix; **live object untouched**. Both drill artifacts torn down after verification. First verifiably-exercised DDB PITR restore (#755). | (1) This doc's pre-emptive "Snapshot the layer" step referenced the retired `life-platform-shared-utils` layer (#781) — **fixed**. (2) `--use-latest-restorable-time` is simpler than the hardcoded `--restore-date-time` in the Scenario 1/2 examples for a drill; examples left as-is (a real incident restores to *before* the bad write). No functional gaps in the restore procedures themselves. |
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-07-10 (DR drill exercised — first DDB PITR restore; S3 versioned restore)
