@@ -135,7 +135,7 @@ function verifyRawSample() {
 export function renderVerify(d) {
   const links = verifyDeviceLinks();
   const sample = verifyRawSample();
-  const methodLink = `<p class="rd-archive">Every statistic this platform publishes — its exact formula, the window it runs over, what it can't tell you — is documented at <a href="/method/registry/">the Methods Registry</a>, generated straight from the code, not hand-written.</p>`;
+  const methodLink = `<p class="rd-archive">Every statistic this platform publishes — its exact formula, the window it runs over, what it can't tell you — is documented at <a href="/method/registry/">the Methods Registry</a>, generated straight from the code, not hand-written. The devices behind these readings — what each measures and where to get it — are on <a href="/gear/">the gear page</a> (kept separate from this page's honesty checks on purpose).</p>`;
   if (!d || d.status === "unavailable") {
     return sec("Cross-device agreement — the credibility signal", empty(d && d.reason ? d.reason : "No overlapping device data recorded yet.")) + links + sample + methodLink + note("Nothing here is fabricated to fill a gap — an empty section says so.");
   }
