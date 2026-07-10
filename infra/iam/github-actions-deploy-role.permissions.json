@@ -80,17 +80,6 @@
       "Resource": "arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq"
     },
     {
-      "Sid": "BedrockVisionQA",
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel"
-      ],
-      "Resource": [
-        "arn:aws:bedrock:*:205930651321:inference-profile/us.anthropic.claude-*",
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
-      ]
-    },
-    {
       "Sid": "KMS",
       "Effect": "Allow",
       "Action": [
@@ -112,10 +101,7 @@
       "Sid": "CloudWatch",
       "Effect": "Allow",
       "Action": [
-        "cloudwatch:DescribeAlarms",
-        "cloudwatch:GetMetricStatistics",
-        "cloudwatch:ListMetrics",
-        "cloudwatch:GetMetricData"
+        "cloudwatch:DescribeAlarms"
       ],
       "Resource": "*"
     },
@@ -151,21 +137,6 @@
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": "arn:aws:iam::205930651321:role/cdk-*"
-    },
-    {
-      "Sid": "IAMReadOnly",
-      "Effect": "Allow",
-      "Action": [
-        "iam:GetRole",
-        "iam:ListRolePolicies",
-        "iam:GetRolePolicy",
-        "iam:ListAttachedRolePolicies",
-        "iam:GetPolicy",
-        "iam:GetPolicyVersion",
-        "iam:ListRoles",
-        "iam:SimulatePrincipalPolicy"
-      ],
-      "Resource": "*"
     },
     {
       "Sid": "CloudFrontInvalidate",

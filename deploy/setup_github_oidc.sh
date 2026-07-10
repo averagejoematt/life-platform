@@ -28,7 +28,15 @@
 #   - EventBridge: describe-rule (I6)
 #   - CloudWatch: describe-alarms (I7)
 #   - Secrets Manager: describe + get-value (I5 existence check, I12 MCP auth)
-#   - IAM: read-only (CDK diff IAM change detection)
+#
+# Read-only diagnosis surface (IAM read-only, Bedrock vision-QA, CloudWatch
+# metric reads) was SHED from this role in #903 — it moved to the dedicated
+# github-actions-diagnosis-role (#687) / github-actions-remediation-role, which
+# is where the vision-QA jobs and the drift sentinel now read. This role keeps
+# only deploy-mutate + the reads a deploy/plan/post-deploy step actually makes.
+# NB: this script's TRUST block below is still the pre-#687 repo-wide subject
+# (repo:...:*) — the live trust was tightened to main-only attended in #687 and
+# is NOT reflected here; do not re-run this bootstrap without reconciling trust.
 #
 # v1.0.0 — 2026-03-15 (R13-F01 CI/CD enablement)
 
@@ -182,17 +190,6 @@ PERMISSION_POLICY=$(cat <<EOF
       "Resource": "arn:aws:sqs:us-west-2:${ACCOUNT}:life-platform-ingestion-dlq"
     },
     {
-      "Sid": "BedrockVisionQA",
-      "Effect": "Allow",
-      "Action": [
-        "bedrock:InvokeModel"
-      ],
-      "Resource": [
-        "arn:aws:bedrock:*:${ACCOUNT}:inference-profile/us.anthropic.claude-*",
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-*"
-      ]
-    },
-    {
       "Sid": "KMS",
       "Effect": "Allow",
       "Action": [
@@ -214,10 +211,7 @@ PERMISSION_POLICY=$(cat <<EOF
       "Sid": "CloudWatch",
       "Effect": "Allow",
       "Action": [
-        "cloudwatch:DescribeAlarms",
-        "cloudwatch:GetMetricStatistics",
-        "cloudwatch:ListMetrics",
-        "cloudwatch:GetMetricData"
+        "cloudwatch:DescribeAlarms"
       ],
       "Resource": "*"
     },
@@ -253,21 +247,6 @@ PERMISSION_POLICY=$(cat <<EOF
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": "arn:aws:iam::${ACCOUNT}:role/cdk-*"
-    },
-    {
-      "Sid": "IAMReadOnly",
-      "Effect": "Allow",
-      "Action": [
-        "iam:GetRole",
-        "iam:ListRolePolicies",
-        "iam:GetRolePolicy",
-        "iam:ListAttachedRolePolicies",
-        "iam:GetPolicy",
-        "iam:GetPolicyVersion",
-        "iam:ListRoles",
-        "iam:SimulatePrincipalPolicy"
-      ],
-      "Resource": "*"
     }
   ]
 }
