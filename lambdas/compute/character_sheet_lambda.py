@@ -155,9 +155,34 @@ def fetch_journal_entries(date_str):
         return []
 
 
+def _enriched_mood_to_10(raw_1to5):
+    """Map an enriched_mood value from its native 1–5 domain onto the 0–10
+    scale that `character_engine` consumes for `mood_avg`.
+
+    #902: `journal_enrichment_lambda` synthesizes `enriched_mood` as a 1–5 score
+    (1 = worst, 5 = best; see its prompt schema `mood_score: <1-5 ...>`), but the
+    `social_mood_correlation` consumer in `character_engine.compute_relationships_raw`
+    reads `journal.get("mood_avg")` and computes `(mood / 10) * 100`, i.e. it
+    treats 10 as the maximal mood (100%). Handing it a raw 1–5 value would
+    silently under-score every day (a perfect 5 would read as 50%).
+
+    We use a linear min–max map, `(m - 1) / 4 * 10`, so the full 1–5 domain
+    covers the full 0–10 range: 1→0, 3→5, 5→10. This puts a *neutral* mood (3) at
+    the midpoint the consumer turns into 50%, consistent with the platform's
+    established "3 = neutral" convention on the 1–5 scale (e.g. the partner-email
+    mood thresholds `>= 3.5` good / `>= 2.5` neutral). Returns None on bad input.
+    """
+    try:
+        m = float(raw_1to5)
+    except (ValueError, TypeError):
+        return None
+    return (m - 1) / 4 * 10
+
+
 def merge_journal_view(entries):
     """Collapse a day's templated journal entries into the single dict shape
-    character_engine expects (`journal.get("themes")` in interaction_quality).
+    character_engine expects (`journal.get("themes")` in interaction_quality,
+    `journal.get("mood_avg")` in social_mood_correlation).
 
     #890: notion journal rows are stored per-template under
     `DATE#{date}#journal#{template}` sort keys — the flat `DATE#{date}` record
@@ -166,19 +191,33 @@ def merge_journal_view(entries):
     pipeline (`enriched_themes`; a plain `themes` field is accepted as a
     fallback), deduped across the day's entries with first-seen order kept.
 
-    Returns None when the day has no themed entries, matching the old
-    "no journal record" falsy contract (the engine does `data.get("journal") or {}`).
+    #902: the same key mismatch also meant `mood_avg` was never populated on this
+    view, so `social_mood_correlation` stayed dead. We now average the day's
+    `enriched_mood` values (native 1–5) and map them onto the engine's 0–10 scale
+    via `_enriched_mood_to_10` (see its docstring for the scale decision).
+
+    Returns None when the day has no themed *and* no mood signal, matching the
+    old "no journal record" falsy contract (the engine does
+    `data.get("journal") or {}`).
     """
     themes = []
     seen = set()
+    moods = []
     for entry in entries or []:
         for theme in entry.get("enriched_themes") or entry.get("themes") or []:
             if isinstance(theme, str) and theme not in seen:
                 seen.add(theme)
                 themes.append(theme)
-    if not themes:
-        return None
-    return {"themes": themes}
+        mapped = _enriched_mood_to_10(entry.get("enriched_mood"))
+        if mapped is not None:
+            moods.append(mapped)
+
+    view = {}
+    if themes:
+        view["themes"] = themes
+    if moods:
+        view["mood_avg"] = round(sum(moods) / len(moods), 1)
+    return view or None
 
 
 def _safe_float(rec, field):

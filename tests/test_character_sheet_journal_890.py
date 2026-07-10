@@ -125,3 +125,78 @@ def test_merge_journal_view_empty_day_stays_falsy():
     assert csl.merge_journal_view([]) is None
     assert csl.merge_journal_view(None) is None
     assert csl.merge_journal_view([{"sk": f"DATE#{DATE}#journal#morning"}]) is None
+
+
+# ── #902: enriched_mood (1–5) → mood_avg (0–10) scale mapping ────────────────
+
+
+def test_enriched_mood_scale_map_full_domain():
+    """The 1–5 domain maps linearly onto the engine's 0–10 scale: 1→0, 3→5,
+    5→10. This is the documented decision — a neutral mood (3) lands at the
+    midpoint the consumer's (mood/10)*100 turns into 50%."""
+    assert csl._enriched_mood_to_10(1) == 0.0
+    assert csl._enriched_mood_to_10(3) == 5.0
+    assert csl._enriched_mood_to_10(5) == 10.0
+    assert csl._enriched_mood_to_10(2) == 2.5
+    assert csl._enriched_mood_to_10(4) == 7.5
+    # Bad / absent input is tolerated.
+    assert csl._enriched_mood_to_10(None) is None
+    assert csl._enriched_mood_to_10("n/a") is None
+
+
+def test_merge_journal_view_averages_and_maps_mood():
+    """A day's enriched_mood values (1–5) are averaged then mapped to 0–10.
+    Moods 5 and 3 -> mapped 10 and 5 -> avg 7.5 on the mood_avg key the engine
+    reads."""
+    entries = [
+        {"sk": f"DATE#{DATE}#journal#morning", "enriched_mood": 5, "enriched_themes": ["family connection"]},
+        {"sk": f"DATE#{DATE}#journal#evening", "enriched_mood": 3},
+    ]
+    view = csl.merge_journal_view(entries)
+    assert view["mood_avg"] == 7.5
+    assert view["themes"] == ["family connection"]
+
+
+def test_mood_only_day_is_no_longer_falsy():
+    """A day with mood but no themes now yields a view (mood_avg set) instead of
+    None — that's exactly the previously-dead signal #902 revives."""
+    view = csl.merge_journal_view([{"sk": f"DATE#{DATE}#journal#morning", "enriched_mood": 4}])
+    assert view == {"mood_avg": 7.5}
+
+
+def _journal_rows_with_mood():
+    """Templated entries carrying enriched_mood AND a social signal — the
+    conditions social_mood_correlation gates on (mood + social_score both
+    present)."""
+    return [
+        {
+            "pk": NOTION_PK,
+            "sk": f"DATE#{DATE}#journal#morning",
+            "enriched_themes": ["family connection"],
+            "enriched_mood": 5,
+            "social_connection_score": 8,
+            "raw_text": "morning entry",
+        },
+        {
+            "pk": NOTION_PK,
+            "sk": f"DATE#{DATE}#journal#evening",
+            "enriched_mood": 3,
+            "raw_text": "evening entry",
+        },
+    ]
+
+
+def test_social_mood_correlation_gets_non_null_input(monkeypatch):
+    """End-to-end #902: with enriched_mood populated (and a social signal
+    present) social_mood_correlation is no longer None.
+
+    Moods 5,3 -> mapped 10,5 -> mood_avg 7.5; the consumer computes
+    (7.5/10)*100 = 75.0."""
+    table = FakeDdbTable(rows=_journal_rows_with_mood(), query_hook=_keyed_query_hook)
+    monkeypatch.setattr(csl, "table", table)
+    data = csl.assemble_data(DATE)
+
+    assert data["journal"]["mood_avg"] == 7.5
+
+    raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
+    assert details["social_mood_correlation"]["score"] == 75.0
