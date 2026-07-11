@@ -44,6 +44,7 @@ def _isolate(monkeypatch, tmp_path, doc_text, widget_count):
     monkeypatch.setattr(sync, "PLATFORM_FACTS", {**sync.PLATFORM_FACTS, "widget_count": widget_count})
     monkeypatch.setattr(sync, "_apply_auto_discovered", lambda facts: facts)  # no real AST/CDK discovery
     monkeypatch.setattr(sync, "_sync_platform_stats", lambda facts, dry_run: [])  # no real site_api_common.py
+    monkeypatch.setattr(sync, "_sync_alarm_inventory", lambda dry_run: [])  # no real docs/MONITORING.md or cdk/stacks
     return doc
 
 
@@ -99,3 +100,90 @@ def test_check_is_clean_on_repo_head():
         "sync_doc_metadata.py --check found drift on repo HEAD — run "
         f"`python3 deploy/sync_doc_metadata.py --apply` and commit the fix.\n{result.stdout}\n{result.stderr}"
     )
+
+
+# ── #934: AST-discovered alarm NAMES ────────────────────────────────────────────
+
+
+def test_alarm_names_discovers_real_set_from_cdk():
+    """The discoverer finds real CDK alarms across every alarm-defining stack, and
+    excludes both the SRE-grader phantom names (#932) and the consolidated
+    ingestion-error-* fleet (error_alarm=False, so no alarm is created)."""
+    names = sync._auto_discover_alarm_names()
+    assert names is not None and len(names) >= 20
+
+    # Real names spanning the three construction shapes + multiple stacks.
+    for real in (
+        "mcp-warmer-error",  # direct cloudwatch.Alarm(...) in mcp_stack
+        "life-platform-canary-anthropic-failure",  # _canary_alarm helper, operational
+        "slo-source-freshness",  # _alarm helper, monitoring
+        "ingest-consecutive-failures-whoop",  # f-string over a static loop var, monitoring
+        "site-api-errors",  # direct, serve_stack
+        "email-subscriber-errors",  # direct, web_stack
+    ):
+        assert real in names, f"expected real CDK alarm {real!r} missing from discovered set"
+
+    # Phantom names the doc used to carry (hand-fixed in #932) must NOT appear.
+    for phantom in (
+        "slo-anthropic-canary",
+        "life-platform-mcp-warmer-error",
+        "life-platform-slo-budget-alarm",
+        "life-platform-token-burn",
+    ):
+        assert phantom not in names, f"phantom alarm {phantom!r} leaked into discovered set"
+
+    # The ingestion fleet's per-Lambda alarms are consolidated away, not real.
+    assert "ingestion-error-whoop" not in names
+
+
+def test_alarm_names_count_matches_alarm_count_discoverer():
+    """One canonical name per alarm — the name-set size equals the #795 count."""
+    names = sync._auto_discover_alarm_names()
+    count = sync._auto_discover_alarm_count()
+    assert names is not None and count is not None
+    assert len(names) == count, f"name set ({len(names)}) diverged from alarm count ({count})"
+
+
+def test_render_alarm_inventory_round_trips_the_name_set():
+    """Every discovered name renders as a backticked bullet exactly once."""
+    import re
+
+    by_stack = sync._auto_discover_alarm_names_by_stack()
+    assert by_stack is not None
+    block = sync._render_alarm_inventory(by_stack)
+    rendered = re.findall(r"^- `([^`]+)`$", block, re.MULTILINE)
+    assert sorted(rendered) == sorted(sync._auto_discover_alarm_names())
+    assert len(rendered) == len(set(rendered)), "a name was rendered more than once"
+
+
+def test_sync_alarm_inventory_fills_markers_and_is_idempotent(tmp_path, monkeypatch):
+    """--apply writes the block between the markers; a second pass is a no-op."""
+    fake = {"monitoring_stack": ["alpha-alarm", "beta-alarm"], "serve_stack": ["gamma-alarm"]}
+    monkeypatch.setattr(sync, "_auto_discover_alarm_names_by_stack", lambda: fake)
+    doc = tmp_path / "MONITORING.md"
+    doc.write_text(
+        f"# Monitoring\n\n{sync._ALARM_INV_BEGIN}\nstale placeholder\n{sync._ALARM_INV_END}\n\n## Next\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sync, "_MONITORING_PATH", doc)
+
+    first = sync._sync_alarm_inventory(dry_run=False)
+    assert any(c.startswith("  ~") for c in first)
+    text = doc.read_text(encoding="utf-8")
+    for n in ("alpha-alarm", "beta-alarm", "gamma-alarm"):
+        assert f"- `{n}`" in text
+    assert "stale placeholder" not in text
+    assert text.startswith("# Monitoring") and text.rstrip().endswith("## Next")  # content outside markers preserved
+
+    assert sync._sync_alarm_inventory(dry_run=False) == [], "second apply must be a clean no-op"
+
+
+def test_sync_alarm_inventory_flags_missing_markers(tmp_path, monkeypatch):
+    """A MONITORING.md with no marker pair is drift the gate must report."""
+    monkeypatch.setattr(sync, "_auto_discover_alarm_names_by_stack", lambda: {"serve_stack": ["gamma-alarm"]})
+    doc = tmp_path / "MONITORING.md"
+    doc.write_text("# Monitoring\n\nno markers here\n", encoding="utf-8")
+    monkeypatch.setattr(sync, "_MONITORING_PATH", doc)
+
+    result = sync._sync_alarm_inventory(dry_run=True)
+    assert result and result[0].startswith("  !")

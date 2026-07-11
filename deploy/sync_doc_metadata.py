@@ -363,6 +363,290 @@ def _auto_discover_alarm_count() -> int | None:
         return None
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# ALARM NAMES (#934) — the name-set sibling of _auto_discover_alarm_count (#795).
+# The count answers "how many"; this answers "which", so MONITORING.md's inventory
+# can't silently name a CloudWatch alarm that no CDK stack defines (the SRE-grader
+# finding 2026-07-10: 4+ phantom names hand-fixed in #932, drift-proofed here).
+# Same AST discipline and the same three construction shapes as the counter, but it
+# resolves each alarm's NAME literal instead of tallying a 1.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _resolve_static_str(node: ast.AST | None, bindings: dict) -> str | None:
+    """Resolve an AST node to a str if statically determinable, else None.
+
+    Handles the shapes alarm names actually take in cdk/stacks/*.py: a plain string
+    literal, a loop-variable Name bound to a constant (the ingest-liveness
+    `for _src in (...)` loop), and an f-string combining constants with those loop
+    vars (`f"ingest-consecutive-failures-{_src}"`). `bindings` maps in-scope loop
+    variable names to their current constant string value.
+    """
+    if isinstance(node, ast.Constant):
+        return node.value if isinstance(node.value, str) else None
+    if isinstance(node, ast.Name):
+        return bindings.get(node.id)
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for value in node.values:
+            if isinstance(value, ast.Constant) and isinstance(value.value, str):
+                parts.append(value.value)
+            elif isinstance(value, ast.FormattedValue):
+                inner = _resolve_formatted_value(value.value, bindings)
+                if inner is None:
+                    return None
+                parts.append(inner)
+            else:
+                return None
+        return "".join(parts)
+    return None
+
+
+def _resolve_formatted_value(node: ast.AST, bindings: dict) -> str | None:
+    """Resolve the expression inside an f-string `{...}` to a str, else None.
+
+    Covers a bound Name (`{_src}`) and the common string-method calls used on loop
+    vars for display (`{_src.title()}`); anything else is a static-analysis miss and
+    returns None (so the whole name is skipped rather than guessed wrong).
+    """
+    if isinstance(node, ast.Name):
+        return bindings.get(node.id)
+    if isinstance(node, ast.Constant):
+        return str(node.value)
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and not node.args and not node.keywords:
+        base = _resolve_formatted_value(node.func.value, bindings)
+        if base is None:
+            return None
+        method = node.func.attr
+        if method in ("title", "lower", "upper", "capitalize"):
+            return getattr(base, method)()
+    return None
+
+
+def _kwarg_value(call: ast.Call, name: str) -> ast.AST | None:
+    """The value node of a plain (non-**spread) keyword arg on a Call, else None."""
+    for kw in call.keywords:
+        if kw.arg == name:
+            return kw.value
+    return None
+
+
+def _positional_or_kw(call: ast.Call, index: int, name: str) -> ast.AST | None:
+    """A call argument by positional index, falling back to keyword name."""
+    if index < len(call.args):
+        return call.args[index]
+    return _kwarg_value(call, name)
+
+
+def _find_direct_alarm_call(stmts: list[ast.stmt]) -> ast.Call | None:
+    """The single alarm-constructor Call in `stmts`, NOT descending into nested defs.
+
+    Mirrors _count_direct_alarm_calls but returns the node so the caller can read the
+    helper's `alarm_name=` binding (which parameter flows into the constructed alarm).
+    """
+    found = []
+
+    class _V(ast.NodeVisitor):
+        def visit_FunctionDef(self, node):
+            return
+
+        def visit_AsyncFunctionDef(self, node):
+            return
+
+        def visit_Lambda(self, node):
+            return
+
+        def visit_Call(self, node):
+            if _is_alarm_constructor_call(node):
+                found.append(node)
+            self.generic_visit(node)
+
+    v = _V()
+    for stmt in stmts:
+        v.visit(stmt)
+    return found[0] if len(found) == 1 else None
+
+
+def _collect_helper_alarm_name_specs(tree: ast.AST, parents: dict) -> dict:
+    """Map `helper_name -> spec` for each single-alarm helper closure in the module.
+
+    A spec describes where the helper's constructed alarm gets its NAME:
+      ("param", index, param_name) — the name is passed IN as an argument (the
+        `_alarm`/`_heartbeat_alarm`/`_canary_alarm` closures forward a positional
+        `alarm_name` param straight into `cloudwatch.Alarm(alarm_name=...)`), OR
+      ("const", "literal")         — the helper hardcodes its alarm's name.
+    Detection reuses the counter's single-alarm-helper rule (a def whose own body
+    builds exactly one alarm, excluding class methods).
+    """
+    specs = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(parents.get(id(node)), ast.ClassDef):
+                continue
+            if _count_direct_alarm_calls(node.body) != 1:
+                continue
+            call = _find_direct_alarm_call(node.body)
+            if call is None:
+                continue
+            name_node = _kwarg_value(call, "alarm_name")
+            if isinstance(name_node, ast.Constant) and isinstance(name_node.value, str):
+                specs[node.name] = ("const", name_node.value)
+            elif isinstance(name_node, ast.Name):
+                for i, arg in enumerate(node.args.args):
+                    if arg.arg == name_node.id:
+                        specs[node.name] = ("param", i, name_node.id)
+                        break
+    return specs
+
+
+def _resolve_platform_lambda_alarm_name(call: ast.Call, dict_assignments: dict) -> str | None:
+    """The per-Lambda error-alarm name a `create_platform_lambda(...)` call yields.
+
+    Follows lambda_helpers.py: `alarm_name` when given (resolving **spreads), else the
+    `ingestion-error-{function_name}` default. Caller has already confirmed the alarm
+    is actually created (_create_platform_lambda_makes_alarm) — the ingestion fleet's
+    `error_alarm=False` spread suppresses these even though it passes explicit names.
+    """
+    explicit = _resolve_kwarg_value(call, "alarm_name", dict_assignments)
+    if explicit is not None and not _is_none_literal(explicit):
+        resolved = _resolve_static_str(explicit, {})
+        if resolved:
+            return resolved
+    fn = _resolve_kwarg_value(call, "function_name", dict_assignments)
+    fn_name = _resolve_static_str(fn, {}) if fn is not None else None
+    if fn_name:
+        return f"ingestion-error-{fn_name}"
+    return None
+
+
+def _static_iter_elts(iter_node: ast.AST) -> list | None:
+    """A for-loop iterable's elements if it's a literal tuple/list/set of constants."""
+    if isinstance(iter_node, (ast.Tuple, ast.List, ast.Set)) and all(isinstance(e, ast.Constant) for e in iter_node.elts):
+        return list(iter_node.elts)
+    return None
+
+
+def _collect_alarm_names_from_tree(tree: ast.AST, parents: dict, out: set) -> None:
+    dict_assignments = _collect_dict_assignments(tree)
+    helper_specs = _collect_helper_alarm_name_specs(tree, parents)
+
+    def _maybe_add(call: ast.Call, bindings: dict) -> None:
+        if _is_alarm_constructor_call(call):
+            # Direct `cloudwatch.Alarm(alarm_name=...)` / `.create_alarm(alarm_name=...)`.
+            # A helper's templated constructor (alarm_name=<param Name>) resolves to None
+            # here — the real name arrives via the helper CALL site below, so no double add.
+            name = _resolve_static_str(_kwarg_value(call, "alarm_name"), bindings)
+            if name:
+                out.add(name)
+            return
+        if isinstance(call.func, ast.Name):
+            fid = call.func.id
+            if fid == "create_platform_lambda":
+                if _create_platform_lambda_makes_alarm(call, dict_assignments):
+                    name = _resolve_platform_lambda_alarm_name(call, dict_assignments)
+                    if name:
+                        out.add(name)
+                return
+            spec = helper_specs.get(fid)
+            if spec is None:
+                return
+            if spec[0] == "const":
+                out.add(spec[1])
+            else:  # ("param", index, param_name)
+                name = _resolve_static_str(_positional_or_kw(call, spec[1], spec[2]), bindings)
+                if name:
+                    out.add(name)
+
+    def _walk(node: ast.AST, bindings: dict) -> None:
+        if isinstance(node, ast.For):
+            elts = _static_iter_elts(node.iter)
+            if elts is not None and isinstance(node.target, ast.Name):
+                for elt in elts:
+                    child_bindings = dict(bindings)
+                    if isinstance(elt.value, str):
+                        child_bindings[node.target.id] = elt.value
+                    for stmt in node.body:
+                        _walk(stmt, child_bindings)
+                for stmt in node.orelse:
+                    _walk(stmt, bindings)
+                return
+            # Non-static or tuple-target loop: walk once (no name-bearing loop of this
+            # shape exists today; unresolved f-string names just resolve to None).
+        if isinstance(node, ast.Call):
+            _maybe_add(node, bindings)
+        for child in ast.iter_child_nodes(node):
+            _walk(child, bindings)
+
+    _walk(tree, {})
+
+
+def _auto_discover_alarm_names_by_stack() -> dict | None:
+    """`{stack_file_stem: sorted[alarm_name]}` for all CDK-defined alarms (#934).
+
+    The name-set companion to _auto_discover_alarm_count() (#795) — reuses its AST
+    machinery (single-alarm-helper auto-detection, the create_platform_lambda gate,
+    the `shared = dict(...)` kwargs-spread resolver) but resolves each alarm's NAME
+    literal instead of tallying, keyed by the stack file that defines it. Alarms are
+    named via the same three shapes the counter handles:
+      1. Direct `cloudwatch.Alarm(alarm_name="...")` — a string-literal kwarg.
+      2. Single-alarm helper closures (`_alarm`/`_heartbeat_alarm`/`_canary_alarm`)
+         that forward a positional `alarm_name` param — resolved at each call site,
+         including the `for _src in (...)` ingest-liveness loop whose name is an
+         f-string over the (statically literal) loop variable.
+      3. `create_platform_lambda(...)` per-Lambda error alarms — the explicit
+         `alarm_name=` or the `ingestion-error-{function_name}` default, but ONLY
+         when the alarm is actually created (topic non-None AND error_alarm not False;
+         the ingestion fleet's consolidation spread suppresses ~all of these).
+
+    Returns None (caller falls back / skips the sync) if fewer than 5 stack files were
+    readable or the total is suspiciously small (<20) — the sanity floor mirroring the
+    counter's, set lower because consolidation means far fewer NAMES than the raw count.
+    """
+    cdk_stacks_dir = ROOT / "cdk" / "stacks"
+    if not cdk_stacks_dir.exists():
+        return None
+    try:
+        by_stack: dict[str, set] = {}
+        stack_files_read = 0
+        total = 0
+        for stack_file in sorted(cdk_stacks_dir.glob("*.py")):
+            try:
+                src = stack_file.read_text(encoding="utf-8")
+                tree = ast.parse(src, filename=str(stack_file))
+            except Exception:
+                continue
+            parents = {id(child): parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)}
+            names: set[str] = set()
+            _collect_alarm_names_from_tree(tree, parents, names)
+            stack_files_read += 1
+            total += len(names)
+            if names:
+                by_stack[stack_file.stem] = names
+        if stack_files_read < 5:
+            return None
+        if total < 20:
+            return None
+        return {stem: sorted(names) for stem, names in sorted(by_stack.items())}
+    except Exception:
+        return None
+
+
+def _auto_discover_alarm_names() -> set[str] | None:
+    """The flat canonical SET of CDK-defined CloudWatch alarm names (#934).
+
+    Unions _auto_discover_alarm_names_by_stack(); the primary API for any future
+    doc-reference checker (option (b) in #934 — assert a backticked alarm literal in
+    MONITORING/RUNBOOK/SLOs is a real CDK alarm).
+    """
+    by_stack = _auto_discover_alarm_names_by_stack()
+    if by_stack is None:
+        return None
+    names: set[str] = set()
+    for stack_names in by_stack.values():
+        names.update(stack_names)
+    return names
+
+
 def _auto_discover_module_count() -> int | None:
     """Count all .py modules in mcp/ (excluding __init__.py)."""
     mcp_dir = ROOT / "mcp"
@@ -492,6 +776,65 @@ def _sync_platform_stats(facts: dict, dry_run: bool) -> list[str]:
     if changes and not dry_run:
         _PLATFORM_STATS_PATH.write_text(src, encoding="utf-8")
     return changes
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# MONITORING.md alarm inventory (#934) — a machine-maintained block between markers,
+# regenerated from _auto_discover_alarm_names_by_stack() the way the served
+# credibility numbers above are regenerated. --apply rewrites it; --check reds CI on
+# any drift, so MONITORING.md can never again name a CloudWatch alarm that no CDK
+# stack defines (the SRE-grader phantom-name finding — #932 hand-fixed, #934 gates,
+# a concrete instance of the #973 docs-ci gate-gap for one drift class).
+# ══════════════════════════════════════════════════════════════════════════════
+
+_MONITORING_PATH = DOCS / "MONITORING.md"
+_ALARM_INV_BEGIN = "<!-- BEGIN GENERATED: alarm-inventory — deploy/sync_doc_metadata.py (#934); do not hand-edit -->"
+_ALARM_INV_END = "<!-- END GENERATED: alarm-inventory -->"
+
+
+def _render_alarm_inventory(by_stack: dict) -> str:
+    """Render the marker-delimited inventory block from `{stack_stem: [names]}`."""
+    total = sum(len(v) for v in by_stack.values())
+    lines = [
+        _ALARM_INV_BEGIN,
+        "",
+        f"_**{total}** CloudWatch alarms are defined in `cdk/stacks/*.py` and AST-discovered by "
+        "`deploy/sync_doc_metadata.py::_auto_discover_alarm_names` (#795 counts them, #934 names them). "
+        "Regenerated by `python3 deploy/sync_doc_metadata.py --apply` and gated by `--check`: add / rename / "
+        "remove an alarm in CDK and this updates automatically; a name here that no stack defines reds CI._",
+        "",
+    ]
+    for stem in sorted(by_stack):
+        names = by_stack[stem]
+        lines.append(f"**`{stem}.py`** ({len(names)})")
+        lines.append("")
+        lines.extend(f"- `{n}`" for n in names)
+        lines.append("")
+    lines.append(_ALARM_INV_END)
+    return "\n".join(lines)
+
+
+def _sync_alarm_inventory(dry_run: bool) -> list[str]:
+    """Regenerate MONITORING.md's alarm-inventory block from the CDK-derived name set."""
+    if not _MONITORING_PATH.exists():
+        return [f"  SKIP (not found): {_MONITORING_PATH}"]
+    by_stack = _auto_discover_alarm_names_by_stack()
+    if by_stack is None:
+        return ["  ! alarm-name discovery returned None (cdk/stacks/*.py unreadable?) — inventory NOT verified"]
+    src = _MONITORING_PATH.read_text(encoding="utf-8")
+    begin = src.find(_ALARM_INV_BEGIN)
+    end = src.find(_ALARM_INV_END)
+    if begin == -1 or end == -1 or end < begin:
+        return ["  ! alarm-inventory markers missing from docs/MONITORING.md — add the BEGIN/END GENERATED: alarm-inventory pair (#934)"]
+    expected = _render_alarm_inventory(by_stack)
+    current = src[begin : end + len(_ALARM_INV_END)]
+    if current == expected:
+        return []
+    new_src = src[:begin] + expected + src[end + len(_ALARM_INV_END) :]
+    if not dry_run:
+        _MONITORING_PATH.write_text(new_src, encoding="utf-8")
+    total = sum(len(v) for v in by_stack.values())
+    return [f"  ~ alarm inventory regenerated ({total} alarms across {len(by_stack)} stacks, from cdk/stacks/*.py)"]
 
 
 def _apply_auto_discovered(facts: dict) -> dict:
@@ -940,10 +1283,24 @@ def main():
             print(c)
         print()
 
+    # MONITORING.md alarm inventory (#934) — machine-maintained from cdk/stacks/*.py.
+    alarm_inv_changes = _sync_alarm_inventory(dry_run)
+    if alarm_inv_changes:
+        print("[docs/MONITORING.md — alarm inventory]")
+        for c in alarm_inv_changes:
+            print(c)
+        print()
+
     # Get unique docs to process
     docs_to_process = sorted(set(doc for doc, _, _ in RULES))
     total_changes = len([c for c in stats_changes if c.startswith("  ~")])
     drifted_docs = ["lambdas/web/site_api_common.py"] if any(c.startswith("  ~") for c in stats_changes) else []
+    # A "~" (regenerated) or "!" (markers missing / discovery failed) both count as drift
+    # that --check must fail on and --apply must resolve.
+    alarm_inv_drift = [c for c in alarm_inv_changes if c.startswith("  ~") or c.startswith("  !")]
+    if alarm_inv_drift:
+        total_changes += len(alarm_inv_drift)
+        drifted_docs.append("docs/MONITORING.md")
 
     for rel_path in docs_to_process:
         changes = process_doc(rel_path, dry_run)
