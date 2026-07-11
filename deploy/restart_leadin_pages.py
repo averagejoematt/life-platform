@@ -415,12 +415,9 @@ CANONICAL_URL_FMT = "https://averagejoematt.com/journal/posts/week-{seq:02d}/"
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def main():
-    ap = argparse.ArgumentParser(description="Rebuild public journal pages + manifest for resurrected chronicle lead-ins")
-    ap.add_argument("--apply", action="store_true", help="write to S3 (default: dry-run print of the plan)")
-    ap.add_argument("--no-invalidate", action="store_true", help="with --apply: skip the CloudFront invalidation")
-    args = ap.parse_args()
-
+def run(apply: bool = False, no_invalidate: bool = False) -> int:
+    """The full render sweep, callable in-process (#976: publish_genesis_preregistration.py
+    reuses it after writing its chronicle record). Same semantics as the CLI flags."""
     dynamodb = boto3.resource("dynamodb", region_name=REGION)
     table = dynamodb.Table(TABLE_NAME)
     s3 = boto3.client("s3", region_name=REGION)
@@ -476,7 +473,7 @@ def main():
     writes.append((MANIFEST_KEY, posts_json_str.encode("utf-8"), "application/json"))
     print(f"  manifest → {MANIFEST_KEY} ({len(posts_manifest)} posts)")
 
-    if not args.apply:
+    if not apply:
         print("\nDRY RUN — nothing written. Re-run with --apply to write S3 + invalidate CloudFront.")
         return 0
 
@@ -484,7 +481,7 @@ def main():
         s3.put_object(Bucket=S3_BUCKET, Key=key, Body=body, ContentType=ctype, CacheControl="max-age=300")
         print(f"WROTE s3://{S3_BUCKET}/{key} ({len(body)} bytes, {ctype})")
 
-    if args.no_invalidate:
+    if no_invalidate:
         print("Skipping CloudFront invalidation (--no-invalidate).")
         return 0
     try:
@@ -501,6 +498,14 @@ def main():
     except Exception as e:
         print(f"WARNING: CloudFront invalidation failed (pages ARE written; caches expire in <=300s anyway): {e}")
     return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Rebuild public journal pages + manifest for resurrected chronicle lead-ins")
+    ap.add_argument("--apply", action="store_true", help="write to S3 (default: dry-run print of the plan)")
+    ap.add_argument("--no-invalidate", action="store_true", help="with --apply: skip the CloudFront invalidation")
+    args = ap.parse_args()
+    return run(apply=args.apply, no_invalidate=args.no_invalidate)
 
 
 if __name__ == "__main__":
