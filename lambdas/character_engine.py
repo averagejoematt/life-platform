@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.3.1"  # #954: unboosted up-gate + monotone demotion buffer
+ENGINE_VERSION = "1.4.0"  # #957: up-gate judges the UNBLENDED raw — no-data days can never support a level-up
 
 # ── ADR-104: coverage floor below which a day carries no leveling signal ──
 DEFAULT_LEVEL_CHANGE_MIN_COVERAGE = 0.5
@@ -860,6 +860,7 @@ def _weighted_pillar_score(component_scores, components_config):
         # 50.0 below is a mathematical placeholder (F-09's "true neutral"),
         # never a real reading; callers must not present it as one.
         details["_not_instrumented"] = True
+        details["_raw_unblended"] = None  # #957: no measurement exists — nothing for the up-gate to credit
         return 50.0, details  # true neutral when no data [F-09]
 
     raw_score = weighted_sum / total_weight
@@ -873,6 +874,12 @@ def _weighted_pillar_score(component_scores, components_config):
     details["_confidence"] = round(confidence, 3)
     details["_data_coverage"] = round(data_coverage, 3)
     details["_not_instrumented"] = False
+    # #957: what the day actually measured, BEFORE the confidence blend pulls
+    # thin-data scores toward neutral 50. In total behavioral silence this is
+    # exactly 0 (absent behaviors score 0, absent devices drop out) — the blend
+    # is uncertainty smoothing for display/EMA, never performance, so it is the
+    # unblended value the level-up gate must judge (evaluate_level_changes).
+    details["_raw_unblended"] = round(_clamp(raw_score), 1)
 
     return round(_clamp(adjusted_score), 1), details
 
@@ -1054,6 +1061,7 @@ def evaluate_level_changes(
     data_coverage: Optional[float] = None,
     raw_score: Optional[float] = None,
     unadjusted_level_score: Optional[float] = None,
+    raw_score_unblended: Optional[float] = None,
 ) -> dict[str, Any]:
     """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]
 
@@ -1094,6 +1102,21 @@ def evaluate_level_changes(
       the previous, looser behavior — the gate never exceeds the target the
       pillar is actually climbing toward.) When the caller doesn't pass it
       (legacy paths), the gate falls back to the boosted target unchanged.
+
+      #957 blend fix: ``raw_score`` arrives AFTER the confidence blend
+      (_weighted_pillar_score pulls thin-coverage scores toward neutral 50),
+      so total behavioral silence still produced a positive "raw" floor
+      (~15.6 for movement: 0 performance at coverage 0.55). Atrophy pins the
+      level score at that same blended floor, the EMA converges down to it,
+      and after ~15-17 dark days ``round(15.6) >= target 16`` self-satisfied
+      every day — a character that never logs anything climbed with level_up
+      celebrations while mood read dormant. ADR-104 model decision: a day
+      with no behavioral data can never support a level-up, at any horizon.
+      Callers therefore pass ``raw_score_unblended`` — the day's measured
+      performance BEFORE the blend (weighted_sum/total_weight; exactly 0 in
+      silence) — and the up-gate judges THAT. The blend keeps smoothing the
+      EMA/display path; it just isn't performance, so it can't buy a climb.
+      Legacy callers that don't pass it fall back to the blended raw.
     """
     leveling = config.get("leveling", {})
 
@@ -1142,7 +1165,11 @@ def evaluate_level_changes(
     raw_gate_target = target_level
     if unadjusted_level_score is not None:
         raw_gate_target = min(target_level, max(1, min(100, round(unadjusted_level_score))))
-    day_supports_up = raw_score is None or round(raw_score) >= raw_gate_target
+    # #957: judge the day on what it MEASURED, not on the confidence-blended
+    # score — in total silence the unblended raw is 0, so no dark day can ever
+    # satisfy the up-gate (the blended floor ~15.6 could, once EMA converged).
+    gate_raw = raw_score if raw_score_unblended is None else raw_score_unblended
+    day_supports_up = gate_raw is None or round(gate_raw) >= raw_gate_target
 
     if coverage_hold:
         pass  # hold both streaks; levels frozen until real data returns
@@ -1479,6 +1506,9 @@ def compute_character_sheet(
             # #954: the raw-day up-gate compares against the pre-modifier EMA —
             # cross-pillar boosts raise the target, never the daily bar.
             unadjusted_level_score=pillar_level_scores[pillar_name],
+            # #957: the up-gate judges the day's UNBLENDED raw (0 in silence) —
+            # the confidence blend smooths uncertainty, it never buys a climb.
+            raw_score_unblended=pillar_details[pillar_name].get("_raw_unblended"),
         )
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
