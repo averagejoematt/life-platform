@@ -149,12 +149,26 @@ FULL_PK_PARTITIONS = [
     # intelligence like ENSEMBLE#disagreements; was scoped in phase_taxonomy but
     # absent here (2026-07-10 clean-sweep audit).
     ("ENSEMBLE#dispute", "ensemble_dispute", "all", {}, ""),
-    # Narrative arc: tombstone pre-genesis HISTORY# snapshots. STATE#current has no
-    # date in its sk so pregenesis-mode skips it — it is left for the first
-    # post-genesis coach-state run to recompute (avoids the phase="plateau" /
-    # experiment-phase attribute collision; the arc reader uses get_item, not the
-    # phase filter). ADR-077 finding 2.
+    # Narrative arc: pre-genesis HISTORY# snapshots AND STATE#current (dated via
+    # its entered_date attr — extract_date #946). The original "left for the first
+    # post-genesis run to recompute" assumption was WRONG (#946 engine-bugs-1):
+    # _detect_arc_transition only writes on a TRANSITION and has no path back to
+    # early_baseline, so a surviving 'setback' arc framed the new cycle's week 1
+    # as a mid-stall. The engine + orchestrator + chronicle readers now also
+    # guard tombstone/entered_date<genesis, so either layer alone is sufficient.
+    # NB: tombstoning overwrites this record's NARRATIVE phase attr with 'pilot'
+    # (the known attribute-name collision) — acceptable: the transition history
+    # lives in HISTORY# rows, and the next real transition rewrites it clean.
     ("NARRATIVE#arc", "narrative_arc", "pregenesis", {}, ""),
+    # Elena's narrative running state (#946 database-4): THREAD#/CALLBACK#/
+    # MOTIF#state/STANCE# all reference the outgoing cycle's story arc — pending
+    # CALLBACKs would otherwise "pay off" promises about a storyline the new
+    # cycle's readers never saw. Every row is datable (sk date, generated_at, or
+    # last_updated), so pregenesis both expires the old cycle and never touches
+    # post-genesis episode state on a re-run. elena_state_updater.gather_state
+    # filters tombstoned rows, so tombstoning (not status mutation) expires them
+    # reversibly, consistent with Interpretation B.
+    ("PERSONA#elena", "persona_elena", "pregenesis", {}, ""),
 ]
 
 # Coach state lives under pk=COACH#<coach_id>, NOT under USER#matthew#SOURCE#*.
@@ -210,7 +224,25 @@ def extract_date(item: dict) -> str | None:
             return _date.fromisocalendar(int(wm.group(1)), int(wm.group(2)), 1).isoformat()
         except (ValueError, AttributeError):
             pass
-    for attr in ("created_at", "stored_at", "computed_at", "generated_at", "captured_at", "ingested_at", "date_saved", "ended_at"):
+    # #946: entered_date dates NARRATIVE#arc STATE#current (the singleton the
+    # coach engine steers by — it carried the OLD cycle's 'setback' across the
+    # reset because nothing here could date it); last_updated dates MOTIF#state-
+    # style running-state singletons. Both only EXPAND pregenesis coverage to
+    # items that were previously skipped as undatable — and both make the wipe
+    # idempotent across re-runs: a post-genesis rewrite of the same sk carries a
+    # post-genesis date and is skipped, never re-tombstoned.
+    for attr in (
+        "created_at",
+        "stored_at",
+        "computed_at",
+        "generated_at",
+        "captured_at",
+        "ingested_at",
+        "date_saved",
+        "ended_at",
+        "entered_date",
+        "last_updated",
+    ):
         v = item.get(attr)
         if isinstance(v, str) and len(v) >= 10 and DATE_RE.match(v[:10]):
             return v[:10]
@@ -291,7 +323,14 @@ def assert_registry_coverage():
             f"taxonomy sources (phantom/misclassified): {sorted(phantom)}. Fix PARTITIONS or the taxonomy."
         )
     covered_pks = {pk for pk, *_ in FULL_PK_PARTITIONS} | {pk for pk, *_ in COACH_PARTITIONS}
-    required_pks = {f"USER#{USER_ID}", "ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "NARRATIVE#arc"} | {
+    required_pks = {
+        f"USER#{USER_ID}",
+        "ENSEMBLE#digest",
+        "ENSEMBLE#disagreements",
+        "ENSEMBLE#dispute",
+        "NARRATIVE#arc",
+        "PERSONA#elena",
+    } | {
         f"COACH#{c}"
         for c in (
             "sleep_coach",

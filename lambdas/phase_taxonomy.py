@@ -171,6 +171,12 @@ _PK_RULES: list = [
     (lambda pk, sk: pk == "ENSEMBLE#dispute", EXPERIMENT_SCOPED),  # #540 inter-coach threads
     (lambda pk, sk: pk == "ENSEMBLE#influence_graph", SYSTEM_STATE),  # static config
     (lambda pk, sk: pk == "NARRATIVE#arc", EXPERIMENT_SCOPED),
+    # #946: Elena's narrative running state (open THREADs, pending CALLBACKs,
+    # MOTIF#state, STANCE#) is per-cycle story continuity — pending callbacks
+    # surviving a reset would "pay off" promises the new cycle's readers never
+    # saw. Classified per-persona for now; the general PERSONA#* class ruling
+    # stays with #930.
+    (lambda pk, sk: pk == "PERSONA#elena", EXPERIMENT_SCOPED),
     # #545: the blind voice-fidelity scoreboard measures the COACHING ENGINE's design
     # (can a blind panel tell coaches apart), not a property of the current experiment
     # run — same rationale as the CROSS_PHASE "calibration" source (SOURCE_CLASS above):

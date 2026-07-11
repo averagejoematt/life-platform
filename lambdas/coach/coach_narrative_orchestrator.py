@@ -39,7 +39,7 @@ from decimal import Decimal
 
 import boto3
 from constants import EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # Structured logger
 try:
@@ -292,13 +292,45 @@ def _call_haiku(system, user_message, max_tokens=6000, temperature=0.3):
 
 
 def _get_item(pk, sk):
-    """Get a single DynamoDB item. Returns None if not found or on error."""
+    """Get a single DynamoDB item. Returns None if not found, hidden, or on error.
+
+    #946: get_item bypasses the query-level phase filter, so post-reset the wiped
+    cycle's singletons (COMPRESSED#latest, STANCE#latest, VOICE#state, NARRATIVE#arc
+    STATE#current, engagement STATE#current — tombstone=true / phase=pilot) kept
+    steering fresh-cycle briefs. Mirror the filter here so the honest fresh-start
+    defaults in _gather_all_state engage instead. Static config with no phase
+    attribute (e.g. ENSEMBLE#influence_graph CONFIG#v1) passes through unchanged."""
     try:
         resp = table.get_item(Key={"pk": pk, "sk": sk})
         item = resp.get("Item")
-        return _decimal_to_float(item) if item else None
+        if not singleton_visible(item):
+            return None
+        return _decimal_to_float(item)
     except Exception as e:
         logger.warning("get_item(%s, %s) failed: %s", pk, sk, e)
+        return None
+
+
+def _narrative_arc_state():
+    """NARRATIVE#arc STATE#current — read raw, NOT via _get_item (#946).
+
+    This record reuses the attribute name `phase` for its NARRATIVE phase
+    (early_baseline / setback / ...), so the generic experiment-phase guard in
+    _get_item would hide every legitimate arc state. Guard on tombstone + cycle
+    instead: an arc entered before the current genesis is the PREVIOUS cycle's
+    story (mirror of coach_computation_engine._detect_arc_transition's
+    staleness guard), and returning None here engages _gather_all_state's
+    honest fresh-start default (early_baseline, journey_day 1)."""
+    try:
+        item = table.get_item(Key={"pk": "NARRATIVE#arc", "sk": "STATE#current"}).get("Item")
+        if not item:
+            return None
+        item = _decimal_to_float(item)
+        if item.get("tombstone") or str(item.get("entered_date") or "") < EXPERIMENT_START_DATE:
+            return None
+        return item
+    except Exception as e:
+        logger.warning("narrative arc read failed: %s", e)
         return None
 
 
@@ -419,8 +451,8 @@ def _gather_all_state(coach_id):
             "note": "No computation results yet — deterministic engine has not run.",
         }
 
-    # 6. Narrative arc state
-    narrative_arc = _get_item("NARRATIVE#arc", "STATE#current")
+    # 6. Narrative arc state (#946: cycle-aware reader — see _narrative_arc_state)
+    narrative_arc = _narrative_arc_state()
     if not narrative_arc:
         logger.info("No narrative arc state — defaulting to early_baseline")
         narrative_arc = {

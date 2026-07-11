@@ -62,6 +62,7 @@ from web.site_api_autonomic import (
 
 # P1.1 Phase B extension (2026-05-27): coach + misc inline blocks extracted.
 from web.site_api_coach import (
+    _integrator_digest,
     handle_ai_analysis,
     handle_calibration,
     handle_coach,
@@ -747,9 +748,8 @@ def lambda_handler(event, context):
             # 1. Weekly priority from integrator
             _cd_priority = {"text": None, "coach_name": "Dr. Kai Nakamura", "generated_at": None}
             try:
-                _cd_int = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
+                _cd_int = _integrator_digest()  # #946: tombstone/phase-guarded
                 if _cd_int:
-                    _cd_int = _decimal_to_float(_cd_int)
                     _cd_priority["text"] = _cd_int.get("analysis", "")
                     _cd_priority["generated_at"] = _cd_int.get("generated_at", "")
             except Exception:
