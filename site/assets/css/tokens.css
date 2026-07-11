@@ -1125,7 +1125,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
    Desktop is untouched: full column layout, no scrollbar, until the tablet width.
    Documented in the mobile section of docs/DESIGN_SYSTEM_V5.md (#1011). */
 .table-scroll {
-  display: block; max-width: 100%; width: auto;
+  display: block; max-width: 100%; width: 100%;
   overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
 }
 
