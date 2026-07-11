@@ -10,7 +10,7 @@ never quoted directly). Occasionally interviews Board of Directors members.
 
 Each installment is:
   1. Emailed as a newsletter
-  2. Published to S3 blog (averagejoematt.com/blog/)
+  2. Published to the v4 journal (generated/journal/, /story/chronicle/)
   3. Stored in DynamoDB for continuity (last 4 installments fed to AI)
 
 AI Model: Sonnet 4.5 (temperature 0.6 for creative voice)
@@ -1346,7 +1346,7 @@ def _chronicle_day_n(date_str):
 
 
 def markdown_to_html(md_text):
-    """Convert Elena's markdown prose to clean HTML for email and blog."""
+    """Convert Elena's markdown prose to clean HTML for email and journal."""
     lines = md_text.strip().split("\n")
     html_parts = []
     in_blockquote = False
@@ -1449,7 +1449,7 @@ def parse_installment(raw_text):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url):
+def build_email_html(title, stats_line, body_html, week_num, date_str, series_url):
     """Build a newsletter-style email — clean white, editorial, readable."""
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
@@ -1499,7 +1499,7 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
   <!-- Footer -->
   <div style="padding:20px 40px;border-top:1px solid #e5e5e0;text-align:center;">
     <p style="font-family:-apple-system,sans-serif;font-size:11px;color:#999;margin:0;">
-      Read the full series at <a href="{blog_url}" style="color:#666;">averagejoematt.com/blog</a>
+      Read the full series at <a href="{series_url}" style="color:#666;">averagejoematt.com/story/chronicle</a>
     </p>
     <p style="font-family:-apple-system,sans-serif;font-size:12px;color:#888;margin:10px 0 4px;">Know someone who'd want this? They can get their own at <a href="https://averagejoematt.com/subscribe" style="color:#555;">averagejoematt.com/subscribe</a></p>
     <p style="font-family:-apple-system,sans-serif;font-size:9px;color:#bbb;margin:6px 0 0;">&#9874;&#65039; Personal health tracking only &mdash; not medical advice. Consult a qualified healthcare professional before making changes to your diet, exercise, or supplement regimen.</p>
@@ -1509,10 +1509,6 @@ def build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
 </body>
 </html>"""
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BLOG HTML
-# ══════════════════════════════════════════════════════════════════════════════
 
 # ══════════════════════════════════════════════════════════════════════════════
 # JOURNAL PUBLISHER (averagejoematt.com/journal/) — Signal aesthetic
@@ -1659,7 +1655,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     word_count = len(body_html.split())
     read_min = max(4, round(word_count / 250))
 
-    # Convert blog body_html (built for email) to prose-ready Signal HTML.
+    # Convert body_html (built for email) to prose-ready Signal HTML.
     # v5 template (#384): the live story-top five-door header + site-foot, editorial
     # cover as og:image, rel=canonical to the un-redirected /journal/posts/ URL, and an
     # end-of-read subscribe CTA. Chrome ported from scripts/v4_build_dispatches.py SHELL;
@@ -1883,363 +1879,6 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
     return f"https://averagejoematt.com/journal/posts/week-{week_num:02d}/"
 
 
-BLOG_POST_TEMPLATE = """<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{title} — The Measured Life</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <header>
-    <a href="index.html" class="series-title">The Measured Life</a>
-    <p class="byline">An ongoing chronicle by Elena Voss</p>
-    <nav class="site-nav"><a href="index.html">Archive</a><a href="about.html">About</a></nav>
-  </header>
-  <main>
-    <article>
-      <h1>"{title}"</h1>
-      <p class="meta">Week {week_num} &middot; {date_display}</p>
-      <p class="stats">{stats_line}</p>
-      <div class="body">
-        {body_html}
-      </div>
-    </article>
-    <nav class="post-nav">
-      {prev_link}
-      <a href="index.html">All installments</a>
-      {next_link}
-    </nav>
-  </main>
-  <footer>
-    <p>&copy; 2026 The Measured Life. A chronicle of one man's attempt to change.</p>
-  </footer>
-</body>
-</html>"""
-
-BLOG_CSS = """/* The Measured Life — Blog Styles */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body {
-  font-family: Georgia, 'Times New Roman', serif;
-  background: #fafaf9;
-  color: #333;
-  line-height: 1.75;
-}
-
-header {
-  max-width: 680px;
-  margin: 48px auto 0;
-  padding: 0 24px 20px;
-  border-bottom: 1px solid #e5e5e0;
-  text-align: center;
-}
-
-.series-title {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 12px;
-  letter-spacing: 3px;
-  text-transform: uppercase;
-  color: #999;
-  text-decoration: none;
-}
-
-.series-title:hover { color: #666; }
-
-.byline {
-  font-family: -apple-system, sans-serif;
-  font-size: 13px;
-  color: #999;
-  margin-top: 6px;
-}
-
-.site-nav {
-  margin-top: 12px;
-  font-family: -apple-system, sans-serif;
-  font-size: 12px;
-}
-
-.site-nav a {
-  color: #bbb;
-  text-decoration: none;
-  margin: 0 10px;
-  letter-spacing: 0.5px;
-}
-
-.site-nav a:hover { color: #666; }
-
-main {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
-
-article { padding: 32px 0; }
-
-h1 {
-  font-size: 28px;
-  font-weight: 400;
-  font-style: italic;
-  color: #1a1a1a;
-  line-height: 1.3;
-  margin-bottom: 8px;
-}
-
-.meta {
-  font-family: -apple-system, sans-serif;
-  font-size: 13px;
-  color: #999;
-}
-
-.stats {
-  font-family: -apple-system, sans-serif;
-  font-size: 12px;
-  color: #b0b0a8;
-  margin-top: 4px;
-  margin-bottom: 24px;
-}
-
-.body p {
-  margin-bottom: 18px;
-  font-size: 17px;
-}
-
-.body blockquote {
-  margin: 24px 0;
-  padding: 16px 24px;
-  border-left: 3px solid #d4d4c8;
-  background: #f0f0ea;
-  font-style: italic;
-  color: #555;
-  font-size: 16px;
-  line-height: 1.7;
-}
-
-.body blockquote strong {
-  font-style: normal;
-  color: #333;
-}
-
-.body hr {
-  border: none;
-  border-top: 1px solid #e5e5e0;
-  margin: 32px 0;
-}
-
-.body .signature {
-  text-align: center;
-  color: #999;
-  font-size: 14px;
-}
-
-.post-nav {
-  display: flex;
-  justify-content: space-between;
-  padding: 20px 0;
-  border-top: 1px solid #e5e5e0;
-  font-family: -apple-system, sans-serif;
-  font-size: 13px;
-}
-
-.post-nav a {
-  color: #666;
-  text-decoration: none;
-}
-
-.post-nav a:hover { color: #333; }
-
-footer {
-  max-width: 680px;
-  margin: 0 auto;
-  padding: 24px 24px 48px;
-  text-align: center;
-  font-family: -apple-system, sans-serif;
-  font-size: 11px;
-  color: #ccc;
-}
-
-@media (max-width: 720px) {
-  header, main, footer { padding-left: 20px; padding-right: 20px; }
-  h1 { font-size: 24px; }
-  .body p { font-size: 16px; }
-}"""
-
-
-def build_blog_index(installments):
-    """Generate the blog landing page from all installments."""
-    # Separate latest from archive
-    latest = installments[0] if installments else None
-    archive = installments  # all installments including latest
-
-    # Build featured/hero section for latest
-    hero_html = ""
-    if latest:
-        l_title = latest.get("title", "Untitled")
-        l_wn = latest.get("week_number", "?")
-        l_date = latest.get("date", "?")
-        try:
-            l_dt = datetime.strptime(l_date, "%Y-%m-%d")
-            l_date_display = l_dt.strftime("%B %-d, %Y")
-        except Exception:
-            l_date_display = l_date
-        l_filename = f"week-{int(l_wn):02d}.html" if l_wn is not None else "week-01.html"
-        l_kicker = "Prologue" if l_wn == 0 else f"Week {l_wn}"
-        l_stats = latest.get("stats_line", "")
-        l_stats_html = (
-            f'<p style="font-family:-apple-system,sans-serif;font-size:12px;color:#bbb;margin-top:4px;">{l_stats}</p>' if l_stats else ""
-        )
-        hero_html = f"""<div class="hero">
-      <div class="kicker">{l_kicker} &middot; {l_date_display}</div>
-      <h2><a href="{l_filename}">"{l_title}"</a></h2>
-      {l_stats_html}
-      <a href="{l_filename}" class="read-link">Read {l_kicker.lower()} &rarr;</a>
-    </div>"""
-
-    # Build archive list
-    entries_html = ""
-    for inst in archive:
-        title = inst.get("title", "Untitled")
-        wn = inst.get("week_number", "?")
-        date = inst.get("date", "?")
-        try:
-            dt = datetime.strptime(date, "%Y-%m-%d")
-            date_display = dt.strftime("%B %-d, %Y")
-        except Exception:
-            date_display = date
-        filename = f"week-{int(wn):02d}.html" if wn is not None else "week-01.html"
-        label = "Prologue" if wn == 0 else f"Week {wn}"
-        entries_html += f"""<li>
-          <a href="{filename}">\"{title}\" <span class="label">{label}</span></a>
-          <span class="date">{date_display}</span>
-        </li>\n"""
-
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>The Measured Life &mdash; by Elena Voss</title>
-  <link rel="stylesheet" href="style.css">
-  <style>
-    .hero {{ padding: 48px 0 40px; border-bottom: 1px solid #e5e5e0; }}
-    .hero .kicker {{ font-family: -apple-system, sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #999; margin-bottom: 16px; }}
-    .hero h2 {{ font-size: 32px; font-weight: 400; font-style: italic; color: #1a1a1a; line-height: 1.3; margin: 0 0 16px; }}
-    .hero h2 a {{ color: inherit; text-decoration: none; }}
-    .hero h2 a:hover {{ color: #444; }}
-    .hero .read-link {{ font-family: -apple-system, sans-serif; font-size: 13px; color: #333; text-decoration: none; letter-spacing: 0.5px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }}
-    .hero .read-link:hover {{ color: #000; border-color: #333; }}
-    .series-intro {{ padding: 32px 0; font-size: 16px; color: #777; line-height: 1.7; border-bottom: 1px solid #e5e5e0; }}
-    .archive-section {{ padding: 28px 0 0; }}
-    .archive-label {{ font-family: -apple-system, sans-serif; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #bbb; margin-bottom: 16px; }}
-    .archive-list {{ list-style: none; padding: 0; }}
-    .archive-list li {{ padding: 14px 0; border-bottom: 1px solid #f0f0ea; display: flex; justify-content: space-between; align-items: baseline; }}
-    .archive-list li a {{ color: #333; text-decoration: none; font-size: 17px; }}
-    .archive-list li a:hover {{ color: #000; }}
-    .archive-list .date {{ font-family: -apple-system, sans-serif; font-size: 12px; color: #bbb; white-space: nowrap; margin-left: 16px; }}
-    .archive-list .label {{ font-family: -apple-system, sans-serif; font-size: 11px; letter-spacing: 0.5px; color: #999; text-transform: uppercase; }}
-  </style>
-</head>
-<body>
-  <header>
-    <span class="series-title">The Measured Life</span>
-    <p class="byline">An ongoing chronicle by Elena Voss</p>
-    <nav class="site-nav"><a href="index.html">Archive</a><a href="about.html">About</a></nav>
-  </header>
-  <main>
-    {hero_html}
-    <div class="series-intro">
-      What happens when a 37-year-old tech executive decides to transform his health using a custom-built AI platform that tracks everything his body produces? "The Measured Life" is an ongoing chronicle following one man's attempt to change &mdash; tracked by 19 data sources, coached by artificial intelligence, and observed by a journalist who's seen it all. New installments every Wednesday.
-    </div>
-    <div class="archive-section">
-      <div class="archive-label">All Installments</div>
-      <ul class="archive-list">
-        {entries_html}
-      </ul>
-    </div>
-  </main>
-  <footer>
-    The Measured Life &middot; A chronicle by Elena Voss &middot; Est. 2026
-  </footer>
-</body>
-</html>"""
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# S3 BLOG PUBLISHING
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-def publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
-    """Write blog post HTML, CSS, and updated index to S3.
-
-    FEAT-12: If write_to_s3=False, returns (post_key, post_html, index_html) tuple
-    for draft storage without touching S3.
-    """
-    blog_prefix = "blog/"
-
-    try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        date_display = dt.strftime("%B %-d, %Y")
-    except Exception:
-        date_display = date_str
-
-    # Navigation links
-    prev_link = ""
-    if week_num > 1:
-        prev_wn = week_num - 1
-        prev_link = f'<a href="week-{prev_wn:02d}.html">&larr; Week {prev_wn}</a>'
-    next_link = ""  # current post is always latest
-
-    post_html = BLOG_POST_TEMPLATE.format(
-        title=title,
-        week_num=week_num,
-        date_display=date_display,
-        stats_line=stats_line,
-        body_html=body_html,
-        prev_link=prev_link,
-        next_link=next_link,
-    )
-
-    filename = f"week-{week_num:02d}.html"
-    post_key = blog_prefix + filename
-    index_html = build_blog_index(all_installments)
-
-    if not write_to_s3:
-        return post_key, post_html, index_html
-
-    # Write post
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=post_key,
-        Body=post_html,
-        ContentType="text/html",
-        CacheControl="max-age=3600",
-    )
-    logger.info(f"Blog post written: {filename}")
-
-    # Write/update CSS
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=blog_prefix + "style.css",
-        Body=BLOG_CSS,
-        ContentType="text/css",
-        CacheControl="max-age=86400",
-    )
-
-    # Rebuild index with all installments (newest first)
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=blog_prefix + "index.html",
-        Body=index_html,
-        ContentType="text/html",
-        CacheControl="max-age=300",
-    )
-    logger.info("Blog index updated")
-
-    return f"https://averagejoematt.com/blog/{filename}"
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # STORE INSTALLMENT
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2350,9 +1989,6 @@ def store_installment(
     confidence_badge_html="",  # BS-05
     status="published",
     approval_token=None,
-    draft_blog_post_html=None,
-    draft_blog_post_key=None,
-    draft_blog_index_html=None,
     draft_journal_post_html=None,
     draft_journal_post_key=None,
     draft_journal_posts_json=None,
@@ -2363,7 +1999,7 @@ def store_installment(
     weekly_signal_wins_losses=None,
     weekly_signal_board_quote=None,
 ):
-    """Store installment in DynamoDB for continuity and blog generation.
+    """Store installment in DynamoDB for continuity and journal generation.
 
     FEAT-12: In preview mode, status="draft" with approval_token + pre-built HTML blobs stored
     so chronicle-approve Lambda can publish to S3 without re-generating content.
@@ -2391,12 +2027,6 @@ def store_installment(
         }
         if approval_token:
             item["approval_token"] = approval_token
-        if draft_blog_post_html:
-            item["draft_blog_post_html"] = draft_blog_post_html
-        if draft_blog_post_key:
-            item["draft_blog_post_key"] = draft_blog_post_key
-        if draft_blog_index_html:
-            item["draft_blog_index_html"] = draft_blog_index_html
         if draft_journal_post_html:
             item["draft_journal_post_html"] = draft_journal_post_html
         if draft_journal_post_key:
@@ -3071,7 +2701,10 @@ def lambda_handler(event: dict, context) -> dict:
             },
         )
 
-    blog_url_draft = f"https://averagejoematt.com/blog/week-{week_num:02d}.html"
+    # The email footer points readers at the live chronicle archive (the /blog/ path
+    # was retired — it 404'd, #969). The per-post journal URL is returned by
+    # publish_to_journal below; the "full series" link is the archive listing.
+    series_url = "https://averagejoematt.com/story/chronicle/"
 
     # ── Privacy gate (fail-closed) — never publish OR store a leaking installment.
     # Prompt rules are the first line; this deterministic gate is the guarantee.
@@ -3146,20 +2779,6 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info("FEAT-12: PREVIEW_MODE — building draft artifacts")
 
         try:
-            blog_post_key, blog_post_html, blog_index_html = publish_to_blog(
-                title,
-                stats_line,
-                body_html,
-                week_num,
-                date_str,
-                all_installments,
-                write_to_s3=False,
-            )
-        except Exception as e:
-            logger.warning(f"FEAT-12: Failed to build blog artifacts: {e}")
-            blog_post_key = blog_post_html = blog_index_html = None
-
-        try:
             journal_post_key, journal_post_html, journal_posts_json = publish_to_journal(
                 title,
                 stats_line,
@@ -3173,7 +2792,7 @@ def lambda_handler(event: dict, context) -> dict:
             logger.warning(f"FEAT-12: Failed to build journal artifacts: {e}")
             journal_post_key = journal_post_html = journal_posts_json = None
 
-        draft_email_html = build_email_html(title, stats_line, body_html, week_num, date_str, blog_url_draft)
+        draft_email_html = build_email_html(title, stats_line, body_html, week_num, date_str, series_url)
 
         approval_token = _secrets.token_hex(32)
         store_installment(
@@ -3189,9 +2808,6 @@ def lambda_handler(event: dict, context) -> dict:
             confidence_badge_html=_conf_badge_html,
             status="draft",
             approval_token=approval_token,
-            draft_blog_post_html=blog_post_html,
-            draft_blog_post_key=blog_post_key,
-            draft_blog_index_html=blog_index_html,
             draft_journal_post_html=journal_post_html,
             draft_journal_post_key=journal_post_key,
             draft_journal_posts_json=journal_posts_json,
@@ -3226,12 +2842,6 @@ def lambda_handler(event: dict, context) -> dict:
         _invoke_elena_state_updater(date_str)
 
         try:
-            blog_url = publish_to_blog(title, stats_line, body_html, week_num, date_str, all_installments)
-        except Exception as e:
-            logger.warning(f"Blog publish failed: {e}")
-            blog_url = blog_url_draft
-
-        try:
             journal_url = publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments)
             logger.info(f"[journal] Published: {journal_url}")
         except Exception as e:
@@ -3251,7 +2861,7 @@ def lambda_handler(event: dict, context) -> dict:
             except Exception as e:
                 logger.warning(f"[#405] share kit S3 write failed (non-fatal): {e}")
 
-        email_html = build_email_html(title, stats_line, body_html, week_num, date_str, blog_url)
+        email_html = build_email_html(title, stats_line, body_html, week_num, date_str, series_url)
         if share_kit_block:
             email_html = email_html.replace("</body>", share_kit_block + "</body>", 1)
         subject = f'The Measured Life — Week {week_num}: "{title}"'
