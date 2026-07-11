@@ -1,6 +1,6 @@
 # R22 — The Consultancy Review (prompt + execution plan)
 
-> **Status:** DRAFT — awaiting Matthew's green-light before execution.
+> **Status:** EXECUTED 2026-07-06 — closure record in [REVIEW_2026-07-06_R22.md](REVIEW_2026-07-06_R22.md); kept as the charter template (now generalized in `.claude/commands/platform-review.md`).
 > **What this is:** Part 1 is the *prompt* (the charter handed to the engagement). Part 2 is
 > the *plan against that prompt* (how a Fable session executes it without burning the token
 > budget before completion).
