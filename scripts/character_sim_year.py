@@ -33,7 +33,7 @@ import sys
 from datetime import date, timedelta
 from pathlib import Path
 
-REPO = Path("/Users/matthewwalker/Documents/Claude/life-platform")
+REPO = Path(__file__).resolve().parents[1]  # #957: repo-relative — a worktree run must simulate ITS OWN engine, not main's
 sys.path.insert(0, str(REPO / "lambdas"))
 
 import character_engine as ce  # noqa: E402
@@ -49,12 +49,18 @@ GENESIS = date(2026, 7, 12)
 
 def _scripted(pillar):
     def fn(data, config):
-        raw, cov = data["_script"][pillar]
+        entry = data["_script"][pillar]
+        raw, cov = entry[0], entry[1]
+        # #957: scripts may carry the pre-blend raw as a third element (dark
+        # days: 0 performance under a positive blended floor). 2-tuples mean
+        # blend-free days (coverage >= 0.8 -> blended == unblended == raw).
+        unblended = entry[2] if len(entry) > 2 else (raw if cov > 0 else None)
         details = {
             "_confidence": min(1.0, cov / 0.80) if cov > 0 else 0.0,
             "_data_coverage": cov,
             "_absent_behaviors": [],
             "_not_instrumented": cov == 0.0,
+            "_raw_unblended": unblended,
         }
         return raw, details
 
@@ -98,14 +104,37 @@ def dark_day(pillar):
             wsum += DARK_MEASURED_ALIVE[pillar][name] * w
             tsum += w
     if tsum == 0:
-        return 50.0, 0.0  # not instrumented that day
+        return 50.0, 0.0, None  # not instrumented that day
     raw = wsum / tsum
     cov = tsum / maxw
     conf = min(1.0, cov / 0.80)
-    return round(raw * conf + 50.0 * (1 - conf), 1), round(cov, 3)
+    # (blended raw, coverage, UNBLENDED raw) — #957: the third value is what
+    # the day actually measured, the value the up-gate now judges.
+    return round(raw * conf + 50.0 * (1 - conf), 1), round(cov, 3), round(raw, 1)
 
 
 DARK = {p: dark_day(p) for p in PILLARS}
+
+
+def silent_day(pillar):
+    """#957: TOTAL silence — behaviors unlogged (score 0 at full weight,
+    ADR-104), no device streams at all. Unblended raw is exactly 0; the
+    confidence blend still floors the blended raw at ~12-16."""
+    comps = CONFIG["pillars"][pillar]["components"]
+    tsum = maxw = 0.0
+    for cfg in comps.values():
+        w = cfg.get("weight", 0)
+        maxw += w
+        if cfg.get("behavioral"):
+            tsum += w
+    if tsum == 0:
+        return 50.0, 0.0, None  # pure-device pillar: not instrumented that day
+    cov = tsum / maxw
+    conf = min(1.0, cov / 0.80)
+    return round(50.0 * (1 - conf), 1), round(cov, 3), 0.0
+
+
+SILENT = {p: silent_day(p) for p in PILLARS}
 
 # Per-pillar personality offsets for good days
 OFFSET = {"sleep": 3, "movement": -2, "nutrition": 0, "metabolic": 1, "mind": -3, "consistency": 2}
@@ -181,6 +210,16 @@ def scen_slow(seed=5):
     return lambda i: (good_day(rng, 45 + 25 * i / 419), dict(ENGAGED))
 
 
+def scen_silent():
+    """#957: a fresh character that NEVER logs anything, from genesis."""
+
+    def fn(i):
+        eng = {"presence_class": "dark", "gap_days": i + 1, "planned_pause": False}
+        return dict(SILENT), eng
+
+    return fn
+
+
 # ---------------------------------------------------------------------------
 # Reporting
 # ---------------------------------------------------------------------------
@@ -239,9 +278,9 @@ def analyze(name, recs, note=""):
 
 def main():
     print(f"engine v{ce.ENGINE_VERSION} | config v{CONFIG['_meta']['version']} | genesis {GENESIS}")
-    print("dark-day (raw, coverage) derived from live config absence math:")
+    print("dark-day (blended raw, coverage, unblended raw) derived from live config absence math:")
     for p in PILLARS:
-        print(f"   {p:<14} {DARK[p]}")
+        print(f"   {p:<14} {DARK[p]}   silent: {SILENT[p]}")
 
     # (a) steady-good 75 — production-real
     recs_a = run(scen_steady(75), 420)
@@ -270,6 +309,16 @@ def main():
         f"  >> pre-dark level (day 89): {pre} | min during/after dark: {dark_min} "
         f"(drop {pre - dark_min}) | day recovered to pre-dark: {rec_day}"
     )
+    # #957: during the 30-day dark window the behavioral pillars (unblended raw
+    # ~0-5) must never climb; sleep/metabolic keep streaming wearable data and
+    # are judged on what they actually measured.
+    behavioral_dark = {"movement", "nutrition", "mind", "consistency"}
+    dark_ups = [(i + 1, ev["pillar"]) for i in range(90, 120) for ev in recs_c[i]["level_events"] if ev["type"] == "level_up"]
+    dark_ups_behavioral = [u for u in dark_ups if u[1] in behavioral_dark]
+    print(
+        f"  >> #957 level_up in dark window: behavioral pillars {dark_ups_behavioral or 'NONE'} (MUST be none) | "
+        f"all: {dark_ups or 'none'}"
+    )
     # daily zoom of the dark window
     print("  >> dark-window zoom (day: char level, mood, movement lvl/score, mind lvl):")
     for i in range(85, 135, 5):
@@ -295,6 +344,27 @@ def main():
     # (e) slow improver 45 -> 70
     recs_e = run(scen_slow(), 420)
     analyze("e: slow improver raw 45 -> 70 linear", recs_e)
+
+    # (f) #957 honesty invariant: fresh character, TOTAL silence from genesis.
+    # Before the fix this climbed to L16 with 12 level_up celebrations in 60
+    # days (blend floor 15.6 -> atrophy pins level_score -> EMA converges ->
+    # round(15.6) >= 16 self-satisfies) while mood read dormant.
+    recs_f = run(scen_silent(), 90)
+    analyze("f: fresh character, TOTAL silence from genesis (#957)", recs_f)
+    climbs = [
+        (i + 1, ev) for i, r in enumerate(recs_f) for ev in r["level_events"] if ev["type"] in ("level_up", "tier_up", "character_level_up")
+    ]
+    dormant_climbs = [
+        (i + 1, ev["type"])
+        for i, r in enumerate(recs_f)
+        if r["character_mood"] == "dormant"
+        for ev in r["level_events"]
+        if ev["type"] == "level_up"
+    ]
+    print(
+        f"  >> #957 invariant — 90 silent days: climbs {len(climbs)} (MUST be 0) | "
+        f"level_up on dormant days {len(dormant_climbs)} (MUST be 0) | final char level {recs_f[-1]['character_level']} (MUST be 1)"
+    )
 
     # focused probe: XP mechanics on a NOT-INSTRUMENTED pillar (relationships)
     print(f"\n{'=' * 78}\nPROBE: relationships (not instrumented, coverage 0.0) XP over scenario (a)")

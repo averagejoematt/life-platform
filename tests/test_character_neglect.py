@@ -132,6 +132,88 @@ def test_fourteen_dark_days_zero_level_up_zero_tier_up():
     assert state["level"] <= 8  # never climbed; may honestly fall
 
 
+def test_sixty_dark_days_zero_level_up_beyond_the_blend_floor():
+    """#957: the 14-day guard above stops at exactly the horizon where the bug
+    re-opens. In total silence the confidence blend floors the BLENDED raw at
+    ~15.6 (0 performance at coverage 0.55), atrophy pins level_score at that
+    floor, the EMA converges down to it, and from ~day 15-17 the old gate
+    (round(15.6)=16 >= target 16) self-satisfied every single dark day. The
+    fixed gate judges the UNBLENDED raw — exactly 0 in silence — so no dark
+    day can support a level-up at ANY horizon. Full-orchestrator replay:
+    level-8 pillar with a healthy history, then 60 days of total silence."""
+    prev = {
+        "character_level": 8,
+        "pillar_movement": {"level": 8, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 850},
+    }
+    histories = {"movement": [60.0] * 14, "sleep": [70.0] * 14}
+    events = []
+    for gap in range(1, 61):
+        data = {"date": "2026-07-08", "engagement_state": _dark(gap)}  # NO data at all: behaviors absent, wearable off
+        rec = compute_character_sheet(data, prev, histories, CONFIG)
+        for p in ("movement", "sleep"):
+            histories[p].append(rec[f"pillar_{p}"]["raw_score"])
+        events.extend(rec["level_events"])
+        prev = rec
+
+    ups = [e for e in events if e["type"] in ("level_up", "tier_up", "character_level_up")]
+    assert ups == [], ups
+    assert rec["pillar_movement"]["level"] <= 8  # never climbed; may honestly fall
+
+
+def test_fresh_character_never_logs_stays_level_one_forever():
+    """#957's worst case: a fresh cycle-5 character that NEVER logs anything
+    reached level 16 with 12 level_up celebrations in 60 days while mood read
+    'dormant'. Now: level 1, zero celebrations, and never a level_up event on
+    a dormant day — the honesty headline at any horizon."""
+    prev = None
+    histories = {"movement": [], "sleep": []}
+    events, dormant_ups = [], []
+    for gap in range(1, 76):
+        data = {"date": "2026-07-08", "engagement_state": _dark(gap)}
+        rec = compute_character_sheet(data, prev, histories, CONFIG)
+        for p in ("movement", "sleep"):
+            histories[p].append(rec[f"pillar_{p}"]["raw_score"])
+        events.extend(rec["level_events"])
+        if rec["character_mood"] == "dormant":
+            dormant_ups.extend(e for e in rec["level_events"] if e["type"] == "level_up")
+        prev = rec
+
+    assert [e for e in events if e["type"] in ("level_up", "tier_up", "character_level_up")] == []
+    assert dormant_ups == []
+    assert rec["character_level"] == 1
+    assert rec["pillar_movement"]["level"] == 1
+    assert rec["character_mood"] == "dormant"
+
+
+def test_up_gate_judges_unblended_raw_not_the_blend_floor():
+    """Direct unit shape of #957: EMA converged to the blend floor (target 16),
+    blended raw sits AT the floor (15.6 -> rounds to 16, the old gate passed),
+    but the day actually measured 0. The gate must hold — forever."""
+    prev = {"level": 8, "tier": "Foundation", "streak_above": 99, "streak_below": 0, "xp_total": 0}
+    result = evaluate_level_changes("movement", 15.6, prev, CONFIG, data_coverage=0.55, raw_score=15.6, raw_score_unblended=0.0)
+    assert result["level"] == 8
+    assert result.get("events") == []
+    assert result["streak_above"] == 99  # held, not grown — a silent day carries no up-signal
+
+
+def test_up_gate_unblended_raw_still_allows_honest_climbs():
+    """A genuinely-lived thin-coverage day is judged on what it MEASURED: a
+    real 60-performance day at coverage 0.55 blends down to 56.9 (the blend
+    pulls above-50 raws toward neutral), which the old gate would have held
+    below a target of 60 — the unblended 60 passes. Uncertainty smoothing
+    cuts both ways; performance credit follows the measurement."""
+    prev = {"level": 30, "tier": "Momentum", "streak_above": 5, "streak_below": 0, "xp_total": 0}
+    result = evaluate_level_changes("movement", 60.0, prev, CONFIG, data_coverage=0.55, raw_score=56.9, raw_score_unblended=60.0)
+    assert result["level"] > 30
+
+
+def test_up_gate_legacy_callers_fall_back_to_blended_raw():
+    """Callers that don't pass raw_score_unblended keep the pre-#957 gate."""
+    prev = {"level": 8, "tier": "Foundation", "streak_above": 5, "streak_below": 0, "xp_total": 0}
+    result = evaluate_level_changes("movement", 26.0, prev, CONFIG, data_coverage=1.0, raw_score=30.0)
+    assert result["level"] > 8
+
+
 def test_up_gate_compares_raw_to_target_not_current_level():
     """Direct unit shape of the scale bug: level 8, EMA target 26, crashed raw 9.
     The old gate (9 >= 8+1) passed; the fixed gate (9 >= 26) must hold."""
