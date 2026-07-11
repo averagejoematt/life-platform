@@ -298,7 +298,8 @@ AI powered down.** Four layers, each with a named owner-mechanism:
      references a retired concept. **Retiring something = adding its tombstone rule in
      the same PR** (that's the generalized #781 lesson);
    - `scripts/check_doc_index.py` — every page is indexed from the wiki home, carries
-     the status header, and the freshness report lists canonical pages unverified >90d.
+     the status header, the >90d advisory freshness report, and a **blocking 180d ceiling**
+     (a canonical page unverified that long fails CI).
 3. **Process gates.** The PR template carries a "Docs impact" checklist; the wrap skill's
    step (e) is a hard gate — every session ends with `**Docs:** <pages>` or
    `**Docs:** none needed — <reason>` in the handover, checkers green. The deploy skill
