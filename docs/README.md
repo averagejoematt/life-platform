@@ -68,6 +68,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [RUNBOOK.md](RUNBOOK.md) | Operate + troubleshoot everything |
 | [RUNBOOK_REENTRY.md](RUNBOOK_REENTRY.md) | OAuth re-auth / data-source re-entry |
 | [SITE_AUTHORING.md](SITE_AUTHORING.md) | Add/change a public-site page end-to-end |
+| [ADD_A_COACH.md](ADD_A_COACH.md) | The paved path for extending the coach roster (persona registry → engine ids → portrait/quality gates → deploy) |
 | [TESTING.md](TESTING.md) | Test layers, run commands, golden harnesses, visual QA |
 | [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) | Restore procedures (PITR + S3 — exercised 2026-07-10) |
 | [REVIEW_METHODOLOGY.md](REVIEW_METHODOLOGY.md) · [SITE_REVIEW_METHODOLOGY.md](SITE_REVIEW_METHODOLOGY.md) | Run an architecture / site audit |
