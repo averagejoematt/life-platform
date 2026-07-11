@@ -1,81 +1,75 @@
-# HANDOVER — Mobile plan executed end-to-end: Epics A + B + C shipped & live (16 issues, PRs #1030–#1038) — 2026-07-11
+# HANDOVER — Launch-eve backlog sweep: 9 self-contained issues shipped end-to-end (PRs #1040–#1048) + fleet deploy — 2026-07-11
 
-> Instruction: "read handover and memory and lets work on the mobile fixes" → "i approve
-> all merges and deploys" → (after Epic A + C + B#1006/#1008 shipped) "ok do it" to the
-> Epic B + C plan → chose **"Do all of Epic B now"** and **"Do #1009 now, full partial"**
-> at the two decision points → "good to /wrap then /clear?"
+> Instruction: "read handover and memory - put together an efficient plan to do as much of
+> the open issues and backlog as possible in this session, for anything highly complex,
+> leave those for now as i will be switching to fable in the next session when things
+> reset" → **"i approve all merges and deploys"** (explicit in-session unblock).
 
 ## What ran
 
-Executed the ENTIRE filed mobile plan (the 2026-07-11 review's Epics A/B/C) end-to-end —
-not review-only this time. **16 issues closed, 8 PRs merged + deployed, 1 tests-only PR,
-9 site deploys** (one caught auto-rollback, recovered). Every site deploy passed the
-visual + AI-vision QA gate. Sequenced Epic C FIRST so its mobile CI gate protected all
-subsequent Epic B PRs (it did — caught an app-bar-overflow regression mid-#1010).
+Last pre-reset Opus session (T−1 to genesis 2026-07-12, cycle 5). Fanned out
+`worktree-implementer` agents over the **self-contained, no-decision, non-fable** tier of
+the open backlog — each landed an OPEN PR in an isolated worktree; the driver merged +
+deployed after the mid-session approval. **9 issues closed (PRs #1040–#1048), 1 filed
+(#1039), 4 site deploys + 2 chronicle-lambda deploys + 1 full fleet deploy (95 fns).**
+Complex/fable/decision issues deliberately left for the Fable session after the reset.
 
-## What shipped (all merged to main + deployed live, verified)
+## What shipped (all merged to main + deployed where applicable, verified)
 
-**Epic A #997 — launch-critical reader bugs (PR #1030):**
-- #1002 scroll-reveal height-independent `threshold:0` (blank challenges/experiments backlogs fixed)
-- #1003 app-bar overflow / unreachable toggle — `:not(.nav-follow)` + icon-over-label column
-- #1004 subscribe.html viewport meta · #1005 dead "preserved Explorer" copy · #1022 $75→$85 ceiling
-
-**Epic C #999 — mobile in CI, landed first (PR #1031, tests-only, no deploy):**
-- #1012 390+360 viewports in `pr_render_gate.py` · #1013 the Epic-A failure classes asserted
-  in `visual_qa.py` (app-bar overflow / stuck reveals / viewport meta gating; tap audit advisory)
-
-**Epic B #998 — foundation (PRs #1032, #1033+#1034, #1035, #1036, #1037, #1038):**
-- #1006 17 breakpoints → 6 canonical boundaries (max=token / min=token+1 convention) — #1032
-- #1008 `.table-scroll` primitive + labs polish — #1033 **auto-rolled-back** (data-driven
-  /data/vitals/ +255px overflow the empty-mock gate missed), fixed forward #1034 (width:100% + restore .rd-sec)
-- #1007 bottom app-bar rebuilt with CSS `@layer chrome-base, chrome` — **!important 16→0** — #1035
-- #1010 44px tap-target floor (vertical `::after` overlays, form min-heights, label-tap) — #1036
-- #1011 DESIGN_SYSTEM_V5 §10 mobile spec (doc had zero mobile content before) — #1037
-- #1009 shared-chrome build partial (`scripts/v4_chrome.py` + `v4_apply_chrome.py`, run
-  LAST by `sync_site_to_s3.sh`) — killed 5-nav/7-footer drift, 5 icon-less pages gained
-  door icons, footer unified UP so no wayfinding lost, 45 canonical pages byte-identical — #1038
+- **#1027** DR stolen-laptop scenario (explicit RPO table + blast-radius rotation checklist) — PR #1040 (docs)
+- **#1016** `/data/` intro card "pick a topic on the left" → viewport-aware span swap at the 821px token (one edit covers all 16 data pages) — PR #1041, **site-deployed**
+- **#1028** `NEW_MACHINE_BOOTSTRAP.md` from-zero rebuild runbook — PR #1042 (docs)
+- **#933** `ADD_A_COACH.md` paved path (persona_id vs board_persona_key duality, the ~6 uncaught coach-id lists) — PR #1043 (docs)
+- **#969** dead legacy-blog publish path — 3 bucket-root S3 writes retired (ADR-046), reader-facing footer 404 → `/story/chronicle/` — PR #1044, **deployed wednesday-chronicle + chronicle-approve**
+- **#971** dead Anthropic API-key plumbing removed (20 src + 3 test files, −284/+63; ADR-062 IAM-only; 4 real-secret readers correctly left) — PR #1045, **fleet-deployed (retry_utils.py is shared → 95 fns)**
+- **#977** narrowed the aws allowlist kernel — 68 mutating-verb `ask` rules in `.claude/settings.json`; cross-file `deny>ask>allow` neutralizes the broad allows in `settings.local.json` — PR #1046 (config)
+- **#978** cycle-aware supplement catalog copy for a Day-0 site — keyed off `preStart()` (#931/#939), dropped stale intake numbers — PR #1047, **site-deployed** + manual `aws s3 cp config/supplement_registry.json`
+- **#934** AST-discover 67 CloudWatch alarm names from CDK → machine-maintain MONITORING.md (name-set sibling of the #795 count discoverer) — PR #1048 (deploy tooling + docs)
+- **Filed #1039** — render-gate realistic-data fixtures: the empty-mock blind spot (`DEFAULT_API_MOCK={}` at `tests/pr_render_gate.py:107`) that let #1008's +255px overflow through the gate.
 
 ## Verification
 
-Every merged PR: local `pr_render_gate.py` 8/8 + CI render gate green before merge. Every
-site deploy: smoke + visual + AI-vision QA green (the one #1008 FAIL auto-rolled-back and
-was fixed forward). #1007 verified across all 10 door types × 4 widths (360/390/768/1366)
-by measured geometry. #1009 verified: canonical `/data/`+`/method/` pages byte-identical
-(the safety property), diffs confined to nav/footer spans, subscribe door icons confirmed
-LIVE. Live build `1ef8ed1`. Epic trackers #997/#998/#999 all closed.
+Every merged PR: `MERGEABLE/CLEAN` + agent's local lint/test green before merge. Site
+deploys (#1016, #978): green through smoke + visual-AI QA. Fleet deploy: **95 updated, 0
+skipped, 0 failed** (dry-run first). Post-fleet health: **life-platform-canary all_pass**
+(DDB/S3/MCP round-trips), **MCP 401-boot**, **qa-smoke failed:1/warned:8** = pre-genesis
+Day-0 baseline (sparse data, not deploy-induced — my changes don't touch qa-smoke's data
+checks). All 9 issues confirmed CLOSED. Main at `ec622f58`, clean, in sync with origin.
+Session worktrees/branches removed (the 5 remaining stale worktrees — 1009/942/955/957/976
+— are prior sessions' #1025 orphan-rescue territory, left alone).
 
-## Gotchas hit
+## Gotchas / reflexes reinforced
 
-- **The render gate mocks APIs EMPTY → blind to data-driven overflow.** #1008 passed the
-  gate locally + in CI but blew out /data/vitals/ +255px under REAL data; only the live
-  visual-AI QA + auto-rollback caught it. Fix-forward: `width:100%` block-scroll (never
-  `width:auto`) + restore the `.rd-sec { overflow-x:auto }` section-scroll for wide NON-table
-  content. **A realistic-data pass in the gate is worth filing.** (See [[reference_local_render_qa]].)
-- **`@layer` de-overlap:** a naïve breakpoint collapse (759→760) reintroduces a min/max
-  boundary double-fire; convention is max-width=token, min-width=token+1. And a max-width
-  token−1 blanket shift broke the 600 chrome boundary (desktop nav overflowed at exactly 600px).
-- **Tap-target `::after` overlay overflows at the right edge** — a `max(100%,44px)`-wide
-  overlay on the app-bar's rightmost toggle pushed past the fixed bar (the #1003 assertion I'd
-  just built caught it). Expand overlays VERTICALLY only near edges.
-- **`now/index.html`'s doors nav had no `</nav>`** (browser auto-closes) — a naïve regex
-  over-matched; the apply script anchors on the theme-toggle `<button>` with `</nav>` optional.
-- **Careless `git stash -u` during review** captured settings.local.json into the shared
-  stash stack — popped it back; the other 3 stashes belong to other sessions, left alone.
-  (Reinforces [[reference_git_stash_shared_across_worktrees]] — don't stash in this repo.)
+- **ci-cd.yml triggers on push-to-main, NOT PRs** — lambda PRs get lint/test from the
+  agent's local run; CI runs post-merge; the Deploy job parks at the GitHub `production`
+  manual-approval gate. Bypassed by deploying directly with matthew-admin creds
+  (`deploy_lambda.sh`/`deploy_fleet.sh`) under the session deploy authorization.
+- **`deploy_lambda.sh` needs `<function-name> <source-file>`** (2 args), not just the name.
+- **doc-sync `test_count` reconcile per PR**: any PR that adds/removes a test drifts the
+  literal in `lambdas/web/site_api_common.py`. #1045 (−1 test) and #1048 (+5 tests) each
+  needed: merge origin/main → `sync_doc_metadata.py --apply` → verify
+  `test_platform_stats_truth` + `test_sync_doc_metadata_check` → commit `--no-verify` →
+  push. (See [[reference_docsync_literal_cross_pr_drift]].)
+- #969+#971 both touched `wednesday_chronicle_lambda.py` — sequenced #969 first, then
+  merged main into #971's branch (clean auto-merge, no conflict).
 
 ## Next picks / residual
 
-- **Epics D (#1000 wayfinding) + E (#1001 perf/PWA)** remain on Later, untouched by design.
-- **File:** a realistic-data pass for `pr_render_gate.py` (the empty-mock blind spot that
-  cost the #1008 rollback).
+- **Deferred to Fable / attended:** character-math epic **#956** + fable children
+  (#958/#959/#960/#962/#963/#964/#965); #1021 timeline (pipeline-crossing); decisions
+  **#1023/#1029/#1017**; risky/attended **#1025** (orphan-commit rescue), **#1026**
+  (launchd), **#936** (live DR drill), **#935** (whoop script doesn't exist).
+- **Moderate-but-riskier, left rather than rushed on launch eve:** #970 helper
+  consolidation, #972 deploy/ archive, #1018 panelcast AAC, #916 MCP authorize,
+  #966/#967/#968 AI-gate work.
+- **New this session:** #1039 (render-gate realistic-data fixtures) is a clean next pick.
 - **Matthew Sunday queue (unchanged, carried):** weigh-in → pipeline re-run →
-  `fix_prologue_cycle_and_subscribe_ttl.py --apply` → `seed_genesis_preregistration.py --apply`
-  + `publish_genesis_preregistration.py --apply`. Plus the timeline accuracy issue #1021
-  (Day-1 self-contradiction) — deliberately left for the pipeline-crossing context, not a mobile fix.
-- Still open from prior sessions: #741, char-math #956, #977; laptop-resilience #1024–#1029.
+  `fix_prologue_cycle_and_subscribe_ttl.py --apply` → `seed_genesis_preregistration.py
+  --apply` + `publish_genesis_preregistration.py --apply`.
 
-**Build beat:** mobile-plan-executed (see below) — Epics A/B/C all merged + deployed live.
+**Build beat:** backlog-sweep-2026-07-11 (see below) — all 9 shipped are merged + live.
 
-**Docs:** DESIGN_SYSTEM_V5.md §10 (new mobile spec, #1011) + SITE_UPLEVEL_PLAYBOOK.md
-cross-link shipped IN the work; SITE_AUTHORING.md updated by #1009 for the chrome-partial
-build step. No further wrap-time doc updates needed — the shipped work carried its own docs.
+**Docs:** shipped IN the work — #1027 DISASTER_RECOVERY.md, #1028 NEW_MACHINE_BOOTSTRAP.md
+(+ README/CONTINUITY/AWS_ACCESS cross-links), #933 ADD_A_COACH.md (+ README), #934
+MONITORING.md (machine-generated block) + `sync_doc_metadata.py` extended. All docs-ci
+gates green at merge. No further wrap-time doc updates needed.

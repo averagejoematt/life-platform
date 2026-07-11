@@ -850,6 +850,28 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1038"
         }
       ]
+    },
+    {
+      "id": "2026-07-11-clean-house-before-day-1",
+      "date": "2026-07-11",
+      "title": "The day before Day 1, I cleaned house instead of adding features",
+      "shipped": "With genesis one day out, the session took the opposite of a feature sprint: nine self-contained backlog issues, each removed a liability or closed a gap rather than adding surface. Dead code went first — an entire Anthropic API-key plumbing path (the platform runs inference through AWS with no such key) was pulled out across twenty files, and a legacy blog publisher that had been quietly writing three orphaned files to storage on every issue was retired, its reader-facing dead link pointed back at the live archive. A real security gap closed: mutating AWS commands — creating roles, editing the budget, deleting infrastructure — could run from this environment without a prompt; sixty-eight guard rules now make every destructive verb ask first. The monitoring docs stopped being hand-maintained: a parser now reads all sixty-seven alarm names straight from the infrastructure code so the page can't drift. And three runbooks were written for the ugly scenarios — rebuilding from a stolen laptop, bootstrapping a machine from zero, adding a new coach to the roster. Each shipped through an isolated worktree as its own reviewed pull request; all nine merged and deployed, including a fleet update that pushed the shared-code change to all ninety-five functions.",
+      "gotcha": "The continuous-integration pipeline only runs its lint and test gates on pushes to the main branch — not on the pull requests themselves — and its deploy step waits behind a manual approval click. So a code change can sit \"green\" on a PR having never been tested by CI at all; the real coverage came from each agent running the suite locally before merge, and the deploys went out by hand rather than through the gated pipeline.",
+      "honest_miss": "The hard problems were deliberately left untouched: the character-growth math that has to stay defensible over a year, the launch-day timeline that still contradicts itself, and several AI-quality gates all wait for the next session. The realistic-data blind spot in the pre-merge render check from the day before is filed but not fixed. And the health check still reports one failure — expected on a Day-0 site with almost no data yet, but a real red until the experiment actually starts.",
+      "prs": [
+        {
+          "label": "PR #1045",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1045"
+        },
+        {
+          "label": "PR #1046",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1046"
+        },
+        {
+          "label": "PR #1040",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1040"
+        }
+      ]
     }
   ]
 }
