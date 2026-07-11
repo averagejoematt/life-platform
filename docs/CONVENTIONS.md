@@ -255,6 +255,31 @@ Source: #382 (epic #342, "live infra matches code").
 
 ---
 
+## 7. Hard-won repo gotchas (each one is a past incident)
+
+- **Lambda Function URLs are payload format 2.0** — request cookies arrive in
+  `event["cookies"]` (a top-level array), not in headers; responses set cookies via a
+  top-level `cookies` array, not a `Set-Cookie` header.
+- **`mcp/core.py`: the name `secrets` is a boto3 Secrets Manager client**, NOT the
+  stdlib module — use `uuid.uuid4().hex` (the repo's opaque-token idiom) for token
+  generation there.
+- **ruff bandit S105 fires on token-prefix string constants** (a label, not a secret) —
+  use a surgical `# noqa: S105` in `mcp/core.py`; `mcp/handler.py` is already exempt
+  via pyproject config.
+- **Never run `black` on `.json` files** — it "formats" valid JSON into a Python dict
+  with trailing commas (= invalid JSON). Re-run tests after ANY post-test formatting.
+- **A golden-test fixture date used in now-minus-date math is a time bomb** — it flips
+  red as wall-clock time passes (the daily-brief golden flipped at n=30); pin fixture
+  dates far in the past.
+- **macOS paths are case-insensitive** — a lowercase path twin
+  (`/Users/…/documents/claude/…`) can silently leak a parallel agent's edits into the
+  shared main tree; always operate through the canonical-case worktree path.
+- **`git stash` is ONE stack shared across all worktrees** — parallel agents have raced
+  stash/pop and swapped each other's trees; never stash in concurrent sessions
+  (recovery: the dropped-stash SHA).
+
+---
+
 ## Facts that drift: run the command, never quote a number
 
 These values change and must **never** be hand-written in docs or memory. Read them:

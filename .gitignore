@@ -4,6 +4,7 @@
 
 # Personal health data exports — never commit to GitHub
 datadrops/
+memory_export/
 
 # Lambda backups — git is the backup now
 lambdas/backup_*/
