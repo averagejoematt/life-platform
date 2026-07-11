@@ -1,82 +1,81 @@
-# HANDOVER — Stolen-laptop resilience audit → 1 epic + 5 stories filed (#1024–#1029), zero code shipped by design — 2026-07-11
+# HANDOVER — Mobile plan executed end-to-end: Epics A + B + C shipped & live (16 issues, PRs #1030–#1038) — 2026-07-11
 
-> Instruction: "if my laptop got stolen do we have everything we need for the platform
-> between what is in AWS and what is in git? If not, what is a plan that we no longer rely
-> on anything local" → (via /plan) → then "can you put these all into epics and stories in
-> open issues rather than executing now" → "continue with putting the plan into the issues
-> plan in git".
+> Instruction: "read handover and memory and lets work on the mobile fixes" → "i approve
+> all merges and deploys" → (after Epic A + C + B#1006/#1008 shipped) "ok do it" to the
+> Epic B + C plan → chose **"Do all of Epic B now"** and **"Do #1009 now, full partial"**
+> at the two decision points → "good to /wrap then /clear?"
 
 ## What ran
 
-A read-only disaster-recovery audit, then the plan filed as backlog — **nothing executed,
-no tracked file touched.** One Explore agent swept the DR/continuity surface (docs/DR,
-CONTINUITY, AWS_ACCESS, ACCOUNTS, .gitignore, launchd plists, datadrops, memory-export
-path, font provenance); the driver verified the git in-flight state directly (worktrees,
-stashes, dangling tips). Findings went to GitHub Issues per ADR-099 (I filed them directly
-with `gh` after the issue-filer subagent hit a credit error mid-run; deduped against the
-open backlog — no overlap).
+Executed the ENTIRE filed mobile plan (the 2026-07-11 review's Epics A/B/C) end-to-end —
+not review-only this time. **16 issues closed, 8 PRs merged + deployed, 1 tests-only PR,
+9 site deploys** (one caught auto-rollback, recovered). Every site deploy passed the
+visual + AI-vision QA gate. Sequenced Epic C FIRST so its mobile CI gate protected all
+subsequent Epic B PRs (it did — caught an app-bar-overflow regression mid-#1010).
 
-## The verdict (audited)
+## What shipped (all merged to main + deployed live, verified)
 
-**~90% recoverable from AWS + git today.** Code (git + deploy zips in S3), all health data
-(DDB PITR — restore drill passed #755), infra (CDK), secrets (Secrets Manager), the
-platform-memory DDB partition, and site + fonts (fonts ARE committed under
-`site/assets/fonts/v4/`, not S3-only) all survive a laptop loss. `docs/CONTINUITY.md` +
-`docs/DISASTER_RECOVERY.md` already map most of it.
+**Epic A #997 — launch-critical reader bugs (PR #1030):**
+- #1002 scroll-reveal height-independent `threshold:0` (blank challenges/experiments backlogs fixed)
+- #1003 app-bar overflow / unreachable toggle — `:not(.nav-follow)` + icon-over-label column
+- #1004 subscribe.html viewport meta · #1005 dead "preserved Explorer" copy · #1022 $75→$85 ceiling
 
-**Six gaps found → the epic:**
-1. Claude Code file-memory dir — laptop-only; S3 backup runs only as a manual /wrap habit.
-2. In-flight git — **mostly self-resolved**: the formerly-dirty ~35-file reset staging tree
-   got committed + pushed as `1fe300f0` (cycle-5 reset) between plan-time and file-time.
-   Residual = 3 low-value stashes + one dangling local-only branch tip
-   (`docs/uplevel-handover` cf3c5586, remote deleted).
-3. `datadrops/` originals (genome, physicals xlsx 2019–2024, Apple Health exports) —
-   presence under the delete-protected `uploads/` S3 prefix unverified.
-4. launchd manual-drop ingest runtime — code in git, running runtime dies with the laptop;
-   no from-zero rebuild runbook.
-5. **Re-entry risk (sharpest, owner-only):** Identity Center not enabled → break-glass keys
-   are the only human AWS path and live on the device; ACCOUNTS.md estate/MFA-recovery rows
-   still blank. Laptop + phone lost together could lock out AWS root + GitHub + registrar.
-6. Live device secrets — recoverable but a theft = compromise; no consolidated rotation
-   scenario in the DR doc.
+**Epic C #999 — mobile in CI, landed first (PR #1031, tests-only, no deploy):**
+- #1012 390+360 viewports in `pr_render_gate.py` · #1013 the Epic-A failure classes asserted
+  in `visual_qa.py` (app-bar overflow / stuck reveals / viewport meta gating; tap audit advisory)
 
-Total remediation cost ≈ **$0.10–0.15/mo** (S3 storage only; no Bedrock/Lambda/alarms).
+**Epic B #998 — foundation (PRs #1032, #1033+#1034, #1035, #1036, #1037, #1038):**
+- #1006 17 breakpoints → 6 canonical boundaries (max=token / min=token+1 convention) — #1032
+- #1008 `.table-scroll` primitive + labs polish — #1033 **auto-rolled-back** (data-driven
+  /data/vitals/ +255px overflow the empty-mock gate missed), fixed forward #1034 (width:100% + restore .rd-sec)
+- #1007 bottom app-bar rebuilt with CSS `@layer chrome-base, chrome` — **!important 16→0** — #1035
+- #1010 44px tap-target floor (vertical `::after` overlays, form min-heights, label-tap) — #1036
+- #1011 DESIGN_SYSTEM_V5 §10 mobile spec (doc had zero mobile content before) — #1037
+- #1009 shared-chrome build partial (`scripts/v4_chrome.py` + `v4_apply_chrome.py`, run
+  LAST by `sync_site_to_s3.sh`) — killed 5-nav/7-footer drift, 5 icon-less pages gained
+  door icons, footer unified UP so no wayfinding lost, 45 canonical pages byte-identical — #1038
 
-## What shipped (backlog only — no code, no deploy)
+## Verification
 
-- **Epic #1024** — Stolen-laptop resilience (`type:epic`, area:infra+security); body carries
-  the verdict, six gaps, success criterion, cost line, story checklist. Links #722, #936.
-- **#1025** — git: rescue 3 stashes + dangling `docs/uplevel-handover` tip · Now · sonnet
-- **#1026** — backup: scheduled launchd job, memory dir + `datadrops/` → S3 daily · Now · sonnet
-- **#1027** — docs: DISASTER_RECOVERY stolen-laptop scenario + RPO · Next · sonnet
-- **#1028** — docs: NEW_MACHINE_BOOTSTRAP.md rebuild runbook · Next · sonnet
-- **#1029** — ops: re-entry hardening owner-gated checklist (Matthew) · Now · security
+Every merged PR: local `pr_render_gate.py` 8/8 + CI render gate green before merge. Every
+site deploy: smoke + visual + AI-vision QA green (the one #1008 FAIL auto-rolled-back and
+was fixed forward). #1007 verified across all 10 door types × 4 widths (360/390/768/1366)
+by measured geometry. #1009 verified: canonical `/data/`+`/method/` pages byte-identical
+(the safety property), diffs confined to nav/footer spans, subscribe door icons confirmed
+LIVE. Live build `1ef8ed1`. Epic trackers #997/#998/#999 all closed.
 
-Plan file (session-local, not committed): `~/.claude/plans/lazy-hatching-squirrel.md`.
+## Gotchas hit
 
-## Gotchas
+- **The render gate mocks APIs EMPTY → blind to data-driven overflow.** #1008 passed the
+  gate locally + in CI but blew out /data/vitals/ +255px under REAL data; only the live
+  visual-AI QA + auto-rollback caught it. Fix-forward: `width:100%` block-scroll (never
+  `width:auto`) + restore the `.rd-sec { overflow-x:auto }` section-scroll for wide NON-table
+  content. **A realistic-data pass in the gate is worth filing.** (See [[reference_local_render_qa]].)
+- **`@layer` de-overlap:** a naïve breakpoint collapse (759→760) reintroduces a min/max
+  boundary double-fire; convention is max-width=token, min-width=token+1. And a max-width
+  token−1 blanket shift broke the 600 chrome boundary (desktop nav overflowed at exactly 600px).
+- **Tap-target `::after` overlay overflows at the right edge** — a `max(100%,44px)`-wide
+  overlay on the app-bar's rightmost toggle pushed past the fixed bar (the #1003 assertion I'd
+  just built caught it). Expand overlays VERTICALLY only near edges.
+- **`now/index.html`'s doors nav had no `</nav>`** (browser auto-closes) — a naïve regex
+  over-matched; the apply script anchors on the theme-toggle `<button>` with `</nav>` optional.
+- **Careless `git stash -u` during review** captured settings.local.json into the shared
+  stash stack — popped it back; the other 3 stashes belong to other sessions, left alone.
+  (Reinforces [[reference_git_stash_shared_across_worktrees]] — don't stash in this repo.)
 
-- **Concurrent session live in the shared tree.** At wrap time the working tree held ~30
-  modified `site/method/*` + `scripts/v4_build_evidence.py` + `tokens.css` files and
-  `settings.local.json` screenshot-perm churn — NONE mine (my session touched zero tracked
-  files). Wrap staged **only** `handovers/` + `CLAUDE.md`; left all concurrent work
-  untouched. Confirmed via `git diff` before staging.
-- **issue-filer subagent died on "out of usage credits"** mid-run; recovered by switching
-  the session to Opus 4.8 and filing the 6 issues directly with `gh`. No partial/duplicate
-  issues created (checked before re-filing).
-- Plan-time git status ≠ file-time git status: the reset commit `1fe300f0` landed in
-  between, erasing what the plan had called the biggest in-flight gap. Re-check live state
-  at execute-time, don't trust the plan snapshot.
+## Next picks / residual
 
-**Build beat:** none — read-only audit + backlog filing; no code merged or deployed this session (#736 skip).
+- **Epics D (#1000 wayfinding) + E (#1001 perf/PWA)** remain on Later, untouched by design.
+- **File:** a realistic-data pass for `pr_render_gate.py` (the empty-mock blind spot that
+  cost the #1008 rollback).
+- **Matthew Sunday queue (unchanged, carried):** weigh-in → pipeline re-run →
+  `fix_prologue_cycle_and_subscribe_ttl.py --apply` → `seed_genesis_preregistration.py --apply`
+  + `publish_genesis_preregistration.py --apply`. Plus the timeline accuracy issue #1021
+  (Day-1 self-contradiction) — deliberately left for the pipeline-crossing context, not a mobile fix.
+- Still open from prior sessions: #741, char-math #956, #977; laptop-resilience #1024–#1029.
 
-**Docs:** none needed — session filed GitHub issues only; no repo doc pages invalidated. (The doc *work* itself is queued as #1027/#1028, to be done when those stories are picked up.)
+**Build beat:** mobile-plan-executed (see below) — Epics A/B/C all merged + deployed live.
 
-## Residual — waiting on Matthew / next session
-
-- **Owner-only (#1029, time-sensitive):** enable Identity Center → deactivate break-glass
-  keys; fill ACCOUNTS.md estate + MFA-recovery rows; confirm FileVault; verify NameCheap
-  login works off-device (**domain renews 2026-08-20, ~6 wks**); decide repo-private.
-- **Now-milestone, AI-doable:** #1025 (git hygiene — quick) and #1026 (the launchd backup
-  job — the highest-leverage automation; makes memory + datadrops ≤24h-durable).
-- #1027/#1028 are the Next-milestone doc pair; #1026 should land first (they cite its RPO).
+**Docs:** DESIGN_SYSTEM_V5.md §10 (new mobile spec, #1011) + SITE_UPLEVEL_PLAYBOOK.md
+cross-link shipped IN the work; SITE_AUTHORING.md updated by #1009 for the chrome-partial
+build step. No further wrap-time doc updates needed — the shipped work carried its own docs.

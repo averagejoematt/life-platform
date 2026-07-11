@@ -828,6 +828,28 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/996"
         }
       ]
+    },
+    {
+      "id": "2026-07-11-mobile-made-to-work",
+      "date": "2026-07-11",
+      "title": "The whole phone experience, rebuilt in a day — the day before Day 1",
+      "shipped": "The mobile review filed the day before had become sixteen issues across three tracks; all sixteen shipped and went live in one session. Readers on a phone get the fixes that matter: the challenge and experiment backlogs — which had rendered as blank scroll because a scroll animation could never trigger on a page that tall — now paint, and the bottom navigation bar stops clipping its own buttons on narrow screens. Under the hood the responsive layer was hardened into something reviewable: seventeen ad-hoc screen-width breakpoints collapsed to six named ones, the app-bar was rebuilt with modern CSS layers so its sixteen `!important` overrides dropped to zero, data tables scroll instead of truncating, tap targets meet the 44-pixel floor, the navigation on all ~75 pages now comes from one shared source (five pages that had lost their door icons got them back), and the design system finally has a written mobile spec. A new pre-merge check renders every PR at phone width so these bugs can't come back.",
+      "gotcha": "The new phone-width check passed one change locally and in CI, then the live site auto-rolled-back minutes after deploy: a data table blew a page 255 pixels past the screen edge. The check mocks the data as empty, so it never rendered anything wide enough to break — its green was necessary but not sufficient. The post-deploy visual QA caught what the pre-merge gate structurally couldn't, and the fix went out on the next push.",
+      "honest_miss": "That blind spot is still there — the pre-merge gate should render with realistic data, and doesn't yet; it's filed, not fixed. The circular theme toggle got a 44-pixel-tall tap area but not a full 44 wide (a bigger circle would have overflowed the bar). And two of the five mobile tracks — deeper wayfinding and a performance/offline pass — were deliberately left for after launch.",
+      "prs": [
+        {
+          "label": "PR #1030",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1030"
+        },
+        {
+          "label": "PR #1035",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1035"
+        },
+        {
+          "label": "PR #1038",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1038"
+        }
+      ]
     }
   ]
 }
