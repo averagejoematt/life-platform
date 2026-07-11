@@ -2,12 +2,12 @@
 
 Last updated: 2026-07-11 (v8.6.0 — 64 MCP tools, 34-module package, 94 Lambdas, 20 data sources)
 
-**Ground truth at last verification:**
-- Lambda functions deployed: 73 (5 power-tuning Lambdas deleted in V2 P4)
-- Shared layer `life-platform-shared-utils`: v76 (verify: `aws lambda list-layer-versions --layer-name life-platform-shared-utils --max-items 1`)
+**Ground truth (point-in-time values are drift — run the command instead):**
+- Lambda functions defined (CDK): 94 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
+- Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
 - Account concurrency limit: **10** (AWS Support case 177921309700709 filed 2026-05-19; awaiting raise to 100; CDK reservations pre-staged but commented out — see `docs/RESERVED_CONCURRENCY.md`)
-- Active alarms in ALARM (2026-05-19): `life-platform-garmin-data-ingestion-errors`, `life-platform-weather-data-ingestion-errors`, `life-platform-compute-pipeline-stale`, `life-platform-dlq-depth-warning`, `life-platform-ingestion-dlq-messages`, `ai-tokens-daily-brief-daily`, `slo-source-freshness` — Garmin-related expected to clear within 24h post-OAuth refresh
-- DLQ: `life-platform-ingestion-dlq`, retention 14d, currently 66 messages (normally near-empty — investigate via `dlq-consumer` Lambda logs)
+- Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
+- DLQ: `life-platform-ingestion-dlq`, retention 14d, normally near-empty — check depth via `aws sqs get-queue-attributes --queue-url $(aws sqs get-queue-url --queue-name life-platform-ingestion-dlq --query QueueUrl --output text) --attribute-names ApproximateNumberOfMessages`; investigate via `dlq-consumer` Lambda logs
 - SES configuration set: `life-platform-emails` — wired to 4 email Lambdas, CloudWatch event destination tracks open/click/bounce/complaint/delivery
 - CloudTrail: `life-platform-trail` now has data events on `s3://matthew-life-platform/raw/*` and `uploads/*`
 
@@ -63,8 +63,8 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 | Mistake | Result | Fix |
 |---------|--------|-----|
-| Edit shared layer module, skip `build_layer.sh` | Dependent Lambdas run stale code silently | Run `bash deploy/build_layer.sh` first |
-| `deploy_lambda.sh life-platform-mcp` | MCP breaks — strips `mcp/` directory (ADR-031) | Use full zip build (see QUICKSTART) |
+| Edit a shared module (`lambdas/` root), deploy only one function | Every other function still runs the old copy | Fleet deploy: merge to main (CI auto-fleet-deploys unmapped `lambdas/` changes) or `bash deploy/deploy_fleet.sh` |
+| Hand-rolled MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail (`No module named 'reading'`) | `bash deploy/deploy_lambda.sh life-platform-mcp` — since #781 it stages the mcp-shaped full bundle |
 | `aws s3 sync --delete s3://matthew-life-platform/` | Deletes 35K+ objects (ADR-032) | Always use `sync_site_to_s3.sh` |
 | Change Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit CDK stack code instead |
 | Add Lambda to CDK, forget `role_policies.py` | `AccessDenied` on first run | Add IAM policy to role_policies.py |
@@ -74,28 +74,26 @@ aws s3api delete-bucket-policy --bucket matthew-life-platform
 
 ---
 
-## Shared Lambda Layer
+## Shared Modules — ONE bundle, no layer (#781/ADR-131)
 
-**Current version:** v76 (2026-06-08). Rebuild with `bash deploy/build_layer.sh`. The layer is consumed by the majority of Lambdas (verify count via `aws lambda list-functions --query 'Functions[?Layers[?contains(Arn, \`life-platform-shared-utils\`)]].FunctionName' --output text | wc -w`).
+The shared layer (`life-platform-shared-utils`) was **retired 2026-07-06**. Shared modules live at the `lambdas/` root and ship **inside every function's code bundle**, staged by `deploy/build_bundle.py` (the whole `lambdas/` tree + `food_vocabulary.json`; MCP also gets `mcp_server.py` + `mcp/`). All deploy paths stage through it (CDK asset, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`), so layer-version drift and partial-zip import breaks are structurally impossible.
 
-Source of truth for the expected version is `cdk/stacks/constants.py:SHARED_LAYER_VERSION`. A CI guard (`tests/test_layer_version_consistency.py`) blocks PRs that mismatch.
+**A shared-module change reaches the fleet via** `bash deploy/deploy_fleet.sh` or `cd cdk && npx cdk deploy --all` — CI fleet-deploys automatically when an unmapped `lambdas/` file changes on main.
 
-Modules included (33+ as of v76): `ai_calls.py` (+ its split modules `ai_context.py`/`ai_summaries.py`), `auth_breaker.py`, `bedrock_client.py`, `budget_guard.py`, `board_loader.py`, `character_engine.py`, `compute_metadata.py`, `digest_utils.py`, `html_builder.py`, `http_retry.py`, `ai_output_validator.py`, `ingestion_framework.py`, `ingestion_validator.py`, `insight_writer.py`, `intelligence_common.py`, `item_size_guard.py`, `numeric.py`, `output_writers.py`, `phase_filter.py`, `platform_logger.py`, `rate_limiter.py`, `request_validator.py`, `retry_utils.py`, `scoring_engine.py`, `secret_cache.py`, `site_writer.py`, plus shared helpers. (`email_framework.py` was removed in V2 — replaced inline.) See `ci/lambda_map.json` `skip_deploy` list for layer-resident modules that should NOT be deployed as standalone Lambda code.
-
-**After rebuilding:** Update all dependent Lambdas to the new layer version via CDK deploy (`cd cdk && npx cdk deploy --all`). The version bump in `cdk/stacks/constants.py` propagates to every Lambda's `Layers=` arg.
-
-**Verify a Lambda is on the current layer:**
+**Invariant (CI-enforced):** zero functions reference the old layer (plan job + `test_i2_shared_layer_retired`). Verify by hand:
 ```bash
-aws lambda get-function-configuration --function-name <name> \
-  --query 'Layers[0].Arn' --output text
-# Expect: ...life-platform-shared-utils:51
+aws lambda list-functions --region us-west-2 \
+  --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"
+# Expect: []
 ```
+
+Dependency layers with real third-party packages (garth, Pillow) are NOT the shared layer and remain. Full reflex: `docs/CONVENTIONS.md` §1.
 
 ---
 
 ## Secret Caching (COST-OPT-1)
 
-Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` in the shared layer. This reduces Secrets Manager API calls by ~90% across 9 Lambdas. The cache is in-memory (per-Lambda instance), so a cold start always fetches fresh secrets.
+Lambdas cache Secrets Manager reads for 15 minutes via `secret_cache.py` (a bundled shared module). This reduces Secrets Manager API calls by ~90% across 9 Lambdas. The cache is in-memory (per-Lambda instance), so a cold start always fetches fresh secrets.
 
 ---
 
@@ -128,7 +126,7 @@ Each OAuth-based ingestion Lambda refreshes its own tokens and writes them back 
 ## Meal Grouping — Backfill & Regroup (ADR-090)
 
 The derived `macrofactor_meals` projection is built by the deterministic `meal_grouper`
-(shared layer). Raw `macrofactor` is never mutated.
+(a bundled shared module). Raw `macrofactor` is never mutated.
 
 **Backfill history** (local script, runs with your admin creds — reads raw directly,
 bypassing the phase filter so it sees full cross-phase history):
@@ -146,13 +144,10 @@ S3_BUCKET=matthew-life-platform USER_ID=matthew python3 deploy/backfill_meals.py
 stale ordinals uses the MCP role's **partition-scoped** `DeleteItem` (LeadingKeys =
 `macrofactor_meals` only — see ADR-090).
 
-**Layer dependency:** the grouper, seed templates, projection writer, and
-`food_vocabulary.json` ship in the shared layer. Changing any of them = rebuild the layer
-(`bash deploy/build_layer.sh`), bump `SHARED_LAYER_VERSION` in `cdk/stacks/constants.py`,
-`cdk deploy LifePlatformCore`, **then** `cdk deploy LifePlatformMcp` (the MCP lambda must
-re-attach the new layer — a code-only push leaves it on the old one; the tell is `cdk diff`
-showing no Layers change). Verify: `aws lambda get-function-configuration
---function-name life-platform-mcp --query 'Layers[].Arn'` ends in the new version, and
+**Bundle dependency (#781):** the grouper, seed templates, projection writer, and
+`food_vocabulary.json` ship inside every function's code bundle (`deploy/build_bundle.py`).
+Changing any of them = fleet deploy (merge to main — CI auto-fleet-deploys — or
+`bash deploy/deploy_fleet.sh`), which includes the MCP lambda. Verify:
 `manage_meals list_templates` returns 10 templates (not an import error).
 
 **Format-drift:** if `get_freshness_status.macrofactor_format_drift.drifted` is true (or the
@@ -868,7 +863,7 @@ for tool in get_daily_snapshot get_health get_habits get_journal_entries; do
 done
 ```
 
-V2 P4.1 finding: only ~11 of the 133 MCP tools were invoked in the last 30 days. Bulk pruning planned post-V2.
+V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 were invoked in 30 days. Executed as the #395 prune (143→60, 2026-07-08) — the audited removal ledger is `docs/MCP_TOOL_AUDIT.md`.
 
 ## SES Email Pipeline
 
@@ -1205,18 +1200,19 @@ All coach Lambdas use `os.environ.get("USER_ID", "matthew")` with a safe default
 cd cdk && npx cdk deploy --all --require-approval never
 ```
 
-### 6. Layer version mismatch
+### 6. Stale shared-module code
 
-If coach Lambdas use stale shared layer modules:
+If coach Lambdas behave as if they run old shared-module code (e.g. an `AttributeError`
+on a recently-added function), some functions missed the last fleet deploy:
 
-1. Check layer version consistency:
+1. Check the layer-retirement invariant + bundle freshness:
 ```bash
-python3 -m pytest tests/test_integration_aws.py::test_i2_lambda_layer_version_current -v
+python3 -m pytest tests/test_integration_aws.py -k i2 -v
 ```
 
-2. Rebuild and deploy:
+2. Fleet-redeploy the one bundle:
 ```bash
-bash deploy/build_layer.sh && cd cdk && npx cdk deploy --all --require-approval never
+bash deploy/deploy_fleet.sh   # or: cd cdk && npx cdk deploy --all --require-approval never
 ```
 
 ---
@@ -1243,7 +1239,7 @@ python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
 
 The pipeline runs (in order, each idempotent):
 1. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
-2. `bash deploy/build_layer.sh` + layer version bump + `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail`
+2. `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail` (#781: constants ship in every bundle — no layer step)
 3. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
 4. `restart_intelligence_wipe.py --apply` — tombstones any newly pre-genesis records
 5. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis
@@ -1494,6 +1490,14 @@ The cron emits a `RoutineConflict` CloudWatch metric and returns `pushed=false` 
 Never describe this feature as "autoregulated" on averagejoematt.com or in the chronicle while the readiness signal is unvalidated. Correct phrasing: **deterministic volume-landmark programming with red-day deload guard.**
 
 ---
+
+## Historical deploy records (completed — pre-#781 layer era)
+
+> The four sections below are **records of one-time deploys executed in May–June 2026**, kept
+> for audit context. The shared layer they reference was retired 2026-07-06 (#781/ADR-131),
+> so their `build_layer.sh` / `SHARED_LAYER_VERSION` commands are **no longer runnable as
+> written** — a module change today is one fleet deploy (`docs/CONVENTIONS.md` §1).
+> Config-only steps (S3 `config/*.json` syncs) remain valid.
 
 ## Hevy Routine Title Convention — Deploy Steps (ADR-067)
 

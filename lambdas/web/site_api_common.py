@@ -114,7 +114,7 @@ PLATFORM_STATS = {
     # contradiction. ~$60 total keeps AI < total and matches the actual run-rate (still « $75 cap).
     "review_count": 19,
     "review_grade": "A",
-    "active_secrets": 15,
+    "active_secrets": 21,
     "site_pages": 77,
     "test_count": 3029,
     "board_technical": 12,

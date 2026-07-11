@@ -374,6 +374,22 @@ def _auto_discover_module_count() -> int | None:
         return None
 
 
+def _auto_discover_tool_module_count() -> int | None:
+    """Count DOMAIN tool modules (mcp/tools_*.py) — the "N tool modules" claim.
+
+    Distinct from _auto_discover_module_count(), which counts every mcp/*.py
+    including shared helpers (handler, core, registry, …). Docs that say
+    "62 tools across N tool modules" mean this narrower number.
+    """
+    mcp_dir = ROOT / "mcp"
+    if not mcp_dir.exists():
+        return None
+    try:
+        return len(list(mcp_dir.glob("tools_*.py"))) or None
+    except Exception:
+        return None
+
+
 def _auto_discover_version() -> str | None:
     """Read version from CHANGELOG.md first entry."""
     changelog = ROOT / "docs" / "CHANGELOG.md"
@@ -506,6 +522,16 @@ def _apply_auto_discovered(facts: dict) -> dict:
     if module_count is not None:
         facts["module_count"] = module_count
 
+    tool_module_count = _auto_discover_tool_module_count()
+    if tool_module_count is not None:
+        facts["tool_module_count"] = tool_module_count
+
+    adr_count = _count_adrs()
+    if adr_count is not None:
+        if facts.get("adr_count") != adr_count:
+            print(f"  [auto] adr_count: {facts.get('adr_count')} → {adr_count} (## ADR- headings in docs/DECISIONS.md)")
+        facts["adr_count"] = adr_count
+
     version = _auto_discover_version()
     if version is not None:
         facts["version"] = version
@@ -521,9 +547,8 @@ def _apply_auto_discovered(facts: dict) -> dict:
     # Recompute derived facts
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
-        f"{facts['secret_count']} active secrets × $0.40/secret/month. "
-        f"`api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. "
-        f"`google-calendar` deleted 2026-03-15 (ADR-030)."
+        f"{facts['secret_count']} active secrets × $0.40/secret/month "
+        f"(live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md)"
     )
     return facts
 
@@ -540,7 +565,9 @@ PLATFORM_FACTS = {
     "lambda_count": 45,  # fallback: auto-discovery may under-count Lambda@Edge
     "tool_count": 88,  # fallback: auto-discovery requires registry.py parseable
     "module_count": 31,  # fallback: all mcp/*.py except __init__.py
-    "secret_count": 9,  # active secrets (webhook-key deleted 2026-03-14, google-calendar deleted 2026-03-15)
+    "tool_module_count": 25,  # fallback: mcp/tools_*.py domain modules only
+    "adr_count": 120,  # fallback: ## ADR- headings in docs/DECISIONS.md (record count; max number may differ — see adr_max)
+    "secret_count": 21,  # live-verified 2026-07-10 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
     "alarm_count": 67,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK)
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 9,
@@ -549,8 +576,8 @@ PLATFORM_FACTS = {
     # Secret state
     "api_keys_status": "PERMANENTLY DELETED 2026-03-14",
     # Cost
-    "secrets_cost": "$3.60",  # secret_count × $0.40
-    "secrets_cost_note": "9 active secrets × $0.40/secret/month. `api-keys` deleted 2026-03-14. `webhook-key` deleted 2026-03-14. `google-calendar` deleted 2026-03-15 (ADR-030).",
+    "secrets_cost": "$8.40",  # secret_count × $0.40
+    "secrets_cost_note": "21 active secrets × $0.40/secret/month (live count: `aws secretsmanager list-secrets`; inventory: docs/SECRETS_MAP.md)",
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -571,28 +598,13 @@ RULES = [
     ),
     (
         "docs/ARCHITECTURE.md",
-        r"MCP Server Lambda \(\d+ tools, 1024 MB\)",
-        "MCP Server Lambda ({tool_count} tools, 1024 MB)",
+        r"MCP Server Lambda \(\d+ tools,",
+        "MCP Server Lambda ({tool_count} tools,",
     ),
     (
         "docs/ARCHITECTURE.md",
-        r"MCP Lambda \(\d+ tools\)",
-        "MCP Lambda ({tool_count} tools)",
-    ),
-    (
-        "docs/ARCHITECTURE.md",
-        r"\d+-module package structure:",
-        "{module_count}-module package structure:",
-    ),
-    (
-        "docs/ARCHITECTURE.md",
-        r"mcp/                            ← MCP server package \(\d+ modules\)",
-        "mcp/                            ← MCP server package ({module_count} modules)",
-    ),
-    (
-        "docs/ARCHITECTURE.md",
-        r"MCP_TOOL_CATALOG\.md           ← All \d+ tools with params",
-        "MCP_TOOL_CATALOG.md           ← All {tool_count} tools with params",
+        r"\*\*\d+ ADRs\*\* \(ADR-001 → ADR-\d+",
+        "**{adr_count} ADRs** (ADR-001 → ADR-{adr_max}",
     ),
     (
         "docs/ARCHITECTURE.md",
@@ -601,8 +613,8 @@ RULES = [
     ),
     (
         "docs/ARCHITECTURE.md",
-        r"CloudWatch metric alarms: \*\*~\d+ total\*\*",
-        "CloudWatch metric alarms: **~{alarm_count} total**",
+        r"← MCP server package \(\d+ tool modules \+ helpers\)",
+        "← MCP server package ({tool_module_count} tool modules + helpers)",
     ),
     (
         "docs/ARCHITECTURE.md",
@@ -623,8 +635,8 @@ RULES = [
     ),
     (
         "docs/INFRASTRUCTURE.md",
-        r"\| Tools \| \d+ across \d+ modules \|",
-        "| Tools | {tool_count} across {module_count} modules |",
+        r"\| Tools \| \*\*\d+\*\* across \*\*\d+\*\* tool modules",
+        "| Tools | **{tool_count}** across **{tool_module_count}** tool modules",
     ),
     (
         "docs/INFRASTRUCTURE.md",
@@ -633,8 +645,8 @@ RULES = [
     ),
     (
         "docs/INFRASTRUCTURE.md",
-        r"CloudWatch alarms \| ~\d+ metric alarms",
-        "CloudWatch alarms | ~{alarm_count} metric alarms",
+        r"\| CloudWatch alarms \| \*\*~\d+ metric alarms\*\*",
+        "| CloudWatch alarms | **~{alarm_count} metric alarms**",
     ),
     # ── RUNBOOK.md ────────────────────────────────────────────────────────────
     (
@@ -651,8 +663,8 @@ RULES = [
     ),
     (
         "docs/COST_TRACKER.md",
-        r"\| \*\*Secrets Manager\*\* \| \$[\d.]+ \|[^\n]+",
-        "| **Secrets Manager** | {secrets_cost} | {secrets_cost_note} |",
+        r"\| \*\*Secrets Manager\*\* \| ~?\$[\d.]+ \| \d+ active secrets × \$0\.40",
+        "| **Secrets Manager** | {secrets_cost} | {secret_count} active secrets × $0.40",
     ),
     # ── MCP_TOOL_CATALOG.md ──────────────────────────────────────────────────
     (
@@ -690,8 +702,137 @@ RULES = [
     ),
     (
         "CLAUDE.md",
-        r"~\d+ tools across \d+\+ domain modules",
-        "~{tool_count} tools across 30+ domain modules",
+        r"~\d+ tools across ~\d+ domain modules",
+        "~{tool_count} tools across ~{tool_module_count} domain modules",
+    ),
+    # ── DECISIONS.md header count line ───────────────────────────────────────
+    (
+        "docs/DECISIONS.md",
+        r"\d+ ADRs total \(ADR-001 → ADR-\d+\)",
+        "{adr_count} ADRs total (ADR-001 → ADR-{adr_max})",
+    ),
+    # ── Root README.md — the repo's front door (#wiki-pr1) ──────────────────
+    (
+        "README.md",
+        r"\*\*~\d+ Lambdas\*\*",
+        "**~{lambda_count} Lambdas**",
+    ),
+    (
+        "README.md",
+        r"\*\*\d+ MCP tools\*\*",
+        "**{tool_count} MCP tools**",
+    ),
+    (
+        "README.md",
+        r"\*\*\d+ CDK stacks\*\*",
+        "**{cdk_stacks} CDK stacks**",
+    ),
+    # ── docs/README.md — the wiki home index ────────────────────────────────
+    (
+        "docs/README.md",
+        r"All \d+ MCP tools by domain",
+        "All {tool_count} MCP tools by domain",
+    ),
+    (
+        "docs/README.md",
+        r"\*\*ADRs \(001–\d+\)\*\*",
+        "**ADRs (001–{adr_max})**",
+    ),
+    (
+        "docs/README.md",
+        r"the \d+ stacks, ingest→store→serve",
+        "the {cdk_stacks} stacks, ingest→store→serve",
+    ),
+    # ── ONBOARDING.md ────────────────────────────────────────────────────────
+    (
+        "docs/ONBOARDING.md",
+        r"exposes \d+ MCP tools",
+        "exposes {tool_count} MCP tools",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"MCP Lambda \(\d+ tools\)",
+        "MCP Lambda ({tool_count} tools)",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"~\d+ Lambdas \(CDK-defined; includes 4 us-east-1",
+        "~{lambda_count} Lambdas (CDK-defined; includes 4 us-east-1",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"\d+ CDK stacks\. Run-rate",
+        "{cdk_stacks} CDK stacks. Run-rate",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"\*\*Lambda\*\* \(~\d+ CDK-defined\)",
+        "**Lambda** (~{lambda_count} CDK-defined)",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"\d+ active secrets\. See `docs/SECRETS_MAP\.md`",
+        "{secret_count} active secrets. See `docs/SECRETS_MAP.md`",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"\| \d+ tools across \d+ domain modules in `mcp/`",
+        "| {tool_count} tools across {tool_module_count} domain modules in `mcp/`",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"exposes \d+ tools that Claude calls",
+        "exposes {tool_count} tools that Claude calls",
+    ),
+    # ── OPERATOR_GUIDE.md ────────────────────────────────────────────────────
+    (
+        "docs/OPERATOR_GUIDE.md",
+        r"through \d+ MCP tools",
+        "through {tool_count} MCP tools",
+    ),
+    (
+        "docs/OPERATOR_GUIDE.md",
+        r"\*\*\d+ Lambdas\*\* run the ingest",
+        "**{lambda_count} Lambdas** run the ingest",
+    ),
+    (
+        "docs/OPERATOR_GUIDE.md",
+        r"CDK-managed across \d+ stacks",
+        "CDK-managed across {cdk_stacks} stacks",
+    ),
+    # ── DEPENDENCY_GRAPH.md ──────────────────────────────────────────────────
+    (
+        "docs/DEPENDENCY_GRAPH.md",
+        r"\*\*\d+ tools across \d+ modules\*\*",
+        "**{tool_count} tools across {tool_module_count} modules**",
+    ),
+    # ── QUICKSTART.md ────────────────────────────────────────────────────────
+    (
+        "docs/QUICKSTART.md",
+        r"`docs/MCP_TOOL_CATALOG\.md` \(\d+ tools\)",
+        "`docs/MCP_TOOL_CATALOG.md` ({tool_count} tools)",
+    ),
+    (
+        "docs/QUICKSTART.md",
+        r"`docs/DECISIONS\.md` \(\d+ ADRs\)",
+        "`docs/DECISIONS.md` ({adr_count} ADRs)",
+    ),
+    # ── REPO_STRUCTURE.md ────────────────────────────────────────────────────
+    (
+        "docs/REPO_STRUCTURE.md",
+        r"MCP server — \d+ tools",
+        "MCP server — {tool_count} tools",
+    ),
+    (
+        "docs/REPO_STRUCTURE.md",
+        r"\d+ CDK stacks \(`stacks/",
+        "{cdk_stacks} CDK stacks (`stacks/",
+    ),
+    # ── RUNBOOK.md ground-truth block ────────────────────────────────────────
+    (
+        "docs/RUNBOOK.md",
+        r"Lambda functions defined \(CDK\): \d+",
+        "Lambda functions defined (CDK): {lambda_count}",
     ),
     # ── .claude/README.md ────────────────────────────────────────────────────
     # The "how this platform is built with Claude" doc — its headline ADR range
@@ -733,6 +874,13 @@ def process_doc(rel_path: str, dry_run: bool) -> list[str]:
         if doc != rel_path:
             continue
         replacement = apply_facts(replacement_template)
+        # A rule whose pattern matches NOTHING is itself drift (#wiki-pr1): the doc
+        # text or the rule changed shape, and the literal it guards is now unguarded.
+        # This is exactly how "133 tools" survived the #395 prune — the ARCHITECTURE
+        # rule expected "1024 MB", the doc said "768 MB", and the rule silently no-op'd.
+        if not re.search(pattern, current):
+            changes.append(f"  ! rule pattern matched NOTHING (doc or rule drifted — fix one): {pattern!r}")
+            continue
         new = re.sub(pattern, replacement, current)
         if new != current:
             # Find what changed for reporting

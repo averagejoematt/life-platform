@@ -97,8 +97,8 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 |-------------|----------|-----|
 | A single Lambda file (e.g., `daily_brief_lambda.py`) | `bash deploy/deploy_lambda.sh daily-brief` | Fast (~10s), no CDK synth |
 | A Lambda + want smoke test | `bash deploy/deploy_and_verify.sh daily-brief` | Deploys + invokes + checks for errors |
-| A shared layer module (see list below) | `bash deploy/build_layer.sh` FIRST, then redeploy dependents | Layer must propagate before Lambda code runs |
-| Any file in `mcp/` | See MCP Deploy below | `deploy_lambda.sh` strips the `mcp/` directory (ADR-031) |
+| A shared module at the `lambdas/` root (e.g. `ai_calls.py`) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — every function must receive the new copy |
+| Any file in `mcp/` | `bash deploy/deploy_lambda.sh life-platform-mcp` | Since #781 the script stages the mcp-shaped full bundle (tree + `mcp_server.py` + `mcp/`) |
 | CDK stack code (IAM, schedules, new Lambda) | `cd cdk && npx cdk deploy <StackName>` | Infra changes require CloudFormation |
 | Site HTML/CSS/JS | **merge to main** — CI deploys it (`site-deploy.yml`, #750) | Manual fallback: `bash deploy/sync_site_to_s3.sh` |
 
@@ -120,21 +120,23 @@ bash deploy/deploy_and_verify.sh daily-brief
 # → packages → updates function code → invokes → checks CloudWatch for errors
 ```
 
-### MCP Lambda deploy (ADR-031)
+### MCP Lambda deploy
 
-`life-platform-mcp` is multi-module — `deploy_lambda.sh` hard-rejects it with the correct commands printed. Use the full zip:
+Since #781, `deploy_lambda.sh` handles MCP correctly — it stages the mcp-shaped full bundle
+(the whole `lambdas/` tree + `mcp_server.py` + `mcp/`):
 
 ```bash
-cd /Users/matthewwalker/Documents/Claude/life-platform
-ZIP=/tmp/mcp_deploy.zip && rm -f $ZIP
-zip -j $ZIP mcp_server.py mcp_bridge.py
-zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
-aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
+bash deploy/deploy_lambda.sh life-platform-mcp
 ```
+
+⚠️ Do NOT hand-roll a zip of only `mcp_server.py` + `mcp/` — it boots but fails at import
+time (`No module named 'reading'`) because the bundled `lambdas/` tree is missing. The
+script is the only sanctioned path. Verify boot after any MCP deploy: an unauthenticated
+curl to the Function URL should return **401** (healthy), not 5xx.
 
 ### Stack names (use with `cdk deploy <name>`)
 
-`LifePlatformCore` · `LifePlatformIngestion` · `LifePlatformCompute` · `LifePlatformEmail` · `LifePlatformOperational` · `LifePlatformMcp` · `LifePlatformMonitoring` · `LifePlatformWeb`
+`LifePlatformCore` · `LifePlatformIngestion` · `LifePlatformCompute` · `LifePlatformEmail` · `LifePlatformOperational` · `LifePlatformServe` · `LifePlatformMcp` · `LifePlatformMonitoring` · `LifePlatformWeb`
 
 ---
 
@@ -196,16 +198,17 @@ npx cdk deploy <StackName>
 
 If a CDK deploy fails mid-stream, CloudFormation auto-rolls-back. No manual action usually needed; check the events tab in the AWS Console.
 
-### Roll back the shared layer
+### Roll back a shared-module change
+
+Shared modules ship inside every function's bundle (#781 — no layer to pin). Roll back the
+commit and let the fleet converge:
 
 ```bash
-# Pin dependent Lambdas to the prior layer version. Edit cdk/stacks/constants.py:
-#   SHARED_LAYER_VERSION = 50   # was 51
-cd cdk
-npx cdk deploy LifePlatformIngestion LifePlatformCompute LifePlatformEmail LifePlatformMcp LifePlatformOperational LifePlatformMonitoring
+git revert <bad-sha>              # on main
+git push                          # CI fleet-deploys the reverted bundle
+# Attended alternative: bash deploy/deploy_fleet.sh   (after the revert is checked out)
+# Single function only: bash deploy/rollback_lambda.sh <function-name>
 ```
-
-Don't delete the new layer version — it lets you roll forward later.
 
 ### Halt all crons (maintenance mode)
 
@@ -217,11 +220,13 @@ bash deploy/maintenance_mode.sh disable   # re-enables
 
 ---
 
-## Shared Layer Modules
+## Shared Modules (bundled — #781/ADR-131)
 
-These modules are deployed as Lambda Layer `life-platform-shared-utils` (currently **v76**, mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). All ingestion, compute, email, and MCP Lambdas reference this layer.
+Shared modules live at the `lambdas/` root and ship **inside every function's code bundle**,
+staged by `deploy/build_bundle.py` (the shared layer `life-platform-shared-utils` was retired
+2026-07-06). Editing any of them = fleet deploy (see the table above).
 
-**If you edit any of these files, run `bash deploy/build_layer.sh` before deploying dependent Lambdas:**
+**Notable shared modules:**
 
 ```
 ai_calls.py              ai_output_validator.py    auth_breaker.py
@@ -236,21 +241,26 @@ secret_cache.py          sick_day_checker.py       site_writer.py
 
 Note: `email_framework.py` was deleted in V2 (replaced inline). `tools_calendar.py` and `podcast_scanner_lambda.py` were also deleted as dead code.
 
-If you skip the layer rebuild and deploy a Lambda, it runs with the OLD version of the shared module silently. CI guard: `tests/test_layer_version_consistency.py`.
+If you edit a shared module and deploy only one function, every OTHER function still runs
+the old copy until fleet-deployed — CI closes this automatically (an unmapped `lambdas/`
+change on main triggers a fleet deploy). CI invariant: zero functions reference the retired
+layer (plan job + integration test I2).
 
 ---
 
 ## Source-of-truth checks
 
 ```bash
-# Authoritative MCP tool count
-grep -c '"name":' mcp/registry.py
+# Authoritative counts (tools, Lambdas, alarms, ADRs) — AST discoverers, prints all of them
+python3 deploy/sync_doc_metadata.py
+# NB: do NOT `grep -c '"name":' mcp/registry.py` for the tool count — it over-counts by
+# matching nested input-schema fields (docs/CONVENTIONS.md "Facts that drift").
 
-# Authoritative layer version
-aws lambda list-layer-versions --layer-name life-platform-shared-utils --region us-west-2 \
-  --query 'LayerVersions[0].Version'
+# Layer-retirement invariant (#781) — must return []
+aws lambda list-functions --region us-west-2 \
+  --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"
 
-# Lambda count in us-west-2
+# Live Lambda count in us-west-2 (live AWS view; CDK-defined count comes from the discoverer above)
 aws lambda list-functions --region us-west-2 \
   --query 'Functions[].FunctionName' --output text | tr '\t' '\n' | wc -l
 ```
@@ -261,7 +271,7 @@ aws lambda list-functions --region us-west-2 \
 
 | If you... | What breaks | How to fix |
 |-----------|------------|-----------|
-| Edit a shared module + skip `build_layer.sh` | Dependent Lambdas run stale code silently | Run `build_layer.sh`, redeploy |
+| Edit a shared module + deploy only ONE function | Every other function runs the old copy | Fleet deploy: merge to main or `bash deploy/deploy_fleet.sh` |
 | Run `aws s3 sync --delete` to bucket root | Tries to delete 35k+ objects (blocked by bucket policy + ADR-032 deny statement, but DON'T test it) | S3 versioning recovers; takes hours |
 | Change a Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit the CDK stack instead |
 | Add a Lambda to CDK without a `role_policies.py` entry | `AccessDenied` on first run | Add the IAM policy, redeploy the stack |
@@ -308,11 +318,11 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 - **Mental model**: `docs/ONBOARDING.md`
 - **Architecture catalog**: `docs/ARCHITECTURE.md`
 - **Data model**: `docs/SCHEMA.md`
-- **Decision history**: `docs/DECISIONS.md` (78 ADRs)
+- **Decision history**: `docs/DECISIONS.md` (119 ADRs)
 - **Daily operations**: `docs/RUNBOOK.md`
-- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (133 tools)
+- **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (64 tools)
 - **V2 audit findings**: `docs/V2_AUDIT_PLAN.md` (76 findings, ~33 shipped, formally closed in ADR-057)
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-07-10 (layer-retirement #781 propagated; counts re-derived via sync_doc_metadata discoverers)

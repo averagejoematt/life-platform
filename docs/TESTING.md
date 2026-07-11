@@ -159,7 +159,7 @@ bug fixed.)
 | Static site visual regression | No screenshot diffing | Medium (cosmetic only) |
 | Whoop/Garmin/etc. live OAuth flows | Requires real creds | High — but covered by smoke + post-deploy alarms |
 | CloudFront cache behavior | Hard to test deterministically | Low (CF is reliable) |
-| WAF rate-limit accuracy | Would require burst-testing | Low (CloudWatch tracks blocks) |
+| In-Lambda rate-limit accuracy under burst | Would require live burst-testing | Low (DDB counters + the 429 path are unit-tested) |
 | Subscriber email deliverability | SES auto-handles bounces/complaints | Low |
 
 ---
@@ -277,7 +277,7 @@ git rm tests/test_<removed_lambda>.py
 When you add new shared module:
 ```bash
 # 1. Write the module in lambdas/
-# 2. Add to deploy/build_layer.sh MODULES list
+# 2. No packaging step — deploy/build_bundle.py ships the whole lambdas/ tree (#781)
 # 3. Add to ci/lambda_map.json skip_deploy
 # 4. Add to cdk/stacks/constants.py if needed
 # 5. Write tests/test_<new_module>.py

@@ -37,7 +37,7 @@ wrong). Real run-rate is **~$33-36/mo** — comfortably under the $85 ceiling.
 |---------|-----------|-------|
 | **CloudWatch** | ~$9.60 | **46 ingestion-error alarms + others (~112 total) × $0.10**. COST-A claimed ~40; regressed. Consolidation to metric-math is a tracked follow-up (~$4/mo). |
 | **WAF** | ~$8.78 | `life-platform-amj-waf` (CLOUDFRONT, 4 rate rules) = $5/ACL + $1/rule. Slated for deletion once the Lambda concurrency quota lands (case 177921309700709). |
-| **Secrets Manager** | ~$5.60 | 14 active secrets × $0.40. All currently referenced in code — pruning needs reference cleanup first (not a safe blind delete). |
+| **Secrets Manager** | $8.40 | 21 active secrets × $0.40. All currently referenced in code — pruning needs reference cleanup first (not a safe blind delete). |
 | **Bedrock (AI)** | ~$5-7 | Claude inference, mostly Haiku 4.5 (coaches) + Sonnet 4.6 (daily brief), prompt-cached. Tracked near-real-time by the cost-governor; Cost Explorer lags 24-48h. |
 | **Tax / Cost Explorer API** | ~$4 | CE GetCostAndUsage calls (governor, hourly) + tax. |
 | **KMS** | ~$1.00 | DynamoDB CMK. |

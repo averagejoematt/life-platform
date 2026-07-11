@@ -16,11 +16,11 @@ top and stop when you have what you need.
 ## Architecture & data
 | Doc | |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 8 stacks, ingest→store→serve) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 9 stacks, ingest→store→serve) |
 | [SCHEMA.md](SCHEMA.md) | **Authoritative** DynamoDB field reference |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | The AWS account by the numbers |
 | [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) | What calls what; SPOFs |
-| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 133 MCP tools by domain |
+| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 64 MCP tools by domain |
 | [API.md](API.md) | The Site-API endpoints |
 | [DATA_GOVERNANCE.md](DATA_GOVERNANCE.md) | PII classification + retention |
 
@@ -30,8 +30,8 @@ top and stop when you have what you need.
 | [RUNBOOK.md](RUNBOOK.md) | Daily ops + troubleshooting |
 | [RUNBOOK_REENTRY.md](RUNBOOK_REENTRY.md) | OAuth re-auth / source re-entry |
 | [MONITORING.md](MONITORING.md) · [SLOs.md](SLOs.md) | Alarms / what fires · service levels |
-| [DEPLOYMENT.md](DEPLOYMENT.md) | Deploy mechanics |
-| [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (layer sequence, deploy-from-main, squash-drift, CI ordering, asset-staging trap) + the drift-discovery commands |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | **Superseded pointer** → CONVENTIONS §1 + QUICKSTART decision tree + deploy/README |
+| [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (the one-bundle rule #781, deploy-from-main, squash-drift, CI ordering, asset-staging trap) + the drift-discovery commands |
 | [MANAGED_WHERE_LEDGER.md](MANAGED_WHERE_LEDGER.md) | **Out-of-IaC resources** (DynamoDB table+GSIs, S3 bucket policy, SES, DNS, SSM) — what's managed where + automated assertions |
 | [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) | Backups + recovery |
 | [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) | Operator onboarding + daily checks |
@@ -43,7 +43,7 @@ top and stop when you have what you need.
 | [SECRETS_MAP.md](SECRETS_MAP.md) · [SECRETS_ROTATION.md](SECRETS_ROTATION.md) | Inventory · rotation |
 
 ## Decisions, taxonomy & cost
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–105)** — why things are the way they are; ADR-103 = complexity-posture ledger, ADR-104 = honest numbers, ADR-105 = the rigor bar |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–133)** — why things are the way they are; ADR-103 = complexity-posture ledger, ADR-104 = honest numbers, ADR-105 = the rigor bar |
 |---|---|
 | [TAG_CODES.md](TAG_CODES.md) | Decode the internal tag alphabet (PG/SIMP/IC/SEC/…) |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |

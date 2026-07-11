@@ -9,7 +9,7 @@
 
 ## What Is This Platform?
 
-A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 133 MCP tools so Claude can answer natural-language health questions against real data.
+A personal health intelligence system built on AWS for a single user (Matthew). It pulls data from ~20 API/webhook/manual sources (wearables, apps, labs, manual uploads), stores everything in a single DynamoDB table, runs a deterministic computation pipeline + an 8-agent coaching layer, and exposes 64 MCP tools so Claude can answer natural-language health questions against real data.
 
 The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
@@ -52,11 +52,11 @@ Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
   + site-stats-refresh (writes public_stats.json)
     │
     ▼
-MCP Lambda (133 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
+MCP Lambda (64 tools) ← Claude Desktop + claude.ai + mobile via remote MCP
 site-api Lambda (60+ endpoints, primarily read-only — ADR-037) ← averagejoematt.com
 ```
 
-73 Lambdas in us-west-2 + 4 in us-east-1 (CloudFront edge + auth) = 77 total. 8 CDK stacks. Monthly cost: ~$13.
+~94 Lambdas (CDK-defined; includes 4 us-east-1 edge/auth functions). 9 CDK stacks. Run-rate: ~$25–40/mo against an $85 enforced ceiling (ADR-063/133 — see `docs/COST_TRACKER.md`).
 
 ---
 
@@ -66,11 +66,11 @@ site-api Lambda (60+ endpoints, primarily read-only — ADR-037) ← averagejoem
 |---------|---------|-------------------|
 | **DynamoDB** (`life-platform`) | Single-table store for all source data, computed metrics, coach state | Read paths via MCP tools; writes via ingestion + compute Lambdas only |
 | **S3** (`matthew-life-platform`) | Raw archives + Lambda-generated content + site assets | `raw/`, `generated/`, `site/`, `uploads/`, `config/`, `cloudtrail/` — see ADR-046 for prefix separation |
-| **Lambda** (73 in us-west-2) | All compute. Ingest, compute, coaches, email, MCP, site-api | Deploy with `deploy/deploy_lambda.sh` (single function) or `cdk deploy <StackName>` (infra changes) |
+| **Lambda** (~94 CDK-defined) | All compute. Ingest, compute, coaches, email, MCP, site-api | Deploy with `deploy/deploy_lambda.sh` (single function), `deploy/deploy_fleet.sh` (shared-module change), or `cdk deploy <StackName>` (infra changes) |
 | **EventBridge** | All cron schedules, fixed UTC (no DST drift) | CDK-managed only — never create rules via Console |
-| **Secrets Manager** (`life-platform/*`) | All credentials | 11–14 active secrets (3 in soft-delete recovery). See `docs/SECRETS_MAP.md` |
+| **Secrets Manager** (`life-platform/*`) | All credentials | 21 active secrets. See `docs/SECRETS_MAP.md` |
 | **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |
-| **MCP Lambda** | 133 tools across 29 domain modules in `mcp/` | The interface Claude uses to query data |
+| **MCP Lambda** | 64 tools across 23 domain modules in `mcp/` | The interface Claude uses to query data |
 | **Anthropic API** | Coach generation + daily brief sections | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative |
 
 ---
@@ -208,7 +208,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 
 | Term | Meaning |
 |------|---------|
-| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 133 tools that Claude calls to query health data. |
+| **MCP** | Model Context Protocol — Claude's native tool interface. The MCP Lambda exposes 64 tools that Claude calls to query health data. |
 | **IC** | Intelligence Capability — the platform's computed health features (IC-1 through IC-30). |
 | **DLQ** | Dead Letter Queue — failed async Lambda invocations. Drained every 6 hours by `dlq-consumer`. |
 | **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep). See `mcp/config.py`. |
