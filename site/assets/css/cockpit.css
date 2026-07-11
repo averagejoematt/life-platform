@@ -537,10 +537,14 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 }
 
 /* ── Phase 3 polish: nav · a11y · honesty · mobile ────────────────────────── */
-.cockpit-top .doors { display: inline-flex; align-items: center; gap: var(--sp-4); }
-.cockpit-top .doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
-.cockpit-top .doors a:hover { color: var(--ember); }
-.cockpit-top .doors a[aria-current="page"] { color: var(--ember); border-bottom: 1px solid var(--ember); padding-bottom: 1px; cursor: default; }
+/* @layer chrome-base: `.cockpit-top .doors` (0,2,0) used to force the mobile app-bar
+   to !important its way past it — now the app-bar (@layer chrome) wins by layer order. (#1007) */
+@layer chrome-base {
+  .cockpit-top .doors { display: inline-flex; align-items: center; gap: var(--sp-4); }
+  .cockpit-top .doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
+  .cockpit-top .doors a:hover { color: var(--ember); }
+  .cockpit-top .doors a[aria-current="page"] { color: var(--ember); border-bottom: 1px solid var(--ember); padding-bottom: 1px; cursor: default; }
+}
 .top-controls { flex-wrap: wrap; }
 
 /* Explicit, always-visible keyboard focus */

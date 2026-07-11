@@ -17,21 +17,25 @@ body { overflow-x: hidden; }
   border: var(--border-hair); border-radius: var(--radius-sm); transition: top var(--dur-fast); }
 .skip:focus { top: var(--sp-2); left: var(--sp-2); }
 
-.story-top {
-  position: sticky; top: 0; z-index: var(--z-sticky);
-  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
-  padding: var(--sp-3) var(--gutter);
-  background: color-mix(in oklch, var(--page) 82%, transparent);
-  backdrop-filter: blur(10px);
-  border-bottom: var(--border-hair);
+/* @layer chrome-base: the desktop nav chrome. Lives in a lower layer so the mobile
+   app-bar (@layer chrome, tokens.css) wins at ≤600 WITHOUT !important. (#1007) */
+@layer chrome-base {
+  .story-top {
+    position: sticky; top: 0; z-index: var(--z-sticky);
+    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
+    padding: var(--sp-3) var(--gutter);
+    background: color-mix(in oklch, var(--page) 82%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: var(--border-hair);
+  }
+  .brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
+  .brand-mark { width: 11px; height: 11px; border-radius: 2px; background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); }
+  .brand-name { font-family: var(--font-mono); font-size: var(--fs-small); }
+  .doors { display: flex; align-items: center; gap: var(--sp-4); }
+  .doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
+  .doors a:hover { color: var(--ember); }
+  .doors a[aria-current="page"] { color: var(--ember); border-bottom: 1px solid var(--ember); padding-bottom: 1px; cursor: default; }
 }
-.brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
-.brand-mark { width: 11px; height: 11px; border-radius: 2px; background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); }
-.brand-name { font-family: var(--font-mono); font-size: var(--fs-small); }
-.doors { display: flex; align-items: center; gap: var(--sp-4); }
-.doors a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); text-decoration: none; }
-.doors a:hover { color: var(--ember); }
-.doors a[aria-current="page"] { color: var(--ember); border-bottom: 1px solid var(--ember); padding-bottom: 1px; cursor: default; }
 .theme-toggle { appearance: none; cursor: pointer; background: transparent; border: var(--border-hair); border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; }
 .theme-dot { width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, var(--ink) 0 50%, transparent 50% 100%); border: 1px solid var(--ink-muted); }
 
@@ -465,17 +469,21 @@ body { overflow-x: hidden; }
 .dx-xlink a { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
 .dx-xlink a:hover { border-color: var(--ember); }
 
-/* ── Narrow-screen topbar: stop the doors nav overflowing ~375px ──────────── */
-@media (max-width: 480px) {
-  .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
-  .brand-door { display: none; }   /* drop the section tag; keep wordmark + nav */
-  .doors { gap: var(--sp-3); }
-  .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
-}
-@media (max-width: 360px) {
-  .brand-name, .brand-door { display: none; }   /* keep the mark; reclaim ~100px */
-  .doors { gap: var(--sp-2); }
-  .doors a { font-size: 0.5625rem; }
+/* ── Narrow-screen topbar shrink. In @layer chrome-base so the mobile app-bar's
+   own door sizing (@layer chrome) wins — these .doors bits are legacy top-nav; the
+   brand/top-bar bits still apply (nothing in chrome competes with them). (#1007) ── */
+@layer chrome-base {
+  @media (max-width: 480px) {
+    .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+    .brand-door { display: none; }   /* drop the section tag; keep wordmark + nav */
+    .doors { gap: var(--sp-3); }
+    .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
+  }
+  @media (max-width: 360px) {
+    .brand-name, .brand-door { display: none; }   /* keep the mark; reclaim ~100px */
+    .doors { gap: var(--sp-2); }
+    .doors a { font-size: 0.5625rem; }
+  }
 }
 
 /* Chronicle audio (the AI-voiced podcast) */
