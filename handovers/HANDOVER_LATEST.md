@@ -1,119 +1,103 @@
-# HANDOVER — "Work the 6 that don't need me" became 8 shipped: MCP auth fully hardened (A+B), first DR restore drill, the Relationships pillar's social half wired — 2026-07-10
+# HANDOVER — The Engineering Wiki program: 10 PRs, docs-as-code made AI-shutdown-proof, drift machinery live, adversarial panel graded 7.5/10 — 2026-07-10
 
-> Instruction (evolving): "read handover and memory so we can talk about what to work on"
-> → "can you work on the 6 things that don't need me, i approve all merges and deploys"
-> → (mid-session) "893, i am fine to do an actual authorize step if it's the right thing.
-> And yes resolve that 902 bug" → "yes wrap". Standing authorization: all merges + deploys
-> (in-session words unblock, per `feedback_prod_deploy_authorization`).
+> Instruction: "put a plan together to build out the wiki … graded 10/10 by a majority of
+> engineers, CTOs, CPOs … the wiki and repo should be enough for if all of AI got powered
+> down, human engineers would have everything they need … and think about deployment
+> practices and session wraps going forward so the wiki stays accurate and avoids drift."
+> Mid-session: "i approve you to do all merges and deploys this session, green light in
+> advance" · "my assumption is the wiki ends up in github.com/…/wiki, no dependency on md
+> files on my laptop" (answered: docs-as-code IN the repo on GitHub = zero laptop
+> dependency + CI-gateable; the /wiki tab is a separate un-CI'd repo — a one-way mirror is
+> available on request) · SSO migration approved (free) — console-enable still pending.
 
-## The shape of the session
+## What shipped (all merged + deployed, docs-ci green on every one)
 
-Picked up the "18 remaining issues" board and separated the genuinely-unblocked from the
-Matthew-gated. Fanned out 3 worktree agents on the clean ones, took the delicate ones
-(live AWS, security design) in the foreground. Two forks surfaced mid-session and Matthew
-answered both live: **#893 option B** (yes, do a real /authorize approval step) and the
-**#902 adjacent bug** (yes, wire the missing social signal). Net: **8 items shipped +
-deployed + verified**, 1 deferred with receipts, 1 IAM apply executed by Matthew.
+**The corpus (7 program PRs):**
+- **#923 wiki-1 repairs** — tombstone purge (retired layer #781 / WAF / stale counts /
+  the inverted "NEVER deploy_lambda.sh for MCP" warnings / banned grep method) across 16
+  live docs; `sync_doc_metadata` hardened (a RULES pattern matching NOTHING now fails
+  `--check` — the silent-no-op class that let "133 tools" survive #395; 10 pre-existing
+  broken rules repaired); RULES extended to 9 more docs; `secret_count` live-verified 9→21;
+  DECISIONS index regenerated 57→119 rows via new `scripts/generate_adr_index.py`;
+  DEPLOYMENT.md → superseded pointer shell.
+- **#924 wiki-2 structure** — `docs/README.md` rebuilt as the wiki home (role paths +
+  Diátaxis + 100% registry + the self-maintenance contract); 15 SPEC_* → `docs/specs/`,
+  v4 quartet + V2 audit + dated artifacts → `docs/archive/` (51 files re-pointed;
+  BACKLOG.md + docs/restart/ deliberately NOT moved — CDK/pipeline write there); status
+  headers (`> **Status:** … · **Verified:**`) on all 39 canonical pages with honest dates.
+- **#925 wiki-6** — `docs/SITE_AUTHORING.md` (add-a-page end-to-end: generators inventory,
+  module-graph hashing trap, sw.js semantics, deploy+rollback); `site/DEPLOY.md` de-staled
+  (described the pre-v4 site).
+- **#926 wiki-4** — `docs/CONTINUITY.md` (the "AI powered down" keystone: 6→8 state
+  surfaces, day-1 successor reading order); `scripts/export_platform_memory.py` (read-only,
+  live dry-run 27 records/5 categories); 7 hard-won gotchas homed in CONVENTIONS §7.
+- **#927 wiki-3** — `docs/AWS_ACCESS.md` (SSO primary + break-glass + OIDC role inventory);
+  `docs/ACCOUNTS.md` (registrar = **NameCheap, averagejoematt.com expires 2026-08-20**;
+  SES sends from mattsusername.com — also NameCheap); QUICKSTART cold-start rewrite;
+  SECRETS_MAP reconciled to live (21 active, 9 previously undocumented secrets mapped).
+- **#928 wiki-5** — SCHEMA.md Key-Family Catalog (every pk/sk family incl. STANCE#,
+  ledger, coach, reading+GSIs; ~50 live Query(Limit=1) verifications); `docs/engines/`
+  ×5 (SCORING/CHARACTER/READINESS/HYPOTHESIS/COACH_STANCE — formulas with file:line refs).
+- **#929 wiki-7 machinery** — `scripts/check_doc_links.py` + `check_doc_tombstones.py`
+  (+ `docs/_lint/tombstones.txt`) + `check_doc_index.py`; `.github/workflows/docs-ci.yml`
+  (docs-only pushes previously ran NO pipeline); same gates in ci-cd Lint; wrap skill
+  step (e) doc-sweep gate; PR-template Docs-impact checklist; CONVENTIONS §8 (the
+  four-layer contract); `tests/test_wiki_checkers.py`.
 
-The recurring friction was **visibility**: Matthew kept hitting ESC to type "status,"
-which *cancels the in-flight tool call* (that's why several live MCP reads showed as
-"rejected" — not denials). Fix going forward: post a short heartbeat after each discrete
-step so he never has to interrupt to know it's progressing. Saved as feedback memory.
+**The grading loop (3 PRs):** 5-persona adversarial panel (staff-eng cold-start, SRE,
+CTO, security, CPO) scored 6.9 → **#932** fixed 24 verified defects (daily-brief is
+17:00 UTC not 11 AM; MONITORING's 4 dead alarm names; RUNBOOK's dead-alarm ingestion
+check; DR Scenario-5's false-security rotate loop; concurrency is 100 not 10; estate/
+break-glass section with loud UNDOCUMENTED rows; ingestion count is 15 — ARCHITECTURE
+was missing hevy, the grader had the outlier backwards) → re-grade → **#937** honesty
+hotfix (my own fix claimed the repo was private; it is still PUBLIC — false security
+assertion corrected) → **#938** round-2 residuals (the "aggregate ingestion alarm" is a
+phantom — deliberately NO fleet alarm exists, detection = freshness+DLQ+canary; and
+`deploy/setup_whoop_auth.py` EXISTS — in `deploy/`, not `setup/`).
 
-## What shipped (all MERGED + DEPLOYED + VERIFIED)
+**Deploys:** site-api ×2 (public `/api/platform_stats` now truthful: 64 tools / 94
+Lambdas / 119 ADRs / 3029 tests / 21 secrets — every one was wrong this morning).
 
-- **#902 → PR #905** — revived `social_mood_correlation`'s mood half. Root cause was
-  deeper than the issue: `merge_journal_view` (#890) never set `mood_avg` at all. Scale
-  map `enriched_mood` 1–5 → 0–10 via `(m-1)/4*10`. Deployed `character-sheet-compute`,
-  smoke-verified (200, clean).
-- **#904 → PR #907** — `/gear/` page (first passive-monetization surface): every device
-  from `source_registry.py`, cross-links to `/method/verify/`, **placeholder affiliate
-  slots** (`data-affiliate="pending"` + FTC disclosure) that Matthew fills in the `GEAR`
-  dict in `scripts/v4_build_gear.py`. Render-QA passed both themes. Site auto-deployed.
-- **#755 → PR #908** — **first verifiably-exercised DDB PITR restore** (+ S3 versioned
-  restore), both into isolated targets (`life-platform-dr-drill` table, `backups/dr-drill/`
-  prefix), spot-checked against prod, torn down. Fixed the DR doc's stale "snapshot the
-  layer" step (shared-utils layer retired #781). Prior to this only S3 versioning had ever
-  been exercised (via the 2026-03-16 accident).
-- **#893-A → PR #909** — `/token` mints a short-lived (24h), **revocable** session bearer
-  (`lps_…`, DDB-backed `core.session_token_issue/valid/revoke`) instead of the permanent
-  key-derived Desktop bearer. `_validate_bearer` accepts the static Desktop bearer OR a
-  live session bearer; fail-closed. Deployed `life-platform-mcp`, **live-verified** (unauth
-  401, static bearer 200, full OAuth flow → `lps_` token → 200).
-- **#893-B → PR #912** — `/authorize` is no longer auto-approve: a **passcode consent
-  form** (passcode = `HMAC(api_key,"life-platform-authorize-v1")`, derived so it's entered
-  without exposing the key) + a signed **30-day remembered-browser cookie** (payload-2.0
-  `cookies` array). URL possession alone now yields nothing. Deployed + **8/8 live checks**
-  (form shown, wrong passcode 401, correct → code+cookie, session token works, cookie
-  fast-path 302). Desktop path untouched throughout.
-- **#910 → PR #911** — the #902 adjacent bug: `character_engine.compute_relationships_raw`
-  read numeric `social_connection_score`/`enriched_social_connection` that *nothing writes*;
-  the enrichment lambda emits categorical `enriched_social_quality`. Bridge maps
-  alone/surface/meaningful/deep → 0/3.33/6.67/10 at read-time (works on historical data),
-  averaged across a day's entries. Lights up the Relationships pillar's second component.
-  Deployed `character-sheet-compute`, smoke-verified.
-- **#903 → PR #906 (code) + live IAM apply EXECUTED by Matthew** — shed `IAMReadOnly` +
-  `BedrockVisionQA` from the CI deploy role and narrowed CloudWatch to `DescribeAlarms`.
-  Matthew ran `put-role-policy` + `verify_oidc_iam --strict` → **CLEAN (9 targets)**. The
-  behavioral proof (no deploy-stage AccessDenied) comes on the next CI deploy; rollback
-  snapshot saved.
-- **Filed:** #910 (social bridge, done same session) + **#916** (Later — #893-B follow-up:
-  refresh_token grant / cookie-TTL tuning, gated on observed passcode-re-entry friction).
+## Final graded scores (honest — no third-party re-score after #938's fixes)
+Cold-start 7 · Correctness 6.7 · Coverage 7.8 · Navigability 8 · Operability 8 ·
+Maintainability 8 · Continuity 7.3 → **≈7.5/10** (from 6.9). The gap to 9 is 3 owner
+actions, not doc quality (below).
 
-## Deploys + verification
+## Verified
+All 5 wiki gates + `sync --check` green on main at `d4def416`; docs-ci success on every
+merge; `tests/test_wiki_checkers.py` + sync/platform-stats truth tests pass (14 tests);
+live-AWS cross-checks by graders (secrets 21/0, PITR ENABLED, CloudTrail logging, OIDC
+roles, whois ×2, concurrency 100).
 
-`character-sheet-compute` (×2: #905 then #911) · `life-platform-mcp` (×2: #893-A then
-#893-B) — all via `deploy_lambda.sh` full-tree bundle (rollback artifacts saved). Live:
-MCP 8/8 auth checks green, static Desktop bearer intact, session flow + passcode gate +
-cookie fast-path all working. DR drill: restored item matched prod exactly. #906: live
-role verified CLEAN by the strict verifier. Site: gear page auto-deployed green. Every
-PR merged to main; `main == live` for the touched surfaces.
+## Gotchas hit (durable ones → memory)
+- GitHub's PR mergeability cache races a force-push — wait ~20s and retry, don't rebuild.
+- The `--alarm-names` describe-alarms trap: nonexistent names are silently omitted →
+  false "all-OK". Query by `--state-value ALARM` instead.
+- Graders introduce-and-catch: 2 of my #932 fixes were themselves wrong (anticipatory
+  "repo is private", "no whoop script"). Write docs to CURRENT truth, never intended
+  truth; scripts live in `deploy/` AND `setup/` — search both.
+- `.flake8` excludes `deploy/`; CI's flake8 only covers `lambdas/ mcp/`; black+ruff
+  cover `scripts/ deploy/` — know which linter owns which dir.
+- My header-inserter matched a bash `# comment` as an H1 in CHANGELOG (first real `# `
+  heading was inside a fence at L1725).
 
-## Gotchas (new this session)
+## Matthew's queue (the entire remaining gap to 9/10)
+1. **Flip the repo PRIVATE** — open HIGH finding; `docs/coaching/` biometrics are
+   world-readable right now (DATA_GOVERNANCE + DR state this honestly).
+2. **Fill the 2 estate rows in `docs/ACCOUNTS.md`** — password manager + estate access;
+   MFA/2FA recovery-code locations. Until then documented bus-factor = 1.
+3. **Enable IAM Identity Center** (console: IAM Identity Center → Enable, us-west-2 →
+   Users → add `matthew`) — then I finish the SSO lane (permission set, assignment,
+   `aws configure sso` verify; docs already written in AWS_ACCESS.md).
+4. Decide the idle `life-platform/notion` secret (retire-candidate since 2026-03).
+5. **averagejoematt.com renews 2026-08-20 at NameCheap** — nearest hard deadline.
 
-- **ESC to ask "status" cancels the in-flight tool call.** That's why live MCP reads
-  showed as "rejected." Not denials — interruptions. Heartbeat after each step instead.
-- **The auto-mode classifier correctly firewalls two protected-scope actions** even under
-  "approve all merges and deploys": (1) live `iam:put-role-policy` on the deploy role, (2)
-  a verify script that *prints* the key-derived passcode to the transcript. Both were
-  handed to Matthew to run in his own shell (`!`/terminal) — "approve deploys" does not
-  extend to IAM mutation or credential materialization. Right guardrail; hand off, don't
-  work around.
-- **`core.py`'s `secrets` is the boto3 SecretsManager client, not stdlib** — used
-  `uuid.uuid4().hex` (the codebase's opaque-token idiom) for token randomness to avoid the
-  name collision.
-- **ruff bandit S105 fires on `SESSION_TOKEN_PREFIX = "lps_"`** (a token *label*, not a
-  secret) in `mcp/core.py` — `mcp/handler.py` is S105-exempt in pyproject but core.py
-  isn't; used a surgical `# noqa: S105` rather than blanket-exempting the file. CI's
-  blocking ruff enforces S-codes (`select=[...,"S"]`, no `|| true`); its blocking flake8
-  only selects `E9,F63,F7,F82` (F401 is informational).
-- **Terminal line-wrap mangles pasted multi-line commands** — the passcode one-liner broke
-  on `--region\n  us-west-2`; give copy-paste commands as a single unwrapped line.
-- **Lambda Function URLs are payload format 2.0** — request cookies arrive in
-  `event["cookies"]` (+ Cookie header); responses set cookies via the top-level `cookies`
-  array, NOT a `Set-Cookie` header. Got this right in #893-B.
+## Residual queue (filed as issues)
+#930 phase_taxonomy misses weight_episodes/training_reference (restart KeyError — real
+bug found by the schema catalog) · #933 ADD_A_COACH.md · #934 alarm-NAME AST sync (kill
+the MONITORING drift class permanently) · #935 whoop script housekeeping (move to
+setup/) · #936 DR swap-back drill + measure the 30-min RTO claim. Prior gated items
+unchanged: PRE-13, HN #741, /verify/ profile URLs, HAE straggler, #748, #916.
 
-**Build beat:** 2026-07-10-mcp-auth-hardened
-
-## Residual — waiting on Matthew (all optional / low-priority)
-
-1. **claude.ai reconnect** — on its next token refresh (≤24h) the connector prompts for
-   the passcode Matthew retrieved this session; he pastes it once per browser (~monthly via
-   the cookie). Desktop needs nothing.
-2. **#748 fulfillment story** — still gate-locked: needs ≥4 weeks of clean fulfillment data
-   incl. a rough patch. #910 wired the social signal (a precondition); watch whether
-   `enriched_social_quality` is actually populated on recent journal days before revisiting.
-3. **#916** — #893-B refresh-friction follow-up; only act if the monthly passcode annoys.
-4. **Still open from prior session:** PRE-13 privacy decisions, HN submission (#741), /verify/
-   profile URLs, HAE straggler repoint, GitHub GC ticket (paused by Matthew).
-5. **#902/#910 live effect** — spot-check a recent character-sheet compute for a non-None
-   Relationships social component once journals carry `enriched_social_quality`.
-
-## Watch
-
-First natural CI deploy after the #906 shed (confirms no deploy-stage AccessDenied) ·
-claude.ai's first post-#893-B refresh (passcode prompt appears as designed) · the
-Relationships pillar's first real social signal on the next character-sheet compute ·
-gear-page affiliate slots stay `pending` until Matthew signs up.
-
-Prior session archived at `handovers/HANDOVER_2026-07-09_decision-sprint.md`.
+**Build beat:** wiki-program-2026-07-10
+**Docs:** the program IS the docs — 10 PRs across ~60 pages; all five gates green at wrap.
