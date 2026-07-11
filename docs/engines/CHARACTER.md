@@ -1,6 +1,6 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 > **Sources of truth:** `lambdas/character_engine.py` (v1.3.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (deployed to `s3://…/config/matthew/character_sheet.json`)
 
 ## Purpose
@@ -80,7 +80,9 @@ worth) — good days pay debt before XP grows; sustained decay is no longer hidd
 - `neglect_decay_state` (:909-943): when `engagement_state.presence_class == "dark"` (and not a
   planned pause), after `n_grace_days` (3) the level score of pillars whose behavioral weight
   share ≥ 0.3 is multiplied by `0.98^(gap−3)`, floored at the day's own raw score and the config
-  floor (0). Models detraining/evidence loss, never punishment (ADR-104).
+  floor (0). Models detraining/evidence loss, never punishment (ADR-104). All four knobs live in
+  `config/character_sheet.json` under `leveling.neglect_decay`
+  (`n_grace_days` / `rate` / `floor` / `min_behavioral_share`).
 - `compute_character_mood` (:950-1009), pure code (ADR-105), first match wins:
   dark ⇒ **dormant**; quiet or 7d-composite trend ≤ −5 ⇒ **fading**; present/light AND trend ≥ +3
   AND composite ≥ 55 ⇒ **thriving**; else **steady**. Trend = mean(last 3 d) − mean(prior 4 d).
@@ -102,4 +104,4 @@ provenance), `coverage_hold`, `neglect_decay`. Config: `config/character_sheet.j
 (5-min warm cache); tunable via the `update_character_config` MCP tool. No env vars beyond the
 standard table/bucket.
 
-> **Verified against `lambdas/character_engine.py` @ git 4d132ec7 on 2026-07-10.**
+> **Verified against `lambdas/character_engine.py` + `config/character_sheet.json` @ git f2c9ed64 on 2026-07-11.**

@@ -1,6 +1,6 @@
 # Phase Taxonomy — experiment-restart data semantics
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-07
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
 **Authoritative classification of every DynamoDB record type for experiment restarts.**
 Machine-readable source of truth: `lambdas/phase_taxonomy.py` (shared layer). Both
@@ -15,10 +15,10 @@ restart tools and the read paths derive from it. See ADR-077 for the decision re
 
 | Class | Restart behavior | Read behavior | Examples |
 |---|---|---|---|
-| **cross_phase** | Never tagged, never wiped | Always fully visible (`include_pilot`) | labs, dexa, genome, **supplements/meds**, **`chronicling`** (frozen pre-platform archive), subscribers, profile, durable platform memories, **`calibration`** (prediction-resolution ledger, #530), **`VOICEFIDELITY#*`** (blind voice-fidelity scoreboard, #545) |
+| **cross_phase** | Never tagged, never wiped | Always fully visible (`include_pilot`) | labs, dexa, genome, **supplements/meds**, **`chronicling`** (frozen pre-platform archive), subscribers, profile, durable platform memories, **`calibration`** (prediction-resolution ledger, #530), **`VOICEFIDELITY#*`** (blind voice-fidelity scoreboard, #545), **`benchmarks`** (cut-benchmarking history, BENCH-1/ADR-089 — #918) |
 | **raw_timeseries** | Never wiped (facts kept) | Current views **genesis-anchored** (date-clamped to `EXPERIMENT_START`) | whoop, withings, strava, garmin, apple_health, eightsleep, habitify, macrofactor, hevy, notion/journal, food_delivery, sick_days, **measurements**, **day_grade**, state_of_mind, travel, interactions, exposures, temptations |
-| **experiment_scoped** | **Tagged + wiped** (tombstone + `phase=pilot` + `cycle=N`) | **Phase-filtered** (pilot hidden) | insights, hypotheses, experiments, challenges, protocols, field_notes, discovery_annotations, **chronicle** (Wednesday narrative), habit_scores, character_sheet, computed_metrics/insights, adaptive_mode, circadian, anomalies, weekly_correlations, centenarian_progress, nutrition_review, ledger TOTALS, ai_analysis, **all COACH#\***, **ENSEMBLE#digest/disagreements**, **NARRATIVE#arc**, **coach_thread**, learning-category platform memories |
-| **system_state** | Ignored entirely | Ignored (some GA on read) | journal_analysis (TTL cache), health_check, dropbox_tracker, hevy_id_map, routine_index, **email_log**, ENSEMBLE#influence_graph, PULSE, CACHE#, SUBSCRIBE#rate_limit, VOTES#, intelligence_quality, ROUTINE#, USER#system, dead partitions (composite_scores, google_calendar) |
+| **experiment_scoped** | **Tagged + wiped** (tombstone + `phase=pilot` + `cycle=N`) | **Phase-filtered** (pilot hidden) | insights, hypotheses, experiments, challenges, protocols, field_notes, discovery_annotations, **chronicle** (Wednesday narrative), habit_scores, character_sheet, computed_metrics/insights, adaptive_mode, circadian, anomalies, weekly_correlations, centenarian_progress, nutrition_review, ledger TOTALS, ai_analysis, **all COACH#\***, **ENSEMBLE#digest/disagreements/dispute** (dispute threads wired into the wipe by #918), **NARRATIVE#arc**, **coach_thread**, learning-category platform memories |
+| **system_state** | Ignored entirely | Ignored (some GA on read) | journal_analysis (TTL cache), health_check, dropbox_tracker, hevy_id_map, routine_index, **email_log**, ENSEMBLE#influence_graph, PULSE, CACHE#, SUBSCRIBE#rate_limit, VOTES#, CHALLENGE_FOLLOWS (#918), intelligence_quality, ROUTINE#, USER#system, dead partitions (composite_scores, google_calendar) |
 
 ## Cycle / reset-generation stamping
 
@@ -56,6 +56,11 @@ The Wednesday Chronicle (`SOURCE#chronicle`, written installments) is experiment
 6. **Shared registry** — the tagger and wipe import `phase_taxonomy.py` instead of divergent hand-rolled lists (the root cause).
 7. **Dead partitions** — composite_scores (ADR-025) + google_calendar (no writer) classified system_state and excluded.
 8. **Standalone-writer stamping closed (#482/X-6, 2026-07-04)** — phase tagging was framework+hevy only; the six standalone writers depended on the manual reset sweep, so an untagged backfill could surface pre-genesis data as current (`phase_filter` passes `attribute_not_exists`). Now every standalone DDB-writing ingestion path stamps `phase` via the public `ingestion_framework.phase_for_date()`: HAE (`if_not_exists` in the merge update), notion, macrofactor, food_delivery (DATE#-keyed records), measurements. The apple_health XML writer was retired the same day (#474) rather than stamped. Pinned by `tests/test_now_remainder_batch.py`.
+9. **Reset-protocol clean sweep (#918, 2026-07-10)** — three registry gaps closed ahead of the cycle-5 reset: `benchmarks` classified **cross_phase** (proven cut-benchmarking history must survive resets), `CHALLENGE_FOLLOWS` classified **system_state**, and `ENSEMBLE#dispute` threads wired into the wipe surface.
+
+## Pending classification (#917)
+
+The coach check-in records (`pk COACH#<id>_coach` / `sk CHECKIN#<date>#<uuid8>`, shipped 2026-07-10) currently **inherit the COACH#\* default (experiment_scoped)**. The recommended class is **cross_phase** — qualitative Q&A history is exactly what ought to survive an experiment reset (see the #917 PR body). The one-line registry addition in `lambdas/phase_taxonomy.py` is a deliberate follow-up; until it lands, a reset will tombstone CHECKIN# rows along with the rest of the coach tier.
 
 ---
 

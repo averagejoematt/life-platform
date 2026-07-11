@@ -1,6 +1,6 @@
 # Life Platform — Schema & Data Dictionary
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-06
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
@@ -140,7 +140,7 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `…SOURCE#forecast` / `FORECAST#<target>#<metric>#h<h>` (legacy `DATE#<d>` rows also live) | daily EWMA expectations (#541) | `compute/forecast_engine_lambda.py` | site_api_data, `get_predictions` | ✓ |
 | `…SOURCE#state_of_matthew` / `DATE#<d>` | weekly narrated synthesis (#552) | `compute/state_of_matthew_lambda.py` | site, brief | ✓ |
 | `…SOURCE#adaptive_mode` / `DATE#<d>` | daily adaptive coaching mode | `compute/adaptive_mode_lambda.py` | `get_adaptive_mode`, orchestrator | ✓ |
-| `…SOURCE#engagement_state` / `STATE#current`, `DATE#<d>` | presence / quiet-stretch state (feeds #913 neglect decay) | `compute/adaptive_mode_lambda.py` | character_sheet_lambda, site_api_ai | ✓ |
+| `…SOURCE#engagement_state` / `STATE#current`, `DATE#<d>` | presence / quiet-stretch state: `presence_class` + `severity` ladder `none\|soft\|loud\|alarm` (#914/#921) + per-channel `channel_detail.<source>.dropout_streak_days`; channels are the `engagement_channel` facet in `lambdas/source_registry.py` (incl. withings `measurement`); feeds #913 neglect decay + `engagement_core.presence_prompt_block` (injected into all narrative prompts, deterministic acknowledgment gate à la ADR-108) | `compute/adaptive_mode_lambda.py` | character_sheet_lambda, narrative prompt builders (via `engagement_core`), site_api_ai | ✓ |
 | `…SOURCE#{circadian, anomalies, scenarios, nutrition_review, centenarian_progress}` / `DATE#<d>` | per-domain daily/periodic computes | respective compute/email lambdas | site_api, MCP | ✓ (anomalies, scenarios) |
 | `…SOURCE#weekly_correlations` / `WEEK#<w>` | weekly cross-metric correlations | `compute/weekly_correlation_compute_lambda.py` | site_api_correlation | ✓ |
 | `…SOURCE#what_changed` / `SNAPSHOT#current`, `MONTH#<m>`, `STATE#first_seen` | SS-08 monthly delta + first-seen ledger | SS-08 compute | site_api_ai | ✓ |
@@ -165,7 +165,10 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `OUTPUT#<date>#<type>` | generated coach narratives | `coach/coach_state_updater.py` | summarizer, observatory | ✓ (partition) |
 | `THREAD#<date>#<slug>` | open coaching threads | `coach/coach_state_updater.py` | summarizer | ✓ (partition) |
 | `PREDICTION#<id>`, `LEARNING#<date>#<slug>`, `CONFIDENCE#<subdomain>`, `COMMITMENT#<id>` | predictions + graded outcomes + per-subdomain confidence | `coach/coach_prediction_evaluator.py`, `coach_checkin.py` | track-record pages, stance engine | ✓ (partition) |
-| `COMPRESSED#latest`, `MEMOIR#…`, `CHECKIN#…`, `INTERACTION#…`, `RELATIONSHIP#state`, `VOICE#state`, `BRIEF#<date>` | compressed memory, memoirs, check-ins, board Q&A, relationship/voice state | summarizer, memoir lambda, coach_checkin, site-api-ai | summarizer, site_api_coach | ✓ (partition) |
+| `CHECKIN#<YYYY-MM-DD>#<uuid8>` | coach check-in loop (#917): a coach's question + Matthew's verbatim answer (field detail in [Coach Check-ins](#coach-check-ins-917)) | `mcp/tools_coach_checkin.py` (core: `lambdas/coach_checkin.py`) | check-in queue tool, `recent_checkins_block` prompt injection | ✓ (partition) |
+| `COMPRESSED#latest`, `MEMOIR#…`, `INTERACTION#…`, `RELATIONSHIP#state`, `VOICE#state`, `BRIEF#<date>` | compressed memory, memoirs, board Q&A, relationship/voice state | summarizer, memoir lambda, site-api-ai | summarizer, site_api_coach | ✓ (partition) |
+
+**CHECKIN# phase classification is a PENDING follow-up (#917):** the rows currently inherit the COACH#\* default (experiment_scoped); the recommended class is **cross_phase** — qualitative history is exactly what ought to survive a reset (see the #917 PR body). The one-line registry addition in `lambdas/phase_taxonomy.py` is a deliberate separate change.
 
 ### Ensemble / narrative / eval families
 
@@ -1592,7 +1595,7 @@ Queried by MCP tools: `get_habit_tier_report`, `get_vice_streak_history`.
 **pk:** `USER#matthew#SOURCE#character_sheet`
 **sk:** `DATE#YYYY-MM-DD`
 
-One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing. Engine v1.2.0 (ADR-104) adds behavioral-absence semantics (an unlogged behavior scores 0, a missing sensor reading stays neutral), the coverage gate (thin-data days can't move levels), the raw-day gate on level-ups, graduated step bands, and per-pillar drivers provenance.
+One item per day. Computed by the backfill script initially, then by the Daily Brief Lambda (Phase 2). Contains the full character state: overall level, all 7 pillar scores, XP, tier info, cross-pillar effects, and level events. Sequential dependency — each day's computation requires the previous day's state for streak tracking and level transitions. Engine v1.1.0 adds confidence scoring, XP decay, progressive difficulty, and per-pillar EMA smoothing. Engine v1.2.0 (ADR-104) adds behavioral-absence semantics (an unlogged behavior scores 0, a missing sensor reading stays neutral), the coverage gate (thin-data days can't move levels), the raw-day gate on level-ups, graduated step bands, and per-pillar drivers provenance. Engine v1.3.0 (#913/#919) adds the deterministic `character_mood`, visible XP debt (the below-zero bleed, no longer hidden by a 0-floor), engagement-driven neglect atrophy, and the up-gate scale fix (`round(raw_score) >= target_level`) — mechanics in `docs/engines/CHARACTER.md`.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -1601,6 +1604,10 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `character_tier` | string | Current tier name: Foundation / Momentum / Discipline / Mastery / Elite |
 | `character_tier_emoji` | string | Tier emoji |
 | `character_xp` | number | Cumulative total XP across all pillars |
+| `character_xp_debt` | number | v1.3.0 (#919): summed per-pillar `xp_debt` — the visible below-zero bleed |
+| `character_mood` | string | v1.3.0 (#919): deterministic mood, `thriving` \| `steady` \| `fading` \| `dormant` — pure code (ADR-105), never narrated into existence |
+| `character_mood_inputs` | map | v1.3.0 (#919): the inputs the mood verdict was derived from (presence class, 7d composite trend) — ADR-104 provenance |
+| `neglect_decay` | map \| null | v1.3.0 (#919): today's engagement-atrophy state (gap days, multiplier); `null` when engaged or on a planned pause |
 | `min_confidence` | number | Lowest pillar confidence (0.0–1.0). v1.1.0+ |
 | `avg_confidence` | number | Average pillar confidence (0.0–1.0). v1.1.0+ |
 | `active_effects` | list | Active cross-pillar effects (e.g., Sleep Drag, Training Boost) |
@@ -1624,8 +1631,9 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `level` | number | Discrete level (1-100), changes subject to progressive streak rules |
 | `tier` | string | Pillar tier name |
 | `tier_emoji` | string | Tier emoji |
-| `xp_total` | number | Cumulative XP for this pillar (decays daily by `daily_xp_decay`) |
+| `xp_total` | number | Cumulative XP for this pillar (decays daily by `daily_xp_decay`); v1.3.0: the positive part only — the below-zero remainder goes to `xp_debt` |
 | `xp_delta` | number | Net XP change today (earned − decay) |
+| `xp_debt` | number | v1.3.0 (#919): the hole dug below zero, capped at `leveling.xp_debt_cap` (100 = one level's worth) — good days pay debt before XP grows |
 | `xp_earned` | number | Raw XP earned today before decay. v1.1.0+ |
 | `xp_buffer` | number | XP within current level (0 to xp_per_level). Protects against level-down. v1.1.0+ |
 | `confidence` | number | Data completeness confidence (0.0–1.0). v1.1.0+ |
@@ -1635,6 +1643,7 @@ One item per day. Computed by the backfill script initially, then by the Daily B
 | `coverage_hold` | bool | ADR-104 (v1.2.0+): day was below `level_change_min_coverage` — no leveling signal, levels frozen both directions |
 | `absent_behaviors` | list | ADR-104 (v1.2.0+): behavioral components with no data this day (scored 0 at full weight — "didn't happen") |
 | `drivers` | map | ADR-104 (v1.2.0+): engine-computed provenance `{top, dragging, absent, no_data}` (component-name lists) — feeds the page's per-pillar "why" line |
+| `neglect_decay` | map \| null | v1.3.0 (#919): this pillar's atrophy state when the engagement gap decayed its level score (`0.98^(gap−3)` after 3 dark days on behavioral-heavy pillars, floored at raw — config `leveling.neglect_decay`); `null` when not decaying |
 | `components` | map | Per-component scores: `{"component_name": {"score": N, "weight": W[, "absent": true]}, "_confidence": N, "_data_coverage": N, "_absent_behaviors": [...]}` |
 
 Config: `s3://matthew-life-platform/config/character_sheet.json`  
@@ -2356,6 +2365,32 @@ Signals are diffed against `last_interaction_date` so repeat runs never double-c
   "quality_score": 0.92
 }
 ```
+
+### Coach Check-ins (#917)
+
+**pk:** `COACH#{coach_id}_coach` (bare pk, evaluator convention — same partition family as `STANCE#`/`PREDICTION#`/`LEARNING#`; NO `USER#matthew#SOURCE#` prefix)
+**sk:** `CHECKIN#{YYYY-MM-DD}#{uuid8}`
+
+The MCP check-in loop (#917): a coach asks Matthew a qualitative question via `get_coach_checkin_queue` (returns the standing open questions, max 3; generates + stores fresh ones only when the queue is empty), and `log_coach_checkin` records his answer **verbatim** (ADR-104 — never paraphrased) or an explicit skip (always valid, zero penalty). The asking coach rotates toward the longest-dark manual engagement channel, falling back to least-recently-asked. Core logic: `lambdas/coach_checkin.py`; MCP surface: `mcp/tools_coach_checkin.py` (took the registry 62 → 64 tools).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `record_type` | string | Constant `coach_checkin` |
+| `coach_id` | string | Bare coach id (e.g. `mind`) — the pk carries the `_coach`-suffixed form |
+| `coach_name` | string | Display name of the asking coach |
+| `question` | string | The coach's question (autonomy-supportive phrasing, never compliance-audit) |
+| `status` | string | `open` \| `answered` \| `skipped` |
+| `answer` | string | Matthew's answer, verbatim (ADR-104); absent until answered |
+| `skipped` | boolean | True when the outcome was an explicit skip |
+| `tags` | list | Lowercase topic words (1-3 at generation; up to 5 on logging) |
+| `asked_at` | string | ISO timestamp the question was stored |
+| `answered_at` | string | ISO timestamp of the answer/skip; absent while open |
+| `provenance` | string | Constant `mcp` |
+| `cycle` | number | SSM `/life-platform/experiment-cycle` at write time (fail-soft — absent if SSM unreadable) |
+| `context_reason` | string | Why this coach asked (e.g. the overdue channel that picked it) |
+| `generated_by` | string | `bedrock` \| `fallback` (canned question when generation is unavailable) |
+
+**Phase taxonomy:** PENDING follow-up (#917) — currently inherits the COACH#\* default (experiment_scoped); recommended cross_phase. See the note in the key-family catalog above.
 
 ### Ensemble Digest
 

@@ -706,6 +706,48 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/938"
         }
       ]
+    },
+    {
+      "id": "2026-07-11-cycle5-countdown-reset",
+      "date": "2026-07-11",
+      "title": "The machine learned to see silence — then the experiment reset itself into a countdown",
+      "shipped": "Two weeks of manual logging going dark — while the wearables kept cheerfully reporting — became a full honesty audit: 47 reviewer agents read every page against the raw data and confirmed 34 real problems, including the sharpest one on the site: the RPG character LEVELED UP five times during total neglect, because a bug compared a daily score against the wrong scale. One overnight session shipped eight fixes end to end: silence is now a first-class signal with an escalation ladder injected into every coach, chronicle, podcast and brief prompt (with a gate that rejects any narrative that fails to acknowledge a live gap); the character now atrophies, carries visible XP debt, and goes dormant when the inputs stop; every dead data source reads as dead instead of narrating in present tense; a genotype that should never have been public was stripped from the labs API; and the coaches can now ask their human questions whose answers become context they reason with. Then the reset itself ran: the experiment re-anchored to a Sunday genesis, every counter wound to zero, prior-cycle data archived in place — and until Day 1 the whole site runs a countdown: T−2 days, first baseline is Sunday's weigh-in.",
+      "gotcha": "The deploy pipeline's own quality gates rejected the countdown twice and auto-rolled the site back — they assumed a running experiment (a weight in the vitals payload, a non-empty lab-notes pane) and treated the honest pre-start state as breakage. The gates weren't wrong; the empty states were. Both now render honest placeholders, and the smoke test knows a countdown window when it sees one.",
+      "honest_miss": "The reset pipeline aborted mid-run on a DynamoDB reserved keyword the dry run structurally could not catch (validation only fires on the real write), and the resumed run silently skipped the old-date sweep because the constants had already flipped — one page kept the old genesis date until the rendered-surface verifier flagged it. Both are fixed in the pipeline for cycle 6.",
+      "prs": [
+        {
+          "label": "#917",
+          "url": "https://github.com/averagejoematt/life-platform/pull/917"
+        },
+        {
+          "label": "#918",
+          "url": "https://github.com/averagejoematt/life-platform/pull/918"
+        },
+        {
+          "label": "#919",
+          "url": "https://github.com/averagejoematt/life-platform/pull/919"
+        },
+        {
+          "label": "#920",
+          "url": "https://github.com/averagejoematt/life-platform/pull/920"
+        },
+        {
+          "label": "#921",
+          "url": "https://github.com/averagejoematt/life-platform/pull/921"
+        },
+        {
+          "label": "#922",
+          "url": "https://github.com/averagejoematt/life-platform/pull/922"
+        },
+        {
+          "label": "#939",
+          "url": "https://github.com/averagejoematt/life-platform/pull/939"
+        },
+        {
+          "label": "#941",
+          "url": "https://github.com/averagejoematt/life-platform/pull/941"
+        }
+      ]
     }
   ]
 }

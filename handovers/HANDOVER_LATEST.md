@@ -1,110 +1,116 @@
-# HANDOVER — The Engineering Wiki program: 10 PRs, docs-as-code made AI-shutdown-proof, drift machinery live, adversarial panel graded 7.5/10 — 2026-07-10
+# HANDOVER — Cycle-5 reset executed early with a live countdown: stall audits → 8 PRs (honesty machinery) → nuke-now, genesis Sunday 2026-07-12 — 2026-07-10/11
 
-> Instruction: "put a plan together to build out the wiki … graded 10/10 by a majority of
-> engineers, CTOs, CPOs … the wiki and repo should be enough for if all of AI got powered
-> down, human engineers would have everything they need … and think about deployment
-> practices and session wraps going forward so the wiki stays accurate and avoids drift."
-> Mid-session: "i approve you to do all merges and deploys this session, green light in
-> advance" · "my assumption is the wiki ends up in github.com/…/wiki, no dependency on md
-> files on my laptop" (answered: docs-as-code IN the repo on GitHub = zero laptop
-> dependency + CI-gateable; the /wiki tab is a separate un-CI'd repo — a one-way mirror is
-> available on request) · SSO migration approved (free) — console-enable still pending.
+> Instruction: "another platform reset, new start date Sunday July 12 … review the reset
+> protocols and make sure it's fully complete … BEFORE the plan, review the actual content
+> of all web pages — 2 weeks of not logging while Whoop/EightSleep kept flowing: do the
+> coaches sound accurate? … character should be sad, levels dropping … run it past
+> psychology/medical/sports-science/biohacking/product/reader experts." Mid-session:
+> "I approve all merges and deploys, green light in advance" → "why can't we have
+> everything nuked NOW and the site becomes a countdown to Sunday?" → executed. Also:
+> "the platform (other than the reset page) must NOT know it's another attempt — no
+> reset article, intro podcast treats it as the start."
 
-## What shipped (all merged + deployed, docs-ci green on every one)
+## What shipped (all merged + deployed + live)
 
-**The corpus (7 program PRs):**
-- **#923 wiki-1 repairs** — tombstone purge (retired layer #781 / WAF / stale counts /
-  the inverted "NEVER deploy_lambda.sh for MCP" warnings / banned grep method) across 16
-  live docs; `sync_doc_metadata` hardened (a RULES pattern matching NOTHING now fails
-  `--check` — the silent-no-op class that let "133 tools" survive #395; 10 pre-existing
-  broken rules repaired); RULES extended to 9 more docs; `secret_count` live-verified 9→21;
-  DECISIONS index regenerated 57→119 rows via new `scripts/generate_adr_index.py`;
-  DEPLOYMENT.md → superseded pointer shell.
-- **#924 wiki-2 structure** — `docs/README.md` rebuilt as the wiki home (role paths +
-  Diátaxis + 100% registry + the self-maintenance contract); 15 SPEC_* → `docs/specs/`,
-  v4 quartet + V2 audit + dated artifacts → `docs/archive/` (51 files re-pointed;
-  BACKLOG.md + docs/restart/ deliberately NOT moved — CDK/pipeline write there); status
-  headers (`> **Status:** … · **Verified:**`) on all 39 canonical pages with honest dates.
-- **#925 wiki-6** — `docs/SITE_AUTHORING.md` (add-a-page end-to-end: generators inventory,
-  module-graph hashing trap, sw.js semantics, deploy+rollback); `site/DEPLOY.md` de-staled
-  (described the pre-v4 site).
-- **#926 wiki-4** — `docs/CONTINUITY.md` (the "AI powered down" keystone: 6→8 state
-  surfaces, day-1 successor reading order); `scripts/export_platform_memory.py` (read-only,
-  live dry-run 27 records/5 categories); 7 hard-won gotchas homed in CONVENTIONS §7.
-- **#927 wiki-3** — `docs/AWS_ACCESS.md` (SSO primary + break-glass + OIDC role inventory);
-  `docs/ACCOUNTS.md` (registrar = **NameCheap, averagejoematt.com expires 2026-08-20**;
-  SES sends from mattsusername.com — also NameCheap); QUICKSTART cold-start rewrite;
-  SECRETS_MAP reconciled to live (21 active, 9 previously undocumented secrets mapped).
-- **#928 wiki-5** — SCHEMA.md Key-Family Catalog (every pk/sk family incl. STANCE#,
-  ledger, coach, reading+GSIs; ~50 live Query(Limit=1) verifications); `docs/engines/`
-  ×5 (SCORING/CHARACTER/READINESS/HYPOTHESIS/COACH_STANCE — formulas with file:line refs).
-- **#929 wiki-7 machinery** — `scripts/check_doc_links.py` + `check_doc_tombstones.py`
-  (+ `docs/_lint/tombstones.txt`) + `check_doc_index.py`; `.github/workflows/docs-ci.yml`
-  (docs-only pushes previously ran NO pipeline); same gates in ci-cd Lint; wrap skill
-  step (e) doc-sweep gate; PR-template Docs-impact checklist; CONVENTIONS §8 (the
-  four-layer contract); `tests/test_wiki_checkers.py`.
+**The investigation (4 audits + 6-seat expert panel + 47-agent truth-audit workflow):**
+`docs/reviews/EDITORIAL_ACCURACY_REVIEW_2026-07-10.md` — 34 verified serious findings
+(4 critical, incl. two live privacy leaks). Headline: the AI coach layer mostly named the
+15-day stall honestly (presence engine #892 was live); the deterministic/front-end layer
+papered over it, and the character LEVELED UP 8→13 during total silence (up-gate scale
+bug, `character_engine.py:896`-class). Plan: `docs/restart/RESET_PLAN_2026-07-12.md`.
 
-**The grading loop (3 PRs):** 5-persona adversarial panel (staff-eng cold-start, SRE,
-CTO, security, CPO) scored 6.9 → **#932** fixed 24 verified defects (daily-brief is
-17:00 UTC not 11 AM; MONITORING's 4 dead alarm names; RUNBOOK's dead-alarm ingestion
-check; DR Scenario-5's false-security rotate loop; concurrency is 100 not 10; estate/
-break-glass section with loud UNDOCUMENTED rows; ingestion count is 15 — ARCHITECTURE
-was missing hevy, the grader had the outlier backwards) → re-grade → **#937** honesty
-hotfix (my own fix claimed the repo was private; it is still PUBLIC — false security
-assertion corrected) → **#938** round-2 residuals (the "aggregate ingestion alarm" is a
-phantom — deliberately NO fleet alarm exists, detection = freshness+DLQ+canary; and
-`deploy/setup_whoop_auth.py` EXISTS — in `deploy/`, not `setup/`).
+**8 PRs, all merged + deployed tonight:**
+- **#920** privacy hotfix — LPA genotype stripped from public labs API (153→152, live-verified);
+  real-person recommenders (Huberman/Attia/Murthy/Conti/Patrick/Norton/Galpin) remapped to the
+  fictional cast on challenges + supplements (both S3 mirrors synced, CF invalidated).
+- **#921** presence hardening — habitify gap bug (wrote a record daily → gap read 0 through a
+  14-day zero-completion stall; now counts only `total_completed>0` days), registry-owned
+  engagement channels facet (+withings measurement channel), severity ladder
+  (soft/loud/alarm), ONE shared presence block injected into every narrative prompt
+  (coaches/chronicle/panelcast/brief/State-of-Matthew), deterministic acknowledgment gate
+  (ADR-108 pattern), per-domain recency stats kill aggregate dilution, authoritative-facts
+  fixes (dark-week synthesis, past-tense scale-dark rule, no-arithmetic counts).
+- **#919** character neglect-honesty — up-gate scale bug fixed (+14-dark-days ⇒ zero level-ups
+  regression test), engagement atrophy (×0.98^(gap−3) on behavioral pillars, planned-pause
+  exempt), visible XP debt, deterministic `character_mood` (thriving/steady/fading/dormant),
+  dormant/fading hero UI, celebrations suppressed in a lull.
+- **#922** staleness pack — 13 dead-source honesty fixes (family panel "nothing logged for N
+  days", as-of weight labels, layoff states on training/nutrition, circadian unmeasured
+  anchors, machine-spec leak translated, field-note fabrication bug (read a nonexistent
+  field → "6 of 7 days" over a 0-of-7 week), eightsleep UTC double-date (framework now PT)).
+- **#918** reset-protocol clean sweep — wipe coverage crash fixed (6 missing sources), fail-fast
+  pipeline, outgoing-genesis literal sweep (`--old-genesis`), v4 chronicle page archival,
+  `--close-cycle` (CYCLE_GENESES + SSM bump + `docs/restart/RESET_LOG.md`), stance-tombstone
+  filtering (pre-start coach mode can engage), `restart_media_reset.py` (panelcast/debrief),
+  verify gate rebuilt to the 40-URL v4 surface.
+- **#917** coach check-in MCP loop — `get_coach_checkin_queue`/`log_coach_checkin` (62→64 tools),
+  COACH# CHECKIN# records w/ cycle stamps, asking-coach picked by most-overdue channel,
+  psychology-panel rules encoded (autonomy-supportive, zero-penalty skip, barriers-not-guilt).
+  Follow-ups open: CHECKIN# taxonomy line + `recent_checkins_block` prompt injection.
+- **#939** pre-start countdown — `pre_start`/`days_until_start` payload contract
+  (journey/snapshot/pulse; baseline-dependent claims nulled), countdown hero/cockpit banner,
+  "starts in N days" stamps, character "record begins Day 1", inert-while-genesis-past proven.
+- **#941** reset-aware tests — sweep tests onto synthetic fixtures (they ate themselves after a
+  real reset), pre-genesis window pins (genesis monkeypatched, never wall-clock-coupled).
 
-**Deploys:** site-api ×2 (public `/api/platform_stats` now truthful: 64 tools / 94
-Lambdas / 119 ADRs / 3029 tests / 21 secrets — every one was wrong this morning).
-
-## Final graded scores (honest — no third-party re-score after #938's fixes)
-Cold-start 7 · Correctness 6.7 · Coverage 7.8 · Navigability 8 · Operability 8 ·
-Maintainability 8 · Continuity 7.3 → **≈7.5/10** (from 6.9). The gap to 9 is 3 owner
-actions, not doc quality (below).
+**THE RESET RAN (2026-07-10 ~21:40–23:10 PT):** `restart_pipeline.py --genesis 2026-07-12
+--override-weight-lbs 300.8 --apply` (+ resume with `--skip-deploy` after one abort — see
+gotchas). Cycle 4→5 closed (SSM=5, RESET_LOG appended), ~2.2k records tombstoned (archived,
+never deleted; raw timeseries phase-tagged `pilot`, cycle-stamped), ledger rolled to
+LIFETIME#+CYCLE_TOTALS#004, both origin lead-ins upleveled in DDB (grounding-diff verified,
+backups in `docs/restart/leadin_backups/` + S3) and re-dated Jul 6/7, rendered via new
+`deploy/restart_leadin_pages.py` (week-01/02 + posts.json manifest), OG images regenerated,
+character recomputed fresh (Level 1 Foundation). **Verify gate 40/40.** Site is LIVE in
+countdown state: "T−2 days … first baseline: Sunday's weigh-in." Site-deploy + smoke +
+visual-QA green end-to-end after the pre-start gate fixes.
 
 ## Verified
-All 5 wiki gates + `sync --check` green on main at `d4def416`; docs-ci success on every
-merge; `tests/test_wiki_checkers.py` + sync/platform-stats truth tests pass (14 tests);
-live-AWS cross-checks by graders (secrets 21/0, PITR ENABLED, CloudTrail logging, OIDC
-roles, whois ×2, concurrency 100).
+Full suite green on main post-#941 (4471 passed; hevy-isolation passes in clean checkouts —
+locally polluted by the wiki session's live worktree). Site-deploy workflow: success (3rd
+attempt; first two auto-rollbacks were the gates correctly rejecting pre-start states the
+site didn't render yet). Live checks: `/api/journey` pre_start=true days_until_start=2;
+pulse narrative T−2; `/api/labs` genotype-free; `/journal/posts.json` = 2 Prologue entries;
+engagement STATE#current severity=alarm gap=15 w/ habitify gap 13 (was 0); coach reasons
+reader-readable. CI/CD run on the #941 merge: was in progress at wrap — check
+`gh run list --workflow=ci-cd.yml` (all gates it covers were green locally).
 
-## Gotchas hit (durable ones → memory)
-- GitHub's PR mergeability cache races a force-push — wait ~20s and retry, don't rebuild.
-- The `--alarm-names` describe-alarms trap: nonexistent names are silently omitted →
-  false "all-OK". Query by `--state-value ALARM` instead.
-- Graders introduce-and-catch: 2 of my #932 fixes were themselves wrong (anticipatory
-  "repo is private", "no whoop script"). Write docs to CURRENT truth, never intended
-  truth; scripts live in `deploy/` AND `setup/` — search both.
-- `.flake8` excludes `deploy/`; CI's flake8 only covers `lambdas/ mcp/`; black+ruff
-  cover `scripts/ deploy/` — know which linter owns which dir.
-- My header-inserter matched a bash `# comment` as an H1 in CHANGELOG (first real `# `
-  heading was inside a fence at L1725).
+## Gotchas (durable ones also in memory)
+- **DDB reserved keyword `hidden`** in the resurrect UpdateExpression — dry-run can't catch
+  UpdateItem validation; alias via ExpressionAttributeNames (fixed in-flight).
+- **Pipeline resume loses the outgoing genesis**: after constants regenerate, a re-run
+  snapshots old-genesis = new genesis and the literal sweep no-ops. Re-ran
+  `restart_site_copy_sync.py --old-genesis 2026-06-14 --apply` manually. Durable fix idea:
+  persist outgoing genesis to the report dir on first run.
+- **`aws lambda invoke` payload**: raw `{}` WITH `--cli-binary-format raw-in-base64-out`
+  (base64+flag sends the literal base64 string → exit 254). Fixed in site_copy_sync.
+- **The site-deploy gates assume a running experiment**: smoke required weight_lbs,
+  visual-QA required a non-empty lab-notes pane → two auto-rollbacks until smoke became
+  pre_start-aware + BOTH dispatches.js and coaching.js (same bug, two modules) render honest
+  empty states into `[data-dx-read]`.
+- **Cross-session collision**: wiki PR #926 (branched pre-my-commit) reverted my 3 docs from
+  main without meaning to — restored in 2059db49. Also its beat used string PRs in
+  beats.json (schema wants label/url objects) → broke test_build_dispatches for everyone.
+- **restart_docs_update prepend** buried the new wiki `> **Status:**` header on CHANGELOG →
+  wiki index gate red. Prepend is now header-aware.
+- Coherence sentinel ALARMS during any pre-start window (week underflow) — expected through
+  Sat; bounded pre-start grace filed as **#942**. Remediation agent (07:45 PT Sat) should
+  treat it as expected.
 
-## Matthew's queue (the entire remaining gap to 9/10)
-1. **Flip the repo PRIVATE** — open HIGH finding; `docs/coaching/` biometrics are
-   world-readable right now (DATA_GOVERNANCE + DR state this honestly).
-2. **Fill the 2 estate rows in `docs/ACCOUNTS.md`** — password manager + estate access;
-   MFA/2FA recovery-code locations. Until then documented bus-factor = 1.
-3. **Enable IAM Identity Center** (console: IAM Identity Center → Enable, us-west-2 →
-   Users → add `matthew`) — then I finish the SSO lane (permission set, assignment,
-   `aws configure sso` verify; docs already written in AWS_ACCESS.md).
-4. Decide the idle `life-platform/notion` secret (retire-candidate since 2026-03).
-5. **averagejoematt.com renews 2026-08-20 at NameCheap** — nearest hard deadline.
+## Next picks / residuals
+1. **Matthew, Sunday morning:** weigh in fasted, then re-run
+   `python3 deploy/restart_pipeline.py --genesis 2026-07-12 --apply` (idempotent; re-anchors
+   baseline from the real weigh-in, replacing the 300.8 override). Everything else self-runs.
+2. **Matthew (blocked-by-classifier one-liner):** delete 3 verified-duplicate eightsleep
+   records: `for d in 2026-06-27 2026-07-03 2026-07-11; do aws dynamodb delete-item --table-name life-platform --key "{\"pk\":{\"S\":\"USER#matthew#SOURCE#eightsleep\"},\"sk\":{\"S\":\"DATE#$d\"}}"; done`
+3. Intro podcast EP0 (week 1, quality-gated): a true introduction — the experiment, the
+   coaches, Day-0 baselines, each coach's dated ledger-logged prediction. **NO prior-cycle
+   references, no stall story** (fresh-start rule; /data/cycles/ is the only reset-aware page).
+4. #942 coherence pre-start grace; wire `restart_leadin_pages.py` into the pipeline (after
+   chronicle handler); #917 follow-ups (CHECKIN# taxonomy line, recent_checkins_block
+   injection into expert/brief prompts).
+5. Watch first post-genesis cron cycle (Mon morning computes) + the first evening-window
+   ingests under the PT framework fix; first coach check-in via MCP to seed qualitative context.
+6. Prior sessions' still-gated items: PRE-13, HN #741, /verify/ profile URLs, HAE straggler.
 
-## Residual queue (filed as issues)
-#930 phase_taxonomy misses weight_episodes/training_reference (restart KeyError — real
-bug found by the schema catalog) · #933 ADD_A_COACH.md · #934 alarm-NAME AST sync (kill
-the MONITORING drift class permanently) · #935 whoop script housekeeping (move to
-setup/) · #936 DR swap-back drill + measure the 30-min RTO claim. Prior gated items
-unchanged: PRE-13, HN #741, /verify/ profile URLs, HAE straggler, #748, #916.
-
-**Post-wrap addendum (same session):** Matthew asked where the /wiki tab content was →
-settled on **option A: docs-as-code is THE wiki; the GitHub wiki tab is a signpost only**
-(a Home.md in the wiki repo points at docs/README.md; #940 added the front-page pointer;
-mirror scaffolding deliberately NOT built — wiki-tab has no CI and is the "always drifts"
-option by construction). Parallel-session wrap bootstrap brief handed to Matthew (sync to
-main → re-read wrap.md from disk → step (e) gates → both handover gate lines).
-
-**Build beat:** wiki-program-2026-07-10
-**Docs:** the program IS the docs — 10 PRs across ~60 pages; all five gates green at wrap.
+**Build beat:** 2026-07-11-cycle5-countdown-reset
+**Docs:** CLAUDE.md (genesis/restart section), SCHEMA.md (CHECKIN#/engagement severity/character mood+xp_debt), PHASE_TAXONOMY.md (benchmarks/CHALLENGE_FOLLOWS), engines/CHARACTER.md (atrophy/up-gate), RUNBOOK.md (reset follow-ups incl. leadin pages + --old-genesis)

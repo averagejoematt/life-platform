@@ -1,6 +1,6 @@
 # Life Platform — Runbook
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
 Last updated: 2026-07-11 (v8.6.0 — 64 MCP tools, 34-module package, 94 Lambdas, 20 data sources)
 
@@ -1246,26 +1246,58 @@ bash deploy/deploy_fleet.sh   # or: cd cdk && npx cdk deploy --all --require-app
 To re-anchor the experiment to a new genesis date:
 
 ```bash
-# 1. Verify the Withings reading exists for the target date in DDB.
+# 1. Verify the Withings reading exists for the target date in DDB
+#    (or pass --override-weight-lbs <w> when the genesis date has no weigh-in yet).
 # 2. Run the orchestrator:
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --dry-run
 # 3. Review the report, then commit:
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply
 ```
 
-The pipeline runs (in order, each idempotent):
-1. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
-2. `cdk deploy LifePlatformCore LifePlatformCompute LifePlatformEmail` (#781: constants ship in every bundle — no layer step)
-3. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
-4. `restart_intelligence_wipe.py --apply` — tombstones any newly pre-genesis records
-5. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis
-6. `restart_chronicle_handler.py --apply` — archives any newly pre-genesis chronicle HTML
-7. `restart_site_copy_sync.py --apply` — regenerates JS/JSON/HTML site copy + CloudFront invalidate
+The pipeline runs (in order, each idempotent; **fail-fast since #918** — any sub-step exiting
+nonzero aborts the run and prints what already ran; `--continue-on-error` is the escape hatch):
+1. Fetch the Withings reading for the target date (or fail / use the override)
+2. Write `config/user_goals.json` + `config/character_sheet.json`; with `--close-cycle`
+   (default ON) append the new genesis to `CYCLE_GENESES` in `lambdas/web/site_api_data.py`
+3. `sync_constants_from_config.py` — regenerates `lambdas/constants.py`
+4. `cdk deploy --all` (#781: constants + `CYCLE_GENESES` ship in every bundle — no layer step; `--skip-deploy` if you just deployed)
+5. `restart_phase_tag.py --apply` — flips DDB phase tags relative to the new genesis
+6. `restart_intelligence_wipe.py --apply` — tombstones newly pre-genesis records, stamping the
+   CLOSING cycle number; `--close-cycle` then bumps SSM `/life-platform/experiment-cycle` to N+1
+7. `restart_ledger_reset.py --apply` — rolls the accountability ledger into `LIFETIME#`/`CYCLE_TOTALS#`, zeroes `TOTALS#current`
+8. `restart_chronicle_handler.py --apply` — archives newly pre-genesis chronicle HTML; resurrects `--keep-chronicle` lead-ins
+9. **Manual (not yet wired into the pipeline):** `python3 deploy/restart_leadin_pages.py --apply` —
+   rebuilds the public lead-in article pages + `/journal/posts.json` from the resurrected chronicle
+   records. Run it right after the chronicle handler, or the story hub serves tombstone JSON and the
+   lead-in URLs 404 until the first post-genesis Wednesday publish. S3-only writes; idempotent.
+10. `restart_media_reset.py --apply` — archives + blanks the panelcast/debrief audio feeds
+11. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis
+12. `restart_site_copy_sync.py --apply --old-genesis <outgoing>` — JS/JSON/HTML genesis-literal sweep + CloudFront invalidate
+13. `restart_docs_update.py --apply` — doc date/copy sync
+14. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 40-URL v4 surface (apply mode only)
+15. `--close-cycle`: appends one line to `docs/restart/RESET_LOG.md` (the human-readable reset ledger)
+
+**Resume gotcha (`--old-genesis`):** the orchestrator snapshots the outgoing genesis from
+`lambdas/constants.py` BEFORE regenerating it — but a **resumed** run (e.g. re-running with
+`--skip-deploy` after an abort) snapshots AFTER constants were already regenerated, so
+old = new and the literal sweep + verifier silently no-op. When resuming, pass the prior
+genesis explicitly: `python3 deploy/restart_site_copy_sync.py --apply --old-genesis <prior genesis>`
+(and the same flag to `restart_verify_rendered.py`).
+
+**Pre-start countdown window (#931/#939):** a reset may stage a FUTURE genesis (the cycle-5
+pattern: reset Friday, genesis Sunday). While `EXPERIMENT_START_DATE` > today (PT), the
+journey/snapshot/pulse API payloads carry `pre_start: true`, `days_until_start`, and
+`start_date`, baseline-dependent claims are nulled, and the site renders its countdown state —
+`deploy/smoke_test_site.sh` and the site-deploy gates accept this window. **Expected alarm:**
+the coherence sentinel's `check_experiment_continuity` treats genesis > today as week-underflow
+and ALARMs for the entire pre-start window — this is expected, not an incident (the remediation
+agent should classify it as such); bounded pre-start grace is tracked as issue #942. Everything
+is inert again (`pre_start: false`, no payload change) once genesis ≤ today.
 
 All steps preserve original data (interpretation B for DDB, archive-not-delete for S3).
-Roll back by removing tombstone flags (DDB) or copying from `*/archive/pilot/` (S3).
+Roll back via `deploy/restart_rollback.py` — removes tombstone flags (DDB) or copies back from `*/archive/pilot/` (S3).
 
-See ADR-058 in `docs/DECISIONS.md` for the design rationale.
+See ADR-058/077 in `docs/DECISIONS.md` for the design rationale.
 
 ## Budget Guardrails (ADR-063)
 
