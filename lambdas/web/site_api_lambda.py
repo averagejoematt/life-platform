@@ -92,6 +92,7 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
     _ok,
     get_request_id,
     logger,
+    pre_start_meta,
     set_request_id,
     table,
 )
@@ -277,7 +278,21 @@ def handle_vacation_fund() -> dict:
     try:
         from vacation_fund import compute_vacation_fund
 
-        return _ok(compute_vacation_fund(), cache_seconds=900)
+        payload = compute_vacation_fund()
+        # PRE-START (#948, the #939 contract): a staged FUTURE genesis inverts the
+        # window (start_date 2026-07-12 > end_date 2026-07-11, day_count floored
+        # to 1). The fund starts counting at genesis — serve the honest zero-window
+        # (start_date = genesis stands as "counting begins", end_date/day_count go
+        # to the not-yet state, no per-week pace off a week that doesn't exist).
+        # Inert (pre_start=False, nothing else changes) once genesis <= today.
+        _pre = pre_start_meta()
+        payload["pre_start"] = bool(_pre)
+        if _pre:
+            payload.update(_pre)
+            payload["end_date"] = None
+            payload["day_count"] = 0
+            payload["pace"] = {"miles_per_week": None, "projected_usd_1yr": None}
+        return _ok(payload, cache_seconds=900)
     except Exception as e:
         logger.error(f"[site_api] /api/vacation_fund failed: {e}")
         return _error(500, "vacation fund unavailable")

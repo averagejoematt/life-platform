@@ -329,7 +329,9 @@ async function renderByCoach(read, id) {
   }
 
   // 2) THE DATA — the numbers the read is about (the owner's "my cardio/lifts/volume this week").
-  if (obs && obs.summary && obs.summary.primary) {
+  // #948: pre-start / empty-window payloads carry a null summary (or a null primary
+  // value) — that's the honest "numbers aren't in yet" state, not a renderable week.
+  if (obs && obs.summary && obs.summary.primary && obs.summary.primary.value != null) {
     const p = obs.summary.primary;
     const spark = Array.isArray(p.sparkline) ? p.sparkline : [];
     const dl = p.delta_label || (p.delta ? `${p.delta > 0 ? "+" : ""}${p.delta}` : "");

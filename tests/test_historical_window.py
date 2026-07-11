@@ -94,20 +94,25 @@ def test_observatory_week_future_clamps_to_today(monkeypatch):
 
 
 def test_observatory_week_pre_start_future_genesis_is_honest_200(monkeypatch):
-    # The pre-genesis window, explicitly (#931): a reset stages EXPERIMENT_START in
-    # the FUTURE. The window lower bounds get lifted to the (future) genesis, the
-    # real _query_source guards start > end by returning [] — the endpoint must
-    # serve an honest empty 200 anchored to today, never a 500. Genesis pinned far
-    # future so the case can't quietly expire (golden-test rule: no wall-clock math).
-    import datetime as _dt
+    # The pre-genesis window, explicitly (#931 → #948): a reset stages
+    # EXPERIMENT_START in the FUTURE. The old behavior served an inverted window
+    # (start > end) with fabricated-zero summaries; the #948 contract early-outs
+    # to the honest empty shape (null summary + the countdown fields). Genesis
+    # pinned far future so the case can't quietly expire (no wall-clock math).
+    from web import site_api_common as common
 
-    today = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+    monkeypatch.setattr(common, "EXPERIMENT_START", "2099-06-01")
     monkeypatch.setattr(data, "EXPERIMENT_START", "2099-06-01")
     monkeypatch.setattr(data, "_query_source", lambda source, start, end, include_pilot=False: [])
     resp = data.handle_observatory_week({"domain": "sleep"})
     assert resp["statusCode"] == 200
     body = json.loads(resp["body"])
-    assert body["as_of_date"] == today
+    assert body["pre_start"] is True
+    assert body["start_date"] == "2099-06-01"
+    assert body["summary"] is None
+    assert body["notable"] is None
+    assert body["period"] is None  # never an inverted start>end window
+    assert body["as_of_date"] is None
 
 
 def test_observatory_week_empty_is_honest_200(monkeypatch):

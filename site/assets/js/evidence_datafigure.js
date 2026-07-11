@@ -42,6 +42,9 @@ export function dfBody(g) {
 }
 
 export function dataFigure(j) {
+  // #948: null-handle the pre-start contract explicitly — Number(null) is 0 (finite),
+  // which would draw a "0 lb" figure while /api/journey suppresses the weight.
+  if (j.start_weight_lbs == null || j.goal_weight_lbs == null || j.current_weight_lbs == null) return "";
   const start = Number(j.start_weight_lbs), goal = Number(j.goal_weight_lbs), now = Number(j.current_weight_lbs);
   if (!isFinite(start) || !isFinite(goal) || !isFinite(now) || start === goal) return "";
   const lost = Number(j.lost_lbs);
