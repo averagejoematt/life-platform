@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
 import os
+import urllib.parse
 from unittest.mock import patch
 
 os.environ.setdefault("S3_BUCKET", "test-bucket")
@@ -79,7 +81,8 @@ def _pkce_pair():
     return verifier, challenge
 
 
-def _authorize(redirect_uri, challenge, method="S256"):
+def _authorize_get(redirect_uri, challenge, method="S256", cookies=None):
+    """Raw GET /authorize — returns the consent form (200), a 302 (valid cookie), or 400."""
     event = {
         "queryStringParameters": {
             "redirect_uri": redirect_uri,
@@ -88,7 +91,28 @@ def _authorize(redirect_uri, challenge, method="S256"):
             "code_challenge_method": method,
         }
     }
+    if cookies is not None:
+        event["cookies"] = cookies
     return h._handle_authorize(event)
+
+
+def _passcode():
+    """The access code the consent form expects (tests patch get_api_key → 'secret')."""
+    return hmac.new(b"secret", h._AUTHORIZE_PASSCODE_DOMAIN, hashlib.sha256).hexdigest()
+
+
+def _authorize(redirect_uri, challenge, method="S256", passcode=None):
+    """Full consent: POST /authorize with the passcode → 302 with a code (happy path)."""
+    body = urllib.parse.urlencode(
+        {
+            "redirect_uri": redirect_uri,
+            "state": "xyz",
+            "code_challenge": challenge,
+            "code_challenge_method": method,
+            "passcode": _passcode() if passcode is None else passcode,
+        }
+    )
+    return h._handle_authorize_submit({"body": body})
 
 
 def _code_from(resp):
@@ -176,35 +200,82 @@ def test_unsupported_grant_type_rejected():
         assert _token({"grant_type": "client_credentials"})["statusCode"] == 400
 
 
-# ── /authorize open-redirect hardening ────────────────────────────────────────
+# ── /authorize open-redirect hardening (validated on the GET entry, before any gate) ──
 def test_authorize_rejects_untrusted_redirect_host():
     _, challenge = _pkce_pair()
-    resp = _authorize("https://evil.example.com/steal", challenge)
-    assert resp["statusCode"] == 400
+    assert _authorize_get("https://evil.example.com/steal", challenge)["statusCode"] == 400
 
 
 def test_authorize_rejects_http_scheme():
     _, challenge = _pkce_pair()
-    resp = _authorize("http://claude.ai/cb", challenge)  # non-loopback must be https
-    assert resp["statusCode"] == 400
-
-
-def test_authorize_allows_loopback_http():
-    _, challenge = _pkce_pair()
-    resp = _authorize("http://127.0.0.1:8976/callback", challenge)
-    assert resp["statusCode"] == 302
-
-
-def test_authorize_allows_claude_subdomain():
-    _, challenge = _pkce_pair()
-    resp = _authorize("https://foo.claude.com/cb", challenge)
-    assert resp["statusCode"] == 302
+    assert _authorize_get("http://claude.ai/cb", challenge)["statusCode"] == 400  # non-loopback must be https
 
 
 def test_redirect_host_suffix_trick_rejected():
     _, challenge = _pkce_pair()
-    resp = _authorize("https://claude.ai.evil.com/cb", challenge)
-    assert resp["statusCode"] == 400
+    assert _authorize_get("https://claude.ai.evil.com/cb", challenge)["statusCode"] == 400
+
+
+def test_authorize_allows_loopback_http():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        resp = _authorize_get("http://127.0.0.1:8976/callback", challenge)  # good → consent form, not 400
+        assert resp["statusCode"] == 200 and "passcode" in resp["body"]
+
+
+def test_authorize_allows_claude_subdomain():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        resp = _authorize_get("https://foo.claude.com/cb", challenge)
+        assert resp["statusCode"] == 200 and "passcode" in resp["body"]
+
+
+# ── #893-B: /authorize consent gate — URL possession alone cannot mint a code ──
+def test_authorize_get_shows_form_and_leaks_no_code():
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        resp = _authorize_get("https://claude.ai/cb", _pkce_pair()[1])
+        assert resp["statusCode"] == 200
+        assert "passcode" in resp["body"] and "code=" not in resp["body"]
+
+
+def test_authorize_wrong_passcode_rejected_no_code():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        resp = _authorize("https://claude.ai/cb", challenge, passcode="wrong")
+        assert resp["statusCode"] == 401
+        assert "Location" not in resp.get("headers", {})
+
+
+def test_authorize_correct_passcode_issues_code_and_cookie():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        resp = _authorize("https://claude.ai/cb", challenge)  # correct passcode by default
+        assert resp["statusCode"] == 302 and "code=" in resp["headers"]["Location"]
+        assert resp.get("cookies") and resp["cookies"][0].startswith("lp_approval=")
+
+
+def test_valid_approval_cookie_skips_passcode():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        cookie = h._issue_approval_cookie().split(";")[0]  # "lp_approval=exp.sig"
+        resp = _authorize_get("https://claude.ai/cb", challenge, cookies=[cookie])
+        assert resp["statusCode"] == 302 and "code=" in resp["headers"]["Location"]
+
+
+def test_forged_approval_cookie_shows_form():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        resp = _authorize_get("https://claude.ai/cb", challenge, cookies=["lp_approval=9999999999.deadbeef"])
+        assert resp["statusCode"] == 200 and "passcode" in resp["body"]
+
+
+def test_expired_approval_cookie_shows_form():
+    _, challenge = _pkce_pair()
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        exp = 1  # correctly signed but long past
+        sig = hmac.new(b"secret", f"lp-authorize-cookie-v1:{exp}".encode(), hashlib.sha256).hexdigest()
+        resp = _authorize_get("https://claude.ai/cb", challenge, cookies=[f"lp_approval={exp}.{sig}"])
+        assert resp["statusCode"] == 200 and "passcode" in resp["body"]
 
 
 # ── #893: session-bearer hardening — no permanent token from address possession ──

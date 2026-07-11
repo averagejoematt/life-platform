@@ -18,6 +18,7 @@ import base64
 import concurrent.futures
 import hashlib
 import hmac
+import html
 import json
 import logging
 import os
@@ -338,11 +339,12 @@ def _parse_body(event):
         return dict(urllib.parse.parse_qsl(raw))
 
 
-# ── Minimal OAuth (auto-approve) ─────────────────────────────────────────────
-# Claude's connector infrastructure requires OAuth discovery even for servers
-# that don't need real auth. This implements a bare-minimum OAuth 2.1 flow
-# that auto-approves everything. Token validation adds a second security layer
-# beyond the unguessable Lambda Function URL.
+# ── OAuth 2.1 flow (PKCE + passcode consent) ─────────────────────────────────
+# Claude's connector infrastructure requires OAuth discovery. /authorize is NO
+# LONGER auto-approve (#893-B): it gates on a passcode (or a remembered-browser
+# cookie), so knowing the Function URL alone cannot mint a code. /token then
+# exchanges the PKCE-bound code for a short-lived, revocable session bearer
+# (#893-A) rather than the permanent key-derived Desktop bearer.
 
 _BEARER_TOKEN_CACHE = {}
 _BEARER_CACHE_TTL = 300  # 5 min — ensures warm containers pick up new key after rotation
@@ -457,6 +459,112 @@ def _validate_bearer(event):
     return session_token_valid(provided)
 
 
+# ── /authorize consent gate (#893 option B) ───────────────────────────────────
+# #893-A stopped /token from minting a permanent bearer, but /authorize still
+# auto-approved anyone who knew the URL. Option B gates /authorize behind an access
+# code so URL possession alone yields nothing. The code is derived from the API key
+# on a distinct HMAC domain (so it can be shown/entered without exposing the key);
+# a signed, expiring "remembered browser" cookie lets an already-approved browser
+# refresh tokens without re-entering it. The static Desktop bearer path is untouched.
+_AUTHORIZE_PASSCODE_DOMAIN = b"life-platform-authorize-v1"
+_APPROVAL_COOKIE_NAME = "lp_approval"
+_APPROVAL_COOKIE_TTL_SECS = 30 * 24 * 3600  # 30 days between passcode prompts per browser
+_APPROVAL_COOKIE_DOMAIN = "lp-authorize-cookie-v1"
+
+
+def _get_authorize_passcode():
+    """The /authorize access code. Sentinel when no API key is configured — fail-closed,
+    so the consent form can never be satisfied and the flow cannot mint a code."""
+    api_key = get_api_key()
+    if not api_key:
+        return "__NO_KEY_CONFIGURED__"
+    return hmac.new(api_key.encode(), _AUTHORIZE_PASSCODE_DOMAIN, hashlib.sha256).hexdigest()
+
+
+def _issue_approval_cookie():
+    """Signed, expiring 'remembered browser' cookie string (for the response `cookies`
+    array). HMAC-bound to the API key; forging it requires the key. None if no key."""
+    api_key = get_api_key()
+    if not api_key:
+        return None
+    exp = int(time.time()) + _APPROVAL_COOKIE_TTL_SECS
+    sig = hmac.new(api_key.encode(), f"{_APPROVAL_COOKIE_DOMAIN}:{exp}".encode(), hashlib.sha256).hexdigest()
+    return f"{_APPROVAL_COOKIE_NAME}={exp}.{sig}; Max-Age={_APPROVAL_COOKIE_TTL_SECS}; Path=/; HttpOnly; Secure; SameSite=Lax"
+
+
+def _approval_cookie_valid(event):
+    """True iff the request carries a valid, unexpired, HMAC-verified approval cookie.
+    Reads both the payload-2.0 `cookies` array and a `Cookie` header (case-insensitive)."""
+    api_key = get_api_key()
+    if not api_key:
+        return False
+    raw = []
+    if isinstance(event.get("cookies"), list):
+        raw.extend(event["cookies"])
+    headers = event.get("headers") or {}
+    cookie_hdr = headers.get("cookie") or headers.get("Cookie") or ""
+    if cookie_hdr:
+        raw.extend(cookie_hdr.split(";"))
+    for part in raw:
+        part = part.strip()
+        if not part.startswith(_APPROVAL_COOKIE_NAME + "="):
+            continue
+        val = part[len(_APPROVAL_COOKIE_NAME) + 1 :]
+        exp_s, sep, sig = val.rpartition(".")
+        if not sep:
+            return False
+        try:
+            exp = int(exp_s)
+        except ValueError:
+            return False
+        if exp < time.time():
+            return False
+        expected = hmac.new(api_key.encode(), f"{_APPROVAL_COOKIE_DOMAIN}:{exp}".encode(), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(sig, expected)
+    return False
+
+
+def _authorize_form_html(redirect_uri, state, code_challenge, code_challenge_method, error=""):
+    """The consent page: a passcode field + hidden OAuth params. All reflected values are
+    HTML-escaped (the redirect_uri is already allowlisted before this renders)."""
+    e = html.escape
+    err = f'<p class="err">{e(error)}</p>' if error else ""
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authorize access</title><style>
+ body{{font-family:-apple-system,system-ui,sans-serif;background:#0b0d10;color:#e7e9ec;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}}
+ form{{background:#14181d;padding:2rem;border-radius:12px;max-width:22rem;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.4)}}
+ h1{{font-size:1.05rem;margin:0 0 .25rem}} p{{color:#9aa4af;font-size:.85rem;margin:.25rem 0 1rem}} .err{{color:#ff6b6b}}
+ input[type=password]{{width:100%;box-sizing:border-box;padding:.6rem;border-radius:8px;border:1px solid #2a323b;background:#0b0d10;color:#e7e9ec;font-size:1rem}}
+ button{{margin-top:1rem;width:100%;padding:.65rem;border:0;border-radius:8px;background:#4f8cff;color:#fff;font-size:1rem;cursor:pointer}}
+</style></head><body><form method="post" autocomplete="off">
+ <h1>Authorize this connection</h1>
+ <p>Enter the access code to connect this client to the Life&nbsp;Platform MCP server.</p>
+ {err}
+ <input type="password" name="passcode" placeholder="Access code" autofocus required>
+ <input type="hidden" name="redirect_uri" value="{e(redirect_uri)}">
+ <input type="hidden" name="state" value="{e(state)}">
+ <input type="hidden" name="code_challenge" value="{e(code_challenge)}">
+ <input type="hidden" name="code_challenge_method" value="{e(code_challenge_method)}">
+ <button type="submit">Authorize</button>
+</form></body></html>"""
+
+
+def _issue_code_and_redirect(redirect_uri, state, code_challenge, code_challenge_method, set_cookie=None):
+    """Mint a single-use PKCE-bound code, store it, and 302 back to the (already
+    allowlisted) redirect_uri. Optionally set the remembered-browser cookie."""
+    code = uuid.uuid4().hex + uuid.uuid4().hex  # 256-bit opaque code
+    if not oauth_code_store(code, code_challenge, code_challenge_method, redirect_uri):
+        return _remote_response(500, json.dumps({"error": "server_error", "error_description": "could not issue code"}))
+    logger.info(f"[OAuth] Issued code → host={urllib.parse.urlparse(redirect_uri).hostname} pkce={'y' if code_challenge else 'n'}")
+    params = urllib.parse.urlencode({"code": code, "state": state})
+    sep = "&" if "?" in redirect_uri else "?"
+    resp = {"statusCode": 302, "headers": {"Location": f"{redirect_uri}{sep}{params}", "Cache-Control": "no-store"}, "body": ""}
+    if set_cookie:
+        resp["cookies"] = [set_cookie]  # payload 2.0 sets cookies via the top-level array
+    return resp
+
+
 def _handle_oauth_server_metadata(event):
     """GET /.well-known/oauth-authorization-server — RFC 8414"""
     base = _get_base_url(event)
@@ -561,11 +669,14 @@ def _verify_pkce(code_verifier: str, code_challenge: str, method: str) -> bool:
 
 
 def _handle_authorize(event):
-    """GET /authorize — issue a single-use, PKCE-bound authorization code and redirect back.
+    """GET /authorize — consent gate, then a single-use PKCE-bound code + redirect back.
 
-    SEC-01: the code is stored server-side (DDB, 10-min TTL) with its PKCE challenge and
-    redirect_uri so /token can only exchange a code this server actually minted. The
+    SEC-01 (#779): the code is stored server-side (DDB, 10-min TTL) with its PKCE
+    challenge and redirect_uri so /token can only exchange a code this server minted; the
     redirect target is allowlisted so /authorize can't be turned into an open redirect.
+    SEC (#893-B): the auto-approve is gone — a request must either carry a valid
+    remembered-browser cookie or complete the passcode consent form (POST /authorize),
+    so knowing the URL alone can no longer mint a code.
     """
     qs = event.get("queryStringParameters") or {}
     redirect_uri = qs.get("redirect_uri", "")
@@ -579,21 +690,43 @@ def _handle_authorize(event):
         logger.warning(f"[OAuth] Rejected disallowed redirect_uri host: {urllib.parse.urlparse(redirect_uri).hostname!r}")
         return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
 
-    code = uuid.uuid4().hex + uuid.uuid4().hex  # 256-bit opaque code
-    if not oauth_code_store(code, code_challenge, code_challenge_method, redirect_uri):
-        return _remote_response(500, json.dumps({"error": "server_error", "error_description": "could not issue code"}))
+    # Already-approved browser → refresh without re-prompting; otherwise show the form.
+    if _approval_cookie_valid(event):
+        return _issue_code_and_redirect(redirect_uri, state, code_challenge, code_challenge_method)
+    return _remote_response(
+        200,
+        _authorize_form_html(redirect_uri, state, code_challenge, code_challenge_method),
+        {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"},
+    )
 
-    logger.info(f"[OAuth] Issued code → host={urllib.parse.urlparse(redirect_uri).hostname} pkce={'y' if code_challenge else 'n'}")
 
-    params = urllib.parse.urlencode({"code": code, "state": state})
-    sep = "&" if "?" in redirect_uri else "?"
-    location = f"{redirect_uri}{sep}{params}"
+def _handle_authorize_submit(event):
+    """POST /authorize — the consent form target. Validates the passcode, then issues the
+    code + sets the remembered-browser cookie. redirect_uri is re-validated (never trust a
+    form field), and passcode is checked in constant time. Fail-closed with no API key."""
+    body = _parse_body(event)
+    redirect_uri = body.get("redirect_uri", "")
+    state = body.get("state", "")
+    code_challenge = body.get("code_challenge", "")
+    code_challenge_method = (body.get("code_challenge_method") or "S256").upper()
+    passcode = (body.get("passcode") or "").strip()
 
-    return {
-        "statusCode": 302,
-        "headers": {"Location": location, "Cache-Control": "no-store"},
-        "body": "",
-    }
+    if not redirect_uri or not _redirect_uri_allowed(redirect_uri):
+        return _remote_response(400, json.dumps({"error": "invalid_request", "error_description": "redirect_uri not allowed"}))
+
+    expected = _get_authorize_passcode()
+    if expected == "__NO_KEY_CONFIGURED__":
+        return _remote_response(500, json.dumps({"error": "server_error"}))
+    if not passcode or not hmac.compare_digest(passcode, expected):
+        logger.warning("[OAuth] /authorize passcode rejected")
+        _emit_auth_failure_metric()
+        return _remote_response(
+            401,
+            _authorize_form_html(redirect_uri, state, code_challenge, code_challenge_method, error="Incorrect access code."),
+            {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"},
+        )
+
+    return _issue_code_and_redirect(redirect_uri, state, code_challenge, code_challenge_method, set_cookie=_issue_approval_cookie())
 
 
 def _handle_token(event):
@@ -664,6 +797,8 @@ def handle_remote_mcp(event, method):
         return _handle_register(event)
     if raw_path == "/authorize" and method == "GET":
         return _handle_authorize(event)
+    if raw_path == "/authorize" and method == "POST":
+        return _handle_authorize_submit(event)
     if raw_path == "/token" and method == "POST":
         return _handle_token(event)
 
