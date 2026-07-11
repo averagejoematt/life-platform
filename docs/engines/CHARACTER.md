@@ -1,6 +1,6 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#954)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#957, ENGINE_VERSION 1.4.0)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
 > **Sources of truth:** `lambdas/character_engine.py` (v1.3.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (deployed to `s3://…/config/matthew/character_sheet.json`)
 
@@ -62,20 +62,24 @@ crossings need longer streaks, e.g. Foundation 5/7 … Elite 21/30). Step size b
 Gates, in order:
 1. **Coverage hold (ADR-104):** `data_coverage < level_change_min_coverage` (0.5) ⇒ no leveling
    signal — both streaks hold, no move in either direction.
-2. **Up-day gate (ADR-104/#913/#954):** climbing also requires `round(raw_score) ≥
-   min(target_level, unadjusted EMA target)` — the day itself must be lived at the target, and
-   the comparison is against the UNboosted EMA of raw scores (like-for-like): cross-pillar
-   bonus modifiers raise the displayed level_score but can no longer raise the daily bar
-   (#954 — boosts were freezing boosted pillars at L1 forever; sim: steady raw ~76 vs a
-   boosted target of ~89 never passed). (Scale fix #913: the old `raw ≥ current_level+1`
-   let a crashed raw 9 beat a converging level 8.) A below-target day *holds* the up-streak,
-   it doesn't reset it.
+2. **Up-day gate (ADR-104/#913/#954/#957):** climbing also requires `round(raw) ≥
+   min(target_level, unadjusted EMA target)`, and since #957 the raw judged is the
+   **UNBLENDED** raw (`weighted_sum/total_weight` before the confidence blend toward 50) —
+   exactly 0 in total silence, so the blend floor (~15.6 for a dark behavioral pillar) can
+   never re-open the up-gate at any horizon (pre-#957: after ~17 dark days the EMA converged
+   down to the blend floor and the gate self-satisfied — a never-logging fresh character
+   reached L16 in 60 days while mood read dormant). The target side stays the UNboosted EMA
+   of raw scores (like-for-like): cross-pillar bonus modifiers raise the displayed
+   level_score but can no longer raise the daily bar (#954 — boosts were freezing boosted
+   pillars at L1 forever). (Scale fix #913: the old `raw ≥ current_level+1` let a crashed
+   raw 9 beat a converging level 8.) A below-target day *holds* the up-streak, it doesn't
+   reset it.
 3. **XP buffer gate (down only, #954):** an explicit per-pillar `xp_buffer` state (fills with
    XP gained, capped at one level's worth; drains with XP lost; floors at 0 — monotone under
    decline) absorbs demotion pressure while `≥ xp_buffer_threshold` (20). Replaced the old
    `xp_total % 100`, which WRAPPED UPWARD as XP declined — losing XP across a 100-boundary
    re-armed near-maximum immunity. Legacy records seed the buffer once from the modulo
-   remainder. ENGINE_VERSION 1.3.1.
+   remainder. ENGINE_VERSION 1.4.0.
 
 ## XP and debt (`_compute_xp`, :182-228)
 

@@ -68,6 +68,13 @@ eightsleep records —
    outgoing 2026-06-14 literals; OG/stats regenerated; 40-page verify gate.)
 8. Pipeline's printed follow-ups: `bash deploy/sync_site_to_s3.sh` (RSS), commit regenerated files from
    main, `restart_verify.py` backend check.
+8b. **Post-pipeline re-seeds (added 2026-07-11 T−1 session — the wipe takes these experiment_scoped
+    records):** `python3 deploy/fix_prologue_cycle_and_subscribe_ttl.py --apply`, then
+    `python3 deploy/seed_genesis_preregistration.py --apply` and
+    `python3 deploy/publish_genesis_preregistration.py --apply` — re-lands the frozen 15-prediction
+    pre-registration (#976) + "Prologue · Part IV: The Plan, On the Record" verbatim
+    (claims frozen in `deploy/generated/genesis_preregistration.json`; Part IV is deliberately NOT
+    in PRELAUNCH_CALENDAR because it's genesis-specific).
 9. `/data/cycles/` gets its honest cycle-5 row (the one reset-aware surface): dates, diagnosis (engagement
    stall + absence-blind narration), fix (presence severity + neglect-honest character).
 10. Verify reader-facing surfaces: home/cockpit/story/OG all read Day 0/1 consistently, no page (other than
