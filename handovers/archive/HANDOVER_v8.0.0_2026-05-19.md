@@ -109,7 +109,7 @@ See `docs/ARCHITECTURE.md` § Lambda inventory. All on layer v51 except 3 v25 (d
 - **2026-06-17:** Coach prediction validation (30 days post-loop closure)
 - **2026-06-19:** Coach quality_gate threshold promotion decision
 - **2026-07-17:** MCP tool bulk delete (60-day grace expires)
-- **2026-08-19:** v3 audit (per `docs/V2_AUDIT_PROMPT.md` cadence)
+- **2026-08-19:** v3 audit (per `docs/archive/V2_AUDIT_PROMPT.md` cadence)
 
 ---
 

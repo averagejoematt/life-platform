@@ -1,6 +1,6 @@
 # Handover — 2026-06-23 (Vitals page redesign — glance-first, three altitudes)
 
-Sixth Evidence page through the design-review → Claude-Code pipeline (Nutrition → Training → Sleep → Habits → Physical → **Vitals**). Spec: `docs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_VITALS_PAGE_v1.md`. Reframed `/evidence/vitals/` (the landing page) into a glance-first instrument panel, three altitudes. 7 P-item commits.
+Sixth Evidence page through the design-review → Claude-Code pipeline (Nutrition → Training → Sleep → Habits → Physical → **Vitals**). Spec: `docs/specs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_VITALS_PAGE_v1.md`. Reframed `/evidence/vitals/` (the landing page) into a glance-first instrument panel, three altitudes. 7 P-item commits.
 
 **Status: built + locally verified + DEPLOYED + live-verified + MERGED.** PR **#205** (`vitals-page-redesign` → `main`, squash-merged `c3a42093`). **Front-end only — no server change.** Live: 10 sections, status RECOVERED, zero console errors.
 
@@ -28,6 +28,6 @@ This page introduces `--alert` (#B14A33, restrained oxblood) in `tokens.css` —
 RQA-04 (readiness on Cockpit, #202), RQA-05 (deficit-sustainability panel, #203), WQA-06 (coach disagreements, #204), Physical page (#201). See those handovers + CHANGELOG.
 
 ## Next: Doors / IA redesign (queued)
-Specs: `docs/specs/CLAUDE_CODE_PROMPT_DOORS_v1.md` + `docs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md`. Cross-site IA review (5-door model + me-first LOCKED). P0 = a real bug: the Day-N/Week stamp disagrees across doors (Home says Week 1 on Day 8; correct is Week 2) → build ONE genesis source of truth every door consumes. Then de-dupe artifacts (P1), per-door uplevels (P2), the moat (P3, incl. the Third-Wall reply mechanic = STOP-AND-ASK). NEVER `--delete` on S3 sync; never run deploy via MCP.
+Specs: `docs/specs/CLAUDE_CODE_PROMPT_DOORS_v1.md` + `docs/specs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md`. Cross-site IA review (5-door model + me-first LOCKED). P0 = a real bug: the Day-N/Week stamp disagrees across doors (Home says Week 1 on Day 8; correct is Week 2) → build ONE genesis source of truth every door consumes. Then de-dupe artifacts (P1), per-door uplevels (P2), the moat (P3, incl. the Third-Wall reply mechanic = STOP-AND-ASK). NEVER `--delete` on S3 sync; never run deploy via MCP.
 
 See [[project_build_fingerprint]], [[reference_local_render_qa]], [[feedback_prod_deploy_authorization]].

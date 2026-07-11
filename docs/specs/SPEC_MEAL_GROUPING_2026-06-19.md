@@ -1,6 +1,6 @@
 # Build Outline & Design Brief — Meal Grouping (Derived Meal Layer) — v1.1
 
-> **Destination in repo:** `docs/SPEC_MEAL_GROUPING_2026-06-19.md`
+> **Destination in repo:** `docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md`
 > **Date:** 2026-06-19 · **Version:** 1.1 (supersedes v1.0 draft, same date — folds in the red-team deltas + the cost-effective LLM design)
 > **Status:** Pre-build outline. Architecture + costing → companion review `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md` (Technical Board). Build instructions → `docs/specs/CLAUDE_CODE_PROMPT_MEAL_GROUPING_v1.md`.
 > **Boards consulted:** Technical (full), Product (Part B).

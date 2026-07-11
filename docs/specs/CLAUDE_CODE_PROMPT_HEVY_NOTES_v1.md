@@ -1,7 +1,7 @@
 # Claude Code Build Prompt — Training Notes Feedback Loop (v1)
 
 > **Destination in repo:** `docs/specs/CLAUDE_CODE_PROMPT_HEVY_NOTES_v1.md`
-> **Pairs with design brief:** `docs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md` (read it first — invariants, taxonomy, schema, board rationale).
+> **Pairs with design brief:** `docs/specs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md` (read it first — invariants, taxonomy, schema, board rationale).
 > **Scope of this prompt:** Phase 0 (measure) + Phase 1 (deterministic+Haiku extractor, exercise-keyed projection, read tool, pain elevation). Phase 2 (loop-back into descriptions, pattern detection) is a separate prompt after Phase 1 is eyeballed privately.
 > **Date:** 2026-06-21
 
@@ -11,7 +11,7 @@
 
 Matthew writes freeform notes on individual Hevy exercises. They sync (per-exercise `notes`, per-workout `description`) but evaporate after one read — no structured, queryable, *progressive* view. Build a **derived note-signal layer**: a projection over the **untouched** raw Hevy notes, keyed by exercise so the per-exercise arc is one Query, with a deterministic safety floor for pain and a bounded Haiku pass for semantic signals.
 
-This is the **same pattern as the meal-grouping layer** (`docs/SPEC_MEAL_GROUPING_2026-06-19.md` / `CLAUDE_CODE_PROMPT_MEAL_GROUPING_v1.md`) — derived projection, raw sovereign, deterministic-first, LLM tail bounded by cache + cap, frozen-as-data + correctable. Reuse its conventions and module shape.
+This is the **same pattern as the meal-grouping layer** (`docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md` / `CLAUDE_CODE_PROMPT_MEAL_GROUPING_v1.md`) — derived projection, raw sovereign, deterministic-first, LLM tail bounded by cache + cap, frozen-as-data + correctable. Reuse its conventions and module shape.
 
 ### Hard invariants (tests must enforce)
 

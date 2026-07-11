@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Habits Page Redesign (v1, rev. with intelligence-layer additions)
 **Target:** averagejoematt.com → `/evidence/habits/`
-**Companion spec:** `docs/SPEC_HABITS_PAGE_REDESIGN_2026-06-21.md` (read first — rationale, panel disagreements, field bindings, the keystone-honesty treatment, and the taxonomy/tier/state/effort layer)
+**Companion spec:** `docs/specs/SPEC_HABITS_PAGE_REDESIGN_2026-06-21.md` (read first — rationale, panel disagreements, field bindings, the keystone-honesty treatment, and the taxonomy/tier/state/effort layer)
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. API: `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); page consumes `/api/habits`, `/api/habit_registry`. Locate the front-end `/evidence/habits/` components; reuse the inline-SVG chart kit (no new deps). Where a component matches a Vices/abstinence-streak page or the sleep correlation board, REUSE it — do not duplicate.

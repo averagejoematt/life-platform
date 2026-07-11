@@ -1,5 +1,7 @@
 # Life Platform — Runbook
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 Last updated: 2026-07-11 (v8.6.0 — 64 MCP tools, 34-module package, 94 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**

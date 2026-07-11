@@ -1,5 +1,7 @@
 # Life Platform — Schema & Data Dictionary
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-06
+
 **Table:** `life-platform` (us-west-2)
 **Design:** Single-table with composite keys (no GSIs by default — ADR-005; reading domain adds GSI1 sparse due-date index + GSI2 overview index per ADR-097)
 **Last updated:** 2026-07-11 (v8.6.0 — 64 MCP tools, 20 data sources, 94 Lambdas, 12 cached tools)

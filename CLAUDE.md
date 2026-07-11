@@ -25,7 +25,7 @@ Deep documentation lives in `docs/`. Start here when context is needed:
 - `docs/DATA_GOVERNANCE.md` — PII classification + retention policy (added v7.2.0)
 - `docs/BOARDS.md` — the three AI persona boards (Personal, Technical, Product)
 - `docs/REVIEW_METHODOLOGY.md` — how to run architecture audits
-- `docs/V2_AUDIT_PLAN.md` — V2 audit plan + outcomes (2026-05-17)
+- `docs/archive/V2_AUDIT_PLAN.md` — V2 audit plan + outcomes (2026-05-17)
 
 ## Commands
 

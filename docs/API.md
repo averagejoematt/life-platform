@@ -1,5 +1,7 @@
 # Public API Reference
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 **Last updated:** 2026-05-19 (v8.0.0)
 
 > The public-facing HTTP API behind `averagejoematt.com`. Two Lambda functions back it: `life-platform-site-api` (data) and `life-platform-site-api-ai` (AI endpoints). All endpoints route via CloudFront → Lambda Function URLs.

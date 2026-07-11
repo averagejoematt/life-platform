@@ -1,6 +1,6 @@
 # SPEC_READING_MIND_2026-06-29.md
 **The Mind Pillar (Reading) — feature spec: data model, services, and the recommendation engine.**
-Repo path: `docs/SPEC_READING_MIND_2026-06-29.md`
+Repo path: `docs/specs/SPEC_READING_MIND_2026-06-29.md`
 Status: DRAFT v0.1 · 2026-06-29
 Fold-into note: once stable, propagate to canonical `ARCHITECTURE.md` + `SCHEMA.md` + `DECISIONS.md` (ADR) + `MCP_TOOL_CATALOG.md` + `DATA_GOVERNANCE.md` per the doc-update matrix. Harmonize with the existing `SPEC_MIND_PAGE_REDESIGN_2026-06-21.md` (this extends the Mind page, does not replace it).
 

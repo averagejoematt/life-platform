@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — The Doors / Cross-Site Experience (v1)
 **Scope:** averagejoematt.com whole-experience — Home `/`, Cockpit `/now/`, Story `/story/`, Coaching `/coaching/`, Evidence `/evidence/`.
-**Companion spec:** `docs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md` (read first — this is an IA/editorial review; the 5-door model and me-first are LOCKED).
+**Companion spec:** `docs/specs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md` (read first — this is an IA/editorial review; the 5-door model and me-first are LOCKED).
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. This touches multiple front-end routes + shared layout/components; locate the door templates and the shared header/footer/genesis-stamp component by inspection. Reuse the design system + signatures (constellation, waveform, tick spine, two-voice); no new deps.

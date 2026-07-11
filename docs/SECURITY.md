@@ -1,5 +1,7 @@
 # Security Posture
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 **Last updated:** 2026-05-19 (v8.0.0)
 
 > What we protect against, what we accept as risk, and the layered defenses in place. Reviewed quarterly.

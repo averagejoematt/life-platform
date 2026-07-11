@@ -1,5 +1,7 @@
 # Life Platform — Architecture Decision Records (ADR)
 
+> **Status:** canonical (append-only) · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > Permanent log of significant architectural, design, and operational decisions.
 > Each ADR captures the decision, context, alternatives considered, and outcome.
 
@@ -2265,7 +2267,7 @@ Remove `get_vacation_fund` from `mcp/registry.py` + redeploy MCP; remove the `/a
 
 **Date:** 2026-06-01 (rebuilt + cut over), refined 2026-06-02
 **Status:** Live on `averagejoematt.com`.
-**Related:** `docs/CLAUDE_CODE_PROMPT_V4_PASTE_READY.md` + the four source-of-truth design docs; `site/index.html`, `site/now/`, `site/story/`, `site/evidence/`, `site/subscribe/`; `site/assets/js/{story,cockpit,evidence,dispatches,charts}.js`; `scripts/v4_build_evidence.py`, `scripts/v4_build_dispatches.py`, `scripts/v4_build_rss.py`, `scripts/v4_migration_inventory.py`, `scripts/v4_vendor_fonts.py`; CloudFront `v4-redirects` function; `site/legacy/`; `handovers/HANDOVER_LATEST.md`.
+**Related:** `docs/archive/CLAUDE_CODE_PROMPT_V4_PASTE_READY.md` + the four source-of-truth design docs; `site/index.html`, `site/now/`, `site/story/`, `site/evidence/`, `site/subscribe/`; `site/assets/js/{story,cockpit,evidence,dispatches,charts}.js`; `scripts/v4_build_evidence.py`, `scripts/v4_build_dispatches.py`, `scripts/v4_build_rss.py`, `scripts/v4_migration_inventory.py`, `scripts/v4_vendor_fonts.py`; CloudFront `v4-redirects` function; `site/legacy/`; `handovers/HANDOVER_LATEST.md`.
 
 ### Context
 
@@ -2689,7 +2691,7 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 ## ADR-090: Derived meal layer — best-effort meal grouping as a recomputable projection over raw MacroFactor
 
 **Date:** 2026-06-19
-**Status:** Implemented (Phase 0–1 live: layer v86 + MCP + freshness deployed, 780 items / 114 days backfilled 2026-06-19; Phase 2 LLM namer deferred). **Related:** `docs/SPEC_MEAL_GROUPING_2026-06-19.md`, `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md`, `lambdas/meal_grouper.py`, `lambdas/meal_templates_seed.py`, `lambdas/meal_projection.py`, `config/food_vocabulary.json`, `mcp/tools_meals.py`, `deploy/backfill_meals.py`.
+**Status:** Implemented (Phase 0–1 live: layer v86 + MCP + freshness deployed, 780 items / 114 days backfilled 2026-06-19; Phase 2 LLM namer deferred). **Related:** `docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md`, `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md`, `lambdas/meal_grouper.py`, `lambdas/meal_templates_seed.py`, `lambdas/meal_projection.py`, `config/food_vocabulary.json`, `mcp/tools_meals.py`, `deploy/backfill_meals.py`.
 
 **Context.** The raw MacroFactor food log is an ingredient ledger (per-food rows). To support meal-level analytics now and a public "your most-eaten meals" view later, we group entries into the meals they were eaten as. Phase 0 confirmed three ways (ingestion code, raw CSV header, stored DDB item) that **the export carries no Breakfast/Lunch/Dinner/Snack bucket** — so timestamp + content inference is the primary (only) segmenter. A 114-day history scan measured the real same-timestamp collision rate at ~4% (the naive detector's 93% was word-split/anchor-set false positives), validating the anchor-SET design.
 
@@ -2835,7 +2837,7 @@ The AWS "account-controls" sub-grade stays below a literal-checklist A on those 
 
 **Status:** ✅ Active — 2026-06-29 (Mind pillar Phase A)
 
-**Context.** The new reading/Mind domain (`docs/SPEC_READING_MIND_2026-06-29.md`) has access patterns that the single composite key cannot serve without a table scan: "everything I'm currently reading / queued" (by status, not by a known pk), "reading-session history over a date range" (across all books), and the daily "recall prompts that are due now" sweep (a time-ordered slice of a sparse subset). ADR-005 ("No GSI") was decided for a workload where every query was `pk = USER#…#SOURCE#X AND sk BETWEEN d1 AND d2` — true then, not true for reading.
+**Context.** The new reading/Mind domain (`docs/specs/SPEC_READING_MIND_2026-06-29.md`) has access patterns that the single composite key cannot serve without a table scan: "everything I'm currently reading / queued" (by status, not by a known pk), "reading-session history over a date range" (across all books), and the daily "recall prompts that are due now" sweep (a time-ordered slice of a sparse subset). ADR-005 ("No GSI") was decided for a workload where every query was `pk = USER#…#SOURCE#X AND sk BETWEEN d1 AND d2` — true then, not true for reading.
 
 **Decision.** Add exactly two Global Secondary Indexes to `life-platform`, additively. This **amends ADR-005** (which stands for every other domain — GSIs remain the documented exception, added only with an ADR):
 - **GSI1 — recall due (SPARSE).** `GSI1PK="RECALL_DUE"`, `GSI1SK=<nextDue iso>`. Only `RECALL#` prompts with an active `nextDue` carry the GSI1 attributes, so the index holds just the un-answered prompts; the daily EventBridge sweep is `query GSI1 where GSI1SK <= now` — never a scan. Answering/retiring a prompt removes the attributes, dropping it from the index.
@@ -3083,7 +3085,7 @@ Every asset URL is now content-hashed and immutable, so an entry module pins the
 
 ## ADR-108: Coach quality gate promoted advisory → blocking, on the measured signal (N-06)
 
-**Date:** 2026-07-05 · **Status:** Accepted · **Story:** #390 (epic #348) · **Amends:** the P5.5 wiring note in ADR-057/`docs/V2_AUDIT_PLAN.md` P3.1
+**Date:** 2026-07-05 · **Status:** Accepted · **Story:** #390 (epic #348) · **Amends:** the P5.5 wiring note in ADR-057/`docs/archive/V2_AUDIT_PLAN.md` P3.1
 
 **Context.** `coach-quality-gate` (Haiku-scored: anti-pattern phrases, decision-class-ceiling compliance, voice distinctiveness, cross-coach similarity) was wired into the COACH-V2 pipeline on 2026-05-19 but left deliberately advisory — `ai_calls._run_coach_v2_pipeline` invoked it `InvocationType="Event"` (fire-and-forget) *after* `output` was already finalized and returned, so the report was computed and logged but never read by anything; `PASS_SCORE_THRESHOLD=60` never gated a single publish. `docs/BACKLOG.md` N-06 scheduled a 30-day re-evaluation for 2026-06-19 to decide promote/adjust/stay-advisory; the date passed with no decision recorded, which is what this story closes.
 

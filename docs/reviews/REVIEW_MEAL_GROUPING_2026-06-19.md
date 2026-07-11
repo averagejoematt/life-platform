@@ -4,7 +4,7 @@
 > **Date:** 2026-06-19
 > **Status:** Approved to build — 11 approve / 0 reject / 1 conditional (Viktor). Conditions folded into spec v1.1.
 > **Boards convened:** Technical (Architecture Review · Intelligence & Data · Productization). Product Board lane = Part B of the spec (future nutrition page), not re-reviewed here.
-> **Related:** `docs/SPEC_MEAL_GROUPING_2026-06-19.md` (v1.1), `docs/specs/CLAUDE_CODE_PROMPT_MEAL_GROUPING_v1.md`, `docs/BOARDS.md`.
+> **Related:** `docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md` (v1.1), `docs/specs/CLAUDE_CODE_PROMPT_MEAL_GROUPING_v1.md`, `docs/BOARDS.md`.
 
 ---
 

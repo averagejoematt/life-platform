@@ -2,7 +2,7 @@
 **The Mind Pillar (Reading) — phased build plan + paste-ready Phase A prompt.**
 Repo path: `docs/specs/CLAUDE_CODE_PROMPT_READING_MIND_v1.md`
 Status: DRAFT v0.1 · 2026-06-29
-Read first, in order: `docs/briefs/BRIEF_2026-06-29_reading_mind.md`, `docs/coaching/READING_CALIBRATION.md`, `docs/SPEC_READING_MIND_2026-06-29.md`.
+Read first, in order: `docs/briefs/BRIEF_2026-06-29_reading_mind.md`, `docs/coaching/READING_CALIBRATION.md`, `docs/specs/SPEC_READING_MIND_2026-06-29.md`.
 > **Persona note (reconciled 2026-06-30):** archetype names herein (Lena / Priya / Nadia / Crowe / Theo / Mara) are **superseded** — reading coach is **Dr. Cora Vance** (`cora_vance`); see `docs/coaching/READING_CALIBRATION.md` §9 and `docs/BOARDS.md`. Kept as the original build record.
 
 ---
@@ -74,7 +74,7 @@ Tests green (incl. `test_mcp_registry` for any MCP change) · acceptance met · 
 Read these four docs in full before doing anything, in this order:
   docs/briefs/BRIEF_2026-06-29_reading_mind.md
   docs/coaching/READING_CALIBRATION.md
-  docs/SPEC_READING_MIND_2026-06-29.md
+  docs/specs/SPEC_READING_MIND_2026-06-29.md
   docs/specs/CLAUDE_CODE_PROMPT_READING_MIND_v1.md
 They are canon. Do not invent structure that contradicts them. If something is
 ambiguous, stop and ask me — do not guess.

@@ -1,5 +1,7 @@
 # Design System v5 — "Coherence"
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-05
+
 Extends (does **not** replace) `DESIGN_SYSTEM_V4_THE_MEASURED_LIFE.md` and
 `site/assets/css/tokens.css`. v4 gave us the *materials* (palette, type triad,
 spacing, signatures). v5 gives us the *through-line*: one editorial spine and a

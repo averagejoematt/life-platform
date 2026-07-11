@@ -1,6 +1,6 @@
 # Build Outline — Hevy Routine Write-Loop
 
-> **Destination in repo:** `docs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md`
+> **Destination in repo:** `docs/specs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md`
 > **Date:** 2026-05-31
 > **Status:** Pre-build outline — approved to outline by all three boards
 > **Review:** `docs/reviews/REVIEW_HEVY_ROUTINE_WRITELOOP_2026_05_31.md`

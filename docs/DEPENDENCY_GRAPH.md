@@ -1,5 +1,7 @@
 # Life Platform — Dependency Graph
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > Complete dependency map: which Lambdas depend on which DynamoDB partitions, which MCP tools depend on which data, which emails depend on which compute Lambdas.
 > Last updated: 2026-05-19 (v8.0.0 — V2 audit + follow-up)
 

@@ -1,5 +1,7 @@
 # Reserved Concurrency Setup
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 Last updated: 2026-05-19 (V2 audit operational sweep)
 
 Phase 1.5 (2026-05-16): preventing noisy-neighbor outages by reserving Lambda concurrency for critical user-facing functions.

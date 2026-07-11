@@ -1,5 +1,7 @@
 # Repository Structure
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+
 The canonical top-level layout. Read this before adding a new file so things land where they belong — the root stays intentional, not accreted.
 
 ## Top-level directories

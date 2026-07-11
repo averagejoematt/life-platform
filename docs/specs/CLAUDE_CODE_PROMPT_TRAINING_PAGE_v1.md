@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Training Page Redesign (v1, rev. with athlete additions)
 **Target:** averagejoematt.com → `/evidence/training/`
-**Companion spec:** `docs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md` (read first — rationale, panel disagreements, field bindings)
+**Companion spec:** `docs/specs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md` (read first — rationale, panel disagreements, field bindings)
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. API: `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); page consumes `/api/training_overview`, `/api/strength_benchmarks`, `/api/workouts`, `/api/weekly_physical_summary`, `/api/pulse_history`. Locate the front-end `/evidence/training/` components; reuse the inline-SVG chart kit (no new deps).

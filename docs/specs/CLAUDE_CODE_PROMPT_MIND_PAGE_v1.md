@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Mind & Accountability Page Redesign (v1)
 **Target:** averagejoematt.com → `/evidence/mind/`
-**Companion spec:** `docs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md` (read first — the "awaiting its human" spine, the sensitivity rules, the friction-killer capture)
+**Companion spec:** `docs/specs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md` (read first — the "awaiting its human" spine, the sensitivity rules, the friction-killer capture)
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. API: `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); page consumes `/api/mind_overview`. Locate the front-end `/evidence/mind/` components; reuse the inline-SVG chart kit (no new deps). Where a component matches a Vices/abstinence-streak surface or the doors/Coaching Third Wall, REUSE it — do not duplicate.

@@ -3,7 +3,7 @@
 > Built + deployed live this session. Layer **v86**; MCP + freshness redeployed; the
 > `macrofactor_meals` projection is backfilled (780 items / 114 days). All Session-1/2/2.5
 > code committed this session. Phase 2 (LLM namer) is deferred. Spec:
-> `docs/SPEC_MEAL_GROUPING_2026-06-19.md` · review: `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md` · ADR-090.
+> `docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md` · review: `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md` · ADR-090.
 
 ---
 

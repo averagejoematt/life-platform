@@ -1,5 +1,7 @@
 # Secrets Rotation Procedures
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 Last updated: 2026-05-19 (V2 audit operational sweep)
 
 Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret is rotated. Used by both the operator (manual rotations) and the freshness checker (staleness alerts).

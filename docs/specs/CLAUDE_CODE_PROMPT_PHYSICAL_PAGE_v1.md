@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Physical Page Redesign (v2 — weight-cockpit-first, PhenoAge)
 **Target:** averagejoematt.com → `/evidence/physical/`
-**Companion spec:** `docs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md` (read first — the two-tier structure, the visual treatments, the PhenoAge honesty rules)
+**Companion spec:** `docs/specs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md` (read first — the two-tier structure, the visual treatments, the PhenoAge honesty rules)
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. API: `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); page consumes `/api/physical_overview`, `/api/weight_progress`, `/api/journey`. PhenoAge inputs come from the bloodwork/labs source (9 standard markers). Locate the front-end `/evidence/physical/` components; reuse the inline-SVG kit, the weight-driven silhouette, and the measuring-rule spine (no new deps).

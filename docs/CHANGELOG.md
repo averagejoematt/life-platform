@@ -57,7 +57,7 @@ Phase B: the recommender + onboarding + the MCP tool surface, over the Phase A d
 
 ## The Mind Pillar (Reading) — Phase A data layer — 2026-06-29
 
-The first phase of the reading/Mind pillar (`docs/SPEC_READING_MIND_2026-06-29.md`): the data layer only — no UI, no MCP tools (those are Phases B–E). **Built + tested; deploy scripts staged for the operator to run.** New SOT domain `reading` on the shared `life-platform` table.
+The first phase of the reading/Mind pillar (`docs/specs/SPEC_READING_MIND_2026-06-29.md`): the data layer only — no UI, no MCP tools (those are Phases B–E). **Built + tested; deploy scripts staged for the operator to run.** New SOT domain `reading` on the shared `life-platform` table.
 
 - **Entities + access patterns** (`lambdas/reading/reading_store.py` + `reading_keys.py`): every reading entity per spec §1 (`BOOK#`, `READING#/STATE|SESSION|NOTE|RECALL`, `READING#REC`, `READING#PROFILE`, `READING#IDEA#`) with the seven access patterns from spec §2 (current/queue, history-by-date, notes, due-recalls, roundedness wheel, track record, Constellation node). Reading is `CROSS_PHASE` in `phase_taxonomy.py` (durable identity data — survives experiment resets; a coverage test asserts the new families classify).
 - **Two GSIs — the first on `life-platform`** (`ADR-097`, amends ADR-005): **GSI1** sparse recall-due (only active prompts project → the daily sweep never scans), **GSI2** reading state/time (current-reading, queue, history). Added via `aws dynamodb update-table` (the table is not CDK-managed), additive/online-backfill.
@@ -198,7 +198,7 @@ Full suite creds-blanked: **2045 passed, 0 failed**; live CI Lint + Unit Tests b
 
 ## Mind page redesign — Phase 0 (the layer the machine can't see); capture deferred — 2026-06-23
 
-Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer the machine can't see — awaiting its human."** Per `docs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`; **Phase 0 only** (P0.1–P0.4, front-end); the Phase-1 capture mechanics are DEFERRED pending the invitation-not-obligation UX sign-off (its explicit STOP-AND-ASK) — tracked as MIND-01..05. Deployed + live-verified. Seventh page redesign.
+Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer the machine can't see — awaiting its human."** Per `docs/specs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`; **Phase 0 only** (P0.1–P0.4, front-end); the Phase-1 capture mechanics are DEFERRED pending the invitation-not-obligation UX sign-off (its explicit STOP-AND-ASK) — tracked as MIND-01..05. Deployed + live-verified. Seventh page redesign.
 
 **Fixed a live privacy leak:** the previous page rendered vice streaks by NAME ("No alcohol", "No sweets"…); Phase 0 renders them **unnamed** per the hard privacy rule — verified live (zero vice names on the page).
 
@@ -211,7 +211,7 @@ Reframed `/evidence/mind/` (the most sensitive page) on the spine **"the layer t
 
 ## Doors / cross-site IA redesign — one documentary, five doors (P0→P3) — 2026-06-23
 
-Cross-site IA/editorial pass over the five doors (Home/Cockpit/Story/Coaching/Evidence). 5-door model + me-first LOCKED (untouched). Per `docs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md`; 11 P-item commits; **front-end only, no server change.** Deployed + live-verified (all doors "Day 10 · Week 2", zero console errors).
+Cross-site IA/editorial pass over the five doors (Home/Cockpit/Story/Coaching/Evidence). 5-door model + me-first LOCKED (untouched). Per `docs/specs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md`; 11 P-item commits; **front-end only, no server change.** Deployed + live-verified (all doors "Day 10 · Week 2", zero console errors).
 
 **P0 — one genesis source of truth:** `genesisCount()` in `coach_popover.js` is now the single source; removed `story.js`'s duplicate day/week math (the drift that had Home on Week 1 vs Story/Coaching Week 2 — already live-fixed by WQA-07, this removes the risk).
 
@@ -223,7 +223,7 @@ Cross-site IA/editorial pass over the five doors (Home/Cockpit/Story/Coaching/Ev
 
 ## Vitals page redesign (P0→P3 — glance-first landing page, three altitudes) — 2026-06-23
 
-Reframed `/evidence/vitals/` — THE landing page — as a glance-first instrument panel that bleeds into the analysis: **"an instant, honest tell at the top; the full documentary as you scroll."** Per `docs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md`; 7 P-item commits; **front-end only, no server change.** Deployed + live-verified (10 sections, zero console errors). Sixth Evidence page.
+Reframed `/evidence/vitals/` — THE landing page — as a glance-first instrument panel that bleeds into the analysis: **"an instant, honest tell at the top; the full documentary as you scroll."** Per `docs/specs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md`; 7 P-item commits; **front-end only, no server change.** Deployed + live-verified (10 sections, zero console errors). Sixth Evidence page.
 
 **Introduces a reserved alert RED** (`--alert`, restrained oxblood) — the first page to use red, scoped strictly to a genuine STATE (run-down / out-of-range), **never to encode a falling direction** (RHR-down / HRV-up / weight-down stay ember-positive). Zero red renders on a recovered day.
 
@@ -249,7 +249,7 @@ Surfaced a previously-hidden signal: `computed_metrics.readiness_score` + `compo
 
 ## Physical page redesign (P0→P2 — weight cockpit + composition arc + transparent PhenoAge) — 2026-06-23
 
-Reframed `/evidence/physical/` on the spine **"weight is the metronome; composition is the arc"** — a daily weight cockpit (Tier 1) over an episodic, countdown-driven composition arc (Tier 2). Per `docs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md`; 21 commits, one per P-item. **Deployed + live-verified (build `89c294fb` == HEAD); PR #201.** Fifth Evidence page (after Nutrition #193/#194 · Training #195 · Sleep #196 · Habits #197). Page renamed "Body composition" → "Weight & composition".
+Reframed `/evidence/physical/` on the spine **"weight is the metronome; composition is the arc"** — a daily weight cockpit (Tier 1) over an episodic, countdown-driven composition arc (Tier 2). Per `docs/specs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md`; 21 commits, one per P-item. **Deployed + live-verified (build `89c294fb` == HEAD); PR #201.** Fifth Evidence page (after Nutrition #193/#194 · Training #195 · Sleep #196 · Habits #197). Page renamed "Body composition" → "Weight & composition".
 
 **Tier 1 — weight cockpit (P0.1–P0.7):** trend-weight hero (dual-layer raw dots + ember smoothed trend; **goal 185 is an annotation, never the axis anchor**; genesis marked; two-voice) · silhouette scrubber **linked to the trend marker in lockstep** · HappyScale stat cluster (high/latest/low · yesterday Δ · % complete) replacing DEXA % as the top figures · **milestone ladder** (the vertical measuring-rule signature, 315→185, rungs click ember when crossed, days-between annotated, live now-edge) · rate tempo strip (7d/30d/90d/since-genesis ember-intensity slope-gauges, 7d flagged "early = water") · **projection cone** (widening fast/mid/slow band, rung date-markers, the stated bet flagged early=water + gradeable) · BMI de-emphasized. New `charts.js` primitives `weightTrendChart` + `projectionCone`; `handle_journey` now surfaces profile `height_inches`.
 
@@ -261,7 +261,7 @@ Reframed `/evidence/physical/` on the spine **"weight is the metronome; composit
 
 ## Habits evidence page redesign (P0→P2 — honest intelligence over Habitify) — 2026-06-23
 
-Rebuilt `/evidence/habits/` from a flat tracker into an honest read of **which habits are load-bearing, where the effort is, and which one pulls the day up — as an early signal, not a law.** Per `docs/SPEC_HABITS_PAGE_REDESIGN_2026-06-21.md`; 17 commits, one per P-item. **Deployed live (build `cfbfaeaa` == HEAD); PR #197.** Completes the four-page Evidence redesign series (Nutrition #193/#194 · Training #195 · Sleep #196 · Habits #197).
+Rebuilt `/evidence/habits/` from a flat tracker into an honest read of **which habits are load-bearing, where the effort is, and which one pulls the day up — as an early signal, not a law.** Per `docs/specs/SPEC_HABITS_PAGE_REDESIGN_2026-06-21.md`; 17 commits, one per P-item. **Deployed live (build `cfbfaeaa` == HEAD); PR #197.** Completes the four-page Evidence redesign series (Nutrition #193/#194 · Training #195 · Sleep #196 · Habits #197).
 
 **Phase 0 (surface):** honesty-rebuilt keystone hero (n-forward, **no bare Pearson**, coefficient withheld <2wk) · consistency RATE as north-star, single streak demoted (honest at 0) · 90-day ember heatmap with the cut-start (Jun 14) ringed — replaces the green/amber/red grid · group grades from real adherence **RATE** not correlation · state taxonomy tagging every habit on ONE ember+ink ramp incl. **backlog/never-started** (most apps hide it), no red · effort strip (not radar) · per-group small-multiples (floor muted) · goal linkage · data-anchored identity · tick spine + serif/mono two-voice; dark + light first-class.
 
@@ -277,7 +277,7 @@ Flipped `/evidence/sleep/` retrospective → prospective: the circadian forecast
 
 ## Training evidence page redesign (P0→P2) — 2026-06-23
 
-Rebuilt `/evidence/training/` on the twin spine "building the engine — and managing the load." Per `docs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. Built + locally verified; PR off `origin/main`.
+Rebuilt `/evidence/training/` on the twin spine "building the engine — and managing the load." Per `docs/specs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. Built + locally verified; PR off `origin/main`.
 
 **Phase 0:** Lift Index (load-trend sparklines, killed the 1RM "✓ goal met" table; <3-session tiles = fills-in) · session-volume ramp hero with a signed-off load-management caution · RHR-decline hero (RHR-down reads ember-POSITIVE — the Training inversion) · Zone-2 vs 150 now cross-source (Hevy bike/elliptical folded into Z2, server) · HR-of-the-engine (cardio HR; lifting HR an honest gap, never a 0 bar) · walking-as-engine + ember-intensity steps heatmap (low days muted, not hidden) · modality composition (ember ramp, mobility out of the cardio list) · Push/Pull/Legs balance · daily strain bar (replaced the naked avg-strain headline) · measuring-rule spine + two-voice signatures.
 
@@ -291,7 +291,7 @@ Rebuilt `/evidence/training/` on the twin spine "building the engine — and man
 
 ## Nutrition evidence page redesign (P0→P2 + CGM) — 2026-06-21
 
-Rebuilt `/evidence/nutrition/` from a flat tile-board into one argued trajectory — "a deficit I can hold, hitting the protein to keep muscle, without quietly costing me anything." Per `docs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. **Deployed live (build `8d342e15`); PR #193.**
+Rebuilt `/evidence/nutrition/` from a flat tile-board into one argued trajectory — "a deficit I can hold, hitting the protein to keep muscle, without quietly costing me anything." Per `docs/specs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md`; 20 commits, one per P-item. **Deployed live (build `8d342e15`); PR #193.**
 
 ### Phase 0 — fixes + the spine (front-end + one API readout)
 §0 hero verdict (measuring-rule energy spine + two-voice) · lead with the 0% protein miss (ember-as-warning, never a "win" block) · kill the frozen protein-timing score · worst-first horizontal micronutrient **sufficiency bars** (value-labelled, no desktop/mobile clip, ember reserved for the worst offenders) · macro split recomputed on a **kcal basis** (fat ~30%, not 16% by mass) · honest empty states (no `Rest Day — Count 0` zero-rows) · per-day macro composition **stacked by energy** (refuses <4 pts) · the two signatures deployed (measuring-rule tick spine on both trend charts + a serif "what this means" annotation) · §1 loss-rate readout (target 3 lb/wk → required −1500 → actual → gap) with a deficit-intensity flag, rate + protein on one sightline.
@@ -1018,7 +1018,7 @@ Last work session of the v1 audit. Shipped what was workable, formally closed wh
 - `docs/ARCHITECTURE.md` shared-layer module list expanded (was 18, now 25)
 - `CLAUDE.md` doc index updated: ADR-001 through ADR-057, "79 Lambdas"
 
-**4. `docs/V2_AUDIT_PROMPT.md` (new)** — comprehensive planning prompt for the v2 audit, encoding lessons from v1 (~10% wrong-premise rate, $80-120/mo savings projection landed at $4-5/mo, KMS-on-S3 caused breakage). Includes:
+**4. `docs/archive/V2_AUDIT_PROMPT.md` (new)** — comprehensive planning prompt for the v2 audit, encoding lessons from v1 (~10% wrong-premise rate, $80-120/mo savings projection landed at $4-5/mo, KMS-on-S3 caused breakage). Includes:
 - The full prompt to feed `/plan` for v2
 - What v2 should NOT re-suggest (citing ADR-057)
 - What v1 missed (latent bugs from environmental drift, failed-by-design paths)
@@ -1035,7 +1035,7 @@ Last work session of the v1 audit. Shipped what was workable, formally closed wh
 - `docs/DECISIONS.md` (+5 ADRs, ADR-053 to ADR-057)
 - `docs/ARCHITECTURE.md` (header refresh + layer module list)
 - `CLAUDE.md` (doc index)
-- `docs/V2_AUDIT_PROMPT.md` (new)
+- `docs/archive/V2_AUDIT_PROMPT.md` (new)
 - `docs/CHANGELOG.md` (this entry)
 - `aws lambda update-function-configuration` on `ai-expert-analyzer` (layer v42→v50)
 
@@ -1043,7 +1043,7 @@ Last work session of the v1 audit. Shipped what was workable, formally closed wh
 
 20 changelog versions (v7.0.0 → v7.21.0) over 2 days. ~70 of ~130 findings shipped. 5 ADRs documenting architectural decisions. SIMP-2 adopted by 8 ingestion Lambdas (−2,383 LOC / −43%). Coach prediction loop closed end-to-end (waiting for 7-30 day data validation). AWS spend trending $35 → $31/mo. Anthropic spend roughly flat at ~$10/mo. One latent bug surfaced and fixed (CloudFront/KMS). Comprehensive backlog snapshot in v7.20.0 entry + ADR-057.
 
-**Next audit:** see `docs/V2_AUDIT_PROMPT.md`. Suggested run date: 2026-08-15 (~3 months post-v1).
+**Next audit:** see `docs/archive/V2_AUDIT_PROMPT.md`. Suggested run date: 2026-08-15 (~3 months post-v1).
 
 ---
 
@@ -1723,6 +1723,8 @@ cd cdk && npx cdk deploy LifePlatformIngestion
 
 ```bash
 # Roll back to pre-SIMP-2 code:
+
+> **Status:** log · **Owner:** Matthew · **Verified:** 2026-07-03
 git revert <this-commit> -- lambdas/todoist_lambda.py
 cd cdk && npx cdk deploy LifePlatformIngestion
 

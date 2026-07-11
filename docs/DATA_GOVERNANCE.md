@@ -1,5 +1,7 @@
 # Data Governance — PII Classification + Retention Policy
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 Phase 7 (2026-05-16, refreshed 2026-05-19 post-V2): single source of truth for what data exists, who can see it, and how long it's kept.
 
 This document covers two cross-cutting concerns:

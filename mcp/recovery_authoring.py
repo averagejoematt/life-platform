@@ -9,7 +9,7 @@ his hand must be (a) authored only on complete data, and (b) self-adapting at
 This module is the DETERMINISTIC CORE — pure functions, stdlib only, NO mcp.config
 / boto3 import, so it unit-tests without env vars or AWS. The I/O that gathers
 volume / recovery / workout-history lives in tools_hevy_routine.py and feeds these
-functions. Design brief: docs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md.
+functions. Design brief: docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md.
 
 Non-negotiables encoded here (brief §2):
   1. Author tier-agnostic — the routine carries GREEN/YELLOW/RED branches; the

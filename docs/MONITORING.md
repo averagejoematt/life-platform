@@ -1,5 +1,7 @@
 # Life Platform — Monitoring & Observability
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 **Last updated:** 2026-05-19 (v8.0.0)
 
 What's monitored, what fires alarms, where to look when something's wrong.

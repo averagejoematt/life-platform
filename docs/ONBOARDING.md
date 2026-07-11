@@ -1,5 +1,7 @@
 # Life Platform — Onboarding Guide
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > First-day mental model. For commands (AWS auth, deploy, rollback), see `docs/QUICKSTART.md`.
 > Last updated: 2026-06-08 (v8.4.0 — v4 front-end live; ADR-077 phase taxonomy + ADR-078 commercial wedge; PG front-door work)
 >
@@ -147,7 +149,7 @@ Don't try to migrate to KMS default encryption — S3 website endpoints can't se
 | AI persona definitions | `docs/BOARDS.md` (3 boards: Personal, Technical, Product) |
 | MCP tool list | `docs/MCP_TOOL_CATALOG.md` |
 | Latest session context | `handovers/HANDOVER_LATEST.md` |
-| V2 audit findings + outcomes | `docs/V2_AUDIT_PLAN.md` |
+| V2 audit findings + outcomes | `docs/archive/V2_AUDIT_PLAN.md` |
 | Incident write-ups | `docs/INCIDENT_LOG.md` + `docs/rca/` |
 | Operator-grade procedures (alarms, runbooks) | `docs/OPERATOR_GUIDE.md` + `docs/RUNBOOK.md` |
 | Schema for a single S3 prefix or table partition | `docs/SCHEMA.md` |
@@ -200,7 +202,7 @@ The handover captures: version bump, what changed, what's pending, and context f
 
 ## Architecture Review Cadence
 
-Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (2026-05-17, 76 findings, ~33 shipped). V2 outcomes are captured in `docs/V2_AUDIT_PLAN.md` and formally closed in **ADR-057**. Reviews stored in `docs/reviews/` and `docs/v2-audits/`. `python3 deploy/generate_review_bundle.py` produces the pre-compiled bundle Claude needs to conduct a fresh review.
+Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (2026-05-17, 76 findings, ~33 shipped). V2 outcomes are captured in `docs/archive/V2_AUDIT_PLAN.md` and formally closed in **ADR-057**. Reviews stored in `docs/reviews/` and `docs/v2-audits/`. `python3 deploy/generate_review_bundle.py` produces the pre-compiled bundle Claude needs to conduct a fresh review.
 
 ---
 

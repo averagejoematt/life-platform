@@ -1,5 +1,7 @@
 # Life Platform — Open Backlog
 
+> **Status:** archive (frozen — ADR-099; live backlog is GitHub Issues) · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > **⚠️ FROZEN — historical archive (ADR-099, 2026-07-03).** The single source of truth for
 > forward work is now the **GitHub issue backlog**: epics (`type:epic`) + ranked stories
 > (`type:story`) on Now/Next/Later milestones — see
@@ -9,7 +11,7 @@
 > 11 won't-do → the parked register). The shipped-history sections retain archival value.
 
 **Last updated:** 2026-06-29 (Self-Management & Coherence Program Phases 1–4 + the content-bug fix + precision pass + asset-completeness guard ALL SHIPPED — see the section directly below. Prior: 2026-06-23 redesign marathon — Physical/Vitals/Mind pages + Doors IA + RQA-04/05 + WQA-06 all shipped; follow-ups added: PHY-01..06, VIT-01..06, DOORS-01, MIND-01..05 (Mind capture DEFERRED pending invitation-UX sign-off). Earlier: Nutrition/Training/Sleep/Habits shipped, EVR-01..06; 2026-06-09 ER-02 upstream-API contract tests DONE → CHANGELOG; ER external-review-lens rigor series ER-01..08; 2026-06-07 v8.4.0 PG product/growth summit, ADR-077 phase taxonomy + restart tooling)
-**Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
+**Source:** Synthesis of V1 audit (2026-05-17, ADR-057), V2 audit (2026-05-17, `docs/archive/V2_AUDIT_PLAN.md`), V2 follow-up sessions (2026-05-18/19), the 2026-05-29 marathon (Bedrock cutover, budget guard, remediation agent, May-30 restart), the 2026-06-01/02 v4 website launch + QA sweep, and the 2026-06-03 operations/cost session (ADR-074/075). Data-blocked items D-01/D-03/D-04 + N-01/L-11 re-checked against live AWS on 2026-06-03.
 
 > Single source of truth for everything **not done**. Items closed-with-rationale (ADR-057) and items shipped are not listed — see `docs/CHANGELOG.md` for what landed and `docs/DECISIONS.md` for what was formally closed.
 
@@ -621,7 +623,7 @@ Items that came up during V2 follow-up sessions and aren't yet scheduled.
 
 ### N-05 — V2 audit drift checks: re-verify all v1-shipped items are still working in 90 days
 - Schedule a 2026-08-17 audit (per V2_AUDIT_PROMPT.md cadence)
-- Use `docs/V2_AUDIT_PROMPT.md` for the v3 round
+- Use `docs/archive/V2_AUDIT_PROMPT.md` for the v3 round
 - Cost: ~1 session of focused agent work
 
 ### N-06 — Coach `quality_gate` threshold promotion — ✅ RESOLVED 2026-07-05 (#390, ADR-107)

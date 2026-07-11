@@ -118,7 +118,7 @@ Responsive to mobile (he authors at night, often on phone). Visible keyboard foc
 ## 10. Successors (separate artifacts)
 
 - `docs/coaching/READING_CALIBRATION.md` — priors, difficulty model, periodization, re-rank triggers, Lena's mandate + standing disagreements.
-- `docs/SPEC_READING_MIND_2026-06-29.md` — entities, schema, GSIs, recommender objective, journal-resonance, mind-body hooks, public/private enforcement.
+- `docs/specs/SPEC_READING_MIND_2026-06-29.md` — entities, schema, GSIs, recommender objective, journal-resonance, mind-body hooks, public/private enforcement.
 - `docs/specs/CLAUDE_CODE_PROMPT_READING_MIND_v1.md` — phased build + paste-ready Phase A prompt.
 
 This brief sets the *look, feel, and rules*. It does not set the data model or build order.

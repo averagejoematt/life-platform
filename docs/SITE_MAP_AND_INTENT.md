@@ -1,5 +1,7 @@
 # Site Map & Page Intent
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-05
+
 > **What each page is for, and why it matters to the platform** — one scannable registry so
 > future redesigns start from intent, not guesswork. Pair with [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md)
 > (the why), [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) (the how-it-looks), and

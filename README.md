@@ -30,6 +30,9 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 
 ## Start here
 
+**The engineering wiki lives at [`docs/README.md`](docs/README.md)** — role-based entry
+paths, the full page registry, and the drift-prevention contract that keeps it accurate.
+
 | You want to… | Read |
 |---|---|
 | Build the mental model | [`docs/ONBOARDING.md`](docs/ONBOARDING.md) |
