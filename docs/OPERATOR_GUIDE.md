@@ -29,7 +29,7 @@ All infrastructure is CDK-managed across 9 stacks (`cdk/stacks/`).
 
 Before you can operate the platform, you need:
 
-1. **AWS auth**: `aws configure list` should show the `205930651321` account, region `us-west-2`. (Use SSO or aws-vault — never long-lived keys.)
+1. **AWS auth**: `aws configure list` should show the `205930651321` account, region `us-west-2`. (Use SSO or aws-vault — never long-lived keys for daily work. Setup procedure: `docs/AWS_ACCESS.md`.)
 2. **Pager off**: disable AWS CLI pager so commands don't block scripts:
    ```bash
    aws configure set cli_pager ""
