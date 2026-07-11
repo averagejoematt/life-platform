@@ -445,7 +445,7 @@ def _digest(findings, semantic):
     worst = ci.overall_status(findings)
     lines = [f"COHERENCE SENTINEL — {worst.upper()} ({_today()})", ""]
     for f in findings:
-        mark = {"ok": "🟢", "warn": "🟡", "alarm": "🔴"}.get(f.status, "·")
+        mark = {"ok": "🟢", "pre_start": "⏳", "warn": "🟡", "alarm": "🔴"}.get(f.status, "·")
         lines.append(f"{mark} {f.name}: {f.detail}")
     if semantic is not None:
         sc = "🟢 coherent" if semantic.get("coherent") else "🔴 incoherent"

@@ -30,9 +30,10 @@ def _pin_continuity(monkeypatch, genesis="2026-06-08", today="2026-07-01", surfa
     DDB get_item) — which made every run_checks() test silently dependent on
     "genesis <= today": a reset staging a FUTURE genesis (the sanctioned #931
     pre-start window) flipped check_experiment_continuity to ALARM and broke the
-    OK-expecting tests. Pinned mid-experiment dates keep each test about ITS
-    invariant; the future-genesis semantics of the pure check are pinned in
-    test_coherence_invariants.py::test_genesis_in_future_alarms."""
+    OK-expecting tests. (#942 since bounded that: genesis ≤ PRE_START_GRACE_DAYS
+    in the future → pre_start, beyond → ALARM.) Pinned mid-experiment dates keep
+    each test about ITS invariant; the future-genesis boundary of the pure check
+    is pinned in test_coherence_invariants.py::TestExperimentContinuity."""
     monkeypatch.setattr(sentinel, "_gather_experiment_continuity", lambda: (genesis, today, list(surfaced)))
 
 

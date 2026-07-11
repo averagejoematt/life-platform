@@ -29,9 +29,16 @@ import re
 from dataclasses import dataclass, field
 
 OK = "ok"
+PRE_START = "pre_start"  # #942: sanctioned countdown window (#931) — OK-severity, but distinct so the digest can say why
 WARN = "warn"
 ALARM = "alarm"
-_RANK = {OK: 0, WARN: 1, ALARM: 2}
+_RANK = {OK: 0, PRE_START: 0, WARN: 1, ALARM: 2}
+
+# How far in the future EXPERIMENT_START_DATE may sit before a "genesis > today"
+# reading stops being the sanctioned countdown window and becomes a mis-set
+# constant (#942). Resets stage Day 1 ~2 days out; 7 gives headroom without
+# letting a fat-fingered month/year silently pass.
+PRE_START_GRACE_DAYS = 7
 
 
 @dataclass
@@ -365,7 +372,10 @@ def check_experiment_continuity(genesis: str, today: str, surfaced_weeks) -> Fin
     genesis date: a surfaced week far ABOVE the one the genesis date implies is the
     ADR-077 reset signature (stale pre-reset high-week posts leaking back into
     selection — the "arc counts 7 weeks vs the 3 the UI shows" class), and a
-    genesis-derived week below 1 means a misconfigured/future genesis.
+    genesis-derived week below 1 means a misconfigured/future genesis — except
+    inside the sanctioned pre-start countdown window (#931/#942): genesis up to
+    PRE_START_GRACE_DAYS in the future reports PRE_START (OK-severity note),
+    anything further stays ALARM.
 
     Pure (no clock): the caller passes `genesis` and `today` as 'YYYY-MM-DD' and
     `surfaced_weeks` as a list of {name, week} actually shown to readers (latest
@@ -385,8 +395,21 @@ def check_experiment_continuity(genesis: str, today: str, surfaced_weeks) -> Fin
     derived_week = ((t - g).days // 7) + 1
     f.value = float(derived_week)
     if derived_week < 1:
-        f.status = ALARM
-        f.detail = f"genesis {genesis} is after today {today} → derived week {derived_week} (<1): counter underflow / bad genesis"
+        # #942: a future genesis within the sanctioned pre-start countdown window
+        # (#931/#939 — restart_pipeline stages Day 1 a few days out) is expected,
+        # not the mis-set-constant failure. Bounded grace: ≤ PRE_START_GRACE_DAYS
+        # in the future → pre_start (OK-severity, distinct note); beyond that a
+        # far-future genesis is still the real bad-constant ALARM.
+        days_until = (g - t).days
+        if 0 < days_until <= PRE_START_GRACE_DAYS:
+            f.status = PRE_START
+            f.detail = f"pre_start: genesis {genesis} is {days_until} day(s) ahead of today {today} — sanctioned countdown window (#931)"
+        else:
+            f.status = ALARM
+            f.detail = (
+                f"genesis {genesis} is {days_until} days after today {today} (> {PRE_START_GRACE_DAYS}-day pre-start grace) "
+                f"→ derived week {derived_week} (<1): counter underflow / bad genesis"
+            )
         return f
 
     tolerance = 1  # a current-week post can be one ahead of the strict genesis math at a week boundary

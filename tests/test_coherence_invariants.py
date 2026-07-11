@@ -300,8 +300,27 @@ class TestExperimentContinuity:
         f = ci.check_experiment_continuity(self.GEN, "2026-06-29", [{"name": "arc", "week": 5}])
         assert f.status == ci.WARN
 
-    def test_genesis_in_future_alarms(self):
+    # ── The #942 pre-start boundary (post-#931 staged genesis): a future genesis
+    #    inside the grace window is the sanctioned countdown, beyond it a mis-set
+    #    constant. Pin BOTH sides of PRE_START_GRACE_DAYS.
+
+    def test_genesis_in_near_future_is_pre_start_not_alarm(self):
+        # genesis 2 days out — the actual cycle-5 countdown shape (2026-07-10 → 07-12).
         f = ci.check_experiment_continuity("2026-07-01", "2026-06-29", [])
+        assert f.status == ci.PRE_START
+        assert not f.is_alarm
+        assert "pre_start" in f.detail
+        # pre_start is OK-severity: it never escalates the run.
+        assert ci.overall_status([f]) == ci.OK
+
+    def test_genesis_at_grace_boundary_is_pre_start(self):
+        # exactly PRE_START_GRACE_DAYS (7) out → still the countdown window.
+        f = ci.check_experiment_continuity("2026-07-06", "2026-06-29", [])
+        assert f.status == ci.PRE_START
+
+    def test_genesis_beyond_grace_alarms(self):
+        # 8 days out (grace + 1) → a mis-set constant is still a real failure.
+        f = ci.check_experiment_continuity("2026-07-07", "2026-06-29", [])
         assert f.is_alarm
         assert "underflow" in f.detail or "<1" in f.detail
 
