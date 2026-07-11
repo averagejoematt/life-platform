@@ -189,7 +189,7 @@ function wireFirstRun() {
     <p class="ev-intro__k label">new here?</p>
     <h2 class="ev-intro__h">Every source this one life is measured by.</h2>
     <ul class="ev-intro__list">
-      <li><strong>Pick a topic</strong> on the left — grouped into <em>the body</em> and <em>mind &amp; accountability</em>. Its trend loads in the center; no page jumps.</li>
+      <li><strong>Pick a topic</strong><span class="ev-intro__where ev-intro__where--wide"> on the left</span><span class="ev-intro__where ev-intro__where--narrow"> above</span> — grouped into <em>the body</em> and <em>mind &amp; accountability</em>. Its trend loads in the center; no page jumps.</li>
       <li>Labels like <em>N=1</em> or <em>preliminary</em> mean a correlation from a single life, not proof — and thin data is flagged, never faked.</li>
       <li><strong>Read-only.</strong> The numbers are the real ones; nothing here is medical advice.</li>
     </ul>

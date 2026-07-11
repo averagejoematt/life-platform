@@ -437,6 +437,17 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ev-intro__list li { color: var(--ink-muted); line-height: 1.5; max-width: 64ch; }
 .ev-intro__list strong { color: var(--ink); font-weight: var(--weight-med); }
 .ev-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: 0.85em; color: var(--ember); }
+/* #1016 — the topic rail sits to the LEFT only at ≥821px (--bp-tw, the evidence
+   reading split); below it renders ABOVE the readout as a swipe strip. Swap the
+   intro's directional word to match so phone readers aren't told to look left at a
+   column that isn't there. Mobile-first: "above" is the default, "on the left" is
+   revealed at the same min-width the two-column layout engages. */
+.ev-intro__where--wide { display: none; }
+.ev-intro__where--narrow { display: inline; }
+@media (min-width: 821px) {
+  .ev-intro__where--wide { display: inline; }
+  .ev-intro__where--narrow { display: none; }
+}
 .ev-intro__go {
   appearance: none; cursor: pointer; margin-top: var(--sp-5);
   font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
