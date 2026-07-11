@@ -80,7 +80,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Morning sunlight resets circadian rhythm, improves cortisol awakening response",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "Morning sunlight within 30 minutes of waking is the single highest-ROI protocol.",
       "protocol": "Walk outdoors within 30 min of waking. Minimum 10 min. No sunglasses.",
       "status": "backlog"
@@ -95,7 +95,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "VO2max is the strongest predictor of all-cause mortality",
-      "board_recommender": "Dr. Peter Attia",
+      "board_recommender": "Dr. Victor Reyes",
       "board_quote": "Building cardiovascular capacity is non-negotiable for the centenarian decathlon.",
       "protocol": "Complete a 5K (3.1 miles) running continuously.",
       "status": "backlog",
@@ -111,7 +111,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Grip strength is one of the strongest predictors of all-cause mortality",
-      "board_recommender": "Dr. Peter Attia",
+      "board_recommender": "Dr. Victor Reyes",
       "board_quote": "Centenarian decathlon benchmark.",
       "protocol": "Hang from a pull-up bar with both hands for 60 continuous seconds.",
       "status": "backlog",
@@ -188,7 +188,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Phone proximity disrupts sleep onset",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "The phone is a dopamine slot machine. It does not belong where you sleep.",
       "protocol": "Phone charges in a different room. Use an alarm clock.",
       "status": "backlog"
@@ -203,7 +203,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "High protein preserves lean mass during deficit",
-      "board_recommender": "Dr. Layne Norton",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "Adherence is the best diet. But protein adherence is non-negotiable in a deficit.",
       "protocol": "190g protein minimum per day via MacroFactor.",
       "status": "backlog"
@@ -233,7 +233,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Higher vegetable intake reduces all-cause mortality",
-      "board_recommender": "Dr. Rhonda Patrick",
+      "board_recommender": "Dr. Amara Patel",
       "board_quote": "Micronutrient density starts at the plate.",
       "protocol": "Every meal includes at least one serving of vegetables.",
       "status": "backlog"
@@ -248,7 +248,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Self-monitoring doubles weight loss outcomes",
-      "board_recommender": "Dr. Layne Norton",
+      "board_recommender": "Dr. Marcus Webb",
       "board_quote": "You can't manage what you don't measure. Logging IS the intervention.",
       "protocol": "Every meal logged at time of eating. No 'I'll log it later.'",
       "status": "backlog"
@@ -278,7 +278,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Expressive writing reduces anxiety (Pennebaker, multiple RCTs)",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "The journal is where you meet yourself before the world tells you who to be today.",
       "protocol": "Write for at least 5 min every morning before any app or email.",
       "status": "backlog"
@@ -293,7 +293,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Gratitude journaling improves wellbeing and sleep quality",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Gratitude isn't toxic positivity. It's teaching the brain to notice what's already working.",
       "protocol": "Every night, write 3 specific things. Not 'family' but 'the way Partner laughed at dinner.'",
       "status": "backlog"
@@ -308,7 +308,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "NSDR improves dopamine by 65%, reduces stress",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "NSDR is the highest-ROI stress tool. Zero cost, 10 minutes.",
       "protocol": "10 min of NSDR or body scan meditation daily.",
       "status": "backlog"
@@ -323,7 +323,7 @@
       "difficulty": 2,
       "evidence_tier": "moderate",
       "evidence_summary": "Sustained attention to art improves focus, reduces rumination",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Truly seeing something without judgment is meditation the anxious mind desperately needs.",
       "protocol": "Go to an art museum. Pick one painting. Sit with it 30+ min. No phone.",
       "status": "backlog",
@@ -339,7 +339,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Expressing gratitude increases wellbeing for writer and recipient",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Vulnerability is the price of admission to meaningful connection.",
       "protocol": "Write a letter to someone who impacted your life. 200+ words. Sending optional.",
       "status": "backlog",
@@ -355,7 +355,7 @@
       "difficulty": 3,
       "evidence_tier": "moderate",
       "evidence_summary": "Social media breaks reduce anxiety and depression",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "A 7-day reset recalibrates your reward circuitry.",
       "protocol": "Delete social media apps. No IG, X, Reddit, TikTok. Messaging fine.",
       "status": "backlog"
@@ -385,7 +385,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Regular social contact reduces mortality risk by 50%",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Social connection is not a luxury. It is the foundation.",
       "protocol": "One in-person coffee/lunch/walk with a friend per week. Different person if possible.",
       "status": "backlog"
@@ -400,7 +400,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Brief social interactions boost mood, reduce social anxiety",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Every conversation with a stranger is exposure therapy.",
       "protocol": "Initiate a brief exchange. Compliment, question, comment. Min 30 seconds.",
       "status": "backlog"
@@ -415,7 +415,7 @@
       "difficulty": 2,
       "evidence_tier": "strong",
       "evidence_summary": "Voice communication creates stronger social bonds than text",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "A text is a transaction. A phone call is a connection.",
       "protocol": "Call one person per day. Friend, family, or colleague. Must be voice.",
       "status": "backlog"
@@ -445,7 +445,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Communal meals strengthen social bonds",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Hosting creates belonging. It doesn't have to be fancy — it has to be real.",
       "protocol": "Host dinner at home for 4+ people. Cook or order — the gathering is the point.",
       "status": "backlog",
@@ -461,7 +461,7 @@
       "difficulty": 2,
       "evidence_tier": "emerging",
       "evidence_summary": "Prosocial behavior increases positive affect",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "A compliment costs nothing and creates genuine human connection.",
       "protocol": "One genuine face-to-face compliment to a stranger daily. Be specific.",
       "status": "backlog"
@@ -476,7 +476,7 @@
       "difficulty": 4,
       "evidence_tier": "strong",
       "evidence_summary": "Group membership reduces mortality risk comparable to quitting smoking",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Your social muscle atrophies without group engagement.",
       "protocol": "One group activity per week. Class, club, meetup, sports league. Not the gym.",
       "status": "backlog"
@@ -521,7 +521,7 @@
       "difficulty": 3,
       "evidence_tier": "strong",
       "evidence_summary": "Cold exposure increases norepinephrine 200-300%",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "Learning to lean into chosen discomfort transfers to every other domain.",
       "protocol": "End of every shower: coldest setting, 30 seconds minimum.",
       "status": "backlog"
@@ -627,7 +627,7 @@
       "evidence_tier": "strong",
       "evidence_summary": "Morning light exposure anchors circadian clock, improves cortisol awakening response",
       "board_recommender": "Dr. Lena Johansson",
-      "board_quote": "Huberman's #1: morning sunlight within 30 minutes sets your entire circadian day.",
+      "board_quote": "Morning sunlight within 30 minutes sets your entire circadian day.",
       "protocol": "Step outside within 30 minutes of waking. 10 min minimum, no sunglasses. Overcast days still count. Track daily.",
       "status": "backlog"
     },
@@ -1017,7 +1017,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "Morning light anchors the cortisol awakening response, calibrates circadian timing, and cascades into HRV, sleep architecture, and metabolic rate. Free. Zero cost.",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "Morning sunlight is the single highest-ROI protocol. You missed it 70% of the time. That ends now.",
       "protocol": "Within 30 minutes of waking, 10 minutes of outdoor light or Luminette glasses. Log it before 9am.",
       "status": "available"
@@ -1049,7 +1049,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Voluntary sensory decompression without algorithm-driven engagement lowers ambient cortisol, restores directed attention, and creates the processing window where emotional integration occurs.",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "This is self-companionship. Sitting with yourself without distraction is harder than it sounds. Start with one hour.",
       "protocol": "One hour per day — any hour — with zero screens. Walk, cook, sketch, sit outside, read physical pages. Log the hour and what you did with it.",
       "status": "available"
@@ -1097,7 +1097,7 @@
       "difficulty": 1,
       "evidence_tier": "moderate",
       "evidence_summary": "Fiction uniquely activates theory of mind and narrative imagination — cognitive modes that problem-solving and self-help content suppress. For someone in isolation, fiction is practice inhabiting another's inner life.",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Fiction is the one context where you're allowed to fully inhabit someone else's inner life. That's not entertainment. That's practice.",
       "protocol": "20 minutes of fiction (book, audiobook, Kindle) before any non-fiction, self-help, or productivity content. Rule is sequence, not duration. Log the title.",
       "status": "available"
@@ -1129,7 +1129,7 @@
       "difficulty": 1,
       "evidence_tier": "strong",
       "evidence_summary": "NSDR (Yoga Nidra protocol) triggers parasympathetic dominance without crossing into sleep staging. The fastest zero-cost intervention for autonomic dysregulation. HRV 29.56 — this is indicated now.",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "Your recovery score is 40. NSDR is the fastest zero-cost reversal. There is no downside.",
       "protocol": "1pm–3pm daily: 10–20 minutes Yoga Nidra script (free on YouTube), eyes closed, horizontal. Not napping. Log each session.",
       "status": "available"
@@ -1145,7 +1145,7 @@
       "difficulty": 4,
       "evidence_tier": "moderate",
       "evidence_summary": "Murthy: vulnerability is the price of admission to meaningful connection. Surface-level contact doesn't meet the social connection threshold for wellbeing. Depth requires practice, not talent.",
-      "board_recommender": "Dr. Vivek Murthy",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "You can spend 150 hours in shallow proximity. The challenge is depth, not quantity.",
       "protocol": "Once per week, in a conversation with someone you care about, say one thing you'd normally hold back. Not a confession — one degree deeper than comfortable. Log what you said (private).",
       "status": "available"
@@ -1161,7 +1161,7 @@
       "difficulty": 4,
       "evidence_tier": "emerging",
       "evidence_summary": "Expressive writing about avoidance periods reduces their psychological grip and creates the narrative distance needed to understand what was actually happening rather than just that it happened.",
-      "board_recommender": "Dr. Paul Conti",
+      "board_recommender": "Dr. Nathan Reeves",
       "board_quote": "Before you build the platform further, you need to know what you actually needed in March. Write the letter.",
       "protocol": "One unsent, private letter to March 17th-Matthew. Three paragraphs: what happened, what you needed that you didn't give yourself, what you want April-Matthew to know. Store in journal. Don't share.",
       "status": "available"
@@ -1257,7 +1257,7 @@
       "difficulty": 3,
       "evidence_tier": "moderate",
       "evidence_summary": "Discomfort tolerance correlates directly with dopamine baseline. People with higher tolerance don't feel more pleasure — they require less stimulus to feel it. Each rep is a vote for the identity: I do hard things.",
-      "board_recommender": "Dr. Andrew Huberman",
+      "board_recommender": "Dr. Kai Nakamura",
       "board_quote": "Effort before reward. That's the sequence that rewires the motivational architecture.",
       "protocol": "Once per day, one mildly uncomfortable act on purpose: cold shower 90s, take stairs, eat the planned meal when easier is available, have a hard conversation. Log what you chose (one line).",
       "status": "available"

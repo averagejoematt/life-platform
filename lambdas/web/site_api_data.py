@@ -3067,8 +3067,37 @@ def handle_phenoage() -> dict:
         return _error(503, "Phenotypic age temporarily unavailable.")
 
 
+import re as _re  # noqa: E402 — aliased: a function-local `import re` above would shadow a plain module-level binding (F402)
+
+# Privacy absolute (PRE-13 pending): named genes / genotypes must NEVER reach the
+# public labs payload. Matched case-insensitively against category + name/notes/range/value.
+_GENETIC_CATEGORY_RE = _re.compile(r"pharmacogenomic|genetic|genomic", _re.IGNORECASE)
+_GENETIC_TEXT_RE = _re.compile(r"genotype|\bgene\b|\brs\d+\b|variant|allele|\bsnp\b", _re.IGNORECASE)
+
+
+def _strip_genetic_biomarkers(labs: dict) -> dict:
+    """Drop any biomarker that is genetic (pharmacogenomics category, or genotype/gene/rsID/variant
+    language in its fields) and recompute served counts so the page header stays consistent."""
+    kept = []
+    for b in labs.get("biomarkers") or []:
+        if _GENETIC_CATEGORY_RE.search(str(b.get("category") or "")):
+            continue
+        text = " ".join(str(b.get(k) or "") for k in ("name", "notes", "range", "value"))
+        if _GENETIC_TEXT_RE.search(text):
+            continue
+        kept.append(b)
+    sanitized = dict(labs)
+    sanitized["biomarkers"] = kept
+    # Same flag semantics as the front-end (evidence_body.js): truthy and not the string "null".
+    sanitized["flagged_count"] = sum(1 for b in kept if b.get("flag") and str(b.get("flag")).lower() != "null")
+    for count_key in ("biomarker_count", "total_biomarkers"):
+        if count_key in sanitized:
+            sanitized[count_key] = len(kept)
+    return sanitized
+
+
 def handle_labs() -> dict:
-    """GET /api/labs — Returns lab biomarkers from clinical.json in S3."""
+    """GET /api/labs — Returns lab biomarkers from clinical.json in S3 (genetic entries stripped)."""
     try:
         S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
         s3 = boto3.client("s3", region_name=S3_REGION)
@@ -3076,6 +3105,9 @@ def handle_labs() -> dict:
         data = json.loads(resp["Body"].read())
         labs = data.get("labs", {})
         if not labs or not labs.get("biomarkers"):
+            return _error(404, "No lab data available.")
+        labs = _strip_genetic_biomarkers(labs)
+        if not labs.get("biomarkers"):
             return _error(404, "No lab data available.")
         return _ok({"labs": labs}, cache_seconds=3600)
     except Exception as e:
