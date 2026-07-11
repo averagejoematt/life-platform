@@ -2,6 +2,12 @@
 """
 v4_build_dispatches.py — generate "The Story" hub: the writing sub-pages (/story/).
 
+CHROME NOTE (#1009): the `<nav class="doors">` and `<footer class="site-foot">` emitted
+inline below are NOT the source of truth — `scripts/v4_apply_chrome.py` re-flattens them
+to `scripts/v4_chrome.py` on every deploy (it runs last in `deploy/sync_site_to_s3.sh`).
+Edit the doors nav / footer in `v4_chrome.py`, not here; the inline copy here will be
+normalized away.
+
 "The Story" is the writing/context — the chronicle, AI lab notes, journal,
 timeline, and about — distinct from the real-time data (Cockpit/Evidence) and
 from the separate cinematic landing at "/". Emits an app shell at

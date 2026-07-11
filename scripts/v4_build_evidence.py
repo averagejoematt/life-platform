@@ -24,6 +24,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
 # slug, title, blurb, group, mode, endpoint, root, legacy
@@ -677,34 +678,23 @@ MOTION_HEAD = (
     'window.__moFail=setTimeout(function(){document.documentElement.classList.remove("mo");},2600);}catch(e){}})();</script>'
 )
 MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
-# The five doors, in loop order: cockpit · data · coaching · protocols · story.
-DOORS = [
-    ("/now/", "the cockpit", "cockpit", "Today's live instrument — your daily numbers, read back to you"),
-    ("/data/", "the data", "data", "Every source the platform reads — trends now and over time"),
-    ("/coaching/", "the coaching", "coaching", "The AI team & their arguments — stances, track records, disagreements"),
-    ("/protocols/", "the protocols", "protocols", "The levers — supplements, experiments, challenges, discoveries"),
-    ("/story/", "the story", "story", "The writing & the why — chronicle, journal, timeline, about"),
-]
-
-
-def door_icon(key: str) -> str:
-    # Inline <use> of the shared sprite — server-rendered (no JS), inherits .ico-door colour.
-    return (
-        '<svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-        f'<use href="/assets/icons/icons.svg#i-door-{key}"></use></svg>'
-    )
+# The doors nav itself is the shared chrome partial (#1009): v4_chrome.doors_nav. This
+# generator only supplies the <header> wrapper + brand and the active door path. Archive
+# pages never carry the follow pill.
+_ACTIVE_KEY_TO_DOOR = {
+    "data": "/data/",
+    "protocols": "/protocols/",
+    "coaching": "/coaching/",
+    "story": "/story/",
+    "cockpit": "/now/",
+}
 
 
 def topbar(active_key: str, brand_door: str) -> str:
-    links = "".join(
-        f'<a href="{href}" title="{esc(title)}"{" aria-current=\"page\"" if key == active_key else ""}>{door_icon(key)}{label}</a>'
-        for href, label, key, title in DOORS
-    )
     return (
         '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
         f'<span class="brand-name">averagejoematt</span> <span class="brand-door label">{esc(brand_door)}</span></a>'
-        f'<nav class="doors" aria-label="Doors">{links}'
-        '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>'
+        f"{doors_nav(_ACTIVE_KEY_TO_DOOR.get(active_key), with_follow=False)}</header>"
     )
 
 
@@ -773,21 +763,8 @@ def registry_json(groups):
     return out
 
 
-# Shared footer (5 doors + the footer-tier Method links) — one map on every archive page.
-FOOTER = (
-    '<footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map">'
-    '<div class="sf-col"><p class="sf-h label">The Story</p>'
-    '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>'
-    '<div class="sf-col"><p class="sf-h label">The Data</p>'
-    '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>'
-    '<div class="sf-col"><p class="sf-h label">The Protocols</p>'
-    '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
-    '<div class="sf-col"><p class="sf-h label">The Coaching</p>'
-    '<a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>'
-    '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
-    '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/method/">The method</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div>'
-    '</nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p></footer>'
-)
+# Shared footer — the single source of truth is v4_chrome.site_footer() (#1009).
+FOOTER = site_footer()
 
 
 # #420/#595: per-slug OG card. A slug with its own data-driven card (drawn daily by the

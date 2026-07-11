@@ -86,6 +86,11 @@ if [ "${1:-}" != "--dry-run" ]; then
   # site/assets/portraits/ (one source of truth with the site SVG). Re-render so a recipe
   # edit propagates here in the same sync; CI's parity guard fails if this is skipped.
   python3 "$(dirname "$0")/../scripts/render_portraits.py" || echo "  ⚠️  portrait PNG render skipped — keeping existing site/assets/portraits/"
+  # #1009: AUTHORITATIVE shared-chrome pass — flatten every page's doors nav + footer to
+  # the single source (scripts/v4_chrome.py). MUST run LAST, after every v4_build_* above
+  # (coaching/dispatches/methods emit their own chrome inline), so generator-local chrome
+  # can't re-drift. Idempotent; detects & preserves each page's current door + follow pill.
+  python3 "$(dirname "$0")/../scripts/v4_apply_chrome.py" || echo "  ⚠️  chrome normalization skipped — pages keep their generator-emitted chrome"
 fi
 
 BUCKET="matthew-life-platform"

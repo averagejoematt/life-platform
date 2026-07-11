@@ -137,6 +137,23 @@ after editing, commit the regenerated output in the same PR.)
 all of `assets/css/` + `assets/js/` **except** the generated `assets/js/portrait_data.js`.
 `/legacy/` is frozen verbatim — served with unhashed assets, never touched.
 
+### Shared chrome — the doors nav + footer are ONE source (#1009)
+
+The `<nav class="doors">` and `<footer class="site-foot">` appear on ~75 pages. They are
+**not** authored per-page (that copy-paste is what drifted — icon-less navs, a stray
+`/gear/` footer link, per-section base labels). The single source of truth is
+`scripts/v4_chrome.py` (`doors_nav(current_door, with_follow)` + `site_footer()`), and
+`scripts/v4_apply_chrome.py` re-flattens every page's chrome to it.
+
+**To change a door label, tooltip, footer link, or icon: edit `scripts/v4_chrome.py`,
+then run `python3 scripts/v4_apply_chrome.py` and commit the regenerated HTML.** That is
+the whole edit — do not touch the ~75 pages by hand, and do not edit the inline chrome in
+`v4_build_coaching.py` / `v4_build_dispatches.py` (they emit their own copy, which the
+apply pass normalizes away). `v4_apply_chrome.py` **runs last in
+`deploy/sync_site_to_s3.sh`** (after every `v4_build_*`), so chrome can't re-drift on a
+deploy; it is idempotent and auto-detects each page's current door + follow pill. Run
+`python3 scripts/v4_apply_chrome.py --check` to assert no page has drifted (CI-friendly).
+
 ## 4. The module-graph hashing trap (why pages "freeze")
 
 Read this before touching any `assets/js/` module. Full history:
