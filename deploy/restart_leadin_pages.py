@@ -10,10 +10,15 @@ feed (/journal/posts.json) serves a tombstone marker and the article URLs 404/le
 tombstone JSON until the first post-genesis Wednesday publish. This script closes that
 gap deterministically from the DDB records.
 
-PIPELINE POSITION (future wiring — deliberately NOT yet wired into
-deploy/restart_pipeline.py): belongs between restart_chronicle_handler (which resurrects
-+ re-dates the lead-in records) and restart_media_reset. Until wired, run it manually
-right after a reset:
+PIPELINE POSITION (wired 2026-07-11, pre-launch content calendar): runs in
+deploy/restart_pipeline.py AFTER restart_chronicle_handler (which resurrects +
+re-dates the PRELAUNCH_CALENDAR chronicle lead-ins) and AFTER restart_media_reset
+(which resurrects the calendar's podcast prequel) — order: chronicle → media →
+leadin pages — so the pages it renders reflect the fully re-dated arc. It covers
+ALL visible (phase=experiment, non-tombstoned) chronicle records: with 3 lead-ins
+it writes week-01/02/03 in date order, and the next real Wednesday publish
+(wednesday_chronicle_lambda._seq_for indexes the same date-sorted list) continues
+at week-04. Standalone use:
 
     python3 deploy/restart_leadin_pages.py            # dry-run (default): print the plan
     python3 deploy/restart_leadin_pages.py --apply    # write S3 + CloudFront invalidation

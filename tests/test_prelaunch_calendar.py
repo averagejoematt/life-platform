@@ -1,0 +1,262 @@
+"""Pre-launch content calendar (2026-07-11) — the reset re-dates a whole
+declared pre-launch arc (chronicle prequels + podcast prequel) to genesis −
+days_before offsets.
+
+Pins:
+  - PRELAUNCH_CALENDAR offset arithmetic (resolve_calendar) for a FIXED genesis
+    (never wall-clock — the golden-tests-wallclock lesson);
+  - the pointer-record repair (restart_leadin_repair) produces well-formed
+    content_html/content_markdown and a fully vetted body;
+  - the media resurrect builds the episodes.json entry schema the panel lambda
+    writes (week/title/date/url/bytes/duration_sec/byline/excerpt/transcript_url);
+  - restart_pipeline step ordering: chronicle handler → media reset → leadin pages;
+  - restart_leadin_pages seq/label logic matches wednesday_chronicle_lambda._seq_for
+    (3 lead-ins → week-01/02/03, the next real publish continues at week-04).
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+GENESIS = "2026-07-12"  # pinned — cycle-5 genesis; tests must never read wall-clock
+
+
+def _load(name: str):
+    """Load a deploy/ script as a module (they self-manage sys.path at import)."""
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, REPO_ROOT / "deploy" / f"{name}.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod  # registered first so cross-imports share the instance
+    spec.loader.exec_module(mod)
+    return mod
+
+
+handler = _load("restart_chronicle_handler")
+media = _load("restart_media_reset")
+repair = _load("restart_leadin_repair")
+pipeline = _load("restart_pipeline")
+leadin = _load("restart_leadin_pages")
+
+
+# ── 1. Calendar offsets → dates ───────────────────────────────────────────────
+
+
+def test_resolve_calendar_offset_arithmetic_synthetic():
+    cal = [
+        {"kind": "chronicle", "sk": "DATE#X", "days_before": 6},
+        {"kind": "podcast", "asset": "wk0", "days_before": 2},
+    ]
+    out = handler.resolve_calendar("2026-07-12", cal)
+    assert [e["date"] for e in out] == ["2026-07-06", "2026-07-10"]
+    # month-boundary arithmetic
+    assert handler.resolve_calendar("2026-08-03", cal)[0]["date"] == "2026-07-28"
+    # pure function: input calendar not mutated
+    assert "date" not in cal[0]
+
+
+def test_real_calendar_shape_and_invariants():
+    out = handler.resolve_calendar(GENESIS)
+    assert len(out) >= 2, "the arc needs at least a chronicle + a podcast prequel"
+    kinds = {e["kind"] for e in out}
+    assert kinds <= {"chronicle", "podcast"}
+    for e in out:
+        assert e["days_before"] >= 1, "every prequel must be dated BEFORE genesis"
+        assert e["date"] < GENESIS
+        if e["kind"] == "chronicle":
+            assert e["sk"].startswith("DATE#")
+        else:
+            assert e["asset"]
+            assert e.get("title")
+    # the declared arc plays in calendar order: dates strictly ascending
+    dates = [e["date"] for e in out]
+    assert dates == sorted(dates) and len(set(dates)) == len(dates)
+
+
+def test_origin_leadins_backcompat_alias():
+    assert handler.ORIGIN_LEAD_INS == [e["sk"] for e in handler.PRELAUNCH_CALENDAR if e["kind"] == "chronicle"]
+
+
+# ── 2. Pointer-record repair ─────────────────────────────────────────────────
+
+
+def _fixture_page() -> str:
+    """A synthetic archived article page embedding every vet-target string
+    (taken from the live registry so the fixture can't drift from the edits)."""
+    edits = repair.REPAIRS["DATE#2026-02-28"]["vet_edits"]
+    paragraphs = "\n\n".join(f"<p>{old}</p>" for _, old, _ in edits)
+    return f"""<html><body>
+<article class="post-body">
+  <div class="prose">
+    <p>The first thing you notice is the charging cables.</p>
+{paragraphs}
+<hr>
+<p>All of this arrives each morning as <em>one email</em> with a <strong>day grade</strong>.</p>
+<p class="signature"><em>Prologue — The Measured Life</em></p>
+  </div>
+</article>
+<div class="prose">trailing duplicated shell — must NOT be extracted</div>
+</body></html>"""
+
+
+def test_pointer_record_detection():
+    assert repair.is_pointer_record({"content_markdown": "See S3: blog/week-00.html", "content_html": "See S3: blog/week-00.html"})
+    assert repair.is_pointer_record({"content_markdown": "", "content_html": ""})
+    real = {"content_markdown": "x" * 500, "content_html": "y" * 500}
+    assert not repair.is_pointer_record(real)
+
+
+def test_repair_produces_wellformed_vetted_content():
+    body = repair.extract_prose_body(_fixture_page())
+    assert "trailing duplicated shell" not in body
+    vetted, applied = repair.apply_vet_edits(body, repair.REPAIRS["DATE#2026-02-28"]["vet_edits"])
+    assert len(applied) == len(repair.REPAIRS["DATE#2026-02-28"]["vet_edits"])
+    repair.assert_vetted(vetted)  # no real names, no named vices, no months/seasons
+    html, md, wc = repair.build_content_fields(repair.REPAIRS["DATE#2026-02-28"], vetted)
+    # content_html shape matches the DATE#2026-02-22 record: h1 + byline + hr + prose
+    assert html.startswith('<h1>The Measured Life — Prologue: "Before the Numbers"</h1>')
+    assert '<p class="byline"><em>By Elena Voss | Seattle, WA</em></p>' in html
+    # content_markdown shape: '# h1' + '*byline*' + '---' + prose
+    assert md.startswith('# The Measured Life — Prologue: "Before the Numbers"')
+    assert "*By Elena Voss | Seattle, WA*" in md
+    assert "\n---\n" in md
+    assert "*one email*" in md and "**day grade**" in md  # inline em/strong conversion
+    assert "*Prologue — The Measured Life*" in md  # signature preserved as emphasis
+    assert wc > 50
+    # the fictional Board roster replaced the real public figures
+    assert "Dr. Reyes" in md and "Attia" not in md
+    # the leadin-pages renderer must strip the header it renders its own chrome for
+    stripped = leadin.body_html_from_record({"content_html": html})
+    assert not stripped.startswith("<h1>") and "byline" not in stripped[:100]
+
+
+def test_vet_edit_must_match_exactly_once():
+    with pytest.raises(RuntimeError, match="expected exactly 1"):
+        repair.apply_vet_edits("<p>totally different body</p>", repair.REPAIRS["DATE#2026-02-28"]["vet_edits"])
+
+
+def test_assert_vetted_catches_forbidden_tokens():
+    for bad in ("a Tuesday in February", "modeled on Attia", "tracks alcohol intake"):
+        with pytest.raises(RuntimeError, match="forbidden token"):
+            repair.assert_vetted(f"<p>{bad}</p>")
+
+
+def test_stats_line_is_date_agnostic():
+    for r in repair.REPAIRS.values():
+        repair.assert_vetted(r["stats_line"])  # e.g. no 'February 2026'
+
+
+# ── 3. Podcast prequel resurrection ──────────────────────────────────────────
+
+
+def test_prequel_episode_entry_schema_and_date():
+    entry = next(e for e in handler.resolve_calendar(GENESIS) if e["kind"] == "podcast")
+    wav_bytes = media.GEMINI_SAMPLE_RATE * 2 * 60 + 44  # exactly 60s of 16-bit mono PCM
+    ep = media.build_prequel_episode(entry, wav_bytes)
+    # schema EXACTLY matches the wk0 intro publisher in coach_panel_podcast_lambda
+    assert set(ep) == {"week", "title", "date", "url", "bytes", "duration_sec", "byline", "excerpt", "transcript_url"}
+    assert ep["week"] == 0
+    assert ep["url"] == "/panelcast/wk0.wav"
+    assert ep["transcript_url"] == "/panelcast/wk0.transcript.json"
+    assert ep["duration_sec"] == 60
+    assert ep["bytes"] == wav_bytes
+    assert ep["date"] == entry["date"] and ep["date"] < GENESIS
+    assert ep["title"] == entry["title"]
+
+
+def test_prequel_feed_carries_the_item():
+    ep = media.build_prequel_episode({"asset": "wk0", "date": "2026-07-10", "title": "Prologue"}, 48044)
+    feed = media._panel_feed_with_items([ep])
+    assert "measured-life-panel-wk0" in feed
+    assert 'type="audio/wav"' in feed
+    assert "<itunes:episode>0</itunes:episode>" in feed
+    assert feed.count("</channel>") == 1 and feed.strip().endswith("</rss>")
+    # empty list degrades to the empty channel
+    assert "measured-life-panel" not in media._panel_feed_with_items([])
+
+
+def test_skip_reason_entries_are_not_resurrected():
+    calls = []
+
+    class _S3Stub:  # any S3 touch for a skipped entry is a bug
+        def __getattr__(self, name):
+            calls.append(name)
+            raise AssertionError(f"S3 must not be touched for a skipped entry (called {name})")
+
+    original = handler.PRELAUNCH_CALENDAR
+    handler.PRELAUNCH_CALENDAR = [{"kind": "podcast", "asset": "wk0", "days_before": 2, "title": "T", "skip_reason": "vet failed"}]
+    try:
+        lines = media.resurrect_podcast_prequels(_S3Stub(), apply=False, now_iso="now", manual=[])
+    finally:
+        handler.PRELAUNCH_CALENDAR = original
+    assert any("SKIP" in ln and "vet failed" in ln for ln in lines)
+    assert not calls
+
+
+# ── 4. Pipeline step ordering ─────────────────────────────────────────────────
+
+
+def test_pipeline_orders_chronicle_then_media_then_leadin_pages():
+    steps = [name for name, _ in pipeline.build_sub_scripts(False, [], "2026-06-08")]
+    assert steps.index("restart_chronicle_handler") < steps.index("restart_media_reset") < steps.index("restart_leadin_pages")
+    # the pages step must precede the rendered-surface work that follows the wipe
+    assert steps.index("restart_leadin_pages") < steps.index("restart_site_copy_sync")
+    assert steps.index("restart_leadin_pages") < steps.index("restart_docs_update")
+
+
+def test_pipeline_leadin_pages_runs_even_when_chronicle_skipped():
+    steps = dict(pipeline.build_sub_scripts(True, [], "2026-06-08"))
+    assert "restart_chronicle_handler" not in steps
+    assert steps["restart_leadin_pages"] == ["python3", "deploy/restart_leadin_pages.py", "--apply"]
+    names = [name for name, _ in pipeline.build_sub_scripts(True, [], "2026-06-08")]
+    assert names.index("restart_media_reset") < names.index("restart_leadin_pages")
+
+
+def test_pipeline_keep_chronicle_passes_resurrect_override():
+    steps = dict(pipeline.build_sub_scripts(False, ["DATE#2026-02-28"], "2026-06-08"))
+    assert steps["restart_chronicle_handler"][-2:] == ["--resurrect-sk", "DATE#2026-02-28"]
+
+
+def test_run_step_strips_apply_in_dry_run(monkeypatch):
+    seen = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    def fake_run(cmd, **kwargs):
+        seen["cmd"] = cmd
+        return _Proc()
+
+    monkeypatch.setattr(pipeline.subprocess, "run", fake_run)
+    pipeline.run_step("x", ["python3", "deploy/restart_leadin_pages.py", "--apply"], apply=False, log=[])
+    assert "--apply" not in seen["cmd"]
+    pipeline.run_step("x", ["python3", "deploy/restart_leadin_pages.py", "--apply"], apply=True, log=[])
+    assert "--apply" in seen["cmd"]
+
+
+# ── 5. Lead-in pages: seq/label parity with the next real publish ────────────
+
+
+def test_leadin_seq_and_labels_continue_at_week_04(monkeypatch):
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    resolved = handler.resolve_calendar(GENESIS)
+    pre_dates = [e["date"] for e in resolved if e["kind"] == "chronicle"]
+    assert len(pre_dates) == 3, "this parity test assumes the 3-lead-in calendar"
+    first_publish = "2026-07-15"  # first post-genesis Wednesday
+    all_dates = sorted(pre_dates + [first_publish])
+    # the 3 lead-ins occupy week-01/02/03 in date order…
+    for i, d in enumerate(sorted(pre_dates), start=1):
+        assert leadin.seq_for(d, all_dates, 0) == i
+        assert leadin.series_label(d, all_dates, 0) == f"Prologue · Part {['I', 'II', 'III'][i - 1]}"
+    # …and the next real publish (wednesday_chronicle_lambda._seq_for uses the same
+    # date-sorted index) continues at week-04, labelled Week 1.
+    assert leadin.seq_for(first_publish, all_dates, 1) == 4
+    assert leadin.series_label(first_publish, all_dates, 1) == "Week 1"

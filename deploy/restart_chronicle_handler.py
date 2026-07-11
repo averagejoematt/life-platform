@@ -9,9 +9,10 @@ Per spec §7 + Matthew's D decision:
       1. Move all chronicle HTML under blog/ to blog/archive/pilot/<key>
          (tombstone-overwrite original since IAM blocks DeleteObject)
       2. Rewrite chronicle index page(s) to show empty Day-1 state
-      3. Optionally resurrect 1-2 entries via --resurrect-sk (re-date them
-         to a date in the genesis week, untombstone the DDB record, copy
-         their S3 HTML to a new key under blog/)
+      3. Re-date the PRELAUNCH_CALENDAR arc (chronicle entries untombstoned +
+         re-dated to genesis − days_before; podcast entries reported here and
+         resurrected by restart_media_reset.py). --resurrect-sk is the legacy
+         explicit override; --no-default-leadins opts out.
 
 Date-agnostic. Idempotent — re-running won't re-archive already-archived
 files (checks existence first).
@@ -52,21 +53,64 @@ CHRONICLE_PREFIXES = [
     ("generated/journal/posts/", "generated/journal/archive/pilot/posts/", None),
 ]
 
-# ── Genesis lead-in chronicles (ADR-077, decided 2026-06-21) ──────────────────
-# The hand-written ORIGIN chapters that depict Matthew's actual arc. They are kept
-# across EVERY reset as re-dated pre-genesis lead-ins (genesis − N days), so the
-# Chronicle door opens on the genuine origin story rather than a blank slate. The
+# ── Pre-launch content calendar (Matthew's rule, 2026-07-11) ─────────────────
+# "Future resets re-date a whole PRE-LAUNCH ARC on a declared calendar — X days
+# before: chronicle prequel 1, Y days before: podcast prequel, Z days before:
+# chronicle prequel 2 — as part of the updating dates." The calendar IS the
+# pre-launch arc; the days_before offsets are the tunables. Every reset re-dates
+# each entry to genesis − days_before, so the story door opens on the genuine
+# origin story, staged as a countdown, rather than a blank slate. The
 # dormant-period auto-generated drafts are NOT kept — only this curated list.
 #
-# CRITICAL: each lead-in here MUST be DATE-AGNOSTIC in its prose — no specific
-# calendar dates, holidays (e.g. Valentine's Day), or season-specific weather —
-# because the reset re-dates them every cycle. (Week 1/2 were edited to this rule
-# on 2026-06-21; re-dating chapters that still named February/March surfaced wrong
-# timing references.) The reset auto-resurrects these unless --no-default-leadins.
-ORIGIN_LEAD_INS = [
-    "DATE#2026-02-22",  # "The Body Votes First" — Week 1 (20% recovery, the body's grammar, grief)
-    "DATE#2026-03-03",  # "The Empty Journal" — Week 2 (27 programs, the blank page, the real arc)
+# Entry kinds:
+#   - "chronicle": a DDB chronicle record (sk) — this script untombstones it,
+#     re-dates it to genesis − days_before, and sets phase=experiment/visible.
+#     restart_leadin_pages.py then rebuilds its public page + the manifest.
+#   - "podcast": an archived panelcast asset — DELEGATED to restart_media_reset.py
+#     (it copies archive/pilot/<asset>.* back over the tombstones and writes
+#     episodes.json/feed.xml with the entry dated genesis − days_before). This
+#     script only reports podcast entries.
+#
+# An entry with a "skip_reason" key is skipped (and the reason printed) — the
+# escape hatch for content that fails vetting (e.g. an audio artifact that can't
+# be edited to comply).
+#
+# CRITICAL: each lead-in's PROSE must be DATE-AGNOSTIC — no specific calendar
+# dates, holidays (e.g. Valentine's Day), or season-specific weather — because
+# the reset re-dates them every cycle. (Week 1/2 were edited to this rule on
+# 2026-06-21; DATE#2026-02-28 was repaired + vetted by restart_leadin_repair.py
+# on 2026-07-11; re-dating chapters that still named February/March surfaced
+# wrong timing references.) Privacy absolutes also hold: no named vices, no
+# genome specifics, no real public figures (tests/test_no_real_names_in_chronicle.py).
+# The reset auto-carries this calendar unless --no-default-leadins.
+PRELAUNCH_CALENDAR = [
+    {"kind": "chronicle", "sk": "DATE#2026-02-28", "days_before": 6, "label": "Prologue · Before the Numbers"},
+    {"kind": "chronicle", "sk": "DATE#2026-03-03", "days_before": 4, "label": "Prologue · The Empty Journal"},
+    {"kind": "chronicle", "sk": "DATE#2026-02-22", "days_before": 3, "label": "Prologue · The Body Votes First"},
+    {"kind": "podcast", "asset": "wk0", "days_before": 2, "title": "Prologue — Elena previews the experiment"},
 ]
+
+# Back-compat alias (pre-calendar name, 2026-06-21): the chronicle sks, in
+# calendar order. Kept so older callers/notebooks that imported ORIGIN_LEAD_INS
+# keep working; new code should read PRELAUNCH_CALENDAR.
+ORIGIN_LEAD_INS = [e["sk"] for e in PRELAUNCH_CALENDAR if e["kind"] == "chronicle"]
+
+
+def resolve_calendar(genesis: str, calendar: list[dict] | None = None) -> list[dict]:
+    """Resolve the pre-launch calendar against a genesis date.
+
+    Returns a copy of each entry with a concrete "date" key = genesis − days_before
+    (ISO). Pure function — the single place offset arithmetic happens, shared by
+    this script (chronicle entries) and restart_media_reset.py (podcast entries).
+    """
+    cal = PRELAUNCH_CALENDAR if calendar is None else calendar
+    g = date.fromisoformat(genesis)
+    out = []
+    for entry in cal:
+        e = dict(entry)
+        e["date"] = (g - timedelta(days=int(e["days_before"]))).isoformat()
+        out.append(e)
+    return out
 
 
 def list_chronicle_html(s3, prefix: str, archive_prefix: str, index_key: str) -> list[str]:
@@ -282,15 +326,15 @@ def main():
     parser.add_argument(
         "--no-default-leadins",
         action="store_true",
-        help="Do NOT auto-carry the curated ORIGIN_LEAD_INS chapters (default: carry them)",
+        help="Do NOT auto-carry the curated PRELAUNCH_CALENDAR entries (default: carry them)",
     )
     args = parser.parse_args()
 
-    # Default behaviour (ADR-077, 2026-06-21): carry the curated origin chapters as
-    # re-dated pre-genesis lead-ins, so every reset opens on the genuine origin story.
-    # Explicit --resurrect-sk overrides the default set; --no-default-leadins opts out.
-    if not args.resurrect_sk and not args.no_default_leadins:
-        args.resurrect_sk = list(ORIGIN_LEAD_INS)
+    # Default behaviour (Matthew's pre-launch calendar rule, 2026-07-11): carry the
+    # whole curated pre-launch arc, each entry re-dated to genesis − days_before.
+    # Explicit --resurrect-sk overrides the calendar (legacy staggered offsets);
+    # --no-default-leadins opts out entirely.
+    calendar_mode = not args.resurrect_sk and not args.no_default_leadins
 
     if len(args.resurrect_sk) > len(ORIGIN_LEAD_INS) + 2:
         print(f"ERROR: at most {len(ORIGIN_LEAD_INS) + 2} chronicles can be kept as lead-ins.")
@@ -331,19 +375,43 @@ def main():
         print(f"  ({'would write' if not args.apply else 'wrote'}) {index_key}  ({len(placeholder)} bytes, Day-1 placeholder)")
 
     # ── 3. Resurrect entries ──
-    if args.resurrect_sk:
-        # ADR-077 dec D: kept issues become pinned pre-genesis lead-ins, re-dated to
+    resurrected = 0
+    if calendar_mode:
+        # Pre-launch calendar (2026-07-11): each entry re-dated to genesis −
+        # days_before. Chronicle entries are handled here; podcast entries are
+        # DELEGATED to restart_media_reset.py (reported for visibility only).
+        entries = resolve_calendar(EXPERIMENT_START_DATE)
+        print(f"\n[3/3] Pre-launch calendar ({len(entries)} entries, genesis={EXPERIMENT_START_DATE}):")
+        for e in entries:
+            desc = e.get("label") or e.get("title") or e.get("sk") or e.get("asset")
+            if e.get("skip_reason"):
+                print(f"  SKIP  {e['kind']:9s} {desc} — {e['skip_reason']}")
+                continue
+            if e["kind"] == "chronicle":
+                print(f"  {e['date']}  chronicle  {e['sk']}  \"{desc}\"  (genesis−{e['days_before']}, phase=experiment, visible)")
+                if args.apply:
+                    untombstone_and_redate(ddb, e["sk"], e["date"], args.apply)
+                resurrected += 1
+            elif e["kind"] == "podcast":
+                print(
+                    f"  {e['date']}  podcast    {e['asset']}  \"{desc}\"  (genesis−{e['days_before']} — restart_media_reset.py resurrects it)"
+                )
+            else:
+                print(f"  SKIP  unknown calendar kind {e['kind']!r}: {e}")
+    elif args.resurrect_sk:
+        # Legacy override path (ADR-077 dec D): explicit keepers re-dated to
         # genesis − N days (default 5), staggered one day earlier per additional
         # keeper so multiple keepers preserve their original chronological order.
         genesis = date.fromisoformat(EXPERIMENT_START_DATE)
         new_dates = [(genesis - timedelta(days=args.keep_days + i)).isoformat() for i in range(len(args.resurrect_sk))]
-        print(f"\n[3/3] Keeping {len(args.resurrect_sk)} chronicle(s) as pre-genesis lead-ins:")
+        print(f"\n[3/3] Keeping {len(args.resurrect_sk)} chronicle(s) as pre-genesis lead-ins (explicit --resurrect-sk override):")
         for sk, new_date in zip(args.resurrect_sk, new_dates):
             print(f"  {sk} → re-dated to {new_date} (phase=experiment, visible)")
             if args.apply:
                 untombstone_and_redate(ddb, sk, new_date, args.apply)
+            resurrected += 1
     else:
-        print("\n[3/3] No --resurrect-sk passed: blank chronicle, fresh start on next Wed cycle.")
+        print("\n[3/3] --no-default-leadins: blank chronicle, fresh start on next Wed cycle.")
 
     # Report
     report_path = REPO_ROOT / "docs" / "restart" / "_chronicle_report.txt"
@@ -355,7 +423,7 @@ def main():
         f"html_files_archived    = {archived_count}\n"
         f"html_files_already_archived = {skipped_count}\n"
         f"index_pages_rewritten  = {len(index_keys)}\n"
-        f"chronicles_resurrected = {len(args.resurrect_sk)}\n"
+        f"chronicles_resurrected = {resurrected}\n"
     )
     print(f"\nReport written to: {report_path.relative_to(REPO_ROOT)}")
     if not args.apply:
