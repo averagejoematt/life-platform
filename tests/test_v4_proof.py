@@ -356,7 +356,9 @@ class TestFallback:
 
         snap = json.loads((Path(__file__).resolve().parent.parent / "scripts" / "proof_snapshot.json").read_text())
         assert "scorecard" in snap and "chronicle" in snap
-        assert snap["scorecard"].get("evaluator_live_since")
+        # pre-genesis the evaluator hasn't run, so the honest snapshot value is "" —
+        # require the key, not a value (#941 reset-aware pattern; render copes with "")
+        assert "evaluator_live_since" in snap["scorecard"]
         # #788: the cockpit fallback must carry a level + as-of (honest stamp)
         assert snap["cockpit"].get("level") is not None
         assert snap["cockpit"].get("as_of")
