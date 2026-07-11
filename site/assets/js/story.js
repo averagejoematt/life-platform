@@ -13,7 +13,7 @@
 
 import { initTheme } from "/assets/js/theme.js";
 import { lineChart } from "/assets/js/charts.js";
-import { stampGenesis, genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
+import { stampGenesis, genesisCount, preStart } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth (+ #931 pre-start)
 import { mountAsk } from "/assets/js/ask.js"; // uplevel P2 — the live inline ask on the home beat
 import { mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — returnability, reader-keyed
 import { instrumentMark, fnv1a, mulberry32 } from "/assets/js/sigils.js"; // visual P2 + #590 seeded drift
@@ -179,7 +179,35 @@ function drawConstellation(pillars, coupling, activeEffects) {
 // their "watch it happen" suffix; the day/week numbers come from the shared util so no door
 // can drift (the bug that had Home on Week 1 while Story/Coaching were on Week 2).
 const STORY_GENESIS_SUFFIX = " — a transformation you can watch happen in real time.";
-function renderNumbers(journey) {
+function renderNumbers(journey, pre) {
+  // #931 pre-start: no baseline exists until Day 1's weigh-in, so the numbers beat
+  // makes no delta/progress claims — launch-eve framing instead, quiet confidence.
+  if (pre) {
+    const hp = bind("hero-proof");
+    if (hp) {
+      hp.textContent = `Launch eve — the instruments are on. The record starts ${pre.startLabel}, with the first weigh-in.`;
+      hp.hidden = false;
+    }
+    const lostEl = bind("lost");
+    if (lostEl) {
+      lostEl.textContent = "—";
+      const figEl = lostEl.closest(".figure");
+      const cap = figEl && figEl.querySelector(".figure-cap");
+      if (cap) cap.textContent = "lbs — counts from Day 1";
+    }
+    const curEl = bind("current");
+    if (curEl && journey && journey.current_weight_lbs != null) {
+      curEl.textContent = journey.current_weight_lbs;
+      const curFig = curEl.closest(".figure");
+      const curCap = curFig && curFig.querySelector(".figure-cap");
+      if (curCap) curCap.textContent = "lbs at the start line";
+    }
+    const prEl = bind("progress");
+    if (prEl) prEl.textContent = "—";
+    const pj = bind("projected");
+    if (pj) pj.textContent = `No projections yet — the finish-line math begins with Day 1's weigh-in on ${pre.startLabel}. No fake finish line; watch it happen from the start.`;
+    return;
+  }
   if (!journey) return;
   if (journey.lost_lbs != null) {
     // lost_lbs > 0 = actually lost; < 0 = gained. Show it honestly (the site's whole point),
@@ -290,9 +318,18 @@ function okayStatus(p) {
 // contract is the honest override. Sleep stays wearable-backed and keeps its trend.
 const OKAY_MANUAL = new Set(["movement", "nutrition", "consistency", "mind"]);
 
-function renderOkay(charV, journeyV, presenceV) {
+function renderOkay(charV, journeyV, presenceV, pre) {
   const wrap = $("[data-okay]");
   if (!wrap) return;
+  // #931 pre-start: nothing has happened yet to read — a neutral awaiting state,
+  // never chips computed off a wiped week.
+  if (pre) {
+    wrap.innerHTML =
+      `<p class="okay-lead">Awaiting Day 1 — the experiment begins <strong>${esc(pre.startLabel)}</strong>. ` +
+      `Baselines start with that morning's first weigh-in, and this panel fills in from the first week of data.</p>` +
+      `<p class="okay-asof label">plain-language, from the live cockpit numbers</p>`;
+    return;
+  }
   // /api/presence is the shipped stall signal (in_lull + gap_days). A lull ≥7 days
   // with no planned pause means the manual pillars aren't "easing off" — nothing is
   // being logged at all, and the chips must say that plainly.
@@ -353,8 +390,11 @@ function renderOkay(charV, journeyV, presenceV) {
 // calm line (the shipped /api/presence contract; same tone as the Story timeline's
 // quiet-stretch beat). No banner, no red, and never a cause — the cause isn't in
 // the data. Hides itself entirely when logging is current or the pause is planned.
-function renderQuiet(p) {
+function renderQuiet(p, pre) {
   const el = bind("hero-quiet");
+  // #931 pre-start: launch eve reads as anticipation, not a lull — the quiet line
+  // stays hidden until the experiment is actually running.
+  if (pre) return;
   if (!el || !p || !p.in_lull || p.planned_pause) return;
   const days = Math.round(Number(p.gap_days) || 0);
   const since = days >= 2 ? `${days} days since the last entry` : "the latest entry is a beat behind";
@@ -573,23 +613,47 @@ async function load() {
     getJSON("/api/pillar_coupling"),  // #590 — measured pillar co-movement for the constellation edges
   ]);
 
+  const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
+  // #931 pre-start: payload-first (journey carries pre_start/days_until_start/
+  // start_date), client GENESIS fallback. Truthy only in the staged-reset window.
+  const pre = preStart(journeyV);
+
   const statsV = stats.status === "fulfilled" ? stats.value : null;
   if (statsV) {
-    if (statsV.elena_hero_line) bind("elena").textContent = statsV.elena_hero_line;
+    // Pre-start the stored hero line can narrate the WIPED cycle — the static
+    // timeless line in the HTML stands instead.
+    if (statsV.elena_hero_line && !pre) bind("elena").textContent = statsV.elena_hero_line;
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
-  stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix
+  stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix (pre-start: the countdown line)
   // The review's "central number": a prominent day-of-experiment counter in the hero.
+  // Pre-start (#931) it counts DOWN to Day 1 — calm, dated, no marketing timer.
   const { dayN, weekN } = genesisCount();
-  if (dayN >= 1) {
-    const dn = bind("dayNum"); if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }
-    const dc = bind("dayCap"); if (dc) dc.textContent = dayN === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`;
+  const dn = bind("dayNum"), dc = bind("dayCap");
+  if (pre && dn && dc) {
+    // The hero daycount IS the countdown — the genesis stamp (which the client-only
+    // stampGenesis may have written from a not-yet-rewritten GENESIS literal, or as
+    // a duplicate countdown) stays hidden pre-start.
+    const gs = bind("genesisStamp");
+    if (gs) gs.hidden = true;
+    if (pre.daysUntil >= 2) {
+      dn.textContent = String(pre.daysUntil);
+      dc.textContent = `days until the experiment begins — ${pre.startLabel}`;
+    } else if (pre.daysUntil === 1) {
+      dn.textContent = "1";
+      dc.textContent = `day to go — the experiment begins tomorrow, ${pre.startLabel}`;
+    } else {
+      dn.textContent = "0";
+      dc.textContent = "the experiment begins today, with the first weigh-in";
+    }
+  } else if (dayN >= 1) {
+    if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }
+    if (dc) dc.textContent = dayN === 1 ? "day one of the experiment" : `days into the experiment · week ${weekN}`;
   }
   dxTeaser();  // P1.1/P1.3 — Home teases the latest chronicle; the full reader lives in Story
 
-  const journeyV = journey.status === "fulfilled" ? (journey.value.journey || journey.value) : null;
-  renderNumbers(journeyV);
-  renderQuiet(presence.status === "fulfilled" ? presence.value : null);
+  renderNumbers(journeyV, pre);
+  renderQuiet(presence.status === "fulfilled" ? presence.value : null, pre);
 
   const wp = weight.status === "fulfilled" ? (weight.value.weight_progress || weight.value) : [];
   const wc = bind("weightchart");
@@ -620,7 +684,7 @@ async function load() {
   // #789 — the friends/family "is he okay this week?" plain-language read, from the
   // pillars + weight already in hand (no extra fetch). The presence result (already
   // fetched for the quiet-stretch line) keeps the chips honest during a logging stall.
-  renderOkay(charV, journeyV, presence.status === "fulfilled" ? presence.value : null);
+  renderOkay(charV, journeyV, presence.status === "fulfilled" ? presence.value : null, pre);
 }
 
 load();

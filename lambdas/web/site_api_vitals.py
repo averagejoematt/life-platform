@@ -47,6 +47,7 @@ from web.site_api_common import (
     _ok,
     _query_source,
     logger,
+    pre_start_meta,
     table,
 )
 
@@ -246,42 +247,66 @@ def handle_journey() -> dict:
     # "what day are we on" number. Single source so labels stay in sync.
     _day_n = max((datetime.now(PT).date() - date.fromisoformat(EXPERIMENT_START)).days + 1, 0)
 
-    return _ok(
-        {
-            "journey": {
-                "start_weight_lbs": start_weight,
-                "goal_weight_lbs": goal_weight,
-                "current_weight_lbs": round(current_weight),
-                "lost_lbs": lost_lbs,
-                "remaining_lbs": remaining,
-                "progress_pct": progress_pct,
-                "weekly_rate_lbs": weekly_rate,
-                # #535: every claim carries its uncertainty. The rate is an interval and
-                # the goal date is a range (earliest..latest), not a false-precision point.
-                "weekly_rate_ci_low": _traj.get("weekly_rate_ci_low"),
-                "weekly_rate_ci_high": _traj.get("weekly_rate_ci_high"),
-                "projection_confidence": _traj.get("projection_confidence"),
-                "rate_provisional": rate_provisional,
-                "weighin_span_days": weighin_span_days,
-                "projected_goal_date": projected_goal_date,
-                "projected_goal_date_earliest": _traj.get("projected_goal_date_earliest"),
-                "projected_goal_date_latest": _traj.get("projected_goal_date_latest"),
-                "days_to_goal": days_to_goal,
-                "started_date": EXPERIMENT_START,
-                # The date behind current_weight_lbs/lost_lbs — the front-end pairs the
-                # (possibly days-stale) weight with a live day counter, so it needs the
-                # as-of anchor to stay honest during a weigh-in gap.
-                "last_weighin_date": last_weighin_date,
-                "day_n": _day_n,
-                "week_n": (max(_day_n - 1, 0) // 7) + 1,
-                # Height (profile, authoritative) so the page can show a de-emphasized BMI
-                # without deriving height from DEXA indices (which disagree ~1.5 in). Not
-                # sensitive — already used in the waist-height ratio. P0.7.
-                "height_inches": _p.get("height_inches"),
-            }
-        },
-        cache_seconds=3600,
-    )
+    journey = {
+        "start_weight_lbs": start_weight,
+        "goal_weight_lbs": goal_weight,
+        "current_weight_lbs": round(current_weight),
+        "lost_lbs": lost_lbs,
+        "remaining_lbs": remaining,
+        "progress_pct": progress_pct,
+        "weekly_rate_lbs": weekly_rate,
+        # #535: every claim carries its uncertainty. The rate is an interval and
+        # the goal date is a range (earliest..latest), not a false-precision point.
+        "weekly_rate_ci_low": _traj.get("weekly_rate_ci_low"),
+        "weekly_rate_ci_high": _traj.get("weekly_rate_ci_high"),
+        "projection_confidence": _traj.get("projection_confidence"),
+        "rate_provisional": rate_provisional,
+        "weighin_span_days": weighin_span_days,
+        "projected_goal_date": projected_goal_date,
+        "projected_goal_date_earliest": _traj.get("projected_goal_date_earliest"),
+        "projected_goal_date_latest": _traj.get("projected_goal_date_latest"),
+        "days_to_goal": days_to_goal,
+        "started_date": EXPERIMENT_START,
+        # The date behind current_weight_lbs/lost_lbs — the front-end pairs the
+        # (possibly days-stale) weight with a live day counter, so it needs the
+        # as-of anchor to stay honest during a weigh-in gap.
+        "last_weighin_date": last_weighin_date,
+        "day_n": _day_n,
+        "week_n": (max(_day_n - 1, 0) // 7) + 1,
+        # Height (profile, authoritative) so the page can show a de-emphasized BMI
+        # without deriving height from DEXA indices (which disagree ~1.5 in). Not
+        # sensitive — already used in the waist-height ratio. P0.7.
+        "height_inches": _p.get("height_inches"),
+    }
+
+    # PRE-START (#931): a staged FUTURE genesis means there is no baseline yet —
+    # Day 1's weigh-in creates it. The countdown fields go ON and every delta /
+    # progress / projection claim comes OFF (ADR-104: "down X lbs" against a
+    # baseline that doesn't exist yet is an invented number). day_n already reads
+    # 0 above. Inert (pre_start=False, nothing else changes) once genesis <= today.
+    _pre = pre_start_meta()
+    journey["pre_start"] = bool(_pre)
+    if _pre:
+        journey.update(_pre)
+        for _k in (
+            "lost_lbs",
+            "remaining_lbs",
+            "progress_pct",
+            "weekly_rate_lbs",
+            "weekly_rate_ci_low",
+            "weekly_rate_ci_high",
+            "projection_confidence",
+            "rate_provisional",
+            "weighin_span_days",
+            "projected_goal_date",
+            "projected_goal_date_earliest",
+            "projected_goal_date_latest",
+            "days_to_goal",
+            "last_weighin_date",
+        ):
+            journey[_k] = None
+
+    return _ok({"journey": journey}, cache_seconds=3600)
 
 
 def handle_character(date: str | None = None) -> dict:
@@ -1596,6 +1621,12 @@ def handle_snapshot() -> dict:
         "readiness": readiness_body,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
+    # PRE-START (#931): the countdown contract at the snapshot's top level too, so
+    # the cockpit doesn't have to dig through a possibly-failed journey sub-object.
+    _pre = pre_start_meta()
+    payload["pre_start"] = bool(_pre)
+    if _pre:
+        payload.update(_pre)
     return {
         "statusCode": 200,
         "headers": {**CORS_HEADERS, "Cache-Control": "public, max-age=60"},
