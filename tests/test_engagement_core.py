@@ -152,3 +152,110 @@ def test_no_internal_keys_leak():
     assert "_dates" not in sig
     for detail in sig["channel_detail"].values():
         assert "_dates" not in detail
+
+
+# ── #955: the genesis clamp (decision option (a)) ────────────────────────────
+# Presence is measured WITHIN the current experiment window: pre-genesis logs
+# are out-of-window, the gap accrues from genesis (never from the prior cycle's
+# stall), and a first log after genesis is a fresh start, not a "return".
+
+GENESIS = "2026-07-12"  # the cycle-5 genesis the live bug is anchored on
+
+# The live launch-eve scenario: cycle 4's last food log was 2026-06-24, then
+# ~2.5 weeks of silence across the reset boundary.
+_CYCLE4_TAIL = {
+    "macrofactor": ["2026-06-24", "2026-06-23", "2026-06-22"],
+    "hevy": ["2026-06-20"],
+    "habitify": ["2026-06-24"],
+    "notion": [],
+}
+
+
+def test_genesis_day1_without_a_log_reads_present():
+    # Day 1, nothing logged yet — the gap starts at genesis (0), not at 06-24
+    # (which unclamped reads as an 18-day dark/alarm stall).
+    sig = compute_presence("2026-07-12", _CYCLE4_TAIL, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
+    assert sig["presence_class"] == PRESENT
+    assert sig["gap_days"] == 0
+    assert sig["severity"] == "none"
+    assert sig["channels_quiet"] == []
+    assert sig["last_food_log_date"] is None  # honest: nothing logged THIS cycle
+    assert sig["experiment_window_start"] == GENESIS
+    # ...whereas unclamped, the same inputs foreground the archived stall.
+    unclamped = compute_presence("2026-07-12", _CYCLE4_TAIL, wearable_latest=_wearables_flowing())
+    assert unclamped["presence_class"] == DARK
+    assert unclamped["severity"] == "alarm"
+
+
+def test_genesis_day1_with_a_log_reads_present():
+    cd = {k: list(v) for k, v in _CYCLE4_TAIL.items()}
+    cd["macrofactor"] = ["2026-07-12"] + cd["macrofactor"]
+    sig = compute_presence("2026-07-12", cd, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
+    assert sig["presence_class"] == PRESENT
+    assert sig["gap_days"] == 0
+    assert sig["last_food_log_date"] == "2026-07-12"
+
+
+def test_no_cross_genesis_return_beat():
+    # First log after genesis, previous log pre-genesis: a fresh start — never
+    # "just returned after ~17 days quiet" on cycle-5 Day 1.
+    from engagement_core import presence_prompt_block
+
+    cd = {k: list(v) for k, v in _CYCLE4_TAIL.items()}
+    cd["macrofactor"] = ["2026-07-12"] + cd["macrofactor"]
+    sig = compute_presence("2026-07-12", cd, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
+    assert sig["returned"] is False
+    assert sig["resumed_after_days"] is None
+    assert "JUST RETURNED" not in presence_prompt_block(sig)
+    # The exact regression the clamp kills: unclamped, this fires as a ~17-day return.
+    unclamped = compute_presence("2026-07-12", cd, wearable_latest=_wearables_flowing())
+    assert unclamped["returned"] is True
+    assert "JUST RETURNED" in presence_prompt_block(unclamped)
+
+
+def test_gap_accrues_from_genesis_not_prior_cycle():
+    # 8 days into cycle 5 with still nothing logged: the silence is real and must
+    # escalate — but counted from genesis (effective 7), never from 06-24 (~25).
+    sig = compute_presence("2026-07-20", _CYCLE4_TAIL, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
+    assert sig["gap_days"] == 7  # (07-20 − 07-12) − 1 lag day
+    assert sig["presence_class"] == DARK
+    for detail in sig["channel_detail"].values():
+        assert detail["gap_days"] == 7
+
+
+def test_pre_genesis_compute_day_is_quiet_about_the_archive():
+    # Launch eve (T−1): the countdown, not the wiped cycle's stall — present/none,
+    # so the ack gate never arms off cycle-4 silence.
+    from engagement_core import presence_ack_required, presence_prompt_block
+
+    sig = compute_presence("2026-07-11", _CYCLE4_TAIL, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
+    assert sig["presence_class"] == PRESENT
+    assert sig["gap_days"] == 0
+    assert sig["severity"] == "none"
+    assert presence_ack_required(sig) is False
+    assert presence_prompt_block(sig) == ""
+
+
+def test_post_genesis_lull_and_return_still_detected():
+    # The clamp must not lobotomise the feature: a real post-genesis lull still
+    # classifies, and a return from it still fires — with post-genesis facts only.
+    cd = {
+        "macrofactor": ["2026-07-20", "2026-07-13", "2026-07-12", "2026-06-24"],
+        "hevy": ["2026-07-12"],
+        "habitify": ["2026-07-13"],
+        "notion": [],
+    }
+    sig = compute_presence("2026-07-20", cd, wearable_latest=_wearables_flowing(), experiment_start=GENESIS)
+    assert sig["returned"] is True
+    assert sig["resumed_after_days"] == 6  # 07-13 → 07-20, both endpoints exclusive
+    assert sig["presence_class"] == PRESENT
+
+
+def test_unclamped_callers_unchanged():
+    # experiment_start=None keeps the legacy semantics byte-for-byte.
+    sig = compute_presence(TODAY, _fresh(), wearable_latest=_wearables_flowing())
+    assert sig["presence_class"] == PRESENT
+    assert sig["experiment_window_start"] is None
+    empty = compute_presence(TODAY, {"macrofactor": [], "hevy": [], "habitify": [], "notion": []})
+    assert empty["presence_class"] == DARK
+    assert empty["gap_days"] is None

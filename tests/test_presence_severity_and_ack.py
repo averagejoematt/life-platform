@@ -70,10 +70,17 @@ class _StubTable:
     def __init__(self, items):
         self._items = items
         self.last_projection = None
+        self.last_kwargs = None
+        self.put_items = []
 
     def query(self, **kwargs):
         self.last_projection = kwargs.get("ProjectionExpression")
+        self.last_kwargs = kwargs
         return {"Items": self._items}
+
+    def put_item(self, Item=None, **kwargs):
+        self.put_items.append(Item)
+        return {}
 
 
 def _adaptive_mode(monkeypatch, items):
@@ -113,6 +120,56 @@ def test_log_dates_keeps_completed_habitify_days(monkeypatch):
         predicate=lambda it: ec.channel_counts_as_logged("habitify", it),
     )
     assert dates == ["2026-06-29"]
+
+
+def test_log_dates_floor_clamps_window_start(monkeypatch):
+    # #955: the genesis floor clamps the query's window start, so the prior
+    # cycle's kept raw_timeseries can't reach the presence computation at all.
+    am, stub = _adaptive_mode(monkeypatch, [])
+    am._log_dates("macrofactor", "2026-07-14", floor="2026-07-12")
+    assert stub.last_kwargs["ExpressionAttributeValues"][":lo"] == "DATE#2026-07-12"
+
+
+def test_log_dates_without_floor_keeps_trailing_window(monkeypatch):
+    am, stub = _adaptive_mode(monkeypatch, [])
+    am._log_dates("macrofactor", "2026-07-14")
+    assert stub.last_kwargs["ExpressionAttributeValues"][":lo"] == "DATE#2026-06-09"  # today − 35d
+
+
+def test_log_dates_floor_before_window_start_is_inert(monkeypatch):
+    # A genesis older than the trailing window must not WIDEN the query.
+    am, stub = _adaptive_mode(monkeypatch, [])
+    am._log_dates("macrofactor", "2026-07-14", floor="2026-01-01")
+    assert stub.last_kwargs["ExpressionAttributeValues"][":lo"] == "DATE#2026-06-09"
+
+
+def test_compute_and_store_engagement_is_genesis_clamped(monkeypatch):
+    # End-to-end through the lambda plumbing on cycle-5 Day 1 (the live #955
+    # scenario): the table only holds the prior cycle's records, yet the stored
+    # STATE#current must read present/none with no cross-cycle return beat —
+    # even if a query somehow returned pre-genesis rows (core filter as
+    # defense-in-depth behind the query floor).
+    from datetime import date as _date, timedelta as _td
+
+    from constants import EXPERIMENT_START_DATE
+
+    # Anchor everything to the live genesis so future resets can't time-bomb this.
+    day1 = EXPERIMENT_START_DATE
+    prior = _date.fromisoformat(day1) - _td(days=18)
+    items = [{"sk": f"DATE#{prior.isoformat()}"}, {"sk": f"DATE#{(prior - _td(days=1)).isoformat()}"}]
+    am, stub = _adaptive_mode(monkeypatch, items)
+    monkeypatch.setattr(am, "_engagement_reference_today", lambda: day1)
+
+    signal = am.compute_and_store_engagement()
+    assert signal["experiment_window_start"] == day1
+    assert signal["presence_class"] == "present"
+    assert signal["severity"] == "none"
+    assert signal["returned"] is False
+    assert signal["last_food_log_date"] is None
+    assert ec.presence_ack_required(signal) is False
+    # Both the DATE# history row and STATE#current were written.
+    sks = {it.get("sk") for it in stub.put_items}
+    assert sks == {f"DATE#{day1}", "STATE#current"}
 
 
 def test_ten_zero_completion_days_make_habits_channel_quiet():

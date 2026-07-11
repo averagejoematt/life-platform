@@ -162,6 +162,7 @@ def compute_presence(
     passive_metrics=None,
     sick_days=None,
     travel_days=None,
+    experiment_start=None,
 ):
     """Compute the presence / quiet-stretch state.
 
@@ -179,6 +180,17 @@ def compute_presence(
             Never synthesised here — grounding is the caller's job.
         sick_days / travel_days: sets of 'YYYY-MM-DD' — a lull mostly covered by
             these is a PLANNED pause, not falling off.
+        experiment_start: 'YYYY-MM-DD' or None — the genesis clamp (#955,
+            decision option (a)): presence is measured WITHIN the current
+            experiment window. Manual logs before this date are out-of-window
+            (the prior cycle's story lives in /data/cycles/, per the #943
+            presentation rule), and a channel with no post-genesis log has been
+            quiet since Day 1 at most — never since the previous cycle's stall.
+            Day 1 therefore reads "present" (the same 24h lag grace a
+            genesis-day log gets) and any gap accrues from genesis, so the
+            semantics self-maintain across every future reset. A first log
+            after genesis is a fresh start, never a cross-cycle "return".
+            None ⇒ unclamped (legacy behaviour).
 
     Returns a plain dict (the engagement_signal / presence record body). Always
     returns a well-formed record; honest defaults, never raises.
@@ -187,12 +199,24 @@ def compute_presence(
     sick_days = set(sick_days or ())
     travel_days = set(travel_days or ())
 
+    # #955 genesis clamp — the window never starts before the experiment does.
+    # With a genesis, a channel with nothing logged since it gets its gap
+    # ANCHORED at genesis (as if the cycle opened present), not None ("dark
+    # forever"): pre-genesis silence is the archive's story, not this cycle's.
+    genesis = _to_date(experiment_start)
+    genesis_gap_cap = _effective_gap(genesis, today) if genesis else None
+
     # Per-channel gap picture.
     channels = {}
     for src, label in MANUAL_CHANNELS.items():
-        dates = sorted({d for d in (channel_dates.get(src) or []) if _to_date(d)}, reverse=True)
+        dates = sorted(
+            {d for d in (channel_dates.get(src) or []) if _to_date(d) and (genesis is None or _to_date(d) >= genesis)},
+            reverse=True,
+        )
         latest = dates[0] if dates else None
         gap = _effective_gap(latest, today)
+        if latest is None and genesis_gap_cap is not None:
+            gap = genesis_gap_cap  # quiet since genesis at most — never since the prior cycle
         tol = CHANNEL_STALE_DAYS.get(src, LULL_MIN_DAYS)
         channels[src] = {
             "label": label,
@@ -217,6 +241,9 @@ def compute_presence(
     severity = _severity(presence_class, primary_gap, channels, planned=bool(planned_reason))
 
     # Return detection: a fresh primary log immediately after a real lull.
+    # _dates are already genesis-filtered (#955), so a first log after genesis
+    # whose previous log is pre-genesis reads as a fresh start, not a "return
+    # after N days" — the cross-cycle return beat can never fire.
     returned, resumed_after = _detect_return(primary.get("_dates"), today)
 
     passive_flowing = _passive_flowing(wearable_latest, today)
@@ -235,6 +262,10 @@ def compute_presence(
         "planned_pause_reason": planned_reason,
         "returned": returned,
         "resumed_after_days": resumed_after,
+        # #955: the genesis clamp in force — makes the stored record
+        # self-explaining when gap_days is genesis-anchored while
+        # last_food_log_date is still None (nothing logged this cycle yet).
+        "experiment_window_start": genesis.isoformat() if genesis else None,
         "channel_detail": {
             src: {
                 "label": c["label"],
