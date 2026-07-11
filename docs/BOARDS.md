@@ -10,7 +10,7 @@
 
 **Purpose**: Advise Matthew as an individual on health, longevity, behavior, mental health, and social connection.
 **Invocation**: "personal board" or by member name
-**Config**: `s3://matthew-life-platform/config/board_of_directors.json` — loaded by `lambdas/board_loader.py` (shared layer).
+**Config**: `s3://matthew-life-platform/config/board_of_directors.json` — loaded by `lambdas/board_loader.py` (bundled shared module).
 **Consumed by**: daily brief, weekly digest, monthly digest, nutrition review, chronicle, observatory renderer.
 **Convenes**: Daily brief, weekly digest, monthly digest, nutrition reviews, chronicle interviews, observatory pages.
 

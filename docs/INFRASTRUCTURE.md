@@ -1,7 +1,7 @@
 # Life Platform — Infrastructure Reference
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-07-11 (v8.6.0 — 94 Lambdas, 9 active secrets, 64 MCP tools, ~67 alarms)
+> Last updated: 2026-07-11 (v8.6.0 — 94 Lambdas, 21 active secrets, 64 MCP tools, ~67 alarms)
 
 ---
 
@@ -57,7 +57,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` |
 | Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | **133** across **29** tool modules (`mcp/tools_*.py`) |
+| Tools | **64** across **23** tool modules (`mcp/tools_*.py`) |
 | Cache warmer | 14 warm-steps pre-computed nightly (warmer config) |
 
 ---
@@ -111,7 +111,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | **~104 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
+| CloudWatch alarms | **~67 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
@@ -136,7 +136,7 @@ All DNS-validated via Route 53 CNAME records.
 
 ---
 
-## Secrets Manager (9 active secrets)
+## Secrets Manager (21 active secrets)
 
 All under prefix `life-platform/`. No values stored in this doc — access via AWS console or CLI.
 
@@ -192,13 +192,11 @@ Source of truth: `aws lambda list-functions --region us-west-2 --query 'length(F
 - `life-platform-og-image` — OG image generation (Pillow layer)
 - `email-subscriber` — Subscribe form intake
 
-### Layer version distribution (2026-05-19)
-- v51: 1 Lambda (deployed during V2 follow-up)
-- v50: 56 Lambdas
-- None / N/A: 15 Lambdas (Edge functions, HAE webhook, freshness-checker, dlq-consumer, journal-analyzer, pipeline-health-check, data-reconciliation — intentionally no shared layer)
-- v2 (Pillow): 1 Lambda (og-image-generator)
-
-> A bulk v50→v51 bump is **not** required — only Lambdas in the COACH-V2 path need the new layer immediately, and they were re-deployed today. Bulk migration deferred.
+### Shared-code distribution — the retired layer (#781/ADR-131)
+The shared layer (`life-platform-shared-utils`) was **retired 2026-07-06**: shared modules ship inside every function's code bundle, staged by `deploy/build_bundle.py`. Invariant: zero functions reference the layer (CI plan job + integration test I2). Old layer versions remain published in AWS (`RemovalPolicy.RETAIN`) but nothing references them.
+Dependency layers with real third-party packages remain (they are NOT the shared layer):
+- Pillow: 1 Lambda (og-image-generator)
+- garth: Garmin ingestion
 
 ---
 

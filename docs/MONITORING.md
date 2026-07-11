@@ -72,7 +72,6 @@ The platform emits custom metrics across these namespaces:
 | `AWS/CloudFront` | AWS auto | Hits, error rates, cache hit ratio |
 | `AWS/SES` | AWS auto | Send, Delivery, Open, Click, Bounce, Complaint |
 | `AWS/SQS` | AWS auto | Queue depth, message age |
-| `AWS/WAFv2` | AWS auto | Allowed, blocked, counted |
 | `LifePlatform/AI` | retry_utils + site_api_ai | AnthropicInputTokens, AnthropicOutputTokens, AnthropicCacheReadTokens, AnthropicCacheWriteTokens, AnthropicAPIFailure |
 | `LifePlatform/MCP` | mcp/handler.py | ToolInvocations (by tool name), ToolDuration, ToolError |
 | `LifePlatform/SiteApi` | site_api_lambda emit_route_log | RouteHits, RouteDuration, RouteErrors |
@@ -219,7 +218,6 @@ See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 | Logs ingestion (~5 GB/mo) | $2.50 |
 | CloudTrail data events (raw/* + uploads/*) | ~$0.50 |
 | SES tracking events | $0 |
-| WAF logs | $0 (default rules) |
 | **TOTAL** | **~$14/month** |
 
 Roughly half the platform's monthly cost. Worth it — most issues surface here before users notice.

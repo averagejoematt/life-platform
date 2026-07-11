@@ -94,7 +94,7 @@ Last reconciled: **2026-05-19** (V2 audit). 12 active + 3 in deletion window und
 
 Use this section to answer "if I rotate secret X, which Lambdas need a redeploy or cache flush?"
 
-Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL across most Lambdas in the shared layer). On rotation, expect up to 15 min of stale reads from warm Lambda containers; cold-start clears it.
+Cache TTL note: COST-OPT-1 uses `secret_cache.py` (15-min in-memory TTL — a bundled shared module in every Lambda). On rotation, expect up to 15 min of stale reads from warm Lambda containers; cold-start clears it.
 
 | Secret | Consumer Lambda(s) | Notes |
 |---|---|---|

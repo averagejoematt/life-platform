@@ -7,11 +7,11 @@ The canonical top-level layout. Read this before adding a new file so things lan
 ### Active — the running system
 | Dir | Purpose |
 |---|---|
-| `lambdas/` | All Lambda source, by stack: `ingestion/ compute/ email/ web/ operational/ intelligence/` + shared layer modules at the root (`ai_calls.py`, `bedrock_client.py`, `constants.py`, …). |
-| `mcp/` | MCP server — 133 tools across `tools_*.py` domain modules, wired in `registry.py`. |
-| `cdk/` | Infrastructure-as-code — 8 CDK stacks (`stacks/*.py`), entry `app.py`. **The only way infra changes.** |
-| `deploy/` | Build/deploy scripts — `build_layer.sh`, `deploy_lambda.sh`, `sync_site_to_s3.sh`, `restart_pipeline.py`, smoke tests, `lib/`. |
-| `scripts/` | Operational helpers — `sync_doc_metadata.py`, `v4_build_*.py`, migration tooling. |
+| `lambdas/` | All Lambda source, by stack: `ingestion/ compute/ email/ web/ operational/ intelligence/` + shared modules at the root (`ai_calls.py`, `bedrock_client.py`, `constants.py`, …) — bundled into every function (#781). |
+| `mcp/` | MCP server — 64 tools across `tools_*.py` domain modules, wired in `registry.py`. |
+| `cdk/` | Infrastructure-as-code — 9 CDK stacks (`stacks/*.py`), entry `app.py`. **The only way infra changes.** |
+| `deploy/` | Build/deploy scripts — `build_bundle.py`, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`, `sync_site_to_s3.sh`, `restart_pipeline.py`, `sync_doc_metadata.py`, smoke tests, `lib/`. |
+| `scripts/` | Operational helpers — `v4_build_*.py` site generators, `generate_adr_index.py`, `content_policy_scan.py`, migration tooling. |
 | `tests/` | pytest (unit/contract/structural) + Playwright `visual_qa.py` + AI-vision QA. |
 | `docs/` | Architecture, runbooks, ADRs (`DECISIONS.md`), schema, this file. Index in `docs/README.md`. |
 | `config/` | DynamoDB schemas, `user_goals.json` (genesis/baseline source), feature configs. |

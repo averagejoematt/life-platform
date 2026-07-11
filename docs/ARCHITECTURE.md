@@ -1,14 +1,14 @@
 # Life Platform — Architecture
 
-Last updated: 2026-07-11 (v8.6.0 — 64 tools, 34-module MCP package, 20 data sources, 94 Lambdas, 9 secrets, 67 alarms, 9 CDK stacks deployed).
+Last updated: 2026-07-11 (v8.6.0 — 64 tools, 34-module MCP package, 20 data sources, 94 Lambdas, 21 secrets, 67 alarms, 9 CDK stacks deployed).
 
-> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared-layer version: see the discovery command in [CONVENTIONS.md](CONVENTIONS.md#facts-that-drift-run-the-command-never-quote-a-number) (don't hand-write it — it drifts). **91 ADRs** (ADR-001 → ADR-103; newest: ADR-101 distribution-before-monetization, ADR-102 single-table-DynamoDB-kept-on-purpose, ADR-103 complexity-posture ledger). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **119 ADRs** (ADR-001 → ADR-133 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
 ## Overview
 
-The life platform is a personal health intelligence system built on AWS. It ingests data from twenty-six sources (thirteen scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
+The life platform is a personal health intelligence system built on AWS. It ingests data from twenty sources (thirteen scheduled + one webhook + three manual/periodic + two MCP-managed + one State of Mind via webhook), normalises everything into a single DynamoDB table, and surfaces it to Claude through a Lambda-backed MCP server. The design philosophy is: get data in automatically, store it cheaply, and make it queryable without a data engineering background.
 
 ---
 
@@ -31,7 +31,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
                          │ DynamoDB queries
 ┌────────────────────────▼────────────────────────────────────┐
 │  SERVE LAYER                                                │
-│  MCP Server Lambda (133 tools, 768 MB) + Lambda Function URL │
+│  MCP Server Lambda (64 tools, 768 MB) + Lambda Function URL │
 │  ← Claude Desktop + claude.ai + Claude mobile via remote MCP│
 │                                                             │
 │  COMPUTE LAYER (IC intelligence features)                   │
@@ -72,7 +72,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | SQS queue | Dead-letter queue | `life-platform-ingestion-dlq` |
 | Lambda Function URL (remote MCP) | Remote MCP HTTPS endpoint | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` (OAuth 2.1 auto-approve + HMAC Bearer) |
 | API Gateway | HTTP endpoint | `health-auto-export-api` (a76xwxt2wa) — webhook ingest |
-| Secrets Manager | Credential store | **9 active secrets** at $0.40/month each = **~$3.60/month**
+| Secrets Manager | Credential store | **21 active secrets** at $0.40/month each = **~$8.40/month**
 | SNS topic | Alert routing | `life-platform-alerts` (urgent) + `life-platform-alerts-digest` (batched daily by `alert-digest-lambda` per ADR-050) |
 | CloudFront (amj) | CDN (public) | `E3S424OXQZ8NBE` → site-api Lambda + S3 `/site`, alias `averagejoematt.com` |
 | CloudFront (dash) | CDN + auth | `EM5NPX6NJN095` (`d14jnhrgfrte42.cloudfront.net`) → S3 `/dashboard`, Lambda@Edge auth, alias `dash.averagejoematt.com` |
@@ -99,9 +99,9 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 **Schedule:** Hourly during active hours (4am–10pm PST) for most sources. Exceptions: Garmin at 4x daily (OAuth rate limits), Weather + Todoist at 2x daily (COST-OPT). Maintenance window: 10pm–4am PST (UTC 6–11 skipped).
 
-**Shared Lambda Layer:** **v76** (mirrored in `cdk/stacks/constants.py:SHARED_LAYER_VERSION`). Includes `ai_calls.py` (god-module split 2026-06-08 → `ai_calls.py` (AI-call layer: `call_anthropic` + coaches + board) / `ai_context.py` (prompt-context + scoring builders) / `ai_summaries.py` (data-summary builders); `ai_calls` re-exports both for backward compat), `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`, `ai_context.py`, `ai_summaries.py`. **30 modules total**. Rebuild with `bash deploy/build_layer.sh`. Source of truth: `cdk/stacks/constants.py:SHARED_LAYER_VERSION` (test `lv6` enforces consistency with the latest AWS-published layer).
+**Shared modules — ONE bundle, no layer (#781/ADR-131, 2026-07-06):** the shared layer (`life-platform-shared-utils`) is **retired**. Shared modules ship **inside every function's code bundle**, staged by `deploy/build_bundle.py` (the whole `lambdas/` tree + `food_vocabulary.json`; the MCP shape adds `mcp_server.py` + `mcp/`). Key modules at the `lambdas/` root: `ai_calls.py` (god-module split 2026-06-08 → `ai_calls.py` (AI-call layer: `call_anthropic` + coaches + board) / `ai_context.py` (prompt-context + scoring builders) / `ai_summaries.py` (data-summary builders); `ai_calls` re-exports both for backward compat), `retry_utils.py`, **`bedrock_client.py`** (ADR-062 — all Claude calls funnel here, IAM auth via `bedrock:InvokeModel`), **`budget_guard.py`** (ADR-063 — `allow(feature)` gates AI by SSM tier), `board_loader.py`, `output_writers.py`, `scoring_engine.py`, `secret_cache.py`, `intelligence_common.py`, `ingestion_framework.py` (SIMP-2 per ADR-056), `auth_breaker.py`, `http_retry.py`, `rate_limiter.py`, `request_validator.py`, `compute_metadata.py`, `constants.py` (genesis date + baseline), `phase_filter.py` (default-deny by phase), `numeric.py`, `character_engine.py`, `html_builder.py`, `ai_output_validator.py`, `platform_logger.py`, `ingestion_validator.py`, `item_size_guard.py`, `digest_utils.py`, `sick_day_checker.py`, `site_writer.py`, `insight_writer.py`. A shared-module change reaches the fleet via `deploy/deploy_fleet.sh` or `cdk deploy --all` (CI fleet-deploys automatically on unmapped `lambdas/` changes). Invariant: **zero functions reference the old layer** (CI plan job + integration test I2). Dependency layers with real third-party packages (garth, Pillow) are NOT the shared layer and remain. See `docs/CONVENTIONS.md` §1.
 
-**Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` in shared layer. Reduces Secrets Manager API calls ~90% across 12 active Lambdas.
+**Secret caching (COST-OPT-1):** 15-min in-memory TTL cache via `secret_cache.py` (bundled shared module). Reduces Secrets Manager API calls ~90% across 12 active Lambdas.
 
 **Prompt caching (COST-OPT-2, ADR-049):** Both `ai_calls.py` and `retry_utils.py` auto-wrap system messages as cached content blocks (`anthropic-beta: prompt-caching-2024-07-31`). 90% discount on repeated system prompt tokens. CloudWatch metrics: `AnthropicCacheWriteTokens`, `AnthropicCacheReadTokens`. Model tiering: structured/templated tasks use Haiku (`AI_MODEL` env var), narrative content stays on Sonnet. All model assignments are env-var configurable for instant rollback.
 
@@ -173,7 +173,7 @@ coaching / generation logic
 
 ### Reading / Mind Pillar data layer (ADR-097, Phase A)
 
-A new source-of-truth domain (`reading`) on the shared table, using top-level pks (`BOOK#`, `READING#`) rather than the `USER#…#SOURCE#` convention. Data layer in `lambdas/reading/` (`reading_store`, `reading_keys`, `reading_visibility`, `reading_enrich`, `cover_placeholder` — bundled with the `lambdas/` asset, not the shared layer). Two **additive GSIs** (the first on `life-platform`, amending ADR-005): **GSI1** sparse recall-due, **GSI2** reading state/time. Public/private split enforced server-side via the `reading_visibility.project_public` allowlist. All reading records are `CROSS_PHASE` (survive experiment resets).
+A new source-of-truth domain (`reading`) on the shared table, using top-level pks (`BOOK#`, `READING#`) rather than the `USER#…#SOURCE#` convention. Data layer in `lambdas/reading/` (`reading_store`, `reading_keys`, `reading_visibility`, `reading_enrich`, `cover_placeholder` — bundled with the `lambdas/` asset like all shared code, #781). Two **additive GSIs** (the first on `life-platform`, amending ADR-005): **GSI1** sparse recall-due, **GSI2** reading state/time. Public/private split enforced server-side via the `reading_visibility.project_public` allowlist. All reading records are `CROSS_PHASE` (survive experiment resets).
 
 | Function | Lambda | Trigger |
 |---|---|---|
@@ -351,7 +351,7 @@ Active role categories (approx counts):
 
 ## Secrets Manager
 
-**9 active secrets** at $0.40/month each = **~$3.60/month**
+**21 active secrets** at $0.40/month each = **~$8.40/month**
 
 | Secret | Used By |
 |---|---|
@@ -382,7 +382,7 @@ Target: under $25/month | Current: ~$13/month
 
 | Driver | Monthly Cost |
 |---|---|
-| Secrets Manager (9 active secrets) | ~$3.60 |
+| Secrets Manager (21 active secrets) | ~$8.40 |
 | Lambda invocations (~2,000/mo) | ~$0.50 |
 | DynamoDB (on-demand) | ~$1.00 |
 | S3 (~2.5 GB + requests) | ~$0.50 |
@@ -399,7 +399,7 @@ Target: under $25/month | Current: ~$13/month
 ~/Documents/Claude/life-platform/
   mcp_server.py                   ← MCP Lambda entry point
   mcp_bridge.py                   ← Local MCP adapter (Claude Desktop → Lambda HTTPS)
-  mcp/                            ← MCP server package (26 tool modules + helpers)
+  mcp/                            ← MCP server package (23 tool modules + helpers)
     handler.py, config.py, utils.py, core.py, helpers.py, labs_helpers.py
     strength_helpers.py, registry.py, warmer.py
     tools_sleep, tools_health, tools_training, tools_nutrition, tools_habits
@@ -463,7 +463,7 @@ Target: under $25/month | Current: ~$13/month
 
 ---
 
-**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Lambda counts via `aws lambda list-functions`; layer version via `aws lambda list-layer-versions` and `cdk/stacks/constants.py:37`; MCP tool count via AST parse (`deploy/sync_doc_metadata.py::_auto_discover_tool_count`); SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; alarm count via `aws cloudwatch describe-alarms`; secret list via `aws secretsmanager list-secrets`.
+**Verified:** 2026-07-10 — wiki accuracy pass (layer-retirement #781 propagated; counts re-derived). Lambda/tool/alarm/ADR counts via `deploy/sync_doc_metadata.py` discoverers (AST); SIMP-2 cohort via `grep -l 'from ingestion_framework import' lambdas/*_lambda.py`; secret list via `aws secretsmanager list-secrets`. The retired-layer version check is gone — the invariant is now zero layer references (CI plan job + I2).
 
 
 ### Experiment Phase Filtering

@@ -6,7 +6,7 @@
 ![IaC](https://img.shields.io/badge/IaC-AWS_CDK-FF9900)
 ![License](https://img.shields.io/badge/license-proprietary-lightgrey)
 
-A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$75/month enforced budget**.
+A personal **health-intelligence platform** — it ingests data from ~20 wearables/apps/labs, stores it in a single-table data model, runs a deterministic computation pipeline plus an 8-agent AI coaching layer, and publishes the results (privately and at **[averagejoematt.com](https://averagejoematt.com)**) — all on a hard **$85/month enforced budget** (floats to $100 in reader-traffic surge mode — ADR-133).
 
 > **N=1, in public, kept honest.** Everything is correlative (never causal), confidence-labelled, and the down weeks are shown, not hidden.
 
@@ -16,12 +16,12 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 
 | | |
 |---|---|
-| **~73 Lambdas** | Ingest → Store → Serve, all serverless (us-west-2 + us-east-1 edge) |
-| **133 MCP tools** | Claude reads the data back via a Model Context Protocol server |
-| **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, no GSIs (PITR + KMS) |
+| **~94 Lambdas** | Ingest → Store → Serve, all serverless (us-west-2 + us-east-1 edge) |
+| **64 MCP tools** | Claude reads the data back via a Model Context Protocol server |
+| **Single-table DynamoDB** | `USER#…#SOURCE#…` / `DATE#…`, on-demand, 2 sanctioned GSIs (ADR-097; PITR + KMS) |
 | **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |
-| **8 CDK stacks** | 100% infrastructure-as-code; OIDC CI/CD with a production-approval gate + auto-rollback |
-| **$75/mo, enforced** | A cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
+| **9 CDK stacks** | 100% infrastructure-as-code; OIDC CI/CD with a production-approval gate + auto-rollback |
+| **$85/mo, enforced** | A cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
 | **v4 site** | Three doors — Cockpit (`/now/`), Story (`/story/`), Evidence (`/evidence/`) |
 
 ## Architecture (one line)

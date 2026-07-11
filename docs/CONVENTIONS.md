@@ -259,7 +259,7 @@ These values change and must **never** be hand-written in docs or memory. Read t
 
 | Fact | Source of truth (run this) |
 |---|---|
-| Shared-layer version | `aws lambda list-layer-versions --layer-name life-platform-shared-utils --region us-west-2 --query 'LayerVersions[0].Version'` (and the `SHARED_LAYER_VERSION` constant in `cdk/stacks/constants.py`) |
+| Layer-retirement invariant (#781) | `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be `[]` (the layer is retired; there is no version to quote) |
 | Lambda count | `python3 deploy/sync_doc_metadata.py` (AST-discovers; syncs `PLATFORM_STATS` + doc headers) |
 | MCP tool count | `deploy/sync_doc_metadata.py::_auto_discover_tool_count` — the top-level keys in `TOOLS` in `mcp/registry.py`. **Do not** `grep -c '"name":'` — it over-counts nested schema fields |
 | Test count | `PLATFORM_STATS["test_count"]` in `lambdas/web/site_api_common.py`, auto-bumped by the sync + the pre-commit hook |

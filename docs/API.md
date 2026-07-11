@@ -101,7 +101,7 @@ Q&A with health data context.
 Initiates double opt-in subscription.
 **Body:** `{ "email": "string" }`
 **Response:** `{ "ok": true, "message": "Check your email" }`
-**Rate limit:** 60/min per IP (WAF)
+**Rate limit:** 60 per 5 min per IP (in-Lambda DynamoDB atomic counter — WAF was removed 2026-06)
 **Sends:** Confirmation email with token link (`{base}/api/subscribe/confirm?token=...`)
 
 ### `GET /api/subscribe/confirm?token=<...>`
@@ -148,7 +148,7 @@ All errors return JSON with `statusCode` and `error` keys:
 |---|---|
 | 400 | Bad request (malformed input) |
 | 401 | Auth required (subscriber token missing or invalid) |
-| 403 | Forbidden (e.g. WAF block) |
+| 403 | Forbidden |
 | 404 | Not found |
 | 429 | Rate limit |
 | 500 | Server error |

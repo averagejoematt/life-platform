@@ -10,7 +10,7 @@
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 133 MCP tools. **73 Lambdas** (5 power-tuning Lambdas deleted in V2 P4) run the ingest → compute → email pipeline daily.
+The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 64 MCP tools. **94 Lambdas** run the ingest → compute → email pipeline daily.
 
 **Pipeline (UTC, ADR-052):**
 - Ingestion: 06:45-09:00 PT
@@ -19,7 +19,7 @@ The Life Platform is a personal health intelligence system. It pulls data from ~
 
 AWS run-rate (real CE, 2026-06-08 sweep): steady-state **~$25-40/mo** against an **$85/mo enforced ceiling** (ADR-063 + ADR-133 amendment; $100 in reader-traffic surge mode; cost-governor degrades AI by tier). Bedrock AI is the swing factor and is in-budget. See `docs/COST_TRACKER.md`.
 
-All infrastructure is CDK-managed across 8 stacks (`cdk/stacks/`).
+All infrastructure is CDK-managed across 9 stacks (`cdk/stacks/`).
 
 ---
 
@@ -82,8 +82,8 @@ Before you can operate the platform, you need:
    - `AccessDenied` → IAM role missing permission. Check `cdk/stacks/role_policies.py`, then `cd cdk && npx cdk diff && npx cdk deploy <stack>`.
    - `ResourceNotFoundException` on secret → secret deleted or in deletion window. Run `aws secretsmanager list-secrets --include-planned-deletion`.
    - `ImportModuleError` → stale code or wrong handler. Redeploy: `bash deploy/deploy_lambda.sh <function-name>`.
-   - `AttributeError: ... 'set_date'` → stale layer or bundled shared module. Rebuild layer: `bash deploy/build_layer.sh`, then `cd cdk && npx cdk deploy --all` to push the new layer version.
-   - For MCP: NEVER use `deploy_lambda.sh` — use the full-zip flow in `docs/RUNBOOK.md` (#MCP Server Failure section).
+   - `AttributeError` on a recently-added shared function → some functions missed the last fleet deploy (stale bundle). Fleet-redeploy: `bash deploy/deploy_fleet.sh` (or `cd cdk && npx cdk deploy --all`).
+   - For MCP: `bash deploy/deploy_lambda.sh life-platform-mcp` (since #781 it stages the mcp-shaped full bundle). Never hand-roll a partial zip — missing `lambdas/` tree = import failure at boot.
 
 ### A data source is stale
 
@@ -154,7 +154,7 @@ aws cloudwatch list-metrics --namespace LifePlatform/MCP --metric-name ToolInvoc
   --query 'Metrics[*].Dimensions[?Name==`ToolName`].Value' --output text
 ```
 
-V2 P4.1 finding: only ~11 of 133 tools used in the last 30 days. Most cold tools are pre-V2 specialty queries scheduled for pruning.
+V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days. Executed as the #395 prune (143→60, 2026-07-08) — ledger: `docs/MCP_TOOL_AUDIT.md`.
 
 ---
 
@@ -164,9 +164,9 @@ V2 P4.1 finding: only ~11 of 133 tools used in the last 30 days. Most cold tools
 |--------|---------|-------|
 | Single Lambda code | `bash deploy/deploy_lambda.sh <name>` | Auto-reads handler config from AWS |
 | Single Lambda code + smoke | `bash deploy/deploy_and_verify.sh <name>` | Preferred for non-trivial changes |
-| MCP server | Full zip build (see RUNBOOK #MCP Lambda Deploy) | **NEVER** use `deploy_lambda.sh life-platform-mcp` — it strips `mcp/` |
+| MCP server | `bash deploy/deploy_lambda.sh life-platform-mcp` | Stages the mcp-shaped full bundle since #781; never hand-roll a partial zip |
 | Website | `bash deploy/sync_site_to_s3.sh` | Uses `safe_sync.sh` wrapper; targets `s3://matthew-life-platform/site/` |
-| Shared layer module | `bash deploy/build_layer.sh` then `cd cdk && npx cdk deploy --all` | Layer version bumps in `cdk/stacks/constants.py` |
+| Shared module (`lambdas/` root) | Merge to main (CI fleet-deploys) or `bash deploy/deploy_fleet.sh` | ONE bundle per function (#781) — no layer step |
 | CDK stack | `cd cdk && npx cdk diff <Stack> && npx cdk deploy <Stack>` | Always diff first |
 | Full CDK redeploy | `cd cdk && npx cdk deploy --all` | After layer bump or cross-stack changes |
 
