@@ -11,6 +11,13 @@ matthew-admin, and `aws s3 sync --delete` is banned — so we NEVER delete; we
 copy each object to an archive/pilot/ key, tombstone-overwrite the original,
 and rewrite the two feed indexes to honest empty structures).
 
+Pre-launch content calendar (2026-07-11): after the sweep, PRELAUNCH_CALENDAR
+"podcast" entries (defined in restart_chronicle_handler.py — the single source
+for the whole pre-launch arc) are RESURRECTED — archive/pilot/<asset>.* copied
+back over the tombstoned live keys and episodes.json/feed.xml rewritten with
+the prequel episode dated genesis − days_before. An entry with skip_reason is
+skipped (audio can't be edited, so a vet-failing episode stays archived).
+
 If the bucket policy blocks a needed PutObject/CopyObject, the failure is
 collected and printed as a MANUAL RUNBOOK step at the end instead of failing
 the pipeline (exit stays 0 for access-denied; any other error exits 1).
@@ -34,6 +41,9 @@ from botocore.exceptions import ClientError
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "deploy"))
+
+from restart_chronicle_handler import resolve_calendar  # noqa: E402 — the pre-launch calendar (single source)
 
 from lambdas.constants import EXPERIMENT_START_DATE
 
@@ -206,6 +216,184 @@ def rewrite_indexes(s3, prefix: str, feed_builder, apply: bool, now_iso: str, ma
     return results
 
 
+# ── Podcast prequel resurrection (pre-launch content calendar, 2026-07-11) ────
+# PRELAUNCH_CALENDAR "podcast" entries survive every reset: after the archive
+# sweep above tombstones the live media, this phase copies the archived
+# archive/pilot/<asset>.* objects BACK over the tombstoned live keys
+# (copy-over-tombstone — we NEVER delete) and writes episodes.json + feed.xml
+# carrying the prequel episode dated genesis − days_before. Entries carrying a
+# "skip_reason" are reported and skipped — the escape hatch for content that
+# fails vetting (audio can't be edited, so a violating episode stays archived).
+# The next real weekly publish (coach_panel_podcast_lambda._write_indexes)
+# rewrites both indexes and simply keeps the prequel entry alongside wk1+.
+
+PANEL_PREFIX = "generated/panelcast/"
+PANEL_ARCHIVE_PREFIX = "generated/panelcast/archive/pilot/"
+GEMINI_SAMPLE_RATE = 24000  # lambdas/gemini_tts.SAMPLE_RATE — wkN.wav is 16-bit mono PCM
+COVER_URL = f"{SITE}/panelcast/cover.jpg"  # series art survives resets (KEEP_BASENAMES)
+
+_RESTORE_CONTENT_TYPES = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".json": "application/json; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+}
+
+
+def _xml_esc(s: str) -> str:
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _rfc822(date_str: str) -> str:
+    return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).strftime("%a, %d %b %Y 16:00:00 GMT")
+
+
+def _hms(seconds) -> str:
+    s = max(0, int(seconds or 0))
+    return f"{s // 3600:d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
+
+
+def build_prequel_episode(entry: dict, wav_bytes: int) -> dict:
+    """The episodes.json entry for a resurrected prequel. Schema matches the wk0
+    intro publisher in lambdas/emails/coach_panel_podcast_lambda.py EXACTLY
+    (week/title/date/url/bytes/duration_sec/byline/excerpt/transcript_url) so the
+    Panel page + next weekly publish treat it as a first-class episode."""
+    asset = entry["asset"]
+    week = int(entry.get("week", 0))
+    return {
+        "week": week,
+        "title": entry.get("title") or f"EP{week}",
+        "date": entry["date"],
+        "url": f"/panelcast/{asset}.wav",
+        "bytes": int(wav_bytes),
+        "duration_sec": max(1, (int(wav_bytes) - 44) // (GEMINI_SAMPLE_RATE * 2)),  # WAV: 16-bit mono PCM
+        "byline": entry.get("byline", "Elena + Dr. Eli Marsh"),
+        "excerpt": entry.get(
+            "excerpt",
+            "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: "
+            "can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
+        ),
+        "transcript_url": f"/panelcast/{asset}.transcript.json",
+    }
+
+
+def _panel_feed_with_items(episodes: list[dict]) -> str:
+    """feed.xml with episode items — item schema mirrors coach_panel_podcast_lambda.
+    _write_indexes (guid measured-life-panel-wk{N}, RFC822 pubDate, itunes fields);
+    the next real weekly publish overwrites this with its own full render."""
+    items = "\n".join(
+        f"""  <item>
+    <title>{_xml_esc(e["title"])}</title>
+    <description>{_xml_esc(e.get("excerpt") or e["title"])}</description>
+    <itunes:summary>{_xml_esc(e.get("excerpt") or e["title"])}</itunes:summary>
+    <enclosure url="{SITE}{e["url"]}" length="{e.get("bytes", 0)}" type="{'audio/mpeg' if e["url"].endswith('.mp3') else 'audio/wav'}"/>
+    <guid isPermaLink="false">measured-life-panel-wk{e["week"]}</guid>
+    <pubDate>{_rfc822(e["date"])}</pubDate>
+    <itunes:duration>{_hms(e.get("duration_sec"))}</itunes:duration>
+    <itunes:episode>{int(e["week"])}</itunes:episode>
+    <itunes:episodeType>full</itunes:episodeType>
+    <itunes:explicit>false</itunes:explicit>
+    <itunes:image href="{COVER_URL}"/>
+  </item>"""
+        for e in episodes
+    )
+    empty = _empty_panel_feed()
+    return empty.replace("</channel>", f"{items}\n</channel>") if items else empty
+
+
+def _list_archive_assets(s3, asset: str) -> list[str]:
+    """All archived generated/panelcast/archive/pilot/<asset>.* keys."""
+    out = []
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"{PANEL_ARCHIVE_PREFIX}{asset}."):
+        out.extend(obj["Key"] for obj in page.get("Contents", []))
+    return out
+
+
+def resurrect_podcast_prequels(s3, apply: bool, now_iso: str, manual: list[str]) -> list[str]:
+    """Restore PRELAUNCH_CALENDAR podcast entries after the archive sweep.
+
+    For each non-skipped podcast entry: copy archive/pilot/<asset>.* back over the
+    tombstoned live keys, then write episodes.json ({"episodes": [...]}, the exact
+    lambda schema) + feed.xml with the prequel dated genesis − days_before.
+    Returns human-readable status lines (also fed to the report).
+    """
+    lines: list[str] = []
+    entries = [e for e in resolve_calendar(EXPERIMENT_START_DATE) if e.get("kind") == "podcast"]
+    if not entries:
+        return ["(no podcast entries on the pre-launch calendar)"]
+    episodes: list[dict] = []
+    for e in entries:
+        desc = e.get("title") or e.get("asset", "?")
+        if e.get("skip_reason"):
+            lines.append(f"SKIP {e.get('asset', '?')} \"{desc}\" — {e['skip_reason']}")
+            continue
+        asset = e["asset"]
+        archived = _list_archive_assets(s3, asset)
+        if not archived:
+            lines.append(f"WARN {asset}: nothing under {PANEL_ARCHIVE_PREFIX}{asset}.* — cannot resurrect")
+            continue
+        wav_bytes = None
+        for src in archived:
+            basename = src[len(PANEL_ARCHIVE_PREFIX) :]
+            live_key = f"{PANEL_PREFIX}{basename}"
+            head = s3.head_object(Bucket=S3_BUCKET, Key=src)
+            if basename == f"{asset}.wav":
+                wav_bytes = head["ContentLength"]
+            if not apply:
+                lines.append(f"would-restore: {src} → {live_key} ({head['ContentLength']} bytes)")
+                continue
+            try:
+                if s3_exists(s3, live_key) and not already_tombstoned(s3, live_key):
+                    lines.append(f"already-restored: {live_key}")
+                    continue
+                ext = "." + basename.rsplit(".", 1)[-1]
+                s3.copy_object(
+                    Bucket=S3_BUCKET,
+                    Key=live_key,
+                    CopySource={"Bucket": S3_BUCKET, "Key": src},
+                    MetadataDirective="REPLACE",
+                    ContentType=_RESTORE_CONTENT_TYPES.get(ext, "application/octet-stream"),
+                    CacheControl="max-age=86400, public" if ext in (".mp3", ".wav") else "max-age=300, public",
+                    Metadata={"resurrected_at": now_iso, "resurrected_reason": f"prelaunch_calendar_{EXPERIMENT_START_DATE}"},
+                )
+                lines.append(f"restored: {src} → {live_key}")
+            except ClientError as ce:
+                if _is_access_denied(ce):
+                    manual.append(f"aws s3 cp s3://{S3_BUCKET}/{src} s3://{S3_BUCKET}/{live_key}  # prequel restore was denied")
+                    lines.append(f"MANUAL (access denied): {live_key}")
+                else:
+                    raise
+        if wav_bytes is None:
+            lines.append(f"WARN {asset}: no {asset}.wav in the archive — episode entry NOT written (mp3-only prequels unsupported)")
+            continue
+        ep = build_prequel_episode(e, wav_bytes)
+        episodes.append(ep)
+        lines.append(f"episode: wk{ep['week']} \"{ep['title']}\" dated {ep['date']} ({ep['duration_sec']}s, {ep['bytes']} bytes)")
+
+    if episodes:
+        episodes.sort(key=lambda x: x.get("week", 0), reverse=True)
+        index_body = json.dumps({"episodes": episodes}, indent=1)
+        feed_body = _panel_feed_with_items(episodes)
+        for key, body, ctype in (
+            (f"{PANEL_PREFIX}episodes.json", index_body, "application/json"),
+            (f"{PANEL_PREFIX}feed.xml", feed_body, "application/rss+xml; charset=utf-8"),
+        ):
+            if not apply:
+                lines.append(f"would-write: {key} ({len(episodes)} episode(s))")
+                continue
+            try:
+                s3.put_object(Bucket=S3_BUCKET, Key=key, Body=body.encode(), ContentType=ctype, CacheControl="max-age=300, public")
+                lines.append(f"wrote: {key} ({len(episodes)} episode(s))")
+            except ClientError as ce:
+                if _is_access_denied(ce):
+                    manual.append(f"# rewrite s3://{S3_BUCKET}/{key} with the prequel episode by hand (PutObject was denied)")
+                    lines.append(f"MANUAL (access denied): {key}")
+                else:
+                    raise
+    return lines
+
+
 def invalidate(apply: bool) -> list[str]:
     """generated/ is stripped at the CloudFront edge — invalidate VIEWER paths
     (the CloudFront-path bug, 2026-06-18), not S3 keys."""
@@ -256,6 +444,16 @@ def main():
         for key, status in rewrite_indexes(s3, prefix, feed_builder, args.apply, now_iso, manual):
             print(f"    {status}: {key}")
             report_lines.append(f"{status}: {key}")
+
+    # Pre-launch calendar: resurrect the podcast prequel(s) AFTER the sweep, so the
+    # end state of one full run is archive-everything + prequels restored + indexes
+    # carrying exactly the calendar episodes. Re-runs are idempotent (the sweep
+    # re-tombstones, this phase re-restores — the archive copy never changes).
+    print("\n[prequel resurrection] pre-launch calendar podcast entries:")
+    report_lines.append("\nPREQUEL RESURRECTION:")
+    for line in resurrect_podcast_prequels(s3, args.apply, now_iso, manual):
+        print(f"    {line}")
+        report_lines.append(f"  {line}")
 
     if not args.skip_cloudfront:
         paths = invalidate(args.apply)

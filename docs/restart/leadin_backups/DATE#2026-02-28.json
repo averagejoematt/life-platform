@@ -1,0 +1,89 @@
+{
+ "Item": {
+  "author": {
+   "S": "Elena Voss"
+  },
+  "content_html": {
+   "S": "See S3: blog/week-00.html"
+  },
+  "content_markdown": {
+   "S": "See S3: blog/week-00.html"
+  },
+  "cycle": {
+   "N": "4"
+  },
+  "date": {
+   "S": "2026-02-28"
+  },
+  "generated_at": {
+   "S": "2026-02-28T18:30:00Z"
+  },
+  "has_board_interview": {
+   "BOOL": false
+  },
+  "hidden": {
+   "BOOL": true
+  },
+  "is_prologue": {
+   "BOOL": true
+  },
+  "phase": {
+   "S": "pilot"
+  },
+  "pk": {
+   "S": "USER#matthew#SOURCE#chronicle"
+  },
+  "schema_version": {
+   "N": "1"
+  },
+  "series_title": {
+   "S": "The Measured Life"
+  },
+  "source": {
+   "S": "chronicle"
+  },
+  "stats_line": {
+   "S": "Prologue | February 2026 | Seattle, WA"
+  },
+  "subtitle": {
+   "S": "Prologue"
+  },
+  "themes": {
+   "L": [
+    {
+     "S": "introduction"
+    },
+    {
+     "S": "technology"
+    },
+    {
+     "S": "transformation"
+    },
+    {
+     "S": "quantified-self"
+    }
+   ]
+  },
+  "title": {
+   "S": "Before the Numbers"
+  },
+  "tombstone": {
+   "BOOL": true
+  },
+  "tombstoned_at": {
+   "S": "2026-07-11T04:47:00.362023+00:00"
+  },
+  "tombstoned_reason": {
+   "S": "experiment_restart_2026-07-12"
+  },
+  "week_number": {
+   "N": "0"
+  },
+  "word_count": {
+   "N": "1850"
+  },
+  "sk": {
+   "S": "DATE#2026-02-28"
+  }
+ }
+}

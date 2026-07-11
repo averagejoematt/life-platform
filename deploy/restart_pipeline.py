@@ -25,8 +25,12 @@ Steps (each can be skipped with --skip-<name>):
     6. restart_intelligence_wipe.py   (stamps the CLOSING cycle onto the archive;
        --close-cycle then bumps SSM /life-platform/experiment-cycle to N+1)
     6b. restart_ledger_reset.py   (zero the accountability ledger → $0)
-    7. restart_chronicle_handler.py
-    8. restart_media_reset.py     (archive + blank panelcast/debrief audio feeds)
+    7. restart_chronicle_handler.py  (re-dates the PRELAUNCH_CALENDAR chronicle
+       lead-ins to genesis − days_before)
+    8. restart_media_reset.py     (archive + blank panelcast/debrief audio feeds,
+       then resurrect the calendar's podcast prequel dated genesis − days_before)
+    8b. restart_leadin_pages.py   (rebuild the public journal pages + posts.json
+       for every visible chronicle record — the lead-ins' pages)
     9. restart_character_rebuild.py
    10. restart_site_copy_sync.py --old-genesis <outgoing>  (JS/HTML literal sweep)
    11. restart_docs_update.py
@@ -252,6 +256,31 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
         CHAR_SHEET.write_text(json.dumps(cs, indent=2) + "\n")
 
 
+def build_sub_scripts(skip_chronicle: bool, keep_chronicle: list[str], old_genesis: str) -> list[tuple[str, list[str]]]:
+    """The restart sub-script sequence. Order matters (pre-launch content
+    calendar, 2026-07-11): chronicle handler (untombstones + re-dates the
+    calendar's chronicle lead-ins) → media reset (archives ALL audio, then
+    resurrects the calendar's podcast prequel + writes episodes.json/feed.xml)
+    → leadin pages (rebuilds the public journal pages + posts.json from the
+    now-visible records) → character rebuild → site copy sync → docs update."""
+    sub_scripts = [
+        ("restart_phase_tag", ["python3", "deploy/restart_phase_tag.py", "--apply"]),
+        ("restart_intelligence_wipe", ["python3", "deploy/restart_intelligence_wipe.py", "--apply"]),
+        ("restart_ledger_reset", ["python3", "deploy/restart_ledger_reset.py", "--apply"]),
+        ("restart_character_rebuild", ["python3", "deploy/restart_character_rebuild.py", "--apply"]),
+        ("restart_site_copy_sync", ["python3", "deploy/restart_site_copy_sync.py", "--apply", "--old-genesis", old_genesis]),
+        ("restart_docs_update", ["python3", "deploy/restart_docs_update.py", "--apply"]),
+    ]
+    sub_scripts.insert(3, ("restart_leadin_pages", ["python3", "deploy/restart_leadin_pages.py", "--apply"]))
+    sub_scripts.insert(3, ("restart_media_reset", ["python3", "deploy/restart_media_reset.py", "--apply"]))
+    if not skip_chronicle:
+        chron_cmd = ["python3", "deploy/restart_chronicle_handler.py", "--apply"]
+        for sk in keep_chronicle:  # ADR-077: explicit carry-forward override (else PRELAUNCH_CALENDAR)
+            chron_cmd += ["--resurrect-sk", sk]
+        sub_scripts.insert(3, ("restart_chronicle_handler", chron_cmd))
+    return sub_scripts
+
+
 def run_step(name: str, cmd: list[str], apply: bool, log: list[str]) -> int:
     print(f"\n──[ {name} ]──")
     print(f"    $ {' '.join(cmd)}")
@@ -387,23 +416,9 @@ def main():
     else:
         print("\n[4-5] CDK deploy skipped (--skip-deploy)")
 
-    # Step 6-11: all the restart sub-scripts. Order matters: chronicle handler →
-    # media reset → site copy sync (the media reset blanks the podcast surfaces
-    # the same pass that blanks the chronicle ones).
-    sub_scripts = [
-        ("restart_phase_tag", ["python3", "deploy/restart_phase_tag.py", "--apply"]),
-        ("restart_intelligence_wipe", ["python3", "deploy/restart_intelligence_wipe.py", "--apply"]),
-        ("restart_ledger_reset", ["python3", "deploy/restart_ledger_reset.py", "--apply"]),
-        ("restart_character_rebuild", ["python3", "deploy/restart_character_rebuild.py", "--apply"]),
-        ("restart_site_copy_sync", ["python3", "deploy/restart_site_copy_sync.py", "--apply", "--old-genesis", old_genesis]),
-        ("restart_docs_update", ["python3", "deploy/restart_docs_update.py", "--apply"]),
-    ]
-    sub_scripts.insert(3, ("restart_media_reset", ["python3", "deploy/restart_media_reset.py", "--apply"]))
-    if not args.skip_chronicle:
-        chron_cmd = ["python3", "deploy/restart_chronicle_handler.py", "--apply"]
-        for sk in args.keep_chronicle:  # ADR-077: curated carry-forward
-            chron_cmd += ["--resurrect-sk", sk]
-        sub_scripts.insert(3, ("restart_chronicle_handler", chron_cmd))
+    # Step 6-11: all the restart sub-scripts (ordering built + unit-tested in
+    # build_sub_scripts).
+    sub_scripts = build_sub_scripts(args.skip_chronicle, args.keep_chronicle, old_genesis)
 
     # Fail-fast (2026-07-10 audit): a nonzero rc used to be silently discarded,
     # so one broken sub-script produced a PARTIAL reset that looked complete.
