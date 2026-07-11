@@ -46,10 +46,16 @@ Whoop/Withings/Strava/Garmin/EightSleep ingestion Lambdas refresh tokens on ever
 ### Manual OAuth re-auth procedures
 
 **Whoop (dead refresh token — full re-auth):**
-> ⚠️ There is NO committed bootstrap script for Whoop (the often-cited
-> `setup/setup_whoop_*.py` never existed in the repo — wiki-panel finding, 2026-07-10).
-> Tokens normally never die (auto-refresh + writeback on every hourly run). If the
-> refresh token IS dead, redo the OAuth authorization-code flow by hand:
+The committed script lives in `deploy/` (NOT `setup/` like its siblings — a
+find-it trap that fooled two audits, 2026-07-10):
+```bash
+python3 deploy/setup_whoop_auth.py
+# Walks the browser OAuth authorization-code flow (localhost callback) and updates
+# life-platform/whoop in place, preserving client_id/client_secret.
+```
+Tokens normally never die (auto-refresh + writeback every hourly run; a lost refresh
+response = permanently dead token = the 2026-06 outage). Manual fallback if the
+script can't run:
 ```bash
 # 1. client_id/client_secret live in the secret:
 aws secretsmanager get-secret-value --secret-id life-platform/whoop --query SecretString --output text
@@ -59,7 +65,7 @@ aws secretsmanager get-secret-value --secret-id life-platform/whoop --query Secr
 # 4. Write the updated JSON (with the new refresh_token) back:
 aws secretsmanager put-secret-value --secret-id life-platform/whoop --secret-string '<updated JSON>'
 ```
-Follow-up: commit a `setup/setup_whoop_auth.py` mirroring the other setup scripts (issue filed).
+Housekeeping (#935): consider moving/symlinking the script into `setup/` so it sits with its siblings.
 
 **Garmin (the most operationally fraught — 30-day OAuth1 lifetime + rate-limit traps):**
 ```bash

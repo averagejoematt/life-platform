@@ -238,7 +238,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 
 1. **Single-user platform.** All DynamoDB keys are `USER#matthew#...`. IAM roles, secrets, schedules — everything assumes one user. Do not generalize without reading ADR-001 + ADR-057 (the "Phase 6 multi-user" decision was formally deferred).
 2. **Site-api is primarily read-only (ADR-037).** Limited writes for interactive features only (votes, follows, checkins, suggestions, user-submitted findings).
-3. **`public_stats.json` is the website heartbeat.** Home, story, mission, observatory pages all read from this one S3 file, written by daily-brief at 11 AM PT. Daily brief failure = stale website data.
+3. **`public_stats.json` is the website heartbeat.** Home, story, mission, observatory pages all read from this one S3 file, written by daily-brief at 17:00 UTC (10 AM PDT). Daily brief failure = stale website data.
 4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. PT times in docs are for humans only.
 5. **Pipeline ordering is strict.** Ingestion → Anomaly → Compute → Brief → OG. Changing schedules without preserving order produces stale results.
 6. **Budget is $15/month target, $20 AWS Budget cap.** Current actual ~$13/month after V2 cost optimization (~$3.65/mo saved per Phase 5).

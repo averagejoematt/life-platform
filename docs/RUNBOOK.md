@@ -288,7 +288,7 @@ Replace `whoop-data-ingestion` with any function name.
 
 ### Via CloudWatch Alarms
 Per-source `ingestion-error-*` alarms were consolidated 2026-05-29 (`error_alarm=False`
-in `ingestion_stack.py`) into the DLQ digest path + a metric-math aggregate — do NOT
+in `ingestion_stack.py`); detection moved downstream — freshness-checker, DLQ depth, canary; there is deliberately NO aggregate alarm (CloudWatch metric-math cap; see MONITORING.md). Do NOT
 query the old names (`describe-alarms --alarm-names` silently omits nonexistent alarms,
 so an empty result reads as false "all-OK"). Query by state instead:
 ```bash

@@ -224,7 +224,7 @@ All EventBridge crons are fixed UTC. PT references shift 1 hour at DST boundarie
 
 **Account-wide Lambda concurrency limit: 100** (raised from 10; verified live 2026-07-10 via `aws lambda get-account-settings`).
 
-This is dangerously low — AWS default is 1000. AWS Support case **177921309700709** filed 2026-05-19 to request raise to 100. Until approved:
+The 2026-05 raise request (Support case 177921309700709) was approved — the limit is 100 (AWS default for mature accounts is 1000; a further raise hasn't been needed). Operational habits that still apply:
 
 - Avoid invoking high-fan-out workflows manually during the daily pipeline window (16:30-17:00 UTC).
 - Reserved concurrency in CDK is **pre-staged but commented out** (see `docs/RESERVED_CONCURRENCY.md`).
