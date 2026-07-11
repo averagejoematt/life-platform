@@ -535,6 +535,66 @@ No labels, no formatting. Natural voice. Max 80 words total."""
 # -- Board of Directors prompt builder -----------------------------------------
 
 
+def _bod_phase_targets(data, profile):
+    """#952 (ai-content-4): the BoD intro's phase facts, derived from the profile's
+    weight_loss_phases registry instead of the former hardcoded 'Phase 1 Ignition:
+    3 lbs/week, 1500 kcal deficit, 1800 cal daily' — which was frozen at phase 1
+    and would silently drift wrong the moment the phase advances (#535/#914-B rate
+    discipline). Returns e.g. 'Phase 2 Push: 2.5 lbs/week, 1250 kcal deficit,
+    1800 cal daily.' or "" when the profile carries no phase registry (fail-soft:
+    the intro simply omits phase targets rather than inventing them)."""
+    profile = profile or {}
+    data = data or {}
+    try:
+        phases = profile.get("weight_loss_phases") or []
+        if not phases:
+            return ""
+        current_w = data.get("latest_weight") or profile.get("current_weight_lbs")
+        phase = None
+        if current_w is not None:
+            for p in phases:
+                if float(current_w) >= float(p.get("end_lbs", 0)):
+                    phase = p
+                    break
+        if phase is None:
+            phase = phases[-1]
+
+        num = phase.get("phase")
+        name = phase.get("name") or ""
+        label = f"Phase {int(float(num))} {name}".strip() if num else (name or "Current phase")
+
+        targets = []
+        weekly = phase.get("weekly_target_lbs")
+        if weekly:
+            targets.append(f"{float(weekly):g} lbs/week")
+        deficit = phase.get("deficit_target_kcal") or phase.get("calorie_deficit_target")
+        if deficit:
+            targets.append(f"{int(float(deficit))} kcal deficit")
+        cal_target = profile.get("calorie_target")
+        if cal_target:
+            targets.append(f"{int(float(cal_target))} cal daily")
+
+        return f"{label}: {', '.join(targets)}." if targets else f"{label}."
+    except Exception as e:
+        print(f"[WARN] BoD phase targets unavailable (omitting): {e}")
+        return ""
+
+
+def _bod_identity_line(data, profile):
+    """#952 (ai-content-4): the BoD intro's identity sentence. Two deliberate
+    changes from the old hardcoded line: (1) the chronological-age token
+    is dropped entirely — no generation prompt carries age, so a model can never
+    echo it into output text (the public-surface age absolute, applied as prompt
+    hygiene); (2) phase/rate/deficit facts come from the profile's phase registry
+    via _bod_phase_targets, never a literal."""
+    weight_ctx = _build_weight_context(data, profile) if data and profile else f"{int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))}->185 lbs"
+    line = f"Speaking to Matthew, weight loss journey ({weight_ctx})."
+    phase_targets = _bod_phase_targets(data, profile)
+    if phase_targets:
+        line += f" {phase_targets}"
+    return line
+
+
 def _build_daily_bod_intro_from_config(data=None, profile=None):
     """Build the Board of Directors role intro from S3 config."""
     if not _HAS_BOARD_LOADER or not _board_loader:
@@ -563,9 +623,8 @@ def _build_daily_bod_intro_from_config(data=None, profile=None):
         if feat_cfg.get("role") == "protocol_tips":
             protocol_note = f"\n{member['name']} provides: {feat_cfg.get('contribution', 'protocol recommendations')}"
 
-    weight_ctx = _build_weight_context(data, profile) if data and profile else f"{int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))}->185 lbs"
     intro = f"""You are the Board of Directors for Project40 — {panel_desc} — unified.
-Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.
+{_bod_identity_line(data, profile)}
 Tone: direct, empathetic, no-BS.{protocol_note}"""
 
     print("[INFO] Using config-driven daily BoD prompt")
@@ -718,10 +777,9 @@ def call_board_of_directors(
     bod_intro = _build_daily_bod_intro_from_config(data, profile)
     if not bod_intro:
         print("[INFO] Using fallback dynamic daily BoD prompt")
-        weight_ctx = _build_weight_context(data, profile)
         bod_intro = (
             "You are the Board of Directors for Project40 — sports scientist + nutritionist + sleep specialist + behavioral coach unified.\n"
-            f"Speaking to Matthew, 36yo, weight loss journey ({weight_ctx}). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily.\n"
+            f"{_bod_identity_line(data, profile)}\n"
             "Tone: direct, empathetic, no-BS."
         )
 
@@ -1019,6 +1077,37 @@ _comp_results_cache = None
 # ("one corrective rewrite, kept only if strictly better") convention used by
 # the grounding gate (ADR-104) elsewhere in this same pipeline.
 _QUALITY_GATE_MAX_REGENERATIONS = 1
+
+# R17-16 outage sentinel returned by call_anthropic when Bedrock is unreachable
+# or tier-3 BudgetExceeded fires. #952 (ai-content-6): the coach v2 pipeline must
+# treat it as "no output" — it contains no numbers so it sails through the
+# grounding gate, and on the same outage the quality-gate lambda's own Bedrock
+# call fails open — so without an explicit check the literal gets cached under
+# the brief fingerprint (sticky reuse), recorded by coach-state-updater, and
+# rendered in the brief.
+AI_UNAVAILABLE_SENTINEL = "[AI_UNAVAILABLE]"
+
+
+def _is_ai_unavailable(text):
+    """True when a generation (or a gate's corrective regeneration) came back as
+    the R17-16 outage sentinel rather than real coaching text (#952)."""
+    return bool(text) and AI_UNAVAILABLE_SENTINEL in text
+
+
+def _allowlist_prompt(system_prompt, few_shot_block):
+    """ADR-104 / #952 (ai-content-3): the prompt text the fabrication allow-list
+    is derived from, with the few-shot voice-calibration block stripped.
+
+    The few-shot examples are fictional/stale vitals ('18.2% deep sleep',
+    'efficiency dipped from 89% to 86%') presented under 'write in this style' —
+    exactly the pressure toward echoing their numeric texture. If their numbers
+    enter the allow-list, a coach that parrots a calibration-example number as
+    Matthew's current data passes the fabrication gate. Stripping the block's
+    TEXT (not subtracting its numbers) keeps any value that also legitimately
+    appears in the facts/data sections allowed."""
+    if few_shot_block and few_shot_block in (system_prompt or ""):
+        return system_prompt.replace(few_shot_block, "")
+    return system_prompt
 
 
 def _invoke_quality_gate_sync(lambda_client, coach_id, output_text, generation_brief):
@@ -1504,6 +1593,15 @@ Write your {domain_label} coaching section now."""
         output = call_anthropic(system_prompt + "\n\n" + user_message, api_key, max_tokens=600)
         print(f"[COACH-V2:{coach_id}] Output: {len(output)} chars")
 
+        # #952 (ai-content-6): Bedrock outage / tier-3 cutoff returns the
+        # '[AI_UNAVAILABLE]' sentinel — hold (return None) so the existing
+        # legacy-fallback contract handles the outage instead of the literal
+        # passing the (number-free) grounding gate, a fail-open quality gate,
+        # the generation cache, and the brief render.
+        if _is_ai_unavailable(output):
+            print(f"[COACH-V2:{coach_id}] AI unavailable sentinel from generation — holding, falling back to legacy")
+            return None
+
         # Step 5.5 (ADR-104): deterministic grounding gate — the highest-traffic
         # coach surface previously shipped with NO numeric check. Findings = hard
         # canonical contradictions (RHR/recovery/HRV) + the allow-list gate (every
@@ -1511,7 +1609,10 @@ Write your {domain_label} coaching section now."""
         # trend endpoints). One corrective rewrite, kept only if strictly better.
         if _gg_mod is not None and output:
             try:
-                _allowed = _gg_mod.allowed_numbers(system_prompt, user_message)
+                # #952 (ai-content-3): derive the allow-list WITHOUT the few-shot
+                # voice-calibration block — its fictional/stale vitals must never
+                # license a parroted number as grounded.
+                _allowed = _gg_mod.allowed_numbers(_allowlist_prompt(system_prompt, few_shot_block), user_message)
 
                 def _findings_fn(_t):
                     return _gg_mod.grounding_findings(_t, facts=_canon_facts or None, allowed=_allowed)
@@ -1573,6 +1674,14 @@ Write your {domain_label} coaching section now."""
                     return None
         except Exception as _ack_e:
             print(f"[COACH-V2:{coach_id}] presence-ack gate failed (non-blocking): {_ack_e}")
+
+        # #952 (ai-content-6, belt-and-braces): any gate's corrective regeneration
+        # (grounding regen_once, quality gate, presence-ack) also goes through
+        # call_anthropic and can come back as the outage sentinel mid-run — never
+        # cache or publish it either.
+        if _is_ai_unavailable(output):
+            print(f"[COACH-V2:{coach_id}] AI unavailable sentinel after gates — holding, falling back to legacy")
+            return None
 
         # Step 6.5 (#738): persist this fresh, gate-passed output under its brief
         # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a
