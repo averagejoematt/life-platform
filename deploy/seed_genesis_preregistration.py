@@ -266,6 +266,13 @@ provided. Rules:
 - confidence: "low", "medium" or "high" — an honest strength-of-belief, not bravado.
 - NEVER mention resets, cycles, prior attempts, or that anything came before this plan.
 - Do not invent data the plan does not state.
+- BOTH predictions must be squarely inside the coach's own named domain — never another
+  specialist's metric, never a generic whole-plan claim every coach could make.
+- Every number in a claim must appear verbatim in the plan facts, or be simple stated
+  arithmetic on them. NEVER estimate a "typical" or assumed baseline (there is no
+  baseline data yet — the experiment has not started). A weight claim is anchored to
+  the stated start weight; anything else has no known starting value, so predict its
+  direction/consistency, not a made-up level.
 Respond with ONLY a JSON array (no fence, no prose):
 [{"claim_natural": "...", "metric": "...", "direction": "up|down|null",
   "window_days": 14, "confidence": "medium"}, ...]"""
@@ -285,6 +292,23 @@ def _live_metric_allowlist():
         return sorted(MEASURABLE_METRICS)
 
 
+def _claim_tokens(claim: str) -> set:
+    return {w for w in re.findall(r"[a-z]+", (claim or "").lower()) if len(w) > 3}
+
+
+def too_similar(claim: str, accepted: list, threshold: float = 0.55) -> bool:
+    """Cross-coach dedup (deterministic): token-set Jaccard vs every accepted claim.
+    Eight specialists restating one whole-plan claim is not a board on the record."""
+    toks = _claim_tokens(claim)
+    if not toks:
+        return True
+    for other in accepted:
+        o = _claim_tokens(other)
+        if o and len(toks & o) / len(toks | o) >= threshold:
+            return True
+    return False
+
+
 def _parse_json_array(text: str):
     """Parse the model's JSON array, tolerating a ```json fence."""
     t = (text or "").strip()
@@ -301,7 +325,7 @@ def generate_predictions_via_bedrock(goals):
     """One Haiku call per coach through the ADR-062 chokepoint. Returns the frozen-file
     coaches dict. Falls back per-coach to FALLBACK_PREDICTIONS on failure."""
     import budget_guard
-    from retry_utils import AI_MODEL_HAIKU, call_anthropic_api
+    from retry_utils import AI_MODEL, call_anthropic_api
 
     if not budget_guard.allow("coach_narrative"):
         raise SystemExit(
@@ -315,12 +339,14 @@ def generate_predictions_via_bedrock(goals):
     print(f"Live-metric allowlist ({len(allowlist)}): {', '.join(allowlist)}")
 
     coaches_out = {}
+    accepted_claims = []
     for coach_id, coach_name, domain in COACHES:
         prompt = (
             f"Coach: {coach_name}, the board's {domain} specialist.\n"
             f"Plan facts (the ONLY ground truth):\n{digest}\n\n"
             f"metric allowlist: {json.dumps(allowlist)}\n\n"
-            f"State {coach_name}'s 2 opening predictions as the JSON array described."
+            f"State {coach_name}'s 2 opening predictions — both strictly about {domain} — "
+            f"as the JSON array described."
         )
         preds = []
         try:
@@ -329,7 +355,7 @@ def generate_predictions_via_bedrock(goals):
                 api_key="",  # ignored — Bedrock IAM auth (ADR-062)
                 max_tokens=900,
                 system=_GEN_SYSTEM,
-                model=AI_MODEL_HAIKU,
+                model=AI_MODEL,  # narrative-tier (Sonnet): a one-off, permanent public artifact
                 temperature=0.4,
             )
             for cand in _parse_json_array(raw)[:2]:
@@ -349,7 +375,11 @@ def generate_predictions_via_bedrock(goals):
                 if issues:
                     print(f"  {coach_id}: dropped a candidate — {'; '.join(issues)}")
                     continue
+                if too_similar(cand["claim_natural"], accepted_claims):
+                    print(f"  {coach_id}: dropped a candidate — near-duplicate of an already-accepted claim")
+                    continue
                 preds.append(cand)
+                accepted_claims.append(cand["claim_natural"])
         except Exception as e:
             print(f"  {coach_id}: generation failed ({e})")
 
