@@ -200,7 +200,8 @@
       "Bash(python3 -m pytest tests/test_character_engine.py tests/test_character_neglect.py -q)",
       "Bash(python3 -m black --check scripts/character_sim_year.py docs)",
       "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE python3 -m pytest tests/ -q)",
-      "Bash(python3 deploy/sync_doc_metadata.py)"
+      "Bash(python3 deploy/sync_doc_metadata.py)",
+      "Bash(sips -g pixelWidth -g pixelHeight coaching_390x844.png coaching_team_390x844.png coaching_scorecard_390x844.png)"
     ]
   },
   "enableAllProjectMcpServers": true,
