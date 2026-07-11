@@ -15,7 +15,8 @@ content_markdown shape the other lead-in records carry, and writes it back to
 the DDB record.
 
 SAFETY: the ORIGINAL record is backed up FIRST — to
-docs/restart/leadin_backups/<sk>.json (committed) AND
+/tmp/leadin_backups/<sk>.json (LOCAL ONLY — original records are UNVETTED and must never
+be committed to the public repo; the durable backup is the private S3 copy) AND
 s3://matthew-life-platform/remediation-log/leadin-backups/<sk>.json — matching
 the existing DATE#2026-02-22 / DATE#2026-03-03 backup pattern. An existing
 backup is NEVER overwritten (the first backup is the pre-repair truth).
@@ -53,7 +54,7 @@ REGION = "us-west-2"
 S3_BUCKET = "matthew-life-platform"
 TABLE = "life-platform"
 CHRONICLE_PK = "USER#matthew#SOURCE#chronicle"
-LOCAL_BACKUP_DIR = REPO_ROOT / "docs" / "restart" / "leadin_backups"
+LOCAL_BACKUP_DIR = Path("/tmp") / "leadin_backups"  # never in-repo: originals are unvetted (privacy)
 S3_BACKUP_PREFIX = "remediation-log/leadin-backups/"
 
 # A content field at/below this length (or starting "See S3:") is a pointer, not prose.
