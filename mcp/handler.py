@@ -27,7 +27,15 @@ import uuid
 
 from mcp import audit as mcp_audit
 from mcp.config import __version__, logger
-from mcp.core import decimal_to_float, get_api_key, oauth_code_consume, oauth_code_store
+from mcp.core import (
+    SESSION_TOKEN_TTL_SECS,
+    decimal_to_float,
+    get_api_key,
+    oauth_code_consume,
+    oauth_code_store,
+    session_token_issue,
+    session_token_valid,
+)
 from mcp.registry import TOOLS
 from mcp.utils import mcp_error, validate_date_range, validate_single_date
 from mcp.warmer import nightly_cache_warmer
@@ -433,14 +441,20 @@ def _validate_bearer(event):
     expected was None, creating a false security boundary.
     """
     expected = _get_bearer_token()
-    # _get_bearer_token() now returns a sentinel string when no key is configured,
-    # so the hmac.compare_digest below will always fail in that case. No special
-    # case needed — fail-closed is the default path.
     auth_header = (event.get("headers") or {}).get("authorization", "")
     if not auth_header.lower().startswith("bearer "):
         return False
     provided = auth_header[7:].strip()
-    return hmac.compare_digest(provided, expected)
+    # Fail-closed: when no API key is configured, _get_bearer_token() returns a sentinel
+    # — reject everything, including any live session token (the whole boundary is off).
+    if expected == "__NO_KEY_CONFIGURED__":
+        return False
+    # Static Desktop bearer (constant-time compare) OR a live remote session bearer
+    # (#893). Desktop tokens are "lp_…" and never reach the "lps_…" session lookup, so
+    # the Desktop path takes no extra DynamoDB read.
+    if hmac.compare_digest(provided, expected):
+        return True
+    return session_token_valid(provided)
 
 
 def _handle_oauth_server_metadata(event):
@@ -613,14 +627,20 @@ def _handle_token(event):
         logger.warning("[OAuth] Token exchange rejected: PKCE verification failed")
         return _remote_response(400, json.dumps({"error": "invalid_grant", "error_description": "PKCE verification failed"}))
 
-    token = _get_bearer_token()
-    if not token or token == "__NO_KEY_CONFIGURED__":
+    # SEC (#893): fail closed if no API key is configured at all (the auth boundary is
+    # otherwise off). Then mint a random, short-lived, revocable SESSION bearer rather
+    # than returning the permanent key-derived Desktop bearer — so completing the
+    # (auto-approving) OAuth flow no longer yields a credential that never expires.
+    if _get_bearer_token() == "__NO_KEY_CONFIGURED__":
+        return _remote_response(500, json.dumps({"error": "server_error"}))
+    session_token = session_token_issue()
+    if not session_token:
         return _remote_response(500, json.dumps({"error": "server_error"}))
 
-    logger.info("[OAuth] Token exchange OK — bearer issued")
+    logger.info("[OAuth] Token exchange OK — session bearer issued")
     return _remote_response(
         200,
-        json.dumps({"access_token": token, "token_type": "Bearer", "expires_in": 86400}),
+        json.dumps({"access_token": session_token, "token_type": "Bearer", "expires_in": SESSION_TOKEN_TTL_SECS}),
     )
 
 

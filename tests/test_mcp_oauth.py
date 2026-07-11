@@ -29,14 +29,19 @@ class _ConditionalCheckFailed(Exception):
 
 
 class _FakeTable:
-    """Minimal DDB stand-in supporting put_item + the conditional single-use
-    update_item(SET consumed, ConditionExpression exists-and-unconsumed)."""
+    """Minimal DDB stand-in supporting put_item, get_item, and two update_item
+    shapes: the conditional single-use auth-code consume (SET consumed) and the
+    session-bearer revoke (SET revoked)."""
 
     def __init__(self):
         self.store = {}
 
     def put_item(self, Item):
         self.store[(Item["pk"], Item["sk"])] = dict(Item)
+
+    def get_item(self, Key):
+        item = self.store.get((Key["pk"], Key["sk"]))
+        return {"Item": dict(item)} if item is not None else {}
 
     def update_item(
         self,
@@ -48,7 +53,14 @@ class _FakeTable:
         ReturnValues=None,
     ):
         item = self.store.get((Key["pk"], Key["sk"]))
-        # Emulate: attribute_exists(sk) AND attribute_not_exists(consumed)
+        names = ExpressionAttributeNames or {}
+        # Session revoke: attribute_exists(sk) → set revoked=true.
+        if "#revoked" in names:
+            if item is None:
+                raise _ConditionalCheckFailed("ConditionalCheckFailedException")
+            item["revoked"] = True
+            return {}
+        # Auth-code consume: attribute_exists(sk) AND attribute_not_exists(consumed).
         if item is None or "consumed" in item:
             raise _ConditionalCheckFailed("ConditionalCheckFailedException")
         item["consumed"] = True
@@ -88,6 +100,10 @@ def _token(body):
     return h._handle_token({"body": json.dumps(body)})
 
 
+def _validate(token):
+    return h._validate_bearer({"headers": {"authorization": f"Bearer {token}"}})
+
+
 # ── the breach: an unbound POST must NOT yield a bearer ───────────────────────
 def test_token_rejects_unbound_request():
     with patch("mcp.handler.get_api_key", return_value="secret"):
@@ -104,7 +120,9 @@ def test_token_rejects_forged_code():
 
 
 # ── the happy path a real Claude client walks ─────────────────────────────────
-def test_full_pkce_flow_issues_bearer():
+def test_full_pkce_flow_issues_session_bearer():
+    """#893: /token now mints a short-lived SESSION bearer, NOT the permanent
+    key-derived Desktop bearer. Address possession no longer yields a forever token."""
     verifier, challenge = _pkce_pair()
     redirect = "https://claude.ai/api/mcp/auth_callback"
     with patch("mcp.handler.get_api_key", return_value="secret"):
@@ -112,8 +130,15 @@ def test_full_pkce_flow_issues_bearer():
         resp = _token({"grant_type": "authorization_code", "code": code, "code_verifier": verifier, "redirect_uri": redirect})
         assert resp["statusCode"] == 200
         body = json.loads(resp["body"])
-        assert body["access_token"] == h._get_bearer_token()
+        token = body["access_token"]
         assert body["token_type"] == "Bearer"
+        # It is a session token, distinct from the permanent static Desktop bearer…
+        assert token.startswith(core.SESSION_TOKEN_PREFIX)
+        assert token != h._get_bearer_token()
+        # …with the real (finite) lifetime advertised…
+        assert body["expires_in"] == core.SESSION_TOKEN_TTL_SECS
+        # …and it actually authenticates a request.
+        assert _validate(token) is True
 
 
 def test_code_is_single_use():
@@ -180,3 +205,51 @@ def test_redirect_host_suffix_trick_rejected():
     _, challenge = _pkce_pair()
     resp = _authorize("https://claude.ai.evil.com/cb", challenge)
     assert resp["statusCode"] == 400
+
+
+# ── #893: session-bearer hardening — no permanent token from address possession ──
+def test_static_desktop_bearer_still_validates():
+    """The additive change must not break Claude Desktop, which presents the static
+    key-derived bearer directly (no OAuth flow, no DDB lookup)."""
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        assert _validate(h._get_bearer_token()) is True
+
+
+def test_session_token_validates_then_revoke_kills_it():
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        token = core.session_token_issue()
+        assert token and token.startswith(core.SESSION_TOKEN_PREFIX)
+        assert _validate(token) is True
+        assert core.session_token_revoke(token) is True
+        assert _validate(token) is False  # revocation is immediate, ahead of TTL
+
+
+def test_expired_session_token_rejected():
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        token = core.session_token_issue()
+        # Force the stored TTL into the past — DDB TTL deletion lags, so validity is
+        # enforced in-process against the stored epoch.
+        core.table.store[(core._OAUTH_PK, f"SESSION#{token}")]["ttl"] = 1
+        assert _validate(token) is False
+
+
+def test_unknown_session_token_rejected():
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        assert _validate("lps_deadbeefdeadbeef") is False
+
+
+def test_fail_closed_rejects_session_token_when_no_key():
+    """Fail-closed: with no API key configured the whole boundary is off — even a
+    token that is otherwise present in the store must be rejected."""
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        token = core.session_token_issue()
+        assert _validate(token) is True
+    h._BEARER_TOKEN_CACHE.clear()
+    with patch("mcp.handler.get_api_key", return_value=""):
+        assert _validate(token) is False
+
+
+def test_malformed_authorization_header_rejected():
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        assert h._validate_bearer({"headers": {}}) is False
+        assert h._validate_bearer({"headers": {"authorization": "Basic xyz"}}) is False
