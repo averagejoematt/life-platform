@@ -244,7 +244,13 @@ def update_doc(path: Path, marker: str, payload: str, mode: str, apply: bool) ->
     if marker in text:
         return "unchanged"
     if mode == "prepend":
-        new_text = payload + "\n" + text
+        # Insert AFTER a leading wiki status header ("> **Status:** ...") if present —
+        # the wiki index gate requires that line to stay at the top of the file.
+        if text.startswith("> **Status:**"):
+            head, _, rest = text.partition("\n")
+            new_text = head + "\n\n" + payload + "\n" + rest.lstrip("\n")
+        else:
+            new_text = payload + "\n" + text
     else:
         sep = "" if text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
         new_text = text + sep + payload

@@ -1,3 +1,5 @@
+> **Status:** log · **Owner:** Matthew · **Verified:** 2026-07-03
+
 ## [Restart 2026-07-12] — 2026-07-10
 
 ### Added
@@ -14,8 +16,6 @@
 - `S3DataKey` customer-managed KMS key resource from `cdk/stacks/core_stack.py`. Bucket already on AES256.
 - Public-facing references to prior attempts: hero copy, CTA, build-history references on `site/builders/`.
 
-
-> **Status:** log · **Owner:** Matthew · **Verified:** 2026-07-03
 
 ## Site deploy — content-hash the full JS module graph (the "frozen page" fix) — 2026-07-03
 
