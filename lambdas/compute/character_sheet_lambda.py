@@ -35,7 +35,7 @@ from decimal import Decimal
 
 import boto3
 import character_engine
-from constants import EXPERIMENT_START_DATE  # ADR-058
+from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -83,6 +83,14 @@ def fetch_date(source, date_str):
 
     ADR-058: returns None if the record is tombstoned (preserves clean-slate
     semantics during/after the experiment restart wipe).
+
+    ADR-058 / #947: also returns None if the record belongs to another phase.
+    get_item bypasses `with_phase_filter` (a Query/Scan-kwargs helper), so this
+    mirrors its semantics — `phase == EXPERIMENT_PHASE_CURRENT` or no phase
+    attribute passes; anything else (e.g. the phase='pilot' records the
+    pre-genesis countdown cron writes) is skipped. Without this,
+    load_previous_state chains pilot xp_debt/streaks/mood into Day-1 compute,
+    defeating the clean-slate contract the pilot tag exists to enforce.
     """
     try:
         resp = table.get_item(
@@ -93,6 +101,8 @@ def fetch_date(source, date_str):
         )
         item = resp.get("Item")
         if item and item.get("tombstone"):
+            return None
+        if item and "phase" in item and item["phase"] != EXPERIMENT_PHASE_CURRENT:
             return None
         return d2f(item) if item else None
     except Exception as e:
