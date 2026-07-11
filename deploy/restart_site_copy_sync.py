@@ -342,7 +342,7 @@ def invoke_regen_lambdas(apply: bool) -> list[tuple[str, str]]:
                     "--invocation-type",
                     "RequestResponse",
                     "--payload",
-                    "e30=",  # base64-encoded '{}'
+                    "{}",  # raw JSON — raw-in-base64-out expects the raw payload, not base64
                     "--cli-binary-format",
                     "raw-in-base64-out",
                     "/tmp/_regen_" + fn.replace("-", "_") + ".json",

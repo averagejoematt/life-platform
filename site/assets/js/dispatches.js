@@ -118,7 +118,7 @@ function entriesFor(s, data) {
     // date are the Prologue (numbered by date); after it they're Week N counted from
     // genesis. The raw `week` field can repeat (two "Week 1" shipped), so it never
     // drives the displayed label.
-    const GENESIS = "2026-06-14";
+    const GENESIS = "2026-07-12";
     const ROMAN = ["I", "II", "III", "IV", "V", "VI"];
     const pre = ps.filter((p) => p.date && p.date < GENESIS).sort((a, b) => (a.date < b.date ? -1 : 1));
     const partOf = new Map(pre.map((p, i) => [p, ROMAN[i] || String(i + 1)]));
@@ -235,7 +235,7 @@ async function renderRead(s, id) {
     const events = (d && d.events ? d.events.slice() : []);
     const posts = (pj && pj.posts) || [];
     events.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));  // newest-first → "walk back"
-    const GEN = "2026-06-14", day1 = Date.parse(GEN), now = Date.now();
+    const GEN = "2026-07-12", day1 = Date.parse(GEN), now = Date.now();
     const dayN = Math.max(1, Math.floor((now - day1) / 864e5) + 1);
     const weekN = Math.max(1, Math.floor((now - day1) / 6048e5) + 1);
     const lost = jr && jr.lost_lbs != null ? Math.round(jr.lost_lbs * 10) / 10 : null;

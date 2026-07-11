@@ -1,0 +1,23 @@
+media reset report — mode=APPLY — genesis=2026-07-12
+generated=2026-07-11T04:53:15.352998+00:00
+
+archived: generated/panelcast/wk0.draft.transcript.txt
+archived: generated/panelcast/wk0.mp3
+archived: generated/panelcast/wk0.transcript.json
+archived: generated/panelcast/wk0.transcript.txt
+archived: generated/panelcast/wk0.wav
+archived: generated/panelcast/wk1.transcript.txt
+archived: generated/panelcast/wk1.wav
+archived: generated/panelcast/wk2.transcript.txt
+archived: generated/panelcast/wk2.wav
+archived: generated/panelcast/wk4.transcript.txt
+archived: generated/panelcast/wk4.wav
+rewritten: generated/panelcast/episodes.json
+rewritten: generated/panelcast/feed.xml
+archived: generated/podcast/debrief/2026-07-07.mp3
+archived: generated/podcast/debrief/2026-07-08.mp3
+archived: generated/podcast/debrief/2026-07-09.mp3
+rewritten: generated/podcast/debrief/episodes.json
+rewritten: generated/podcast/debrief/feed.xml
+
+archived=14 skipped=0 manual=0

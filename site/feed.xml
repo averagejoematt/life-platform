@@ -5,7 +5,7 @@
     <link>https://averagejoematt.com/story/chronicle/</link>
     <description>The weekly chronicle of an ordinary life, measured in full — every number, every week, including the weeks it dips. Written by Elena Voss.</description>
     <language>en-us</language>
-    <lastBuildDate>Thu, 09 Jul 2026 04:44:02 +0000</lastBuildDate>
+    <lastBuildDate>Sat, 11 Jul 2026 05:30:44 +0000</lastBuildDate>
     <atom:link href="https://averagejoematt.com/rss.xml" rel="self" type="application/rss+xml"/>
     <image>
       <url>https://averagejoematt.com/assets/images/og-image.png</url>
@@ -20,32 +20,18 @@
       <pubDate>Wed, 08 Jul 2026 12:00:00 +0000</pubDate>
     </item>
     <item>
-      <title>The Wall</title>
-      <link>https://averagejoematt.com/journal/posts/week-05/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-05/</guid>
-      <description>"The Wall" [Weight: 300.8 lbs | Week Grade: avg 57 | T0 Streak: 0 days] The week started with a 126-minute pull session at 5:19 in the morning. That's the last thing Matthew did that the system could call unambiguous. A Tuesday, before dawn, in the rain — the kind of Seattle June that doesn't apo</description>
-      <pubDate>Tue, 30 Jun 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The Week That Decided to Begin</title>
-      <link>https://averagejoematt.com/journal/posts/week-04/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-04/</guid>
-      <description>"The Week That Decided to Begin" [Weight: 305.1 lbs | Week Grade: avg 66 | T0 Streak: 1 day] The protein shake was lukewarm. That's the detail I keep coming back to from the morning the machine finally turned on. He was standing at his kitchen counter at 5 AM, not quite awake, stirring something</description>
-      <pubDate>Sat, 20 Jun 2026 12:00:00 +0000</pubDate>
+      <title>The Body Votes First</title>
+      <link>https://averagejoematt.com/journal/posts/week-02/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-02/</guid>
+      <description>The first thing Matthew Walker shows me when I sit down with him on a Thursday evening is not a chart. It's a number. Twenty — as in 20% recovery, the score his Whoop band assigned to his body on the final morning of his first full week. He holds up his wrist like it's evidence of something, and I s</description>
+      <pubDate>Tue, 07 Jul 2026 12:00:00 +0000</pubDate>
     </item>
     <item>
       <title>The Empty Journal</title>
-      <link>https://averagejoematt.com/journal/posts/week-02/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-02/</guid>
-      <description>"The Empty Journal" Here is something I did not expect to find while shadowing a man in the weeks before his experiment formally began: someone who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembere</description>
-      <pubDate>Thu, 11 Jun 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The Body Votes First</title>
       <link>https://averagejoematt.com/journal/posts/week-01/</link>
       <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-01/</guid>
-      <description>"The Body Votes First" The first thing Matthew Walker shows me when I sit down with him on a Thursday evening is not a chart. It's a number. Twenty. As in 20% recovery — the score his Whoop band assigned to his body on the final morning of a week in early June, before the machine I'd come to docume</description>
-      <pubDate>Sun, 07 Jun 2026 12:00:00 +0000</pubDate>
+      <description>Two weeks into this assignment, here is what I did not expect to find: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single jou</description>
+      <pubDate>Mon, 06 Jul 2026 12:00:00 +0000</pubDate>
     </item>
   </channel>
 </rss>

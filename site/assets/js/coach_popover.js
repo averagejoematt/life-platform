@@ -16,11 +16,11 @@ import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || 
 // Day-N/Week stamp consumes this one function — no door re-implements the math (that drift was
 // the original cross-door bug). `genesisCount()` is the pure calc; `stampGenesis()` writes it
 // into any [data-bind="genesisStamp"] element, with an optional per-door suffix.
-const GENESIS = new Date("2026-06-14T00:00:00");
+const GENESIS = new Date("2026-07-12T00:00:00");
 export function genesisCount() {
   const dayN = Math.floor((Date.now() - GENESIS.getTime()) / 86400000) + 1;
   const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
-  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since June 14 2026` };
+  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since July 12 2026` };
 }
 
 // Pre-start countdown (#931). A reset can stage a FUTURE genesis (constants + this

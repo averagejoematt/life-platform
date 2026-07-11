@@ -12,3 +12,4 @@ that ties them together (genesis, cycle, baseline, pipeline report).
 | 2 | 2026-06-01 | — | first reset (ADR-077 tooling) |
 | 3 | 2026-06-08 | 311.62 | docs/restart/_pipeline_report.txt (overwritten per run) |
 | 4 | 2026-06-14 | 306.87 | Sunday-anchored routine reset |
+| 5 | 2026-07-12 | 300.8 | docs/restart/_pipeline_report.txt @ 2026-07-11 |

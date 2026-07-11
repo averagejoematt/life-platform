@@ -257,10 +257,9 @@ def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool):
         ddb_table.update_item(
             Key={"pk": "USER#matthew#SOURCE#chronicle", "sk": sk},
             UpdateExpression=(
-                "REMOVE tombstone, tombstoned_at, tombstoned_reason, hidden "
-                "SET #d = :d, #p = :exp, redated_at = :ts, redated_from_sk = :osk"
+                "REMOVE tombstone, tombstoned_at, tombstoned_reason, #h " "SET #d = :d, #p = :exp, redated_at = :ts, redated_from_sk = :osk"
             ),
-            ExpressionAttributeNames={"#d": "date", "#p": "phase"},
+            ExpressionAttributeNames={"#d": "date", "#p": "phase", "#h": "hidden"},
             ExpressionAttributeValues={
                 ":d": new_date,
                 ":exp": "experiment",

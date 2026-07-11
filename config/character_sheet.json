@@ -6,9 +6,9 @@
     "review_ref": "docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md"
   },
   "baseline": {
-    "start_date": "2026-06-14",
-    "start_weight_lbs": 314.52,
-    "start_weight_kg": 142.664,
+    "start_date": "2026-07-12",
+    "start_weight_lbs": 300.8,
+    "start_weight_kg": 136.441,
     "baseline_source": "withings",
     "goal_weight_lbs": 185,
     "weight_phase": "loss",
@@ -159,7 +159,7 @@
       "ema_lambda": 0.93,
       "rolling_window_days": 14,
       "owner": "Social Connection",
-      "not_instrumented_note": "No relationship data source feeds this pillar yet — tracked as future work (#747).",
+      "not_instrumented_note": "No relationship data source feeds this pillar yet \u2014 tracked as future work (#747).",
       "components": {
         "social_interaction_frequency": {
           "weight": 0.4
