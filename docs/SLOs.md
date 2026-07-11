@@ -124,7 +124,7 @@ The `life-platform-ops` dashboard includes an "SLO Health" section with:
 | SLO-3 MCP | OK | No alarms firing |
 | SLO-4 AI | At risk | `ai-tokens-daily-brief-daily` in ALARM (token budget exceeded) — investigate prompt size growth |
 
-Alarms in ALARM state at audit time (2026-05-19): `ai-tokens-daily-brief-daily`, `life-platform-compute-pipeline-stale`, `life-platform-dlq-depth-warning`, `life-platform-garmin-data-ingestion-errors`, `life-platform-ingestion-dlq-messages`, `life-platform-weather-data-ingestion-errors`, `slo-source-freshness`.
+Point-in-time ALARM snapshots drift (the 2026-05-19 snapshot that used to sit here named alarms that no longer exist). Get the live picture: `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --region us-west-2`.
 
 ---
 

@@ -205,3 +205,27 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 ---
 
 **Verified:** 2026-05-19
+
+
+## Editorial guardrails (public surfaces) — canonical home
+
+Migrated from the frozen BACKLOG archive (2026-07-10 — a live guardrail was buried in a
+deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build beats):
+
+- No employer / role / industry. Partner is never named.
+- **Vices:** only *alcohol* and *food-delivery* categories are ever named publicly; all
+  other vice categories are aggregate-only (streak counts, no labels). See
+  `feedback_sensitive_content` policy — marijuana/porn content must never be public.
+- Bereavement content is opt-in only.
+- Correlative framing always ("associated with", never "caused").
+- Down-weeks are always visible — absence of bad data is a lie of omission (ADR-104).
+- Chronological age is never published (PhenoAge Option A — bio-age only).
+
+## Scope note: the PII guard vs the repo itself
+
+`deploy/pii_surface_guard.py` scans the **published site surface (`site/`) only**. The
+repo's `docs/coaching/` files carry Tier-2 owner-only data (real biometrics, training
+calibration) — their privacy control is **repo visibility** (private since 2026-07),
+NOT the guard. Wiki-panel finding 2026-07-10: treat repo visibility as a load-bearing
+privacy control; never flip this repo public again without first relocating or
+redacting `docs/coaching/`.

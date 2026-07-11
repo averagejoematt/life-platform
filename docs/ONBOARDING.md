@@ -49,7 +49,7 @@ Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
   coach-prediction-evaluator (9 AM PT, daily)
     │
     ▼
-7 email Lambdas (daily-brief at 11 AM PT, weekly digests, chronicle, etc.)
+7 email Lambdas (daily-brief at 17:00 UTC (10 AM PDT), weekly digests, chronicle, etc.)
   + og-image-generator (11:30 AM PT, 6 PNG share cards)
   + site-stats-refresh (writes public_stats.json)
     │

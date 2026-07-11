@@ -170,11 +170,20 @@ aws iam create-access-key --user-name matthew-admin
 # Update local AWS config with new keys
 aws iam delete-access-key --user-name matthew-admin --access-key-id <OLD>
 
-# 3. Force-rotate all platform secrets
-for sec in $(aws secretsmanager list-secrets --region us-west-2 \
-    --query 'SecretList[?contains(Name, `life-platform/`)].Name' --output text | tr '\t' '\n'); do
-  aws secretsmanager rotate-secret --secret-id "$sec" --region us-west-2 || echo "no rotation: $sec"
-done
+# 3. Invalidate ALL platform credentials — rotate-secret alone is FALSE SECURITY here:
+#    only mcp-api-key has a rotation Lambda; the other ~20 secrets would silently
+#    NOT rotate (the || fallback swallows the failure) while the attacker's copies
+#    stay valid. Do all three classes:
+#    (a) the one auto-rotatable secret:
+aws secretsmanager rotate-secret --secret-id life-platform/mcp-api-key --region us-west-2
+#    (b) vendor API keys (Anthropic ai-keys + site-api-ai-key, Hevy, Todoist, Habitify,
+#        google-tts, pexels, …): REVOKE at each provider console, reissue, put-secret-value —
+#        per-secret procedures in docs/SECRETS_ROTATION.md.
+#    (c) OAuth refresh tokens (whoop/withings/strava/garmin/eightsleep): revoke the app
+#        grant at the provider, then redo each auth flow (setup/ scripts; Whoop is manual —
+#        SECRETS_ROTATION §Whoop). Internal HMAC signing secrets (subscriber-token-secret,
+#        ritual-token-secret, site-api-origin-secret): generate new random values and
+#        put-secret-value (invalidates outstanding tokens — acceptable in a compromise).
 
 # 4. Check CloudTrail for unauthorized API calls
 aws cloudtrail lookup-events --region us-west-2 \
@@ -290,3 +299,20 @@ Document outcomes in `docs/INCIDENT_LOG.md` as "DR drill" entries and in the log
 ---
 
 **Verified:** 2026-07-10 (DR drill exercised — first DDB PITR restore; S3 versioned restore)
+
+
+## GitHub repo-configuration reconstruction
+
+The repo's *settings* are reproducible state that lives only in GitHub (wiki-panel
+finding, 2026-07-10). If the repo/org were lost, rebuild:
+
+| Setting | Value / where defined |
+|---|---|
+| Default branch | `main`; squash-merge is the merge convention |
+| `production` environment | Required reviewer: Matthew — this is CI's deploy approval gate (`ci-cd.yml` `environment: production`) |
+| OIDC identity provider | `token.actions.githubusercontent.com` in IAM (account 205930651321); trust policies on the 4 CI roles (inventory: `AWS_ACCESS.md` §4) |
+| Actions | Enabled; workflows in `.github/workflows/` (all in-repo — nothing console-only) |
+| Repo visibility | PRIVATE (flipped 2026-07 — `docs/coaching/` carries Tier-2 personal data; visibility is a load-bearing privacy control, see DATA_GOVERNANCE) |
+| Webhooks / branch protection | None beyond the environment gate (verify: `gh api repos/{owner}/{repo}/branches/main/protection`) |
+
+Re-derive current truth: `gh api repos/averagejoematt/life-platform` + `gh api repos/averagejoematt/life-platform/environments`.

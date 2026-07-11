@@ -128,3 +128,11 @@ Decisions where cost was a factor in the design:
 ---
 
 **Verified:** 2026-06-08 (production run-rate sweep — real CE data; governor enforcing; CE polling 4h)
+
+## What degrades when (the tier ladder)
+
+The feature-by-tier degradation ladder (tier 0–3, bands ≈73/87/97% of the effective
+ceiling, audience-ordered per ADR-125 — internal AI pauses first, the daily brief is
+protected longest) is specified once in `CLAUDE.md` §"AI Inference (Bedrock + Budget
+Guard)" and implemented in `lambdas/budget_guard.py` (tests: `test_budget_guard_ladder.py`).
+Check the live tier: `aws ssm get-parameter --name /life-platform/budget-tier --query Parameter.Value --output text`.

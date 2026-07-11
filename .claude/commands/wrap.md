@@ -45,7 +45,7 @@ paragraph beneath it (the actual content).
 
 Memory lives outside the repo at
 `~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/` — it is
-NOT git-tracked and is a separate step from the commit in (e).
+NOT git-tracked and is a separate step from the commit in (f).
 
 - Durable, reusable lessons (a gotcha that will recur, an incident narrative, a completed
   program's outcome) go to a topic file there — `project_*.md` for a body of work,
@@ -58,6 +58,13 @@ NOT git-tracked and is a separate step from the commit in (e).
   lessons/reflexes → memory topic files (this step) or `docs/CONVENTIONS.md` if it's a
   load-bearing repo-wide rule. The CLAUDE.md status block (step b) is a terse pointer,
   never the primary home for either.
+
+**Close step (c) with the memory backup** — snapshot the laptop-only memory dir to
+private, versioned S3 (wiki continuity contract; the laptop is the only other copy):
+```bash
+aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/ \
+  s3://matthew-life-platform/claude-memory-backup/ --region us-west-2
+```
 
 ### (d) Build beat OR explicit skip — this step always produces one of the two (#736)
 

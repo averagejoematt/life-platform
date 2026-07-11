@@ -11,7 +11,7 @@ the accumulated institutional memory says.
 
 There are six state surfaces. Three are in this repo (`handovers/`, the CLAUDE.md
 session block, `.claude/commands/`), one is in DynamoDB (platform memory), one is on
-Matthew's laptop only (Claude Code file memory — **the single at-risk asset**), and one
+Matthew's laptop only (Claude Code file memory — **one of the TWO laptop-only assets (see the launchd runtime below)**), and one
 is on GitHub (the Issues backlog).
 
 ---
@@ -111,7 +111,7 @@ python3 scripts/export_platform_memory.py               # one markdown file per 
 `memory_export/` is gitignored — the export contains personal data and this repo is
 public.
 
-## 4. Claude Code file memory — the ONE laptop-only asset
+## 4. Claude Code file memory — one of the TWO laptop-only assets
 
 Claude Code's cross-session memory for this project lives at:
 
@@ -191,3 +191,30 @@ archive. Conventions:
 10. **This page** — then go to the live state: `handovers/HANDOVER_LATEST.md`, the
     CLAUDE.md status block, `gh issue list --milestone Now`, and (if you need the
     machine's memory) the platform-memory export in §3.
+
+
+## The seventh + eighth surfaces (added 2026-07-10 — CTO-grader falsifications)
+
+The original six-surface map missed two. Recorded here so the claim "every state surface
+outside docs/" stays true:
+
+**7. The macOS launchd ingest runtime (the OTHER laptop-only asset).** Manual-drop
+ingestion runs on Matthew's Mac, not in AWS: `ingest/com.matthewwalker.life-platform-ingest.plist`
+(drop-folder watchers: Apple Health exports, MacroFactor, historical backfills),
+`setup/com.matthewwalker.calendar-sync.plist`, and the MacroFactor drop agent under
+`datadrops/`. The CODE survives in git; the RUNTIME dies with the laptop — scheduled
+API ingestion (AWS) continues, but manual-drop sources silently stop. Reinstall on a
+new machine: `bash ingest/install.sh` (+ re-point the drop folders). 
+
+**8. Runtime config in S3 (`config/` prefix).** Live behavior-shaping state editable
+WITHOUT any deploy: `s3://matthew-life-platform/config/<user>/board_of_directors.json`
+(the coach/persona roster — ADR-012), `config/<user>/character_sheet.json` (leveling/EMA
+constants), `config/training_phases.json`, `config/user_goals.json` (genesis/baseline),
+plus the root `config/` catalogs the Evidence pages read. Read them:
+`aws s3 ls s3://matthew-life-platform/config/ --recursive`. They are delete-protected
+(bucket policy) and S3-versioned; the restart pipeline re-syncs some from the repo's
+`config/` — see `docs/PHASE_TAXONOMY.md` for which survive a reset.
+
+**Memory backup is now a wrap-step habit** (not merely "recommended"): the wrap skill's
+step (c) ends with `aws s3 sync ~/.claude/projects/<slug>/memory/ s3://matthew-life-platform/claude-memory-backup/ --region us-west-2`
+so every session close snapshots the laptop-only memory into versioned, private S3.

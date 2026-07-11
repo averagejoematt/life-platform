@@ -1,6 +1,6 @@
 # Security Posture
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
 
 **Last updated:** 2026-05-19 (v8.0.0)
 
@@ -53,7 +53,7 @@ See `docs/SECRETS_ROTATION.md` for rotation procedures.
 
 ### Layer 3 — Public endpoints (CloudFront → site-api/site-api-ai)
 
-- ⚠️ **WAF removed** — `life-platform-amj-waf` was **deleted** (2026-06, ~−$8/mo). Rate limiting is now entirely **in-Lambda (DDB-backed)**, which is durable across warm containers and was hardened in PG-10. (NB: `cdk/stacks/web_stack.py` may still reference the dead WAF ARN — flagged for cleanup before the next `cdk deploy LifePlatformWeb`.)
+- ⚠️ **WAF removed** — `life-platform-amj-waf` was **deleted** (2026-06, ~−$8/mo). Rate limiting is now entirely **in-Lambda (DDB-backed)**, which is durable across warm containers and was hardened in PG-10. (The `web_stack.py` cleanup is DONE — `web_acl_id` intentionally omitted with an in-code warning against re-adding a dead ARN.)
 - ✅ **In-app rate limiting** (DDB-backed, PG-10 hardened):
   - `/api/ask`: 5/hr anon, 20/hr subscriber
   - `/api/board_ask`: 5/IP/hour
@@ -100,7 +100,7 @@ See `docs/DISASTER_RECOVERY.md`. Summary:
 ### Layer 8 — Endpoint hardening
 
 - ✅ **HAE webhook signature check** — HMAC verifies request body (ADR ≈ P2.7)
-- ✅ **MCP Bearer token auth** — HMAC-derived bearer required on all MCP tool calls
+- ✅ **MCP auth, fully hardened 2026-07-10 (#893 A+B):** Desktop path keeps the static HMAC bearer (`life-platform/mcp-api-key`, auto-rotated 90d); the remote OAuth path now mints **short-lived, revocable SESSION bearers** at `/token` (#909) and `/authorize` is a **passcode consent gate** with a 30-day remembered-browser cookie (#912) — URL possession alone yields nothing. NB: the Function URL itself appears in historical `docs/reviews/` bundles from the repo's public era; the control is this auth model + repo visibility, not URL secrecy.
 - ✅ **No public Function URLs without auth** — `chronicle-approve` was flagged as `authType=NONE` but resides behind the dormant chronicle workflow; re-evaluate if reactivated
 - ✅ **Public Function URLs (mcp, site-api, site-api-ai)**: app-layer Bearer/API-key required in code
 

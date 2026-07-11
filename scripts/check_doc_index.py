@@ -27,7 +27,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 INDEX = DOCS / "README.md"
 
-FRESHNESS_DAYS = 90
+FRESHNESS_DAYS = 90  # advisory report threshold
+FRESHNESS_HARD_DAYS = 180  # BLOCKING — a canonical page unverified this long fails CI (CTO-grader rec, 2026-07-10)
 
 VALID_STATUSES = ("canonical", "generated", "log", "superseded", "archive")
 
@@ -71,6 +72,10 @@ def main():
             d = date.fromisoformat(v.group(1))
             if today - d > timedelta(days=FRESHNESS_DAYS):
                 stale.append((str(today - d).split(",")[0], f"docs/{rel}", v.group(1)))
+            if not fresh_only and today - d > timedelta(days=FRESHNESS_HARD_DAYS):
+                problems.append(
+                    f"canonical page unverified > {FRESHNESS_HARD_DAYS}d (re-verify + bump the header): docs/{rel} ({v.group(1)})"
+                )
 
     if problems:
         print(f"❌ {len(problems)} wiki index/header problem(s):")

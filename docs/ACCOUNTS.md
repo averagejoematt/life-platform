@@ -54,9 +54,7 @@ genome / measurements / supplements / food-delivery (manual entry paths).
 - **The nearest hard deadline is the domain**: averagejoematt.com registration
   expires **2026-08-20** at NameCheap (as of the 2026-07-10 whois) — confirm
   auto-renew + a working payment method there.
-- `mattsusername.com` (the SES sending domain) is a second domain; its registrar
-  was not verified in this pass — see the open-questions list in the PR that
-  added this file, and `docs/MANAGED_WHERE_LEDGER.md` for what's managed where.
+- `mattsusername.com` (the SES sending domain) — registrar **NameCheap** (whois-verified 2026-07-10), same registrar account as averagejoematt.com. Check ITS expiry too when renewing.
 - Rotation procedures live in `docs/SECRETS_ROTATION.md`; source re-auth walkthroughs
   in `docs/RUNBOOK_REENTRY.md`.
 
@@ -67,3 +65,19 @@ genome / measurements / supplements / food-delivery (manual entry paths).
 Update this file whenever a new external service is added (new ingestion source,
 new API dependency) or an account is retired. Re-verify the whois/SES/Route53
 facts with the source-of-truth commands in the header — never from memory.
+
+
+## The keyring itself — estate / break-glass (added 2026-07-10)
+
+Every recovery path above terminates in "Matthew's password manager." That makes the
+manager the **single root node of the entire access graph** (CTO-grader finding). What a
+successor needs, recorded pointer-level only:
+
+| Item | Status |
+|---|---|
+| Which password manager + where its emergency/estate access lives | ⚠️ **UNDOCUMENTED — owner action required.** Matthew: record (a) the manager, (b) the estate mechanism (e.g. 1Password Emergency Kit / family recovery, iCloud Legacy Contact, printed kit + physical location) here, pointer-level only. |
+| MFA device + 2FA recovery-code locations (AWS root, GitHub, SSO) | ⚠️ **UNDOCUMENTED — owner action required.** If these live only on one phone, root+GitHub+SSO recovery all fail together. Record where backup codes live. |
+| AWS root email | See password manager (deliberate — never in this repo). |
+
+Until both ⚠️ rows are filled, treat bus-factor as **1** regardless of how good the rest
+of this wiki is. This section exists so the gap is loud, not silent.
