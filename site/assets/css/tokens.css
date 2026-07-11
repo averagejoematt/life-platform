@@ -39,6 +39,20 @@
    10. Minimal base (applies the tokens)
 */
 
+/* ── Cascade layers (#1007) ───────────────────────────────────────────────────
+   Declared FIRST (in tokens.css, which every page loads before its per-door CSS) so
+   the order is fixed regardless of stylesheet load order — later layer wins.
+     chrome-base : the per-door desktop nav chrome (.doors, .story-top, …). Lives in
+                   cockpit/story/evidence.css, which load AFTER tokens.css — so before
+                   #1007 the mobile app-bar needed ~16 !important to beat them.
+     chrome      : the mobile bottom app-bar (this file). Being a LATER layer, it wins
+                   over chrome-base by layer order — no !important, no specificity war.
+   This replaces the load-order-dependent !important stack that let the A2 bug (a
+   .doors specificity collision resurrecting .nav-follow, #1003) happen. Unlayered
+   rules still beat both layers, so every competing .doors/.*-top rule is placed in
+   chrome-base; nothing that fights the app-bar is left unlayered. */
+@layer chrome-base, chrome;
+
 /* ════════════════════════════════════════════════════════════════════════════
    RESPONSIVE BREAKPOINTS — the canonical scale (#1006)
    ════════════════════════════════════════════════════════════════════════════
@@ -1016,50 +1030,52 @@ a.vg-lit:hover { background: var(--ember-wash); }
   color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
 .cp-link:hover { border-color: var(--ember); }
 
-/* ── Mobile: the three doors become a fixed, thumb-reachable bottom app-bar
-   (2026-06-14). Replaces the old top-nav shrink-to-9px. tokens.css loads before
-   the per-door CSS, so !important is required to supersede .cockpit-top/.doors. */
-@media (max-width: 600px) {
-  /* A backdrop-filter / transform / filter ancestor creates a containing block that
-     traps position:fixed children — that pinned the door-bar to the .story-top bar
-     (top) on Story/Home while it sat at the viewport bottom on Evidence/Cockpit.
-     Neutralize those on the top bars at mobile width so the bar is ALWAYS bottom. */
-  .story-top, .ev-top, .cockpit-top {
-    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
-    transform: none !important; filter: none !important; perspective: none !important;
+/* ── Mobile: the five doors become a fixed, thumb-reachable bottom app-bar
+   (2026-06-14; five doors since the v5 IA). Replaces the old top-nav shrink-to-9px.
+   Lives in @layer chrome so it wins over the per-door desktop nav (@layer chrome-base)
+   by LAYER ORDER — no !important, no specificity war. Load order no longer matters:
+   the layer order is fixed by the @layer statement at the top of this file. (#1007) */
+@layer chrome {
+  @media (max-width: 600px) {
+    /* A backdrop-filter / transform / filter ancestor creates a containing block that
+       traps position:fixed children — that pinned the door-bar to the .story-top bar
+       (top) on Story/Home while it sat at the viewport bottom on Evidence/Cockpit.
+       Neutralize those on the top bars at mobile width so the bar is ALWAYS bottom.
+       (Load-bearing — see the mobile PWA memory. Only .story-top actually sets a
+       backdrop-filter; the rest are defensive. No !important needed: this layer beats
+       chrome-base, where every top-bar rule now lives.) */
+    .story-top, .ev-top, .cockpit-top {
+      backdrop-filter: none; -webkit-backdrop-filter: none;
+      transform: none; filter: none; perspective: none;
+    }
+    .doors {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+      display: flex; justify-content: space-around; align-items: stretch;
+      gap: 0;
+      padding: 0 .25rem env(safe-area-inset-bottom);
+      background: var(--surface-raised, #14110b);
+      border-top: 1px solid var(--ember-line, rgba(140,120,90,.28));
+      box-shadow: 0 -2px 14px rgba(0,0,0,.28);
+    }
+    /* :not(.nav-follow) keeps the follow pill out of the flex rule so it stays hidden
+       (the A2/#1003 collision). Icon-over-label column so the longest word ("protocols")
+       gets the full door width; min-width:0 lets the 5 doors + toggle fit 360px. */
+    .doors a:not(.nav-follow) {
+      flex: 1 1 0; display: flex; flex-direction: column; gap: 2px;
+      align-items: center; justify-content: center;
+      min-width: 0; min-height: 52px; padding: .5rem 0;
+      font-size: .66rem; letter-spacing: .02em; text-align: center;
+    }
+    .doors a:not(.nav-follow) .ico-door { margin: 0 0 1px 0; }
+    .doors a[aria-current="page"] { border-bottom: 0; color: var(--ember); }
+    /* The theme toggle is a <button>, so the door flex rule never sized it — reserve its
+       own space (don't grow) and center it. (44px tap-target work is #1010.) */
+    .doors .theme-toggle { flex: 0 0 auto; align-self: center; margin: 0 .15rem; }
+    .nav-follow { display: none; }
+    /* content clears the fixed bar (incl. iOS home-indicator inset); the icon-over-label
+       column doors make the bar ~66px tall, so clearance matches. */
+    body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
   }
-  .doors {
-    position: fixed !important; left: 0; right: 0; bottom: 0; z-index: 60;
-    display: flex !important; justify-content: space-around; align-items: stretch;
-    gap: 0 !important;
-    padding: 0 .25rem env(safe-area-inset-bottom) !important;
-    background: var(--surface-raised, #14110b);
-    border-top: 1px solid var(--ember-line, rgba(140,120,90,.28));
-    box-shadow: 0 -2px 14px rgba(0,0,0,.28);
-  }
-  /* :not(.nav-follow) keeps the follow pill OUT of the flex rule — otherwise
-     `.doors a` (0,1,1) beats `.nav-follow { display:none }` (0,1,0) and resurrects
-     the intentionally-hidden pill, overflowing the fixed bar. Only the 5 doors flex. (#1003) */
-  .doors a:not(.nav-follow) {
-    flex: 1 1 0; display: flex !important; flex-direction: column; gap: 2px;
-    align-items: center; justify-content: center;
-    /* min-width:0 lets the 5 doors shrink below their min-content width so the row
-       (5 doors + the fixed-width toggle) fits 360px — flex-basis:0 alone can't, because
-       the default min-width:auto floors each door at its longest word + icon. And
-       stacking the icon OVER the label (column) gives the longest word ("protocols")
-       the full door width — icon-beside-label overflowed a 64px box at 360px. (#1003) */
-    min-width: 0; min-height: 52px; padding: .5rem 0 !important;
-    font-size: .66rem !important; letter-spacing: .02em !important; text-align: center;
-  }
-  .doors a:not(.nav-follow) .ico-door { margin: 0 0 1px 0; }
-  .doors a[aria-current="page"] { border-bottom: 0 !important; color: var(--ember) !important; }
-  /* The theme toggle is a <button>, so `.doors a` never sized it — reserve its own
-     space (don't grow) and center it; once the follow pill is hidden it fits and is
-     reachable at 360px. (44px tap-target enlargement is #1010, not this fix.) (#1003) */
-  .doors .theme-toggle { flex: 0 0 auto; align-self: center; margin: 0 .15rem; }
-  /* content clears the fixed bar (incl. iOS home-indicator inset). The icon-over-label
-     column doors make the bar ~66px tall, so clearance matches. (#1003) */
-  body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
 
 /* ── Follow link — desktop nav affordance; hidden on mobile (bottom bar has no room) ── */
@@ -1071,7 +1087,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
   border-radius: 4px; padding: .1em .5em .15em; white-space: nowrap;
 }
 .nav-follow:hover { color: var(--ember); border-color: var(--ember); }
-@media (max-width: 600px) { .nav-follow { display: none !important; } }
+/* nav-follow is hidden on mobile inside @layer chrome above (no !important needed). */
 
 /* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */
 /* muted, but NOT below AA: --ink-faint is AA-tuned (4.9:1 on paper); the old opacity:0.6 dropped it to 2.34. */
