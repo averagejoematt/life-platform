@@ -1,145 +1,119 @@
-# HANDOVER — The decision sprint: Matthew answered ~15 questions live, 12 PRs shipped on the answers, OIDC tightened attended, the essay published, the site now deploys itself — 2026-07-08/09 (overnight)
+# HANDOVER — "Work the 6 that don't need me" became 8 shipped: MCP auth fully hardened (A+B), first DR restore drill, the Relationships pillar's social half wired — 2026-07-10
 
-> Instruction (evolving through the session): "is there any work we can be doing from the
-> open issues, or do they all require something from me? I approve you to do all merge and
-> deploys" → "merge or update the 2 open pull requests" → "organize [the Matthew-gated
-> issues] easiest to unblock and how I can answer" → two answer batches + live refinements
-> (Habitify-first capture, Strava correction, $85 ceiling) → "keep going on everything not
-> requiring me, then wrap; I'll unblock the optional questions next session."
+> Instruction (evolving): "read handover and memory so we can talk about what to work on"
+> → "can you work on the 6 things that don't need me, i approve all merges and deploys"
+> → (mid-session) "893, i am fine to do an actual authorize step if it's the right thing.
+> And yes resolve that 902 bug" → "yes wrap". Standing authorization: all merges + deploys
+> (in-session words unblock, per `feedback_prod_deploy_authorization`).
 
 ## The shape of the session
 
-The previous wrap said "remaining 18 issues are ALL gated — no unblocked work exists."
-This session's discovery: **most gates were one-sentence questions.** Ranking them
-easiest-to-answer and asking in plain language turned "all blocked" into 15 answers,
-which became 12 merged+deployed PRs (#887–#889, #892, #894–#901), one attended security
-execution (#687), and one published essay — in a single overnight sitting. The
-org-chart-of-one essay shipped *during* the session that demonstrated its thesis.
+Picked up the "18 remaining issues" board and separated the genuinely-unblocked from the
+Matthew-gated. Fanned out 3 worktree agents on the clean ones, took the delicate ones
+(live AWS, security design) in the foreground. Two forks surfaced mid-session and Matthew
+answered both live: **#893 option B** (yes, do a real /authorize approval step) and the
+**#902 adjacent bug** (yes, wire the missing social signal). Net: **8 items shipped +
+deployed + verified**, 1 deferred with receipts, 1 IAM apply executed by Matthew.
+
+The recurring friction was **visibility**: Matthew kept hitting ESC to type "status,"
+which *cancels the in-flight tool call* (that's why several live MCP reads showed as
+"rejected" — not denials). Fix going forward: post a short heartbeat after each discrete
+step so he never has to interrupt to know it's progressing. Saved as feedback memory.
 
 ## What shipped (all MERGED + DEPLOYED + VERIFIED)
 
-- **Dependabot pair** — #847 (dev tooling; CI's own ruff→0.14.14 / playwright→1.61.0 pins
-  bumped across 4 workflows — the CQ-01 guard caught the drift) + #846 (action SHAs;
-  fixed two stale `# v3.0.1` comments on v6.2.2 pins).
-- **#885 (PR #887)** — email-subscriber Function URL origin guard: the last unguarded
-  CloudFront origin. Direct URL → 403, via CF → 200, live-verified.
-- **#886 (PR #888)** — `mcp-audit/` lifecycle (IA@30d, expire 90d). Agent also fixed a
-  real footgun: `apply_s3_lifecycle.sh` declared 1 rule while the bucket had 8 — a re-run
-  would have wiped 7. Now the declarative full config (9 rules), applied live.
-- **Driver fix** — prod MCP canary red since the #395 prune (asserted ≥80 tools, registry
-  60): floor → 55, deployed, verified ("60 tools listed, all_pass true"; 62 after #898).
-- **#739 (PR #889)** — surge ceiling: floats to **$100** (Matthew) at >900 trailing-7d
-  uniques (~4× real median — ADR-133, derived from live traffic-digest logs), edge-
-  triggered alert via SSM `/life-platform/surge-active`; **base ceiling $75 → $85**
-  (Matthew, mid-session — tier-1 was from internal creep at $79.27 projected). Tier bands
-  now scale as fractions of the effective ceiling; AWS Budgets bumped via CDK (name kept —
-  replacement key). NB: **$85 does NOT clear tier 1 immediately** — bands trip at ~73% by
-  design; it self-clears as dev burn decays.
-- **#746 (PR #892)** — manual-source reliability (channels = HAE/Notion/MCP, Matthew's
-  call): thresholds as `source_registry` facets (HAE per-datatype thresholds migrated in;
-  Notion 14d from real cadence), kind evening-nudge section, public "dark Nd" honesty
-  display.
-- **#422 (PR #898)** — habit causality, redesigned twice on Matthew's live input:
-  **Habitify `/notes` ingestion is the primary capture** (note at check-off/skip =
-  trigger/reward/why-missed, verbatim), MCP is a **reflection loop**
-  (`get_habit_reflection_queue` + `log_habit_reflection`, provenance-tagged, never nags).
-  Registry 60 → 62 (audit ratchet row added). Watch the first post-deploy Habitify ingest
-  (live `/notes` field names unverified — fail-open).
-- **#421 (PR #900)** — vitals depth: VO₂max trend (287 real Garmin records), walking HR
-  (775 Strava Walk activities — **Strava IS a live source**; the driver wrongly told the
-  agent otherwise and Matthew caught it), fitness age 59 (56–62, PhenoAge privacy
-  pattern, leak-grep test). Hourly habits + vascular age **deferred with receipts**
-  (Habitify timestamps are poll-observation times; no in-repo vascular formula).
-  Fleet-wide motion.js dash-truncation fix (also heals the live weight hero).
-- **#750 (PR #897)** — site deploys through CI on merge (separate `site-deploy.yml`, no
-  approval gate by design, rollback wired). **Earned its keep within the hour** — see
-  gotchas.
-- **#741 part (PR #899)** — the essay is **LIVE**:
-  `/journal/essays/org-chart-of-one/` — first "In my own words" post, RSS item #1,
-  `/method/build/` cross-link, HN block ready in the PR. #741 stays open for Matthew's
-  submission (referrer measurement already exists in the traffic digest).
-- **PR #901** — reader participation ON: votes/follows/check-ins/suggest-an-experiment/
-  submit-a-finding live against the long-hardened endpoints; the "deferred" footnote
-  retired. Discovery: **predict-the-week was already active** (weekly config upload
-  ritual) — the "dormant" note in memory was stale.
-- **#890 (PR #895)** — character-sheet journal fetch fixed (flat `DATE#` key could never
-  match templated `DATE#…#journal#…`): `themes` path revived via `merge_journal_view`;
-  the Relationships pillar may show its **first real signal** on the next compute.
-- **#891 (PR #894)** — `MCP_TOOL_CATALOG.md` regenerated from the registry via a new
-  idempotent zero-arg generator (`scripts/generate_mcp_tool_catalog.py`).
-- **#687 EXECUTED (attended, direct commits dcd4d17f)** — OIDC trust-tighten: both roles
-  main-only (deploy also `environment:production` per ADR-120); **negative test proven**
-  (branch dispatch → `Not authorized to perform sts:AssumeRoleWithWebIdentity`); new
-  **`github-actions-diagnosis-role`** (main-only trust, Bedrock-vision-QA-only) assumed by
-  all 3 vision-QA jobs; `proposed/` promoted to canonical; `verify_oidc_iam` CLEAN (9
-  targets); weekly drift sentinel gained `check_oidc_iam`. Full pipeline green
-  post-tighten (Deploy job = the environment subject).
-- **Also closed without code:** #740 (essay approved as-is + venue shortlist: blog → HN
-  same week; LeadDev/Pragmatic Engineer/AI-Eng-Summit as the submission options).
-- **Filed:** #893 (MCP auth beyond URL possession — R22 residual, Matthew-approved),
-  #902 (journal mood-scale mismatch — social_mood_correlation still dead), #903 (shed
-  diagnosis reads from the deploy role), #904 (gear page w/ affiliate links — Matthew's
-  idea).
-- **Tail fixes:** MANAGED_WHERE_LEDGER stale `seeds/` pointer → `deploy/bucket_policy.json`;
-  `get_date_range` description no longer references a pruned tool; QUICKSTART/RUNBOOK now
-  present CI as the primary site-deploy path.
+- **#902 → PR #905** — revived `social_mood_correlation`'s mood half. Root cause was
+  deeper than the issue: `merge_journal_view` (#890) never set `mood_avg` at all. Scale
+  map `enriched_mood` 1–5 → 0–10 via `(m-1)/4*10`. Deployed `character-sheet-compute`,
+  smoke-verified (200, clean).
+- **#904 → PR #907** — `/gear/` page (first passive-monetization surface): every device
+  from `source_registry.py`, cross-links to `/method/verify/`, **placeholder affiliate
+  slots** (`data-affiliate="pending"` + FTC disclosure) that Matthew fills in the `GEAR`
+  dict in `scripts/v4_build_gear.py`. Render-QA passed both themes. Site auto-deployed.
+- **#755 → PR #908** — **first verifiably-exercised DDB PITR restore** (+ S3 versioned
+  restore), both into isolated targets (`life-platform-dr-drill` table, `backups/dr-drill/`
+  prefix), spot-checked against prod, torn down. Fixed the DR doc's stale "snapshot the
+  layer" step (shared-utils layer retired #781). Prior to this only S3 versioning had ever
+  been exercised (via the 2026-03-16 accident).
+- **#893-A → PR #909** — `/token` mints a short-lived (24h), **revocable** session bearer
+  (`lps_…`, DDB-backed `core.session_token_issue/valid/revoke`) instead of the permanent
+  key-derived Desktop bearer. `_validate_bearer` accepts the static Desktop bearer OR a
+  live session bearer; fail-closed. Deployed `life-platform-mcp`, **live-verified** (unauth
+  401, static bearer 200, full OAuth flow → `lps_` token → 200).
+- **#893-B → PR #912** — `/authorize` is no longer auto-approve: a **passcode consent
+  form** (passcode = `HMAC(api_key,"life-platform-authorize-v1")`, derived so it's entered
+  without exposing the key) + a signed **30-day remembered-browser cookie** (payload-2.0
+  `cookies` array). URL possession alone now yields nothing. Deployed + **8/8 live checks**
+  (form shown, wrong passcode 401, correct → code+cookie, session token works, cookie
+  fast-path 302). Desktop path untouched throughout.
+- **#910 → PR #911** — the #902 adjacent bug: `character_engine.compute_relationships_raw`
+  read numeric `social_connection_score`/`enriched_social_connection` that *nothing writes*;
+  the enrichment lambda emits categorical `enriched_social_quality`. Bridge maps
+  alone/surface/meaningful/deep → 0/3.33/6.67/10 at read-time (works on historical data),
+  averaged across a day's entries. Lights up the Relationships pillar's second component.
+  Deployed `character-sheet-compute`, smoke-verified.
+- **#903 → PR #906 (code) + live IAM apply EXECUTED by Matthew** — shed `IAMReadOnly` +
+  `BedrockVisionQA` from the CI deploy role and narrowed CloudWatch to `DescribeAlarms`.
+  Matthew ran `put-role-policy` + `verify_oidc_iam --strict` → **CLEAN (9 targets)**. The
+  behavioral proof (no deploy-stage AccessDenied) comes on the next CI deploy; rollback
+  snapshot saved.
+- **Filed:** #910 (social bridge, done same session) + **#916** (Later — #893-B follow-up:
+  refresh_token grant / cookie-TTL tuning, gated on observed passcode-re-entry friction).
 
 ## Deploys + verification
 
-Ordered: LifePlatformWeb (subscriber guard) → lifecycle applied → canary → serial merge
-train with doc-sync reconciles → **site-api BEFORE site** (learned the hard way, see
-gotchas) → `cdk deploy --all` 9/9 → SSM `hevy/restamp_enabled=true` → site via its own CI.
-**Verified:** full ci-cd green on tip (post-tighten, every job) · site-deploy green
-(smoke + visual-QA 34/34) · direct-URL 403 / via-CF 200 · canary 62 tools · AWS budget
-$85 · essay 200 + RSS + build stamp == main tip · participation flows render-QA'd ·
-`verify_oidc_iam` CLEAN.
+`character-sheet-compute` (×2: #905 then #911) · `life-platform-mcp` (×2: #893-A then
+#893-B) — all via `deploy_lambda.sh` full-tree bundle (rollback artifacts saved). Live:
+MCP 8/8 auth checks green, static Desktop bearer intact, session flow + passcode gate +
+cookie fast-path all working. DR drill: restored item matched prod exactly. #906: live
+role verified CLEAN by the strict verifier. Site: gear page auto-deployed green. Every
+PR merged to main; `main == live` for the touched surfaces.
 
 ## Gotchas (new this session)
 
-- **Deploy the API before the front-end that calls it.** The new site-deploy CI shipped
-  the site while `/api/vitals_depth` wasn't deployed → visual-QA 404 → **auto-rollback
-  fired correctly on day one**. site-api first, then site.
-- **Superseded queued site-deploy runs** hit the clobber guard as red runs + SNS alerts;
-  fixed with an up-front ancestry check that skips cleanly (the newer commit's run
-  deploys a superset).
-- **A transient API outage killed all 7 in-flight agents simultaneously.** Worktrees and
-  branches survived; `SendMessage` resume-from-transcript recovered every one with zero
-  lost work. Also: two agents stalled because their render-QA subagents couldn't route
-  verdicts back — the driver must relay.
-- **IAM normalizes single-element `StringLike` lists to bare strings** — store the
-  normalized form in `infra/iam/*.json` or the verifier false-drifts.
-- **`gh issue create` has no `--json` flag** — it fails silently inside a piped one-liner;
-  three "filed" issues weren't. Check the URL output.
-- **The "all gated" framing goes stale fast** — asking the human ranked, simplified
-  questions with recommended answers unblocked 15 items in minutes. Cheapest tool in the
-  box.
-- The old HAE API (`a76xwxt2wa`) still takes ~4–5 successful POSTs/day — a straggler
-  device/automation. **Deletion approved but HELD** until it's repointed.
+- **ESC to ask "status" cancels the in-flight tool call.** That's why live MCP reads
+  showed as "rejected." Not denials — interruptions. Heartbeat after each step instead.
+- **The auto-mode classifier correctly firewalls two protected-scope actions** even under
+  "approve all merges and deploys": (1) live `iam:put-role-policy` on the deploy role, (2)
+  a verify script that *prints* the key-derived passcode to the transcript. Both were
+  handed to Matthew to run in his own shell (`!`/terminal) — "approve deploys" does not
+  extend to IAM mutation or credential materialization. Right guardrail; hand off, don't
+  work around.
+- **`core.py`'s `secrets` is the boto3 SecretsManager client, not stdlib** — used
+  `uuid.uuid4().hex` (the codebase's opaque-token idiom) for token randomness to avoid the
+  name collision.
+- **ruff bandit S105 fires on `SESSION_TOKEN_PREFIX = "lps_"`** (a token *label*, not a
+  secret) in `mcp/core.py` — `mcp/handler.py` is S105-exempt in pyproject but core.py
+  isn't; used a surgical `# noqa: S105` rather than blanket-exempting the file. CI's
+  blocking ruff enforces S-codes (`select=[...,"S"]`, no `|| true`); its blocking flake8
+  only selects `E9,F63,F7,F82` (F401 is informational).
+- **Terminal line-wrap mangles pasted multi-line commands** — the passcode one-liner broke
+  on `--region\n  us-west-2`; give copy-paste commands as a single unwrapped line.
+- **Lambda Function URLs are payload format 2.0** — request cookies arrive in
+  `event["cookies"]` (+ Cookie header); responses set cookies via the top-level `cookies`
+  array, NOT a `Set-Cookie` header. Got this right in #893-B.
 
-**Build beat:** 2026-07-09-decision-sprint
+**Build beat:** 2026-07-10-mcp-auth-hardened
 
-## Residual — waiting on Matthew (he'll unblock next session)
+## Residual — waiting on Matthew (all optional / low-priority)
 
-1. **PRE-13 decisions** (audit delivered in-session): genome is public per-SNP incl.
-   APOE genotype; labs public at exact values incl. testosterone/PSA/cancer screening —
-   both contradict DATA_GOVERNANCE's "aggregates only". Recommended: genericize genome
-   to category counts, split labs (experiment-core exact, clinical-personal banded),
-   remove the latent adherence_pct code path, genericize quest names. One PR once
-   answered.
-2. **HN submission** (title + URL in PR #899) + the one-line call: update the essay's
-   snapshot-pinned "8 stacks, ~140 tools" to current (9/60) or leave.
-3. **/verify/ profile URLs** — Strava/Hevy/Garmin public profile links or "keep private".
-4. **HAE straggler** — repoint the device still on the old URL, then the API gets deleted.
-5. GitHub GC ticket — paused by Matthew's explicit choice.
+1. **claude.ai reconnect** — on its next token refresh (≤24h) the connector prompts for
+   the passcode Matthew retrieved this session; he pastes it once per browser (~monthly via
+   the cookie). Desktop needs nothing.
+2. **#748 fulfillment story** — still gate-locked: needs ≥4 weeks of clean fulfillment data
+   incl. a rough patch. #910 wired the social signal (a precondition); watch whether
+   `enriched_social_quality` is actually populated on recent journal days before revisiting.
+3. **#916** — #893-B refresh-friction follow-up; only act if the monthly passcode annoys.
+4. **Still open from prior session:** PRE-13 privacy decisions, HN submission (#741), /verify/
+   profile URLs, HAE straggler repoint, GitHub GC ticket (paused by Matthew).
+5. **#902/#910 live effect** — spot-check a recent character-sheet compute for a non-None
+   Relationships social component once journals carry `enriched_social_quality`.
 
 ## Watch
 
-First 18:00 UTC Hevy re-stamp run (metrics `LifePlatform/HevyRoutine`, alarm
-`hevy-restamp-errors`; Hevy app should show the recommended branch) · first Habitify
-`/notes` ingest (field names unverified against live API) · Relationships pillar's first
-real `interaction_quality` signal on the next character-sheet compute · Sunday fresh-eyes
-run · surge metrics appearing after the next weekly traffic digest · first organic CI
-site deploy on a normal site/ merge · `mcp-audit/` records (still zero — fine unless MCP
-writes happened) · budget tier self-clearing below ~$62 projected.
+First natural CI deploy after the #906 shed (confirms no deploy-stage AccessDenied) ·
+claude.ai's first post-#893-B refresh (passcode prompt appears as designed) · the
+Relationships pillar's first real social signal on the next character-sheet compute ·
+gear-page affiliate slots stay `pending` until Matthew signs up.
 
-Prior session archived at `handovers/HANDOVER_2026-07-08_backlog-paydown-64-to-18.md`.
+Prior session archived at `handovers/HANDOVER_2026-07-09_decision-sprint.md`.
