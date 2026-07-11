@@ -1004,14 +1004,29 @@ a.vg-lit:hover { background: var(--ember-wash); }
     border-top: 1px solid var(--ember-line, rgba(140,120,90,.28));
     box-shadow: 0 -2px 14px rgba(0,0,0,.28);
   }
-  .doors a {
-    flex: 1; display: flex !important; align-items: center; justify-content: center;
-    min-height: 52px; padding: .5rem .25rem !important;
-    font-size: .72rem !important; letter-spacing: .04em !important; text-align: center;
+  /* :not(.nav-follow) keeps the follow pill OUT of the flex rule — otherwise
+     `.doors a` (0,1,1) beats `.nav-follow { display:none }` (0,1,0) and resurrects
+     the intentionally-hidden pill, overflowing the fixed bar. Only the 5 doors flex. (#1003) */
+  .doors a:not(.nav-follow) {
+    flex: 1 1 0; display: flex !important; flex-direction: column; gap: 2px;
+    align-items: center; justify-content: center;
+    /* min-width:0 lets the 5 doors shrink below their min-content width so the row
+       (5 doors + the fixed-width toggle) fits 360px — flex-basis:0 alone can't, because
+       the default min-width:auto floors each door at its longest word + icon. And
+       stacking the icon OVER the label (column) gives the longest word ("protocols")
+       the full door width — icon-beside-label overflowed a 64px box at 360px. (#1003) */
+    min-width: 0; min-height: 52px; padding: .5rem 0 !important;
+    font-size: .66rem !important; letter-spacing: .02em !important; text-align: center;
   }
+  .doors a:not(.nav-follow) .ico-door { margin: 0 0 1px 0; }
   .doors a[aria-current="page"] { border-bottom: 0 !important; color: var(--ember) !important; }
-  /* content clears the fixed bar (incl. iOS home-indicator inset) */
-  body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
+  /* The theme toggle is a <button>, so `.doors a` never sized it — reserve its own
+     space (don't grow) and center it; once the follow pill is hidden it fits and is
+     reachable at 360px. (44px tap-target enlargement is #1010, not this fix.) (#1003) */
+  .doors .theme-toggle { flex: 0 0 auto; align-self: center; margin: 0 .15rem; }
+  /* content clears the fixed bar (incl. iOS home-indicator inset). The icon-over-label
+     column doors make the bar ~66px tall, so clearance matches. (#1003) */
+  body { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
 
 /* ── Follow link — desktop nav affordance; hidden on mobile (bottom bar has no room) ── */

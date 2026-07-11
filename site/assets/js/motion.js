@@ -257,7 +257,12 @@
       draw(e.target);
       countUp(e.target);
     });
-  }, { threshold: 0.1, rootMargin: "0px 0px -6% 0px" });
+    // threshold:0 (any-pixel intersect) is height-independent — a fractional threshold
+    // like 0.1 can NEVER be reached on a section taller than 10 viewport-heights (the
+    // 80-card /protocols/challenges/ backlog is ~22,600px; max ratio ≈3.7%), so its
+    // cards stay opacity:0 forever. The -12% bottom rootMargin gives the same "reveal a
+    // beat after it enters" feel the threshold used to, but for any element height. (#1002)
+  }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
 
   function arm(scope) {
     var list = [];
