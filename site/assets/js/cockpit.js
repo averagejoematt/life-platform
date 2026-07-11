@@ -622,10 +622,17 @@ async function renderForecast() {
       `<span class="fx-range label">${escapeHTML(String(f.frame || "tomorrow"))} · 80% range ${escapeHTML(String(f.lo))}–${escapeHTML(String(f.hi))}</span></li>`;
   });
   bind("fx-rows").innerHTML = rows.join("");
+  // #948 pre-start frame: before genesis these are the model's physiology warm-up —
+  // Home's "no projections yet" promise is about finish-line math, and a prior-cycle
+  // "range held N% of M graded" stat would read as this cycle's track record.
+  // Payload flag first (/api/forecast carries pre_start), client GENESIS fallback.
+  const preFx = preStart(d);
   const cov = d.coverage;
-  bind("fx-cov").textContent = cov && cov.n_resolved
-    ? ` · range held ${Math.round(cov.coverage_pct)}% of ${cov.n_resolved} graded`
-    : " · ungraded until tomorrow";
+  bind("fx-cov").textContent = preFx
+    ? " · the model's warm-up — physiology expectations only; the finish-line math begins with Day 1's weigh-in"
+    : (cov && cov.n_resolved
+      ? ` · range held ${Math.round(cov.coverage_pct)}% of ${cov.n_resolved} graded`
+      : " · ungraded until tomorrow");
   const res = (d.resolutions_today || []).filter((r) => r.horizon_days === 1 && r.actual != null && r.point != null);
   const rline = bind("fx-resolved");
   if (res.length) {

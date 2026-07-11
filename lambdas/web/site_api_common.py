@@ -171,7 +171,10 @@ def pre_start_meta() -> dict | None:
     where N = whole PT calendar days until genesis (always >= 1 — on genesis day
     itself the experiment has started). Returns None once genesis <= today: the
     normal path is a structural no-op, proven by tests/test_pre_start_countdown.py.
-    Consumers: /api/journey, /api/snapshot, /api/pulse (+ the front-end doors)."""
+    Consumers: /api/journey, /api/snapshot, /api/pulse (+ the front-end doors); the
+    #948 sweep added /api/observatory_week, /api/cycle_compare, /api/vacation_fund,
+    /api/weekly_priority, /api/journey_waveform, /api/forecast (flag only) and the
+    zeroed character/character_stats states."""
     today = datetime.now(PT).date()
     start = date.fromisoformat(EXPERIMENT_START)
     if start <= today:

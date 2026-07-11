@@ -51,6 +51,7 @@ from web.site_api_common import (
     _load_s3_json,
     _ok,
     logger,
+    pre_start_meta,
     table,
 )
 
@@ -1617,9 +1618,17 @@ def handle_coach_timeline(event):
 def handle_weekly_priority(event):
     """GET /api/weekly_priority"""
     try:
+        # PRE-START (#948, the #939 contract): any stored integrator record predates
+        # the staged genesis — serving it would present the wiped cycle's "week's
+        # call" as current. Honest null + the countdown fields; every consumer
+        # already renders the empty state. Inert (normal path, pre_start=False)
+        # once genesis <= today.
+        _pre = pre_start_meta()
+        if _pre:
+            return _ok({"weekly_priority": None, "cross_domain_notes": {}, **_pre}, cache_seconds=300)
         _int_item = _integrator_digest()  # #946: tombstone/phase-guarded
         if not _int_item:
-            return _ok({"weekly_priority": None, "cross_domain_notes": {}}, cache_seconds=300)
+            return _ok({"weekly_priority": None, "cross_domain_notes": {}, "pre_start": False}, cache_seconds=300)
         return _ok(
             {
                 "weekly_priority": _int_item.get("analysis", ""),
@@ -1628,6 +1637,7 @@ def handle_weekly_priority(event):
                 "week_number": _int_item.get("week_number"),
                 "coach_name": "Dr. Kai Nakamura",
                 "coach_title": "Integrative Health Director",
+                "pre_start": False,
             },
             cache_seconds=300,
         )

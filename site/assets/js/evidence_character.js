@@ -68,7 +68,9 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
     ? pillars.map((p) => (((p.neglect_decay && p.neglect_decay.applied) || (p.absent_behaviors || []).length) ? Object.assign({}, p, { dim: true }) : p))
     : pillars;
   let center;
-  if (jj && isFinite(Number(jj.start_weight_lbs)) && isFinite(Number(jj.current_weight_lbs)) && Number(jj.start_weight_lbs) !== Number(jj.goal_weight_lbs)) {
+  // #948: explicit null checks — Number(null) is 0 (finite), which would draw a
+  // goal-weight silhouette while /api/journey suppresses the pre-start weight.
+  if (jj && jj.start_weight_lbs != null && jj.current_weight_lbs != null && isFinite(Number(jj.start_weight_lbs)) && isFinite(Number(jj.current_weight_lbs)) && Number(jj.start_weight_lbs) !== Number(jj.goal_weight_lbs)) {
     const g = Math.max(0, Math.min(1, (Number(jj.current_weight_lbs) - Number(jj.goal_weight_lbs)) / (Number(jj.start_weight_lbs) - Number(jj.goal_weight_lbs))));
     center = `<svg x="118" y="76" width="124" height="208" viewBox="0 0 300 620" aria-hidden="true">` +
       `<circle class="ch-body" cx="150" cy="64" r="${(29 + 6 * g).toFixed(1)}"></circle>` +

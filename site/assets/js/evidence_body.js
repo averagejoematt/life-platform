@@ -248,8 +248,9 @@ export function physicalRateTempo(readings, j) {
 // meaningless on a heavy frame rebuilding lean mass). Height from the profile, never a hero.
 export function physicalBMI(readings, j) {
   const hIn = Number(j.height_inches);
-  const latest = readings.length ? Number(readings[readings.length - 1].weight_lbs) : Number(j.current_weight_lbs);
-  if (!Number.isFinite(hIn) || hIn <= 0 || !Number.isFinite(latest)) return "";
+  // #948: Number(null) is 0 — a nulled pre-start weight must hide the BMI, not compute 0.0.
+  const latest = readings.length ? Number(readings[readings.length - 1].weight_lbs) : (j.current_weight_lbs != null ? Number(j.current_weight_lbs) : NaN);
+  if (!Number.isFinite(hIn) || hIn <= 0 || latest <= 0 || !Number.isFinite(latest)) return "";
   const bmi = Math.round((703 * latest / (hIn * hIn)) * 10) / 10;
   return sec("BMI — included, but kept in its place",
     `<p class="rd-bmi"><span class="rd-bmi-v mono">${fmt(bmi)}</span> <span class="label">BMI</span></p>` +

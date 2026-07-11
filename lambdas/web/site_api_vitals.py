@@ -289,6 +289,11 @@ def handle_journey() -> dict:
     if _pre:
         journey.update(_pre)
         for _k in (
+            # #948: the weight + its as-of anchor travel TOGETHER (the in-code
+            # contract above) — keeping a stale prior-cycle weigh-in while nulling
+            # last_weighin_date served an unattributable ghost weight during the
+            # countdown, and contradicted /api/vitals (which nulls weight_lbs).
+            "current_weight_lbs",
             "lost_lbs",
             "remaining_lbs",
             "progress_pct",
@@ -344,6 +349,11 @@ def handle_character(date: str | None = None) -> dict:
         # pilot/pre-genesis sheet right after a reset: the first experiment-phase sheet
         # isn't computed until the morning after genesis, and a 503 in that window
         # degraded the Cockpit. Show zeroed, never a 503.
+        # #948: never stamp a FUTURE as_of — a staged genesis put "as of <tomorrow>"
+        # in the cockpit footer and character hero, a freshness claim about a date
+        # that hasn't happened. Clamp to today (PT); the countdown fields ride along
+        # pre-start. Inert (no clamp, pre_start=False) once genesis <= today.
+        _pre = pre_start_meta()
         return _ok(
             {
                 "character": {
@@ -351,13 +361,14 @@ def handle_character(date: str | None = None) -> dict:
                     "tier": "Foundation",
                     "tier_emoji": "🔨",
                     "xp_total": 0,
-                    "as_of_date": as_of,
+                    "as_of_date": min(as_of, datetime.now(PT).date().isoformat()),
                     "pre_experiment": True,
                 },
                 "pillars": [
                     {"name": p, "emoji": PILLAR_EMOJI.get(p, ""), "level": 1, "raw_score": 0, "tier": "Foundation", "xp_delta": 0}
                     for p in PILLAR_ORDER
                 ],
+                **(_pre or {"pre_start": False}),
             },
             cache_seconds=900,
         )
@@ -653,6 +664,11 @@ def handle_character_stats() -> dict:
     # Pre-experiment: zeroed character
     if date_str < EXPERIMENT_START:
         PILLARS_ZERO = {p: {"level": 1, "raw_score": 0, "tier": "Foundation"} for p in PILLARS}
+        # #948: align the stamp with /api/character's zeroed state \u2014 the honest
+        # "as of" for a not-yet-started sheet is today (clamped so a staged future
+        # genesis never stamps tomorrow), not the stale prior-cycle record's date;
+        # the two character endpoints disagreed (2026-07-10 vs 2026-07-12).
+        _pre = pre_start_meta()
         return _ok(
             {
                 "character_stats": {
@@ -660,10 +676,11 @@ def handle_character_stats() -> dict:
                     "tier": "Foundation",
                     "tier_emoji": "\ud83d\udd28",
                     "xp_total": 0,
-                    "as_of_date": date_str,
+                    "as_of_date": min(EXPERIMENT_START, datetime.now(PT).date().isoformat()),
                     "pre_experiment": True,
                 },
                 "pillars": PILLARS_ZERO,
+                **(_pre or {"pre_start": False}),
             },
             cache_seconds=3600,
         )
@@ -1025,6 +1042,18 @@ def handle_journey_waveform() -> dict:
     """
     today = datetime.now(PT).date()
     genesis = date.fromisoformat(EXPERIMENT_START)
+
+    # PRE-START (#948): day_n clamps to 0 — matching handle_journey — so the
+    # front-end #931 gates ("day 1 of the experiment", "1 day · the shape of it")
+    # stay quiet until genesis instead of painting a Day-1 figure over an empty
+    # strip at T−1. No fabricated single-day series. Inert once genesis <= today.
+    _pre = pre_start_meta()
+    if _pre:
+        return _ok(
+            {"days": [], "max_score": 1, "window": 0, "day_n": 0, "week_n": 0, "genesis": EXPERIMENT_START, **_pre},
+            cache_seconds=3600,
+        )
+
     day_count = max((today - genesis).days + 1, 1)  # 1-indexed Day-N
     window = min(day_count, 365)
     start = today - timedelta(days=window - 1)
@@ -1095,6 +1124,7 @@ def handle_journey_waveform() -> dict:
             "day_n": day_count,
             "week_n": ((day_count - 1) // 7) + 1,
             "genesis": EXPERIMENT_START,
+            "pre_start": False,
         },
         cache_seconds=3600,
     )

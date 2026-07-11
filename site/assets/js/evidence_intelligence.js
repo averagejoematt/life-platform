@@ -167,6 +167,11 @@ export function renderWrong(d) {
 
 // Cycle vs cycle — matched first-K-days windows across experiment restarts.
 export function renderCycles(d) {
+  // #948 pre-start: window 0 — there is no matched window before Day 1, so say when
+  // the comparison begins instead of tabling a degenerate 1-day pseudo-window.
+  if (d && d.pre_start) {
+    return empty(d.note || `The matched-window comparison begins with Day 1${d.start_date ? ` — cycle ${fmt(d.current_cycle)} starts ${d.start_date}` : ""}.`);
+  }
   const cs = d.cycles || [];
   if (!cs.length) return empty("Cycle comparison fills in once a restart has data to compare.");
   const K = d.window_days;
@@ -180,7 +185,8 @@ export function renderCycles(d) {
   ];
   const head = `<tr><th></th>${cs.map((c) => `<th>cycle ${esc(String(c.cycle))}${c.is_current ? " · now" : ""}</th>`).join("")}</tr>`;
   const body = rows.map(([lbl, f]) => `<tr><td class="rd-name">${esc(lbl)}</td>${cs.map((c) => `<td class="num${c.is_current ? " rd-flagmark" : ""}">${f(c)}</td>`).join("")}</tr>`).join("");
-  return sec(`The same first ${K} days, every restart`, `<table class="rd-tbl"><thead>${head}</thead><tbody>${body}</tbody></table>`) +
+  // #948: the day-1 case reads "first 1 day" — the singular recurs on every genesis day.
+  return sec(`The same first ${K} day${K === 1 ? "" : "s"}, every restart`, `<table class="rd-tbl"><thead>${head}</thead><tbody>${body}</tbody></table>`) +
     `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 

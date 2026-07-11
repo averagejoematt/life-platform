@@ -55,6 +55,7 @@ from web.site_api_common import (
     _query_source,
     _scrub_blocked_terms,
     logger,
+    pre_start_meta,
     table,
 )
 
@@ -2670,6 +2671,14 @@ def handle_forecast() -> dict:
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
     data["available"] = True
     data["framing"] = "what the model expects from observed patterns — correlative, not causal"
+    # PRE-START (#948, throughline): before genesis these are the model's physiology
+    # warm-up expectations, while Home simultaneously promises "no finish-line math
+    # until Day 1" — flag the window so the cockpit can frame the panel instead of
+    # reading as a contradiction. Inert (pre_start=False) once genesis <= today.
+    _pre = pre_start_meta()
+    data["pre_start"] = bool(_pre)
+    if _pre:
+        data.update(_pre)
     return _ok(data, cache_seconds=900)
 
 
@@ -3285,6 +3294,30 @@ def handle_observatory_week(qs: dict = None) -> dict:
     ip = bool(date)  # ADR-058: include pilot/prior-cycle records only when time-travelling
 
     now = datetime.now(timezone.utc)
+
+    # PRE-START (#948, the #939 contract): with genesis staged in the FUTURE the 7-day
+    # window inverts (start 2026-07-12 > end 2026-07-11) and every branch below emits
+    # invented zero-comparisons against a week that doesn't exist (ADR-104). Honest
+    # empty shape instead — null summary + the countdown fields — so the front-end's
+    # existing "numbers aren't in yet" branches engage. Time-travel (?date=) still
+    # serves real prior-cycle history. Inert (nothing changes) once genesis <= today.
+    if not date:
+        _pre = pre_start_meta()
+        if _pre:
+            return _ok(
+                {
+                    "domain": domain,
+                    "period": None,
+                    "summary": None,
+                    "notable": None,
+                    "last_updated": now.isoformat(),
+                    "as_of_date": None,
+                    "time_travel": False,
+                    **_pre,
+                },
+                cache_seconds=900,
+            )
+
     # Anchor the window to `date` (clamped to today so a future scrub shows the live week),
     # else to now. start/prev_* derive off the anchor — every domain branch below is unchanged.
     anchor = min(date, now.strftime("%Y-%m-%d")) if date else now.strftime("%Y-%m-%d")
@@ -3314,29 +3347,46 @@ def handle_observatory_week(qs: dict = None) -> dict:
             ]
             best_eff = max(eff_vals) if eff_vals else None
 
+            # ADR-104 (#948): a week-over-week claim needs BOTH weeks. In week 1 of a
+            # cycle the prior window clamps to genesis and stays empty — "vs 0 last
+            # week" would be a fabricated comparison, so the delta goes null instead.
+            _has_wow = bool(durations and prev_durations)
             summary = {
                 "primary": {
                     "label": "Average Duration",
-                    "value": round(avg_dur, 1),
+                    "value": round(avg_dur, 1) if durations else None,
                     "unit": "hrs",
-                    "delta": round(avg_dur - prev_avg, 1),
-                    "delta_label": f"vs {round(prev_avg, 1)} last week",
-                    "trend": "up" if avg_dur > prev_avg else "down",
+                    "delta": round(avg_dur - prev_avg, 1) if _has_wow else None,
+                    "delta_label": f"vs {round(prev_avg, 1)} last week" if _has_wow else "",
+                    "trend": ("up" if avg_dur > prev_avg else "down") if _has_wow else "flat",
                     "sparkline": [round(d, 1) for d in durations],
                 },
                 "highlight": {
                     "label": "Best Night",
-                    "value": f"{best.get('sk', '').replace('DATE#', '')[5:]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h",
-                    "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%",
+                    "value": (
+                        f"{best.get('sk', '').replace('DATE#', '')[5:]} · {round(float(best.get('sleep_duration_hours', 0)), 1)}h"
+                        if best
+                        else None
+                    ),
+                    "detail": f"Recovery {round(float(best.get('recovery_score', 0)))}%" if best else "",
                 },
                 "lowlight": {
                     "label": "Worst Night",
-                    "value": f"{worst.get('sk', '').replace('DATE#', '')[5:]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h",
+                    "value": (
+                        f"{worst.get('sk', '').replace('DATE#', '')[5:]} · {round(float(worst.get('sleep_duration_hours', 0)), 1)}h"
+                        if worst
+                        else None
+                    ),
                     "detail": "",
                 },
                 "best_efficiency": round(best_eff) if best_eff else None,
             }
-            notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
+            if _has_wow:
+                notable = f"Avg sleep {'improved' if avg_dur > prev_avg else 'declined'} {abs(round(avg_dur - prev_avg, 1))}h vs last week"
+            elif durations:
+                notable = f"Avg sleep {round(avg_dur, 1)}h this week (no completed prior week in this cycle to compare)"
+            else:
+                notable = "No sleep data in the window yet"
 
         elif domain == "nutrition":
             items = _query_source("macrofactor", start_date, end_date, include_pilot=ip)
@@ -3367,14 +3417,17 @@ def handle_observatory_week(qs: dict = None) -> dict:
                 _complete_days = max(1, (datetime.strptime(end_date, "%Y-%m-%d") - datetime.strptime(start_date, "%Y-%m-%d")).days)
             except Exception:
                 _complete_days = 6
+            # ADR-104 (#948): same week-over-week rule as sleep — no prior-week data,
+            # no comparison claim (week 1 of a cycle must not read "vs 0 last week").
+            _has_wow = bool(cals and prev_cals)
             summary = {
                 "primary": {
                     "label": "Avg Calories",
-                    "value": round(avg_cal),
+                    "value": round(avg_cal) if cals else None,
                     "unit": "kcal",
-                    "delta": round(avg_cal - prev_avg_cal),
-                    "delta_label": f"vs {round(prev_avg_cal)} last week",
-                    "trend": "up" if avg_cal > prev_avg_cal else "down",
+                    "delta": round(avg_cal - prev_avg_cal) if _has_wow else None,
+                    "delta_label": f"vs {round(prev_avg_cal)} last week" if _has_wow else "",
+                    "trend": ("up" if avg_cal > prev_avg_cal else "down") if _has_wow else "flat",
                     "sparkline": [round(c) for c in cals],
                 },
                 "highlight": {"label": "Avg Protein", "value": f"{round(avg_protein)}g/day", "detail": ""},
@@ -3538,6 +3591,27 @@ def handle_cycle_compare() -> dict:
     """
     try:
         current = max(CYCLE_GENESES)
+
+        # PRE-START (#948): the current cycle is staged but has 0 elapsed days — a
+        # matched window of 0 days is not a comparison, and flooring it to 1 produced
+        # the degenerate "the same first 1 days" pseudo-window. Say when the comparison
+        # begins instead. Inert (normal path below) once genesis <= today.
+        _pre = pre_start_meta()
+        if _pre:
+            return _ok(
+                {
+                    "window_days": 0,
+                    "current_cycle": current,
+                    "cycles": [],
+                    "note": (
+                        f"Cycle {current} begins {CYCLE_GENESES[current]}. The matched-window comparison "
+                        "starts with Day 1 — no pseudo-window before then. Correlative, N=1."
+                    ),
+                    **_pre,
+                },
+                cache_seconds=3600,
+            )
+
         today = datetime.now(PT).date()
         elapsed = (today - datetime.strptime(CYCLE_GENESES[current], "%Y-%m-%d").date()).days + 1
         window = max(1, min(elapsed, 28))
@@ -3573,7 +3647,8 @@ def handle_cycle_compare() -> dict:
                 "current_cycle": current,
                 "cycles": cycles,
                 "note": (
-                    f"Each cycle measured over its own first {window} days — matched windows, "
+                    # #948: "first 1 days" recurs on every genesis day of every cycle — pluralize.
+                    f"Each cycle measured over its own first {window} day{'s' if window != 1 else ''} — matched windows, "
                     "never a short run vs a long one. Correlative, N=1."
                 ),
             },

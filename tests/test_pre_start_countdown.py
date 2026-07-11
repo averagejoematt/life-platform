@@ -119,13 +119,16 @@ def test_journey_pre_start_contract(monkeypatch):
         "projected_goal_date_latest",
         "days_to_goal",
         "last_weighin_date",
+        # #948: the weight and its as-of anchor travel together — a stale
+        # prior-cycle weigh-in with a nulled last_weighin_date was an
+        # unattributable ghost weight (and contradicted /api/vitals).
+        "current_weight_lbs",
     ):
         assert j[k] is None, f"journey.{k} must be suppressed pre-start (got {j[k]!r})"
 
-    # The non-claim anchors survive: start/goal/current (the override baseline).
+    # The non-claim anchors survive: start/goal (the staged baseline + the target).
     assert j["start_weight_lbs"] == 315.0
     assert j["goal_weight_lbs"] == 185.0
-    assert j["current_weight_lbs"] is not None
 
 
 def test_journey_inert_when_genesis_past(monkeypatch):
