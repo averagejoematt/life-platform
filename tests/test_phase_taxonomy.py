@@ -113,6 +113,9 @@ LIVE_FAMILIES = [
     ("USER#system", "CANARY#last_state"),
     ("USER#system", "INGESTION_STATE#hevy"),
     ("VOTES#challenges", "CH#no-doordash-30"),
+    ("CHALLENGE_FOLLOWS", "EMAIL#0269def9#CH#no-doordash-30"),
+    ("USER#matthew#SOURCE#benchmarks", "EPISODE#2026-06-14"),
+    ("ENSEMBLE#dispute", "THREAD#2026-W27#deficit_depth"),
     # Reading / Mind pillar (ADR-097) — CROSS_PHASE, durable identity data
     ("BOOK#0123456789abcdef", "META"),
     ("READING#0123456789abcdef", "STATE"),
@@ -155,6 +158,13 @@ def test_unknown_pk_raises():
         ("supplements", pt.CROSS_PHASE),  # dec A — med safety
         ("chronicling", pt.CROSS_PHASE),  # dec D — frozen "before" archive
         ("subscribers", pt.CROSS_PHASE),
+        ("benchmarks", pt.CROSS_PHASE),  # BENCH-1 cut-benchmarking history — cross-cycle by design
+        ("forecast", pt.EXPERIMENT_SCOPED),
+        ("state_of_matthew", pt.EXPERIMENT_SCOPED),
+        ("engagement_state", pt.EXPERIMENT_SCOPED),
+        ("scenarios", pt.EXPERIMENT_SCOPED),
+        ("what_changed", pt.EXPERIMENT_SCOPED),
+        ("panelcast", pt.EXPERIMENT_SCOPED),
         ("measurements", pt.RAW_TIMESERIES),  # dec B — body fact, GA not hide
         ("day_grade", pt.RAW_TIMESERIES),  # dec C — keep series for Replay
         ("whoop", pt.RAW_TIMESERIES),
@@ -215,6 +225,10 @@ def test_pk_rules():
     assert pt.classify("ENSEMBLE#influence_graph", "CONFIG#v1") == pt.SYSTEM_STATE
     assert pt.classify("PULSE", "DATE#2026-04-04") == pt.SYSTEM_STATE
     assert pt.classify("USER#system", "CANARY#last_state") == pt.SYSTEM_STATE
+    # audience state — kept across resets (reader emails awaiting challenge-start notify)
+    assert pt.classify("CHALLENGE_FOLLOWS", "EMAIL#abc#CH#no-doordash-30") == pt.SYSTEM_STATE
+    # inter-coach dispute threads (#540) = experiment_scoped, wiped at reset
+    assert pt.classify("ENSEMBLE#dispute", "THREAD#2026-W27#deficit_depth") == pt.EXPERIMENT_SCOPED
     # reading / Mind pillar (ADR-097) = cross_phase (durable, never wiped)
     assert pt.classify("BOOK#abc", "META") == pt.CROSS_PHASE
     assert pt.classify("READING#abc", "STATE") == pt.CROSS_PHASE

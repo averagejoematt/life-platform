@@ -350,10 +350,19 @@ def _recent_outputs(coach_id, limit=25):  # CC-07: depth for the daily-journey t
 
 def _stance_latest(coach_id):
     """The coach-opinion engine's current evidence-derived stance (STANCE#latest),
-    written weekly by coach_history_summarizer. None pre-data / during engine lag."""
+    written weekly by coach_history_summarizer. None pre-data / during engine lag.
+
+    Honors the restart tombstone: the intelligence wipe stamps tombstone=true +
+    phase=pilot (tombstoned_reason=experiment_restart_<genesis>) on every COACH#
+    record, but get_item bypasses the query-level phase filter — without this guard
+    the old cycle's stance kept serving post-reset and the CC-09 pre-start ladder
+    fallback never engaged. The next weekly summarizer run overwrites the record
+    clean, so this is only the between-reset-and-first-compute window."""
     try:
         item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "STANCE#latest"}).get("Item")
-        return _decimal_to_float(item) if item else None
+        if not item or item.get("tombstone") or item.get("phase") == "pilot":
+            return None
+        return _decimal_to_float(item)
     except Exception:
         return None
 

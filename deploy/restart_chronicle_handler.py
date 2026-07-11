@@ -38,11 +38,18 @@ from lambdas.constants import EXPERIMENT_START_DATE
 REGION = "us-west-2"
 S3_BUCKET = "matthew-life-platform"
 
-# Each entry: (prefix, archive_prefix, index_key)
+# Each entry: (prefix, archive_prefix, index_key). index_key=None → no index page
+# to rewrite for that prefix (the archive step still runs).
 CHRONICLE_PREFIXES = [
     ("blog/", "blog/archive/pilot/", "blog/index.html"),
     ("dashboard/chronicle/posts/", "dashboard/chronicle/archive/pilot/posts/", "dashboard/chronicle/index.html"),
     ("site/chronicle/", "site/chronicle/archive/pilot/", "site/chronicle/index.html"),
+    # v4 article pages (wednesday_chronicle_lambda writes generated/journal/posts/
+    # week-NN/index.html, served at /journal/posts/week-NN/). Missed by the cycle-4
+    # reset — old week pages kept rendering at their public URLs even though the
+    # posts.json feed was tombstoned. No hub index lives under this prefix (the
+    # chronicle hub is site/story/chronicle/), so index_key is None.
+    ("generated/journal/posts/", "generated/journal/archive/pilot/posts/", None),
 ]
 
 # ── Genesis lead-in chronicles (ADR-077, decided 2026-06-21) ──────────────────
@@ -317,9 +324,10 @@ def main():
             else:
                 skipped_count += 1
 
-    # ── 2. Rewrite each index ──
+    # ── 2. Rewrite each index (prefixes with index_key=None have no hub page) ──
     print("\n[2/3] Rewriting chronicle index pages:")
-    for _, _, index_key in CHRONICLE_PREFIXES:
+    index_keys = [ik for _, _, ik in CHRONICLE_PREFIXES if ik]
+    for index_key in index_keys:
         placeholder = rewrite_index(s3, index_key, args.apply)
         print(f"  ({'would write' if not args.apply else 'wrote'}) {index_key}  ({len(placeholder)} bytes, Day-1 placeholder)")
 
@@ -347,7 +355,7 @@ def main():
         f"html_files_total       = {total_html}\n"
         f"html_files_archived    = {archived_count}\n"
         f"html_files_already_archived = {skipped_count}\n"
-        f"index_pages_rewritten  = {len(CHRONICLE_PREFIXES)}\n"
+        f"index_pages_rewritten  = {len(index_keys)}\n"
         f"chronicles_resurrected = {len(args.resurrect_sk)}\n"
     )
     print(f"\nReport written to: {report_path.relative_to(REPO_ROOT)}")
