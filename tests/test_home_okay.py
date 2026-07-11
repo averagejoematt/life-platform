@@ -35,10 +35,12 @@ def test_okay_beat_has_a_no_js_fallback_pointer():
 
 
 def test_render_reads_existing_endpoints_no_new_fetch_or_ai():
-    """renderOkay is fed the already-fetched character + journey values; it must
-    not open its own network call or invoke any AI path."""
+    """renderOkay is fed the already-fetched character + journey + presence values
+    (presence was already fetched for the hero quiet-stretch line; it keeps the
+    chips honest during a logging stall — truth audit 2026-07-10); it must not
+    open its own network call or invoke any AI path."""
     assert "function renderOkay(" in STORY_JS
-    assert "renderOkay(charV, journeyV)" in STORY_JS
+    assert 'renderOkay(charV, journeyV, presence.status === "fulfilled" ? presence.value : null)' in STORY_JS
     # The render function body must contain no fetch/getJSON of its own.
     start = STORY_JS.find("function renderOkay(")
     body = STORY_JS[start : STORY_JS.find("\n}\n", start)]

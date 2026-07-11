@@ -254,14 +254,16 @@ export function projectionCone(current, goal, ratePerWeek, {
   // fan is drawn from). No CI ⇒ the point date, honestly caveated.
   const gr = goalDateRange || {};
   const dEarly = _dISO(gr.earliest), dLate = _dISO(gr.latest);
-  const betMidMs = t0 + reach(rDayMidC) * 86400000;
   let bet;
   if (hasCI && dEarly) {
     bet = (slowOpen || !dLate)
       ? `The honest read: ${_r1(rWk)} lb/wk now puts ${g} around <strong>${escAttr(dEarly)}</strong> at the earliest — but the slow end of the interval can't rule out holding flat, so no late date is claimed yet. The band's the honest part; it tightens as weigh-ins accrue.`
       : `The honest read: hold ${_r1(rWk)} lb/wk and ${g} lands about <strong>${escAttr(dEarly)}–${escAttr(dLate)}</strong> — that range is the ${confidence != null ? Math.round(Number(confidence) * 100) + "% " : ""}CI on the trend, not a single promised day. The band tightens as weigh-ins accrue.`;
   } else {
-    bet = `Current trajectory points at ${g} around <strong>~${escAttr(_d(betMidMs))}</strong> — shown as a single line, not a band: the rate's still too young for an honest interval.${provisional ? " Early loss is mostly water; this will slow." : ""} The confidence band draws in once the slope stabilises.`;
+    // Staleness honesty (truth audit 2026-07-10): when the backend hasn't computed a
+    // goal-date range, the front-end must not invent one from its own slope — a
+    // "~Oct 2026" no engine ever claimed. State the absence instead.
+    bet = `Current trajectory slopes toward ${g}, but there's <strong>no dated projection yet</strong> — the backend hasn't computed an honest goal-date interval${provisional ? " (early loss is mostly water; the rate will slow)" : ""}. A dated bet appears here only when the range is real, never invented client-side.`;
   }
   const summary = (hasCI && dEarly)
     ? `Projection fan from ${Math.round(cur)} lb toward ${g} lb: ${(dLate && !slowOpen) ? `${dEarly}–${dLate} (the CI on the trend)` : `${dEarly} at the earliest, open-ended at the slow bound`}.`

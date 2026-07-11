@@ -363,6 +363,8 @@ def handle_nutrition_overview() -> dict:
                     "latest_date": None,
                     "as_of": None,
                     "today_pending": True,
+                    "lag_days": None,
+                    "stalled": False,
                     "latest_calories": None,
                     "latest_protein_g": None,
                 },
@@ -804,6 +806,22 @@ def handle_nutrition_overview() -> dict:
                 "note": "present protein vs the proven loss-period blueprint",
             }
 
+    # Staleness honesty (truth audit 2026-07-10): "reflects complete days — through
+    # Jun 24" normalized a 16-day-dead log as routine upload lag. Emit the real lag +
+    # a stalled flag graded against the macrofactor threshold in source_registry (the
+    # one place staleness thresholds live) so the front-end can say "logging stopped".
+    _nut_lag_days = None
+    _nut_stalled = False
+    if latest_date:
+        try:
+            from source_registry import DEFAULT_STALE_HOURS, stale_hours_overrides
+
+            _nut_lag_days = max(0, (datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(latest_date, "%Y-%m-%d")).days)
+            _mf_stale_hours = stale_hours_overrides().get("macrofactor") or DEFAULT_STALE_HOURS
+            _nut_stalled = _nut_lag_days * 24 > _mf_stale_hours
+        except Exception as _lag_e:
+            logger.warning(f"[nutrition_overview] lag computation failed (non-fatal): {_lag_e}")
+
     return _ok(
         {
             "nutrition": {
@@ -831,6 +849,8 @@ def handle_nutrition_overview() -> dict:
                 # logging gap. Front-end labels "through <as_of>", never "not logged today".
                 "as_of": latest_date,
                 "today_pending": bool(latest_date and latest_date < today),
+                "lag_days": _nut_lag_days,
+                "stalled": _nut_stalled,
                 "latest_calories": round(_mf(latest, "calories")) if _mf(latest, "calories") else None,
                 "latest_protein_g": (
                     round(_mf(latest, "protein_g", "total_protein_g"), 1) if _mf(latest, "protein_g", "total_protein_g") else None
@@ -1172,13 +1192,20 @@ def handle_training_overview() -> dict:
         )
 
     # Recalculate Z2 from all flattened activities
+    # Staleness honesty (truth audit 2026-07-10): the 30d average masks a quiet current
+    # week (218 min/wk average over weeks at 21 and 15 min). Track the trailing-7d Z2
+    # alongside it so the front-end can show the CURRENT week vs target honestly.
+    _d7_cal = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     z2_minutes_30d = 0
+    z2_trailing_7d = 0.0
     for a in all_activities_30d:
         avg_hr = a.get("average_heartrate") or a.get("avg_hr")
         dur = _act_minutes(a)
         if avg_hr and dur:
             if z2_low <= float(avg_hr) <= z2_high:
                 z2_minutes_30d += dur
+                if (a.get("_day_date") or "") >= _d7_cal:
+                    z2_trailing_7d += dur
     z2_weekly_avg = round(z2_minutes_30d / 4.3)
     z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
 
@@ -1338,6 +1365,9 @@ def handle_training_overview() -> dict:
             z2_from_whoop = float(ww.get("zone_2_minutes", 0) or 0)
             if z2_from_whoop > 0:
                 z2_minutes_30d += z2_from_whoop
+                _ww_date = ww.get("date") or ww.get("sk", "").replace("DATE#", "")[:10]
+                if (_ww_date or "") >= _d7_cal:
+                    z2_trailing_7d += z2_from_whoop
         # Recalculate Z2 weekly avg with Whoop data
         if whoop_workouts:
             z2_weekly_avg = round(z2_minutes_30d / 4.3)
@@ -1457,6 +1487,8 @@ def handle_training_overview() -> dict:
             secs = sum(float(s.get("duration_sec") or 0) for s in sets)
             if is_cardio and secs:
                 _hevy_cardio_min += secs / 60.0
+                if (wdate or "") >= _d7_cal:
+                    z2_trailing_7d += secs / 60.0
             cardio_sessions.append(
                 {
                     "date": wdate,
@@ -1487,7 +1519,11 @@ def handle_training_overview() -> dict:
                 "total_distance_mi": round(total_distance_mi, 1),
                 "z2_weekly_avg_min": z2_weekly_avg,
                 "z2_target_min": z2_target,
-                "z2_pct": min(z2_pct, 100),
+                # Staleness honesty: z2_pct is the 30d AVERAGE vs target, served uncapped
+                # (a capped 100 hid that it was an average at all); z2_trailing_7d_min is
+                # the current week — the number that goes quiet when training stops.
+                "z2_pct": z2_pct,
+                "z2_trailing_7d_min": round(z2_trailing_7d),
                 "avg_strain": avg_strain,
                 "strength_sessions_30d": strength_sessions_30d,
                 "top_activities": [{"type": t, "count": c} for t, c in top_activities],

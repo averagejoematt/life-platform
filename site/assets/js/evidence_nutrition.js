@@ -4,6 +4,7 @@
 */
 import { lineChart, barChart, stackedBar, intakeSpine, sufficiencyBars, stackedColumns, mealWindowRibbon, dualLineChart, sparkline, ring } from "/assets/js/charts.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, fig, figs, sec, empty, note, kvtable } from "/assets/js/evidence_shared.js";
+import { genesisCount } from "/assets/js/coach_popover.js"; // P0.1 — the one genesis source of truth
 
 // The §0 verdict (P0.1): mono states the figures, serif judges the trade. Computed
 // only from the protein pct + avg_deficit — no fabricated mechanism, just the honest
@@ -232,7 +233,12 @@ export async function renderNutrition(d) {
   // Nutrition is a manual end-of-day upload — always a day behind BY DESIGN. Frame the
   // latest COMPLETE day as the live state so the trailing gap reads as expected, never
   // as "hasn't logged today". Uses n.as_of / n.today_pending from the API.
-  if (n.as_of) {
+  // Staleness honesty (truth audit 2026-07-10): "uploads after the day ends" normalized
+  // a 16-day-dead log as routine lag. The API now emits lag_days + a stalled flag (lag
+  // vs the macrofactor threshold in source_registry) — when stalled, say it plainly.
+  if (n.as_of && n.stalled) {
+    parts.push(`<p class="rd-meta label nut-asof nut-stalled">Nutrition logging <strong>stopped ${esc(fmtShort(n.as_of))}</strong> — ${fmt(n.lag_days)} days dark. Everything below reads from that last logged stretch, not the present.</p>`);
+  } else if (n.as_of) {
     parts.push(`<p class="rd-meta label nut-asof">Nutrition reflects complete days — through <strong>${esc(fmtShort(n.as_of))}</strong>${n.today_pending ? ". Today's intake uploads after the day ends." : "."}</p>`);
   }
   // ── §2 lead — the protein miss as THE weighted signal (P0.2).
@@ -377,8 +383,11 @@ export async function renderNutrition(d) {
       : sod > el.sodium_ref_high
         ? "above the 1.5–2.3 g range — more water retention, a higher scale reading"
         : "inside the 1.5–2.3 g range";
-    const wk1 = (el.days_logged != null && el.days_logged < 14)
-      ? `<p class="tv-human nut-anno">It's week one — the early scale drop is mostly water, not fat: sodium and glycogen swings move the number by pounds. Sodium here is the honesty check on that, not a hydration vanity score.</p>`
+    // "It's week one" must be gated on the EXPERIMENT's age, not logged-day count —
+    // a stalled log kept this caption alive on day 27 (truth audit 2026-07-10).
+    const _dayN = genesisCount().dayN || 0;
+    const wk1 = (_dayN > 0 && _dayN <= 14)
+      ? `<p class="tv-human nut-anno">It's early days — the early scale drop is mostly water, not fat: sodium and glycogen swings move the number by pounds. Sodium here is the honesty check on that, not a hydration vanity score.</p>`
       : "";
     parts.push(sec("Hydration & electrolytes — the water-weight honesty check",
       figs([fig(fmt(sod), "avg sodium mg"), el.potassium_pct != null && fig(fmt(el.potassium_pct) + "%", "potassium vs target")]) +

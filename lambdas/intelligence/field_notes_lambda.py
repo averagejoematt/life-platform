@@ -178,13 +178,34 @@ def gather_week_data(start_date, end_date):
             }
 
     # Habits (habit_scores)
+    # Truth audit 2026-07-10: habit_scores records have NO `completion_rate` field —
+    # reading it always yielded [], so avg_completion was silently None and the model,
+    # handed only days_scored=7, invented "you scored 6 of 7 days" over a week where
+    # every completion was zero. Derive the real rate from the fields the records DO
+    # carry (tier0_pct, or tier0_done/tier0_total) and state a zero week explicitly so
+    # the prompt can never romance it.
     habits = _query_day_records("habit_scores", start_date, end_date)
     if habits:
-        completion_rates = [float(h.get("completion_rate", 0)) for h in habits if h.get("completion_rate") is not None]
+        rates = []
+        for h in habits:
+            r = h.get("tier0_pct")
+            if r is None and h.get("tier0_total"):
+                try:
+                    r = float(h.get("tier0_done", 0)) / float(h["tier0_total"]) * 100
+                except (TypeError, ValueError, ZeroDivisionError):
+                    r = None
+            if r is not None:
+                rates.append(float(r))
+        days_with_any_completion = sum(1 for r in rates if r > 0)
         data["habits"] = {
             "days_scored": len(habits),
-            "avg_completion": round(sum(completion_rates) / len(completion_rates) * 100) if completion_rates else None,
+            "days_with_any_completion": days_with_any_completion,
+            "avg_tier0_completion_pct": round(sum(rates) / len(rates)) if rates else None,
         }
+        if rates and days_with_any_completion == 0:
+            data["habits"][
+                "note"
+            ] = "zero habit completions recorded on every scored day this week — a full stall, not a partial week; do not report any completed days"
 
     # Journal (Notion)
     journal_pk = f"{USER_PREFIX}notion"

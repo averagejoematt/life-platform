@@ -162,7 +162,12 @@ function renderVerdict(priority) {
     v.innerHTML = `<span class="mark">&rsaquo;</span> The board's weekly read isn't in yet — it posts after the next briefing.`;
     return;
   }
-  const sentences = String(text).match(/[^.!?]+[.!?]+(?:\s|$)/g) || [String(text)];
+  // Decimal-safe sentence split: the old /[^.!?]+[.!?]+/ regex treated the "." in
+  // "7.3 lb/week" as a sentence boundary and rendered "3 lb/week" as its own beat
+  // (truth audit 2026-07-10). Split only on terminal punctuation FOLLOWED BY
+  // whitespace, so numbers pass through intact.
+  const sentences = String(text).split(/(?<=[.!?])\s+/).filter(Boolean);
+  if (!sentences.length) sentences.push(String(text));
   const beats = [];
   const per = Math.ceil(sentences.length / Math.min(3, sentences.length));
   for (let i = 0; i < sentences.length; i += per) beats.push(sentences.slice(i, i + per).join("").trim());

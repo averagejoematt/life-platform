@@ -933,6 +933,7 @@ def handle_pulse() -> dict:
     # Check for journal entry today + streak (single query for last 30 days)
     journal_today = False
     journal_streak = 0
+    journal_gap_days = None  # staleness honesty: days since the LAST entry, for the narrative
     try:
         d30_ago = (datetime.now(PT) - timedelta(days=30)).strftime("%Y-%m-%d")
         j_resp = table.query(
@@ -952,6 +953,9 @@ def handle_pulse() -> dict:
                     journal_streak += 1
                 else:
                     break
+        elif j_dates:
+            _last_j = max(d[5:] for d in j_dates)
+            journal_gap_days = max(0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_j, "%Y-%m-%d").date()).days)
     except Exception:
         pass
 
@@ -960,8 +964,10 @@ def handle_pulse() -> dict:
     ah_wt = float(ah.get("weight_lbs", 0)) if ah and ah.get("weight_lbs") else None
     w_date = withings.get("sk", "").replace("DATE#", "")[:10] if withings else None
     ah_date = ah.get("sk", "").replace("DATE#", "")[:10] if ah else None
+    w_eff_date = w_date  # the date the served weight actually belongs to (staleness honesty)
     if ah_wt and (not w_val or (ah_date and w_date and ah_date > w_date)):
         w_val = ah_wt
+        w_eff_date = ah_date
 
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
@@ -1002,6 +1008,25 @@ def handle_pulse() -> dict:
         if _hevy_items:
             trained_today = True
             workout_type = _hevy_items[0].get("routine_name") or _hevy_items[0].get("workout_name") or "Strength"
+    except Exception:
+        pass
+    # Staleness honesty (truth audit 2026-07-10): "Rest day" on day 15 of a training
+    # blackout is fiction. Days since the last logged strength session (Hevy is the
+    # strength log of record) drives the honest label below.
+    days_since_workout = None
+    try:
+        _hevy_last = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hevy") & Key("sk").begins_with("DATE#"),
+            ScanIndexForward=False,
+            Limit=1,
+            ProjectionExpression="sk",
+        )
+        _hl_items = _hevy_last.get("Items", [])
+        if _hl_items:
+            _last_lift_date = _hl_items[0].get("sk", "")[5:15]
+            days_since_workout = max(
+                0, (datetime.strptime(today_pt, "%Y-%m-%d").date() - datetime.strptime(_last_lift_date, "%Y-%m-%d").date()).days
+            )
     except Exception:
         pass
     if not trained_today:
@@ -1077,6 +1102,11 @@ def handle_pulse() -> dict:
     def _scale_state():
         if w_val is None:
             return "gray"
+        # Staleness honesty (truth audit 2026-07-10): a lit glyph reads as "today's
+        # weigh-in". When the latest reading belongs to an older day the glyph goes
+        # gray — value/delta stay in the payload for context, dated by as_of.
+        if w_eff_date and w_eff_date != today_pt:
+            return "gray"
         delta = w_val - start_weight
         if delta <= 0:
             return "green"
@@ -1125,7 +1155,7 @@ def handle_pulse() -> dict:
             "direction": "down" if w_val and w_val < start_weight else "up",
             "delta": round(w_val - start_weight, 1) if w_val else None,
             "delta_label": f"{round(w_val - start_weight, 1):+.1f} lbs" if w_val else None,
-            "as_of": w_date or ah_date or today_pt,
+            "as_of": w_eff_date or today_pt,
         },
         "water": {
             "state": _water_state(),
@@ -1158,13 +1188,30 @@ def handle_pulse() -> dict:
             "state": "green" if journal_today else "gray",
             "written_today": journal_today,
             "streak_days": journal_streak,
-            "label": "Journaled" if journal_today else "No entry yet",
+            "gap_days": journal_gap_days,
+            "label": (
+                "Journaled"
+                if journal_today
+                else (f"No entry in {journal_gap_days} days" if journal_gap_days is not None and journal_gap_days >= 2 else "No entry yet")
+            ),
         },
         "lift": {
             "state": "green" if trained_today else "gray",
             "trained_today": trained_today,
             "workout_type": workout_type,
-            "label": workout_type or ("Trained" if trained_today else "Rest day"),
+            "days_since_last": days_since_workout,
+            # "Rest day" is only honest for a beat or two after a session; past that it's
+            # a layoff and the glyph says how long. No hevy record at all reads unlogged.
+            "label": workout_type
+            or (
+                "Trained"
+                if trained_today
+                else (
+                    "Rest day"
+                    if days_since_workout is not None and days_since_workout <= 3
+                    else (f"No training logged — {days_since_workout} days" if days_since_workout is not None else "No training logged")
+                )
+            ),
         },
         "mind": {
             "state": _mind_state(),
@@ -1192,7 +1239,18 @@ def handle_pulse() -> dict:
     if w_val is not None:
         delta_from_start = round(w_val - start_weight, 1)
         dir_word = "down" if delta_from_start < 0 else "up" if delta_from_start > 0 else "flat"
-        narrative_parts.append(f"Day {_pulse_day}. {round(w_val, 1)} lbs \u2014 {dir_word} {abs(delta_from_start):.1f} from start.")
+        # Staleness honesty: a days-old weigh-in narrated without a date reads as
+        # today's number \u2014 stale-qualify it with the day it actually belongs to.
+        _w_stale_note = ""
+        if w_eff_date and w_eff_date != today_pt:
+            try:
+                _lw_dt = datetime.strptime(w_eff_date, "%Y-%m-%d")
+                _w_stale_note = f" (last weighed {_lw_dt.strftime('%b')} {_lw_dt.day})"
+            except ValueError:
+                _w_stale_note = f" (last weighed {w_eff_date})"
+        narrative_parts.append(
+            f"Day {_pulse_day}. {round(w_val, 1)} lbs \u2014 {dir_word} {abs(delta_from_start):.1f} from start{_w_stale_note}."
+        )
     elif _pulse_day:
         narrative_parts.append(f"Day {_pulse_day}.")
     if sleep_hrs is not None:
@@ -1214,6 +1272,9 @@ def handle_pulse() -> dict:
             narrative_parts.append(f"Recovery at {r_val}%.")
     if journal_today:
         narrative_parts.append("Journal logged.")
+    elif journal_gap_days is not None and journal_gap_days >= 2:
+        # "yet" implies today is the exception — past the threshold, the gap is the fact.
+        narrative_parts.append(f"No journal entry in {journal_gap_days} days.")
     else:
         narrative_parts.append("No journal entry yet.")
     if nutrition_logged_7d > 0:

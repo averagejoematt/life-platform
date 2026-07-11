@@ -196,7 +196,21 @@ function renderNumbers(journey) {
       if (cap) cap.textContent = even ? "lbs · even" : (up ? "lbs up" : "lbs down");
     }
   }
-  if (journey.current_weight_lbs != null) bind("current").textContent = journey.current_weight_lbs;
+  if (journey.current_weight_lbs != null) {
+    const curEl = bind("current");
+    curEl.textContent = journey.current_weight_lbs;
+    // Staleness honesty (truth audit 2026-07-10): "lbs today" over a weigh-in that's
+    // weeks old reads false. When the last weigh-in is >2 days back, the caption
+    // carries the real as-of date instead of claiming "today".
+    if (journey.last_weighin_date) {
+      const lwd = new Date(`${journey.last_weighin_date}T12:00:00`);
+      if (!isNaN(lwd.getTime()) && (Date.now() - lwd.getTime()) / 86400000 > 2) {
+        const curFig = curEl.closest(".figure");
+        const curCap = curFig && curFig.querySelector(".figure-cap");
+        if (curCap) curCap.textContent = `lbs at last weigh-in (${lwd.toLocaleDateString("en-US", { month: "short", day: "numeric" }).toLowerCase()})`;
+      }
+    }
+  }
   if (journey.progress_pct != null) bind("progress").textContent = `${journey.progress_pct}%`;
   // P2.1 — pair the live weight delta with the genesis timeframe up in the hero, so the claim
   // meets its proof on the opening screen (down-beat waveform leads just below).
@@ -270,9 +284,21 @@ function okayStatus(p) {
   if (t === "down") return { txt: "eased off a little", state: "down" };
   return { txt: "holding steady", state: "flat" };
 }
-function renderOkay(charV, journeyV) {
+// The manual-input pillars — the ones that only move when Matthew logs. During a
+// verified logging stall (truth audit 2026-07-10) their scores decay slowly enough
+// that a 100%→0% two-week collapse still read "eased off a little"; the presence
+// contract is the honest override. Sleep stays wearable-backed and keeps its trend.
+const OKAY_MANUAL = new Set(["movement", "nutrition", "consistency", "mind"]);
+
+function renderOkay(charV, journeyV, presenceV) {
   const wrap = $("[data-okay]");
   if (!wrap) return;
+  // /api/presence is the shipped stall signal (in_lull + gap_days). A lull ≥7 days
+  // with no planned pause means the manual pillars aren't "easing off" — nothing is
+  // being logged at all, and the chips must say that plainly.
+  const pres = presenceV || {};
+  const lullDays = Math.round(Number(pres.gap_days) || 0);
+  const inLull = !!pres.in_lull && !pres.planned_pause && lullDays >= 7;
   const character = (charV && (charV.character || charV)) || {};
   const pillars = (charV && (charV.pillars || (charV.character && charV.character.pillars))) || [];
   const asOf = character.as_of_date || "";
@@ -298,8 +324,13 @@ function renderOkay(charV, journeyV) {
     lead = "The short version — how the week's actually going, in plain terms:";
   }
 
-  const rows = OKAY_LEGIBLE.map(([name, label]) => ({ label, s: okayStatus(byName[name]) }));
-  const allAbsent = rows.every((r) => r.s.state === "absent");
+  const rows = OKAY_LEGIBLE.map(([name, label]) => ({
+    label,
+    s: inLull && OKAY_MANUAL.has(name)
+      ? { txt: `nothing logged for ${lullDays} days`, state: "absent" }
+      : okayStatus(byName[name]),
+  }));
+  const allAbsent = !inLull && rows.every((r) => r.s.state === "absent");
   const asofLine = asOf
     ? `<p class="okay-asof label">as of ${esc(asOf)} · plain-language, computed from the same numbers on <a href="/now/">the cockpit</a></p>`
     : `<p class="okay-asof label">plain-language, from the live cockpit numbers</p>`;
@@ -587,8 +618,9 @@ async function load() {
   if (cw && couplingV && couplingV.window_days) cw.textContent = ` over the last ${couplingV.window_days} days`;
 
   // #789 — the friends/family "is he okay this week?" plain-language read, from the
-  // pillars + weight already in hand (no extra fetch). Renders after both land.
-  renderOkay(charV, journeyV);
+  // pillars + weight already in hand (no extra fetch). The presence result (already
+  // fetched for the quiet-stretch line) keeps the chips honest during a logging stall.
+  renderOkay(charV, journeyV, presence.status === "fulfilled" ? presence.value : null);
 }
 
 load();
