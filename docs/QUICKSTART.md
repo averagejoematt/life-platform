@@ -37,7 +37,7 @@ git clone git@github.com:averagejoematt/life-platform.git ~/Documents/Claude/lif
 cd ~/Documents/Claude/life-platform
 python3 -m venv .venv                 # python3 must be 3.12.x — see table above
 source .venv/bin/activate
-pip install -r requirements-dev.txt   # pytest, black, ruff, playwright, boto3 — pinned to match CI's gates
+pip install -r requirements-dev.txt   # pytest, black, ruff, flake8, playwright, boto3 — pinned to match CI's gates
 pip install -r cdk/requirements.txt   # aws-cdk-lib + constructs (pinned)
 playwright install chromium           # browser for tests/visual_qa.py (local visual QA)
 bash scripts/install_hooks.sh         # pre-commit hook: black/ruff format gate + doc-metadata sync (sync_doc_metadata.py --apply)
@@ -109,7 +109,7 @@ CI runs the same commands on every push (`.github/workflows/ci-cd.yml`).
 
 ```bash
 # 1. Edit the Lambda source
-vim lambdas/daily_brief_lambda.py
+vim lambdas/emails/daily_brief_lambda.py
 
 # 2. Deploy + smoke test
 bash deploy/deploy_and_verify.sh daily-brief
@@ -138,7 +138,7 @@ curl to the Function URL should return **401** (healthy), not 5xx.
 
 ## 4. Check Daily-Brief Output
 
-The daily-brief Lambda runs at 11 AM PT and is the platform heartbeat. To verify it ran successfully today:
+The daily-brief Lambda runs at 17:00 UTC (10 AM PDT / 9 AM PST — `cron(0 17 * * ? *)` in `email_stack.py`) and is the platform heartbeat. To verify it ran successfully today:
 
 ```bash
 # Latest invocation logs (last 10 minutes)
@@ -206,6 +206,13 @@ git push                          # CI fleet-deploys the reverted bundle
 # Single function only: bash deploy/rollback_lambda.sh <function-name>
 ```
 
+### Roll back the public site
+
+```bash
+bash deploy/rollback_site.sh HEAD~1     # redeploys the prior commit's site/ tree
+# CI does this automatically when post-deploy smoke or visual-QA fails (site-deploy.yml)
+```
+
 ### Halt all crons (maintenance mode)
 
 ```bash
@@ -271,7 +278,7 @@ aws lambda list-functions --region us-west-2 \
 | Run `aws s3 sync --delete` to bucket root | Tries to delete 35k+ objects (blocked by bucket policy + ADR-032 deny statement, but DON'T test it) | S3 versioning recovers; takes hours |
 | Change a Lambda env var in AWS Console | Next `cdk deploy` reverts it silently | Edit the CDK stack instead |
 | Add a Lambda to CDK without a `role_policies.py` entry | `AccessDenied` on first run | Add the IAM policy, redeploy the stack |
-| Use `deploy_lambda.sh` for MCP | All MCP endpoints break (ADR-031) | Use the full zip build above |
+| Hand-roll a partial MCP zip (only `mcp_server.py` + `mcp/`) | MCP boots but imports fail — bundled `lambdas/` tree missing | `bash deploy/deploy_lambda.sh life-platform-mcp` (sanctioned since #781) |
 | Use DST-aware cron in EventBridge | Schedule drifts twice yearly | All crons fixed UTC — see RUNBOOK |
 | Default-encrypt the S3 bucket with KMS | CloudFront → 400 on website endpoints (ADR-053) | Revert to AES256 bucket default; use explicit `--sse aws:kms` for sensitive uploads |
 | Re-enable the deleted Lambdas (`email_framework`, `tools_calendar`, `podcast_scanner`) | V2 dead-code closure regression | They were deliberately deleted — check the V2 PR before resurrecting |
@@ -281,11 +288,11 @@ aws lambda list-functions --region us-west-2 \
 ## Pipeline Ordering
 
 ```
-06:45–09:00 AM PT   INGESTION    14 Lambdas (8 SIMP-2 + 6 exempt — ADR-056)
+06:45–09:00 AM PT   INGESTION    15 Lambdas (8 SIMP-2 + 7 exempt — ADR-056/060)
 09:05 AM PT         ANOMALY      Anomaly detector runs on ingested data
 10:20–10:35 AM PT   COMPUTE      character-sheet, daily-metrics, daily-insight,
                                  adaptive-mode, hypothesis-engine + coach pipeline
-11:00 AM PT         DAILY BRIEF  Reads computed results, sends email, writes
+17:00 UTC (10am PDT) DAILY BRIEF  Reads computed results, sends email, writes
                                  public_stats.json + character_stats.json
 11:30 AM PT         OG IMAGES    6 PNG share cards from public_stats.json
 ```

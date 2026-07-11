@@ -1,6 +1,6 @@
 # Life Platform — Monitoring & Observability
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
 
 **Last updated:** 2026-05-19 (v8.0.0)
 
@@ -43,13 +43,14 @@ In code (CDK), alarm constructor chooses the topic via `digest=True/False` flag 
 | Alarm | Threshold | Trigger |
 |---|---|---|
 | `life-platform-daily-brief-errors` | ≥1 error in 5min window | Daily-brief Lambda failed |
-| `slo-daily-brief-delivery` | No success in 24h | Brief didn't ship today |
-| `life-platform-mcp-warmer-error` | Failure | MCP warming broken |
+| `slo-daily-brief-delivery` | ≥1 Lambda error in 24h (error-count, not absence-detection) | Brief errored today |
+| `daily-brief-no-invocations-24h` | <1 invocation in 24h | Brief never ran (the absence signal) |
+| `mcp-warmer-error` | Failure | MCP warming broken |
 | `life-platform-canary-mcp-failure` | Failure | MCP Lambda unreachable |
-| `slo-anthropic-canary` | Failure | Anthropic API access lost (key disabled or billing) |
-| `ingestion-error-*` (one per source) | ≥1 error | Specific source ingestion failing |
+| `life-platform-canary-anthropic-failure` | Failure | Anthropic API access lost (key disabled or billing) |
+| Ingestion aggregate (metric-math, `LifePlatformMonitoring`) | ≥1 error across the fleet | Per-Lambda `ingestion-error-*` alarms were consolidated away 2026-05-29 (`error_alarm=False`) — check the DLQ digest path |
 | `life-platform-dlq-depth-warning` | ≥10 messages | Real failures accumulating |
-| `life-platform-slo-budget-alarm` | Monthly cost > $20 | Budget breach |
+| AWS Budget `life-platform-monthly-75` ($85 ceiling, ADR-133) + cost-governor SSM tiers | 50/70/85/100% alerts | Budget breach (an AWS Budget + SSM mechanism, not a CloudWatch alarm) |
 
 ### Warning (digest tier — review daily)
 
@@ -57,7 +58,7 @@ In code (CDK), alarm constructor chooses the topic via `digest=True/False` flag 
 |---|---|---|
 | `*-duration-p95` (most Lambdas) | p95 > 80% of timeout | Lambda getting slow |
 | `slo-source-freshness` | Any source > 48h stale | Data flow degraded |
-| `life-platform-token-burn` | >150% expected daily tokens | AI spend spike |
+| `ai-tokens-daily-brief-daily` | Token spend above calibrated threshold | AI spend spike |
 | `cf-4xx-rate-elevated` | >50% over 5min | CloudFront errors |
 | `ses-bounce-rate` | >5% in 24h | Email deliverability issue |
 
@@ -203,7 +204,7 @@ If you're paged (or notice red alarms during a routine check):
 See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 
 - **No synthetic monitoring** for public site beyond CloudWatch canary on MCP + Anthropic
-- **No log-based metric for "daily-brief sent successfully"** — we infer from absence of errors, but a positive signal would be more reliable
+- Positive daily-brief signals exist: `daily-brief-no-invocations-24h` (absence detection) + `life-platform-daily-brief-invocations` — the old "infer from absence of errors" gap is closed
 - **Token telemetry rolling out** — 9 of 22 AI-calling Lambdas now emit (V2 follow-up); remaining 13 still dark
 - **Cost anomaly detector** is on (Default-Services-Subscription, daily email)
 - **Dashboard-as-code** not used — CDK could define dashboards; currently console-managed

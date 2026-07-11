@@ -49,7 +49,7 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 | Garmin | `life-platform/garmin` | OAuth1 + OAuth2 | ~30 days (OAuth1 refresh) | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | ✅ 2026-07-10 |
 | Withings | `life-platform/withings` | OAuth2 | similar to Garmin (manual refresh on rate-limit) | `setup/fix_withings_oauth.py` | ✅ 2026-07-10 |
 | Strava | `life-platform/strava` | OAuth2 | similar pattern | manual refresh script | ✅ 2026-07-10 |
-| Whoop | `life-platform/whoop` | OAuth2 | similar pattern | `setup/setup_whoop_auth.py` | ✅ 2026-07-10 |
+| Whoop | `life-platform/whoop` | OAuth2 | similar pattern | manual OAuth flow (see `SECRETS_ROTATION.md` §Whoop — no committed script) | ✅ 2026-07-10 |
 | Eight Sleep | `life-platform/eightsleep` + `life-platform/eightsleep-client` | username/password + client credential | static | rotate manually if exposed | ✅ 2026-07-10 (two secrets — user creds + app client ID) |
 | Habitify | `life-platform/habitify` | API key | static | rotate manually if exposed | ✅ 2026-07-10 (dedicated secret, ADR-014) |
 | Hevy (read) | `life-platform/hevy` | API key | static | regenerate in Hevy app settings | ✅ 2026-07-10 — consumed by `lambdas/hevy_common.py` |

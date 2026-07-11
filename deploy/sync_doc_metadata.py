@@ -705,6 +705,11 @@ RULES = [
         r"~\d+ tools across ~\d+ domain modules",
         "~{tool_count} tools across ~{tool_module_count} domain modules",
     ),
+    (
+        "CLAUDE.md",
+        r"ADRs \(ADR-001 through ADR-\d+\)",
+        "ADRs (ADR-001 through ADR-{adr_max})",
+    ),
     # ── DECISIONS.md header count line ───────────────────────────────────────
     (
         "docs/DECISIONS.md",

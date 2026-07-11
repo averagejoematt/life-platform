@@ -192,7 +192,7 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 ## Secrets & Credentials
 
 - **12 active secrets** in AWS Secrets Manager under `life-platform/` prefix (as of 2026-05-19).
-- **3 in deletion window**: `notion`, `dropbox` (delete 2026-05-24, migrated to `ingestion-keys` bundle); `anthropic-api-key` (delete 2026-05-23, orphan never adopted).
+- **0 in deletion window** (live-verified 2026-07-10). Note: `notion` was RESTORED 2026-05-24 and is live-but-idle — flagged retire-candidate in `SECRETS_MAP.md` (owner decision pending).
 - OAuth tokens (Whoop, Withings, Strava, Garmin, Eight Sleep) auto-refresh on each successful API call.
 - MCP API key auto-rotates every 90 days via `life-platform-key-rotator`.
 - `pipeline-health-check` Lambda probes all secrets daily and emits CloudWatch metrics.
@@ -222,7 +222,7 @@ All EventBridge crons are fixed UTC. PT references shift 1 hour at DST boundarie
 
 ## Concurrency Limit (Active Constraint)
 
-**Account-wide Lambda concurrency limit: 10** (verified 2026-05-19).
+**Account-wide Lambda concurrency limit: 100** (raised from 10; verified live 2026-07-10 via `aws lambda get-account-settings`).
 
 This is dangerously low — AWS default is 1000. AWS Support case **177921309700709** filed 2026-05-19 to request raise to 100. Until approved:
 
@@ -238,7 +238,7 @@ This is dangerously low — AWS default is 1000. AWS Support case **177921309700
 - AWS account: **205930651321** (us-west-2)
 - Alert SNS topic: `life-platform-alerts` → email to `awsdev@mattsusername.com`
 - CloudFront distribution: `E3S424OXQZ8NBE`
-- AWS Support case for concurrency raise: **177921309700709** (filed 2026-05-19)
+- The 2026-05-19 concurrency-raise Support case (177921309700709) was RESOLVED — limit is 100 now
 
 ---
 

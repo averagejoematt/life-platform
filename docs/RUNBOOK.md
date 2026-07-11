@@ -7,7 +7,7 @@ Last updated: 2026-07-11 (v8.6.0 — 64 MCP tools, 34-module package, 94 Lambdas
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 94 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
 - Shared layer: **RETIRED** (#781/ADR-131) — shared modules ship in every bundle. Invariant check: `aws lambda list-functions --region us-west-2 --query "Functions[?Layers[?contains(Arn, 'life-platform-shared-utils')]].FunctionName"` → must be empty
-- Account concurrency limit: **10** (AWS Support case 177921309700709 filed 2026-05-19; awaiting raise to 100; CDK reservations pre-staged but commented out — see `docs/RESERVED_CONCURRENCY.md`)
+- Account concurrency limit: **100** (raised from 10 via Support case 177921309700709 — verified live 2026-07-10 via `aws lambda get-account-settings`; see `docs/RESERVED_CONCURRENCY.md` for the reservation strategy)
 - Alarms currently firing: point-in-time — check `aws cloudwatch describe-alarms --state-value ALARM --query 'MetricAlarms[].AlarmName' --output table --region us-west-2`
 - DLQ: `life-platform-ingestion-dlq`, retention 14d, normally near-empty — check depth via `aws sqs get-queue-attributes --queue-url $(aws sqs get-queue-url --queue-name life-platform-ingestion-dlq --query QueueUrl --output text) --attribute-names ApproximateNumberOfMessages`; investigate via `dlq-consumer` Lambda logs
 - SES configuration set: `life-platform-emails` — wired to 4 email Lambdas, CloudWatch event destination tracks open/click/bounce/complaint/delivery
@@ -287,14 +287,17 @@ aws logs tail /aws/lambda/whoop-data-ingestion --since 24h
 Replace `whoop-data-ingestion` with any function name.
 
 ### Via CloudWatch Alarms
+Per-source `ingestion-error-*` alarms were consolidated 2026-05-29 (`error_alarm=False`
+in `ingestion_stack.py`) into the DLQ digest path + a metric-math aggregate — do NOT
+query the old names (`describe-alarms --alarm-names` silently omits nonexistent alarms,
+so an empty result reads as false "all-OK"). Query by state instead:
 ```bash
-aws cloudwatch describe-alarms --alarm-names \
-  ingestion-error-whoop ingestion-error-withings ingestion-error-strava \
-  ingestion-error-todoist ingestion-error-eightsleep ingestion-error-macrofactor \
-  ingestion-error-apple-health garmin-ingestion-errors habitify-ingestion-errors \
-  --query 'MetricAlarms[*].{Name:AlarmName,State:StateValue}'
+aws cloudwatch describe-alarms --state-value ALARM \
+  --query 'MetricAlarms[?contains(AlarmName, `ingestion`) || contains(AlarmName, `dlq`)].{Name:AlarmName,State:StateValue}' \
+  --region us-west-2
 ```
-All should be `OK`. If any show `ALARM`, check that function's logs.
+Empty output = nothing ingestion-related is firing. Freshness is the better signal
+anyway: `slo-source-freshness` + the /status/ page.
 
 ### Via DLQ (failed messages land here)
 ```bash
@@ -303,6 +306,17 @@ aws sqs get-queue-attributes \
   --attribute-names ApproximateNumberOfMessages
 ```
 Should be `0`. If non-zero, use the console to inspect messages.
+
+**Redrive options:** the `dlq-consumer` Lambda auto-drains every 6h (redrives where
+possible). To force reprocessing NOW instead of waiting:
+```bash
+# invoke the consumer directly
+aws lambda invoke --function-name life-platform-dlq-consumer --region us-west-2 /tmp/dlq_out.json
+# or use SQS's native redrive (moves messages back to the source queue):
+aws sqs start-message-move-task \
+  --source-arn arn:aws:sqs:us-west-2:205930651321:life-platform-ingestion-dlq --region us-west-2
+```
+Fix the root cause FIRST — redriving into a still-broken Lambda just round-trips the messages.
 
 ---
 

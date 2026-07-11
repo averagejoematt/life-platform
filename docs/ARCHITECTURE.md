@@ -124,7 +124,7 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 | Activity Enrichment | `activity-enrichment` | Hourly | Compute |
 | Apple Health (CGM, water, BP, SOM) | `health-auto-export-webhook` | Near real-time (webhook) | HAE push |
 
-> **SIMP-2 cohort (8 of 14 ingestion Lambdas, ADR-056):** `whoop`, `garmin`, `strava`, `withings`, `eightsleep`, `habitify`, `todoist`, `weather`. All `import from ingestion_framework`. The 6 pattern-exempt sources are: `notion`, `macrofactor`, `apple_health`, `dropbox_poll`, `food_delivery`, `health_auto_export` (now `measurements_ingestion`).
+> **SIMP-2 cohort (8 of 15 scheduled ingestion Lambdas, ADR-056):** `whoop`, `garmin`, `strava`, `withings`, `eightsleep`, `habitify`, `todoist`, `weather`. All `import from ingestion_framework`. The 7 pattern-exempt sources are: `notion`, `macrofactor`, `apple_health`, `dropbox_poll`, `food_delivery`, `health_auto_export` (now `measurements_ingestion`), and `hevy` (`hevy-backfill`, hourly 12–23 UTC — ADR-060).
 >
 > **Lambda renames + deletions in V2 cleanup (2026-05-17/19):** `weather_handler.py` → `weather_lambda.py`. `tools_calendar.py` DELETED (ADR-030 retired, Google Calendar). `podcast_scanner_lambda.py` DELETED (no AWS counterpart). `email_framework.py` DELETED from shared layer.
 

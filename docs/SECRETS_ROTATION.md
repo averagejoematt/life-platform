@@ -6,7 +6,7 @@ Last updated: 2026-05-19 (V2 audit operational sweep)
 
 Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret is rotated. Used by both the operator (manual rotations) and the freshness checker (staleness alerts).
 
-**V2 update (2026-05-19):** `life-platform/notion` and `life-platform/dropbox` are now in the deletion window — bundle path (`life-platform/ingestion-keys`) is authoritative. Rotation procedure for these now operates on the bundle. `life-platform/anthropic-api-key` is an orphan in deletion window — no rotation needed.
+**Update (2026-07-10):** the 2026-05 deletion-window era is over — 21 active secrets, 0 deleting (live-verified; inventory: `SECRETS_MAP.md`). `notion` was restored 2026-05-24 and sits live-but-idle (retire-candidate, owner decision pending); `dropbox` + `anthropic-api-key` completed deletion. The `ingestion-keys` bundle remains authoritative for its members.
 
 ## Summary table
 
@@ -45,12 +45,21 @@ Whoop/Withings/Strava/Garmin/EightSleep ingestion Lambdas refresh tokens on ever
 
 ### Manual OAuth re-auth procedures
 
-**Whoop:**
+**Whoop (dead refresh token — full re-auth):**
+> ⚠️ There is NO committed bootstrap script for Whoop (the often-cited
+> `setup/setup_whoop_*.py` never existed in the repo — wiki-panel finding, 2026-07-10).
+> Tokens normally never die (auto-refresh + writeback on every hourly run). If the
+> refresh token IS dead, redo the OAuth authorization-code flow by hand:
 ```bash
-# Run locally with browser interaction
-python3 setup/setup_whoop_oauth.py
-# Updates life-platform/whoop with fresh refresh_token
+# 1. client_id/client_secret live in the secret:
+aws secretsmanager get-secret-value --secret-id life-platform/whoop --query SecretString --output text
+# 2. Authorize in a browser (redirect URI registered as http://localhost:3000/callback):
+#    https://api.prod.whoop.com/oauth/oauth2/auth?client_id=<id>&redirect_uri=http://localhost:3000/callback&response_type=code&scope=read:recovery%20read:sleep%20read:workout%20read:profile%20read:body_measurement
+# 3. Exchange the code at https://api.prod.whoop.com/oauth/oauth2/token (grant_type=authorization_code)
+# 4. Write the updated JSON (with the new refresh_token) back:
+aws secretsmanager put-secret-value --secret-id life-platform/whoop --secret-string '<updated JSON>'
 ```
+Follow-up: commit a `setup/setup_whoop_auth.py` mirroring the other setup scripts (issue filed).
 
 **Garmin (the most operationally fraught — 30-day OAuth1 lifetime + rate-limit traps):**
 ```bash

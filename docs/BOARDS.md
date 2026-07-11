@@ -12,7 +12,7 @@
 
 **Purpose**: Advise Matthew as an individual on health, longevity, behavior, mental health, and social connection.
 **Invocation**: "personal board" or by member name
-**Config**: `s3://matthew-life-platform/config/board_of_directors.json` — loaded by `lambdas/board_loader.py` (bundled shared module).
+**Config (the roster's source of truth — this doc's table is a snapshot that drifts):** re-derive live via `aws s3 cp s3://matthew-life-platform/config/board_of_directors.json - | python3 -m json.tool | grep '"name"'`. `s3://matthew-life-platform/config/board_of_directors.json — loaded by `lambdas/board_loader.py` (bundled shared module).
 **Consumed by**: daily brief, weekly digest, monthly digest, nutrition review, chronicle, observatory renderer.
 **Convenes**: Daily brief, weekly digest, monthly digest, nutrition reviews, chronicle interviews, observatory pages.
 

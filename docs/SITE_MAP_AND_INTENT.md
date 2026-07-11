@@ -52,7 +52,7 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 - **Must deliver:** each coach's stance, track record (predictions, scored), and current feedback;
   the disagreements surfaced (not averaged); honest empty-states before data accrues.
 - **Good looks like:** you can watch a model apply real knowledge to real data and take sides.
-- **Files:** `coaching.js`, `v4_build_coaching.py`, coach styles in `story.css`. **Endpoints:** `/api/coaches`, `/api/coach/{id}`, `/api/coach_team`, `/api/predictions`, `/api/field_notes`.
+- **Files:** `coaching.js`, `v4_build_coaching.py`, coach styles in `story.css`. **Endpoints:** `/api/coaches`, `/api/coach/{id}`, `/api/coach_team`, `/api/predictions`, `/api/field_notes`, `/api/board_ask` + `/api/board_question` (**reader Q&A — ask-the-board**: the door's engagement/conversion loop, rate-limited 5/IP/hr, moderated via `generated/board_questions/` → `scripts/publish_board_answer.py`; unit-economically protected to degrade LAST per ADR-100/125).
 
 ### The Protocols — `/protocols/` · the levers
 - **Loop role:** the levers — what gets changed to move the data, and whether it moved. **Audience:** enthusiasts + Matthew.
