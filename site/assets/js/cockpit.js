@@ -658,9 +658,13 @@ function _weekdaySince(iso) {
 // logging has gone quiet — or when he's just returned after a lull. No streaks,
 // no shame, no red; the platform simply notices, the way a coach would. Reads the
 // fail-closed /api/presence (no private per-channel detail). Self-hides when present.
-async function renderPresence() {
+async function renderPresence(pre) {
   const sec = $("[data-presence]");
   if (!sec) return;
+  // #955 pre-start: mirror story.js renderQuiet — launch eve reads as
+  // anticipation, not a lull. The wiped cycle's silence must never sit next to
+  // the T−N countdown as if it were a current gap.
+  if (pre) { sec.hidden = true; return; }
   let d = null;
   try { d = await getJSON(`${API}/presence`); } catch (e) { d = null; }
   if (!d || (!d.in_lull && !d.returned)) { sec.hidden = true; return; }
@@ -1032,7 +1036,7 @@ async function load(dateStr) {
     renderVerdict(pri);
     renderBoardline(pri);
     renderBoard();      // #591 fire-and-forget; the inter-coach thread + team stances, self-hiding
-    renderPresence();   // fire-and-forget; hides itself unless he's gone quiet / just returned
+    renderPresence(pre); // fire-and-forget; hides itself unless he's gone quiet / just returned (#955: and pre-start)
     renderSinceLastVisit(); // fire-and-forget; only speaks to a genuine returning visitor
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
     renderForecast();   // fire-and-forget (#541); hides itself until the engine has a summary

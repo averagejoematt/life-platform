@@ -299,7 +299,7 @@ def _engagement_reference_today():
         return datetime.now(timezone.utc).date().isoformat()
 
 
-def _log_dates(source, today, window_days=35, attrs=(), predicate=None):
+def _log_dates(source, today, window_days=35, attrs=(), predicate=None, floor=None):
     """Trailing-window list of days `source` logged (high-water-mark widened).
     Deduped 'YYYY-MM-DD', newest first. BETWEEN spans suffixed SKs (hevy
     DATE#..#WORKOUT#, notion DATE#..#journal#).
@@ -308,12 +308,20 @@ def _log_dates(source, today, window_days=35, attrs=(), predicate=None):
     record counts as Matthew actually logging that day — habitify's pull writes a
     record EVERY day even at total_completed=0, so counting bare record-days read
     a 14-day zero-completion stall as gap_days=0. A day counts if ANY record on
-    that day passes the predicate (a suffixed-SK source may hold several)."""
+    that day passes the predicate (a suffixed-SK source may hold several).
+
+    #955: `floor` ('YYYY-MM-DD') clamps the window start — the manual-channel
+    presence window never reaches before EXPERIMENT_START_DATE, so the prior
+    cycle's logs (raw_timeseries, kept across resets) can't leak into this
+    cycle's gap/return computation. The clamp is at the query, so the semantics
+    self-maintain across every future reset."""
     from datetime import timedelta as _td
 
     pk = f"USER#{USER_ID}#SOURCE#{source}"
     base = datetime.strptime(today, "%Y-%m-%d").date()
     lo = (base - _td(days=window_days)).isoformat()
+    if floor:
+        lo = max(lo, str(floor)[:10])
     try:
         resp = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
@@ -412,6 +420,19 @@ def compute_and_store_engagement():
     )
 
     today = _engagement_reference_today()
+    # #955 (option a): presence is clamped at the experiment genesis — manual
+    # logs from the prior cycle are out-of-window, Day 1 reads "present", and a
+    # first log after genesis is a fresh start, never a cross-cycle "return".
+    # Only /data/cycles/ may know it's another attempt (#943). Fail-soft: an
+    # import failure degrades to the unclamped (pre-#955) behaviour.
+    experiment_start = None
+    try:
+        from constants import EXPERIMENT_START_DATE
+
+        experiment_start = EXPERIMENT_START_DATE
+    except Exception as e:
+        logger.warning("engagement genesis clamp unavailable (constants import failed): %s", e)
+
     # #914: per-source "counts as logged" predicate from the registry facet —
     # habitify days only count when at least one habit was completed.
     channel_dates = {
@@ -420,6 +441,7 @@ def compute_and_store_engagement():
             today,
             attrs=channel_presence_fields(src),
             predicate=lambda item, _s=src: channel_counts_as_logged(_s, item),
+            floor=experiment_start,
         )
         for src in MANUAL_CHANNELS
     }
@@ -445,6 +467,7 @@ def compute_and_store_engagement():
         weight_series=weight_series,
         sick_days=sick_days,
         travel_days=travel_days,
+        experiment_start=experiment_start,
     )
     store_engagement_state(today, signal)
     return signal
