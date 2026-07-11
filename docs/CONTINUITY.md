@@ -183,6 +183,8 @@ archive. Conventions:
 2. `docs/README.md` — the wiki home: the full categorized doc index.
 3. `docs/ONBOARDING.md` — the mental model.
 4. `docs/QUICKSTART.md` + `docs/AWS_ACCESS.md` — first commands, AWS auth and access.
+   (If the machine itself is gone: `docs/NEW_MACHINE_BOOTSTRAP.md` — the from-zero
+   rebuild runbook that restores the two laptop-only assets in §4 + §7 below.)
 5. `docs/ARCHITECTURE.md` — the system: stacks, lambdas, data flows.
 6. `docs/SCHEMA.md` — the DynamoDB field reference.
 7. `docs/RUNBOOK.md` — daily operations and troubleshooting.
