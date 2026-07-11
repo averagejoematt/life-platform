@@ -6,6 +6,7 @@ import concurrent.futures
 import json
 import logging
 import time
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -197,6 +198,80 @@ def oauth_code_consume(code: str):
         "code_challenge_method": (item.get("code_challenge_method") or "").upper(),
         "redirect_uri": item.get("redirect_uri", ""),
     }
+
+
+# ── Remote-session bearer store (SEC / #893) ──
+# #779 hardened the /token *code exchange* (single-use, PKCE-bound, redirect-checked),
+# but /token still handed back the permanent, key-derived Desktop bearer — so anyone
+# who completes the (auto-approving) OAuth flow received a credential that never
+# expires. Address possession thus implied a permanent bearer. Fix: /token now mints a
+# random, short-lived, individually-revocable session bearer stored here. The static
+# Desktop bearer path (hmac of the API key) is UNCHANGED — this is purely additive, so
+# Claude Desktop keeps working while the remote (claude.ai) path gets expiring,
+# revocable tokens that silently re-authorize on expiry.
+SESSION_TOKEN_TTL_SECS = 86400  # 24h — matches the historical expires_in the client already expects
+SESSION_TOKEN_PREFIX = "lps_"  # noqa: S105 — token *prefix* label, not a secret value; distinct from the static "lp_" Desktop bearer
+
+
+def session_token_issue():
+    """Mint + persist a random, short-lived session bearer. Returns the token string,
+    or None if the store write failed. 256 bits of uuid4 (os.urandom-backed) entropy,
+    mirroring the opaque-code idiom in _handle_authorize."""
+    token = SESSION_TOKEN_PREFIX + uuid.uuid4().hex + uuid.uuid4().hex
+    try:
+        ttl_epoch = int(time.time()) + SESSION_TOKEN_TTL_SECS
+        table.put_item(
+            Item={
+                "pk": _OAUTH_PK,
+                "sk": f"SESSION#{token}",
+                "ttl": Decimal(str(ttl_epoch)),
+                "issued_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        )
+        return token
+    except Exception as e:
+        logger.warning(f"[oauth] session token store failed: {e}")
+        return None
+
+
+def session_token_valid(token: str) -> bool:
+    """True iff `token` is a known, unexpired, unrevoked session bearer. Expiry is
+    enforced in-process because DDB TTL deletion can lag by up to ~48h; an explicit
+    `revoked` flag allows immediate revocation ahead of TTL."""
+    if not token or not token.startswith(SESSION_TOKEN_PREFIX):
+        return False
+    try:
+        resp = table.get_item(Key={"pk": _OAUTH_PK, "sk": f"SESSION#{token}"})
+    except Exception as e:
+        logger.warning(f"[oauth] session token lookup error: {type(e).__name__}")
+        return False
+    item = resp.get("Item")
+    if not item or item.get("revoked"):
+        return False
+    ttl = item.get("ttl")
+    if ttl and float(ttl) < time.time():
+        return False
+    return True
+
+
+def session_token_revoke(token: str) -> bool:
+    """Revoke a session bearer immediately (sets revoked=true; the row still TTL-expires).
+    Operational kill-switch for a leaked token. Uses a conditional UpdateItem because the
+    MCP role's DeleteItem is scoped to the meal-prune partition only (role_policies.mcp_server)."""
+    if not token or not token.startswith(SESSION_TOKEN_PREFIX):
+        return False
+    try:
+        table.update_item(
+            Key={"pk": _OAUTH_PK, "sk": f"SESSION#{token}"},
+            UpdateExpression="SET #revoked = :t",
+            ConditionExpression="attribute_exists(sk)",
+            ExpressionAttributeNames={"#revoked": "revoked"},
+            ExpressionAttributeValues={":t": True},
+        )
+        return True
+    except Exception as e:
+        logger.warning(f"[oauth] session token revoke rejected: {type(e).__name__}")
+        return False
 
 
 # ── DynamoDB queries ──
