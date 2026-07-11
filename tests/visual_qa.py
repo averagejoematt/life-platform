@@ -8,7 +8,10 @@ read-only engine:
   2. Scrolls each page top-to-bottom (triggers lazy data fetch + .reveal animations).
   3. Verifies key containers rendered + inline-SVG charts have drawn geometry.
   4. Exercises one interaction (cockpit pillar disclosure → Day-Grade Replay detail).
-  5. Checks responsive overflow at a mobile width (390px).
+  5. Mobile pass at 390px (+ chrome at 360px): horizontal overflow, plus the Epic-A
+     failure classes as regression tests (#1013) — app-bar row ≤ viewport (#1003),
+     no reveal stuck at opacity:0 after scroll (#1002), viewport meta present (#1004),
+     and a tap-target advisory audit (#1010, non-gating).
   6. Captures full-page + per-chart element screenshots.
   7. Optional --ai-qa: hands the screenshots to Claude (Bedrock) for semantic
      "does this actually render correctly" judgement — robust to daily data changes
@@ -398,6 +401,97 @@ def _mobile_overflow(page):
     return page.evaluate("() => document.documentElement.scrollWidth - document.documentElement.clientWidth")
 
 
+# ── Mobile failure-class assertions (#1013) ───────────────────────────────────
+# These pin the EXACT classes the 2026-07-11 mobile review found live and Epic A
+# fixed (#1002 stuck reveals, #1003 app-bar overflow, #1004 missing viewport meta),
+# so they become regression tests, not lore. (a)-(c) gate; (d) tap-targets is
+# advisory output only (the 44px floor is Epic B #1010, not yet enforced).
+
+# Mirrors the reveal selector in site/assets/js/motion.js — an element matching this
+# that stays opacity:0 after a scroll-through is the #1002 tall-section reveal bug.
+MOBILE_REVEAL_SEL = (
+    ".hero, .page-hero, .ev-head, .dx-head, .beat, .loop, .rd-sec, .two-voice, "
+    ".coach-daily, .coach-progress, .coach-report, .coach-stance, .team-lead, "
+    ".team-focus, .team-tension, .team-huddle, .supp, .cap-card, .vr-row, .figs, .ml-ladder"
+)
+
+# Advisory only: the cockpit's headline controls + the site-wide chrome the review
+# measured under the 44px floor (#1010). Reported, never gated (yet).
+TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs a, .ev-link, .cta-quiet"
+
+
+def _app_bar_overflow(page):
+    """px by which the fixed bottom app-bar (.doors) row exceeds the viewport at the
+    current width — >2 is the #1003 overflow (clipped toggle / truncated door)."""
+    return page.evaluate(
+        """() => {
+        const bar = document.querySelector('.doors');
+        if (!bar) return null;                       // page has no app-bar → n/a
+        const vw = document.documentElement.clientWidth;
+        // scrollWidth catches children pushed past the edge even when the bar itself
+        // is clipped to viewport width; also check the rightmost child's edge.
+        let far = 0;
+        bar.querySelectorAll(':scope > *').forEach(c => {
+            const style = getComputedStyle(c);
+            if (style.display === 'none') return;
+            far = Math.max(far, c.getBoundingClientRect().right);
+        });
+        return Math.round(Math.max(bar.scrollWidth - vw, far - vw));
+    }"""
+    )
+
+
+def _stuck_reveals(page, sel):
+    """Reveal-selector elements that are real-sized but stuck at opacity:0 after scroll
+    (the #1002 bug). Excludes zero-size / honest-empty elements to avoid false positives."""
+    return page.evaluate(
+        """(sel) => {
+        const out = [];
+        document.querySelectorAll(sel).forEach(el => {
+            const r = el.getBoundingClientRect();
+            // Only substantial, laid-out sections count — the #1002 bug strands whole
+            // content blocks (hero/rd-sec/backlog cards, all >100px). Requiring ≥24px
+            // excludes empty/collapsed elements and tiny transient labels so the live
+            // post-deploy sweep can't false-positive on an honest sparse-data element.
+            if (r.width < 24 || r.height < 24) return;
+            if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') return;
+            const op = parseFloat(getComputedStyle(el).opacity);
+            if (op < 0.05) out.push((el.className || el.tagName).toString().slice(0, 40));
+        });
+        return out;
+    }""",
+        sel,
+    )
+
+
+def _viewport_meta_ok(page):
+    """True if a width=device-width viewport meta is present (the #1004 class)."""
+    return page.evaluate(
+        """() => {
+        const m = document.querySelector('meta[name="viewport"]');
+        return !!(m && /width\\s*=\\s*device-width/i.test(m.getAttribute('content') || ''));
+    }"""
+    )
+
+
+def _tap_target_audit(page, sel):
+    """Advisory (#1010): interactive controls whose effective hit area is < 44px."""
+    return page.evaluate(
+        """(sel) => {
+        const out = [];
+        document.querySelectorAll(sel).forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.width === 0 && r.height === 0) return;        // not rendered
+            if (r.width < 44 || r.height < 44) {
+                out.push(`${(el.className||el.tagName).toString().slice(0,28)} ${Math.round(r.width)}x${Math.round(r.height)}`);
+            }
+        });
+        return out;
+    }""",
+        sel,
+    )
+
+
 def _write_step_summary(path, passed, failed, warns, results):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
@@ -588,16 +682,43 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
             except Exception:
                 pass
 
-        # ── responsive overflow @ 390px ──
+        # ── mobile @ 390px: overflow + the Epic-A failure classes (#1013) ──
         page.set_viewport_size({"width": 390, "height": 844})
-        page.wait_for_timeout(400)
+        # Re-scroll at the mobile viewport so motion.js's IntersectionObserver fires
+        # at the 844px height — the #1002 stuck-reveal bug is viewport-height-dependent
+        # (a section too tall to reach the threshold never reveals), and some pages
+        # only overflow the threshold on desktop. This makes the mobile-only case real.
+        _scroll_and_reveal(page)
         overflow = _mobile_overflow(page)
         if overflow and overflow > 4:
             issues.append(f"Horizontal overflow at 390px — content exceeds viewport by {overflow}px")
+        # (b) #1002 — reveal-selector elements stuck at opacity:0 after scroll-through.
+        stuck = _stuck_reveals(page, MOBILE_REVEAL_SEL)
+        if stuck:
+            issues.append(
+                f"Scroll-reveal stuck at opacity:0 on {len(stuck)} element(s) @390px (#1002 class): {', '.join(sorted(set(stuck))[:4])}"
+            )
+        # (a) #1003 — bottom app-bar row overflows the viewport at 390px.
+        bar390 = _app_bar_overflow(page)
+        if bar390 is not None and bar390 > 2:
+            issues.append(f"App-bar row exceeds viewport by {bar390}px @390px (#1003 class)")
+        # (c) #1004 — the page must carry a width=device-width viewport meta.
+        if not _viewport_meta_ok(page):
+            issues.append("Missing width=device-width viewport meta (#1004 class)")
+        # (d) #1010 — tap-target floor, ADVISORY only (not gated yet).
+        small = _tap_target_audit(page, TAP_TARGET_SEL)
+        if small:
+            warnings.append(f"Tap targets < 44px @390px (advisory #1010): {', '.join(small[:5])}")
         if save_screenshots:
             mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
             page.screenshot(path=mob, full_page=True)
             shots.append({"kind": "mobile", "path": mob})
+        # ── chrome @ 360px: the app-bar is tightest here (#1003 verified at 360) ──
+        page.set_viewport_size({"width": 360, "height": 800})
+        page.wait_for_timeout(200)
+        bar360 = _app_bar_overflow(page)
+        if bar360 is not None and bar360 > 2:
+            issues.append(f"App-bar row exceeds viewport by {bar360}px @360px (#1003 class)")
 
         # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
         # A 429 is throttle noise, not a broken endpoint: the sweep's parallel
