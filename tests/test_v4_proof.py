@@ -299,22 +299,44 @@ class TestCoachingReadBlock:
 
 
 class TestCoachingReadCommitted:
-    """#804 — the DELIVERED /coaching/ HTML carries the board's read: curl-visible, no JS."""
+    """#804 — the DELIVERED /coaching/ HTML carries the board's read: curl-visible, no JS.
+
+    Reset-aware (ADR-104): right after an experiment reset the board legitimately
+    has no reads yet — coaching_read_block_html() bakes nothing rather than
+    fabricating (a coach with no live read is omitted, never invented), so the
+    committed HTML can honestly ship WITHOUT the proof block (or with the priority
+    but no per-coach roster) until Day-1 content exists. The invariant pinned here
+    is therefore conditional: IF a baked read ships it must be well-formed (dated
+    stamp + real content; a roster header only ever with actual coach rows); if
+    none ships, the page must be the clean JS shell with no half-baked artifacts.
+    """
 
     def _html(self, rel):
         return (Path(__file__).resolve().parent.parent / "site" / "coaching" / rel).read_text(encoding="utf-8")
 
+    def _assert_baked_read_or_honest_placeholder(self, html):
+        if "The board's read on the data" in html:
+            # a baked read ships → it must be the full #804 treatment, well-formed:
+            assert "<noscript>" in html
+            assert "as of 20" in html  # a dated honesty stamp
+            # real content: the integrator's priority and/or the per-coach roster —
+            # never a bare header with nothing under it.
+            assert "<blockquote>" in html or "Each coach" in html
+            if "Each coach" in html:
+                assert "<ul><li>" in html, "roster header present but no coach rows baked"
+        else:
+            # honest pre-start/post-reset placeholder: no fabricated or partial proof
+            assert "Each coach's read" not in html
+            assert "<blockquote>" not in html
+            # the live board still boots via JS once content exists
+            assert "coaching.js" in html
+
     def test_index_carries_the_baked_read(self):
-        html = self._html("index.html")
-        assert "<noscript>" in html
-        assert "The board's read on the data" in html
-        assert "as of 20" in html  # a dated honesty stamp
-        # the differentiator: the committed snapshot has coach reads, so the roster ships.
-        assert "Each coach" in html
+        self._assert_baked_read_or_honest_placeholder(self._html("index.html"))
 
     def test_read_section_carries_the_baked_read(self):
-        # the "read" landing (the default section URL) also ships the proof.
-        assert "The board's read on the data" in self._html("read/index.html")
+        # the "read" landing (the default section URL) ships the same proof-or-honest state.
+        self._assert_baked_read_or_honest_placeholder(self._html("read/index.html"))
 
 
 class TestFallback:

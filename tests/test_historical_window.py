@@ -69,9 +69,15 @@ def test_observatory_week_bad_date(monkeypatch):
 
 
 def test_observatory_week_future_clamps_to_today(monkeypatch):
+    # Running-experiment case: genesis is PINNED in the past. Reading the live
+    # constant made this test fail during a staged-future-genesis window: the
+    # prev window's genesis lower-bound (max(anchor-8d, EXPERIMENT_START))
+    # legitimately exceeds today when genesis is tomorrow, so "max end == today"
+    # only holds once the experiment is running.
     import datetime as _dt
 
     today = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+    monkeypatch.setattr(data, "EXPERIMENT_START", "2026-06-08")
     seen = {"ends": []}
 
     def fake_qs(source, start, end, include_pilot=False):
@@ -84,6 +90,23 @@ def test_observatory_week_future_clamps_to_today(monkeypatch):
     assert resp["statusCode"] == 200
     # the primary window end (the max across the current+prev queries) is clamped to today
     assert max(seen["ends"]) == today
+    assert body["as_of_date"] == today
+
+
+def test_observatory_week_pre_start_future_genesis_is_honest_200(monkeypatch):
+    # The pre-genesis window, explicitly (#931): a reset stages EXPERIMENT_START in
+    # the FUTURE. The window lower bounds get lifted to the (future) genesis, the
+    # real _query_source guards start > end by returning [] — the endpoint must
+    # serve an honest empty 200 anchored to today, never a 500. Genesis pinned far
+    # future so the case can't quietly expire (golden-test rule: no wall-clock math).
+    import datetime as _dt
+
+    today = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d")
+    monkeypatch.setattr(data, "EXPERIMENT_START", "2099-06-01")
+    monkeypatch.setattr(data, "_query_source", lambda source, start, end, include_pilot=False: [])
+    resp = data.handle_observatory_week({"domain": "sleep"})
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
     assert body["as_of_date"] == today
 
 
