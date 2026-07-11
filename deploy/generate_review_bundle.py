@@ -450,6 +450,24 @@ def build_bundle():
 | R19-F05 | 118 MCP tools (4th consecutive review) | ✅ RESOLVED | v4.5.1 | ADR-045 formally accepts tool count as operating state. Current count: 115 (reduced from 118). |
 | R19-F06 | Site-API region contradicts Function URL | ✅ RESOLVED | v4.3.0 | AWS CLI verification confirmed us-west-2. Docs updated. |
 | R19-F07 | Section 13b not updated for R17/R18 | ✅ RESOLVED | v4.5.2 + v4.9.0 | R17, R18, R19 findings all added to generate_review_bundle.py Section 13b. |
+
+### 2026-07-11 overnight sweep (13-lens survey → adversarial verify → file; manifest: docs/reviews/SWEEP_MANIFEST_2026-07-11.json)
+
+| Finding ID | Issue | Status | Fixed in | Resolution |
+|-----------|-------|--------|----------|------------|
+| SW11-privacy (privacy-1..3) | #945 | ✅ RESOLVED | PR #983 | Genome identifiers purged from repo test fixtures, supplements registry (both mirrors + root S3 + container recycle), build beats. Live-verified gene-free. |
+| SW11-reset-singletons (engine-bugs-1,3; serving-bugs-1; database-4) | #946 | ✅ RESOLVED | PR #986 | singleton_visible() guard on every get_item reader; arc restarts early_baseline pre-genesis; Elena PERSONA wipe coverage. Data tombstones fold into Sunday's pipeline re-run. |
+| SW11-pilot-chain (engine-bugs-2) | #947 | ✅ RESOLVED | PR #980 | fetch_date/load_previous_state phase-filtered per ADR-058. |
+| SW11-prestart-contracts (serving-bugs-3,5,6; render-live-2,4,5; throughline-4,7) | #948 | ✅ RESOLVED | PR #988 | 7 endpoints get the #939 pre_start contract; self-disarms post-genesis. |
+| SW11-countdown-content (missing-features-1,2; render-live-1,3; throughline-1,2,3,5,6-banner; serving-bugs-2) | #949 | ✅ RESOLVED | PR #989 | Mechanism-level pre_start branches in builders/renderers; public_stats contract; subscribe CTA. |
+| SW11-habitify-notes (engine-bugs-4) | #950 | ✅ RESOLVED | PR #979 | from/to range params per the API contract (was 412 since ship). |
+| SW11-taxonomy-total (database-1,2,3,5 + #930) | #951 | ✅ RESOLVED | PR #987 | All 83 live families classify; SSM bump ordering; subscribe TTL attr; prologue cycle re-stamp at resurrect. |
+| SW11-ai-trio (ai-content-3,4,6) | #952 | ✅ RESOLVED | PR #985 | Few-shot text stripped from the ADR-104 allow-list; AI_UNAVAILABLE sentinel held; BoD intro derives identity/phase from profile. |
+| SW11-sdlc-pair (sdlc-2,7) | #953 | ✅ RESOLVED | PR #981 | Tree-walk skips .claude/cdk.out; scripts/validate_beats.py wired into /wrap. |
+| SW11-char-gates (char-sim-1; char-math-2) | #954 | ✅ RESOLVED | PR #984 | Up-gate vs unboosted EMA target; monotone XP demotion buffer (ENGINE_VERSION 1.3.1). |
+| SW11-doc-drift (doc-drift-1,2,3; sdlc-4,5) | — | ✅ RESOLVED | PR #982 | CLAUDE.md cadence/verify-count corrections; R22 charter stamped EXECUTED; stale layer memory retired. |
+| SW11-suite-stragglers | — | ✅ RESOLVED | PRs #944, #990 | Reset-aware proof-snapshot assertion; PERSONA#elena semantic collision; order-proof observatory test. |
+| SW11-open-backlog | #955–#978 | 📋 FILED | — | 24 open stories/epics from the same sweep (character-math epic #956, presence-genesis decision #955, etc.) — do NOT re-flag; they are known and ranked. |
 """
     )
 

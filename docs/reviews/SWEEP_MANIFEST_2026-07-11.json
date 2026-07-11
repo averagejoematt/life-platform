@@ -1,0 +1,481 @@
+{
+ "sweep": "2026-07-11 overnight full-platform sweep (13-lens survey -> adversarial verify 67/70 -> ADR-099 filing)",
+ "issues_filed": {
+  "W1": "945",
+  "W2": "946",
+  "W3": "947",
+  "W4": "948",
+  "W5": "949",
+  "W6": "950",
+  "W7": "951",
+  "W8": "952",
+  "W9": "953",
+  "W10": "954",
+  "D": "955",
+  "EPIC-CHAR": "956",
+  "C1": "957",
+  "C2s": "958",
+  "C3s": "959",
+  "C4s": "960",
+  "C5s": "961",
+  "C6s": "962",
+  "C7s": "963",
+  "C8s": "964",
+  "C9s": "965",
+  "A2": "966",
+  "A5": "967",
+  "A7": "968",
+  "Q1": "969",
+  "Q2": "970",
+  "Q3": "971",
+  "Q4": "972",
+  "DD4": "973",
+  "MF3": "974",
+  "MF4": "975",
+  "MF5": "976",
+  "S1": "977",
+  "T6": "978"
+ },
+ "shipped_same_night": {
+  "W1": "#945/PR983",
+  "W2": "#946/PR986",
+  "W3": "#947/PR980",
+  "W4": "#948/PR988",
+  "W5": "#949/PR989",
+  "W6": "#950/PR979",
+  "W7": "#951/PR987 (also closed #930)",
+  "W8": "#952/PR985",
+  "W9": "#953/PR981",
+  "W10": "#954/PR984"
+ },
+ "refuted": {
+  "privacy-4": "intentional per ADR-071 /legacy preservation",
+  "sdlc-1": "narrow kernel refiled as #977"
+ },
+ "docs": [
+  "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md",
+  "docs/reviews/CLAUDE_PLATFORM_UNDERSTANDING_2026-07.md"
+ ],
+ "findings": [
+  {
+   "id": "engine-bugs-1",
+   "summary": "Cycle-5 launch week will be narrated under the cycle-4 'setback' arc: the reset deliberately leaves NARRATIVE#arc STATE#current in place expecting 'the first post-genesis coach-state run to recompute' it, but _detect_arc_transition only writes on a TRANSITION and has no path back to early_baseline \u2014 from 'setback' the only exit is 'breakthrough' (60%+ metrics improving), so the orchestrator's fresh-start default (journey_day 1, 'experiment just begun') can never engage.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "engine-bugs-2",
+   "summary": "Day-1 character compute will chain continuity (xp_total, xp_debt, streaks, mood) from phase=pilot pre-genesis records: character_sheet_lambda.fetch_date/load_previous_state check tombstone but NOT phase, so Monday's compute for 2026-07-12 inherits the countdown-window pilot record for 7/11 \u2014 and the Sunday-evening cron re-creates that pilot record even if Matthew's Sunday pipeline re-run tombstones the current ones (cron computes yesterday=7/11 at 16:30 UTC), defeating ADR-058's clean-slate contract that the pilot tag exists to enforce.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "engine-bugs-3",
+   "summary": "Every STATE#current singleton reader ignores the tombstone attribute, so post-wipe narrative surfaces are steered by wiped cycle-4 data until the next writer run: coach_narrative_orchestrator._get_item (engagement_signal, STANCE#latest, VOICE#state), ai_expert_analyzer._load_engagement_signal, and character_sheet_lambda's STATE#current fallback all return the tombstoned record \u2014 asymmetric with _query_begins_with which filters tombstones.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "engine-bugs-4",
+   "summary": "Habitify habit-causality notes capture (#898, EVR-01/02 \u2014 the 'why missed' channel) is silently dead since ship: fetch_notes calls GET /notes/{habit_id}?target_date=..., but the Habitify API requires from/to range params and 412s every call ('Unable to find to, from. Expect to, from in query'); the by-design non-fatal contract swallows it, so notes are always [] and nothing alarms.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "engine-bugs-5",
+   "summary": "Presence/engagement is deliberately cross-cycle ('about the human, not the domain') with no genesis clamp, so Day-1 narrative surfaces will foreground the cycle-4 stall: live signal is gap=15d/severity=alarm (last food log 2026-06-24); if Matthew hasn't logged food by Monday the acknowledgment gate FORCES every coach/chronicle output to reference a pre-genesis ~17-day gap (or be held), and if he logs Sunday the coaches open week 1 with 'just returned after ~17 days quiet' \u2014 in tension with the presentation rule that only /data/cycles/ acknowledges the prior attempt; needs a conscious decision (clamp gap computation at genesis, or accept the cross-cycle voice for launch week).",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "serving-bugs-1",
+   "summary": "Tombstoned cycle-4 integrator digest serves live on /coaching/ \u2014 4 get_item call sites (site_api_coach.py:505, 1114, 1599; site_api_lambda.py:750) bypass the tombstone/phase guard that _stance_latest already documents and applies (site_api_coach.py:355-364), so /api/weekly_priority, /api/coaching-dashboard and /api/coach_team tensions all narrate the WIPED cycle ('week 4', '7.3 lb/week trajectory', '46 days silent on journaling', 'the 14-day logging silence') as 'the board's read on you \u00b7 right now' at T\u22121, and coaching.js renderReadToday/renderReadWeek/tensionsHTML render it with no pre-start guard.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "serving-bugs-2",
+   "summary": "public_stats.json serves pre-reset cycle-4 ghosts (journey: started_date 2026-06-14, days_in 27, lost_lbs 13.8, weekly_rate -7.33; hero.days_on_journey 27; character.level 13 \u2014 the exact bug number the reset buried; brief_excerpt = the neglect-era Elena line) because site-stats-refresh rewrites only the vitals section in place, and the homepage 'where would you land' mirror (wireMirror) consumes journey with NO pre-start guard \u2014 live homepage renders 'Matthew started at 314.52 lbs, is at 300.77 today' at T\u22121, while the same file's elena_hero_line IS suppressed pre-start two functions away.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "serving-bugs-3",
+   "summary": "/api/observatory_week has no pre_start contract: with genesis in the future its window inverts (period start 2026-07-12 > end 2026-07-11) and it emits fabricated-zero summaries \u2014 'Best Night: \" \u00b7 0.0h\", Recovery 0%', delta_label 'vs 0 last week', notable 'Avg sleep declined 0h vs last week' \u2014 and coaching.js renderByCoach renders the payload raw as 'the data \u00b7 last 7 days \u00b7 2026-07-12 \u2192 2026-07-11' with '0 hrs Average Duration' (its empty-state branch never engages because summary.primary exists). /api/vacation_fund shows the same inverted-window family (start_date 2026-07-12, end_date 2026-07-11, day_count 1).",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "serving-bugs-4",
+   "summary": "/now/ cockpit shows 'Off the grid since Jun 24 \u2014 15 days without a log' (from /api/presence: in_lull=true, gap_days=15, last_log_date 2026-06-24 \u2014 the wiped cycle's silence) right next to the pre-start verdict 'T\u22121... the instruments are on', because cockpit.js renderPresence has no pre-start guard \u2014 while story.js renderQuiet deliberately suppresses the identical lull pre-start with the comment 'launch eve reads as anticipation, not a lull'.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "serving-bugs-5",
+   "summary": "/api/journey pre-start contract is internally inconsistent: it keeps current_weight_lbs=301 (a cycle-4 weigh-in via the _latest_item('withings') fallback) while force-nulling last_weighin_date \u2014 stripping exactly the as-of anchor the in-code contract comment says the front-end needs to keep a stale weight honest \u2014 and it contradicts /api/vitals, which nulls weight_lbs entirely pre-start.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "serving-bugs-6",
+   "summary": "/api/character serves as_of_date '2026-07-12' \u2014 a future date \u2014 on 2026-07-11 (cockpit binds it verbatim: 'as of 2026-07-12'), while /api/character_stats says as_of_date '2026-07-10' for the same sheet; the two character endpoints disagree and one timestamps tomorrow.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "render-live-1",
+   "summary": "Pre-start podcast page (/story/panel/) shows the CYCLE-4 bet ledger \u2014 'THE BETS \u00b7 1 WON \u00b7 0 LOST \u00b7 2 OPEN' with wk4/wk1/wk2 badges dated 2026-06-20..07-07 \u2014 because handle_panel_ledger does a raw get_item that ignores the tombstone the reset correctly stamped (tombstone=true, cycle=4, phase=pilot, tombstoned 2026-07-11T04:47Z). Violates Matthew's presentation rule: EP0 = pure introduction, only the cycles page may acknowledge prior attempts.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "render-live-2",
+   "summary": "/data/character/ hero says 'day 1 OF THE EXPERIMENT \u00b7 as of 2026-07-12' while the banner directly below says '1 DAY UNTIL DAY 1' \u2014 /api/journey_waveform clamps day_n to minimum 1 (`max(...days+1, 1)`) so the front-end's #931 pre-start gate (`wave.day_n >= 1`) never suppresses the figure; the same day_n=1 also paints Home's waveform kicker '1 DAY \u00b7 THE SHAPE OF IT' over an empty hatched strip on day 0. /api/journey correctly reports day_n=0, pre_start=true.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "render-live-3",
+   "summary": "Home hero hardcodes 'This attempt starts at 315 lbs' (cycle-4's 314.5 baseline) while the live-bound strip lower on the SAME page renders '301 LBS AT THE START LINE' from /api/journey (start_weight_lbs 300.8) \u2014 two different start weights on the flagship landing page at launch eve; evidence_body.js also hardcodes 'Milestone ladder \u2014 315 to 185' in a section heading.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "render-live-4",
+   "summary": "Pre-start zeroed character sheet stamps as_of_date = EXPERIMENT_START (2026-07-12), so on July 11 the cockpit footer and character hero display 'as of 2026-07-12' \u2014 a freshness claim dated tomorrow, on the site whose moat is honest numbers.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "render-live-5",
+   "summary": "/method/cycles/ pre-start renders 'THE SAME FIRST 1 DAYS, EVERY RESTART' (window_days floored at 1 while cycle 5 has 0 days) and presents 1-day 'avg recovery / avg sleep' rows (47%/84%/86%/49%) as a cycle comparison \u2014 grammatically broken kicker plus a degenerate n=1-day window that undercuts the page's own 'matched windows' promise.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "missing-features-1",
+   "summary": "The Coaching door serves the wiped cycle-4 board read live during the countdown: /api/weekly_priority and the baked /coaching/ HTML ('The board's read on the data \u2014 as of 2026-07-10') open with Dr. Nakamura scolding a 14-day logging stall, '7.3 lb/week trajectory', and 'ten sessions across four weeks' \u2014 all from the cycle the reset tombstoned \u2014 while every other surface says the experiment begins tomorrow. The cockpit was explicitly guarded against exactly this (cockpit.js comment: 'the countdown owns the verdict slot (a stale-cycle board read pre-genesis\u2026)') but coaching.js has no preStart import/gate and the stored artifact wasn't refreshed. This both reads incoherently at T\u22121 and violates the presentation rule that only the cycles page may acknowledge the prior attempt.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "missing-features-2",
+   "summary": "The countdown moment has no conversion hook: story.js's pre-start branch renders '1 day to go \u2014 the experiment begins tomorrow' with no adjacent follow-by-email capture; the only subscribe affordances are the small nav 'follow' link and a generic footer CTA. A Reddit newcomer arriving at T\u22121 (the highest-intent moment the site will ever have \u2014 a show about to premiere) is given no mechanism to be brought back for Day 1. Elite version: the countdown block itself carries 'Day 1 lands Sunday \u2014 get the first morning read in your inbox' (inline capture or a prominent /subscribe/ CTA), mirrored on the cockpit's countdown slot.",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "missing-features-3",
+   "summary": "The cockpit shows three of the four loop stations but not the levers: /now/ renders the board's read (Coaching), pillars/trends/forecast (Data), and the log/achievements (Story), yet has no 'active levers today' strip \u2014 which supplements are in protocol, which experiment is running (day N/duration), what training block is prescribed. The Protocols station is invisible in the daily slice, so the loop the home page teaches ('the protocols shift the data') never closes on the page Matthew opens every morning. Elite version: a compact levers row sourced from the existing /api/supplements + /api/experiments + Hevy routine, each linking into /protocols/.",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "missing-features-4",
+   "summary": "Manual-input freshness is reactive, not instrumented: the cockpit's presence UI is a self-hiding lull banner ('Self-hides when present', fires only after a quiet stretch is already established), while cycle 4 died of 14 silent days that the deterministic layer papered over (the truth audit's central finding). /api/presence already carries last_log_date, gap_days, and channels_quiet_count, and the Data door gives automated sources a live freshness board \u2014 but the manual channels the machine depends on (food, journal, training detail) get no equivalent always-visible treatment on /now/. Elite version: a small 'the inputs the machine needs' freshness row (last-logged marks per manual channel), framed as instrument health, not a streak/nag \u2014 which is a real design tension with the stated 'No streaks, no nags' stance, hence design-question.",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "missing-features-5",
+   "summary": "Cycle 5 has no public pre-registration moment: at T\u22121 the predictions surface is 0/0 across every coach and there is no dated, on-the-record 'the plan for cycle 5, registered before Day 1' \u2014 target rate band, which protocols start Sunday, the board's opening predictions, the model's finish-line odds the home hero already promises ('the model tracks the odds'). The platform's own rigor bar (ADR-105) and R21 pre-registered experiments prove the machinery exists for experiments but not for the cycle itself. Elite version: a genesis-stamped pre-registration note on /method/predictions/ (or a Prologue Part IV) that readers can grade at week milestones \u2014 no prior-cycle mention needed, so it respects the presentation rule.",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "code-quality-1",
+   "summary": "Dead-but-running legacy blog publish path: wednesday_chronicle still writes 3 S3 objects per publish to bucket-root blog/ (outside the ADR-046 site//generated/ prefix model), but https://averagejoematt.com/blog/ returns 404 with no redirects.map entry \u2014 and the internal chronicle email footer links readers to that 404 ('Read the full series at averagejoematt.com/blog'). ~360 lines of BLOG_POST_TEMPLATE/BLOG_CSS/build_blog_index/publish_to_blog machinery whose output is unreachable; publish_to_journal (the v4 /story/ path) already runs in parallel and returns the correct URL.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "code-quality-2",
+   "summary": "The pre-#781 copy-paste helper family is still fleet-wide and has already drifted behaviorally: d2f exists in ~34 copies, safe_float in ~15, query_range in ~8 \u2014 while the canonical digest_utils copies now ship inside EVERY bundle (one-bundle rule #781), so the R13-F10 deferral ('full dedup deferred to layer v12') lost its reason to exist when the layer was retired. Drift is not hypothetical: hypothesis_engine's query_range does not paginate (silently truncates at the 1MB page) and returns a list, while nutrition_review's paginates via LastEvaluatedKey and returns a dict-by-date.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "code-quality-3",
+   "summary": "Dead Anthropic API-key plumbing threaded through 10 lambdas (51 references): get_anthropic_key() returns the truthy sentinel '_BEDROCK_IAM_' purely so `if api_key:` availability gates stay green, and retry_utils.call_anthropic_api keeps a mandatory api_key parameter its own body documents as ignored \u2014 while the in-code tracking pointer ('Full plumbing removal tracked as task #90') dangles: repo #90 is an unrelated merged Whoop-OAuth PR, so the cleanup is tracked nowhere live. The always-true gates mislead readers about the ADR-062 IAM-only auth posture.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "code-quality-4",
+   "summary": "deploy/ root (84 scripts) carries completed one-time and decision-contradicting scripts alongside the live tooling: setup_waf.sh + setup_waf_endpoint_rules.sh would recreate the WAF deliberately removed platform-wide 2026-06 (web_stack.py records the removal and the ~-$8/mo rationale), finish_waf_removal.sh is a finished one-time, and v4_cutover.sh / setup_r18_alarms.sh / request_amj_cert.sh / validate_amj_cert.sh / void_legacy_predictions_726.py / tombstone_legacy_hevy_aggregates.py are all done-once artifacts \u2014 while the paved archival path (deploy/archive_onetime_scripts.sh, archive/ has 23 entries) already exists but wasn't applied to these.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "doc-drift-1",
+   "summary": "CLAUDE.md misdescribes hypothesis-engine as one of the 5 compute Lambdas that 'run before the 17:00 UTC brief daily' \u2014 it actually runs weekly (Sunday 19:00 UTC, two hours AFTER the brief); ARCHITECTURE.md and docs/engines/HYPOTHESIS.md both have it right, so the doc every session reads first is the outlier (exactly the #389 'fresh session's first false fact' failure mode).",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "doc-drift-2",
+   "summary": "CLAUDE.md's restart-pipeline section says the pipeline 'verifies 27 rendered pages' but deploy/restart_verify_rendered.py checks 33 pages + 7 JSON endpoints (40 checks) \u2014 CLAUDE.md even contradicts itself, since its own session block reports 'verify 40/40'; the '27' is a fossil from the pre-v5 page list and this literal is not one of the 3 CLAUDE.md regexes sync_doc_metadata registers.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "doc-drift-3",
+   "summary": "docs/reviews/REVIEW_PROMPT_R22_CONSULTANCY.md still carries 'Status: DRAFT \u2014 awaiting Matthew's green-light before execution' even though R22 executed 2026-07-06 with a closure record (REVIEW_2026-07-06_R22.md, 47 findings filed #779\u2013#825) \u2014 and because docs/reviews/ is exempt from all three doc gates (links, tombstones, index/status), a wrong status header there is structurally uncatchable.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "doc-drift-4",
+   "summary": "Gate-gap class (the #934-adjacent family the lens asked for): (a) CLAUDE.md inline prose counts/schedules beyond the 3 registered regexes are ungated \u2014 findings 1 and 2 are live instances; (b) the engine-doc 'Verified: <date>' freshness check is calendar-only (90d) and ADVISORY-never-fails, with no linkage to whether the declared 'Sources of truth' files changed after the verify date \u2014 CHARACTER.md verified 2026-07-11 stays 'fresh' for 90 days even if character_engine.py is rewritten tomorrow; (c) the ~15 file:line pins per engine doc (e.g. ':1316-1323', ':1123-1188') have no checker at all (I spot-verified ~10 pins as currently accurate, so this is preventive, not a live break).",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-1",
+   "summary": "The presence/engagement pipeline has no genesis awareness: live STATE#current is dark/alarm/gap_days=15 (last food log 2026-06-24, cycle 4), adaptive-mode recomputes it daily from a 35-day window that crosses the reset boundary, and the #921 acknowledgment gates then FORCE every cycle-5 Day-1 narrative \u2014 8 public coach sections, State of Matthew (alarm must lead the opening sentence), the Wednesday chronicle (held with a 500 if unacknowledged), the daily brief \u2014 to lead with the archived cycle's 15\u201317-day stall (or a 'you're back after 17 days' return beat once he logs Sunday), directly violating the presentation rule that only /data/cycles/ may know it's another attempt.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-2",
+   "summary": "ADR-104 'grounded generation on every AI narrative surface' has a coverage hole at the highest-frequency surface: the daily brief's 4 legacy AI calls (Board of Directors, training+nutrition, journal coach, TL;DR) have no allow-list number gate and no quality gate (only the heuristic AI-3 validator), the BoD prompt explicitly demands 'Reference specific numbers (at least two)', and the legacy training/nutrition call is also the automatic fallback whenever a v2 draft is HELD by the quality or presence-ack gate \u2014 so a deliberate hold still publishes an ungated narrative for that domain in the same email.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-3",
+   "summary": "Few-shot voice-calibration examples poison the ADR-104 fabrication allow-list: the coach v2 gate computes allowed_numbers(system_prompt, user_message), and system_prompt embeds few_shot_examples that are dense with fictional/stale vitals ('18.2% deep sleep', 'efficiency dipped from 89% to 86%', '6-8ms below your 30-day EWMA', 'week two') \u2014 so a coach that parrots a calibration-example number as if it were Matthew's current data passes the fabrication gate; on cycle-5 Day 1 these deep-history examples also calibrate coaches toward longitudinal claims they cannot yet make.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-4",
+   "summary": "The live, config-driven Board of Directors intro (not just the fallback) hardcodes stale identity and phase facts into every daily prompt: 'Speaking to Matthew, 36yo, weight loss journey (...). Phase 1 Ignition: 3 lbs/week, 1500 kcal deficit, 1800 cal daily' \u2014 a hardcoded age (privacy absolute: age must never surface, and an AI handed '36yo' can echo it into output text), plus a fixed '3 lbs/week / 1500 kcal deficit' target that bypasses the profile's phase registry and the platform's CI-carrying rate discipline (#535/#914-B).",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-5",
+   "summary": "#921 presence-block coverage gaps beyond the known CHECKIN# follow-up: daily_debrief (narrates 'today', number-gated but presence-blind), monday_compass, weekly_digest, and monthly_digest build LLM narratives with no presence_prompt_block injection \u2014 during a dark stretch each would narrate a normal day/week over the silence, the exact truth-audit failure class #921 was shipped to kill (these are private-email surfaces, hence medium-low).",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-6",
+   "summary": "The '[AI_UNAVAILABLE]' sentinel is never filtered in the coach v2 pipeline: on Bedrock outage or tier-3 BudgetExceeded, call_anthropic returns the literal sentinel, which passes the grounding gate (contains no numbers), can pass a fail-open quality gate (the gate lambda's own Bedrock call fails on the same outage \u2192 infra fail-open), then gets recorded by coach-state-updater, stored in generation_cache under the brief fingerprint (sticky reuse on unchanged briefs), and rendered in the brief \u2014 the serving side filters it on only 2 site_api_coach fields.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "ai-content-7",
+   "summary": "Coach-voiced surfaces outside the daily brief bypass the ADR-108 coach quality gate entirely: the site's ask/board answers (site_api_ai), inter_coach_dialogue, and coach_memoir all speak in coach personas with grounding gates but no anti-pattern/voice-distinctiveness/decision-class gate \u2014 the 10.2% real-failure rate ADR-108 measured on daily outputs presumably applies to these voices too, unmeasured.",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-1",
+   "summary": "The coaching door (and the cockpit's 'argument underneath') serves stale cycle-4 mid-experiment board content directly under the 'THE EXPERIMENT BEGINS TOMORROW' banner \u2014 'THE BOARD'S READ ON YOU \u00b7 RIGHT NOW' says 'ten training sessions across four weeks', '27 days total in the program', 'final third of a 12-month cut' (a timeline stated nowhere else on the site), and 'maintained a 7.3 lb/week weight loss trajectory', which fails arithmetic (cycle-4 actual: 314.5\u2192301.0 lb over 25 days = 3.78 lb/week; 7.3 lb/wk would be 29 lb in four weeks) \u2014 all sitting above the footer claim 'GROUNDED, NO INVENTED NUMBERS'. The same 2026-W27 Webb/Reyes dispute ('lost 1.4 lbs of lean mass over eight weeks', 'WRITTEN JUL 4') also renders on /now/ at T\u22121. This is baked into the static coaching HTML (SEO/no-JS visible) and violates the presentation rule that only the cycles page acknowledges prior attempts; every audience hits a hard story-spine contradiction (begins tomorrow vs. 27 days in).",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-2",
+   "summary": "The site's single most visible claim contradicts every live surface: the hand-coded home hero says 'This attempt starts at 315 lbs, aimed at 185' (site/index.html:83) while the SAME page shows '301 LBS AT THE START LINE', /data/ shows 'now 301 lb / 301 START / -116 lb TO GOAL', the cockpit forecasts 'WEIGHT 300.9 lb TOMORROW MORNING', the chronicle dek says 'WEIGHT: 301.0 LBS', and /protocols/ says 'Losing 117 lbs' (= cycle-1's 302\u2192185). Three different implied start weights across the doors at T\u22121; 315 matches cycle-4's 314.5 genesis, i.e. the hero still tells last cycle's story. Because it is hardcoded copy, Sunday's re-anchoring weigh-in will not fix it.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-3",
+   "summary": "Home's discovery ticker announces prior-cycle intelligence on a Day-0 site: 'NEWLY UNLOCKED THIS MONTH: HABIT PCT \u2194 DAY GRADE (R=0.8777, N=20, POSITIVE \u00b7 WEAK)' comes from /api/what_changed with window 2026-06-05\u21922026-07-04 (week 2026-W27, computed 2026-07-04 \u2014 pre-reset). A newcomer reads '1 DAY TO GO' and, four screens later, a correlation from 20 days of data that per the countdown shouldn't exist. Bonus incoherence: r=0.878 is displayed with the label 'WEAK' (and 4-decimal false precision), which reads self-contradictory to the QS audience.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-4",
+   "summary": "/method/cycles/ \u2014 the ONE page licensed to tell the restart story \u2014 renders a degenerate comparison at T\u22121: header 'THE SAME FIRST 1 DAYS, EVERY RESTART', rows 'Weight change (first 1d): \u2014 \u2014 \u2014 \u2014 \u2014', 'Days with data: 1/1/1/1/0', and footnote 'Each cycle measured over its own first 1 days'. window_days floors at 1 because cycle 5 has 0 days, so the honesty centerpiece reads broken/meaningless exactly when a curious pre-launch visitor would check it.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-5",
+   "summary": "Story door contradicts its own banner: 'THE EXPERIMENT BEGINS TOMORROW \u2014 SUNDAY, JULY 12' sits directly above Prologue Part III's dek 'WEIGHT: 301.0 LBS | ... | WEEK 1 OF THE MEASURED LIFE' and body copy 'the final morning of his first full week', and the share widget exposes the legacy slug 'AVERAGEJOEMATT.COM/JOURNAL/POSTS/WEEK-03/'. The re-dated prologue chapters kept mid-experiment 'week 1'/'week-03' framing, so a newcomer cannot reconcile 'begins tomorrow' with 'his first full week' three lines later. Same artifact leaks to home's chronicle teaser (line 99).",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-6",
+   "summary": "The protocols door has no countdown banner (home/coaching/story/now have one; data/protocols/method don't) and its entire supplement catalog speaks in mid-cut present tense with prior-cycle numbers: 'At 1800 cal with 190g protein target' (vs coaching's '1,581 kcal/day' and '1500-calorie deficit' \u2014 three different intake numbers live at once), 'At your training volume, magnesium depletion through sweat is real', 'PAUSED \u2014 ZERO TRACKING ENTRIES AFTER 31 DAYS', as-of 2026-06-26. At T\u22121 the 'levers you pull' door reads like an abandoned mid-flight dashboard rather than the plan for Sunday.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "throughline-7",
+   "summary": "Home explicitly promises 'No projections yet \u2014 the finish-line math begins with Day 1's weigh-in on Sunday, July 12. No fake finish line', while the cockpit simultaneously forecasts 'WEIGHT 300.9 lb TOMORROW MORNING \u00b7 80% RANGE 299.3\u2013302.5' with 'RANGE HELD 83% OF 12 GRADED' (prior-cycle grading), and stamps its footer 'AS OF 2026-07-12' \u2014 a future date shown on 2026-07-11. Physiology forecasts vs finish-line math is a defensible distinction, but at T\u22121 the two pages read as 'we don't project yet' vs 'here's tomorrow's projection, we've been graded 12 times'.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "database-1",
+   "summary": "Six MORE live DDB record families are unclassified in phase_taxonomy beyond #930's catalog \u2014 macrofactor_meals (780 rows), ingest_liveness (31), training_notes (22), coach_gen_cache (8), personal_baselines (1), EVALUATOR#coach_prediction (1) \u2014 and because data_export_lambda derives its export census from SOURCE_CLASS, all of them are silently OMITTED from data exports, recreating the exact 'quietly incomplete export' disease #498 fixed; classify() raises KeyError on every one, and tests/test_phase_taxonomy.py's 'live census' is a frozen fixture that predates them (none appear in it). SCHEMA.md also lacks training_notes/coach_gen_cache/ingest_liveness/personal_baselines/EVALUATOR#.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "database-2",
+   "summary": "Restart pipeline orders the SSM cycle bump BEFORE restart_ledger_reset, so the closing run's ledger totals are archived under the WRONG cycle number: the 2026-07-11 reset wrote the cycle-4 closing totals as CYCLE_TOTALS#005 (cycle=5) while the intelligence wipe stamped the very same closing run cycle=4 \u2014 an internal off-by-one contradiction present at every historical reset (CYCLE_TOTALS#004 closed_at 2026-06-14 = the day cycle 4 STARTED per CYCLE_GENESES) and contrary to restart_ledger_reset.py's own docstring ('cycle=N' = closing run).",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "database-3",
+   "summary": "Subscribe rate-limit rows never expire: email_subscriber_lambda writes its expiry epoch to attribute `expires_at` but the table's TTL is configured on attribute `ttl` (rate_limiter.py uses `ttl` correctly \u2014 RATE# buckets ARE being reaped), so all 550 SUBSCRIBE#rate_limit rows lack the reaped attribute and accumulate forever, one row per IP-hash per 5-minute bucket, despite the code comment claiming 'TTL one hour past bucket end \u2026 DDB cleanup'.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "database-4",
+   "summary": "Elena's cycle-4 narrative running state survived the reset live and will feed post-genesis episodes: PERSONA#elena holds 2 status=pending CALLBACK rows ('does silence correlate with crashes', 'what do the zone-2 walks mean', both 2026-07-07) plus 7 status=open THREAD rows ('silence-as-symptom', 'body-keeps-receipts', \u2026) that all reference the wiped cycle-4 stall arc; elena_state_updater builds pending_callbacks/open threads into the next-episode prompt state with no cycle filter, so EP1+ would 'pay off' promises about a storyline readers of cycle 5 never saw \u2014 violating the presentation rule that only /data/cycles/ may acknowledge prior cycles. (PERSONA#* classification itself is catalogued in #930; the distinct, time-sensitive action here is resetting/expiring Elena's pending state before the first post-genesis episode.)",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "database-5",
+   "summary": "Prologue chronicle cycle stamps are inconsistent after the carry-forward: DATE#2026-02-28 ('Before the Numbers') carries cycle=4 while its two live Prologue siblings DATE#2026-02-22 and DATE#2026-03-03 carry cycle=5 (all three phase=experiment, un-tombstoned) \u2014 so the ADR-077 'archive navigable by reset generation' promise is broken for this row: the cycle-4 archive would contain a live cycle-5 Prologue chapter, and any future tooling filtering chronicle by cycle sees one-third of the Prologue in the wrong generation.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "privacy-1",
+   "summary": "The public repo re-publishes the exact genotype #920 removed: tests/test_labs_privacy.py quotes \"Lpa Aspirin Genotype \u2014 Ile/Ile\" as 'the exact live finding' (docstring line 5 + fixture lines 59-60 labeled '# The exact live finding'), and PR #920's public body says outright it is Matthew's actual genotype; commit dd623142's message/diff carries it too. The hotfix that stripped the genotype from /api/labs immortalized the value on a fresh public surface.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "privacy-2",
+   "summary": "Live public API still asserts a named-gene fact about Matthew's genome: /api/supplements and /config/supplement_registry.json (both 200) serve \"Genome includes MTHFR variants \u2014 check whether you need methylated forms\" + rationale \"MTHFR variants in genome suggest methylation support needed\" \u2014 the same named-gene-with-personal-carrier-status class #920 called critical, and it survived the #920 commit that edited this exact file (dd623142 touched site/config/supplement_registry.json but only remapped recommenders).",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "privacy-3",
+   "summary": "Public build beat names the specific gene involved in the (Matthew-gated) privacy audit: /story/build/beats.json (200, rendered on the build page) honest_miss says the site published \"specific gene variants including APOE status, and exact hormone and cancer-screening lab values\" \u2014 publicly confirming APOE data exists and was once served (an invitation to archive/Wayback digging), and violating the norm PR #943 itself established ('specifics deliberately NOT quoted here \u2014 public repo'). Adjacent risk: the public test file also contains an \"APOE Allele e3/e3\" fixture, so readers can plausibly (even if wrongly) read a real value off the pair.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "privacy-4",
+   "summary": "/legacy still serves pre-#920 real-person-recommender voice on publicly reachable URLs: /legacy/supplements/ (200) \u2014 \"I tend to trust people I find credible \u2014 Rhonda Patrick, researchers\u2026\" \u2014 and /legacy/tools/ (200) \u2014 \"Centenarian target (Attia)\"; robots.txt is Allow:/ with no Disallow /legacy/, so the surface is crawlable the moment any external link to it exists (sitemap/rss are clean today).",
+   "sev_guess": "low",
+   "verdict": "REFUTED"
+  },
+  {
+   "id": "sdlc-1",
+   "summary": "Permission allowlist re-defeats the human gates that closed issue #784 established: broad mutating wildcards (Bash(git *) => unprompted push-to-main which auto-deploys the site per #750; Bash(npx cdk *) => unprompted 'cdk deploy --all'; Bash(aws iam *), Bash(aws lambda *) => update-function-code/invoke; Bash(aws cloudformation *), Bash(aws budgets *) => the $85 ceiling itself is mutable, Bash(aws s3api *)) accumulated back into settings.local.json, and there is no deny/ask section at all \u2014 the 'I run deploys is a hard boundary' rule is unenforced by the permission system again.",
+   "sev_guess": "high",
+   "verdict": "REFUTED"
+  },
+  {
+   "id": "sdlc-2",
+   "summary": "tests/test_hevy_compiler_isolation.py walks the whole repo tree but _SKIP_DIRS omits '.claude' (agent worktrees) and root 'cdk.out', so any live concurrent worktree reds the full suite on main \u2014 this exact class was hit in 2 of the last 4 sessions ('known class, hit again' 07-08; 'locally polluted by the wiki session's live worktree' 07-10/11) despite a dedicated memory entry telling humans to prune first.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "sdlc-3",
+   "summary": "The #797 memory-hygiene rule ('terminal Active Work entries move to the shipped archive at wrap \u2014 never stack') is stated in MEMORY.md's own section header but is NOT a step in the /wrap skill, and the drift is visible: at least 5 terminal entries (Reconcile #415/#417 RESOLVED, Fable R21 batch RESOLVED, Review\u2192backlog COMPLETE, backlog-paydown superseded-by-next-night, /uplevel driver shipped+ON) still sit in Active Work, so every session pays context tax re-reading closed programs.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "sdlc-4",
+   "summary": "CLAUDE.md restart-pipeline section says the pipeline 'verifies 27 rendered pages' but #918 rebuilt the verify gate to the 40-URL v4 surface \u2014 the same file's status block says 'verify 40/40' 22 lines later; additionally the 'MCP Tool Modules' section lists only 11 of the 23 actual mcp/tools_*.py modules (missing tools_social, tools_coach_checkin, tools_memory, tools_data, etc.), which can mislead a fresh session grepping for a module's existence.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "sdlc-5",
+   "summary": "MEMORY.md index line 28 ('Layer deploy sequence \u2014 build_layer.sh only builds; LifePlatformCore publishes') teaches the shared-layer deploy path that #781 retired \u2014 deploy/build_layer.sh no longer exists on disk \u2014 violating the repo's own 'docs: current truth only' discipline; a session following it would chase a dead script.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "sdlc-6",
+   "summary": "The multi-lens platform-review ritual has been rebuilt bespoke at least three times (R22 charter docs/reviews/REVIEW_PROMPT_R22_CONSULTANCY.md, the 47-agent truth-audit workflow 07-10, tonight's 13-lens run) with the same skeleton each time \u2014 fan-out lenses \u2192 dedup against generate_review_bundle.py \u00a713b + open issues \u2192 finding-verifier adversarial pass \u2192 ADR-099 filing \u2014 but no /platform-review command exists, so each run re-derives the charter, the dedup lists, and the hard rules (budget-tier constraints, kill-on-sight list) from scratch.",
+   "sev_guess": "proposal",
+   "verdict": "PLAUSIBLE"
+  },
+  {
+   "id": "sdlc-7",
+   "summary": "The /wrap build-beat step defers the beats.json prs-field schema to an external checklist and runs no local validation, and the exact predicted failure happened 07-10: the wiki session wrote string PRs instead of label/url objects into site/story/build/beats.json, redding test_build_dispatches for every concurrent session until hand-fixed.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "sdlc-8",
+   "summary": "Agent-roster gap: review\u2192backlog filing recurs (~5 sessions: R22 filed 47 issues #779\u2013#825, review-backlog program filed #337\u2013#423, the decision sprint, the truth audit, tonight's Phase 5) but there is no issue-filer agent encoding the ADR-099 conventions (type:story/epic labels, Now/Next/Later milestones, model:* plan-of-attack routing labels, dedup search before filing, 'Fixes #N' linkage) \u2014 each filing pass re-learns the format from docs and past issues.",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-math-1",
+   "summary": "Climb-during-darkness returns after ~17 dark days: the confidence blend sets a no-data performance floor (movement blended raw = 15.6 in total silence), the neglect-atrophy floor pins level_score at that same blended raw, the EMA converges down to it, and the #913 up-gate (round(raw_score) >= target_level, character_engine.py:1099) then auto-passes \u2014 16 >= 16 \u2014 every single dark day. Simulated with the live config: the audit's exact scenario (level 8, healthy history, total silence) fires level_up events on dark days 17/20/23/26/29 and lands at level 13 (the audit's exact 8\u219213 numbers); a fresh cycle-5 level-1 character that NEVER logs anything reaches level 16 with 12 level_up celebrations in 60 days, while character_mood simultaneously reads 'dormant'. tests/test_character_neglect.py:106 only guards 14 dark days \u2014 the regression begins at day ~17 when EMA converges to the blend floor. Minimal fix: a dark-presence day can never support a level-up (mirror the coverage_hold for the up direction, passing engagement into evaluate_level_changes), or evaluate the up-gate against the UNBLENDED raw (weighted_sum/total_weight before the 50-blend at character_engine.py:851), which is 0 in silence.",
+   "sev_guess": "critical",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-math-2",
+   "summary": "The level-down XP buffer gate is xp_total % 100 (character_engine.py:1085), which WRAPS UPWARD as XP declines: losing XP across a 100-boundary re-arms near-maximum demotion immunity (buffer 5 \u2192 75 \u2192 85 in the sim). Simulated 60-day total crash from level 30: with xp_total=205 the pillar demotes ONCE (30\u219228) in 60 days while streak_below reaches 30; with xp_total=0 the same crash honestly demotes 30\u219218. Historical XP grants demotion immunity in arbitrary ~26-day modulo chunks \u2014 path-dependent, not the 'earned buffer' F-02 intended \u2014 and since levels are never derived from XP, xp_total's ONLY leveling effect is this pathological modulo. Also makes the displayed unbounded xp_total (site character payload, xp_per_level=100 in config) misleading: 850 XP at level 8 reads as 8.5 levels of stored progress that doesn't exist. Fix: track a within-level buffer that only fills on good days and drains monotonically under demotion pressure (or drop the gate \u2014 streaks already anti-flip-flop).",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-math-3",
+   "summary": "Two post-engine mutations in the compute lambda bypass every engine honesty gate: (a) the food-delivery modifier multiplies the STORED nutrition raw_score (0.85\u20131.10) after XP bands, the up-gate, and drivers were computed from the unmodified value (character_sheet_lambda.py:580-586) \u2014 and because load_raw_score_histories reads the stored raw_score (:417), the modifier silently leaks into tomorrow's EMA and future level decisions with no coverage/confidence/provenance trace (the displayed raw_score is not the number the engine scored); (b) challenge bonus XP is added straight to xp_total (:653) ignoring the #913 xp_debt paydown contract ('good days pay debt before XP grows') and arbitrarily perturbing the %100 demotion buffer of finding 2. Fix: pass both as engine inputs (a component/modifier inside compute_character_sheet and a bonus arg to _compute_xp) so debt, drivers, and gates see them.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-math-4",
+   "summary": "Four engine inputs are never produced by assemble_data (vice_streaks, buddy_freshness_days, streak_all_above_30th, weekend_weekday_ratio \u2014 grep of character_sheet_lambda.py finds none set), leaving permanently-dead component weights: the consistency meta-pillar is structurally clamped to [12.5, 87.5] forever (verified: perfect day scores 87.5, worst day 12.5, coverage capped 0.6), mind's vice_control (0.1) and relationships' buddy_engagement (0.15) can never score, and the 'Vice Shield' cross-pillar effect is hardcoded always-False (character_engine.py:1281-1282 returns False for any vice_streak condition, comment says 'Handled via data' but nothing handles it). Same disease as the removed body-fat component (#486/B-3 precedent: 'could never score and structurally capped coverage'). Fix: wire the existing platform producers (an /api/vice_streaks source exists; habitify/withings streak data exists) or remove the components + effect from config as B-3 did.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-math-5",
+   "summary": "Cross-pillar effect conditions evaluate EMA level_SCORES, not levels: compute_character_sheet passes pillar_level_scores (character_engine.py:1373), so 'Alignment Bonus: all_pillars >= 41' \u2014 which the config's own protocols text frames as the leveled meta-achievement at the Discipline tier boundary ('Target Alignment Bonus (all pillars 41+)') \u2014 can fire in week 1 of a fresh cycle when every pillar is still level 1, merely because week-one raw scores EMA above 41. Mathematically bounded and clamped (adjusted = clamp(ls*(1+mod)), :1379; max stack +0.16 on metabolic \u2014 verified bounded), so this is a semantics/narrative question, not an overflow: decide whether effects gate on scores (rename thresholds so they stop mirroring tier min_levels) or on earned levels (pass pillar levels once available).",
+   "sev_guess": "proposal",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-sim-1",
+   "summary": "Cross-pillar positive modifiers raise the #913 up-gate target above any achievable daily raw score, permanently freezing boosted pillars: under steady raw ~76, metabolic stays Level 1 for all 420 days (Training Boost +5% + Synergy +8% + Alignment +3% = x1.161 boost -> target 89 vs raw ~76, so day_supports_up is always False and streak_above never leaves 0). Perverse inversion: an oscillating performer (2 good weeks/1 bad, mean raw ~65) reaches char L62 Mastery by day 420 because bad weeks toggle the boosts OFF and let metabolic climb, while the steady-75 performer caps at L49 with metabolic at L1.",
+   "sev_guess": "critical",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-sim-2",
+   "summary": "XP zero-point sits at raw 80 (band 60-79 earns 2, daily decay 2 -> net 0; 40-59 nets -1), so every realistic-good trajectory bleeds or never repays the #913 visible debt while levels climb: the slow improver (raw 45->70) hits ALL-pillar debt cap (700 total) by day 200 and still shows 0 XP / ~700 debt at day 420 despite reaching char L57; the oscillator shows 0 XP / 627 debt at L62 Mastery; the dark-stretch character's 322 debt pays down only ~50 over 300 subsequent days of raw-75 living. The public character page (evidence_character.js:105-106,283,314-315) renders this as a permanent '-N owed' badge plus a 0% XP bar directly contradicting a rising level/tier story.",
+   "sev_guess": "high",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-sim-3",
+   "summary": "XP/debt is not gated on coverage_hold or not_instrumented: the uninstrumented relationships pillar (#747, coverage 0.0, level correctly frozen at 1) feeds its 50.0 'mathematical placeholder, never a real reading' into _compute_xp as a mediocre day (earned 1 - decay 2 = -1/day), accruing a permanent public 100-XP debt by ~day 120 in every scenario \u2014 contradicting ADR-104's 'a device gap is not a failure' and the engine's own comment at line 843; it also inflates character_xp_debt by a constant 100 and makes total debt nonzero even for the steady-excellent character.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-sim-4",
+   "summary": "A 30-day total dark stretch barely registers on the headline character level: pre-dark L19 -> min 17 (a 2-level, ~10% dip; only 7 level-down events across all pillars in 420 days), recovered to pre-dark within 2 days of resuming and +6 levels above it within ~11 days \u2014 the honesty is carried entirely by secondary surfaces (mood 'dormant' all 30 days, level_score crash 74->13, atrophy multiplier to 0.63, debt +300), while metabolic (coverage 0.45<0.5) and consistency (0.2) sit in coverage-hold and cannot drop at all during the dark month; down-streak reset-after-each-drop (7d cadence in Momentum) plus the XP-buffer modulo gate cap the visible loss.",
+   "sev_guess": "medium",
+   "verdict": "CONFIRMED"
+  },
+  {
+   "id": "char-sim-5",
+   "summary": "Elite tier (81+) is effectively unreachable at any horizon: even under 420 days of sustained raw ~90 the character reaches only L48 (L52 with relationships instrumented), with per-pillar Elite extrapolating to ~day 500+ of near-perfection; structurally, the frozen relationships pillar (weight 0.07, level 1 forever per #747) plus the finding-1 metabolic freeze (weight 0.12) cap the character ceiling at floor(0.81*100 + 0.12*1 + 0.07*1) = 81 \u2014 Elite requires literally every other pillar at exactly 100 \u2014 yet the Elite tier is marketed in the public tier ladder, protocols, and OG cards.",
+   "sev_guess": "low",
+   "verdict": "CONFIRMED"
+  }
+ ]
+}
