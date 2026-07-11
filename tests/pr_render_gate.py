@@ -24,6 +24,13 @@ reference_local_render_qa memory):
     genuine render failure, a JS error, a horizontal overflow, or a leaked
     NaN/undefined/[object Object] in the visitor-facing prose blocks the merge.
 
+Mobile coverage (#1012): capture_page runs a mobile pass at 390×844 (+ the app-bar
+chrome check at 360×800) on every gate page, so the pre-merge gate now renders mobile
+in addition to 1440×900 desktop — and asserts the Epic-A failure classes there
+(stuck reveals #1002, app-bar overflow #1003, missing viewport meta #1004; tap-target
+audit #1010 is advisory). A PR that reintroduces one of those classes fails the gate
+before merge instead of surfacing on the live site.
+
 This SUPPLEMENTS the post-deploy live QA (ci-cd.yml visual-qa job) — it never
 replaces it. The live sweep still runs against real prod data after deploy.
 
