@@ -103,6 +103,15 @@ def test_observatory_week_pre_start_future_genesis_is_honest_200(monkeypatch):
 
     monkeypatch.setattr(common, "EXPERIMENT_START", "2099-06-01")
     monkeypatch.setattr(data, "EXPERIMENT_START", "2099-06-01")
+    # Order-proof: the suite imports the web modules under two identities
+    # (web.site_api_common vs site_api_common), and pre_start_meta reads ITS OWN
+    # module's global — patch the symbol the handler actually calls so an earlier
+    # import under the other identity can't leak the real genesis in.
+    monkeypatch.setattr(
+        data,
+        "pre_start_meta",
+        lambda: {"pre_start": True, "days_until_start": 42, "start_date": "2099-06-01"},
+    )
     monkeypatch.setattr(data, "_query_source", lambda source, start, end, include_pilot=False: [])
     resp = data.handle_observatory_week({"domain": "sleep"})
     assert resp["statusCode"] == 200

@@ -283,8 +283,10 @@ def test_pk_rules():
     assert pt.classify("CANARY#matthew", "CANARY#2026-07-01T00:00:00Z") == pt.SYSTEM_STATE
     assert pt.classify("SYSTEM#dlq-ledger", "MSG#x") == pt.SYSTEM_STATE
     assert pt.classify("OAUTH#matthew", "SESSION#tok") == pt.SYSTEM_STATE
-    # narrator persona state deliberately spans cycles (#951 — preserves de-facto behavior)
-    assert pt.classify("PERSONA#elena", "THREAD#2026-07-01#slug") == pt.CROSS_PHASE
+    # PERSONA#elena is experiment_scoped (#946 — her cycle-4 callbacks/running state
+    # leaking into post-genesis episodes was a verified reset bug; the specific rule
+    # precedes #951's generic PERSONA#* cross_phase default for undecided personas)
+    assert pt.classify("PERSONA#elena", "THREAD#2026-07-01#slug") == pt.EXPERIMENT_SCOPED
     assert pt.classify("PERSONA#margaret", "STATE#current") == pt.CROSS_PHASE
     # suffixed training_notes pks resolve to the base source (#951)
     assert pt.classify("USER#matthew#SOURCE#training_notes#EXERCISE#79dad4ee", "DATE#2026-07-01#WORKOUT#x") == pt.RAW_TIMESERIES
