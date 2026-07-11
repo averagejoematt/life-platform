@@ -5,10 +5,18 @@
 import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, weightTrendChart, projectionCone, ciWhisker } from "/assets/js/charts.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, figs, sec, empty, note, evClass, kvtable } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
+import { preStart } from "/assets/js/coach_popover.js"; // #978 — the shared pre-start / Day-N cycle signal
 
 export function renderSupplements(d) {
   const g = d.groups || {};
   const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]);
+  // #978 — cycle-aware framing. Before genesis this catalog is the plan going in, not a
+  // progress report; say so, keyed off the same pre-start signal every door uses. Once
+  // the experiment starts, preStart() returns null and the frame drops away.
+  const pre = preStart();
+  const frame = pre
+    ? `<p class="supp-frame">The stack Matthew starts ${esc(pre.startDow)} — the plan going in, not a progress report. Nothing's been logged yet; adherence and results fill in once the experiment begins.</p>`
+    : "";
   const secs = Object.values(g).map((grp) => {
     const cards = (grp.items || []).map((s) => {
       const [c, l] = evClass(s.ev);
@@ -47,7 +55,7 @@ export function renderSupplements(d) {
     }).join("");
     return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`;
   }).join("");
-  return head + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
+  return head + frame + secs + note("Evidence strength is the published research consensus — not a claim about Matthew.");
 }
 
 export function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers || []; if (!bm.length) return empty("No bloodwork drawn yet — panels appear here as they're added."); const by = {}; for (const b of bm) (by[b.category || "Other"] ||= []).push(b); const secs = Object.entries(by).map(([cat, rows]) => sec(cat, `<table class="rd-tbl"><thead><tr><th>biomarker</th><th>value</th><th>reference</th><th>flag</th></tr></thead><tbody>${rows.map((b) => { const f = b.flag && String(b.flag).toLowerCase() !== "null"; return `<tr class="${f ? "rd-flag" : ""}"><td class="rd-name">${esc(b.name)}</td><td class="num">${esc(b.value)}${b.unit ? ` <span class="rd-unit">${esc(b.unit)}</span>` : ""}</td><td class="num rd-range">${esc(b.range || "—")}</td><td>${f ? `<span class="rd-flagmark">${esc(b.flag)}</span>` : ""}</td></tr>`; }).join("")}</tbody></table>`)).join(""); return figs([fig(L.total_draws ?? "—", "draws"), fig(bm.length, "biomarkers"), fig(L.flagged_count ?? 0, "flagged"), L.latest_draw_date && fig(L.latest_draw_date, "latest draw")]) + secs + note("Reference ranges are lab-provided; flags mark out-of-range."); }

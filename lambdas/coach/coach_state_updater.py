@@ -212,15 +212,6 @@ STALENESS_THRESHOLD = 3
 # SECRET CACHING
 # ══════════════════════════════════════════════════════════════════════════════
 
-_api_key_cache = {"key": None, "ts": 0}
-_API_KEY_TTL = 900  # 15 minutes
-
-
-def _get_api_key():
-    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
-    return "_BEDROCK_IAM_"
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -311,8 +302,6 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
     2026-05-03: bumped default max_tokens 1500 → 3000. Was hitting truncation
     on 5-coach state extraction; truncation → invalid JSON → fallback to default.
     """
-    api_key = _get_api_key()
-
     body = {
         "model": AI_MODEL_HAIKU,
         "max_tokens": max_tokens,
@@ -328,7 +317,6 @@ def _call_haiku(system, user_message, max_tokens=3000, temperature=0.1):
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "anthropic-beta": "prompt-caching-2024-07-31",
         },

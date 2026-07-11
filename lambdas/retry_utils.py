@@ -108,7 +108,6 @@ def _build_system_block(
 
 def call_anthropic_api(
     prompt: str,
-    api_key: str,
     max_tokens: int = 500,
     system: Union[str, list[dict[str, Any]], None] = None,
     model: Optional[str] = None,
@@ -120,7 +119,6 @@ def call_anthropic_api(
 
     Args:
         prompt:       User message content (str).
-        api_key:      Anthropic API key.
         max_tokens:   Max tokens for response.
         system:       Optional system prompt (str or list of content blocks).
         model:        Model ID — defaults to AI_MODEL env var.
@@ -148,7 +146,7 @@ def call_anthropic_api(
         body["temperature"] = temperature
 
     # ADR-062 (2026-05-27): Bedrock invoke_model (was urllib → api.anthropic.com).
-    # api_key param ignored (IAM auth). See lambdas/bedrock_client.py.
+    # Auth is IAM — no API key. See lambdas/bedrock_client.py.
     import botocore.exceptions as _bce
     from bedrock_client import invoke as _bedrock_invoke
 

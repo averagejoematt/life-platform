@@ -197,7 +197,7 @@ REGISTRY = [
     (
         "supplements",
         "Supplements",
-        "What's taken, why, and what the evidence actually supports.",
+        "The daily stack — what's in it, why, and what the evidence actually supports.",
         "Protocol & experiments",
         "data",
         "/api/supplements",

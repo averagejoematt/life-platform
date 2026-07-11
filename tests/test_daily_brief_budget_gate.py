@@ -8,9 +8,9 @@ being swallowed by a generic `except Exception`. Two things are pinned:
      explicitly, and fails OPEN (never blocks AI) if budget_guard itself is
      unavailable or raises — the same convention every other gated feature
      (coach_narrative_orchestrator, state_of_matthew_lambda) follows.
-  2. `_run_ai_coach_pipeline` — the extracted body of the brief's `if
-     api_key:` branch — actually SKIPS every ai_calls.* call when the gate
-     denies, and attempts them when it allows. This is the "wired" contract:
+  2. `_run_ai_coach_pipeline` — the extracted body of the brief's AI branch —
+     actually SKIPS every ai_calls.* call when the gate denies, and attempts
+     them when it allows. This is the "wired" contract:
      a denial must produce zero calls into ai_calls/bedrock, not just an
      exception caught somewhere downstream.
 
@@ -133,7 +133,7 @@ def test_pipeline_takes_data_only_path_when_budget_denies(monkeypatch):
     _mock_ai_calls(monkeypatch, m)
     monkeypatch.setattr(m, "_daily_brief_ai_allowed", lambda: False)
 
-    result = m._run_ai_coach_pipeline(api_key="fake-anthropic-key", **_PIPELINE_KWARGS)
+    result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
 
     # The contract: at tier 3, NOT ONE ai_calls.* function is invoked — this is
     # the thing the issue says was previously unenforced (only a coincidental
@@ -157,30 +157,13 @@ def test_pipeline_takes_data_only_path_when_budget_denies(monkeypatch):
     }
 
 
-def test_pipeline_skips_gate_check_entirely_without_an_api_key(monkeypatch):
-    """No api_key ⇒ short-circuits before even asking the budget guard (matches
-    the pre-existing `if api_key:` behavior — no key, no AI, regardless of tier)."""
-    import daily_brief_lambda as m
-
-    _mock_ai_calls(monkeypatch, m)
-    gate = MagicMock(return_value=True)
-    monkeypatch.setattr(m, "_daily_brief_ai_allowed", gate)
-
-    result = m._run_ai_coach_pipeline(api_key=None, **_PIPELINE_KWARGS)
-
-    gate.assert_not_called()
-    for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
-        getattr(m.ai_calls, name).assert_not_called()
-    assert result["bod_insight"] == ""
-
-
 def test_pipeline_attempts_ai_path_when_budget_allows(monkeypatch):
     import daily_brief_lambda as m
 
     _mock_ai_calls(monkeypatch, m)
     monkeypatch.setattr(m, "_daily_brief_ai_allowed", lambda: True)
 
-    result = m._run_ai_coach_pipeline(api_key="fake-anthropic-key", **_PIPELINE_KWARGS)
+    result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
 
     for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
         getattr(m.ai_calls, name).assert_called_once()
@@ -199,7 +182,7 @@ def test_pipeline_journal_coach_only_called_with_journal_entries(monkeypatch):
 
     kwargs = dict(_PIPELINE_KWARGS)
     kwargs["data"] = {"date": "2026-07-06"}  # no journal_entries key
-    m._run_ai_coach_pipeline(api_key="fake-anthropic-key", **kwargs)
+    m._run_ai_coach_pipeline(**kwargs)
     m.ai_calls.call_journal_coach.assert_not_called()
 
 
@@ -212,7 +195,7 @@ def test_end_to_end_gate_allows_below_hard_stop(monkeypatch, tier):
     _mock_ai_calls(monkeypatch, m)
     monkeypatch.setattr(budget_guard, "current_tier", lambda: tier)
 
-    result = m._run_ai_coach_pipeline(api_key="fake-anthropic-key", **_PIPELINE_KWARGS)
+    result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
     assert result["bod_insight"] == "mock text"
     m.ai_calls.call_board_of_directors.assert_called_once()
 
@@ -224,7 +207,7 @@ def test_end_to_end_gate_denies_at_hard_stop_tier_3(monkeypatch):
     _mock_ai_calls(monkeypatch, m)
     monkeypatch.setattr(budget_guard, "current_tier", lambda: 3)
 
-    result = m._run_ai_coach_pipeline(api_key="fake-anthropic-key", **_PIPELINE_KWARGS)
+    result = m._run_ai_coach_pipeline(**_PIPELINE_KWARGS)
     for name in _COACH_FN_NAMES + _MAIN_AI_FN_NAMES:
         getattr(m.ai_calls, name).assert_not_called()
     assert result["tldr_guidance"] == {}

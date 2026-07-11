@@ -102,15 +102,6 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 # d2f, avg, fmt, fmt_num, safe_float imported from digest_utils
 
 
@@ -1137,7 +1128,7 @@ def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
-def call_haiku(data, profile, api_key):
+def call_haiku(data, profile):
     clean = d2f(data)
     pd = json.loads(json.dumps(clean))
     # Trim activities for token economy
@@ -1216,7 +1207,7 @@ def call_haiku(data, profile, api_key):
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
         method="POST",
     )
     resp = call_anthropic_with_retry(req)
@@ -2068,12 +2059,11 @@ def lambda_handler(event, context):
     }
     logger.info("Gate telemetry: subs=%s weight=%s start=%s goal=%s", _real_subs, _cur_w, _start_w, _goal_w)
 
-    api_key = get_anthropic_key()
     if hasattr(logger, "set_date"):
         logger.set_date(dates.get("this_end", ""))  # OBS-1
     logger.info("Calling Haiku for Board commentary...")
     try:
-        commentary = call_haiku(data, profile, api_key)
+        commentary = call_haiku(data, profile)
     except Exception as e:
         logger.warning(f"Haiku failed: {e}")
         commentary = "🎯 THE CHAIR — OVERVIEW\nCommentary unavailable.\n" "💡 INSIGHT OF THE WEEK\nReview data sections below."

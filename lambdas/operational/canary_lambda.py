@@ -302,11 +302,6 @@ def check_mcp(canary_ts: str) -> tuple[bool, str, float]:
 # ── Check 4: Anthropic API reachability (reentry sweep, 2026-05-03) ─────────
 
 
-def get_anthropic_api_key() -> str | None:
-    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
-    return "_BEDROCK_IAM_"
-
-
 def check_anthropic(canary_ts: str) -> tuple[bool, str, float]:
     """Make a tiny (max_tokens=1) Bedrock call to verify Claude inference is live.
 
