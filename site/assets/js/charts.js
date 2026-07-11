@@ -839,7 +839,7 @@ export function pillarRing(pillars, { size = 360, rimR = 0.46, width = 10 } = {}
     const off = (-i * (SEG_DEG + GAP_DEG) * circ) / 360;
     const rot = `transform="rotate(-90 ${C} ${C})"`;
     out += `<circle class="pring-seg" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${segLen.toFixed(2)} ${(circ - segLen).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" ${rot}/>`;
-    out += `<circle class="pring-fill" data-i="${i}" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${fillLen.toFixed(2)} ${(circ - fillLen).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" ${rot} style="transition-delay:${(0.2 + i * 0.1).toFixed(1)}s"/>`;
+    out += `<circle class="pring-fill${p.dim ? " pring-dimmed" : ""}" data-i="${i}" cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${color}" stroke-width="${width}" stroke-dasharray="${fillLen.toFixed(2)} ${(circ - fillLen).toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}" ${rot} style="transition-delay:${(0.2 + i * 0.1).toFixed(1)}s"/>`;
   });
   return out;
 }

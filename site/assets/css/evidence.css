@@ -542,6 +542,38 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-rwhy { margin: calc(-1 * var(--sp-2)) 0 0 calc(22px + var(--sp-2)); color: var(--ink-faint); font-size: var(--fs-label); line-height: 1.4; max-width: var(--measure-narrow); }
 .ch-hold { margin-left: var(--sp-1); padding: 0 4px; border: var(--border-hair); border-radius: 3px; color: var(--ink-faint); font-size: 0.85em; letter-spacing: 0.04em; }
 .ch-quiet { max-width: var(--measure-narrow); }
+
+/* ── #913 · neglect states — calm and muted, never alarm-red (--alert stays
+   reserved for out-of-range vitals). fading = partial desaturation + dimmed
+   arcs for the pillars whose behaviors stopped; dormant = the figure itself
+   goes quiet: strong desaturation, dimmed emblem. */
+.ch-hero[data-state="fading"] .ch-ringsvg { filter: saturate(0.65); }
+.ch-hero[data-state="dormant"] .ch-ringsvg { filter: saturate(0.25); opacity: 0.85; }
+.ch-hero[data-state="dormant"] .ch-emblem { filter: saturate(0.3); opacity: 0.7; }
+.ch-hero[data-state="dormant"] .ch-class { color: var(--ink-muted); }
+.ch-hero[data-state="fading"] .pring-fill.pring-dimmed,
+.ch-hero[data-state="dormant"] .pring-fill.pring-dimmed { opacity: 0.35; }
+.ch-mood { color: var(--ink-muted); margin-top: 2px; }
+
+/* The atrophy chip — same badge grammar as `held`, muted ember. */
+.ch-atrophy { color: var(--ember); border-color: var(--ember-line); background: var(--ember-wash); }
+
+/* The quiet-stretch state banner — structural, persistent, muted ember. */
+.ch-state { border: 1px solid var(--ember-line); border-radius: var(--radius-sm); background: var(--ember-wash); padding: var(--sp-3) var(--sp-4); max-width: var(--measure); }
+.ch-state .ch-state-line { color: var(--ink); }
+.ch-state .ch-state-line .num { font-family: var(--font-mono); font-size: var(--fs-data-lg); color: var(--ember); margin-right: var(--sp-1); }
+.ch-state .ch-state-detail { color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); margin-top: var(--sp-2); max-width: var(--measure-narrow); }
+
+/* Timeline: distinct level-DOWN rendering + de-celebrated lull entries. */
+.ch-tl li.ch-tl-down { border-left-color: var(--rule-strong); }
+.ch-tl li.ch-tl-down .ch-tl-ev { color: var(--ink-muted); }
+.ch-tl li.ch-tl-down .ch-tl-lv { color: var(--ink-faint); }
+.ch-tl-dn { color: var(--ink-faint); }
+.ch-tl li.ch-tl-muted { opacity: 0.75; }
+.ch-tl li.ch-tl-muted .ch-tl-lv { color: var(--ink-faint); }
+
+/* The visible XP bleed line in the economy panel. */
+.ch-xpdebt .num { color: var(--ember); }
 .radar-chart { margin: 0; }
 .radar-chart svg { width: 100%; height: auto; display: block; }
 .radar-grid { stroke: var(--rule); }

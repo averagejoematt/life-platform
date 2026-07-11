@@ -29,6 +29,21 @@ export const chDelta = (v, unit = "") => {
   return n > 0 ? `<span class="ch-d ch-dup">+${fmt(n)}${unit}</span>` : `<span class="ch-d ch-ddn">−${fmt(Math.abs(n))}${unit}</span>`;
 };
 
+/* #913 · the deterministic mood — engine-computed on the daily record
+   (thriving/steady/fading/dormant). Records computed before v1.3.0 carry no
+   mood, so /api/presence is the honest fallback: dark → dormant, any lull →
+   fading. Never derived from prose, always from the presence instrument. */
+export const CH_MOODS = ["thriving", "steady", "fading", "dormant"];
+export const chMood = (ch, pres) => {
+  const m = ch && ch.character_mood;
+  if (CH_MOODS.includes(m)) return m;
+  if (pres && pres.available) {
+    if (pres.presence_class === "dark") return "dormant";
+    if (pres.in_lull) return "fading";
+  }
+  return "steady";
+};
+
 // Shared context for wireCharacter's time-travel re-render (P1.3): the hero +
 // stat block rebuild for a scrubbed date; the slow-moving sections stand.
 export let _chCtx = null;
@@ -38,11 +53,19 @@ export let _chCtx = null;
    journey isn't available the composite number holds the center instead.
    A builder (not inline) so time travel can redraw it for any date. */
 
-export function chHeroHtml(ch, pillars, jj, wave) {
+export function chHeroHtml(ch, pillars, jj, wave, mood) {
   const tier = String(ch.tier || "Foundation");
   const level = Math.round(Number(ch.level) || 1);
   const composite = Number(ch.composite_score);
   const RING = 360;
+  /* #913 · neglect states: the hero carries data-state, and during a lull the
+     arcs of pillars that are decaying / whose behaviors aren't happening dim —
+     the figure literally fades where the life went quiet. */
+  const state = CH_MOODS.includes(mood) ? mood : (CH_MOODS.includes(ch.character_mood) ? ch.character_mood : "steady");
+  const lull = state === "fading" || state === "dormant";
+  const ringPillars = lull
+    ? pillars.map((p) => (((p.neglect_decay && p.neglect_decay.applied) || (p.absent_behaviors || []).length) ? Object.assign({}, p, { dim: true }) : p))
+    : pillars;
   let center;
   if (jj && isFinite(Number(jj.start_weight_lbs)) && isFinite(Number(jj.current_weight_lbs)) && Number(jj.start_weight_lbs) !== Number(jj.goal_weight_lbs)) {
     const g = Math.max(0, Math.min(1, (Number(jj.current_weight_lbs) - Number(jj.goal_weight_lbs)) / (Number(jj.start_weight_lbs) - Number(jj.goal_weight_lbs))));
@@ -54,22 +77,35 @@ export function chHeroHtml(ch, pillars, jj, wave) {
   }
   const legend = pillars.map((p) => `<span class="ch-leg"><i class="ch-dot" style="background:var(--pillar-${esc(p.name)},var(--ember))"></i>${esc(CH_ABBR[p.name] || p.name)}</span>`).join("");
   const tt = ch.time_travel ? `<span class="ch-ttflag">time travel</span> · ` : "";
-  return `<section class="rd-sec ch-hero" data-tier="${esc(tier.toLowerCase())}">
+  /* #913 · the state, said plainly under the class line — and no celebratory
+     share copy while the sheet is in a lull (the level was earned earlier;
+     framing it as a win next to a dark stretch would be a lie of emphasis). */
+  const moodLine = state === "dormant"
+    ? `<p class="ch-mood label">dormant — manual logging has gone dark; the levels below are decaying, not paused</p>`
+    : state === "fading"
+      ? `<p class="ch-mood label">fading — a quiet stretch is pulling the sheet down</p>`
+      : "";
+  const shareText = lull
+    ? `Level ${level} ${tier} — the character sheet during a quiet stretch: absent behaviors score zero and the levels atrophy. Honest, not flattering`
+    : `Level ${level} ${tier} — my life as an RPG character sheet, scored nightly from real data`;
+  return `<section class="rd-sec ch-hero" data-tier="${esc(tier.toLowerCase())}" data-state="${esc(state)}">
     <div class="ch-stage">
       <div class="ch-figwrap">
-        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven pillar ring around the body silhouette — each arc fills with its pillar's score" data-cpts="${esc(JSON.stringify(pillarRingCpts(pillars, { size: RING })))}" data-cpts-hit="xy">${pillarRing(pillars, { size: RING })}${center}</svg>
+        <svg class="ch-ringsvg" viewBox="0 0 ${RING} ${RING}" role="img" aria-label="The seven pillar ring around the body silhouette — each arc fills with its pillar's score" data-cpts="${esc(JSON.stringify(pillarRingCpts(ringPillars, { size: RING })))}" data-cpts-hit="xy">${pillarRing(ringPillars, { size: RING })}${center}</svg>
         <div class="ch-legend label">${legend}</div>
       </div>
       <div class="ch-id">
         <div class="ch-emblem">${tierEmblem(tier, level)}</div>
         <p class="ch-class label">${tt}${esc(tier)} · Level ${level} of 100${ch.as_of_date ? ` · as of ${esc(String(ch.as_of_date))}` : ""}</p>
+        ${moodLine}
         <p class="ch-idnote">One character, seven pillars — scored nightly from the same data every other page reads. The silhouette is the real weight; the ring is today's pillar scores; the emblem evolves with the tier.</p>
         ${figs([
           Number.isFinite(composite) && fig(fmt(composite), "composite", ch.composite_delta_1d != null ? `${Number(ch.composite_delta_1d) >= 0 ? "+" : ""}${fmt(ch.composite_delta_1d)} d/d` : ""),
           ch.xp_total != null && fig(fmt(ch.xp_total), "xp"),
+          Number(ch.xp_debt) > 0 && fig(`−${fmt(ch.xp_debt)}`, "xp debt"),
           !ch.time_travel && (wave && wave.day_n) != null && fig(`day ${wave.day_n}`, "of the experiment"),
         ])}
-        <p class="ch-share">${shareMount("/data/character/", `Level ${level} ${tier} — my life as an RPG character sheet, scored nightly from real data`)}</p>
+        <p class="ch-share">${shareMount("/data/character/", shareText)}</p>
       </div>
     </div>
   </section>`;
@@ -94,6 +130,11 @@ export function chWhy(p) {
     return `Levels frozen — only ${cov} of this pillar's data exists right now. The engine won't judge on gaps: no data can't climb, and no data can't crash.`;
   }
   const bits = [];
+  // #913: atrophy is a state, not a footnote — name it first, with the gap.
+  if (p.neglect_decay && p.neglect_decay.applied) {
+    const gap = Math.round(Number(p.neglect_decay.gap_days) || 0);
+    bits.push(`atrophy: ${gap} dark days are decaying this level score — real detraining and evidence loss, floored at what today measured`);
+  }
   if (drv.absent && drv.absent.length) bits.push(`not happening: ${names(drv.absent)} (scores 0 while absent)`);
   if (drv.dragging && drv.dragging.length) bits.push(`dragging: ${names(drv.dragging)}`);
   if (drv.top && drv.top.length) bits.push(`carried by: ${names(drv.top)}`);
@@ -111,16 +152,26 @@ export function chStatHtml(pillars, hist) {
     // the placeholder neutral score — data-driven off the engine's own flag,
     // so this clears itself automatically the day a component gets real data.
     const notInstrumented = !!p.not_instrumented;
-    const lvBadge = notInstrumented
+    // #913: the atrophy chip — same badge grammar as `held`, muted ember, so a
+    // decaying pillar is visibly different from a frozen or healthy one.
+    const atrophy = !notInstrumented && p.neglect_decay && p.neglect_decay.applied
+      ? `<span class="ch-hold ch-atrophy" title="a sustained quiet stretch is decaying this pillar's level score — floored at what the day itself measured">atrophy</span>`
+      : "";
+    const lvBadge = (notInstrumented
       ? `<span class="ch-hold" title="not yet instrumented — no data source feeds this pillar">n/a</span>`
-      : (p.coverage_hold ? `<span class="ch-hold" title="levels frozen — not enough data to judge">held</span>` : "");
+      : (p.coverage_hold ? `<span class="ch-hold" title="levels frozen — not enough data to judge">held</span>` : "")) + atrophy;
     const bar = notInstrumented
       ? `<i class="ch-rbar-none"></i>`
       : `<i style="width:${raw}%;background:var(--pillar-${esc(p.name)},var(--ember))"></i>`;
     const rawCell = notInstrumented
       ? `<span class="ch-rraw label" title="not yet instrumented">—</span>`
       : `<span class="ch-rraw num">${fmt(raw)}<small>/100</small></span>`;
-    const xpCell = notInstrumented ? `<span class="ch-d ch-d0">—</span>` : chDelta(p.xp_delta, " xp");
+    // #913: a pillar in debt shows the hole, not a mute 0 — the bleed is the point.
+    const xpCell = notInstrumented
+      ? `<span class="ch-d ch-d0">—</span>`
+      : (Number(p.xp_debt) > 0
+        ? `<span class="ch-d ch-ddn" title="XP owed below zero — good days pay this down before XP grows again">−${fmt(p.xp_debt)} owed</span>`
+        : chDelta(p.xp_delta, " xp"));
     return `<div class="ch-row">
       <span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))">${domainIcon(p.name)}</span>
       <span class="ch-rname">${esc(ttl(p.name))}</span>
@@ -154,12 +205,23 @@ export async function renderCharacter(d) {
   const hist = (stats && stats.pillar_history) || [];
   _chCtx = { jj, wave, hist, genesis: (wave && wave.genesis) || null };
 
-  const hero = chHeroHtml(ch, pillars, jj, wave);
-  /* ADR-104: the quiet stretch, said plainly — fail-closed /api/presence, same
-     calm voice as the cockpit/story lines. No red banner; the sheet just tells
-     the truth about why some pillars are falling or frozen right now. */
-  const quiet = pres && pres.available && pres.in_lull && Number(pres.gap_days) >= 2
-    ? `<p class="rd-archive ch-quiet">A quiet stretch — manual logging has been dark for ${esc(String(Math.round(Number(pres.gap_days))))} days${pres.passive_still_flowing ? " while the wearables keep flowing" : ""}. The sheet doesn't look away: behaviors that aren't happening score zero, thin pillars freeze instead of climbing, and the levels below are what the data actually earns.</p>`
+  /* #913 · the deterministic mood drives the hero's visual state, the share
+     copy, and the celebration gating below. */
+  const mood = chMood(ch, pres);
+  const lullNow = !!(pres && pres.available && pres.in_lull && Number(pres.gap_days) >= 2);
+
+  const hero = chHeroHtml(ch, pillars, jj, wave, mood);
+  /* ADR-104/#913: the quiet stretch as a structural state banner — same calm
+     voice, muted ember (never alarm-red), but persistent and specific: the
+     gap-day counter plus exactly which pillars are decaying right now. */
+  const decaying = pillars.filter((p) => (p.neglect_decay && p.neglect_decay.applied) || (p.absent_behaviors || []).length);
+  const graceDays = Number(cfg && cfg.leveling && cfg.leveling.neglect_decay && cfg.leveling.neglect_decay.n_grace_days) || 3;
+  const quiet = lullNow
+    ? `<section class="rd-sec ch-state" data-mood="${esc(mood)}" aria-label="Quiet-stretch state">
+        <p class="ch-state-line"><strong class="num">${esc(String(Math.round(Number(pres.gap_days))))}</strong><span class="label"> days since a manual log</span>${pres.passive_still_flowing ? `<span class="label"> · the wearables keep flowing</span>` : ""}</p>
+        ${decaying.length ? `<p class="ch-state-detail">Decaying while the logging is dark: ${decaying.map((p) => `<strong style="color:var(--pillar-${esc(p.name)},var(--ember))">${esc(ttl(p.name))}</strong>`).join(", ")}.</p>` : ""}
+        <p class="ch-state-detail">The sheet doesn't look away: behaviors that aren't happening score zero, XP bleeds into visible debt, and after ${esc(String(graceDays))} dark days the levels themselves atrophy — modeling real detraining and evidence loss, not punishment. The levels below are what the data actually earns.</p>
+      </section>`
     : "";
   const statblock = chStatHtml(pillars, hist);
 
@@ -227,8 +289,14 @@ export async function renderCharacter(d) {
         <span class="ch-band-p">${here.map((p) => `<span class="ch-ric" style="color:var(--pillar-${esc(p.name)},var(--ember))" title="${esc(ttl(p.name))} · ${fmt(p.raw_score)}">${domainIcon(p.name)}</span>`).join("")}</span>
       </div>`;
     }).join("");
+    /* #913 · the bleed, visible: pillars sitting below the 0-floor used to
+       render an indistinguishable 0 — now the debt line names the hole. */
+    const debtors = pillars.filter((p) => Number(p.xp_debt) > 0);
+    const debtLine = (Number(ch.xp_debt) > 0 || debtors.length)
+      ? `<p class="rd-why ch-xpdebt">XP debt: <strong class="num">−${fmt(Number(ch.xp_debt) || debtors.reduce((a, p) => a + Number(p.xp_debt), 0))}</strong>${debtors.length ? ` (${debtors.map((p) => `${esc(ttl(p.name))} −${fmt(p.xp_debt)}`).join(" · ")})` : ""} — weak days used to vanish silently at the 0-floor; now they dig a visible hole that good days must repay before XP grows again.</p>`
+      : "";
     const economy = sec("The XP economy", `<div class="ch-bands">${bandRows}</div>
-      <p class="rd-why">Each pillar's nightly score lands in a band and earns (or loses) that XP — today's pillars are placed where they scored. Against it runs the decay: <strong>−${fmt(lv.daily_xp_decay)} XP every day</strong>, no exceptions. The game is simple and honest: you can't bank a good week and coast.</p>`);
+      <p class="rd-why">Each pillar's nightly score lands in a band and earns (or loses) that XP — today's pillars are placed where they scored. Against it runs the decay: <strong>−${fmt(lv.daily_xp_decay)} XP every day</strong>, no exceptions. The game is simple and honest: you can't bank a good week and coast.</p>${debtLine}`);
 
     /* 8 · Cross-pillar effects — evaluated live against today's raw scores. */
     const evalCond = (cond) => {
@@ -279,10 +347,28 @@ export async function renderCharacter(d) {
     mechanics = nextlvl + economy + effects + feeds;
   }
 
-  /* 4 · The record — level events, the weekly heatmap, the daily waveform. */
+  /* 4 · The record — level events, the weekly heatmap, the daily waveform.
+     #913: a level-DOWN renders distinctly (muted, marked), and during a lull
+     no "up" entry gets celebratory framing — ups dated inside the dark window
+     are recorded-not-celebrated (they're pre-fix artifacts or EMA momentum);
+     ups from before it are labeled as earned back then. Never a tier-up party
+     next to the quiet-stretch banner. */
   const tl = (stats && stats.timeline) || [];
+  const lullStart = lullNow ? String(pres.last_log_date || "") : "";
   const tlHtml = tl.length
-    ? `<ul class="ch-tl">${tl.slice(-14).reverse().map((e) => `<li><span class="label">${esc(String(e.date || "").slice(0, 10))}</span><span class="ch-tl-ev">${esc(e.event || "")}</span>${e.character_level != null ? `<span class="ch-tl-lv label">Lv ${esc(String(Math.round(e.character_level)))}</span>` : ""}</li>`).join("")}</ul>`
+    ? `<ul class="ch-tl">${tl.slice(-14).reverse().map((e) => {
+      const ty = String(e.type || "");
+      const isDown = ty.includes("down") || / tier down/.test(String(e.event || ""));
+      const isUp = !isDown && (ty.includes("up") || e.type == null);
+      const d = String(e.date || "").slice(0, 10);
+      let cls = isDown ? " ch-tl-down" : "";
+      let annot = "";
+      if (isUp && lullNow) {
+        if (lullStart && d > lullStart) { cls += " ch-tl-muted"; annot = ` <span class="label">· during the quiet stretch — recorded, not celebrated</span>`; }
+        else annot = ` <span class="label">· earned before the quiet stretch</span>`;
+      }
+      return `<li class="ch-tl-li${cls}"><span class="label">${esc(d)}</span><span class="ch-tl-ev">${isDown ? `<span class="ch-tl-dn label" aria-hidden="true">▾</span> ` : ""}${esc(e.event || "")}${annot}</span>${e.character_level != null ? `<span class="ch-tl-lv label">Lv ${esc(String(Math.round(e.character_level)))}</span>` : ""}</li>`;
+    }).join("")}</ul>`
     : `<p class="rd-archive">No level events yet this cycle — a level only moves after a sustained multi-day streak, so the first entries here are earned, not noise.</p>`;
   let heat = "";
   if (hist.length) {
@@ -344,7 +430,7 @@ export async function renderCharacter(d) {
   /* 10 · The math — prose interpolated from the live config so it can never lie. */
   const lvv = (cfg && cfg.leveling) || null;
   const math = lvv
-    ? sec("The math", `<p class="rd-prose">Each pillar scores 0–100 nightly from weighted components (above). Components that measure a <strong>behavior</strong> — logging food, journaling, training — score zero when the behavior doesn't happen; components that measure a <strong>sensor</strong> simply go quiet, and the engine won't judge what it can't see${lvv.level_change_min_coverage != null ? ` (below ${esc(String(Math.round(Number(lvv.level_change_min_coverage) * 100)))}% data coverage, levels freeze in both directions)` : ""}. An exponential moving average (λ = ${esc(String(lvv.ema_lambda))} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate, a level-up also requires the day itself to have scored at the new level, and crossing a tier boundary demands a longer streak still. Bigger honest gaps move in bigger steps, so pillars converge to what the data earns instead of marching in lockstep. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. The character level is the weighted average of the seven pillar levels, floored — so it understates, never flatters.</p>
+    ? sec("The math", `<p class="rd-prose">Each pillar scores 0–100 nightly from weighted components (above). Components that measure a <strong>behavior</strong> — logging food, journaling, training — score zero when the behavior doesn't happen; components that measure a <strong>sensor</strong> simply go quiet, and the engine won't judge what it can't see${lvv.level_change_min_coverage != null ? ` (below ${esc(String(Math.round(Number(lvv.level_change_min_coverage) * 100)))}% data coverage, levels freeze in both directions)` : ""}. An exponential moving average (λ = ${esc(String(lvv.ema_lambda))} over ${esc(String(lvv.ema_window_days))} days) smooths the noise into a level score. A <strong>streak counter</strong> then gates every level change — the smoothed score has to hold above (or below) the line for the full gate, a level-up also requires the day itself to have scored at the new level, and crossing a tier boundary demands a longer streak still. Bigger honest gaps move in bigger steps, so pillars converge to what the data earns instead of marching in lockstep. XP runs alongside as resilience: ${esc(String(lvv.xp_per_level))} XP to a level, decaying ${fmt(lvv.daily_xp_decay)} a day, with the buffer under ${esc(String(lvv.xp_buffer_threshold))} XP the only state where a level-down can land. Neglect is modeled, not ignored: after ${esc(String((lvv.neglect_decay && lvv.neglect_decay.n_grace_days) || 3))} dark days of manual-logging silence, behavioral pillars <strong>atrophy</strong> — a small daily decay on the smoothed score, floored at what each day actually measured — and XP below zero shows as visible <strong>debt</strong> instead of a silent floor. The character level is the weighted average of the seven pillar levels, floored — so it understates, never flatters.</p>
       <p class="rd-archive">The plain-language version lives on <a href="/method/character/">the character explainer</a>; the engine itself runs nightly in the platform's compute layer, and every number in this section is read live from its config.</p>`)
     : `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
 

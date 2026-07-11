@@ -261,6 +261,21 @@ def assemble_data(yesterday_str):
     # separate state_of_mind partition — reuse the already-fetched apple record.
     data["state_of_mind"] = data.get("apple") or {}
 
+    # #913: presence signal (adaptive_mode_lambda.compute_and_store_engagement)
+    # — drives neglect atrophy + character_mood in the engine. The dated record
+    # is the honest per-day signal (correct for backfill/reset rebuilds too);
+    # STATE#current is only a fallback when the target date is recent, so a
+    # historical rebuild never smears today's presence onto past days.
+    data["engagement_state"] = fetch_date("engagement_state", yesterday_str)
+    if data["engagement_state"] is None:
+        days_old = (datetime.now(timezone.utc).date() - dt.date()).days
+        if days_old <= 2:
+            try:
+                resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
+                data["engagement_state"] = d2f(resp.get("Item")) if resp.get("Item") else None
+            except Exception as e:
+                logger.warning(f"[character] engagement_state STATE#current fetch failed (non-fatal): {e}")
+
     # ── Rolling windows (batch queries for efficiency) ──
 
     # Sleep 14d (for onset consistency)
@@ -744,6 +759,9 @@ def lambda_handler(event, context):
                 "date": ev.get("date", yesterday_str),
                 "character_level": float(ev.get("new_level", char_level)),
                 "event": _build_event_description(ev),
+                # #913: carry the raw event type so the front end can render a
+                # level-DOWN distinctly and never celebrate during a lull.
+                "type": ev.get("type", ""),
             }
             for ev in (events or [])
         ]

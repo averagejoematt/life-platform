@@ -44,7 +44,7 @@ from character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.2.0"
+    assert ENGINE_VERSION == "1.3.0"
 
 
 # ── F-01: Confidence scoring ──
@@ -267,19 +267,23 @@ def test_xp_decays_on_mediocre_day():
         "xp_bands": [{"min_raw_score": 40, "xp": 1}, {"min_raw_score": 0, "xp": -1}],
         "leveling": {"daily_xp_decay": 2},
     }
-    earned, delta, new_xp = _compute_xp(45, 100, config)
+    earned, delta, new_xp, debt = _compute_xp(45, 100, config)
     assert earned == 1
     assert delta == -1  # 1 earned - 2 decay
     assert new_xp == 99  # 100 + 1 - 2
+    assert debt == 0  # positive balance -> no debt
 
 
-def test_xp_floors_at_zero():
+def test_xp_floors_at_zero_with_visible_debt():
+    """#913: xp_total still floors at 0 (downstream % consumers untouched),
+    but the shortfall is now a visible xp_debt instead of vanishing."""
     config = {
         "xp_bands": [{"min_raw_score": 0, "xp": -1}],
         "leveling": {"daily_xp_decay": 2},
     }
-    _, _, new_xp = _compute_xp(10, 1, config)
+    _, _, new_xp, debt = _compute_xp(10, 1, config)
     assert new_xp == 0  # Can't go negative
+    assert debt == 2  # 1 - 3 = -2 -> the bleed is visible, not silent
 
 
 def test_xp_grows_on_good_day():
@@ -287,10 +291,11 @@ def test_xp_grows_on_good_day():
         "xp_bands": [{"min_raw_score": 80, "xp": 3}, {"min_raw_score": 0, "xp": -1}],
         "leveling": {"daily_xp_decay": 2},
     }
-    earned, delta, new_xp = _compute_xp(85, 100, config)
+    earned, delta, new_xp, debt = _compute_xp(85, 100, config)
     assert earned == 3
     assert delta == 1  # 3 earned - 2 decay
     assert new_xp == 101
+    assert debt == 0
 
 
 # ── F-04: Body comp sigmoid ──
