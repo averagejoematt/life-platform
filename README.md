@@ -30,7 +30,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 
 ## Start here
 
-**The engineering wiki lives at [`docs/README.md`](docs/README.md)** — role-based entry
+**📖 The engineering wiki lives at [`docs/README.md`](docs/README.md)** (the GitHub wiki *tab* is just a signpost — docs-as-code is the single gated source of truth) — role-based entry
 paths, the full page registry, and the drift-prevention contract that keeps it accurate.
 
 | You want to… | Read |
