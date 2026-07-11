@@ -45,7 +45,7 @@ This codebase labels work with short tag-codes in **commits, code comments, `doc
 | **HP-##** | Home-page / share-card work (e.g. `HP-13` = OG share card). |
 | **TB#-##** | Tech-backlog (e.g. `TB7-25` = auto-rollback on smoke-test failure). |
 | **A11Y** | Accessibility (see `docs/A11Y_BASELINE.md`). |
-| **lv#** | A test name shorthand (e.g. `lv6` = `test_layer_version_consistency`). |
+| **lv#** | A test-name shorthand from the retired layer-consistency suite (the suite was removed with the layer, #781; the invariant is now `test_i2_shared_layer_retired`). |
 
 ## How to decode a specific tag
 1. **Shipped?** → `grep "<TAG>" docs/CHANGELOG.md` (what landed + when).

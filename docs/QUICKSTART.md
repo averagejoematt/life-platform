@@ -296,10 +296,9 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 
 ## Budget
 
-- **Target**: $15/month
-- **AWS Budget alert**: $20/month cap (25%/50%/100% thresholds)
-- **Current actual**: ~$13/month (post V2 Phase 5 — saved ~$3.65/mo via prompt caching + model tiering + log retention)
-- **Anthropic spend**: ~$8–12/month (down from $17–20 pre-ADR-049)
+- **Enforced ceiling**: $85/month base, floating to $100 in reader-traffic surge mode (ADR-063 + ADR-133)
+- **Real run-rate**: ~$25–40/month steady-state — see `docs/COST_TRACKER.md` for the live breakdown
+- **Enforcement**: cost-governor writes a tier 0–3 to SSM; `budget_guard.py` degrades AI features by tier (CLAUDE.md "AI Inference" section)
 - **Cost Explorer**:
   ```bash
   aws ce get-cost-and-usage \

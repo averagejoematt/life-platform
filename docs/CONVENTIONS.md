@@ -157,7 +157,6 @@ validates the *deploy contract*, not product/data correctness or AI narrative qu
 
 | File | What it guards |
 |------|----------------|
-| `test_layer_version_consistency.py` | shared-layer module presence + consumer wiring (the offline half; `test_lv6` is `integration`, excluded) |
 | `test_wiring_coverage.py` | every Lambda wires the required safety modules; every MCP tool registered |
 | `test_mcp_registry.py` | MCP registry integrity |
 | `test_role_policies.py` | static IAM policy correctness (KMS/secret scoping, no wildcards) |
@@ -277,6 +276,40 @@ Source: #382 (epic #342, "live infra matches code").
 - **`git stash` is ONE stack shared across all worktrees** — parallel agents have raced
   stash/pop and swapped each other's trees; never stash in concurrent sessions
   (recovery: the dropped-stash SHA).
+
+---
+
+## 8. The wiki stays true — the four-layer contract
+
+The engineering wiki is `docs/` (home: `docs/README.md`). Its accuracy is machinery,
+not diligence. The bar: **a human team could run the platform from these pages with the
+AI powered down.** Four layers, each with a named owner-mechanism:
+
+1. **Generated facts.** Counts/versions are never hand-typed in canonical pages —
+   `deploy/sync_doc_metadata.py` AST-discovers them and `--check` fails CI on drift,
+   including when a sync RULE itself stops matching (the silent-no-op class that let
+   "133 tools" outlive the #395 prune). Fully generated pages: `MCP_TOOL_CATALOG.md`
+   (`scripts/generate_mcp_tool_catalog.py`) and the ADR index in `DECISIONS.md`
+   (`scripts/generate_adr_index.py --apply` after every new ADR).
+2. **Mechanical CI lint** — `docs-ci.yml` on every docs push + the same gates in
+   ci-cd.yml's Lint job for code pushes:
+   - `scripts/check_doc_links.py` — every relative link/anchor resolves;
+   - `scripts/check_doc_tombstones.py` + `docs/_lint/tombstones.txt` — no live page
+     references a retired concept. **Retiring something = adding its tombstone rule in
+     the same PR** (that's the generalized #781 lesson);
+   - `scripts/check_doc_index.py` — every page is indexed from the wiki home, carries
+     the status header, and the freshness report lists canonical pages unverified >90d.
+3. **Process gates.** The PR template carries a "Docs impact" checklist; the wrap skill's
+   step (e) is a hard gate — every session ends with `**Docs:** <pages>` or
+   `**Docs:** none needed — <reason>` in the handover, checkers green. The deploy skill
+   prompts the same at deploy time.
+4. **Periodic verification.** Each canonical page's `> **Status:** … · **Verified:**`
+   header records when a human/agent last verified its content against reality; the
+   freshness report is the re-verification worklist. `/accuracy-review` is the deep pass.
+
+**Adding a page:** flat in `docs/` if canonical (`specs/` dated spec, `archive/`
+superseded) → status header → one line in `docs/README.md` → checkers green. That is
+the entire process; anything more wouldn't get followed.
 
 ---
 

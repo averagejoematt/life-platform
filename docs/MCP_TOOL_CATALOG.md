@@ -1,5 +1,7 @@
 # Life Platform — MCP Tool Catalog
 
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-11
+
 **Version:** v8.6.0 | **Last updated:** 2026-07-11 | **Total tools:** 64
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
@@ -14,7 +16,7 @@
 
 ---
 
-## All 62 Tools — by module
+## All 64 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -41,6 +43,7 @@
 | `mcp/tools_reading.py` | 8 |
 | `mcp/registry.py` | 1 |
 | `mcp/tools_habits.py` | 2 |
+| `mcp/tools_coach_checkin.py` | 2 |
 
 ### Training Notes (`mcp/tools_training_notes.py`)
 
@@ -218,6 +221,13 @@
 |------|-----------|-------------|
 | `get_habit_reflection_queue` | days= | #422: Recent habit-days still missing causality context — what to ask Matthew about. Deterministically returns missed days with no recorded 'why' and completed days with no trigger/reward, scoped to the last N days. Use this OPTIONALLY when Matthew is already reflecting on his day/week: pick a couple, ask about them conversationally, then call log_habit_reflection with his answer. Never nag or schedule — it only makes the ask possible. Use for: 'ask me about my habits', 'what habit context am I missing?', end-of-day/week reflection. |
 | `log_habit_reflection` | habit, date=, trigger=, reward=, why_missed=, context= | #422: Log Matthew's reflection about a habit on a date — the richer, Claude-sourced context layer that complements in-app Habitify notes. Record any of trigger (what cued it), reward (what it paid back), why_missed (why a missed day slipped), or free-text context. Stored verbatim, keyed to habit+date, tagged channel=claude_reflection so it coexists with (never overwrites) Habitify-sourced notes. Renders on the habits page. Use for: 'I missed meditation because I was traveling', 'the walk is triggered by my morning coffee'. |
+
+### mcp.tools_coach_checkin (`mcp/tools_coach_checkin.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_coach_checkin_queue` | coach_id=, count= | #915: Up to 3 open check-in questions FROM Matthew's AI coaches — qualitative questions whose verbatim answers pair with (or explain the absence of) the quantitative data. Open questions persist: re-calls return the SAME queue; fresh questions are generated (Bedrock, in the asking coach's persona, grounded in live presence/adaptive-mode/manual-source context) only when the queue is empty. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is always valid with zero penalty — never nag. Use for: 'what do my coaches want to know?', 'coach check-in', periodic qualitative catch-ups. |
+| `log_coach_checkin` | checkin_id, coach_id=, answer=, skip=, tags=[] | #915: Record Matthew's answer to a coach check-in question VERBATIM (his words, never a paraphrase — ADR-104), or an explicit skip (always valid, zero penalty). The answer becomes durable qualitative context stored with the coach's records. Use after get_coach_checkin_queue, once Matthew has responded (or declined). |
 
 ---
 

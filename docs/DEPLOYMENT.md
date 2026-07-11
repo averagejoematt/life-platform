@@ -1,6 +1,6 @@
 # Deployment Guide — SUPERSEDED POINTER
 
-**Status:** superseded · **Verified:** 2026-07-10
+> **Status:** superseded · **Owner:** Matthew · **Verified:** 2026-07-10
 
 > This page used to restate deploy procedure and drifted badly (it still taught the
 > shared-layer dance a month after the layer was retired by #781/ADR-131, and a raw

@@ -231,6 +231,19 @@ jobs:
         if: always()
         run: python3 deploy/sync_doc_metadata.py --check
 
+      - name: Wiki gates (ENFORCED — links, tombstones, index, ADR index)
+        # The wiki drift machinery (CONVENTIONS §8): dead relative links, live docs
+        # referencing retired concepts (docs/_lint/tombstones.txt), index coverage +
+        # status headers, and the generated ADR index being current. docs-ci.yml runs
+        # the same gates on docs-only pushes; this copy catches code pushes that
+        # invalidate docs (e.g. deleting a script a doc links to).
+        if: always()
+        run: |
+          python3 scripts/check_doc_links.py
+          python3 scripts/check_doc_tombstones.py
+          python3 scripts/check_doc_index.py
+          python3 scripts/generate_adr_index.py --check
+
   # ════════════════════════════════════════════════════════════════
   # Job 2a: Deploy-critical test lane (#416, ADR-117) — GATES the chain
   # ════════════════════════════════════════════════════════════════

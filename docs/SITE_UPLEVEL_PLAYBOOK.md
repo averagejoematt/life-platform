@@ -50,8 +50,9 @@ moment someone actually looked at it.
   ("you run it this time") unblocks it. (Memory: `feedback_prod_deploy_authorization`.)
 - **Work in a git worktree** — Matthew runs concurrent sessions on one repo (memory:
   `feedback_concurrent_session_worktree`).
-- **Build scripts are run manually**, then the generated HTML is committed. `sync_site_to_s3.sh`
-  only auto-runs the RSS build. After editing a `v4_build_*.py`, re-run it and commit the output.
+- **Build scripts generate committed HTML.** `sync_site_to_s3.sh` re-runs the generator suite
+  per deploy (8 `v4_build_*.py` scripts as of 2026-07-10 — see `docs/SITE_AUTHORING.md` §3 for the
+  inventory). After editing a generator, run it and commit its output — never hand-edit generated pages.
 - **The pre-commit hook auto-bumps doc dates** (`sync_doc_metadata.py`) — cosmetic, expect it.
 - **Assets are hashed across the FULL module graph, not just HTML** (ADR-098). `deploy/hash_site_assets.py`
   hashes every CSS/JS file leaves-first and rewrites HTML refs, intra-module `import`s, and CSS. If you

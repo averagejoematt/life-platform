@@ -128,3 +128,11 @@ enforces both channels stay on `deploy/build_bundle.py`.)
 
 **Special:**
 - life-platform-mcp → SPECIAL BUILD (see above)
+
+## Doc impact (wiki contract — CONVENTIONS §8)
+
+A deploy that changes behavior usually invalidates a wiki page. Before closing the loop:
+name the affected canonical docs and update them (or state "docs: none needed — <reason>"
+in the session log). If the deploy RETIRED something, add a tombstone rule to
+`docs/_lint/tombstones.txt`. The wrap skill's step (e) enforces this at session end —
+doing it at deploy time is cheaper.
