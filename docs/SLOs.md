@@ -115,9 +115,12 @@ The `life-platform-ops` dashboard includes an "SLO Health" section with:
 
 ---
 
-## SLO Status Snapshot (2026-05-19)
+## SLO Status Snapshot — HISTORICAL (2026-05-19 audit; statuses below are frozen, NOT current)
 
-| SLO | Status | Notes |
+> Live status: run the describe-alarms command below + check /status/. The May incidents
+> referenced here (Garmin staleness, SES IAM regression) were resolved in May–June.
+
+| SLO | Status (2026-05-19) | Notes |
 |-----|--------|-------|
 | SLO-1 Daily Brief | Likely BREACHED in current window | Daily-brief was AccessDenied for 2026-05-17 (V2 SES IAM regression) — error budget consumed for May. Recovered same day. |
 | SLO-2 Freshness | **BREACHED** | `slo-source-freshness` in ALARM — Garmin stale ~44 days (P2 incident, see INCIDENT_LOG.md). Expected to clear within 24h of OAuth refresh. |

@@ -48,7 +48,7 @@ In code (CDK), alarm constructor chooses the topic via `digest=True/False` flag 
 | `mcp-warmer-error` | Failure | MCP warming broken |
 | `life-platform-canary-mcp-failure` | Failure | MCP Lambda unreachable |
 | `life-platform-canary-anthropic-failure` | Failure | Anthropic API access lost (key disabled or billing) |
-| Ingestion aggregate (metric-math, `LifePlatformMonitoring`) | ≥1 error across the fleet | Per-Lambda `ingestion-error-*` alarms were consolidated away 2026-05-29 (`error_alarm=False`) — check the DLQ digest path |
+| ⚠️ NO fleet-wide ingestion-error ALARM exists (by design) | — | Per-Lambda alarms removed 2026-05-29; CloudWatch's ~10-metric math cap prevents an aggregate (19 ingestion fns). Detection is downstream: `slo-source-freshness`, DLQ depth alarms, the canary, the remediation agent. The `LifePlatformMonitoring` metric-math is a DASHBOARD widget only — it does not page |
 | `life-platform-dlq-depth-warning` | ≥10 messages | Real failures accumulating |
 | AWS Budget `life-platform-monthly-75` ($85 ceiling, ADR-133) + cost-governor SSM tiers | 50/70/85/100% alerts | Budget breach (an AWS Budget + SSM mechanism, not a CloudWatch alarm) |
 
@@ -204,7 +204,7 @@ If you're paged (or notice red alarms during a routine check):
 See `docs/BACKLOG.md` for the full backlog. Monitoring-relevant gaps:
 
 - **No synthetic monitoring** for public site beyond CloudWatch canary on MCP + Anthropic
-- Positive daily-brief signals exist: `daily-brief-no-invocations-24h` (absence detection) + `life-platform-daily-brief-invocations` — the old "infer from absence of errors" gap is closed
+- Positive daily-brief absence detection exists: `daily-brief-no-invocations-24h` (<1 invocation in 24h). (`life-platform-daily-brief-invocations` was REMOVED 2026-03-10 — don't cite it.) The old "infer from absence of errors" gap is closed
 - **Token telemetry rolling out** — 9 of 22 AI-calling Lambdas now emit (V2 follow-up); remaining 13 still dark
 - **Cost anomaly detector** is on (Default-Services-Subscription, daily email)
 - **Dashboard-as-code** not used — CDK could define dashboards; currently console-managed
