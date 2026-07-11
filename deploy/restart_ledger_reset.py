@@ -20,6 +20,16 @@ Dry-run default; pass --apply to commit. Idempotent (safe to re-run).
 
     python3 deploy/restart_ledger_reset.py            # dry-run
     python3 deploy/restart_ledger_reset.py --apply    # commit
+    python3 deploy/restart_ledger_reset.py --apply --closing-cycle 5
+
+Cycle semantics (#951): the CYCLE_TOTALS# row + tombstone stamps describe the
+CLOSING run, per this docstring and ADR-077. The restart pipeline bumps SSM
+/life-platform/experiment-cycle right after the intelligence wipe — BEFORE this
+script runs — so reading SSM here mislabels the closing totals with the NEW
+cycle number (the 2026-07-11 reset archived cycle-4's closing totals as
+CYCLE_TOTALS#005/cycle=5 while the wipe's tombstones said cycle=4). Pass
+--closing-cycle explicitly (the pipeline now does); the SSM read remains only
+as the standalone-invocation fallback.
 """
 from __future__ import annotations
 
@@ -55,9 +65,24 @@ def _num(v) -> Decimal:
         return Decimal(0)
 
 
+def parse_closing_cycle(argv: list[str]) -> int | None:
+    """Return the value of --closing-cycle N if present (supports = form), else None."""
+    for i, arg in enumerate(argv):
+        if arg == "--closing-cycle" and i + 1 < len(argv):
+            return int(argv[i + 1])
+        if arg.startswith("--closing-cycle="):
+            return int(arg.split("=", 1)[1])
+    return None
+
+
 def main() -> int:
     apply = "--apply" in sys.argv
-    cycle = current_cycle()
+    explicit = parse_closing_cycle(sys.argv)
+    # Explicit beats SSM: by the time the pipeline runs this step, SSM already
+    # holds the NEW cycle (bumped right after the wipe) — see module docstring.
+    cycle = explicit if explicit is not None else current_cycle()
+    if explicit is None:
+        print(f"  (no --closing-cycle passed — using SSM {SSM_CYCLE_PARAM}; correct only OUTSIDE the restart pipeline)")
     table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
     now_iso = datetime.now(timezone.utc).isoformat()
 

@@ -80,6 +80,16 @@ SOURCE_CLASS: dict[str, str] = {
     "interactions": RAW_TIMESERIES,
     "exposures": RAW_TIMESERIES,
     "temptations": RAW_TIMESERIES,  # accountability/identity log (resisted-temptation facts)
+    "macrofactor_meals": RAW_TIMESERIES,  # #951: derived meal projection over the raw macrofactor
+    # food log (meal_projection.py — idempotent, never mutates raw). It's a fact layer (meals
+    # eaten), so it follows its parent partition's class: kept forever, genesis-anchored on read.
+    "training_notes": RAW_TIMESERIES,  # #951: exercise-keyed projection of Matthew's own Hevy
+    # notes (training_notes.py — "frozen-as-data", raw sovereign). User-authored facts like
+    # notion; follows the raw hevy parent. NB pk carries a suffix (…#training_notes#EXERCISE#<id>,
+    # plus #CACHE/#USAGE LLM bookkeeping) — _source_of() resolves all of them to this entry.
+    "food_responses": RAW_TIMESERIES,  # #951: logged per-food glycemic-response facts (MCP/CGM)
+    "life_events": RAW_TIMESERIES,  # #951: user-logged life-event annotations (site vitals timeline)
+    "ruck_log": RAW_TIMESERIES,  # #951: logged ruck workouts (MCP)
     # — CROSS_PHASE: clinical truths + durable anchors (never touch) —
     "labs": CROSS_PHASE,
     "dexa": CROSS_PHASE,
@@ -94,6 +104,12 @@ SOURCE_CLASS: dict[str, str] = {
     "benchmarks": CROSS_PHASE,  # BENCH-1 (ADR-089): cut-benchmarking history — each row is a
     # completed-cut episode measured against the literature. Like "calibration", it's a long-run
     # cross-cycle record (the whole point is comparing cuts across resets), so it survives every reset.
+    "weight_episodes": CROSS_PHASE,  # #930/#951: BENCH-1 detected loss/regain episodes over the
+    # full 14-year withings history (episode_detect_lambda). The writer's contract is explicit:
+    # cross-phase reference data, written WITHOUT a phase attribute so a reset never wipes them —
+    # same rationale as "benchmarks" (comparing cuts across resets is the point).
+    "training_reference": CROSS_PHASE,  # #930/#951: BENCH-1 proven by-band prescription singleton,
+    # derived from the same 14-year history — cross-phase reference like weight_episodes.
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "habit_scores": EXPERIMENT_SCOPED,  # see vice_streaks split note in ADR-077 dec G
@@ -140,6 +156,18 @@ SOURCE_CLASS: dict[str, str] = {
     "sleep_unified": SYSTEM_STATE,  # dead: #487/ADR-113 retired the reconciler — no writer, no
     # reader. Orphan records kept (never wiped/served); classed here so the reset tooling still
     # traverses them without raising. Was RAW_TIMESERIES when the reconciler wrote it.
+    "coach_gen_cache": SYSTEM_STATE,  # #951: gate-passed generation cache (generation_cache.py,
+    # ADR-126) — one overwritten row per (coach, output_type); the semantic fingerprint self-busts
+    # on any input change (incl. a reset), so the phase machinery can ignore it.
+    "ingest_liveness": SYSTEM_STATE,  # #951: daily pipeline-health snapshot (pipeline_health_check)
+    "personal_baselines": SYSTEM_STATE,  # #951: SNAPSHOT#LATEST percentile bands (#543/ADR-105) —
+    # fully recomputable monthly from raw_timeseries; consumers floor-guard to constants if absent.
+    "deletion_log": SYSTEM_STATE,  # #951: USER#admin GDPR-deletion audit records
+    # (delete_user_data_lambda) — ops audit trail, never traversed by the restart tooling.
+    "experiment_suggestions": SYSTEM_STATE,  # #951: reader-submitted suggestions awaiting
+    # moderation (site_api_social) — audience state like VOTES#/CHALLENGE_FOLLOWS, kept across resets.
+    "email_digest": SYSTEM_STATE,  # #951: between-chronicle digest change-marker
+    # (between_chronicle_lambda, STATE#between_chronicle) — pure dedup state.
 }
 
 # platform_memory is split BY CATEGORY: durable user facts are cross-phase;
@@ -214,15 +242,33 @@ _PK_RULES: list = [
     # reader emails awaiting a "challenge started" notification. Audience state like
     # SUBSCRIBE#/VOTES#: kept across resets, ignored by the phase machinery.
     (lambda pk, sk: pk.startswith("CHALLENGE_FOLLOWS"), SYSTEM_STATE),
+    # ── #930/#951: the ops pk families, classified deliberately (all were previously
+    # unclassified — classify() raised). None are traversed by the restart tooling
+    # (the tagger scans USER#…#SOURCE# only); these rules make the registry total.
+    # Grading-liveness watermark (coach_prediction_evaluator STATE#last_decided) — an
+    # ops gauge marker ("days since last decided" alarm input), not run intelligence.
+    (lambda pk, sk: pk.startswith("EVALUATOR#"), SYSTEM_STATE),
+    (lambda pk, sk: pk.startswith("RATE#"), SYSTEM_STATE),  # per-IP TTL rate buckets (rate_limiter)
+    (lambda pk, sk: pk.startswith("BOARDSESS#"), SYSTEM_STATE),  # TTL'd board Q&A sessions (#546)
+    (lambda pk, sk: pk.startswith("CANARY#"), SYSTEM_STATE),  # synthetic-monitor state (canary_lambda)
+    (lambda pk, sk: pk.startswith("SYSTEM#"), SYSTEM_STATE),  # ops namespace (SYSTEM#dlq-ledger)
+    (lambda pk, sk: pk.startswith("OAUTH#"), SYSTEM_STATE),  # TTL'd MCP auth codes + session bearers (#779/#909)
+    # Narrator persona state (PERSONA#elena show memory + callbacks, PERSONA#margaret
+    # editor state). Durable narrative identity that deliberately spans cycles — the
+    # cycle-5 reset carried Elena straight into EP0. This classification preserves the
+    # de-facto behavior (never touched); wiping personas at reset would be a new
+    # decision needing its own wipe wiring (like ENSEMBLE#dispute in #918), not a default.
+    (lambda pk, sk: pk.startswith("PERSONA#"), CROSS_PHASE),
 ]
 
 
 def _source_of(pk: str) -> str | None:
     """Return the base <source> from a USER#...#SOURCE#<source> pk, else None.
 
-    The email_log family uses pks like SOURCE#email_log#daily_brief — the part
-    after the first '#' is the email type, not a distinct source, so the base is
-    `email_log`. No other source contains a '#'.
+    Some families carry a suffix after the base source — the part after the first
+    '#' is a sub-key, not a distinct source: email_log#<type> (email type),
+    training_notes#EXERCISE#<id> / #CACHE / #USAGE (per-exercise partitions + LLM
+    bookkeeping). The base is everything before the first '#'.
     """
     marker = "#SOURCE#"
     idx = pk.find(marker)

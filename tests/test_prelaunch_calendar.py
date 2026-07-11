@@ -223,6 +223,19 @@ def test_pipeline_keep_chronicle_passes_resurrect_override():
     assert steps["restart_chronicle_handler"][-2:] == ["--resurrect-sk", "DATE#2026-02-28"]
 
 
+def test_pipeline_passes_closing_cycle_to_ledger_reset():
+    """#951: the SSM cycle bump fires right after the wipe (before the ledger reset),
+    so the ledger reset must receive the CLOSING cycle explicitly - an SSM read
+    inside it would stamp CYCLE_TOTALS# with the NEW cycle number (the off-by-one
+    the 2026-07-11 reset wrote: cycle-4 closing totals archived as cycle=5)."""
+    steps = dict(pipeline.build_sub_scripts(False, [], "2026-06-08", closing_cycle=4))
+    assert steps["restart_ledger_reset"][-2:] == ["--closing-cycle", "4"]
+    assert steps["restart_ledger_reset"][:3] == ["python3", "deploy/restart_ledger_reset.py", "--apply"]
+    # legacy/standalone call shape (no cycle known) omits the flag
+    steps_legacy = dict(pipeline.build_sub_scripts(False, [], "2026-06-08"))
+    assert "--closing-cycle" not in steps_legacy["restart_ledger_reset"]
+
+
 def test_run_step_strips_apply_in_dry_run(monkeypatch):
     seen = {}
 
