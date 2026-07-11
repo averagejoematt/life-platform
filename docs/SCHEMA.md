@@ -110,6 +110,118 @@ Where multiple sources measure the same thing:
 
 ---
 
+## Key-Family Catalog
+
+Every pk/sk family in the `life-platform` table, derived from code (writers = `put_item`/`update_item` call sites) and cross-checked against the ADR-077 phase registry (`lambdas/phase_taxonomy.py`). **Live?** = verified 2026-07-10 with a read-only `Query(Limit=1)`; "empty" = the query succeeded but the partition has no rows yet; "n/v" = pk contains a generated id, so existence is code-defined, not verified live. Families marked **⚠ not in registry** would raise `KeyError` in `phase_taxonomy.classify()`.
+
+### The `USER#matthew#SOURCE#<source>` backbone
+
+| family (pk / sk) | what it holds | writer | readers | phase class | live? |
+|---|---|---|---|---|---|
+| `…SOURCE#{whoop, withings, strava, garmin, apple_health, eightsleep, habitify, todoist, weather, macrofactor, macrofactor_workouts, hevy, notion}` / `DATE#<d>` (+ `DATE#<d>#WORKOUT#<id>` sub-items, `DELETE#WORKOUT#<id>` tombstones, `DATE#<d>#journal#<template>` for notion) | ingested device/app metrics | `lambdas/ingestion/*_lambda.py` (per source) | `mcp/tools_*`, `lambdas/web/site_api_*`, compute lambdas | raw_timeseries | ✓ (whoop, hevy sampled) |
+| `…SOURCE#{habit_causality, food_delivery, sick_days, measurements, state_of_mind, mood, travel, interactions, exposures, temptations}` / `DATE#<d>` (+ `#TXN#<id>`, `MONTH#`/`YEAR#`/`STREAK#current` for food_delivery) | user-logged facts (MCP log tools / HAE webhook) | `mcp/tools_lifestyle.py`, `tools_social.py`, `tools_sick_days.py`, HAE lambda | same MCP domain tools, site_api | raw_timeseries | ✓ (temptations empty) |
+| `…SOURCE#day_grade` / `DATE#<d>` | the Day-Grade series (see `docs/engines/SCORING.md`) | `daily_metrics_compute_lambda.py`, daily brief | site_api_vitals, MCP | raw_timeseries (ADR-077 dec C) | ✓ |
+| `…SOURCE#{labs, dexa, genome, supplements}` / `DATE#<d>` (+ `PROVIDER#<provider>#<period>` for labs) | clinical/identity truths | labs/dexa/genome upload paths, `log_supplement` | tools_labs, tools_health | cross_phase | ✓ (labs) |
+| `…SOURCE#chronicling` / `DATE#<d>#journal#…` | frozen pre-platform archive | none (frozen) | story pages | cross_phase | n/v |
+| `…SOURCE#subscribers` / `EMAIL#<sha256>` | audience identity | `web/email_subscriber_lambda.py`, `subscriber_onboarding_lambda.py` | `web/site_api_social.py` | cross_phase | ✓ |
+| `…SOURCE#calibration` / `CALIB#<date>#<id>` | hypothesis + forecast resolution ledger (the long-run scoreboard) | `hypothesis_engine_lambda.py`, `forecast_engine_lambda.py` | scorecard/site, digests | cross_phase | ✓ |
+| `…SOURCE#benchmarks` / — | cut-benchmarking history (BENCH-1, ADR-089) | `mcp/tools_benchmark.py` | same | cross_phase | empty |
+
+### Derived intelligence (EXPERIMENT_SCOPED — tagged + tombstoned + cycle-stamped at reset)
+
+| family (pk / sk) | what it holds | writer | readers | live? |
+|---|---|---|---|---|
+| `…SOURCE#character_sheet` / `DATE#<d>` | daily character sheet (see `docs/engines/CHARACTER.md`) | `compute/character_sheet_lambda.py` | MCP `get_character`, site_api | ✓ |
+| `…SOURCE#habit_scores` / `DATE#<d>` | tiered habit compliance detail | `compute/daily_metrics_compute_lambda.py` | tools_habits, character gather | ✓ |
+| `…SOURCE#computed_metrics` / `DATE#<d>` | day grade + readiness + TSB + baselines (see `docs/engines/READINESS.md`) | `compute/daily_metrics_compute_lambda.py` | daily brief, site_api_vitals, MCP readiness | ✓ |
+| `…SOURCE#computed_insights` / `DATE#<d>` | pre-computed daily insight | `compute/daily_insight_compute_lambda.py` | daily brief | n/v |
+| `…SOURCE#insights` / `INSIGHT#<ts>#<digest_type>` | saved insights | `lambdas/insight_writer.py`, MCP `save_insight` | site_api_intelligence, `get_insights` | ✓ |
+| `…SOURCE#hypotheses` / `HYPOTHESIS#<ISO-ts>` | pre-registered hypotheses + deterministic verdicts (see `docs/engines/HYPOTHESIS.md`) | `compute/hypothesis_engine_lambda.py` | `/api/hypotheses`, `get_hypotheses`, challenge generator | ✓ |
+| `…SOURCE#forecast` / `FORECAST#<target>#<metric>#h<h>` (legacy `DATE#<d>` rows also live) | daily EWMA expectations (#541) | `compute/forecast_engine_lambda.py` | site_api_data, `get_predictions` | ✓ |
+| `…SOURCE#state_of_matthew` / `DATE#<d>` | weekly narrated synthesis (#552) | `compute/state_of_matthew_lambda.py` | site, brief | ✓ |
+| `…SOURCE#adaptive_mode` / `DATE#<d>` | daily adaptive coaching mode | `compute/adaptive_mode_lambda.py` | `get_adaptive_mode`, orchestrator | ✓ |
+| `…SOURCE#engagement_state` / `STATE#current`, `DATE#<d>` | presence / quiet-stretch state (feeds #913 neglect decay) | `compute/adaptive_mode_lambda.py` | character_sheet_lambda, site_api_ai | ✓ |
+| `…SOURCE#{circadian, anomalies, scenarios, nutrition_review, centenarian_progress}` / `DATE#<d>` | per-domain daily/periodic computes | respective compute/email lambdas | site_api, MCP | ✓ (anomalies, scenarios) |
+| `…SOURCE#weekly_correlations` / `WEEK#<w>` | weekly cross-metric correlations | `compute/weekly_correlation_compute_lambda.py` | site_api_correlation | ✓ |
+| `…SOURCE#what_changed` / `SNAPSHOT#current`, `MONTH#<m>`, `STATE#first_seen` | SS-08 monthly delta + first-seen ledger | SS-08 compute | site_api_ai | ✓ |
+| `…SOURCE#chronicle` / `DATE#<d>`, `WEEK#<w>` | the Wednesday chronicle narrative | `emails/wednesday_chronicle_lambda.py` | chronicle sender, site_writer | ✓ |
+| `…SOURCE#panelcast` / — | The Panel podcast series state | `emails/coach_panel_podcast_lambda.py` | podcast lambdas | n/v |
+| `…SOURCE#experiments` / `EXP#<id>` | experiment records | MCP `create_experiment`/`end_experiment` | site_api_vitals/social, `list_experiments` | ✓ |
+| `…SOURCE#challenges` / `CHALLENGE#<slug>_<date>` | challenge records | `intelligence/challenge_generator_lambda.py`, MCP | site_api_social, `list_challenges` | ✓ |
+| `…SOURCE#protocols` / `PROTOCOL#<id>` | protocol registry | MCP `create/update/retire_protocol` | site_api_data, `list_protocols` | ✓ |
+| `…SOURCE#field_notes` / `WEEK#<iso-week>` | weekly field notes | `intelligence/field_notes_lambda.py` | chronicle, `get_field_notes` | ✓ |
+| `…SOURCE#discovery_annotations` / — | discovery annotations | MCP `annotate_discovery` | `get_discovery_annotations` | n/v |
+| `…SOURCE#ledger` / `TOTALS#current`, `LEDGER#<id>`, `LIFETIME#aggregate`, `CYCLE_TOTALS#<n>` | accountability ledger; `LIFETIME#`/`CYCLE_TOTALS#` written at reset by `deploy/restart_ledger_reset.py` (ADR-072/077 dec F) | MCP `log_ledger_entry`; reset tool | `web/site_api_data.py` | ✓ |
+| `…SOURCE#ai_analysis` / `EXPERT#<name>` | expert-lens analyses | `intelligence/ai_expert_analyzer_lambda.py` | chronicle, site_api_intelligence | ✓ |
+| `…SOURCE#decisions` / `DECISION#<ISO-ts>` | logged decisions + outcomes | `mcp/tools_decisions.py` | `get_decisions` | ✓ |
+| `…SOURCE#rewards` / `REWARD#<id>` | reward definitions | `lambdas/output_writers.py` (MCP `set_reward`) | `get_rewards` | empty |
+| `…SOURCE#platform_memory` / `MEMORY#<category>#<date>` | platform memory — **split by category**: durable categories (baseline_snapshot, re_entry, cycle_marker, cycle) are cross_phase; coach running-state categories are experiment_scoped | `mcp/tools_memory.py`, failure-pattern/insight/hypothesis computes | `read_platform_memory`, digests | ✓ |
+
+### Coach intelligence tier (`pk COACH#<coach_id>` — all EXPERIMENT_SCOPED)
+
+| sk family | what it holds | writer | readers | live? |
+|---|---|---|---|---|
+| `STANCE#<date>` + `STANCE#latest` | evidence-derived coach stance (see `docs/engines/COACH_STANCE.md`) | `coach/coach_history_summarizer.py` | site_api_coach, orchestrator | ✓ (partition) |
+| `OUTPUT#<date>#<type>` | generated coach narratives | `coach/coach_state_updater.py` | summarizer, observatory | ✓ (partition) |
+| `THREAD#<date>#<slug>` | open coaching threads | `coach/coach_state_updater.py` | summarizer | ✓ (partition) |
+| `PREDICTION#<id>`, `LEARNING#<date>#<slug>`, `CONFIDENCE#<subdomain>`, `COMMITMENT#<id>` | predictions + graded outcomes + per-subdomain confidence | `coach/coach_prediction_evaluator.py`, `coach_checkin.py` | track-record pages, stance engine | ✓ (partition) |
+| `COMPRESSED#latest`, `MEMOIR#…`, `CHECKIN#…`, `INTERACTION#…`, `RELATIONSHIP#state`, `VOICE#state`, `BRIEF#<date>` | compressed memory, memoirs, check-ins, board Q&A, relationship/voice state | summarizer, memoir lambda, coach_checkin, site-api-ai | summarizer, site_api_coach | ✓ (partition) |
+
+### Ensemble / narrative / eval families
+
+| family (pk / sk) | what it holds | writer | readers | phase class | live? |
+|---|---|---|---|---|---|
+| `ENSEMBLE#digest` / `CYCLE#<date>` | cross-coach digest | `coach/coach_ensemble_digest.py` | digests, site | experiment_scoped | ✓ |
+| `ENSEMBLE#disagreements` / `ACTIVE#<topic>` | live coach disagreements | ensemble digest | `get_coach_disagreements` | experiment_scoped | ✓ |
+| `ENSEMBLE#dispute` / `THREAD#<week>#<slug>` | inter-coach dispute threads (#540) | `coach/inter_coach_dialogue_lambda.py` | site, chronicle | experiment_scoped | n/v |
+| `ENSEMBLE#influence_graph` / — | static influence config | config seed | ensemble | system_state | n/v |
+| `NARRATIVE#arc` / `STATE#current`, `HISTORY#<date>` | season/arc narrative state | narrative updater | chronicle | experiment_scoped | ✓ |
+| `VOICEFIDELITY#<…>` / — | blind voice-fidelity scoreboard (#545) | `coach/voice_fidelity_harness.py` | scoreboard | cross_phase | empty (sampled pk) |
+| `EVALRET#<surface>` / — | retained ADR-104 gate verdict/regen pairs (#812/#744) | `lambdas/eval_retention.py` | monthly eval harvest | cross_phase | n/v |
+
+### Reading / Mind pillar (ADR-097 — all CROSS_PHASE; scheme in `lambdas/reading/reading_keys.py`)
+
+| family (pk / sk) | what it holds | writer | readers | live? |
+|---|---|---|---|---|
+| `BOOK#<bookId>` / `META` | book catalog (bookId = 16-char sha1 of ISBN-13/OLID/title-slug) | `mcp/tools_reading.py` | reading tools, site_api_reading | ✓ |
+| `READING#<bookId>` / `STATE`, `SESSION#<ts>`, `NOTE#<id>`, `RECALL#<id>` | relationship state machine, sessions, notes, spaced-recall prompts | `mcp/tools_reading.py` | reading tools, recall sweep | ✓ |
+| `READING#REC` / `REC#<ts>` | recommendation track record | reading tools | `get_reading_track_record` | empty |
+| `READING#PROFILE` / `CURRENT` | calibration profile (one item) | reading tools | `get_reading_profile` | ✓ |
+| `READING#IDEA#<id>` / `META`, `EDGE#<otherId>` | Constellation nodes/edges (Phase E) | reading tools | `get_constellation` | n/v |
+| `READING#NUDGE` / `RECALL_QUEUE#current` | recall-nudge queue | `reading/reading_recall_sweep_lambda.py` | `get_due_recalls` | ✓ |
+
+**GSIs (the only two, ADR-097):** **GSI1** — sparse recall-due index: active `RECALL#` rows carry `GSI1PK="RECALL_DUE"` / `GSI1SK=<nextDue ISO>`; answered prompts drop out (attributes removed). Sweep = `GSI1SK <= now`. **GSI2** — reading state/time: STATE rows → `GSI2PK="READING_STATUS#<status>"` / `GSI2SK=<changedAt>`; SESSION rows → `GSI2PK="READING_SESSION"` / `GSI2SK=<date>`. Both verified live 2026-07-10 (GSI1 currently empty — sparse, nothing due; GSI2 `READING_STATUS#reading` returns rows).
+
+### Audience interaction + ops (SYSTEM_STATE unless noted)
+
+| family (pk / sk) | what it holds | writer | readers | phase class | live? |
+|---|---|---|---|---|---|
+| `VOTES#experiment_library` / `LIB#<id>`, `VOTES#challenges` / `CH#<id>`, `VOTES#predict_week`, `VOTES#rate_limit` | reader votes + vote rate buckets | `web/site_api_social.py` | same | system_state | ✓ (challenges) |
+| `EXPERIMENT_FOLLOWS` / `EMAIL#<hash>#EXP#<id>`, `CHALLENGE_FOLLOWS` / `CHFOLLOW#…` | follow-interest records | `web/site_api_social.py` | same | system_state | empty |
+| `SUBSCRIBE#rate_limit` / — | subscribe rate counters | `web/email_subscriber_lambda.py` | same | system_state | n/v |
+| `RATE#<endpoint>#<ip_hash>` / `HOUR#<bucket>` | per-IP atomic rate counters (ask/board_ask) | `lambdas/rate_limiter.py` | same | **⚠ not in registry** (TTL ops state) | n/v |
+| `BOARDSESS#<token>` / — | TTL'd board Q&A follow-up sessions (#546) | `web/site_api_ai_lambda.py` | same | **⚠ not in registry** (TTL ops state) | n/v |
+| `USER#matthew` / `PROFILE#v1` | the user profile (targets, weights, habit registry) | manual/setup | everything | cross_phase | ✓ |
+| `USER#matthew` / `SOURCE#coach_thread…` | coach conversation memory | coach modules | coach pipeline | experiment_scoped | n/v |
+| `USER#matthew` / `SOURCE#intelligence_quality…` | intelligence quality tracker | quality tracker | `get_intelligence_quality` | system_state | n/v |
+| `USER#matthew#MEMORY` / `CYCLE#<n>#<label>` | durable restart-cycle memory | restart tooling | re-entry flows | cross_phase | ✓ |
+| `USER#matthew#ROUTINE#<version>` / — | Hevy routine IR audit trail | `lambdas/routine_repo.py` | routine repo | system_state | n/v |
+| `USER#system` / `CANARY#…` etc. | ops state (canary, DLQ ledger) | operational lambdas | monitors | system_state | ✓ |
+| `PULSE` / `DATE#<d>` | site pulse cache | pulse writer | site | system_state | ✓ |
+| `CACHE#<…>` / — | generation/template caches | `generation_cache.py`, `hevy_template_cache.py` | same | system_state | n/v |
+| `…SOURCE#{journal_analysis, health_check, dropbox_tracker, hevy_id_map, routine_index, email_log#<type>, google_calendar, composite_scores, sleep_unified}` | caches, trackers, sent-mail archive, dead partitions | various (email_log: email lambdas; hevy_id_map: routine_repo) | various | system_state | ✓ (email_log#daily_brief) |
+| `INGEST_HEALTH#<source>`, `CANARY#<…>`, `ALERTSTATE#<…>`, `ENTITY_REGISTRY#current`, `BEHAVIOR_REGISTRY#current`, `USER#admin#SOURCE#deletion_log` | ingest liveness, synthetic monitors, alert dedup, static registries, deletion audit | ingestion_framework, operational lambdas | freshness checker, monitors | **⚠ not in registry** (ops state, not traversed by restart tooling) | n/v |
+
+### ⚠ Families NOT in the phase-taxonomy registry
+
+`phase_taxonomy.classify()` would raise `KeyError` on these — real coverage gaps for the restart tooling (the SOURCE# ones) or deliberate ops-state exclusions (the rest):
+
+- **`USER#matthew#SOURCE#weight_episodes`** — written by `compute/episode_detect_lambda.py`, **live rows exist** (verified). Not in `SOURCE_CLASS`.
+- **`USER#matthew#SOURCE#training_reference`** — same writer, **live rows exist** (verified). Not in `SOURCE_CLASS`.
+- Non-SOURCE ops pks with no `_PK_RULES` predicate: `RATE#*`, `BOARDSESS#*`, `INGEST_HEALTH#*`, `CANARY#*`, `ALERTSTATE#*`, `ENTITY_REGISTRY#*`, `BEHAVIOR_REGISTRY#*`, `SYSTEM#dlq-ledger`, `USER#admin#SOURCE#deletion_log`, `PERSONA#*`, `OAUTH#*`. These are TTL/ops records the restart tooling does not traverse today, but they are unclassified by the registry.
+
+---
+
 ## Sources
 
 Valid source identifiers: `whoop`, `withings`, `strava`, `todoist`, `apple_health`, `hevy`, `eightsleep`, `chronicling`, `macrofactor`, `macrofactor_workouts`, `macrofactor_export`, `garmin`, `habitify`, `notion`, `labs`, `dexa`, `genome`, `supplements`, `weather`, `travel`, `state_of_mind`, `habit_scores`, `character_sheet`, `computed_metrics`, `platform_memory`, `insights`, `decisions`, `habit_causality`, `hypotheses`, `chronicle`, `measurements`, `food_delivery`, `weight_episodes`, `training_reference`, `macrofactor_meals`, `evening_ritual`
