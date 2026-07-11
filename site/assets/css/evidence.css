@@ -115,6 +115,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-desc { color: var(--ink-muted); max-width: var(--measure); margin-bottom: var(--sp-4); }
 
 /* Supplements — what / why / what's-backed cards */
+/* #978 — pre-start framing line: the catalog is the plan going in, not a progress
+   report. Shown only before genesis (keyed off preStart() in evidence_body.js). */
+.supp-frame { color: var(--ink-muted); max-width: var(--measure); margin: 0 0 var(--sp-4);
+  padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-style: italic; }
 .supp-grid { display: grid; gap: var(--bento-gap); }
 @media (min-width: 761px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
 .supp { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
