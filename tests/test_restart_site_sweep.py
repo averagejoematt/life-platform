@@ -4,9 +4,15 @@ The 2026-07-10 clean-sweep audit: restart_site_copy_sync's JS sweep was
 hardcoded to the cycle-1 literal "2026-04-01", so the cycle-4 genesis
 "2026-06-14" (coach_popover.js, evidence_body.js, dispatches.js,
 evidence_habits.js — ISO and prose forms) survived every later reset. These
-tests run the sweep DRY against the real site/ tree with a simulated new
-genesis and assert the known offender files are caught, so a regression in the
-sweep (or a new hardcoded genesis literal pattern it can't see) fails in CI.
+tests pin the property that mattered: the sweep catches the ISO and prose
+forms that actually leaked, in the file types they leaked in.
+
+They run against a SYNTHETIC site tree (tmp_path, planted offender literals),
+not the live site/ — asserting the live tree still carries the outgoing
+genesis made the test eat itself the moment a real reset legitimately swept
+those literals away (exactly what happened on the cycle-5 reset). The sweep
+functions read the module-global REPO_ROOT at call time, so the fixture just
+repoints it.
 """
 
 from __future__ import annotations
@@ -22,34 +28,58 @@ scs = importlib.util.module_from_spec(_spec)
 sys.modules["restart_site_copy_sync"] = scs
 _spec.loader.exec_module(scs)
 
-OLD = "2026-06-14"  # the cycle-4 genesis actually hardcoded in site JS today
+OLD = "2026-06-14"  # a planted outgoing genesis (the cycle-4 literal that leaked)
 NEW = "2026-07-12"  # a simulated next genesis (never written: apply=False)
 
+# The offender shapes from the 2026-07-10 audit, planted verbatim.
+_FIXTURES = {
+    "site/assets/js/coach_popover.js": (f'const GENESIS = new Date("{OLD}T00:00:00");\nconst stamp = "since June 14 2026";\n'),
+    "site/assets/js/evidence_body.js": f'export const PHYS_GENESIS = "{OLD}";\n',
+    "site/assets/js/dispatches.js": f"const GEN = '{OLD}';\n",
+    "site/assets/js/evidence_habits.js": (f'const cfg = {{ cutDate: "{OLD}" }};\nconst caption = "the cut starting Jun 14";\n'),
+    # prose + bare-ISO forms in HTML (the html-iso branch of the prose sweep)
+    "site/story/index.html": (f'<p>Day 1 was June 14, 2026.</p>\n<time datetime="{OLD}">{OLD}</time>\n'),
+    # /legacy is preserved verbatim (ADR-071): planted literal must NOT be touched
+    "site/legacy/assets/old.js": f'const GENESIS = "{OLD}"; // since June 14 2026\n',
+}
 
-def _with_new_genesis(monkeypatch):
+JS_OFFENDERS = (
+    "site/assets/js/coach_popover.js",  # const GENESIS = new Date("...T00:00:00")
+    "site/assets/js/evidence_body.js",  # export const PHYS_GENESIS = "..."
+    "site/assets/js/dispatches.js",  # const GEN = '...'
+    "site/assets/js/evidence_habits.js",  # cutDate: "..."
+)
+
+PROSE_OFFENDERS = (
+    "site/assets/js/coach_popover.js",  # "since June 14 2026"
+    "site/assets/js/evidence_habits.js",  # "cut starting Jun 14" caption
+)
+
+
+def _fixture_tree(tmp_path, monkeypatch):
+    """Build the synthetic site/ tree and point the sweep at it (NEW genesis)."""
+    for rel, text in _FIXTURES.items():
+        f = tmp_path / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(text)
+    monkeypatch.setattr(scs, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(scs, "EXPERIMENT_START_DATE", NEW)
 
 
-def test_iso_sweep_catches_known_offenders(monkeypatch):
-    _with_new_genesis(monkeypatch)
+def test_iso_sweep_catches_known_offenders(tmp_path, monkeypatch):
+    _fixture_tree(tmp_path, monkeypatch)
     touched = scs.rewrite_js_files(apply=False, old_genesis=OLD)
-    for offender in (
-        "site/assets/js/coach_popover.js",  # const GENESIS = new Date("2026-06-14T00:00:00")
-        "site/assets/js/evidence_body.js",  # export const PHYS_GENESIS = "2026-06-14"
-        "site/assets/js/dispatches.js",  # const GENESIS / const GEN = "2026-06-14"
-        "site/assets/js/evidence_habits.js",  # cutDate: "2026-06-14"
-    ):
+    for offender in JS_OFFENDERS:
         assert offender in touched, f"{offender} not caught by the ISO sweep (touched={touched})"
 
 
-def test_prose_sweep_catches_known_offenders(monkeypatch):
-    _with_new_genesis(monkeypatch)
+def test_prose_sweep_catches_known_offenders(tmp_path, monkeypatch):
+    _fixture_tree(tmp_path, monkeypatch)
     touched = scs.rewrite_genesis_prose(apply=False, old_genesis=OLD)
-    for offender in (
-        "site/assets/js/coach_popover.js",  # "since June 14 2026"
-        "site/assets/js/evidence_habits.js",  # "cut starting Jun 14" caption
-    ):
+    for offender in PROSE_OFFENDERS:
         assert offender in touched, f"{offender} not caught by the prose sweep (touched={touched})"
+    # HTML carries both a prose form and a bare ISO literal — the html branch must see it.
+    assert "site/story/index.html" in touched, f"html prose/ISO form not caught (touched={touched})"
 
 
 def test_prose_patterns_forms():
@@ -76,8 +106,10 @@ def test_iso_rewrite_preserves_time_suffix_and_other_dates():
     assert '"2026-05-01"' in out  # unrelated dates untouched
 
 
-def test_sweeps_never_touch_legacy(monkeypatch):
-    _with_new_genesis(monkeypatch)
+def test_sweeps_never_touch_legacy(tmp_path, monkeypatch):
+    # The fixture plants the SAME offender literal inside site/legacy/ — the
+    # sweep must skip it even though it would match (ADR-071: verbatim rollback).
+    _fixture_tree(tmp_path, monkeypatch)
     for touched in (
         scs.rewrite_js_files(apply=False, old_genesis=OLD),
         scs.rewrite_genesis_prose(apply=False, old_genesis=OLD),
@@ -87,7 +119,8 @@ def test_sweeps_never_touch_legacy(monkeypatch):
         assert not legacy, f"/legacy is preserved verbatim (ADR-071) but the sweep touched: {legacy}"
 
 
-def test_same_genesis_is_noop():
-    # re-converge run (old == new) must not rewrite anything
+def test_same_genesis_is_noop(tmp_path, monkeypatch):
+    # re-converge run (old == new) must not rewrite anything, even with matches present
+    _fixture_tree(tmp_path, monkeypatch)
     assert scs.rewrite_js_files(apply=False, old_genesis=scs.EXPERIMENT_START_DATE) == []
     assert scs.rewrite_genesis_prose(apply=False, old_genesis=scs.EXPERIMENT_START_DATE) == []

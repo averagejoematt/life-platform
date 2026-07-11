@@ -7,6 +7,7 @@ state (the C-3 all-inconclusive board + a 30-vs-86 narrative split) and assert
 run_checks() surfaces the alarms and the digest renders — no AWS, no HTTP.
 """
 
+import datetime as _dt
 import json
 import os
 import sys
@@ -23,7 +24,20 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas", "ope
 import coherence_sentinel_lambda as sentinel  # noqa: E402
 
 
+def _pin_continuity(monkeypatch, genesis="2026-06-08", today="2026-07-01", surfaced=()):
+    """Pin the SS-05 continuity gather to explicit fixture dates. The real gather
+    reads the LIVE constants.EXPERIMENT_START_DATE and the wall clock (plus a real
+    DDB get_item) — which made every run_checks() test silently dependent on
+    "genesis <= today": a reset staging a FUTURE genesis (the sanctioned #931
+    pre-start window) flipped check_experiment_continuity to ALARM and broke the
+    OK-expecting tests. Pinned mid-experiment dates keep each test about ITS
+    invariant; the future-genesis semantics of the pure check are pinned in
+    test_coherence_invariants.py::test_genesis_in_future_alarms."""
+    monkeypatch.setattr(sentinel, "_gather_experiment_continuity", lambda: (genesis, today, list(surfaced)))
+
+
 def _patch_bad_state(monkeypatch):
+    _pin_continuity(monkeypatch)
     # C-3 signature: many closed predictions, none decided.
     monkeypatch.setattr(
         sentinel,
@@ -137,6 +151,10 @@ def _patch_empty_post_reset_board(monkeypatch, age_days):
     monkeypatch.setattr(sentinel, "_gather_counts", lambda: [])
     monkeypatch.setattr(sentinel, "_semantic_pass", lambda facts, narr: None)
     monkeypatch.setattr(sentinel, "_experiment_age_days", lambda: age_days)
+    # freshly-reset cycle: genesis just passed, nothing surfaced to readers yet;
+    # today derives from the pinned genesis + the test's age, never the wall clock
+    _today = (_dt.date.fromisoformat("2026-06-08") + _dt.timedelta(days=age_days)).isoformat()
+    _pin_continuity(monkeypatch, genesis="2026-06-08", today=_today, surfaced=())
     empty_payload = {
         "overall": {"total": 0},
         "predictions": [],
@@ -170,6 +188,7 @@ def test_same_empty_board_alarms_once_past_the_grace_window(monkeypatch):
 
 
 def test_healthy_state_is_ok(monkeypatch):
+    _pin_continuity(monkeypatch, surfaced=[{"name": "experiment_arc_week_count", "week": 4}])
     monkeypatch.setattr(
         sentinel,
         "_gather_predictions",

@@ -323,10 +323,17 @@ def test_measurements_session_number_is_date_rank(monkeypatch):
 
 
 def test_measurements_records_stamp_phase(monkeypatch):
+    # Genesis PINNED (not the live constant): phase_for_date compares against
+    # ingestion_framework.EXPERIMENT_START_DATE, so a reset moving genesis past
+    # 2026-07-01 (the cycle-5 future-staged genesis did) silently flips the
+    # expected stamp. Pinning keeps the test about the boundary, not the calendar.
+    import ingestion_framework
+
+    monkeypatch.setattr(ingestion_framework, "EXPERIMENT_START_DATE", "2026-06-08")
     fake_table, _ = _run_measurements(monkeypatch, _CSV_TWO_SESSIONS)
     for p in fake_table.puts:
         assert p.get("phase") in ("pilot", "experiment"), p
-    # 2026-03-01 is pre-genesis (2026-06-08) → pilot; 2026-07-01 → experiment
+    # against the pinned 2026-06-08 genesis: 2026-03-01 → pilot; 2026-07-01 → experiment
     by_date = {p["date"]: p["phase"] for p in fake_table.puts}
     assert by_date["2026-03-01"] == "pilot"
     assert by_date["2026-07-01"] == "experiment"
