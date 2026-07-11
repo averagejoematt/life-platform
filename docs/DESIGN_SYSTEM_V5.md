@@ -329,3 +329,103 @@ across the sweep (the dominant lede-paragraph style on `/data/`, `/method/`, `/p
 element on at least one common page type — on a data-driven site where the LCP element can shift
 day to day with what's populated, preloading all three uniformly is the robust choice; the
 italic→normal swap was the one unconditional, evidence-backed fix.
+
+## 10. The mobile / responsive layer (the spec — #998 Epic B)
+
+The site is **one responsive codebase + an installable Cockpit PWA** (board-ratified
+2026-06-14, PRs #118/#119) — not a separate mobile build. This section is the **spec a PR
+must satisfy** on the responsive layer, written after the 2026-07-11 mobile review filed it
+as tribal knowledge (this doc had zero mobile content before #1011). The enforcing harness is
+the pre-merge render gate at 390 + 360 (`tests/pr_render_gate.py`, #1012) plus the failure-class
+assertions in `tests/visual_qa.py` (#1013): a PR that violates the rules below fails CI.
+
+### 10.1 Breakpoints — six canonical boundaries, nothing else (#1006)
+
+CSS custom properties **cannot** be used inside `@media` queries and the site has **no CSS
+build step**, so breakpoints are documented **named constants** (see the block at the top of
+`tokens.css`), not `var()`s. Every `@media` in `site/assets/css/**` uses exactly one of:
+
+| token | value | job |
+|---|---|---|
+| `--bp-xs` | 360 | tiny-phone last resort (hide brand tag, shrink door labels) |
+| `--bp-sm` | 480 | small phone — stack tight 2-ups, drop non-essential columns |
+| `--bp-md` | 600 | **phone / chrome boundary** — app-bar, single-column, the "is this a phone" call |
+| `--bp-lg` | 760 | tablet — 2-col content grids, sticky side rails begin |
+| `--bp-tw` | 820 | tablet-wide — the evidence 2-col reading layout (rail + readout) |
+| `--bp-xl` | 900 | desktop — 3-col grids, hero / subscribe split-screens |
+
+**Rule:** pick the boundary by *job*, not pixel-taste. **Convention:** `max-width` uses the
+token exactly (360/480/600/760/820); `min-width` uses **token+1** (601/761/821/901) so a
+min/max pair straddling a boundary never both fire at the same pixel. A PR must not introduce
+a seventh value — `grep -rhoE '\((max|min)-width: *[0-9]+px\)' site/assets/css` returns only
+those nine numbers.
+
+### 10.2 The bottom app-bar — @layer, not !important (#1007)
+
+On mobile (`≤600`) the five doors become a **fixed, thumb-reachable bottom app-bar**. It is
+built with **CSS cascade layers**, declared once at the top of `tokens.css`:
+`@layer chrome-base, chrome;`.
+- **chrome-base** — the per-door *desktop* nav chrome (`.doors`, `.story-top`, `.cockpit-top`,
+  …), which lives in `cockpit.css` / `story.css` / `evidence.css` (they load *after* tokens.css).
+- **chrome** — the mobile bottom app-bar (tokens.css). A *later* layer, so it wins over
+  chrome-base **by layer order** — no `!important`, no specificity war.
+
+**Load-bearing, do not remove:** the **backdrop-filter neutralizer** — a `backdrop-filter` /
+`transform` / `filter` ancestor creates a containing block that traps `position:fixed` children,
+which pins the bar to the top bar instead of the viewport bottom. The neutralizer zeroes those
+on `.story-top/.ev-top/.cockpit-top` at mobile width. (Only `.story-top` actually sets one; the
+rest are defensive.)
+
+**Rules for a PR touching the chrome:** (a) never add an `!important` to a `.doors`/app-bar rule
+— put the competing rule in `@layer chrome-base` instead; (b) any rule that could beat the app-bar
+must be layered (unlayered rules beat *both* layers); (c) the app-bar row width ≤ viewport at 360
+**and** 390, the theme toggle on-screen + tappable, no door-label truncation, follow pill hidden
+(all asserted by #1013). The doors stack **icon-over-label** (`flex-direction:column` + `min-width:0`)
+so the longest word ("protocols") gets the full door width.
+
+### 10.3 Touch grammar
+
+Charts use a **Pointer-Events** grammar (`motion.js`) — not hover-first — so a line chart is
+explorable by touch, and a **~2600ms fail-open timer** un-gates motion if `motion.js` never
+initializes (so reveals can't strand content). **Scroll-reveal is height-independent**
+(`threshold:0` + `rootMargin`, #1002): a fractional IntersectionObserver threshold silently never
+fires on a section taller than `viewport/threshold`, so any reveal wrapper over a data-driven list
+**must** use `threshold:0`. Reduced-motion (`prefers-reduced-motion`) paints everything immediately.
+
+### 10.4 Tap-target floor — 44px effective (#1010)
+
+Interactive controls must reach a **44px effective hit area** on touch, expanded *without visual
+redesign*, by technique:
+- **isolated icon/button** (theme toggle, intro "×"): a transparent centered `::after` overlay,
+  expanded **vertically** (`height: max(100%,44px)`, `width:100%`) — a horizontal overlay on the
+  right-edge app-bar toggle would overflow the fixed bar.
+- **form control** (scrubbers, selects): `min-height: 44px`.
+- **text button**: `min-height:44` + block padding.
+- **checkbox**: expand the wrapping `<label>` (pseudo-elements don't render on replaced inputs).
+- **inline prose link**: `padding-block` (no reflow; never an inline-flex 44px block or an overlay
+  that swallows adjacent-word taps).
+Touch-width only, so desktop hover is untouched. The `visual_qa` tap-target audit (#1013) reports
+violations (advisory).
+
+### 10.5 Type registers at mobile sizes
+
+The triad's jobs are unchanged on mobile; only the register tightens. Data tables use `--fs-small`
+(14px) cells with `--fs-label` (11px, uppercase, tracked) headers — the **11px mono label** is the
+smallest register that ships, and only for machine-voice labels, never body copy. Door labels drop
+to `.66rem` in the app-bar (icon-over-label gives them the width to stay legible).
+
+### 10.6 The responsive-table primitive (#1008)
+
+One shared pattern: `.table-scroll` (tokens.css) — the block-scroll trick (`display:block;
+width:100%; overflow-x:auto`), no wrapper element needed, columns stay aligned. The shared
+`.rd-tbl` readout-table class inherits it at `≤820`. **Rule:** a wide data table must scroll inside
+its own box (`width:100%`, never `width:auto` — `auto` lets a `display:block` table size to content
+and blow out the page under real data, which auto-rolled-back a deploy on 2026-07-11) or reflow to
+cards; it must never squeeze columns until headers truncate. Wide **non-table** content (stat rows,
+strips) relies on the section-level `.rd-sec { overflow-x:auto }` scroll — keep it.
+
+### 10.7 PWA layer
+
+The Cockpit is an installable PWA: a web manifest + an active service worker (`sw.js`). SW coverage
+and a build-hash cache VERSION are tracked as forward work (#1020). A PR that changes cached assets
+should assume the SW may serve a stale copy until the cache rolls.

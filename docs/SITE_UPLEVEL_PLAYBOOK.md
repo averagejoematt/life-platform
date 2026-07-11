@@ -5,7 +5,9 @@
 > **How to redesign or uplevel the site well** — the method and the hard-won lessons, so the
 > next Claude inherits the playbook, not just the state. Start from
 > [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) + [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md);
-> build to [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md).
+> build to [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) — including its **§10 mobile / responsive
+> layer** (breakpoint tokens, the `@layer` app-bar, touch grammar, the 44px tap floor, the table
+> primitive), which a site PR must satisfy and the pre-merge render gate enforces at 390 + 360.
 
 ## The loop (run it every time)
 
