@@ -99,5 +99,12 @@ the MONITORING drift class permanently) · #935 whoop script housekeeping (move 
 setup/) · #936 DR swap-back drill + measure the 30-min RTO claim. Prior gated items
 unchanged: PRE-13, HN #741, /verify/ profile URLs, HAE straggler, #748, #916.
 
+**Post-wrap addendum (same session):** Matthew asked where the /wiki tab content was →
+settled on **option A: docs-as-code is THE wiki; the GitHub wiki tab is a signpost only**
+(a Home.md in the wiki repo points at docs/README.md; #940 added the front-page pointer;
+mirror scaffolding deliberately NOT built — wiki-tab has no CI and is the "always drifts"
+option by construction). Parallel-session wrap bootstrap brief handed to Matthew (sync to
+main → re-read wrap.md from disk → step (e) gates → both handover gate lines).
+
 **Build beat:** wiki-program-2026-07-10
 **Docs:** the program IS the docs — 10 PRs across ~60 pages; all five gates green at wrap.
