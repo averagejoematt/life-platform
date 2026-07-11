@@ -1,5 +1,7 @@
 # Life Platform — Operator Guide
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > Everything you need to run this platform. Read this on Day 1.
 > For architectural decisions: ARCHITECTURE.md
 > For emergency procedures: RUNBOOK.md

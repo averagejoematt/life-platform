@@ -1,7 +1,7 @@
 """reading_keys.py — pure key / id / GSI discipline for the reading domain.
 
 No boto3, no I/O — just deterministic construction of the pk/sk and GSI
-attributes per `docs/SPEC_READING_MIND_2026-06-29.md` §1–§3. Kept pure so the
+attributes per `docs/specs/SPEC_READING_MIND_2026-06-29.md` §1–§3. Kept pure so the
 access-pattern tests can exercise it without AWS.
 
 Entity → key map (single-table `life-platform`):

@@ -12,7 +12,7 @@ read tool (get_exercise_notes) + backfill run in the MCP package — both reach 
 the layer. `table` and the LLM fn are injected so the core stays unit-testable with
 ZERO I/O and ZERO model calls.
 
-Design brief: docs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md (invariants §1, taxonomy
+Design brief: docs/specs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md (invariants §1, taxonomy
 §5, extractor §6). Build: docs/specs/CLAUDE_CODE_PROMPT_HEVY_NOTES_v1.md.
 
 INVARIANTS (tests enforce):

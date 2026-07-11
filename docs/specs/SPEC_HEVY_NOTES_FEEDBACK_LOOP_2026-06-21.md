@@ -1,10 +1,10 @@
 # Build Outline & Design Brief — Training Notes Feedback Loop (Derived Note-Signal Layer) — v1.0
 
-> **Destination in repo:** `docs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md`
+> **Destination in repo:** `docs/specs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md`
 > **Date:** 2026-06-21 · **Version:** 1.0 (pre-build outline)
 > **Status:** Pre-build outline. Build instructions → `docs/specs/CLAUDE_CODE_PROMPT_HEVY_NOTES_v1.md`.
 > **Boards consulted:** Personal (full — what's worth extracting + the safety lens), Technical (full), Product (light — the two-way-voice loop).
-> **Related / prior art:** `docs/SPEC_MEAL_GROUPING_2026-06-19.md` (the derived-projection-over-untouched-raw pattern this mirrors), `docs/SCHEMA.md` (single-table keys, ADR-005 no-GSI), the `ruck_log` overlay (notes-correct-the-number precedent), `get_freshness_status` (silent-failure guard hook), `TRAINING_CALIBRATION.md` (the consumer — pre-flight + autoregulation gates).
+> **Related / prior art:** `docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md` (the derived-projection-over-untouched-raw pattern this mirrors), `docs/SCHEMA.md` (single-table keys, ADR-005 no-GSI), the `ruck_log` overlay (notes-correct-the-number precedent), `get_freshness_status` (silent-failure guard hook), `TRAINING_CALIBRATION.md` (the consumer — pre-flight + autoregulation gates).
 
 A build outline, not line-level code. Captures the architecture, the signal taxonomy, the schema, the cost-bounded extractor, the safety handling for pain, and the two-way loop that is the whole point.
 
@@ -257,7 +257,7 @@ Per the trigger matrix: CHANGELOG + PROJECT_PLAN always; SCHEMA + DECISIONS (new
 
 **14.2 Rest-time adherence.** New `rest_adherence` class (§5). Matthew is deliberately extending rest this first week. Capture prescribed-rest vs actual-rest where Hevy exposes it (**Phase 0 confirms availability**); surface where he needs more/less, trend it, and make it **bidirectional** — the coach may deliberately prescribe rest discipline as the day's focus ('today, holding 90s rest matters more than the load'). Where Hevy doesn't expose per-set rest, the notes loop captures it qualitatively.
 
-**14.3 Recovery-conditional descriptors (fixes night-before staleness).** *Surfaced live, now promoted to its own spec:* see **`docs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md`** (edge-case-proof night-before authoring: tier-agnostic routines, wrist-band self-selection, freshness-gated authoring, subtract-only ceiling, week-position floors). The 2026-06-21 routine was built the night before and hard-stamped `recovery_tier=yellow` off Jun 20's reading; Matthew woke GREEN 95%. The bike-level branch ('YELLOW → L10; GREEN → intervals 6↔8') sources from the `progression` timeline here, but the full authoring design lives in the dedicated spec.
+**14.3 Recovery-conditional descriptors (fixes night-before staleness).** *Surfaced live, now promoted to its own spec:* see **`docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md`** (edge-case-proof night-before authoring: tier-agnostic routines, wrist-band self-selection, freshness-gated authoring, subtract-only ceiling, week-position floors). The 2026-06-21 routine was built the night before and hard-stamped `recovery_tier=yellow` off Jun 20's reading; Matthew woke GREEN 95%. The bike-level branch ('YELLOW → L10; GREEN → intervals 6↔8') sources from the `progression` timeline here, but the full authoring design lives in the dedicated spec.
 
 **14.4 BUG — `get_muscle_volume` staleness + core-mapping (own ticket / RCA).** *Surfaced live, two distinct defects:*
   - **Staleness/lag:** the night-before pull (Jun 14–20) reported Calves 10 / 'lagging' and Core 0; the next-morning re-pull (Jun 14–21) reported Calves 14 / 'optimal' with most groups jumping — the latest session(s) weren't aggregated when first read, so synthesis ran on incomplete volume. Same failure-class as the Strava high-water-mark blindness — **a volume read must know whether the most recent sessions are counted, or flag that they aren't.**

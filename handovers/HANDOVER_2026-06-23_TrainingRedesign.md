@@ -1,6 +1,6 @@
 # Handover — 2026-06-23 (Training evidence page redesign — P0→P2)
 
-Second page through the design-review → Claude-Code pipeline (after Nutrition). Spec: `docs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_TRAINING_PAGE_v1.md` (from `docs/design-review/fitness.md` run through the claude.ai expert panel). Rebuilt `/evidence/training/` on the twin spine: **"building the engine — and managing the load so a heavy body absorbs the work instead of breaking."** 20 commits, one per P-item (+1 fix).
+Second page through the design-review → Claude-Code pipeline (after Nutrition). Spec: `docs/specs/SPEC_TRAINING_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_TRAINING_PAGE_v1.md` (from `docs/design-review/fitness.md` run through the claude.ai expert panel). Rebuilt `/evidence/training/` on the twin spine: **"building the engine — and managing the load so a heavy body absorbs the work instead of breaking."** 20 commits, one per P-item (+1 fix).
 
 **Status: built + locally verified; NOT deployed (deploy is Matthew's).** PR **#? (`training-page-redesign` → `main`)** — clean off `origin/main` (no cherry-pick; branched after #193 merged). Local renders verified desktop + mobile-390px + light.
 

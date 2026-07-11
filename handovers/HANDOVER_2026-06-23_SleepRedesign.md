@@ -1,6 +1,6 @@
 # Handover — 2026-06-23 (Sleep evidence page redesign — P0→P2 + correlation board)
 
-Third page through the design-review → Claude-Code pipeline (Nutrition, Training, now Sleep). Spec: `docs/SPEC_SLEEP_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_SLEEP_PAGE_v1.md`. Spine: **flip retrospective → prospective** — the circadian forecast LEADS, last night demotes to evidence. 23 commits, one per P-item.
+Third page through the design-review → Claude-Code pipeline (Nutrition, Training, now Sleep). Spec: `docs/specs/SPEC_SLEEP_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_SLEEP_PAGE_v1.md`. Spine: **flip retrospective → prospective** — the circadian forecast LEADS, last night demotes to evidence. 23 commits, one per P-item.
 
 **Status: built + locally verified (dark + mobile-390px + the new LIGHT capture). NOT deployed (deploy is a STOP-AND-ASK).** Branch `sleep-page-redesign` is stacked on `training-page-redesign` (which is on `origin/main` + the live-but-unmerged training work) — the sleep chart-kit additions sit on top of training's, so it must NOT be branched off origin/main (would revert training's charts.js). PR is stacked (base = training-page-redesign).
 

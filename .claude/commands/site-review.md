@@ -19,7 +19,7 @@ Parse `$ARGUMENTS` to pick a mode. Default to `capture` if empty.
 ### Mode: `review [<date>]` (the main event)
 Default `<date>` = the latest folder under `qa-screenshots/`. If no packet exists, run `capture` first.
 
-1. **Load the packet.** Read `qa-screenshots/<date>/manifest.json` and `consistency.json`. Read `docs/SITE_REVIEW_METHODOLOGY.md` and skim `docs/V4_DESIGN_CONSTITUTION_2026_06_01.md` (§0 north star, §1 audience, §3 doors, §7 moat, §11 guardrails).
+1. **Load the packet.** Read `qa-screenshots/<date>/manifest.json` and `consistency.json`. Read `docs/SITE_REVIEW_METHODOLOGY.md` and skim `docs/archive/V4_DESIGN_CONSTITUTION_2026_06_01.md` (§0 north star, §1 audience, §3 doors, §7 moat, §11 guardrails).
 2. **Scope.** Review one door per invocation for the weekly cadence (`manifest.pages` filtered by `door`); do the full site only for a milestone pass. Walk pages in `narrative_order`.
 3. **Per page** (this is where Claude Code's vision matters — actually Read the images):
    - **Read** the `screenshots.full` PNG and the `screenshots.mobile` PNG from the run folder. Read any `annotations/<slug>-*.png` present and treat the user's markup as a directed, **top-priority** finding.

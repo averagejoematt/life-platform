@@ -1,7 +1,7 @@
 # Claude Code Build Prompt — Recovery-Adaptive Night-Before Authoring (v1)
 
 > **Destination in repo:** `docs/specs/CLAUDE_CODE_PROMPT_RECOVERY_ADAPTIVE_AUTHORING_v1.md`
-> **Pairs with brief:** `docs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md` (read first — principles, rubric, edge-case table).
+> **Pairs with brief:** `docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md` (read first — principles, rubric, edge-case table).
 > **Date:** 2026-06-21
 
 ---

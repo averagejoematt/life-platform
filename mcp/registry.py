@@ -1328,7 +1328,7 @@ TOOLS = {
     },
     # ADR-066 (2026-05-31): Hevy routine write-loop. Single fat tool with action
     # dispatcher; respects SPEC §9 "fewer fat tools" guidance. Cron + add-load
-    # both ship gated off (SSM defaults false). See docs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md.
+    # both ship gated off (SSM defaults false). See docs/specs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md.
     "manage_hevy_routine": {
         "fn": tool_manage_hevy_routine,
         "schema": {

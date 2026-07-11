@@ -4,9 +4,9 @@
 > Paste this whole prompt into Claude Code to begin. It sequences the work and points to the detailed specs. Do the stages IN ORDER — later stages depend on earlier ones being trustworthy.
 
 ## Read first
-- `docs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md` (+ its §10 data-integrity appendix)
+- `docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md` (+ its §10 data-integrity appendix)
 - `docs/specs/CLAUDE_CODE_PROMPT_RECOVERY_ADAPTIVE_AUTHORING_v1.md`
-- `docs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md`
+- `docs/specs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md`
 - `docs/specs/CLAUDE_CODE_PROMPT_HEVY_NOTES_v1.md`
 
 ## Working rules (all stages)

@@ -1,5 +1,7 @@
 # Phase Taxonomy — experiment-restart data semantics
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-07
+
 **Authoritative classification of every DynamoDB record type for experiment restarts.**
 Machine-readable source of truth: `lambdas/phase_taxonomy.py` (shared layer). Both
 restart tools and the read paths derive from it. See ADR-077 for the decision record.

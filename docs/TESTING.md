@@ -1,5 +1,7 @@
 # Testing Strategy
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 **Last updated:** 2026-05-19 (v8.0.0)
 
 > What's tested, what isn't, and how to add tests without slowing yourself down.

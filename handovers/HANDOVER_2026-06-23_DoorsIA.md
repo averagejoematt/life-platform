@@ -1,6 +1,6 @@
 # Handover — 2026-06-23 (Doors / cross-site IA redesign)
 
-Cross-site IA/editorial pass over the five doors (Home `/`, Cockpit `/now/`, Story `/story/`, Coaching `/coaching/`, Evidence `/evidence/`). Spec: `docs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_DOORS_v1.md`. 11 P-item commits. **Front-end only — no server change.** 5-door model + me-first LOCKED (untouched).
+Cross-site IA/editorial pass over the five doors (Home `/`, Cockpit `/now/`, Story `/story/`, Coaching `/coaching/`, Evidence `/evidence/`). Spec: `docs/specs/SPEC_DOORS_EXPERIENCE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_DOORS_v1.md`. 11 P-item commits. **Front-end only — no server change.** 5-door model + me-first LOCKED (untouched).
 
 **Status: built + DEPLOYED + live-verified + MERGED.** PR **#206** (`doors-experience-redesign` → `main`, squash-merged `f2a5990c`). Live: all doors "Day 10 · Week 2" from one source, zero console errors.
 
@@ -20,6 +20,6 @@ Cross-site IA/editorial pass over the five doors (Home `/`, Cockpit `/now/`, Sto
 Physical (#201), RQA-04 (#202), RQA-05 (#203), WQA-06 (#204), Vitals (#205) — all live. See their handovers + CHANGELOG.
 
 ## Next: Mind page redesign (queued)
-Specs: `docs/specs/CLAUDE_CODE_PROMPT_MIND_PAGE_v1.md` + `docs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`. THE most sensitive page. HARD RULES: vices/substances NEVER named publicly (private unnamed streaks); relapse = muted RESET, NO red (site-wide red rule EXCLUDED here), no shame; lead with cumulative restraint/resilience not a fragile streak; mood/journal logging is an INVITATION not obligation; non-clinical tone; inviting empty states; Mind pillar decomposes; Third Wall restores Matthew's last word. STOP-AND-ASK: ANY red; the mood/journal/temptation capture mechanics (confirm invitation-not-obligation UX first); the Third-Wall reply mechanic; any deploy. No light screenshot yet — create one.
+Specs: `docs/specs/CLAUDE_CODE_PROMPT_MIND_PAGE_v1.md` + `docs/specs/SPEC_MIND_PAGE_REDESIGN_2026-06-21.md`. THE most sensitive page. HARD RULES: vices/substances NEVER named publicly (private unnamed streaks); relapse = muted RESET, NO red (site-wide red rule EXCLUDED here), no shame; lead with cumulative restraint/resilience not a fragile streak; mood/journal logging is an INVITATION not obligation; non-clinical tone; inviting empty states; Mind pillar decomposes; Third Wall restores Matthew's last word. STOP-AND-ASK: ANY red; the mood/journal/temptation capture mechanics (confirm invitation-not-obligation UX first); the Third-Wall reply mechanic; any deploy. No light screenshot yet — create one.
 
 See [[project_build_fingerprint]], [[reference_local_render_qa]], [[feedback_sensitive_content]], [[feedback_prod_deploy_authorization]].

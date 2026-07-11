@@ -1,5 +1,7 @@
 # Life Platform — Board of Directors Reference
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > Three expert boards advise different aspects of the platform. Invoke by name or board type.
 > This file is the single reference for all board composition. Claude Code should read this when board input is needed.
 > Last updated: 2026-05-19 (v8.0.0). Personal Board roster cross-checked against `s3://matthew-life-platform/config/board_of_directors.json`.

@@ -1,5 +1,7 @@
 # Re-Entry Protocol — Reusable Runbook
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 Last updated: 2026-05-19 (V2 audit operational sweep)
 
 **Trigger:** Any planned or unplanned platform gap > 7 days.

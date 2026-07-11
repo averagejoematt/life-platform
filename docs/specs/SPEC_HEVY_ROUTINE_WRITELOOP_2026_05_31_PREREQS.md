@@ -1,6 +1,6 @@
 # Prerequisites — Hevy Routine Write-Loop
 
-> **Companion to:** `docs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md` §10
+> **Companion to:** `docs/specs/SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31.md` §10
 > **Date:** 2026-05-31
 > **Status:** §A, §B, §C, §D all closed (§D Option 1 approved 2026-05-31)
 

@@ -1,5 +1,7 @@
 # Disaster Recovery
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+
 **Last updated:** 2026-07-10 (first DR drill exercised — #755; retired-layer backup step corrected)
 
 > What can go catastrophically wrong, and the recovery sequence for each. Not exhaustive — meant as a starter playbook.

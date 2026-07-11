@@ -1,5 +1,7 @@
 # Platform North Star
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-27
+
 > The durable **why**. Read this first before any redesign or uplevel. It changes
 > rarely — purpose and thesis, not counts or dates (those live in auto-synced docs).
 > Companions: [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) (what each page is for),

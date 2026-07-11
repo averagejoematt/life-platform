@@ -1,5 +1,7 @@
 # Tag-Code Legend
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-07
+
 This codebase labels work with short tag-codes in **commits, code comments, `docs/BACKLOG.md`, and `docs/CHANGELOG.md`** (e.g. `IC-3`, `PG-10`, `SEC-02`, `COST-OPT-1`, `R17-04`). They come from successive audit / backlog / sprint cycles. This file decodes the **families**; for any specific item, see "How to decode a specific tag" at the bottom.
 
 > **Rule going forward:** prefer a documented family below, or an `ADR-###`. Don't invent a new prefix without adding it here.
@@ -23,7 +25,7 @@ This codebase labels work with short tag-codes in **commits, code comments, `doc
 | Prefix | Domain |
 |---|---|
 | **PG-##** | **Product & Growth** — the 2026-06-07 Product/Personal summit backlog (ADR-078). |
-| **P#.#** | V2-audit phase/plan items (e.g. `P2.4`, `P4.1`) — see `docs/V2_AUDIT_PLAN.md`. |
+| **P#.#** | V2-audit phase/plan items (e.g. `P2.4`, `P4.1`) — see `docs/archive/V2_AUDIT_PLAN.md`. |
 | **N-##** | New work surfaced post-V2. |
 | **S-##** | Site / public-website (v4) follow-ups. |
 | **D-##** | Data / deploy items. |

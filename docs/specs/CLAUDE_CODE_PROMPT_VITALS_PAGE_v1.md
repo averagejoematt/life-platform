@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Vitals Page Redesign (v2 — glance-first landing page)
 **Target:** averagejoematt.com → `/evidence/vitals/`
-**Companion spec:** `docs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md` (read first — the three altitudes, the status-rings rule, the updated red/color rule)
+**Companion spec:** `docs/specs/SPEC_VITALS_PAGE_REDESIGN_2026-06-21.md` (read first — the three altitudes, the status-rings rule, the updated red/color rule)
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. API: `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); page consumes `/api/pulse`, `/api/pulse_history` (+ habit completion for the glyph row). Locate the front-end `/evidence/vitals/` components; reuse the inline-SVG chart kit (no new deps).

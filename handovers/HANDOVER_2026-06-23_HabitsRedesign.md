@@ -1,6 +1,6 @@
 # Handover — 2026-06-23 (Habits evidence page redesign — P0→P2)
 
-Fourth and final page through the design-review → Claude-Code pipeline (Nutrition → Training → Sleep → **Habits**). Spec: `docs/SPEC_HABITS_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_HABITS_PAGE_v1.md`. Rebuilt `/evidence/habits/` into an honest intelligence layer over Habitify: **which habits are load-bearing, where the effort is, and which one pulls the day up — as an early signal, not a law.** 17 commits, one per P-item.
+Fourth and final page through the design-review → Claude-Code pipeline (Nutrition → Training → Sleep → **Habits**). Spec: `docs/specs/SPEC_HABITS_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_HABITS_PAGE_v1.md`. Rebuilt `/evidence/habits/` into an honest intelligence layer over Habitify: **which habits are load-bearing, where the effort is, and which one pulls the day up — as an early signal, not a law.** 17 commits, one per P-item.
 
 **Status: built + locally verified + DEPLOYED + live-verified + MERGED.** PR **#197** (`habits-page-redesign` → `main`, squash-merged, branch deleted). Build fingerprint `cfbfaeaa` == HEAD live. **Completes the four-page Evidence series** (Nutrition #193/#194 · Training #195 · Sleep #196 · Habits #197).
 

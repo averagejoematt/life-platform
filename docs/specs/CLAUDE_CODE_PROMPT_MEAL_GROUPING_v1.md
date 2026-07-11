@@ -1,6 +1,6 @@
 # Claude Code Prompt — Meal Grouping (Derived Meal Layer) Implementation
 
-Read `docs/SPEC_MEAL_GROUPING_2026-06-19.md` (v1.1) and `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md` in full before starting.
+Read `docs/specs/SPEC_MEAL_GROUPING_2026-06-19.md` (v1.1) and `docs/reviews/REVIEW_MEAL_GROUPING_2026-06-19.md` in full before starting.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Nutrition Page Redesign (v1)
 **Target:** averagejoematt.com → `/evidence/nutrition/`
-**Companion spec:** `docs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md` (read it first — it carries the rationale, the panel disagreements, and the field-level bindings)
+**Companion spec:** `docs/specs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md` (read it first — it carries the rationale, the panel disagreements, and the field-level bindings)
 **Date:** 2026-06-21
 
 You are implementing a redesign of the nutrition evidence page. Work in phases. Inspect existing code before changing it — do not assume signatures. The API is served by `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); the page consumes `/api/nutrition_overview`, `/api/frequent_meals`, `/api/protein_sources`. Locate the front-end `/evidence/nutrition/` template/components by inspection.

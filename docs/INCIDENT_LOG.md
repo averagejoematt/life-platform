@@ -1,5 +1,7 @@
 # Life Platform — Incident Log
 
+> **Status:** log · **Owner:** Matthew · **Verified:** 2026-05-19
+
 Last updated: 2026-07-10 (added the first DR drill entry — DDB PITR + S3 versioned restore exercised, #755)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.

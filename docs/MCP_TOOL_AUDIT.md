@@ -1,5 +1,7 @@
 # MCP Tool Audit Ledger — the AUDITED_AT ratchet
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-08
+
 Dated, reviewable record of every batch of MCP registry removals (issue #395, epic #345
 "Less machine, same power", finding ER-04). Nothing disappears from the registry without
 an entry here citing the usage telemetry that justified it. Git history is the archive —

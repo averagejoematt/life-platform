@@ -1,6 +1,6 @@
 # Handover — 2026-06-21 (Nutrition evidence page redesign — P0→P2 + CGM)
 
-Driven by a turnkey spec (`docs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_NUTRITION_PAGE_v1.md`). Rebuilt `/evidence/nutrition/` from a flat tile-board into one argued trajectory: **"a deficit I can hold, hitting the protein to keep muscle, without quietly costing me anything."** All three phases, one commit per P-item.
+Driven by a turnkey spec (`docs/specs/SPEC_NUTRITION_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_NUTRITION_PAGE_v1.md`). Rebuilt `/evidence/nutrition/` from a flat tile-board into one argued trajectory: **"a deficit I can hold, hitting the protein to keep muscle, without quietly costing me anything."** All three phases, one commit per P-item.
 
 **Status: DEPLOYED + live-verified.** Site-api + site both deployed by Matthew; production build `8d342e15`. Verified on live desktop + mobile-390px + dark/light. **PR [#193](https://github.com/averagejoematt/life-platform/pull/193) (`nutrition-redesign-pr` → `main`) is open — merge it to bring `main` in sync with what's deployed** (the deploy ran from the local `nutrition-page-redesign` branch; the PR is the clean cherry-pick onto `origin/main`, since hevy is already on main via #192).
 

@@ -1,5 +1,7 @@
 # Quickstart — First Day Commands
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+
 > Action sequence for a new engineer on day 1: auth, run tests, deploy a single Lambda, verify daily-brief output, roll back if needed.
 > For mental model + concepts, see `docs/ONBOARDING.md`. For full operations, see `docs/RUNBOOK.md`.
 > Last updated: 2026-05-19 (v8.0.0)
@@ -321,7 +323,7 @@ If compute runs before ingestion completes, it uses yesterday's data. If the bri
 - **Decision history**: `docs/DECISIONS.md` (119 ADRs)
 - **Daily operations**: `docs/RUNBOOK.md`
 - **MCP tool catalog**: `docs/MCP_TOOL_CATALOG.md` (64 tools)
-- **V2 audit findings**: `docs/V2_AUDIT_PLAN.md` (76 findings, ~33 shipped, formally closed in ADR-057)
+- **V2 audit findings**: `docs/archive/V2_AUDIT_PLAN.md` (76 findings, ~33 shipped, formally closed in ADR-057)
 
 ---
 

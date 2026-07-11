@@ -1,10 +1,10 @@
 # Build Outline & Design Brief — Recovery-Adaptive Night-Before Authoring — v1.0
 
-> **Destination in repo:** `docs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md`
+> **Destination in repo:** `docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md`
 > **Date:** 2026-06-21 · **Version:** 1.0
 > **Status:** Pre-build outline. Build instructions → `docs/specs/CLAUDE_CODE_PROMPT_RECOVERY_ADAPTIVE_AUTHORING_v1.md`.
 > **Boards consulted:** Personal (Sarah Chen, Iris Tanaka, Maya Rodriguez, Marcus Webb, Henning Brandt), Technical (Priya, Jin, Omar, Henning).
-> **Related:** `docs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md` §14.3 (this supersedes that stub), `TRAINING_CALIBRATION.md` (subtract-only autoreg, autoregulation gates), the `get_muscle_volume` staleness bug (§14.4 of the notes brief — a hard prerequisite here).
+> **Related:** `docs/specs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md` §14.3 (this supersedes that stub), `TRAINING_CALIBRATION.md` (subtract-only autoreg, autoregulation gates), the `get_muscle_volume` staleness bug (§14.4 of the notes brief — a hard prerequisite here).
 
 ---
 

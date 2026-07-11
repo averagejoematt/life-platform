@@ -83,7 +83,7 @@ to push back. Never give me the generic answer or tell me what I want to hear.
    (wake → car → gym) with ZERO chance to adjust. So:
    - AUTHOR TIER-AGNOSTIC. Never hard-stamp one night's recovery_tier into the prescription —
      I won't have that tier in the morning. Instead write recovery BRANCHES into the cues per
-     the rubric (docs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md):
+     the rubric (docs/specs/SPEC_RECOVERY_ADAPTIVE_AUTHORING_2026-06-21.md):
        🟢 GREEN (Whoop 67–100): take the ceiling — intervals / +1 RPE cap / optional work on
        🟡 YELLOW (34–66): the baseline plan (this is the safe default if I have no signal)
        🔴 RED (1–33): subtract to the floor — Z2/mobility, cut top sets, or rest

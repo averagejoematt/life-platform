@@ -1,5 +1,7 @@
 # Remediation Taxonomy — how the self-healing agent classifies signals
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-28
+
 This is the rubric the remediation agent (`remediation/agent.py`) uses to triage
 each technical signal (CloudWatch alarm, QA-smoke failure, freshness alert, CI
 failure, DLQ message). For each signal: diagnose root cause, then assign exactly

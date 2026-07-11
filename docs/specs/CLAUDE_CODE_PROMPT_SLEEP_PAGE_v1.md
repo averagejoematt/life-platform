@@ -1,6 +1,6 @@
 # CLAUDE CODE PROMPT — Sleep Page Redesign (v1, rev. with correlation board)
 **Target:** averagejoematt.com → `/evidence/sleep/`
-**Companion spec:** `docs/SPEC_SLEEP_PAGE_REDESIGN_2026-06-21.md` (read first — rationale, panel disagreements, field bindings, the correlation-board honesty mechanics in §3)
+**Companion spec:** `docs/specs/SPEC_SLEEP_PAGE_REDESIGN_2026-06-21.md` (read first — rationale, panel disagreements, field bindings, the correlation-board honesty mechanics in §3)
 **Date:** 2026-06-21
 
 Implement in phases. Inspect existing code before changing it. API: `lambdas/site_api_lambda.py` (Lambda `life-platform-site-api`, **us-west-2**); page consumes `/api/sleep_detail`, `/api/circadian`, `/api/sleep_reconciliation`. The correlation board is powered by existing platform tools (`get_cross_source_correlation` with day-lag, `get_sleep_environment_analysis`, `get_autonomic_balance`, `get_decision_fatigue_signal`, `get_journal_sentiment_trajectory`, `get_jet_lag_recovery`) — surface via the site API; do not call MCP tools from the front-end. Reuse the inline-SVG chart kit (no new deps).

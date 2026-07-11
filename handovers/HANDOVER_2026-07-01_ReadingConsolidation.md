@@ -254,7 +254,7 @@ Merging the audit's CI-integrity work triggered fresh pipeline runs that exposed
 Phase A of the reading/Mind pillar — **the data layer only** (no UI, no MCP tools; those are Phases
 B–E). **Built + fully tested; deploy scripts staged for you to run** (per the canon norm, Claude does
 not execute deploys). Canon read in full first: `docs/briefs/BRIEF_2026-06-29_reading_mind.md`,
-`docs/coaching/READING_CALIBRATION.md`, `docs/SPEC_READING_MIND_2026-06-29.md`,
+`docs/coaching/READING_CALIBRATION.md`, `docs/specs/SPEC_READING_MIND_2026-06-29.md`,
 `docs/specs/CLAUDE_CODE_PROMPT_READING_MIND_v1.md`.
 
 Branch: `feat/reading-phase-a-data-layer` (off `origin/main` = `50dbc196`, the live tip + your merged

@@ -1,5 +1,7 @@
 # averagejoematt.com — Holistic Site Review Methodology
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-06-20
+
 > Repeatable process for reviewing the *whole* public site as a product and a story —
 > not "did it render" (that's the gating `tests/visual_qa.py`), but "does each page's
 > story land, does the site cohere into one throughline, and does the data corroborate

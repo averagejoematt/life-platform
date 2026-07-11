@@ -1,5 +1,7 @@
 # Managed-Where Ledger
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-09
+
 > Every production resource that lives **outside infrastructure-as-code**, with how
 > each is verified. A wrong answer to "is this managed in code?" caused the 2026-06
 > traffic-logging incident; this ledger makes the right answer scannable.

@@ -1,5 +1,7 @@
 # Site Uplevel Playbook
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-03
+
 > **How to redesign or uplevel the site well** — the method and the hard-won lessons, so the
 > next Claude inherits the playbook, not just the state. Start from
 > [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) + [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md);

@@ -1,5 +1,7 @@
 # Life Platform — Architecture Review Methodology
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+
 > Repeatable process for conducting comprehensive architecture reviews.
 > First review: 2026-03-08 (v2.91.0). Latest: V2 audit (2026-05-17, 76 findings, ~33 shipped, formally closed in ADR-057).
 > Reviews stored in `docs/reviews/`; V2-style audits in `docs/v2-audits/`.

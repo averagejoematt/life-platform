@@ -26,7 +26,7 @@
 ## 1. Cost work
 - **Governor was crying wolf** (projected ~$116, held a phantom tier-2 website-AI pause). #137 fixed the AI side (trailing window); **#144** finishes it — non-AI now also projects from a trailing window via one `_non_ai_daily_series` CE DAILY call (no extra CE cost), so the day-1 monthly-charge lump (Secrets/Route53/KMS, already banked in mtd) stops being extrapolated. Surfaces `non_ai_per_day`.
 - **#142 (G1/G2):** `bedrock_client.invoke()` now meters token usage + `EstimatedCostUSD` per `LambdaFunction` (every AI call, all paths) + a dimensionless aggregate → `ai-daily-spend-high` alarm ($6/day). Removed the duplicate emit from `ai_calls`/`retry_utils`. **Caveat that bit us:** this needs `cloudwatch:PutMetricData` on every AI role → see #147.
-- **`docs/COST_FORECAST_2026-06.md`** — the one-pager (infra vs feature fees; steady-state ~$70/mo; lower/reduce/leave-alone; guardrails). June is a ~$90 outlier (reset + reviews + this work); self-corrects.
+- **`docs/archive/COST_FORECAST_2026-06.md`** — the one-pager (infra vs feature fees; steady-state ~$70/mo; lower/reduce/leave-alone; guardrails). June is a ~$90 outlier (reset + reviews + this work); self-corrects.
 - **Secrets consolidation = NO-GO** (verified): the easy bundling is already done (`ingestion-keys`); the rest is rotating-OAuth (write-back contention) or actively-read (habitify per ADR-014, todoist via MCP, ai-keys ×14 lambdas). Log retention already 30d. Not worth the auth risk while under budget.
 
 ## 2. Hevy title renderer (ADR-088 — supersedes the 2026-05-31 ADR-067 amendment)

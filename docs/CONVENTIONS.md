@@ -1,5 +1,7 @@
 # CONVENTIONS — the load-bearing reflexes
 
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
 a rule here changes, it changes **here** — the project brief (`CLAUDE.md`) and the

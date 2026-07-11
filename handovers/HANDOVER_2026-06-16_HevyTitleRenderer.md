@@ -2,7 +2,7 @@
 
 > Two independent PRs this session, both **code-complete + tested, deploys pending**:
 > **#142** AI cost telemetry/alarm (G1/G2), and the **Hevy `Phase - Type - N - Y`
-> renderer** (ADR-088, this branch). Plus the cost one-pager `docs/COST_FORECAST_2026-06.md`.
+> renderer** (ADR-088, this branch). Plus the cost one-pager `docs/archive/COST_FORECAST_2026-06.md`.
 
 ---
 

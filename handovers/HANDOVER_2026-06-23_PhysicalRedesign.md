@@ -1,6 +1,6 @@
 # Handover — 2026-06-23 (Physical page redesign — weight cockpit + composition arc + PhenoAge)
 
-Fifth Evidence page through the design-review → Claude-Code pipeline (Nutrition → Training → Sleep → Habits → **Physical**). Spec: `docs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_PHYSICAL_PAGE_v1.md`. Reframed `/evidence/physical/` on the spine **"weight is the metronome; composition is the arc."** 21 commits, one per P-item.
+Fifth Evidence page through the design-review → Claude-Code pipeline (Nutrition → Training → Sleep → Habits → **Physical**). Spec: `docs/specs/SPEC_PHYSICAL_PAGE_REDESIGN_2026-06-21.md` + `docs/specs/CLAUDE_CODE_PROMPT_PHYSICAL_PAGE_v1.md`. Reframed `/evidence/physical/` on the spine **"weight is the metronome; composition is the arc."** 21 commits, one per P-item.
 
 **Status: built + locally verified + DEPLOYED + live-verified + MERGED.** PR **#201** (`physical-page-redesign` → `main`, squash-merged `9773214c`, branch deleted). Build fingerprint `89c294fb` == HEAD live; live page renders all 13 sections with real (thin, ~9-day) data, zero console errors. Page renamed "Body composition" → **"Weight & composition"**.
 
