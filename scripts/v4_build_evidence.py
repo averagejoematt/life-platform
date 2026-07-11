@@ -458,7 +458,7 @@ REGISTRY = [
     (
         "inference",
         "The inference receipt",
-        "Every AI call, priced — the meter behind the $75 ceiling, live.",
+        "Every AI call, priced — the meter behind the $85 ceiling, live.",
         "Credibility & the machine",
         "data",
         "/api/inference_receipt",
@@ -605,7 +605,7 @@ EDITORIAL = {
         '<p class="rd-archive">The Kitchen is personalised meal intelligence — built from CGM response, macro tracking, and your real eating patterns. It needs data to work, and fills in automatically once daily nutrition logging and CGM readings accumulate over the first weeks. Until then, see Nutrition and Glucose &amp; meals for what\'s already flowing.</p>'
     ),
     "build": (
-        '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard $75-a-month ceiling.</p>'
+        '<p class="rd-lede">Most of these pages show the data. This one shows the machine that gathers it — built in public, by one person and a model, on a hard $85-a-month ceiling.</p>'
         # Hand-authored inline-SVG architecture diagram (themes via CSS vars; zero runtime cost).
         '<figure class="arch-fig" aria-label="System architecture: ingest, store, serve, with one AI chokepoint">'
         '<svg class="arch-svg" viewBox="0 0 760 250" role="img" preserveAspectRatio="xMidYMid meet">'
