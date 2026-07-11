@@ -41,10 +41,31 @@ from pathlib import Path
 
 SITE = "https://averagejoematt.com"
 SNAPSHOT = Path(__file__).resolve().parent / "proof_snapshot.json"
+CONSTANTS_PY = Path(__file__).resolve().parent.parent / "lambdas" / "constants.py"
 
 
 def _today() -> str:
     return datetime.date.today().isoformat()
+
+
+def _experiment_start() -> str:
+    """The genesis date from lambdas/constants.py (text-parsed, no lambda imports).
+
+    The restart pipeline regenerates constants.py, so a staged FUTURE genesis is
+    visible to the site builders at build time — the #949 mechanism: pre-start,
+    the proof blocks bake the countdown truth, never the wiped prior cycle's read.
+    """
+    try:
+        m = re.search(r"EXPERIMENT_START_DATE\s*=\s*[\"'](\d{4}-\d{2}-\d{2})[\"']", CONSTANTS_PY.read_text(encoding="utf-8"))
+        return m.group(1) if m else ""
+    except Exception:
+        return ""
+
+
+def pre_start_date() -> str:
+    """The staged genesis date iff it's still in the future ('' once Day 1 exists)."""
+    start = _experiment_start()
+    return start if start and _today() < start else ""
 
 
 def _fetch_json(path: str, timeout: int = 8):
@@ -167,7 +188,14 @@ def load_coaching_read() -> dict:
     fabricated read (ADR-104 behavioral-absence). If the live API is unreachable we
     fall back to the last-known-good snapshot so an offline/CI build still bakes real
     coach voices rather than a blank shell.
+
+    #949 pre-start: with a staged future genesis the dashboard's stored read (and the
+    committed snapshot) narrate the WIPED prior cycle — the honest bake is the
+    countdown, so the loader short-circuits to a pre_start marker and never fetches.
     """
+    pre = pre_start_date()
+    if pre:
+        return {"pre_start": True, "start_date": pre, "as_of": _today(), "source": "pre-start"}
     d = _fetch_json("/api/coaching-dashboard")
     if isinstance(d, dict) and (d.get("weekly_priority") or d.get("coaches")):
         wp = d.get("weekly_priority") or {}
@@ -394,6 +422,26 @@ def coaching_read_block_html(read: dict) -> str:
     """
     if not read:
         return ""
+    # #949 pre-start: the honest static proof is the countdown — a dated "the board
+    # convenes with Day 1" line, never the prior cycle's board read (only
+    # /data/cycles/ may acknowledge earlier attempts). Deliberately avoids the
+    # "board's read" header + roster/blockquote markup so the no-JS state is
+    # unambiguous to readers and to the committed-HTML tests alike.
+    if read.get("pre_start"):
+        start = read.get("start_date", "")
+        try:
+            start_disp = datetime.date.fromisoformat(start).strftime("%A, %B %-d")
+        except Exception:
+            start_disp = start
+        return (
+            '<noscript><section class="proof-static dx-prose" aria-label="The coaching — pre-start">'
+            f'<p class="label">The coaching — pre-start · as of {_esc(read.get("as_of", ""))}</p>'
+            f"<p>The experiment begins <strong>{_esc(start_disp)}</strong>, with the first baseline weigh-in. "
+            "The AI coaching board reads only this run's data — its first take lands here once Day 1's numbers exist.</p>"
+            '<p>Meanwhile: <a href="/coaching/team/">who the coaches are</a> · '
+            '<a href="/coaching/scorecard/">how their calls get graded</a>.</p>'
+            "</section></noscript>"
+        )
     wp = read.get("weekly_priority") or {}
     priority = str(wp.get("text") or "").strip()
     coaches = read.get("coaches") or []

@@ -829,6 +829,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   <main id="ev" class="ev-app">
     <div class="page-hero">
       <p class="ph-kicker label">{pillar["kicker"]}</p>
+      <p class="hero-day label" data-bind="genesisStamp" hidden></p>
       <h1 class="ph-title">{esc(pillar["h1"])}</h1>
       <p class="ph-promise">{esc(pillar["lede"])}</p>
       {loop_ribbon(pillar["door"])}

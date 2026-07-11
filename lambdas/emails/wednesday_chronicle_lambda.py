@@ -1555,6 +1555,27 @@ def journal_post_ref(date_str, all_installments, week_num):
     return seq, label, url
 
 
+# #949 — the reader-facing dek for PRE-GENESIS lead-ins, reframed. The stored
+# stats_line was authored mid-experiment ("… | Week 1 of The Measured Life"),
+# which contradicts the prologue framing (only /data/cycles/ acknowledges prior
+# attempts). Render parity with deploy/restart_leadin_pages.display_stats_line —
+# both rebuild the SAME manifest, so a Wednesday publish must not resurrect the
+# raw mid-experiment dek the reset's leadin pass reframed. DDB is never modified.
+_WEEK_SEG_RE = re.compile(r"(?i)^week\s+\d+\b")
+_PROLOGUE_HINT_RE = re.compile(r"(?i)prologue|before day 1")
+
+
+def display_stats_line(stats_line, date_str):
+    line = str(stats_line or "")
+    if not date_str or date_str >= EXPERIMENT_START_DATE:
+        return line
+    parts = [p.strip() for p in line.split("|") if p.strip()]
+    kept = [p for p in parts if not _WEEK_SEG_RE.match(p)]
+    if not any(_PROLOGUE_HINT_RE.search(p) for p in kept):
+        kept.append("Prologue — the instrumented weeks before Day 1")
+    return " | ".join(kept)
+
+
 def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_installments, write_to_s3=True):
     """Publish installment to the Signal-themed journal on averagejoematt.com.
 
@@ -1823,7 +1844,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
                 "label": _series_label(idate),
                 "title": inst.get("title", ""),
                 "date": idate,
-                "stats_line": inst.get("stats_line", ""),
+                "stats_line": display_stats_line(inst.get("stats_line", ""), idate),  # #949 — prologue-framed dek pre-genesis
                 "url": _u,
                 "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
                 "word_count": inst.get("word_count", 0),

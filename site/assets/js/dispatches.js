@@ -177,9 +177,18 @@ async function renderRead(s, id) {
         `</div>`
       : "";
     // The Panel ledger — the running scoreboard of coach bets + outcomes (proof-of-honesty).
-    const lg = await tryJSON("/api/panel_ledger");
+    // #949 pre-start: the stored ledger is the WIPED prior cycle's (tombstoned at
+    // reset); until Day 1 the page is a pure introduction — an honest "no bets yet"
+    // instead of last cycle's scoreboard. Presentation rule: only /data/cycles/
+    // acknowledges prior attempts.
+    const preBets = preStart();
+    const lg = preBets ? null : await tryJSON("/api/panel_ledger");
     let ledgerHTML = "";
-    if (lg && (lg.ledger || []).length) {
+    if (preBets) {
+      ledgerHTML =
+        `<section class="panel-ledger"><p class="dx-kicker label">the bets</p>` +
+        `<p class="dx-prose">No bets on the board yet — the first one is placed once the experiment is running, and every bet lands here graded, won or lost.</p></section>`;
+    } else if (lg && (lg.ledger || []).length) {
       // One bet per week by design — a historical re-publish once appended a
       // paraphrased duplicate (the wk1 double). Keep the NEWEST entry per week;
       // the stored ledger is fixed too, this is the render-side belt-and-braces.
@@ -446,10 +455,14 @@ function dispatchFoot(s, ent, all) {
   // same URL RSS + the sitemap point at — one content identity, one shareable URL.
   // Falls back to the in-app deep link when a post has no permalink page yet.
   const permalink = ent.url ? (location.origin + ent.url) : (location.origin + `/story/${s.key}/#${ent.id}`);
+  // #949: a Prologue post's sequential slug (…/week-03/) contradicts its own label
+  // ("Prologue · Part III") — the URL still works and shares fine, but the raw
+  // slug text stays out of the reader's face for pre-genesis installments.
+  const showSlug = !/^Prologue/i.test(String(ent.label || ""));
   const share = `
     <p class="dx-share">
       <button type="button" class="dx-share-btn" data-url="${esc(permalink)}" data-title="${esc(ent.title || "")}">Share this dispatch</button>
-      <span class="dx-share-link label" aria-hidden="true">${esc(permalink.replace(/^https?:\/\//, ""))}</span>
+      ${showSlug ? `<span class="dx-share-link label" aria-hidden="true">${esc(permalink.replace(/^https?:\/\//, ""))}</span>` : ""}
     </p>`;
   return share + `
     <aside class="dx-subscribe" aria-label="Follow the experiment">
