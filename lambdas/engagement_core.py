@@ -32,30 +32,67 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-# ── Channels ────────────────────────────────────────────────────────────────
-# Manual channels that STOP when Matthew disengages. Label = the reader-facing
-# noun. macrofactor (food) is the PRIMARY anchor: it's the daily-expected manual
-# channel and the first, most reliable thing to stop when routine breaks. Source
-# keys per the DDB PK (gotchas: journal lives under `notion`, workouts split
-# hevy + macrofactor_workouts — hevy is the interactive one).
-PRIMARY_CHANNEL = "macrofactor"
-MANUAL_CHANNELS = {
-    "macrofactor": "food",
-    "hevy": "training",
-    "habitify": "habits",
-    "notion": "journal",
+# ── Channels — DERIVED from source_registry (#914, the #498 drift cure) ─────
+# Manual channels that STOP when Matthew disengages. The channel set, labels,
+# staleness tolerances, and per-source presence predicates are the
+# `engagement_channel` facet in lambdas/source_registry.py — this module only
+# projects them (gotchas the registry documents: journal lives under `notion`;
+# hevy is the interactive workout channel; habitify writes a record every day so
+# it needs a completion predicate). source_registry is pure data — importing it
+# keeps this core boto3/clock/I-O free.
+# NB: the loud rung has no constant to import — dark itself begins at
+# ENGAGEMENT_SEVERITY_LOUD_DARK_DAYS (=5, see _classify's `primary_gap >= 5`),
+# so dark→loud is definitional; only the alarm escalations need thresholds here.
+from source_registry import (
+    ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS,
+    ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS,
+    ENGAGEMENT_SEVERITY_ALARM_QUIET_CHANNELS,
+    engagement_channels,
+    engagement_primary_channel,
+)
+
+_CHANNELS = engagement_channels()
+PRIMARY_CHANNEL = engagement_primary_channel()
+MANUAL_CHANNELS = {k: v["label"] for k, v in _CHANNELS.items()}
+CHANNEL_STALE_DAYS = {k: v["stale_days"] for k, v in _CHANNELS.items()}
+
+# ── Presence predicates (#914) ──────────────────────────────────────────────
+# Does a DDB record for this source count as Matthew actually LOGGING that day?
+# Default: any record. habitify's hourly pull writes a record EVERY day even at
+# total_completed=0, so a 14-day zero-completion stall read as gap_days=0 — its
+# predicate counts a day only when at least one habit was completed. Predicates
+# are pure item→bool; the registry facet names them, this dict resolves them.
+PRESENCE_PREDICATES = {
+    "habitify_completed": lambda item: _as_float((item or {}).get("total_completed")) > 0,
 }
 
-# Per-channel staleness tolerance in days (lag-adjusted). Daily-expected channels
-# (food, habits) go stale fast; sparse ones (training has legit rest days,
-# journaling is inherently intermittent) are lenient so a rest day never reads as
-# falling off.
-CHANNEL_STALE_DAYS = {
-    "macrofactor": 2,
-    "habitify": 2,
-    "hevy": 4,
-    "notion": 4,
+# Extra DDB attributes a predicate needs (the caller's query projects sk only by
+# default — it must widen the projection for these sources).
+PRESENCE_PREDICATE_FIELDS = {
+    "habitify_completed": ("total_completed",),
 }
+
+
+def _as_float(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def channel_presence_fields(source):
+    """Extra DDB attributes the source's presence predicate reads ((),) if none."""
+    name = (_CHANNELS.get(source) or {}).get("presence_predicate")
+    return PRESENCE_PREDICATE_FIELDS.get(name, ())
+
+
+def channel_counts_as_logged(source, item):
+    """True if this DDB record counts as Matthew logging that day (per the
+    source's registry-named predicate; sources without one count any record)."""
+    name = (_CHANNELS.get(source) or {}).get("presence_predicate")
+    pred = PRESENCE_PREDICATES.get(name)
+    return True if pred is None else bool(pred(item))
+
 
 # Passive wearables — kept flowing by the device, not by Matthew. Their presence
 # is what makes "went quiet but the wearables kept talking" true.
@@ -70,6 +107,18 @@ PRESENT = "present"
 LIGHT = "light"
 QUIET = "quiet"
 DARK = "dark"
+
+# Severity ladder (#914) — how loudly the narrative surfaces must treat the gap.
+# Thresholds live in source_registry next to the engagement_channel facet
+# definitions (imported above). A planned pause always de-escalates to none.
+SEVERITY_NONE = "none"
+SEVERITY_SOFT = "soft"
+SEVERITY_LOUD = "loud"
+SEVERITY_ALARM = "alarm"
+
+# Severities at which the acknowledgment gate arms (generated narratives MUST
+# reference the gap or be regenerated/held — the ADR-108 pattern).
+ACK_SEVERITIES = (SEVERITY_LOUD, SEVERITY_ALARM)
 
 
 # ── date helpers ────────────────────────────────────────────────────────────
@@ -165,6 +214,7 @@ def compute_presence(
     gap_days_unexcused, planned_reason = _unexcused_gap(last_manual_log, today, sick_days, travel_days)
 
     presence_class = _classify(primary_gap, quiet_channels, gap_days_unexcused, planned=bool(planned_reason))
+    severity = _severity(presence_class, primary_gap, channels, planned=bool(planned_reason))
 
     # Return detection: a fresh primary log immediately after a real lull.
     returned, resumed_after = _detect_return(primary.get("_dates"), today)
@@ -174,6 +224,7 @@ def compute_presence(
     signal = {
         "date": today,
         "presence_class": presence_class,
+        "severity": severity,  # #914 ladder: none | soft | loud | alarm
         "gap_days": primary_gap,  # canonical lag-adjusted days since a food log
         "last_manual_log_date": last_manual_log,
         "last_food_log_date": primary.get("last_log_date"),
@@ -185,7 +236,15 @@ def compute_presence(
         "returned": returned,
         "resumed_after_days": resumed_after,
         "channel_detail": {
-            src: {"label": c["label"], "last_log_date": c["last_log_date"], "gap_days": c["gap_days"]} for src, c in channels.items()
+            src: {
+                "label": c["label"],
+                "last_log_date": c["last_log_date"],
+                "gap_days": c["gap_days"],
+                # #914: how long this specific channel has been dropped (same
+                # lag-adjusted semantic as gap_days; None = nothing in window).
+                "dropout_streak_days": c["gap_days"],
+            }
+            for src, c in channels.items()
         },
     }
 
@@ -259,6 +318,56 @@ def _classify(primary_gap, quiet_channels, gap_days_unexcused, *, planned):
     return QUIET if len(quiet_channels) >= 3 else LIGHT
 
 
+def _severity(presence_class, primary_gap, channels, *, planned):
+    """The #914 severity ladder — none | soft | loud | alarm. Registry-owned
+    thresholds (they live next to the engagement_channel facet definitions):
+
+      quiet                      → soft
+      dark (gap ≥ 5)             → loud
+      dark ≥ 10d                 → alarm
+      ≥ 3 channels quiet ≥ 7d    → alarm (even when food alone looks fresher —
+                                   a multi-channel dropout is a stall, not noise)
+
+    A planned pause (sick/travel) de-escalates to none — the classifier already
+    holds the class at 'light' for those, and a deliberate break must never trip
+    the acknowledgment gate. A channel with nothing in the window (gap None) has
+    certainly been quiet ≥ the alarm threshold."""
+    if planned:
+        return SEVERITY_NONE
+    quiet_long = sum(1 for c in channels.values() if c["gap_days"] is None or c["gap_days"] >= ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS)
+    if presence_class in (QUIET, DARK) and quiet_long >= ENGAGEMENT_SEVERITY_ALARM_QUIET_CHANNELS:
+        return SEVERITY_ALARM
+    if presence_class == DARK:
+        if primary_gap is None or primary_gap >= ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS:
+            return SEVERITY_ALARM
+        return SEVERITY_LOUD
+    if presence_class == QUIET:
+        return SEVERITY_SOFT
+    return SEVERITY_NONE
+
+
+def severity_of(signal):
+    """The signal's severity, deriving it for records written before the #914
+    ladder existed (presence_class/gap_days only). Honest defaults, never raises."""
+    signal = signal or {}
+    sev = signal.get("severity")
+    if sev in (SEVERITY_NONE, SEVERITY_SOFT, SEVERITY_LOUD, SEVERITY_ALARM):
+        return sev
+    cls = signal.get("presence_class")
+    if signal.get("planned_pause"):
+        return SEVERITY_NONE
+    gap = signal.get("gap_days")
+    try:
+        gap = int(gap) if gap is not None else None
+    except (TypeError, ValueError):
+        gap = None
+    if cls == DARK:
+        return SEVERITY_ALARM if (gap is None or gap >= ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS) else SEVERITY_LOUD
+    if cls == QUIET:
+        return SEVERITY_SOFT
+    return SEVERITY_NONE
+
+
 def _detect_return(primary_dates, today):
     """(returned, resumed_after_days). True when the primary channel logged
     fresh (today/yesterday) DIRECTLY after a real lull. resumed_after_days = the
@@ -314,3 +423,224 @@ def _weight_delta_over_gap(weight_series, primary_dates, resumed_after):
         return None
     current = parsed[-1][1]
     return round(current - baseline, 1)
+
+
+# ── #914: the ONE shared presence prompt block ───────────────────────────────
+# Extracted verbatim from ai_expert_analyzer_lambda._presence_block so every
+# narrative surface (expert coaches, integrator, chronicle, podcasts, daily
+# brief, State of Matthew) injects the SAME steering text. Pure function — the
+# caller passes the engagement_state STATE#current read.
+
+
+def _num_or_none(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def presence_prompt_block(sig):
+    """A steering block for when Matthew's OWN logging has gone quiet (or he just
+    returned). Empty string when he's present. This is what stops a narrative
+    surface from claiming perfect adherence / an unbroken streak / 'zero missed
+    targets' over a window that actually contains a logging gap — the exact
+    incoherence the presence feature exists to kill. The REASON for the gap is
+    never included (the coach names the silence and invites the story).
+
+    Pure, no I/O: `sig` is the engagement_state STATE#current record the caller
+    read (fail-soft {} → ""). At severity=alarm the block ends with the mandate
+    that the gap be addressed in the opening paragraph."""
+    sig = sig or {}
+    if not sig:
+        return ""
+    cls = sig.get("presence_class")
+    returned = bool(sig.get("returned"))
+    severity = severity_of(sig)
+    if cls not in (LIGHT, QUIET, DARK) and not returned and severity not in ACK_SEVERITIES:
+        return ""  # present → nothing to say
+
+    lines = []
+    if returned:
+        rn = _num_or_none(sig.get("resumed_after_days"))
+        lines.append(f"Matthew has JUST RETURNED to logging after ~{rn if rn is not None else 'a few'} days quiet.")
+        wd = sig.get("weight_delta_over_gap")
+        if wd is not None:
+            try:
+                lines.append(f"Weight change over the gap: {float(wd):+g} lb (data, not a verdict).")
+            except (TypeError, ValueError):
+                pass
+        lines.append("Acknowledge the return SUPPORTIVELY — never punitive; the goal is to help him restart.")
+    else:
+        gap = _num_or_none(sig.get("gap_days"))
+        last = sig.get("last_food_log_date")
+        gap_txt = f"~{gap} days" if gap is not None else "several days"
+        lines.append(
+            f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log"
+            + (f" (last logged {last})" if last else "")
+            + "."
+        )
+        quiet = sig.get("channels_quiet") or []
+        if quiet:
+            lines.append(f"Channels gone silent: {', '.join(str(q) for q in quiet)}.")
+        if sig.get("passive_still_flowing"):
+            lines.append(
+                "His WEARABLES are still reporting — the passive data (sleep/recovery/RHR) keeps flowing even though he stopped logging, so you can see the consequences but not the cause."
+            )
+        if sig.get("planned_pause"):
+            lines.append(
+                f"This looks like a PLANNED pause ({sig.get('planned_pause_reason') or 'sick/travel'}) — frame it as a break, not falling off."
+            )
+
+    guard = (
+        "CRITICAL: because of this gap, DO NOT claim perfect adherence, an unbroken streak, "
+        "'zero missed targets', or summarize the period as flawless — any window that includes "
+        "these days is INCOMPLETE, and celebrating it would be dishonest. Acknowledge the silence "
+        "honestly in your own voice, ground the day-count in the number above, do NOT invent WHY he "
+        "went quiet (you cannot see it — name the gap and invite the story), and cite only the "
+        "authoritative wearable values you were given for any consequences. "
+    )
+    if severity == SEVERITY_ALARM and not returned:
+        guard += (
+            "SEVERITY: ALARM. This is the single most important fact about this period. "
+            "Address it in the opening paragraph. Do not narrate a normal week."
+        )
+    else:
+        guard += (
+            "PLACEMENT: the gap must NOT be your OPENING line unless the quiet channel is your "
+            "own domain's primary signal — one coach opening on it is honest; all eight opening on it "
+            "reads as one templated voice. Open with your own domain's read, then name the gap where "
+            "it genuinely bears on your analysis."
+        )
+    return "PRESENCE / QUIET STRETCH (Matthew's own logging):\n" + "\n".join(f"- {ln}" for ln in lines) + "\n" + guard
+
+
+# ── #914: the acknowledgment gate (ADR-108 pattern) ──────────────────────────
+# When the gap is loud/alarm, a generated narrative that reads like a normal
+# week is dishonest — the deterministic check below verifies the output actually
+# references the gap (anchor phrases / the injected day-count; no LLM judge),
+# and the enforcement helper regenerates once then HOLDS, exactly like
+# ai_calls._enforce_quality_gate. Pure functions — the caller supplies the
+# regeneration callable and the STATE#current read.
+
+# Small, deterministic anchor-phrase set: any one of these counts as the output
+# acknowledging the gap. Deliberately generic-but-specific — phrases a narrative
+# would only use when talking about the logging silence itself.
+_ACK_PHRASES = (
+    "quiet",
+    "silence",
+    "silent",
+    "gap",
+    "went dark",
+    "gone dark",
+    "stopped logging",
+    "hasn't logged",
+    "has not logged",
+    "no logs",
+    "not logging",
+    "without a log",
+    "logging break",
+    "logging lapse",
+    "logging stall",
+    "stall",
+    "off the log",
+    "absence",
+    "dropped off",
+    "fallen off",
+    "fell off",
+)
+
+
+def presence_ack_required(sig):
+    """True when generated narratives MUST acknowledge the gap (loud/alarm and
+    not a planned pause / a fresh return)."""
+    sig = sig or {}
+    if bool(sig.get("returned")) or bool(sig.get("planned_pause")):
+        return False
+    return severity_of(sig) in ACK_SEVERITIES
+
+
+def presence_ack_anchors(sig):
+    """The anchor strings whose presence in an output counts as acknowledging
+    the gap: the injected gap-day count (both '~N days' and bare 'N-day' forms),
+    the last-log date, plus the small fixed phrase set."""
+    anchors = []
+    gap = _num_or_none((sig or {}).get("gap_days"))
+    if gap is not None:
+        anchors.extend([f"{gap} days", f"{gap}-day", f"{gap} day"])
+    last = (sig or {}).get("last_food_log_date")
+    if last:
+        anchors.append(str(last))
+    anchors.extend(_ACK_PHRASES)
+    return anchors
+
+
+def presence_ack_finding(text, sig):
+    """Deterministic post-generation check. None when the output acknowledges the
+    gap (or no acknowledgment is required); else a finding dict in the
+    grounded_generation shape ({type, detail, ...})."""
+    if not presence_ack_required(sig):
+        return None
+    low = (text or "").lower()
+    for anchor in presence_ack_anchors(sig):
+        if anchor.lower() in low:
+            return None
+    gap = _num_or_none((sig or {}).get("gap_days"))
+    return {
+        "type": "presence_unacknowledged",
+        "severity": severity_of(sig),
+        "gap_days": gap,
+        "detail": (
+            f"the narrative never references Matthew's logging gap "
+            f"({'~' + str(gap) + ' days' if gap is not None else 'several days'} quiet, severity={severity_of(sig)}) "
+            "— it reads as a normal week over an incomplete window"
+        ),
+    }
+
+
+def presence_ack_correction(sig):
+    """The corrective-rewrite note for a draft that failed the acknowledgment
+    check (mirrors grounded_generation.correction_prompt's directness)."""
+    gap = _num_or_none((sig or {}).get("gap_days"))
+    gap_txt = f"~{gap} days" if gap is not None else "several days"
+    note = (
+        "ACKNOWLEDGMENT REQUIRED — your draft narrates this period as a normal week, but Matthew's own "
+        f"logging has been quiet for {gap_txt}. Rewrite so the narrative honestly references this gap "
+        f"(use the real day-count: {gap_txt}). Do NOT invent why he went quiet — name the silence and "
+        "invite the story. Keep your voice and length; do not mention that a correction was made."
+    )
+    if severity_of(sig) == SEVERITY_ALARM:
+        note += " SEVERITY: ALARM — this is the single most important fact about this period; " "address it in the opening paragraph."
+    return note
+
+
+def enforce_presence_acknowledgment(text, sig, regenerate_fn, max_regenerations=1):
+    """Regenerate-or-hold, exactly the ADR-108 gate shape (see
+    ai_calls._enforce_quality_gate): a draft that never acknowledges a loud/alarm
+    gap is retried through `regenerate_fn(correction_note)` up to
+    `max_regenerations` times; if no attempt acknowledges it, returns
+    (None, finding) — the caller's "None = hold, don't publish" contract.
+
+    Fail-open on regeneration INFRA errors is deliberately NOT the behavior for
+    the verdict itself: a responding pipeline that keeps producing an
+    unacknowledging draft is held. A regenerate_fn exception keeps the prior
+    draft's verdict (held), never publishes the failing text.
+
+    Returns (text_or_None, finding_or_None). finding is the ORIGINAL draft's
+    finding when the gate fired (even if a regeneration then passed)."""
+    finding = presence_ack_finding(text, sig)
+    if finding is None:
+        return text, None
+    attempts = 0
+    current = text
+    while attempts < max_regenerations:
+        attempts += 1
+        try:
+            regenerated = regenerate_fn(presence_ack_correction(sig))
+        except Exception:
+            break
+        if not (regenerated or "").strip():
+            break
+        current = regenerated
+        if presence_ack_finding(current, sig) is None:
+            return current, finding
+    return None, finding

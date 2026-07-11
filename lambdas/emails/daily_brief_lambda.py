@@ -1726,6 +1726,19 @@ def lambda_handler(event, context):
     # Phase 2: Inject additional data sources for richer AI prompts
     data["character_sheet"] = character_sheet or {}
     data["adaptive_mode"] = {"brief_mode": brief_mode, "engagement_score": engagement_score}
+    # #914: the shared presence / quiet-stretch block (engagement_core, written by
+    # adaptive_mode → STATE#current). Rendered once here; daily_brief_shared_system
+    # injects it into all 4 brief AI calls. Empty when Matthew is present. Fail-soft.
+    data["presence_block"] = ""
+    try:
+        from engagement_core import presence_prompt_block
+
+        _pres_sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        data["presence_block"] = presence_prompt_block(_pres_sig)
+        if data["presence_block"]:
+            logger.info("Presence block injected (class=" + str(_pres_sig.get("presence_class")) + ")")
+    except Exception as _pres_e:
+        logger.warning("presence block skipped (non-fatal): " + str(_pres_e))
     data["weather"] = data.get("weather_yesterday") or {}
     data["supplements_recent"] = data.get("supplements_7d") or []
     # State of Mind — SoM daily aggregates (som_avg_valence, som_top_associations)

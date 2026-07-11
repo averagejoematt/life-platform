@@ -124,7 +124,28 @@ def authoritative_facts_block(facts: dict) -> str:
         # #535: the rate carries its interval — narrative must not present it as exact.
         if facts.get("weekly_rate_ci_low") is not None and facts.get("weekly_rate_ci_high") is not None:
             _rate_line += f" [80% CI {facts['weekly_rate_ci_low']:g} to {facts['weekly_rate_ci_high']:g}]"
+        # #914-B: a provisional rate (short weigh-in span) must be framed as provisional.
+        if facts.get("rate_provisional"):
+            _rate_line += " — PROVISIONAL (short weigh-in span; frame as an early estimate, never a settled rate)"
         lines.append(_rate_line)
+    # #914-B: scale recency — the live incident was "maintained a 7.3 lb/week
+    # trajectory" cited 14 days after the last weigh-in. When the caller supplies
+    # weigh-in recency, render it; past ~a week of scale darkness the rate is
+    # HISTORY, and present-tense rate claims ("maintaining", "is losing") are
+    # fabrication. Callers without these keys render exactly as before.
+    if facts.get("last_weighin_date"):
+        _dsw = facts.get("days_since_weighin")
+        _w_line = f"  - Last weigh-in: {facts['last_weighin_date']}"
+        if _dsw is not None:
+            _w_line += f" ({int(_dsw)} days ago)"
+        lines.append(_w_line)
+        if _dsw is not None and int(_dsw) >= 7:
+            lines.append(
+                "  - SCALE DARK: there has been NO weigh-in since the date above. Any weight-rate claim must be "
+                "PAST-TENSE and dated (e.g. 'was losing ~X lb/week through "
+                f"{facts['last_weighin_date']}; no weigh-in since') — never 'maintained', 'maintaining', or any "
+                "present-tense trajectory. The current weight is UNKNOWN."
+            )
     if facts.get("projected_goal_date_earliest") and facts.get("projected_goal_date_latest"):
         lines.append(
             f"  - Projected goal-weight date: a RANGE of {facts['projected_goal_date_earliest']} to "

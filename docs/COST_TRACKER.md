@@ -1,6 +1,6 @@
 # Life Platform — Cost Tracker
 
-Last updated: 2026-07-09 (v8.6.0)
+Last updated: 2026-07-11 (v8.6.0)
 
 > Budget ceiling: **$85/month all-in** (base; raised $75→$85 on 2026-07-08 per the ADR-133 amendment, floats to $100 in reader-traffic surge mode; the original $25→$75 raise came with the Bedrock migration + automated guardrails, 2026-05-29). Design constraint: every feature must justify its cost.
 

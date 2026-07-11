@@ -1052,6 +1052,16 @@ def _gather_week(post: dict, state: dict) -> dict:
         if out and out.get("summary"):
             coach_reads.append({"id": cid, "name": persona_registry.display_name(cid, s3, S3_BUCKET) or cid, **out})
     guest = coach_reads[post.get("week", 0) % len(coach_reads)] if coach_reads else None
+    # #914: the ONE shared presence block — if Matthew's own logging has gone
+    # quiet, the panel must not review a normal week over an incomplete window.
+    presence_note = ""
+    try:
+        from engagement_core import presence_prompt_block
+
+        sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        presence_note = presence_prompt_block(sig)
+    except Exception as e:
+        logger.warning("[panel] presence block skipped (non-fatal): %s", e)
     return {
         "week": post.get("week"),
         "date": post.get("date"),
@@ -1059,6 +1069,7 @@ def _gather_week(post: dict, state: dict) -> dict:
         "chronicle": chronicle,
         "coach_reads": coach_reads,
         "guest": guest,
+        "presence_note": presence_note,
         "last_open_bet": state.get("open_bet"),
         "recent_topics": state.get("recent_topics", []),
         "prev_guest": (state.get("last_episode") or {}).get("guest_name") or "",
@@ -1146,8 +1157,10 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         if _chron
         else "NO CHRONICLE THIS WEEK — review the week from the coaches' reads below and the week's data; do not reference or imply a chronicle exists.\n\n"
     )
+    # #914: a real logging stall is the week's context, not a detail to skip.
+    _presence_block = f"{beats['presence_note']}\n\n" if beats.get("presence_note") else ""
     user = (
-        f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n{_chron_block}"
+        f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n{_chron_block}{_presence_block}"
         f"GUEST COACH {guest.get('name')} — recent read: {guest.get('summary', '')}\nThemes: {', '.join(guest.get('themes', []))}\n\n"
         f"OTHER COACHES (for THE SPLIT — find a genuine disagreement):\n{split_material}\n\n"
         f"LAST WEEK'S OPEN BET (score it in RECEIPTS, honestly): {beats.get('last_open_bet') or '(none — this is the first weekly)'}\n\n"
@@ -1691,7 +1704,11 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     for t in turns:
         t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
-    allowed = er03_gate.numbers_in(beats["chronicle"] + " " + " ".join(c["summary"] for c in beats["coach_reads"]))
+    # #914: the presence note is part of the writer's source material, so its real
+    # gap-day count is an allowed number (a spoken "eleven days quiet" must pass).
+    allowed = er03_gate.numbers_in(
+        beats["chronicle"] + " " + " ".join(c["summary"] for c in beats["coach_reads"]) + " " + beats.get("presence_note", "")
+    )
 
     def _valid(ts):
         return [t for t in ts if isinstance(t, dict) and (t.get("line") or "").strip()]

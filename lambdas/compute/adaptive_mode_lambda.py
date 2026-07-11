@@ -299,10 +299,16 @@ def _engagement_reference_today():
         return datetime.now(timezone.utc).date().isoformat()
 
 
-def _log_dates(source, today, window_days=35):
+def _log_dates(source, today, window_days=35, attrs=(), predicate=None):
     """Trailing-window list of days `source` logged (high-water-mark widened).
     Deduped 'YYYY-MM-DD', newest first. BETWEEN spans suffixed SKs (hevy
-    DATE#..#WORKOUT#, notion DATE#..#journal#)."""
+    DATE#..#WORKOUT#, notion DATE#..#journal#).
+
+    #914: `attrs` widens the projection and `predicate(item)` decides whether a
+    record counts as Matthew actually logging that day — habitify's pull writes a
+    record EVERY day even at total_completed=0, so counting bare record-days read
+    a 14-day zero-completion stall as gap_days=0. A day counts if ANY record on
+    that day passes the predicate (a suffixed-SK source may hold several)."""
     from datetime import timedelta as _td
 
     pk = f"USER#{USER_ID}#SOURCE#{source}"
@@ -312,13 +318,15 @@ def _log_dates(source, today, window_days=35):
         resp = table.query(
             KeyConditionExpression="pk = :pk AND sk BETWEEN :lo AND :hi",
             ExpressionAttributeValues={":pk": pk, ":lo": f"DATE#{lo}", ":hi": f"DATE#{today}~"},
-            ProjectionExpression="sk",
+            ProjectionExpression=", ".join(["sk"] + list(attrs)),
         )
     except Exception as e:
         logger.warning("engagement _log_dates(%s) query failed: %s", source, e)
         return []
     out = set()
     for it in resp.get("Items", []):
+        if predicate is not None and not predicate(it):
+            continue
         d = it.get("sk", "").replace("DATE#", "")[:10]
         try:
             datetime.strptime(d, "%Y-%m-%d")
@@ -395,10 +403,26 @@ def store_engagement_state(today, signal):
 def compute_and_store_engagement():
     """Compute + persist the presence / quiet-stretch state. Fail-soft — never
     aborts the adaptive_mode run."""
-    from engagement_core import MANUAL_CHANNELS, WEARABLES, compute_presence
+    from engagement_core import (
+        MANUAL_CHANNELS,
+        WEARABLES,
+        channel_counts_as_logged,
+        channel_presence_fields,
+        compute_presence,
+    )
 
     today = _engagement_reference_today()
-    channel_dates = {src: _log_dates(src, today) for src in MANUAL_CHANNELS}
+    # #914: per-source "counts as logged" predicate from the registry facet —
+    # habitify days only count when at least one habit was completed.
+    channel_dates = {
+        src: _log_dates(
+            src,
+            today,
+            attrs=channel_presence_fields(src),
+            predicate=lambda item, _s=src: channel_counts_as_logged(_s, item),
+        )
+        for src in MANUAL_CHANNELS
+    }
     wearable_latest = {src: _latest_date(src, today) for src in WEARABLES}
     weight_series = _weight_series(today)
 

@@ -184,9 +184,12 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
     )
     _chron = beats.get("chronicle", "")
     _mem = memory_block(memory)
+    # #914: a real logging stall is the week's context, not a detail to skip.
+    _presence = f"{beats['presence_note']}\n\n" if beats.get("presence_note") else ""
     elena_user = (
         f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n"
         + (f"CHRONICLE (background only, never quote it):\n{_chron[:3000]}\n\n" if _chron else "NO CHRONICLE THIS WEEK.\n\n")
+        + _presence
         + f"GUEST: {guest.get('name')} — their recent read: {guest.get('summary', '')}\n\n"
         + f"THE SPLIT MATERIAL (real, on the record):\n{split_material}\n\n"
         + (f"{_mem}\n\n" if _mem else "")
