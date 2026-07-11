@@ -222,6 +222,8 @@ def build_catalog() -> str:
     lines = [
         "# Life Platform — MCP Tool Catalog",
         "",
+        f"> **Status:** generated · **Owner:** Matthew · **Verified:** {date}",
+        "",
         f"**Version:** {version} | **Last updated:** {date} | **Total tools:** {count}",
         "",
         "> **GENERATED FILE — do not hand-edit the tables.** Regenerate via",

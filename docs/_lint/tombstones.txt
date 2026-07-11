@@ -1,0 +1,24 @@
+# docs/_lint/tombstones.txt — retired concepts that must not appear as LIVE claims.
+#
+# Format: one rule per line →  REGEX \t REPLACEMENT-HINT
+# Scanned by scripts/check_doc_tombstones.py over the LIVE docs surface (canonical
+# docs + README + CLAUDE.md). History files (CHANGELOG, DECISIONS, INCIDENT_LOG,
+# BACKLOG) and archive dirs are exempt — history may mention history.
+#
+# Add a line here WHENEVER something load-bearing is retired (a script, a service,
+# a pattern). This is the generalized catcher for the class of drift where a
+# retirement propagates to 2 of 10 docs (the #781 layer lesson, found 2026-07-10).
+
+build_layer\.sh	retired by #781/ADR-131 — one bundle via deploy/build_bundle.py; see CONVENTIONS §1
+SHARED_LAYER_VERSION	retired by #781/ADR-131 — there is no layer version; see CONVENTIONS §1
+shared layer module	retired phrasing — say "shared module (bundled, #781)"
+in the shared layer	retired phrasing — shared code is bundled per function (#781)
+deployed as (a )?Lambda Layer	the shared layer is retired (#781); dependency layers (garth/Pillow) are the only layers
+\(WAF\)	WAF was removed 2026-06 — rate limiting is in-Lambda (DynamoDB counters)
+WAF block	WAF was removed 2026-06
+WAF rule	WAF was removed 2026-06
+\b1[34]\d MCP tools	hardcoded stale tool count — use the sync_doc_metadata discoverer
+\$75/month enforced	the ceiling is $85 base / $100 surge since ADR-133 (2026-07-08)
+grep -c '"name":' mcp/registry\.py	banned counting method — over-counts nested schema fields; use the AST discoverer
+hevy-webhook FunctionURL is (live|active|standing)	removed 2026-07-06 (#756)
+test_layer_version_consistency	test retired with the layer (#781) — the invariant is test_i2_shared_layer_retired

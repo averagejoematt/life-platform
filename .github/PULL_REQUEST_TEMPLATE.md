@@ -28,6 +28,14 @@ If neither applies (e.g., docs-only, infra-only, new feature with no backfill co
 Linked TD items (if applicable):
 - [ ] None
 
+## Docs impact (wiki contract — CONVENTIONS §8)
+
+<!-- One of the two MUST be checked. If this PR retires something load-bearing
+     (a script, a service, a pattern), also add a rule to docs/_lint/tombstones.txt
+     in the SAME PR — that's what keeps every other page from teaching the dead path. -->
+- [ ] **Docs updated:** <pages touched>
+- [ ] **Docs: none needed** — <one-clause reason>
+
 ## Test plan
 
 <!-- How was this validated? Pytest output, manual smoke, CloudWatch logs, etc. -->

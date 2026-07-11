@@ -1,0 +1,78 @@
+# docs-ci.yml — the wiki's own CI gate (wiki program PR-7, 2026-07-10).
+#
+# WHY A SEPARATE WORKFLOW: ci-cd.yml deliberately triggers only on code paths, so a
+# docs-only push used to reach main with NO pipeline at all — the doc-drift gate only
+# fired when an unrelated code change happened to re-run Lint. This workflow closes
+# that hole: every push that touches the wiki surface runs the full drift machinery.
+# (ci-cd.yml's Lint job runs the same gates for code pushes — a code change can
+# invalidate docs too, e.g. deleting a script a page links to.)
+#
+# Gates (all blocking):
+#   1. sync_doc_metadata --check   — literal counts match AST discovery; a sync rule
+#                                    matching nothing is itself a failure
+#   2. check_doc_links             — every relative link + anchor resolves
+#   3. check_doc_tombstones        — no live doc references a retired concept
+#   4. check_doc_index             — index coverage + status headers (+ freshness report)
+#   5. generate_adr_index --check  — the ADR index reflects every ## ADR- heading
+
+name: Docs CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
+      - '.claude/commands/**'
+      - 'deploy/sync_doc_metadata.py'
+      - 'scripts/check_doc_*.py'
+      - 'scripts/generate_adr_index.py'
+      - 'scripts/generate_mcp_tool_catalog.py'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'CLAUDE.md'
+      - '.claude/commands/**'
+      - 'deploy/sync_doc_metadata.py'
+      - 'scripts/check_doc_*.py'
+      - 'scripts/generate_adr_index.py'
+      - 'scripts/generate_mcp_tool_catalog.py'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  wiki-gates:
+    name: Wiki drift gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Each gate reports independently (#749 pattern) so one red doesn't mask the rest.
+      - name: Literal-drift gate (sync_doc_metadata --check)
+        if: always()
+        run: python3 deploy/sync_doc_metadata.py --check
+
+      - name: Dead-link gate
+        if: always()
+        run: python3 scripts/check_doc_links.py
+
+      - name: Tombstone gate (retired concepts)
+        if: always()
+        run: python3 scripts/check_doc_tombstones.py
+
+      - name: Index coverage + status headers (+ freshness report)
+        if: always()
+        run: python3 scripts/check_doc_index.py
+
+      - name: ADR index current
+        if: always()
+        run: python3 scripts/generate_adr_index.py --check

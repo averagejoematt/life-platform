@@ -1,3 +1,5 @@
+> **Status:** log · **Owner:** Matthew · **Verified:** 2026-07-03
+
 ## Site deploy — content-hash the full JS module graph (the "frozen page" fix) — 2026-07-03
 
 One bug, **deployed live**. Many v5 pages loaded frozen — the static shell (header/title/footer) rendered but the JS-populated content stayed blank; a hard reload fixed it, and it reproduced after a browser restart. **Root cause:** `sync_site_to_s3.sh` content-hashed CSS/JS and served the hashed files immutable/1yr (ADR-039) but rewrote references **only in `*.html`** — the ES-module `import ... from "/assets/js/charts.js"` statements *inside* the modules kept pointing at the unhashed, mutable, 24h-cached URL. A deploy that changed an entry module **and** a dependency together (as #260 did) let a returning browser pair a fresh hashed entry module with a stale cached dependency; the ES module graph throws atomically on a mismatched import, so nothing executed and only the shell rendered. **Fix (ADR-098):** new `deploy/hash_site_assets.py` hashes the **whole module graph in dependency order (leaves first)** and rewrites every reference — HTML `<link>`/`<script>`, intra-module `import`s, and CSS — so every asset URL is content-hashed and immutable and version skew is structurally impossible. `/legacy` stays unhashed. **Verified:** 0 dangling refs, 0 unhashed HTML refs, headless render executes; live — `/data/` + `/coaching/` serve a fully-hashed, self-consistent, immutable module graph (shared `sigils` hash identical across pages), `version.json` == `sw.js` VERSION. Stuck visitors self-heal within ~5 min. See INCIDENT_LOG 2026-07-03 (P3), ADR-098. (PR #332.)
@@ -1724,7 +1726,6 @@ cd cdk && npx cdk deploy LifePlatformIngestion
 ```bash
 # Roll back to pre-SIMP-2 code:
 
-> **Status:** log · **Owner:** Matthew · **Verified:** 2026-07-03
 git revert <this-commit> -- lambdas/todoist_lambda.py
 cd cdk && npx cdk deploy LifePlatformIngestion
 

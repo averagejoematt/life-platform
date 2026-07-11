@@ -1,5 +1,5 @@
 Close out the current session: archive the outgoing handover, replace the CLAUDE.md
-session-status block, update the persistent memory system, distill a build beat if
+session-status block, update the persistent memory system, sweep doc impact, distill a build beat if
 warranted, and commit the wrap (the "#365 wrap convention").
 
 ## Arguments: $ARGUMENTS
@@ -84,13 +84,36 @@ omission is not an outcome.
 - Run `python3 scripts/content_policy_scan.py` locally before committing (CI's
   content-policy gate re-runs it on every push).
 
-### (e) Commit the wrap
+### (e) Doc-impact sweep OR explicit skip — a wrap gate, same shape as (d)
+
+The wiki contract (CONVENTIONS §8): every shipped change either updates the wiki pages
+it invalidates, or the handover records why none were needed. **Silent omission is not
+an outcome.**
+
+- For each item shipped this session, name the canonical docs it touches (deploy paths →
+  QUICKSTART/CONVENTIONS; data model → SCHEMA; algorithms → docs/engines/; new/retired
+  MCP tools → regenerate the catalog; new ADR → `scripts/generate_adr_index.py --apply`;
+  secrets/accounts → SECRETS_MAP/ACCOUNTS; site → SITE_AUTHORING/SITE_MAP_AND_INTENT).
+  Update them, bump each touched page's `Verified:` date.
+- **If something load-bearing was retired** (script/service/pattern): add a rule to
+  `docs/_lint/tombstones.txt` in the same commit — that is what stops every other page
+  from teaching the dead path (the #781 lesson).
+- Run the machinery before the wrap commit — all must be green:
+  ```bash
+  python3 deploy/sync_doc_metadata.py --apply
+  python3 scripts/check_doc_links.py && python3 scripts/check_doc_tombstones.py && \
+  python3 scripts/check_doc_index.py && python3 scripts/generate_adr_index.py --check
+  ```
+- The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
+  `**Docs:** <pages updated>` or `**Docs:** none needed — <one-clause reason>`.
+
+### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
 git and are never part of this commit):
 
 ```bash
-git add handovers/ CLAUDE.md site/story/build/beats.json   # beats.json only if (d) fired
+git add handovers/ CLAUDE.md docs/ site/story/build/beats.json   # beats.json only if (d) fired; docs/ only if (e) touched pages
 git commit -m "$(cat <<'EOF'
 docs(wrap): <short session theme> (<n items/PRs shipped>)
 
@@ -111,3 +134,6 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
   a plan, never an open PR.
 - **Beat or explicit skip, never silence (#736).** Every wrap's handover carries a
   `**Build beat:** <id or "none — reason">` line; step (d) cannot be skipped implicitly.
+- **Docs or explicit skip, never silence (wiki contract).** Every wrap's handover carries
+  a `**Docs:** <pages or "none needed — reason">` line; step (e) cannot be skipped
+  implicitly, and the wiki checkers must be green at the wrap commit.

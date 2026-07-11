@@ -73,13 +73,13 @@ python3 -m pytest tests/ -m integration -v
   - `test_i12_mcp_tool_shape` — tool dispatch returns expected shape
   - `test_i13_freshness_checker_returns_valid_data` — pipeline health
 
-### 4. Layer-version consistency tests (`test_layer_version_consistency.py`)
-- **LV1:** No hardcoded layer ARN with version number in CDK stacks
-- **LV2:** All consumers in `ci/lambda_map.json` referenced in CDK
-- **LV3:** All layer modules in lambda_map exist on disk
-- **LV4:** Consumer-list min count (catches truncation)
-- **LV5:** Hardcoded ARN only in `constants.py`
-- **LV6:** Source-vs-AWS check — `SHARED_LAYER_VERSION` constant matches latest published (V2 P0.2 follow-up; prevents the regression bomb)
+### 4. Shared-code distribution invariant (post-#781)
+The layer-consistency suite (LV1–LV6) was retired with the shared layer (#781/ADR-131 —
+there is no layer version to keep consistent). The surviving invariant:
+- `test_i2_shared_layer_retired` (integration) — zero functions reference the retired
+  layer `life-platform-shared-utils`; the CI plan job asserts the same.
+- `tests/test_deploy_bundle_paths.py` — CDK and `deploy_site_api.sh` stay on the ONE
+  bundle channel (`deploy/build_bundle.py`).
 
 ### 5. MCP orphan tool tests (`test_mcp_orphan_tools.py`)
 - Catches `def tool_*` functions that aren't registered in `mcp/registry.py`
