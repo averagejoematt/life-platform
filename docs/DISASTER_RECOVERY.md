@@ -312,7 +312,7 @@ finding, 2026-07-10). If the repo/org were lost, rebuild:
 | `production` environment | Required reviewer: Matthew — this is CI's deploy approval gate (`ci-cd.yml` `environment: production`) |
 | OIDC identity provider | `token.actions.githubusercontent.com` in IAM (account 205930651321); trust policies on the 4 CI roles (inventory: `AWS_ACCESS.md` §4) |
 | Actions | Enabled; workflows in `.github/workflows/` (all in-repo — nothing console-only) |
-| Repo visibility | PRIVATE (flipped 2026-07 — `docs/coaching/` carries Tier-2 personal data; visibility is a load-bearing privacy control, see DATA_GOVERNANCE) |
+| Repo visibility | Target: PRIVATE (⚠️ still PUBLIC as of 2026-07-10 — flip pending, owner action; `docs/coaching/` carries Tier-2 personal data and visibility is a load-bearing privacy control, see DATA_GOVERNANCE) |
 | Webhooks / branch protection | None beyond the environment gate (verify: `gh api repos/{owner}/{repo}/branches/main/protection`) |
 
 Re-derive current truth: `gh api repos/averagejoematt/life-platform` + `gh api repos/averagejoematt/life-platform/environments`.

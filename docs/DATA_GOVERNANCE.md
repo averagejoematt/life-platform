@@ -225,7 +225,9 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
 
 `deploy/pii_surface_guard.py` scans the **published site surface (`site/`) only**. The
 repo's `docs/coaching/` files carry Tier-2 owner-only data (real biometrics, training
-calibration) — their privacy control is **repo visibility** (private since 2026-07),
-NOT the guard. Wiki-panel finding 2026-07-10: treat repo visibility as a load-bearing
+calibration) — their intended privacy control is **repo visibility**, NOT the guard.
+⚠️ **As of 2026-07-10 the repo is still PUBLIC and this exposure is OPEN** — the owner
+has committed to flipping it private; until that happens, `docs/coaching/` is
+world-readable and this note must not be read as assurance. Wiki-panel finding 2026-07-10: treat repo visibility as a load-bearing
 privacy control; never flip this repo public again without first relocating or
 redacting `docs/coaching/`.
