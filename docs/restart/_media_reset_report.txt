@@ -1,23 +1,33 @@
 media reset report — mode=APPLY — genesis=2026-07-12
-generated=2026-07-11T04:53:15.352998+00:00
+generated=2026-07-11T07:41:08.385303+00:00
 
-archived: generated/panelcast/wk0.draft.transcript.txt
-archived: generated/panelcast/wk0.mp3
-archived: generated/panelcast/wk0.transcript.json
-archived: generated/panelcast/wk0.transcript.txt
-archived: generated/panelcast/wk0.wav
-archived: generated/panelcast/wk1.transcript.txt
-archived: generated/panelcast/wk1.wav
-archived: generated/panelcast/wk2.transcript.txt
-archived: generated/panelcast/wk2.wav
-archived: generated/panelcast/wk4.transcript.txt
-archived: generated/panelcast/wk4.wav
+already-tombstoned: generated/panelcast/wk0.draft.transcript.txt
+already-tombstoned: generated/panelcast/wk0.mp3
+already-tombstoned: generated/panelcast/wk0.transcript.json
+already-tombstoned: generated/panelcast/wk0.transcript.txt
+already-tombstoned: generated/panelcast/wk0.wav
+already-tombstoned: generated/panelcast/wk1.transcript.txt
+already-tombstoned: generated/panelcast/wk1.wav
+already-tombstoned: generated/panelcast/wk2.transcript.txt
+already-tombstoned: generated/panelcast/wk2.wav
+already-tombstoned: generated/panelcast/wk4.transcript.txt
+already-tombstoned: generated/panelcast/wk4.wav
 rewritten: generated/panelcast/episodes.json
 rewritten: generated/panelcast/feed.xml
-archived: generated/podcast/debrief/2026-07-07.mp3
-archived: generated/podcast/debrief/2026-07-08.mp3
-archived: generated/podcast/debrief/2026-07-09.mp3
+already-tombstoned: generated/podcast/debrief/2026-07-07.mp3
+already-tombstoned: generated/podcast/debrief/2026-07-08.mp3
+already-tombstoned: generated/podcast/debrief/2026-07-09.mp3
 rewritten: generated/podcast/debrief/episodes.json
 rewritten: generated/podcast/debrief/feed.xml
 
-archived=14 skipped=0 manual=0
+PREQUEL RESURRECTION:
+  restored: generated/panelcast/archive/pilot/wk0.draft.transcript.txt → generated/panelcast/wk0.draft.transcript.txt
+  restored: generated/panelcast/archive/pilot/wk0.mp3 → generated/panelcast/wk0.mp3
+  restored: generated/panelcast/archive/pilot/wk0.transcript.json → generated/panelcast/wk0.transcript.json
+  restored: generated/panelcast/archive/pilot/wk0.transcript.txt → generated/panelcast/wk0.transcript.txt
+  restored: generated/panelcast/archive/pilot/wk0.wav → generated/panelcast/wk0.wav
+  episode: wk0 "Prologue — Elena previews the experiment" dated 2026-07-10 (346s, 16631610 bytes)
+  wrote: generated/panelcast/episodes.json (1 episode(s))
+  wrote: generated/panelcast/feed.xml (1 episode(s))
+
+archived=0 skipped=14 manual=0

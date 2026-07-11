@@ -5,13 +5,27 @@
     <link>https://averagejoematt.com/story/chronicle/</link>
     <description>The weekly chronicle of an ordinary life, measured in full — every number, every week, including the weeks it dips. Written by Elena Voss.</description>
     <language>en-us</language>
-    <lastBuildDate>Sat, 11 Jul 2026 05:30:44 +0000</lastBuildDate>
+    <lastBuildDate>Sat, 11 Jul 2026 07:51:57 +0000</lastBuildDate>
     <atom:link href="https://averagejoematt.com/rss.xml" rel="self" type="application/rss+xml"/>
     <image>
       <url>https://averagejoematt.com/assets/images/og-image.png</url>
       <title>The Measured Life — averagejoematt</title>
       <link>https://averagejoematt.com/story/chronicle/</link>
     </image>
+    <item>
+      <title>The Body Votes First</title>
+      <link>https://averagejoematt.com/journal/posts/week-03/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-03/</guid>
+      <description>The first thing Matthew Walker shows me when I sit down with him on a Thursday evening is not a chart. It's a number. Twenty — as in 20% recovery, the score his Whoop band assigned to his body on the final morning of his first full week. He holds up his wrist like it's evidence of something, and I s</description>
+      <pubDate>Thu, 09 Jul 2026 12:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>The Empty Journal</title>
+      <link>https://averagejoematt.com/journal/posts/week-02/</link>
+      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-02/</guid>
+      <description>Two weeks into this assignment, here is what I did not expect to find: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single jou</description>
+      <pubDate>Wed, 08 Jul 2026 12:00:00 +0000</pubDate>
+    </item>
     <item>
       <title>The Org Chart of One Human and N Agents</title>
       <link>https://averagejoematt.com/journal/essays/org-chart-of-one/</link>
@@ -20,17 +34,10 @@
       <pubDate>Wed, 08 Jul 2026 12:00:00 +0000</pubDate>
     </item>
     <item>
-      <title>The Body Votes First</title>
-      <link>https://averagejoematt.com/journal/posts/week-02/</link>
-      <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-02/</guid>
-      <description>The first thing Matthew Walker shows me when I sit down with him on a Thursday evening is not a chart. It's a number. Twenty — as in 20% recovery, the score his Whoop band assigned to his body on the final morning of his first full week. He holds up his wrist like it's evidence of something, and I s</description>
-      <pubDate>Tue, 07 Jul 2026 12:00:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>The Empty Journal</title>
+      <title>Before the Numbers</title>
       <link>https://averagejoematt.com/journal/posts/week-01/</link>
       <guid isPermaLink="true">https://averagejoematt.com/journal/posts/week-01/</guid>
-      <description>Two weeks into this assignment, here is what I did not expect to find: a man who has built twenty-seven automated programs to monitor his sleep, his blood glucose, his heart rate recovery, his gait symmetry, and whether he remembered to take his apigenin before bed — who has not written a single jou</description>
+      <description>The first thing you notice about Matthew's apartment is the charging cables. There's one snaking from the nightstand — that's the Whoop strap, a fitness tracker that monitors his heart rate variability while he sleeps. Another on the bathroom counter feeds a Garmin Epix watch that measures his stre</description>
       <pubDate>Mon, 06 Jul 2026 12:00:00 +0000</pubDate>
     </item>
   </channel>

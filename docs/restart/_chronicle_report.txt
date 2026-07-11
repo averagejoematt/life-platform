@@ -1,8 +1,8 @@
 chronicle handler report — mode=APPLY — genesis=2026-07-12
-generated=2026-07-11T04:53:13.882228+00:00
+generated=2026-07-11T07:40:56.003900+00:00
 
 html_files_total       = 29
 html_files_archived    = 0
 html_files_already_archived = 29
 index_pages_rewritten  = 3
-chronicles_resurrected = 2
+chronicles_resurrected = 3

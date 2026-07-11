@@ -1,15 +1,15 @@
 {
   "_note": "Offline fallback for scripts/v4_proof.py (#729/#730/#788/#804). Refresh by re-running the builders online; the live API is preferred at build time. as_of/evaluator_live_since are honest stamps.",
   "scorecard": {
-    "total": 385,
+    "total": 0,
     "confirmed": 0,
     "refuted": 0,
     "decided": 0,
-    "pending": 309,
-    "inconclusive": 76,
+    "pending": 0,
+    "inconclusive": 0,
     "accuracy_pct": 0,
-    "evaluator_live_since": "2026-06-14",
-    "as_of": "2026-07-06",
+    "evaluator_live_since": "",
+    "as_of": "2026-07-11",
     "source": "snapshot"
   },
   "cockpit": {

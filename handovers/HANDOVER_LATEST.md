@@ -105,9 +105,22 @@ reader-readable. CI/CD run on the #941 merge: was in progress at wrap — check
 3. Intro podcast EP0 (week 1, quality-gated): a true introduction — the experiment, the
    coaches, Day-0 baselines, each coach's dated ledger-logged prediction. **NO prior-cycle
    references, no stall story** (fresh-start rule; /data/cycles/ is the only reset-aware page).
-4. #942 coherence pre-start grace; wire `restart_leadin_pages.py` into the pipeline (after
-   chronicle handler); #917 follow-ups (CHECKIN# taxonomy line, recent_checkins_block
-   injection into expert/brief prompts).
+4. #942 coherence pre-start grace; #917 follow-ups (CHECKIN# taxonomy line,
+   recent_checkins_block injection into expert/brief prompts).
+4b. **LATE ADDITION (post-wrap, same night): the pre-launch content calendar (#943, merged
+   + applied live).** Matthew: "prequels on a declared schedule — X days before chronicle 1,
+   Y before podcast prequel — part of updating dates; the platform must not know it's
+   another attempt." PRELAUNCH_CALENDAR in restart_chronicle_handler.py now drives the arc:
+   G−6 "Before the Numbers" (the recovered week-00 Prologue — its DDB record was a 3-word
+   S3 pointer; restart_leadin_repair.py extracted + vetted the real 1242-word article),
+   G−4 "The Empty Journal", G−3 "The Body Votes First", G−2 the wk0 Elena-preview podcast
+   (resurrected from archive — transcript vetted clean). restart_leadin_pages.py is now a
+   pipeline step (chronicle → media → pages). LIVE: 3 Prologue chapters + EP0 preview,
+   verify 40/40. Gotchas: the scorecard noscript bakes evaluator_live_since from
+   scripts/proof_snapshot.json when the live API is empty — refresh that fallback at reset;
+   an agent quoted the scrubbed private details in the PUBLIC PR body (#943 — scrubbed) and
+   committed the unvetted original backup (removed; backups now go to private S3 + /tmp
+   only, never the repo).
 5. Watch first post-genesis cron cycle (Mon morning computes) + the first evening-window
    ingests under the PT framework fix; first coach check-in via MCP to seed qualitative context.
 6. Prior sessions' still-gated items: PRE-13, HN #741, /verify/ profile URLs, HAE straggler.
