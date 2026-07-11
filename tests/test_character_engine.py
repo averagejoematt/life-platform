@@ -31,6 +31,7 @@ from character_engine import (
     _compute_lab_score,
     _compute_xp,
     _in_range_score,
+    _social_quality_to_10,
     _weighted_pillar_score,
     compute_character_sheet,
     compute_ema_level_score,
@@ -138,6 +139,93 @@ def test_compute_relationships_raw_with_data_is_instrumented():
     raw, details = compute_relationships_raw(data, config)
     assert details["_not_instrumented"] is False
     assert raw != 50.0 or details["_confidence"] > 0  # a real (if partial) reading, not the bare placeholder
+
+
+# ── #910: categorical enriched_social_quality → numeric social_score bridge ──
+
+
+def _relationships_config():
+    return {
+        "pillars": {
+            "relationships": {
+                "components": {
+                    "social_interaction_frequency": {"weight": 0.4},
+                    "interaction_quality": {"weight": 0.3},
+                    "buddy_engagement": {"weight": 0.15},
+                    "social_mood_correlation": {"weight": 0.15},
+                }
+            }
+        }
+    }
+
+
+def test_social_quality_scale_map_full_domain():
+    """The four ordered categories spread evenly across the 0–10 scale by rank:
+    alone→0, surface→3.33, meaningful→6.67, deep→10. The consumer's
+    `social_score * 10` then lands them at the intuitive quartiles 0/33/67/100 %."""
+    assert _social_quality_to_10("alone") == 0.0
+    assert round(_social_quality_to_10("surface"), 2) == 3.33
+    assert round(_social_quality_to_10("meaningful"), 2) == 6.67
+    assert _social_quality_to_10("deep") == 10.0
+    # Case / whitespace tolerant (the field is a free-form LLM string).
+    assert _social_quality_to_10(" Deep ") == 10.0
+    # Unknown / null / non-string -> None (falsy contract preserved).
+    assert _social_quality_to_10("null") is None
+    assert _social_quality_to_10("") is None
+    assert _social_quality_to_10(None) is None
+    assert _social_quality_to_10(5) is None
+
+
+def test_social_quality_bridges_interaction_frequency():
+    """A day whose only social signal is the categorical enriched_social_quality
+    now scores social_interaction_frequency — previously dead, since the numeric
+    fields are never written. deep -> 10 -> *10 -> 100."""
+    data = {"journal_entries": [{"enriched_social_quality": "deep"}]}
+    raw, details = compute_relationships_raw(data, _relationships_config())
+    assert details["social_interaction_frequency"]["score"] == 100.0
+    assert details["_not_instrumented"] is False
+
+
+def test_social_quality_averaged_across_entries():
+    """Multiple entries' mapped qualities are averaged (mirrors #902's mood_avg).
+    deep(10) + surface(3.33) -> avg 6.67 -> *10 -> 66.7."""
+    data = {
+        "journal_entries": [
+            {"enriched_social_quality": "deep"},
+            {"enriched_social_quality": "surface"},
+        ]
+    }
+    raw, details = compute_relationships_raw(data, _relationships_config())
+    assert details["social_interaction_frequency"]["score"] == 66.7
+
+
+def test_social_quality_enables_mood_correlation():
+    """social_mood_correlation is gated on `social_score is not None`; #902 fixed
+    `mood`, and the categorical bridge now supplies the remaining social_score.
+    meaningful -> 6.67 (non-None) unlocks the gate; mood_avg 8.0 -> (8/10)*100."""
+    data = {
+        "journal": {"mood_avg": 8.0},
+        "journal_entries": [{"enriched_social_quality": "meaningful"}],
+    }
+    raw, details = compute_relationships_raw(data, _relationships_config())
+    assert details["social_mood_correlation"]["score"] == 80.0
+
+
+def test_numeric_social_score_takes_precedence_over_quality():
+    """The numeric field stays the primary path; the categorical is only a
+    fallback. A numeric 7 wins even when enriched_social_quality is also present."""
+    data = {"journal_entries": [{"social_connection_score": 7.0, "enriched_social_quality": "alone"}]}
+    raw, details = compute_relationships_raw(data, _relationships_config())
+    assert details["social_interaction_frequency"]["score"] == 70.0
+
+
+def test_unknown_social_quality_leaves_both_components_none():
+    """An unrecognized / null category leaves social_score None -> both social
+    components stay None (falsy contract preserved), even with mood present."""
+    data = {"journal": {"mood_avg": 8.0}, "journal_entries": [{"enriched_social_quality": "null"}]}
+    raw, details = compute_relationships_raw(data, _relationships_config())
+    assert details["social_interaction_frequency"]["score"] is None
+    assert details["social_mood_correlation"]["score"] is None
 
 
 def test_compute_character_sheet_propagates_not_instrumented_and_note():

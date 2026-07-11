@@ -642,6 +642,40 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
     return _weighted_pillar_score(scores, components)
 
 
+# Ordered rungs of the categorical `enriched_social_quality` field emitted by
+# journal_enrichment_lambda. Rank spacing maps linearly onto the 0–10 scale.
+_SOCIAL_QUALITY_RANK = {"alone": 0, "surface": 1, "meaningful": 2, "deep": 3}
+
+
+def _social_quality_to_10(raw):
+    """Map the categorical `enriched_social_quality`
+    (`alone|surface|meaningful|deep`) onto the 0–10 scale
+    `compute_relationships_raw` already handles for `social_score`.
+
+    #910: `journal_enrichment_lambda` only ever writes the *categorical*
+    `enriched_social_quality`; the numeric `social_connection_score` /
+    `enriched_social_connection` fields the consumer reads are never produced by
+    any code, so `social_score` was always None and both
+    `social_interaction_frequency` (`social_score * 10`) and
+    `social_mood_correlation` (gated on `social_score is not None`) stayed dead.
+
+    The four ordered rungs are spread evenly across the 0–10 range by rank,
+    `rank / 3 * 10`: alone→0, surface→3.33, meaningful→6.67, deep→10. The
+    consumer's `social_interaction_frequency = social_score * 10` then lands them
+    at the intuitive quartiles 0 / 33 / 67 / 100 %. Unknown / `null` / missing →
+    None, preserving the falsy contract (a day with no recognizable social signal
+    stays uninstrumented). The numeric fields remain the primary path; this is
+    only the read-time fallback, mirroring #902's `enriched_mood`→`mood_avg`
+    bridge. Returns None on unrecognized / non-string input.
+    """
+    if not isinstance(raw, str):
+        return None
+    rank = _SOCIAL_QUALITY_RANK.get(raw.strip().lower())
+    if rank is None:
+        return None
+    return rank / 3 * 10
+
+
 def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[float, dict[str, Any]]:
     """Compute Relationships pillar raw_score (0-100)."""
     pillar_cfg = config.get("pillars", {}).get("relationships", {})
@@ -651,13 +685,24 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
     journal = data.get("journal") or {}
     entries = data.get("journal_entries") or []
 
-    # Social interaction frequency
+    # Social interaction frequency.
+    # Primary path: the numeric social_connection_score / enriched_social_connection
+    # (future-proof — no producer writes them yet, first-found wins as before).
+    # Fallback (#910): derive social_score from the categorical
+    # enriched_social_quality the enrichment lambda actually emits, averaging the
+    # mapped rungs across the day's entries (mirrors #902's mood_avg averaging).
     social_score = None
+    quality_scores = []
     for entry in entries:
         sc = _safe_float(entry, "social_connection_score") or _safe_float(entry, "enriched_social_connection")
         if sc is not None:
             social_score = sc
             break
+        mapped = _social_quality_to_10(entry.get("enriched_social_quality"))
+        if mapped is not None:
+            quality_scores.append(mapped)
+    if social_score is None and quality_scores:
+        social_score = sum(quality_scores) / len(quality_scores)
     if social_score is not None:
         scores["social_interaction_frequency"] = _clamp(round(social_score * 10, 1)) if social_score <= 10 else _clamp(social_score)
     else:

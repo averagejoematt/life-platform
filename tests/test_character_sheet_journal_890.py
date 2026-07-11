@@ -200,3 +200,47 @@ def test_social_mood_correlation_gets_non_null_input(monkeypatch):
 
     raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
     assert details["social_mood_correlation"]["score"] == 75.0
+
+
+# ── #910: categorical enriched_social_quality → social_score bridge (end-to-end)
+
+
+def _journal_rows_with_social_quality():
+    """Templated entries carrying only the categorical enriched_social_quality
+    (the field the enrichment lambda actually emits) — NO numeric
+    social_connection_score anywhere, the real-world condition #910 fixes. Mood
+    is included so the mood-gated social_mood_correlation can also be exercised."""
+    return [
+        {
+            "pk": NOTION_PK,
+            "sk": f"DATE#{DATE}#journal#morning",
+            "enriched_themes": ["family connection"],
+            "enriched_social_quality": "deep",
+            "enriched_mood": 5,
+            "raw_text": "morning entry",
+        },
+        {
+            "pk": NOTION_PK,
+            "sk": f"DATE#{DATE}#journal#evening",
+            "enriched_social_quality": "meaningful",
+            "enriched_mood": 3,
+            "raw_text": "evening entry",
+        },
+    ]
+
+
+def test_social_quality_revives_both_social_components(monkeypatch):
+    """End-to-end #910: with ONLY the categorical enriched_social_quality stored
+    (no numeric field), social_interaction_frequency AND social_mood_correlation
+    are both non-null through the real assemble_data path.
+
+    Quality deep,meaningful -> mapped 10, 6.67 -> avg 8.33 -> *10 -> 83.3.
+    Moods 5,3 -> mapped 10,5 -> mood_avg 7.5 -> (7.5/10)*100 = 75.0."""
+    table = FakeDdbTable(rows=_journal_rows_with_social_quality(), query_hook=_keyed_query_hook)
+    monkeypatch.setattr(csl, "table", table)
+    data = csl.assemble_data(DATE)
+
+    raw, details = character_engine.compute_relationships_raw(data, _relationships_config())
+    assert details["social_interaction_frequency"]["score"] == 83.3
+    assert details["social_mood_correlation"]["score"] == 75.0
+    assert details["_not_instrumented"] is False
