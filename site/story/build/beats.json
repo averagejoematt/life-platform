@@ -665,16 +665,46 @@
       "gotcha": "Two of the fixes were themselves wrong — one doc claimed a protection was already live when it was still pending, and one declared a recovery script nonexistent that had been sitting in a different folder all along. The second-pass audit caught both. Lesson now baked into the process: docs state what IS true at the moment of writing, never what's intended to be true.",
       "honest_miss": "The grade is 7.5, not the 9 that was the target — and the remaining gap isn't documentation at all. It's three things only the human owner can do: locking down a repository that's still more open than it should be, writing down where the master keys live, and turning on the new sign-in system. The manual can't fix bus-factor-one by itself.",
       "prs": [
-        "#923",
-        "#924",
-        "#925",
-        "#926",
-        "#927",
-        "#928",
-        "#929",
-        "#932",
-        "#937",
-        "#938"
+        {
+          "label": "#923",
+          "url": "https://github.com/averagejoematt/life-platform/pull/923"
+        },
+        {
+          "label": "#924",
+          "url": "https://github.com/averagejoematt/life-platform/pull/924"
+        },
+        {
+          "label": "#925",
+          "url": "https://github.com/averagejoematt/life-platform/pull/925"
+        },
+        {
+          "label": "#926",
+          "url": "https://github.com/averagejoematt/life-platform/pull/926"
+        },
+        {
+          "label": "#927",
+          "url": "https://github.com/averagejoematt/life-platform/pull/927"
+        },
+        {
+          "label": "#928",
+          "url": "https://github.com/averagejoematt/life-platform/pull/928"
+        },
+        {
+          "label": "#929",
+          "url": "https://github.com/averagejoematt/life-platform/pull/929"
+        },
+        {
+          "label": "#932",
+          "url": "https://github.com/averagejoematt/life-platform/pull/932"
+        },
+        {
+          "label": "#937",
+          "url": "https://github.com/averagejoematt/life-platform/pull/937"
+        },
+        {
+          "label": "#938",
+          "url": "https://github.com/averagejoematt/life-platform/pull/938"
+        }
       ]
     }
   ]
