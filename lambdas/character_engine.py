@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.3.0"
+ENGINE_VERSION = "1.3.1"  # #954: unboosted up-gate + monotone demotion buffer
 
 # ── ADR-104: coverage floor below which a day carries no leveling signal ──
 DEFAULT_LEVEL_CHANGE_MIN_COVERAGE = 0.5
@@ -226,6 +226,26 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0
     new_debt = min(debt_cap, max(0, -balance))
 
     return earned, xp_delta, new_xp, new_debt
+
+
+def _roll_xp_buffer(prev_buffer, prev_xp, new_xp, xp_per_level):
+    """Roll the level-down XP buffer forward one day. [F-02, #954]
+
+    The old buffer was ``xp_total % xp_per_level`` — a modulo that WRAPS UPWARD
+    as XP declines: losing XP across a 100-boundary (205 → 199) re-armed
+    near-maximum demotion immunity (buffer 5 → 99), so a crashed pillar with
+    lucky lifetime XP fell 30→28 instead of 30→18 over 60 days. The buffer is
+    now explicit state, monotone in the day's XP change: it FILLS by XP gained
+    (capped at one level's worth) and DRAINS by XP lost, floored at 0 — a
+    decline can only ever deplete it. ``prev_buffer=None`` (state stored before
+    this fix, or the first day of a cycle) seeds from the legacy within-level
+    remainder of the PREVIOUS total, the last honest reading before the wrap.
+    """
+    if xp_per_level <= 0:
+        return 0
+    if prev_buffer is None:
+        prev_buffer = (prev_xp or 0) % xp_per_level
+    return round(max(0.0, min(float(prev_buffer) + (float(new_xp) - float(prev_xp or 0)), float(xp_per_level))), 2)
 
 
 # ==============================================================================
@@ -1033,6 +1053,7 @@ def evaluate_level_changes(
     config: dict[str, Any],
     data_coverage: Optional[float] = None,
     raw_score: Optional[float] = None,
+    unadjusted_level_score: Optional[float] = None,
 ) -> dict[str, Any]:
     """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]
 
@@ -1058,6 +1079,21 @@ def evaluate_level_changes(
       score the EMA says the pillar deserves. Strictly tighter than the old
       gate whenever target > current + 1, never looser; a below-target day
       HOLDS the up-streak (it doesn't reset it), so honest climbs still land.
+
+      #954 boost fix: ``current_level_score`` arrives AFTER cross-pillar
+      modifiers (F-05), so a standing positive boost (Alignment + Synergy +
+      Training Boost = x1.16) pushed the raw-day gate above any achievable
+      raw score and froze the boosted pillar forever (steady raw 76 vs a
+      boosted target of 89 — day_supports_up never True). The #913 rationale
+      is like-for-like — today's RAW performance vs what the EMA of RAW
+      scores says the pillar deserves — so callers pass the pre-modifier EMA
+      as ``unadjusted_level_score`` and the raw-day gate compares against
+      ``min(boosted target, unboosted target)``: boosts still raise the level
+      the pillar converges TO, but never demand a raw day nobody can live.
+      (min, not the unboosted value outright, so a NEGATIVE modifier keeps
+      the previous, looser behavior — the gate never exceeds the target the
+      pillar is actually climbing toward.) When the caller doesn't pass it
+      (legacy paths), the gate falls back to the boosted target unchanged.
     """
     leveling = config.get("leveling", {})
 
@@ -1080,9 +1116,14 @@ def evaluate_level_changes(
     tier_down_streak_needed = tier_cfg.get("tier_boundary_down", leveling.get("tier_down_streak_days", 10))
 
     # XP buffer gate for level-down [F-02]
+    # #954: the buffer is explicit state (see _roll_xp_buffer) — trusted from
+    # previous_state when present so an XP decline can never re-arm it via the
+    # old % wrap; the modulo remains only as the seed for legacy stored state.
     xp_per_level = leveling.get("xp_per_level", DEFAULT_XP_PER_LEVEL)
     xp_buffer_threshold = leveling.get("xp_buffer_threshold", DEFAULT_XP_BUFFER_THRESHOLD)
-    xp_buffer = xp_total % xp_per_level if xp_per_level > 0 else 0
+    xp_buffer = prev.get("xp_buffer")
+    if xp_buffer is None:
+        xp_buffer = xp_total % xp_per_level if xp_per_level > 0 else 0
 
     target_level = max(1, min(100, round(current_level_score)))
     events = []
@@ -1096,7 +1137,12 @@ def evaluate_level_changes(
     # never a comparison against the still-converging (small) current level.
     # round() on both sides: target_level is round(level_score), so the raw
     # side gets the same treatment (raw 86.9 must not lose to its own EMA's 87).
-    day_supports_up = raw_score is None or round(raw_score) >= target_level
+    # #954: the raw-day gate compares against the UNboosted EMA when the caller
+    # provides it — cross-pillar boosts raise the target, never the daily bar.
+    raw_gate_target = target_level
+    if unadjusted_level_score is not None:
+        raw_gate_target = min(target_level, max(1, min(100, round(unadjusted_level_score))))
+    day_supports_up = raw_score is None or round(raw_score) >= raw_gate_target
 
     if coverage_hold:
         pass  # hold both streaks; levels frozen until real data returns
@@ -1416,6 +1462,7 @@ def compute_character_sheet(
                 "streak_below": pp.get("streak_below", 0),
                 "xp_total": pp.get("xp_total", 0),
                 "xp_debt": pp.get("xp_debt", 0),  # #913: the visible bleed carries over
+                "xp_buffer": pp.get("xp_buffer"),  # #954: explicit buffer state (None = legacy, seeds from % remainder)
             }
 
     all_events = []
@@ -1429,6 +1476,9 @@ def compute_character_sheet(
             config,
             data_coverage=pillar_details[pillar_name].get("_data_coverage"),
             raw_score=pillar_raw_scores[pillar_name],
+            # #954: the raw-day up-gate compares against the pre-modifier EMA —
+            # cross-pillar boosts raise the target, never the daily bar.
+            unadjusted_level_score=pillar_level_scores[pillar_name],
         )
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
@@ -1437,6 +1487,10 @@ def compute_character_sheet(
             pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number, previous_debt=prev_debt
         )
         level_state["xp_total"] = new_xp
+        # #954: roll the demotion buffer forward with today's XP change — fills
+        # on gain, drains on loss, never the wrap-prone % of lifetime XP.
+        xp_per_level_cfg = (config.get("leveling", {}) or {}).get("xp_per_level", DEFAULT_XP_PER_LEVEL)
+        level_state["xp_buffer"] = _roll_xp_buffer(prev_state.get("xp_buffer") if prev_state else None, prev_xp, new_xp, xp_per_level_cfg)
 
         pillar_results[pillar_name] = {
             "raw_score": pillar_raw_scores[pillar_name],

@@ -31,6 +31,7 @@ from character_engine import (
     _compute_lab_score,
     _compute_xp,
     _in_range_score,
+    _roll_xp_buffer,
     _social_quality_to_10,
     _weighted_pillar_score,
     compute_character_sheet,
@@ -44,7 +45,7 @@ from character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.3.0"
+    assert ENGINE_VERSION == "1.3.1"
 
 
 # ── F-01: Confidence scoring ──
@@ -505,6 +506,140 @@ def test_xp_buffer_depleted_allows_level_down():
     # xp_buffer = 10 % 100 = 10 < 20 threshold -> allow
     result = evaluate_level_changes("sleep", 5.0, prev, FULL_CONFIG)
     assert result["level"] == 9  # Level down
+
+
+# ── #954 (char-math-2): the demotion buffer is explicit, monotone state ──
+
+
+def test_xp_buffer_decline_across_century_does_not_rearm():
+    """The wrap bug: xp 205 → 199 used to flip the buffer 5 → 99 (% 100),
+    re-arming near-maximum demotion immunity BY LOSING XP. The rolled buffer
+    drains by the loss and floors at 0 — it can only ever deplete on decline."""
+    assert _roll_xp_buffer(5, 205, 199, 100) == 0
+    assert _roll_xp_buffer(5, 205, 202, 100) == 2  # partial drain, no wrap
+
+
+def test_xp_buffer_monotone_under_sustained_decline():
+    """60 crash days: the buffer never increases while XP only falls."""
+    buffer, xp = None, 205.0
+    seen = []
+    for _ in range(60):
+        new_xp = max(0.0, xp - 3.0)
+        buffer = _roll_xp_buffer(buffer, xp, new_xp, 100)
+        seen.append(buffer)
+        xp = new_xp
+    assert all(b2 <= b1 for b1, b2 in zip(seen, seen[1:]))
+    assert seen[-1] == 0
+
+
+def test_xp_buffer_fills_on_gain_capped_at_one_level():
+    assert _roll_xp_buffer(95, 200, 212, 100) == 100  # fills, capped
+    assert _roll_xp_buffer(40, 100, 103, 100) == 43  # ordinary good day
+
+
+def test_xp_buffer_legacy_state_seeds_from_remainder():
+    """State stored before the fix has no xp_buffer — seed from the previous
+    total's within-level remainder (the last honest pre-wrap reading)."""
+    assert _roll_xp_buffer(None, 250, 245, 100) == 45  # seed 50, drain 5
+
+
+def test_stored_buffer_wins_over_modulo_in_down_gate():
+    """xp_total=199 would read as buffer 99 under the old % wrap and hold the
+    level forever; the explicitly stored (drained) buffer must win."""
+    prev = {"level": 10, "tier": "Foundation", "streak_above": 0, "streak_below": 4, "xp_total": 199, "xp_buffer": 5}
+    result = evaluate_level_changes("sleep", 5.0, prev, FULL_CONFIG)
+    assert result["level"] == 9  # demotes — the wrap no longer grants immunity
+
+
+def test_stored_buffer_still_absorbs_when_genuinely_earned():
+    prev = {"level": 10, "tier": "Foundation", "streak_above": 0, "streak_below": 4, "xp_total": 130, "xp_buffer": 30}
+    result = evaluate_level_changes("sleep", 5.0, prev, FULL_CONFIG)
+    assert result["level"] == 10  # a real earned buffer still holds
+
+
+def test_sixty_day_crash_demotes_honestly_despite_lifetime_xp():
+    """The issue's sim: level 30 with xp_total=205 crashed for 60 days used to
+    demote ONCE (30→28) because every century crossing re-armed the buffer.
+    With the monotone buffer the pillar falls at the streak-gated pace."""
+    state = {"level": 30, "tier": "Momentum", "streak_above": 0, "streak_below": 0, "xp_total": 205.0}
+    buffer = None
+    downs = 0
+    for _ in range(60):
+        result = evaluate_level_changes("sleep", 5.0, dict(state, xp_buffer=buffer), FULL_CONFIG, data_coverage=1.0, raw_score=5.0)
+        _earned, _delta, new_xp, _debt = _compute_xp(5.0, state["xp_total"], FULL_CONFIG)
+        buffer = _roll_xp_buffer(buffer, state["xp_total"], new_xp, 100)
+        downs += sum(1 for e in result.get("events", []) if e["type"] == "level_down")
+        state = {
+            "level": result["level"],
+            "tier": result["tier"],
+            "streak_above": result["streak_above"],
+            "streak_below": result["streak_below"],
+            "xp_total": new_xp,
+        }
+    assert downs >= 4  # the old wrap allowed exactly 1 demotion in 60 days
+    assert state["level"] < 28  # 28 was the buggy landing spot
+
+
+# ── #954 (char-sim-1): cross-pillar boosts must not raise the raw-day bar ──
+
+
+def test_boosted_target_does_not_freeze_up_gate():
+    """Steady raw 76 under a +16% cross-pillar boost: the boosted target (88)
+    exceeds any day this performer lives, but the gate compares against the
+    UNboosted EMA (76) — the pillar still climbs toward the boosted target."""
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("metabolic", 88.2, prev, FULL_CONFIG, data_coverage=1.0, raw_score=76.0, unadjusted_level_score=76.0)
+    assert result["level"] > 5  # 3rd Foundation day above target -> climb
+
+
+def test_boosted_target_freezes_without_unadjusted_score():
+    """Legacy callers that don't pass the unboosted EMA keep the old gate."""
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("metabolic", 88.2, prev, FULL_CONFIG, data_coverage=1.0, raw_score=76.0)
+    assert result["level"] == 5
+    assert result["streak_above"] == 2  # held, not reset
+
+
+def test_negative_modifier_keeps_the_looser_adjusted_gate():
+    """With a NEGATIVE modifier the adjusted target is BELOW the raw EMA; the
+    gate uses min(adjusted, unadjusted) so it never demands more than the
+    target the pillar is actually climbing toward."""
+    prev = {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50}
+    result = evaluate_level_changes("metabolic", 26.0, prev, FULL_CONFIG, data_coverage=1.0, raw_score=26.0, unadjusted_level_score=30.0)
+    assert result["level"] > 5  # raw 26 meets the adjusted target 26
+
+
+def test_unboosted_gate_still_blocks_ema_momentum():
+    """The #913 protection is intact: a crashed raw day can't ride either
+    target up — 9 fails the unboosted EMA (26) exactly as it fails the target."""
+    prev = {"level": 8, "tier": "Foundation", "streak_above": 5, "streak_below": 0, "xp_total": 0}
+    result = evaluate_level_changes("movement", 30.2, prev, FULL_CONFIG, data_coverage=1.0, raw_score=9.0, unadjusted_level_score=26.0)
+    assert result["level"] == 8
+    assert result.get("events") == []
+
+
+def test_steady_76_with_active_boost_levels_up_end_to_end():
+    """Issue #954 regression (1), through compute_character_sheet: a steady
+    raw-76 sleep pillar under an active +16% cross-pillar effect must climb —
+    before the fix the boosted target (88) froze it at its previous level."""
+    config = _scenario_config()
+    config["cross_pillar_effects"] = [
+        {"name": "Test Boost", "emoji": "*", "condition": "sleep >= 50", "targets": {"sleep": 0.16}},
+    ]
+    # sleep_performance 76 with only the efficiency component -> raw exactly 76
+    config["pillars"]["sleep"]["components"] = {"efficiency": {"weight": 1.0}}
+    data = {"date": "2026-07-20", "sleep": {"sleep_performance": 76}}
+    prev_state = {
+        "character_level": 3,
+        "pillar_sleep": {"level": 5, "tier": "Foundation", "streak_above": 2, "streak_below": 0, "xp_total": 50, "xp_debt": 0},
+    }
+    record = compute_character_sheet(data, prev_state, {"sleep": [76.0] * 21}, config)
+
+    sleep_p = record["pillar_sleep"]
+    assert any(e["name"] == "Test Boost" for e in record["active_effects"])
+    assert sleep_p["raw_score"] == 76.0
+    assert sleep_p["level_score"] > 85  # the boost still lifts the displayed target
+    assert sleep_p["level"] > 5  # ...and no longer freezes the climb
 
 
 # ── ADR-104: behavioral absence scores 0, not neutral ──
