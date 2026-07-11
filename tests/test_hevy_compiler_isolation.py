@@ -41,7 +41,11 @@ _ALLOWED_FILES = {
 
 _KEY = "exercise_template_id"
 
-_SKIP_DIRS = {".git", "__pycache__", "cdk", "deploy", "docs", "site", "node_modules"}
+# ".claude" — concurrent-agent worktrees under .claude/worktrees/ are full repo
+# checkouts whose lambdas/hevy_compiler.py copies are NOT in _ALLOWED_FILES (the
+# set holds absolute main-tree paths), so a live worktree redded the suite on
+# main in 2 of 4 sessions (#953). "cdk.out" — synth output can land at repo root.
+_SKIP_DIRS = {".git", ".claude", "__pycache__", "cdk", "cdk.out", "deploy", "docs", "site", "node_modules"}
 
 
 def _iter_py_files():

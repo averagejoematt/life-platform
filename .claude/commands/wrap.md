@@ -83,13 +83,17 @@ omission is not an outcome.
   handover, so every handover records the gate's outcome either way.
 - The beat itself: append one object to `beats` in `site/story/build/beats.json` with fields
   `id`, `date`, `title`, `shipped`, `gotcha`, `honest_miss`, `prs` (schema + example in the
-  checklist). Distill from the new `HANDOVER_LATEST.md` you just wrote in step (a).
+  checklist). **`prs` entries are `{"label": "PR #953", "url": "https://github.com/…/pull/953"}`
+  objects, never bare strings** (string PRs redded `test_build_dispatches` for every
+  concurrent session, 2026-07-10). Distill from the new `HANDOVER_LATEST.md` you just
+  wrote in step (a).
 - **One beat max per session** even if several things shipped — pick the story, mention
   the rest in a clause.
 - Numbers in the beat must come from the handover/PR/measured output (ADR-104 honesty
   bar) — never invented.
-- Run `python3 scripts/content_policy_scan.py` locally before committing (CI's
-  content-policy gate re-runs it on every push).
+- Run `python3 scripts/content_policy_scan.py && python3 scripts/validate_beats.py`
+  locally before committing (#953 — the beats schema validator catches malformed `prs`
+  before it reds `test_build_dispatches` repo-wide; CI re-checks both on every push).
 
 ### (e) Doc-impact sweep OR explicit skip — a wrap gate, same shape as (d)
 
