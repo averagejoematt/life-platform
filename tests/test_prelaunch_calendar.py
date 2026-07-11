@@ -273,3 +273,58 @@ def test_leadin_seq_and_labels_continue_at_week_04(monkeypatch):
     # date-sorted index) continues at week-04, labelled Week 1.
     assert leadin.seq_for(first_publish, all_dates, 1) == 4
     assert leadin.series_label(first_publish, all_dates, 1) == "Week 1"
+
+
+# ── 6. #949: the pre-genesis dek is reframed on every rendered surface ────────
+# The stored stats_line was authored mid-experiment ("… | Week 1 of The Measured
+# Life") — rendered under the countdown banner it contradicted "begins tomorrow".
+# display_stats_line reframes the RENDERED dek only (DDB untouched), and the
+# Wednesday publish's manifest rebuild must derive the identical dek (render
+# parity — otherwise the first Week-1 publish resurrects the raw line).
+
+_DEK = "Weight: 301.0 lbs | Recovery range: 12–98% | HRV range: 14–53ms | Week 1 of The Measured Life"
+
+
+def test_display_stats_line_reframes_pre_genesis_week_dek(monkeypatch):
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    out = leadin.display_stats_line(_DEK, "2026-07-09")
+    assert "Week 1" not in out
+    assert out.startswith("Weight: 301.0 lbs")  # the real measurements stay
+    assert "before Day 1" in out and "Prologue" in out
+
+
+def test_display_stats_line_respects_existing_prologue_framing(monkeypatch):
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    line = "Prologue | Before Day 1 | Seattle, WA"
+    assert leadin.display_stats_line(line, "2026-07-06") == line  # no duplicate stamp
+
+
+def test_display_stats_line_post_genesis_passes_through(monkeypatch):
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    line = "Weight: 296.4 lbs | Week 2 of The Measured Life"
+    assert leadin.display_stats_line(line, GENESIS) == line
+    assert leadin.display_stats_line(line, "2026-07-20") == line
+
+
+def test_display_stats_line_parity_with_wednesday_lambda(monkeypatch):
+    import os
+
+    os.environ.setdefault("TABLE_NAME", "life-platform")
+    os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
+    os.environ.setdefault("EMAIL_RECIPIENT", "test@example.com")
+    os.environ.setdefault("EMAIL_SENDER", "noreply@example.com")
+    sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+    sys.path.insert(0, str(REPO_ROOT / "lambdas" / "emails"))
+    import wednesday_chronicle_lambda as chron
+
+    monkeypatch.setattr(chron, "EXPERIMENT_START_DATE", GENESIS)
+    monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
+    cases = [
+        (_DEK, "2026-07-09"),
+        ("Prologue | Before Day 1 | Seattle, WA", "2026-07-06"),
+        ("Week 2 | Seattle, WA | The Measured Life", "2026-07-08"),
+        (_DEK, GENESIS),
+        ("", "2026-07-09"),
+    ]
+    for line, d in cases:
+        assert chron.display_stats_line(line, d) == leadin.display_stats_line(line, d), (line, d)

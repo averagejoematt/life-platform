@@ -271,6 +271,9 @@ class TestCoachingReadBlock:
         assert "<b>hi</b>" not in html
 
     def test_loader_parses_live_api_shape(self, monkeypatch):
+        # #949: disarm the pre-start short-circuit — this test pins the POST-start
+        # loader, and must not flip red whenever a reset stages a future genesis.
+        monkeypatch.setattr(v4_proof, "pre_start_date", lambda: "")
         monkeypatch.setattr(
             v4_proof,
             "_fetch_json",
@@ -293,6 +296,7 @@ class TestCoachingReadBlock:
         assert out["source"] == "live"
 
     def test_loader_falls_back_to_snapshot_offline(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "pre_start_date", lambda: "")  # #949 — pin the post-start path
         monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: None)
         monkeypatch.setattr(v4_proof, "_snapshot", lambda: {"coaching_read": self.READ})
         assert v4_proof.load_coaching_read() == self.READ
@@ -367,3 +371,50 @@ class TestFallback:
 class TestEscape:
     def test_esc(self):
         assert v4_proof._esc('<a href="x">&') == "&lt;a href=&quot;x&quot;&gt;&amp;"
+
+
+class TestPreStartProof:
+    """#949 — with a staged FUTURE genesis, the coaching proof bakes the countdown
+    truth: never the wiped prior cycle's board read (the live dashboard AND the
+    committed snapshot both carried it at T−1), and never a fetch that could
+    resurrect it. Post-start, the pre-start path goes inert."""
+
+    def test_pre_start_date_future_genesis(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_experiment_start", lambda: "2099-01-01")
+        assert v4_proof.pre_start_date() == "2099-01-01"
+
+    def test_pre_start_date_inert_once_started(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "_experiment_start", lambda: "2001-01-01")
+        assert v4_proof.pre_start_date() == ""
+        monkeypatch.setattr(v4_proof, "_experiment_start", lambda: "")
+        assert v4_proof.pre_start_date() == ""
+
+    def test_loader_short_circuits_pre_start_never_fetches(self, monkeypatch):
+        def _boom(path, timeout=8):
+            raise AssertionError("pre-start build must not fetch the (possibly stale) dashboard")
+
+        monkeypatch.setattr(v4_proof, "_fetch_json", _boom)
+        monkeypatch.setattr(v4_proof, "pre_start_date", lambda: "2099-01-09")
+        out = v4_proof.load_coaching_read()
+        assert out["pre_start"] is True
+        assert out["start_date"] == "2099-01-09"
+
+    def test_pre_start_block_is_countdown_not_board_read(self):
+        html = v4_proof.coaching_read_block_html({"pre_start": True, "start_date": "2026-07-12", "as_of": "2026-07-11"})
+        assert html.startswith("<noscript>") and html.endswith("</noscript>")
+        assert "The experiment begins" in html and "Sunday, July 12" in html
+        assert "as of 2026-07-11" in html
+        # the committed-HTML contract (TestCoachingReadCommitted else-branch):
+        # no prior-cycle board-read markup may ship pre-start.
+        assert "The board's read on the data" not in html
+        assert "Each coach's read" not in html
+        assert "<blockquote>" not in html
+
+    def test_snapshot_coaching_read_is_neutralized(self):
+        # #949: the committed fallback must not carry a prior cycle's board read —
+        # an offline build bakes honest nothing instead (block omitted).
+        import json
+
+        snap = json.loads((Path(__file__).resolve().parent.parent / "scripts" / "proof_snapshot.json").read_text())
+        assert snap.get("coaching_read") == {}
+        assert v4_proof.coaching_read_block_html(snap["coaching_read"]) == ""

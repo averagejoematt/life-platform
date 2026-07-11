@@ -170,7 +170,9 @@ export function physicalMilestoneLadder(readings, j, goal) {
     const meta = crossed && date ? `<span class="ml-meta label">crossed ${esc(_physShortDate(date))}${esc(days)}</span>` : "";
     return `<div class="ml-rung ${cls}"><span class="ml-tick"></span><span class="ml-w mono">${fmt(r.w)}</span>${cap}${meta}${nowMark}</div>`;
   }).join("");
-  return sec("Milestone ladder — 315 to 185, ten pounds at a time",
+  // #949: the heading derives from the same start/goal the ladder body already uses —
+  // a hand-coded "315 to 185" strands on the next reset's re-anchored baseline.
+  return sec(`Milestone ladder — ${fmt(Math.round(start))} to ${fmt(goal)}, ten pounds at a time`,
     `<div class="ml-ladder">${rows}</div>` +
     `<p class="rd-meta label">Each rung is a 10-lb mark on the way down; it clicks ember the day the trend crosses it, stamped with how long that rung took. The gaps widen as the cut matures — that's the real pace, not a straight line to the goal.</p>`);
 }

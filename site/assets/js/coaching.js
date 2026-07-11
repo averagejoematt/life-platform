@@ -19,7 +19,7 @@
   Reuses dx- and coach- styles from story.css; one type system (coaches speak serif).
 */
 import { initTheme } from "/assets/js/theme.js";
-import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
+import { enhanceCoachNames, stampGenesis, preStart } from "/assets/js/coach_popover.js"; // + #949 pre-start gate
 import { sigil, instrumentMark } from "/assets/js/sigils.js";
 import { portrait, markStanceChange } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 stance-change sweep
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
@@ -188,7 +188,19 @@ function tensionsHTML(d) {
 }
 
 // ── THE READ (default) — Today / This week / The experiment ──
+// #949 pre-start: until Day 1 exists, the stored board read narrates the WIPED
+// prior cycle (the exact leak cockpit.js guards its verdict slot against) — the
+// countdown owns this surface instead. Same one-genesis source as every door.
+function preStartReadHTML(pre) {
+  return `<p class="dx-kicker label">the coaching · pre-start</p>` +
+    `<h2 class="dx-title">The board convenes with Day 1.</h2>` +
+    `<p class="dx-prose">The experiment begins <strong>${esc(pre.startLabel)}</strong>, with the first baseline weigh-in. ` +
+    `The coaches read only this run's data — their first take lands here once Day 1's numbers exist. ` +
+    `Meanwhile: <a href="/coaching/team/">who the coaches are</a> and <a href="/coaching/scorecard/">how their calls get graded</a>.</p>`;
+}
 async function renderReadToday(read) {
+  const pre = preStart();
+  if (pre) { read.innerHTML = preStartReadHTML(pre); return; }
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the board…</span></p>`;
   const d = await tryJSON("/api/coaching-dashboard");
   const team = await tryJSON("/api/coach_team"); // for the tensions band + disclosure
@@ -225,6 +237,8 @@ async function renderReadToday(read) {
   enhanceCoachNames(read);
 }
 async function renderReadWeek(read) {
+  const pre = preStart();
+  if (pre) { read.innerHTML = preStartReadHTML(pre); return; }  // #949 — no week exists to read yet
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the week…</span></p>`;
   const wp = await tryJSON("/api/weekly_priority");
   let h = `<p class="dx-kicker label">the week · what each domain showed</p><h2 class="dx-title">This week</h2>`;
@@ -895,6 +909,9 @@ function build() {
 // Fail-quiet: no data → no ribbon.
 async function wireMachineryRibbon(tabsEl) {
   try {
+    // #949 pre-start: tensions + the record are prior-cycle artifacts until Day 1 —
+    // the ribbon stays honestly absent rather than quoting a wiped board.
+    if (preStart()) return;
     const [team, preds] = await Promise.all([tryJSON("/api/coach_team"), tryJSON("/api/predictions")]);
     const bits = [];
     const tension = ((team && team.tensions) || []).find((t) => t && (t.topic || t.summary));

@@ -625,6 +625,14 @@ async function load() {
     if (statsV.elena_hero_line && !pre) bind("elena").textContent = statsV.elena_hero_line;
     if (statsV._meta && statsV._meta.generated_at) bind("asof").textContent = `updated ${String(statsV._meta.generated_at).slice(0, 10)}`;
   }
+  // #949 — the hero's "this attempt starts at …" claim binds to the LIVE baseline
+  // (/api/journey start_weight_lbs), never a hand-coded literal that strands on the
+  // next reset. Pre-start there is no baseline yet — the weigh-in is the honest copy.
+  const hs = bind("hero-start");
+  if (hs) {
+    if (pre) hs.textContent = `${pre.startDow}'s first weigh-in`;
+    else if (journeyV && journeyV.start_weight_lbs != null) hs.textContent = `${Math.round(Number(journeyV.start_weight_lbs))} lbs`;
+  }
   stampGenesis(document, STORY_GENESIS_SUFFIX);  // P0.1 — shared genesis source; per-door suffix (pre-start: the countdown line)
   // The review's "central number": a prominent day-of-experiment counter in the hero.
   // Pre-start (#931) it counts DOWN to Day 1 — calm, dated, no marketing timer.
@@ -645,6 +653,15 @@ async function load() {
     } else {
       dn.textContent = "0";
       dc.textContent = "the experiment begins today, with the first weigh-in";
+    }
+    // #949 — the countdown moment gets its conversion hook: an inline follow CTA
+    // right under the count, pre-start only (post-start the close beat owns it).
+    const dcWrap = dn.closest(".hero-daycount");
+    if (dcWrap && !$(".hero-cta-pre")) {
+      const cta = document.createElement("p");
+      cta.className = "hero-cta hero-cta-pre";
+      cta.innerHTML = `<a href="/subscribe/" class="cta">Get Day 1 in your inbox →</a> <a href="/rss.xml" class="cta cta-quiet">or follow via RSS</a>`;
+      dcWrap.insertAdjacentElement("afterend", cta);
     }
   } else if (dayN >= 1) {
     if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }
@@ -701,14 +718,22 @@ load();
   const rib = wrap.querySelector("[data-home-since]");
   await mountSinceRibbon(rib);
   try {
-    const r = await fetch("/api/what_changed", { headers: { accept: "application/json" } });
-    const d = r.ok ? await r.json() : null;
-    const nu = ((d && d.newly_unlocked) || [])[0];
-    const el = wrap.querySelector("[data-home-unlocked]");
-    if (nu && el) {
-      const pretty = String(nu.label || "").replace(/_vs_/g, " ↔ ").replace(/_/g, " ");
-      el.textContent = `newly unlocked this month: ${pretty} (r=${nu.r}, n=${Math.round(nu.n)}, ${nu.direction}${nu.interpretation ? " · " + nu.interpretation : ""}) — correlation, not cause; announced once.`;
-      el.hidden = false;
+    // #949 pre-start: /api/what_changed still carries the PRIOR cycle's unlocks
+    // (its window predates Day 1) — announcing intelligence on a Day-0 site reads
+    // incoherent under the countdown. The engine starts listening with Day 1.
+    if (!preStart()) {
+      const r = await fetch("/api/what_changed", { headers: { accept: "application/json" } });
+      const d = r.ok ? await r.json() : null;
+      const nu = ((d && d.newly_unlocked) || [])[0];
+      const el = wrap.querySelector("[data-home-unlocked]");
+      if (nu && el) {
+        const pretty = String(nu.label || "").replace(/_vs_/g, " ↔ ").replace(/_/g, " ");
+        // r to 2 decimals — 4-decimal display is false precision (ADR-105); the
+        // strength label stays the engine's own n-gated call, never re-derived here.
+        const rDisp = Number.isFinite(Number(nu.r)) ? Number(nu.r).toFixed(2) : nu.r;
+        el.textContent = `newly unlocked this month: ${pretty} (r=${rDisp}, n=${Math.round(nu.n)}, ${nu.direction}${nu.interpretation ? " · " + nu.interpretation : ""}) — correlation, not cause; announced once.`;
+        el.hidden = false;
+      }
     }
   } catch (e) { /* honest silence */ }
   if ((rib && !rib.hidden) || !wrap.querySelector("[data-home-unlocked]").hidden) wrap.hidden = false;
@@ -761,7 +786,12 @@ async function wireMirror() {
         read: (x) => `Matthew's current resting HR is ${Math.round(v.rhr_bpm)} bpm. Yours is ${Math.round(x)} — ${Math.abs(Math.round(x - v.rhr_bpm))} bpm ${x < v.rhr_bpm ? "lower" : x > v.rhr_bpm ? "higher" : "— the same"}. One body's number, not a target.` }),
     };
   }
-  if (typeof j.start_weight_lbs === "number" && typeof j.current_weight_lbs === "number" && typeof j.goal_weight_lbs === "number") {
+  // #949 pre-start: the stored journey block can narrate the WIPED cycle ("started
+  // at X, is at Y today") — the weight mirror stays honestly absent until Day 1's
+  // baseline exists. Payload-first (the regenerated file carries pre_start), client
+  // GENESIS fallback so a stale cached file can't leak prior-cycle numbers as "today".
+  const preMirror = preStart(j);
+  if (!preMirror && typeof j.start_weight_lbs === "number" && typeof j.current_weight_lbs === "number" && typeof j.goal_weight_lbs === "number") {
     metrics.weight = {
       label: "weight (lbs)", unit: "lbs", max: 1000,
       markers: () => ({ lo: Math.min(j.goal_weight_lbs, j.current_weight_lbs) - 20, hi: j.start_weight_lbs + 20,

@@ -9,6 +9,7 @@
     window.__START_SLUG__ = "<slug>"
 */
 import { initTheme } from "/assets/js/theme.js";
+import { stampGenesis } from "/assets/js/coach_popover.js"; // #949 — the cross-site Day-N anchor / pre-start countdown
 import { domainIcon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
 import { esc, getJSON, tryJSON, isBad, sec, empty, note } from "/assets/js/evidence_shared.js";
@@ -212,6 +213,7 @@ wireFirstRun();
 buildTabs();
 buildSide();
 renderCenter();
+stampGenesis();  // #949 — same Day-N anchor as every door; pre-start it reads as the countdown
 
 // Build stamp — muted deploy fingerprint in the footer (apples-to-apples in QA). Reads
 // the <meta name="build"> the deploy script injects; no-op locally where it's absent.

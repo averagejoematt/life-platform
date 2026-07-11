@@ -205,6 +205,30 @@ def seq_for(date_str, all_dates, week_num):
     return (all_dates.index(date_str) + 1) if date_str in all_dates else int(week_num)
 
 
+_WEEK_SEG_RE = re.compile(r"(?i)^week\s+\d+\b")
+_PROLOGUE_HINT_RE = re.compile(r"(?i)prologue|before day 1")
+
+
+def display_stats_line(stats_line, date_str):
+    """The reader-facing dek, reframed for pre-genesis lead-ins (#949).
+
+    The stored stats_line was authored mid-experiment ("… | Week 1 of The Measured
+    Life"), which contradicts the countdown banner sitting right above it on the
+    story hub ("the experiment begins tomorrow" vs "Week 1" three lines later).
+    For a pre-genesis date: drop any "Week N …" segment and stamp the prologue
+    framing instead. Post-genesis installments pass through untouched, and the
+    DDB record is never modified — this reframes only the rendered surfaces.
+    """
+    line = str(stats_line or "")
+    if not date_str or date_str >= EXPERIMENT_START_DATE:
+        return line
+    parts = [p.strip() for p in line.split("|") if p.strip()]
+    kept = [p for p in parts if not _WEEK_SEG_RE.match(p)]
+    if not any(_PROLOGUE_HINT_RE.search(p) for p in kept):
+        kept.append("Prologue — the instrumented weeks before Day 1")
+    return " | ".join(kept)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Article page — the v5 template ported from publish_to_journal() (no-image path)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -417,7 +441,7 @@ def main():
         date_str = item.get("date", "")
         week_num = int(item.get("week_number", 0) or 0)
         title = item.get("title", "Untitled")
-        stats_line = item.get("stats_line", "")
+        stats_line = display_stats_line(item.get("stats_line", ""), date_str)  # #949 — prologue-framed dek pre-genesis
         label = series_label(date_str, all_dates, week_num)
         seq = seq_for(date_str, all_dates, week_num)
         body_html = body_html_from_record(item)
@@ -438,7 +462,7 @@ def main():
                 "label": series_label(date_str, all_dates, int(item.get("week_number", 0) or 0)),
                 "title": item.get("title", ""),
                 "date": date_str,
-                "stats_line": item.get("stats_line", ""),
+                "stats_line": display_stats_line(item.get("stats_line", ""), date_str),  # #949 — prologue-framed dek
                 "url": f"/journal/posts/week-{seq:02d}/",
                 # Prose-only excerpt (header stripped) — same field the reader shows verbatim.
                 "excerpt": body_markdown_from_record(item)[:300].strip(),

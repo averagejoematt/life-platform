@@ -63,6 +63,22 @@ HERO_WHY_PARAGRAPH = (
 )
 
 
+def _days_until_start() -> int:
+    """Days until the staged genesis (#949) — 0 once the experiment has started.
+
+    A reset can stage a FUTURE genesis (#931/#939): in that window the incoming
+    vitals/journey/brief still describe the WIPED prior cycle, and this writer
+    must not bake them into public_stats.json as 'today' (the homepage mirror
+    quoted cycle-4 numbers at T−1). Mechanism-level: constants regenerate at
+    every reset, so the pre-start branch below re-arms itself each cycle.
+    """
+    try:
+        start = datetime.strptime(JOURNEY_START_DATE, "%Y-%m-%d").date()
+        return max(0, (start - datetime.now(timezone.utc).date()).days)
+    except Exception:
+        return 0
+
+
 def _json_safe(obj):
     """Convert Decimal and other non-JSON-serializable types."""
     if isinstance(obj, Decimal):
@@ -91,6 +107,23 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
         days_on_journey = max(1, (today - start).days + 1)
     except Exception:
         days_on_journey = 0
+
+    # #949 pre-start: no Day 1 exists yet — the hero makes no journey claims
+    # (no days-on-journey, no delta/progress, no projections). The countdown
+    # fields carry the honest state; the front-end preStart() contract reads them.
+    days_until = _days_until_start()
+    if days_until > 0:
+        return {
+            "why_paragraph": HERO_WHY_PARAGRAPH,
+            "scroll_invitation": "See the actual numbers below →",
+            "pre_start": True,
+            "days_until_start": days_until,
+            "start_date": JOURNEY_START_DATE,
+            "days_on_journey": 0,
+            "goal_weight_lbs": GOAL_WEIGHT,
+            "journey_started": JOURNEY_START_DATE,
+            "paragraph_is_placeholder": False,
+        }
 
     current_weight = journey.get("current_weight_lbs") or vitals.get("weight_lbs")
     lost_lbs = journey.get("lost_lbs")
@@ -272,6 +305,23 @@ def write_public_stats(
     """
     try:
         hero = _compute_hero(vitals, journey)
+
+        # #949 pre-start: the incoming journey/brief/hero-line still describe the
+        # WIPED prior cycle until Day 1's weigh-in re-anchors them — publish the
+        # countdown contract instead, never last cycle's numbers as "today".
+        # (story.js preStart() is payload-first off exactly these fields.)
+        days_until = _days_until_start()
+        if days_until > 0:
+            journey = {
+                "pre_start": True,
+                "days_until_start": days_until,
+                "start_date": JOURNEY_START_DATE,
+                "started_date": JOURNEY_START_DATE,
+                "goal_weight_lbs": GOAL_WEIGHT,
+                "day_n": 0,
+            }
+            brief_excerpt = None  # a neglect-era AI line must not narrate launch eve
+            elena_hero_line = None  # the stored hero line can narrate the wiped cycle
 
         # BS-02: Fetch latest Chronicle headline for below-fold section
         chronicle_headline = None
@@ -455,7 +505,8 @@ def _compute_pulse(
         from datetime import date as _date
 
         started = _date.fromisoformat(JOURNEY_START_DATE)
-        day_number = max(1, (_date.today() - started).days + 1)
+        # #949 pre-start: a staged future genesis is Day 0, not a clamped "Day 1".
+        day_number = 0 if _date.today() < started else max(1, (_date.today() - started).days + 1)
     except Exception:
         day_number = 0
 
