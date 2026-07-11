@@ -22,6 +22,27 @@ PHASE_FILTER_NAMES = {"#phase": "phase"}
 PHASE_FILTER_VALUES = {":phase_experiment": EXPERIMENT_PHASE_CURRENT}
 
 
+def singleton_visible(item) -> bool:
+    """Item-level mirror of the query filter, for get_item reads (#946).
+
+    Query paths hide wiped records via with_phase_filter, but get_item bypasses
+    filters entirely — so every STATE#current-style singleton reader must apply
+    this predicate, or a reset's tombstones keep serving the wiped cycle until
+    the next writer run overwrites the record.
+
+    Hidden when tombstone=true (the restart wipe, Interpretation B) or when a
+    phase attribute exists and isn't the current experiment phase (identical
+    semantics to PHASE_FILTER_EXPRESSION). Items with no phase attribute
+    (config, profile, genome) pass through, matching the query filter.
+    """
+    if not item:
+        return False
+    if item.get("tombstone"):
+        return False
+    phase = item.get("phase")
+    return phase is None or phase == EXPERIMENT_PHASE_CURRENT
+
+
 def with_phase_filter(kwargs: dict, include_pilot: bool = False) -> dict:
     """Add phase filter to a boto3 Query/Scan kwargs dict.
 

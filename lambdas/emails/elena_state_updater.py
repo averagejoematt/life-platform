@@ -41,6 +41,7 @@ from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from phase_filter import singleton_visible  # #946: hide reset-tombstoned persona state
 
 try:
     from platform_logger import get_logger
@@ -99,7 +100,13 @@ def _get_item(pk, sk, consistent=False):
     lambda milliseconds after flipping status to published, and an eventually-
     consistent read could still see the draft and skip the week."""
     try:
-        return table.get_item(Key={"pk": pk, "sk": sk}, ConsistentRead=consistent).get("Item")
+        item = table.get_item(Key={"pk": pk, "sk": sk}, ConsistentRead=consistent).get("Item")
+        # #946: get_item bypasses the phase filter — a restart-tombstoned singleton
+        # (MOTIF#state, STANCE#latest, chronicle installment) is the OLD cycle's
+        # narrative state and must not seed the new cycle's episodes.
+        if not singleton_visible(item):
+            return None
+        return item
     except Exception as e:
         logger.warning("get_item(%s, %s) failed: %s", pk, sk, e)
         return None
@@ -112,7 +119,10 @@ def _query_prefix(pk, sk_prefix, limit=100):
             ScanIndexForward=False,
             Limit=limit,
         )
-        return resp.get("Items", [])
+        # #946: PERSONA#elena THREAD#/CALLBACK# rows survive a reset with a
+        # tombstone; without this filter EP1+ would "pay off" promises about a
+        # storyline the new cycle's readers never saw.
+        return [it for it in resp.get("Items", []) if singleton_visible(it)]
     except Exception as e:
         logger.warning("query(%s, %s) failed: %s", pk, sk_prefix, e)
         return []

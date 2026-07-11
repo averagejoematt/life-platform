@@ -915,10 +915,20 @@ Write only the analysis — no preamble, no "Here is my analysis:", just paragra
 
 def _load_engagement_signal():
     """Read the presence / quiet-stretch state (engagement_state STATE#current),
-    written by adaptive_mode via engagement_core. Fail-soft → {}."""
+    written by adaptive_mode via engagement_core. Fail-soft → {}.
+
+    #946: honors the restart tombstone — get_item bypasses the query-level phase
+    filter, so a wiped (tombstone=true / phase=pilot) singleton would otherwise
+    keep injecting the OLD cycle's presence severity into every expert prompt
+    until adaptive_mode's next daily run rewrites it."""
     try:
+        from phase_filter import singleton_visible
+
         resp = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"})
-        return resp.get("Item") or {}
+        item = resp.get("Item")
+        if not singleton_visible(item):
+            return {}
+        return item
     except Exception as e:  # pragma: no cover — defensive
         logger.warning("engagement signal read failed: %s", e)
         return {}

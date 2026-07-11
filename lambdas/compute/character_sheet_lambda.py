@@ -36,7 +36,7 @@ from decimal import Decimal
 import boto3
 import character_engine
 from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
 try:
@@ -282,7 +282,10 @@ def assemble_data(yesterday_str):
         if days_old <= 2:
             try:
                 resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
-                data["engagement_state"] = d2f(resp.get("Item")) if resp.get("Item") else None
+                # #946: get_item bypasses the phase filter — a wiped (tombstoned)
+                # singleton must not smear the OLD cycle's presence onto the rebuild.
+                _es_item = resp.get("Item")
+                data["engagement_state"] = d2f(_es_item) if singleton_visible(_es_item) else None
             except Exception as e:
                 logger.warning(f"[character] engagement_state STATE#current fetch failed (non-fatal): {e}")
 

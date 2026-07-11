@@ -702,6 +702,22 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
     except Exception:
         arc = {}
 
+    # #946: a tombstoned arc (restart wipe) or one entered before the current
+    # genesis is the PREVIOUS cycle's story. This state machine has no path back
+    # to early_baseline — from 'setback' the only exit is 'breakthrough' — so a
+    # stale arc would either frame the fresh cycle's week 1 as a mid-stall or
+    # trip an absurd day-N 'breakthrough' the moment metrics improve. Treat it
+    # as absent: the narrative restarts at early_baseline, and the next real
+    # transition's put_item rewrites STATE#current clean.
+    if arc and (arc.get("tombstone") or str(arc.get("entered_date") or "") < EXPERIMENT_START):
+        logger.info(
+            "Narrative arc is stale (tombstone=%s entered_date=%s < genesis %s) — restarting at early_baseline",
+            arc.get("tombstone"),
+            arc.get("entered_date"),
+            EXPERIMENT_START,
+        )
+        arc = {}
+
     current_phase = arc.get("phase", "early_baseline")
     entered_date = arc.get("entered_date", EXPERIMENT_START)
 

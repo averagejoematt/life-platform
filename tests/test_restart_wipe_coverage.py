@@ -67,3 +67,56 @@ def test_partition_modes_are_valid():
         assert mode in valid_modes, f"FULL_PK_PARTITIONS[{label}] has invalid mode {mode!r}"
     for _pk, label, mode, _extra in wipe.COACH_PARTITIONS:
         assert mode in valid_modes, f"COACH_PARTITIONS[{label}] has invalid mode {mode!r}"
+
+
+# ── #946: narrative singletons must not survive the wipe ──────────────────────
+
+
+def test_persona_elena_scoped_and_covered():
+    """Elena's narrative running state (pending CALLBACKs, open THREADs, motifs,
+    stance) is per-cycle story continuity — it survived the cycle-5 reset live
+    because PERSONA#elena was unclassified and absent from the wipe."""
+    assert taxonomy.classify("PERSONA#elena", "CALLBACK#2026-07-07#x") == taxonomy.EXPERIMENT_SCOPED
+    covered_pks = {pk for pk, *_ in wipe.FULL_PK_PARTITIONS}
+    assert "PERSONA#elena" in covered_pks
+
+
+def test_narrative_arc_state_current_is_now_datable():
+    """The wipe's pregenesis mode skipped NARRATIVE#arc STATE#current every time
+    (no date in the sk) on the wrong assumption that the engine would recompute
+    it — but _detect_arc_transition has no path back to early_baseline. The
+    entered_date fallback makes the singleton datable so pregenesis catches it."""
+    stale_arc = {
+        "pk": "NARRATIVE#arc",
+        "sk": "STATE#current",
+        "phase": "setback",
+        "entered_date": "2026-07-03",
+        "previous_phase": "plateau",
+    }
+    assert wipe.extract_date(stale_arc) == "2026-07-03"
+
+
+def test_wipe_never_retombstones_a_fresh_arc():
+    """Idempotency across re-runs: once the engine writes a post-genesis arc,
+    re-running the wipe (same genesis) must skip it, not re-tombstone it."""
+    from datetime import date, timedelta
+
+    genesis = date.fromisoformat(wipe.EXPERIMENT_START_DATE)
+    stale = {"pk": "NARRATIVE#arc", "sk": "STATE#current", "entered_date": (genesis - timedelta(days=9)).isoformat()}
+    fresh = {"pk": "NARRATIVE#arc", "sk": "STATE#current", "entered_date": (genesis + timedelta(days=3)).isoformat()}
+    assert wipe.should_tombstone(stale, "pregenesis") is True
+    assert wipe.should_tombstone(fresh, "pregenesis") is False
+
+
+def test_elena_rows_all_datable_for_pregenesis():
+    """Every PERSONA#elena row shape must be datable or pregenesis silently skips
+    it (the exact bug this issue fixes for NARRATIVE#arc)."""
+    rows = [
+        {"sk": "THREAD#2026-07-07#silence-as-symptom", "status": "open"},
+        {"sk": "CALLBACK#2026-07-07#zone-2-walks", "status": "pending"},
+        {"sk": "STANCE#2026-07-08", "as_of": "2026-07-08", "generated_at": "2026-07-08T14:00:00+00:00"},
+        {"sk": "STANCE#latest", "as_of": "2026-07-08", "generated_at": "2026-07-08T14:00:00+00:00"},
+        {"sk": "MOTIF#state", "last_updated": "2026-07-08T14:00:00+00:00"},
+    ]
+    for row in rows:
+        assert wipe.extract_date(row) is not None, f"undatable PERSONA#elena row: {row['sk']}"

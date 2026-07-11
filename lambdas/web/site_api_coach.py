@@ -26,7 +26,7 @@ from decimal import Decimal  # noqa: F401
 import boto3
 import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
 # CC-00/CC-09 shared-layer modules. Imported defensively so a site-api CODE deploy
 # that lands BEFORE the layer (with these modules) is published doesn't break the
@@ -367,6 +367,27 @@ def _stance_latest(coach_id):
         return None
 
 
+def _integrator_digest():
+    """The integrator's cross-coach weekly digest (ai_analysis EXPERT#integrator),
+    written weekly by ai-expert-analyzer. None pre-data or while the record is
+    tombstoned from a reset.
+
+    #946 — same class as _stance_latest above: the intelligence wipe stamps
+    tombstone=true + phase=pilot on every ai_analysis record, but four get_item
+    call sites (weekly_priority, coaching-dashboard, coach_analysis cross-domain
+    note, coach_team tensions) bypassed the query-level phase filter, so
+    /coaching/ kept narrating the WIPED cycle as "the board's read on you ·
+    right now". One guarded accessor closes the get_item-bypass class on this
+    record; the first post-genesis integrator run overwrites it clean."""
+    try:
+        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
+        if not singleton_visible(item):
+            return None
+        return _decimal_to_float(item)
+    except Exception:
+        return None
+
+
 def _stance_history(coach_id, limit=8):
     """Recent STANCE# snapshots (newest first) for the 'how this read evolved' trail.
     Skips the STANCE#latest pointer — the dated series IS the history."""
@@ -502,10 +523,9 @@ def _team_tensions():
     """Live cross-coach disagreements from the integrator digest (CC-10).
     Same source as get_coach_disagreements; honest empty pre-data."""
     try:
-        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"}).get("Item")
+        item = _integrator_digest()  # #946: tombstone/phase-guarded
         if not item:
             return []
-        item = _decimal_to_float(item)
         raw = item.get("disagreements") or item.get("active_disagreements") or []
         out = []
         for d in raw if isinstance(raw, list) else []:
@@ -797,7 +817,7 @@ def handle_experiment_synthesis():
     """
     ai_pk = f"{USER_PREFIX}ai_analysis"
     item = table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item")
-    if not item:
+    if not singleton_visible(item):  # #946: honest-null while tombstoned from a reset
         return _ok({"arc": None, "throughline": None, "chapters": [], "week_count": 0, "generated_at": None}, cache_seconds=300)
     item = _decimal_to_float(item)
     return _ok(
@@ -861,7 +881,9 @@ def handle_ai_analysis(event):
         return _error(400, "Invalid expert key")
     ai_pk = f"{USER_PREFIX}ai_analysis"
     ai_item = table.get_item(Key={"pk": ai_pk, "sk": f"EXPERT#{expert_key}"}).get("Item")
-    if not ai_item:
+    # #946: singleton_visible closes the tombstone gap the days_in_experiment
+    # guard below can't see (a wiped record whose day count is <= today's).
+    if not singleton_visible(ai_item):
         return _ok({"expert_key": expert_key, "analysis": None, "generated_at": None}, cache_seconds=300)
     ai_item = _decimal_to_float(ai_item)
     # Stage0 Fix 3 (2026-05-30): freshness guard. The Brandt block on /explorer/
@@ -1111,8 +1133,7 @@ def handle_coach_analysis(event):
 
         # Add cross-domain context note from the integrator (if available)
         try:
-            _int_resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
-            _int_item = _decimal_to_float(_int_resp.get("Item", {}))
+            _int_item = _integrator_digest() or {}  # #946: tombstone/phase-guarded
             _cdn = _int_item.get("cross_domain_notes", {})
             if isinstance(_cdn, dict) and domain in _cdn:
                 resp["cross_domain_note"] = _cdn[domain]
@@ -1596,8 +1617,7 @@ def handle_coach_timeline(event):
 def handle_weekly_priority(event):
     """GET /api/weekly_priority"""
     try:
-        _int_resp = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator"})
-        _int_item = _decimal_to_float(_int_resp.get("Item", {}))
+        _int_item = _integrator_digest()  # #946: tombstone/phase-guarded
         if not _int_item:
             return _ok({"weekly_priority": None, "cross_domain_notes": {}}, cache_seconds=300)
         return _ok(

@@ -32,7 +32,7 @@ from decimal import Decimal
 import boto3
 import privacy_guard  # deterministic real-name + vice gate (layer module)
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()
@@ -347,11 +347,19 @@ def gather_chronicle_data():
     arc_pk = "NARRATIVE#arc"  # platform singleton partition (not a USER#…#SOURCE# source)
     ai_pk = f"USER#{USER_ID}#SOURCE#ai_analysis"
     try:
-        narrative_arc = d2f(table.get_item(Key={"pk": arc_pk, "sk": "STATE#current"}).get("Item") or {}) or None
+        # #946: get_item bypasses the phase filter — hide a tombstoned arc, and
+        # (since NARRATIVE#arc reuses `phase` for its NARRATIVE phase, the generic
+        # singleton_visible check can't apply) an arc entered before the current
+        # genesis: it's the previous cycle's story, not this recap's throughline.
+        _arc_raw = d2f(table.get_item(Key={"pk": arc_pk, "sk": "STATE#current"}).get("Item") or {})
+        if _arc_raw and not _arc_raw.get("tombstone") and str(_arc_raw.get("entered_date") or "") >= EXPERIMENT_START_DATE:
+            narrative_arc = _arc_raw
     except Exception as e:
         logger.warning(f"Narrative arc query: {e}")
     try:
-        experiment_arc = d2f(table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item") or {}) or None
+        _exp_arc_raw = table.get_item(Key={"pk": ai_pk, "sk": "EXPERT#experiment_arc"}).get("Item")
+        if singleton_visible(_exp_arc_raw):  # #946: honest-null while tombstoned from a reset
+            experiment_arc = d2f(_exp_arc_raw) or None
     except Exception as e:
         logger.warning(f"Experiment arc query: {e}")
 
