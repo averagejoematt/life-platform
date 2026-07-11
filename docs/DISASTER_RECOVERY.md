@@ -1,8 +1,8 @@
 # Disaster Recovery
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
-**Last updated:** 2026-07-10 (first DR drill exercised — #755; retired-layer backup step corrected)
+**Last updated:** 2026-07-11 (Scenario 8 — stolen/lost laptop: RPO + rotation checklist, from the #1024 audit)
 
 > What can go catastrophically wrong, and the recovery sequence for each. Not exhaustive — meant as a starter playbook.
 
@@ -19,6 +19,7 @@
 | S3 bucket corruption (specific path) | 5 min (versioned restore) | Versioning enabled — every put |
 | S3 bucket deletion (catastrophic) | ⚠️ NOT RECOVERABLE — cross-region replication not enabled (ADR-057 W-03 deferred) | — |
 | Account compromise | Hours (rotate all secrets + audit CloudTrail) | Depends on compromise window |
+| Stolen / lost laptop | Hours (rotate device-resident creds + rebuild on a new machine) | Pushed git = last push; Claude memory + `datadrops/` ≤24h behind once #1026 lands (manual/unbounded until then) — see Scenario 8 |
 | us-west-2 region outage | Hours-days (no DR region — ADR-057 W-03 deferred) | — |
 | Anthropic API outage | Auto-degrade — see below | — |
 
@@ -254,6 +255,111 @@ Per ADR-057 W-03, this is deferred — overkill for current scale.
 
 ---
 
+## Scenario 8 — Stolen / lost laptop
+
+**Symptoms:** the development laptop is stolen, lost, or otherwise out of your physical
+control. This is the consolidated device-loss playbook from the stolen-laptop resilience
+audit (epic #1024, 2026-07-11). Audit verdict: **~90% of the platform is recoverable from
+AWS + git** — nothing production-critical lives only on the laptop — but a small set of
+device-resident credentials and un-pushed work needs deliberate handling.
+
+**First decision — is this a breach or an inconvenience? (FileVault)**
+The entire severity of this scenario hinges on macOS FileVault full-disk encryption:
+- **FileVault ON and the machine was locked / powered off when lost** → the disk is
+  unreadable without your login password. Theft is an *inconvenience*: buy a new machine,
+  rebuild it (Scenario: rebuild via the from-zero bootstrap runbook, #1028), and treat the
+  rotation checklist below as *precautionary*, not an emergency.
+- **FileVault OFF, or the machine was awake / unlocked when taken** → assume **full
+  compromise** of everything a logged-in shell could reach. Execute the rotation checklist
+  **immediately** — this is Scenario 5 (account compromise) with a device-loss ordering.
+
+FileVault being enabled is the single control that turns this from a breach into a
+shrug. It is an owner-verifiable setting (`System Settings → Privacy & Security →
+FileVault`); confirming it is tracked in the re-entry hardening story #1029.
+
+### Recovery Point Objective (what could be lost)
+
+**RPO line:** pushed git is safe to the last push; **Claude memory + `datadrops/`
+originals will be ≤24h behind once the launchd backup job (#1026) is live** — until that
+job lands the backup is manual and the window is unbounded (whatever was last copied by
+hand); **un-pushed git WIP = whatever's on `origin`, everything else is gone.**
+
+Grounded in what actually lives *only* on the laptop:
+
+| Laptop-only asset | Backed by | RPO |
+|---|---|---|
+| Git-tracked code + docs | GitHub `origin` | Last push (near-zero if you push per session) |
+| Un-pushed commits / working-tree edits / `git stash` entries | **nothing** | Total loss beyond `origin`; today's orphaned commits + stashes are being rescued under #1025 |
+| Claude memory dir (`MEMORY.md` + topic files) | **manual today → S3 daily once #1026 lands** | ≤24h target (post-#1026); manual/unbounded until then |
+| `datadrops/` originals (raw source drops) | same as memory (#1026) | ≤24h target (post-#1026); manual/unbounded until then |
+| On-device break-glass AWS keys | Secrets/IAM (not a data-loss risk — a *compromise* risk) | n/a — see rotation checklist |
+
+The practical takeaway: **push often, and land #1026** so the two laptop-only data
+directories stop being a silent loss surface.
+
+### Credential / secret rotation checklist (compromised laptop)
+
+Priority order = blast radius first. The rotation *mechanics* live in Scenario 5 above
+and in `docs/SECRETS_ROTATION.md`; this is the device-loss ordering. Do **not** enumerate
+key file paths here (repo is public) — the device-resident credential inventory is in
+`docs/AWS_ACCESS.md` and `docs/ACCOUNTS.md`.
+
+1. **AWS break-glass keys — do this first (highest blast radius).** The long-lived
+   access keys on IAM user `matthew-admin` (the break-glass path, `docs/AWS_ACCESS.md` §3)
+   can be present on the laptop and grant admin to account 205930651321. Deactivate then
+   delete them immediately (`aws iam update-access-key … --status Inactive`, then
+   `delete-access-key`; procedure in Scenario 5 step 2). **Because IAM Identity Center
+   (SSO) is currently OFF** (audit gap, tracked in #1029), these long-lived keys *are* the
+   human-access path — killing them is the whole game. If/when SSO is enabled per
+   `docs/AWS_ACCESS.md` §2, also revoke active SSO sessions.
+2. **GitHub session + token revocation.** Revoke all other web sessions
+   (github.com → Settings → Sessions → *Revoke all other sessions*), regenerate any `gh`
+   CLI token / personal access token the laptop held, and audit registered SSH keys
+   (remove the stolen machine's key). This stops an attacker pushing to `origin` or
+   reading the repo.
+3. **Secrets Manager `life-platform/` prefix.** A logged-in shell on the laptop could
+   read and write every secret under the prefix. Rotate per the Scenario 5 three-class
+   sequence and `docs/SECRETS_ROTATION.md` §"Compromise procedure", in this order:
+   (a) internal HMAC signing secrets (`subscriber-token-secret`, `ritual-token-secret`,
+   `site-api-origin-secret`) — generate new random values (invalidates outstanding
+   tokens, acceptable here); (b) vendor API keys — Anthropic `ai-keys` +
+   `site-api-ai-key` first (spend blast radius), then Hevy / Todoist / Habitify / etc.,
+   revoked at each provider then `put-secret-value`; (c) OAuth refresh tokens — revoke the
+   app grant at the provider, then re-run each `setup/` auth flow.
+4. **The Whoop single-use-refresh-token trap.** Whoop rotates the refresh token on every
+   use, so a *leaked refresh response permanently invalidates it* — if the attacker
+   redeems it once, your ingestion 401s; if you re-auth, theirs dies. Either way the fix
+   is a full browser re-auth via `deploy/setup_whoop_auth.py` (see `docs/SECRETS_ROTATION.md`
+   §Whoop). Do this deliberately — a half-finished Whoop re-auth leaves ingestion broken.
+5. **Everything else the browser/keychain held.** claude.ai / Claude Code session,
+   third-party connector tokens (Notion, Dropbox, …), and any browser-saved provider
+   logins. The successor-facing inventory of these accounts is `docs/ACCOUNTS.md`
+   (see its estate / break-glass section).
+
+### What's recoverable vs. what's truly lost
+
+**Recoverable from AWS + git (the ~90%):**
+- All Lambda code, the 9 CDK stacks, and the site — reproducible from git +
+  `deploy/build_bundle.py` + `cdk deploy --all` (see "What IS protected").
+- All production data — DynamoDB via 35-day PITR, S3 via versioning.
+- All wiki/docs — in git.
+- A brand-new machine is brought back online by re-authenticating per
+  `docs/AWS_ACCESS.md` and following the from-zero rebuild runbook (#1028).
+
+**Truly lost (the gap the RPO quantifies):**
+- Un-pushed git commits, working-tree edits, and `git stash` entries beyond what's on
+  `origin` (today's are being rescued under #1025).
+- Claude memory + `datadrops/` changes since the last backup — bounded to ≤24h once #1026
+  lands, otherwise back to the last manual copy.
+- Any purely-local scratch that was never committed or uploaded.
+
+**Cross-refs:** epic #1024 · git-WIP rescue #1025 · launchd backup that sets the RPO
+#1026 · from-zero rebuild runbook #1028 · re-entry hardening (Identity Center, FileVault,
+ACCOUNTS estate rows) #1029 · rotation mechanics: Scenario 5 above +
+`docs/SECRETS_ROTATION.md`.
+
+---
+
 ## Pre-emptive: Daily/weekly backups to keep
 
 Although automatic backups handle most cases, periodically (e.g. monthly):
@@ -298,7 +404,7 @@ Document outcomes in `docs/INCIDENT_LOG.md` as "DR drill" entries and in the log
 
 ---
 
-**Verified:** 2026-07-10 (DR drill exercised — first DDB PITR restore; S3 versioned restore)
+**Verified:** 2026-07-11 (Scenario 8 stolen/lost-laptop added from the #1024 audit; DR drill 2026-07-10 — first DDB PITR restore + S3 versioned restore)
 
 
 ## GitHub repo-configuration reconstruction

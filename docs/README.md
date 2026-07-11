@@ -24,15 +24,16 @@ folder hierarchy, is how you navigate. Every page carries a status header
 1. [ONBOARDING.md](ONBOARDING.md) — the mental model (what this system is, in one page)
 2. [REPO_STRUCTURE.md](REPO_STRUCTURE.md) — the repo map + "where does X go" rules
 3. [AWS_ACCESS.md](AWS_ACCESS.md) — get AWS access (SSO — the one true auth procedure)
-4. [QUICKSTART.md](QUICKSTART.md) — fresh laptop → first deploy
-5. [ARCHITECTURE.md](ARCHITECTURE.md) — the full system design
-6. [CONVENTIONS.md](CONVENTIONS.md) — the load-bearing reflexes (read before your first deploy)
+4. [QUICKSTART.md](QUICKSTART.md) — fresh laptop → first deploy (already have the toolchain + AWS access)
+5. [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the layer below QUICKSTART: bare metal → operational (rebuild a lost/replacement Mac from zero)
+6. [ARCHITECTURE.md](ARCHITECTURE.md) — the full system design
+7. [CONVENTIONS.md](CONVENTIONS.md) — the load-bearing reflexes (read before your first deploy)
 
 **"I'm operating the system today"** (on-call view):
 [RUNBOOK.md](RUNBOOK.md) — daily ops + troubleshooting · [MONITORING.md](MONITORING.md) — what fires and why · [SLOs.md](SLOs.md) · [OPERATOR_GUIDE.md](OPERATOR_GUIDE.md) — the daily health check · [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) — backups + drilled restore procedures
 
 **"I'm taking this platform over from the AI"** (successor view):
-[CONTINUITY.md](CONTINUITY.md) — the map of every state surface outside `docs/` (session handovers, platform memory, skills), the memory-export tooling, and the day-1 reading order.
+[CONTINUITY.md](CONTINUITY.md) — the map of every state surface outside `docs/` (session handovers, platform memory, skills), the memory-export tooling, and the day-1 reading order · [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) — the from-zero rebuild runbook if the laptop is gone.
 
 **"I'm changing the public website"**:
 [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) — the durable why · [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) — what each page is for · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) — the standards · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) — how to change it well · [SITE_AUTHORING.md](SITE_AUTHORING.md) — add/change a page end-to-end
@@ -61,11 +62,13 @@ folder hierarchy, is how you navigate. Every page carries a status header
 
 | Doc | |
 |---|---|
+| [NEW_MACHINE_BOOTSTRAP.md](NEW_MACHINE_BOOTSTRAP.md) | Bare metal → operational: rebuild a lost/replacement Mac from zero (the layer below QUICKSTART) |
 | [QUICKSTART.md](QUICKSTART.md) | Cold start + "I edited X, what do I run?" decision tree |
 | [AWS_ACCESS.md](AWS_ACCESS.md) | Get/verify AWS access (SSO primary, break-glass keys, CI's OIDC roles) |
 | [RUNBOOK.md](RUNBOOK.md) | Operate + troubleshoot everything |
 | [RUNBOOK_REENTRY.md](RUNBOOK_REENTRY.md) | OAuth re-auth / data-source re-entry |
 | [SITE_AUTHORING.md](SITE_AUTHORING.md) | Add/change a public-site page end-to-end |
+| [ADD_A_COACH.md](ADD_A_COACH.md) | The paved path for extending the coach roster (persona registry → engine ids → portrait/quality gates → deploy) |
 | [TESTING.md](TESTING.md) | Test layers, run commands, golden harnesses, visual QA |
 | [DISASTER_RECOVERY.md](DISASTER_RECOVERY.md) | Restore procedures (PITR + S3 — exercised 2026-07-10) |
 | [REVIEW_METHODOLOGY.md](REVIEW_METHODOLOGY.md) · [SITE_REVIEW_METHODOLOGY.md](SITE_REVIEW_METHODOLOGY.md) | Run an architecture / site audit |

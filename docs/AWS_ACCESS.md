@@ -181,4 +181,6 @@ aws s3 ls s3://matthew-life-platform/site/ --region us-west-2 | head
 ```
 
 If both succeed, continue with `docs/QUICKSTART.md` §1 (toolchain + clone) and
-you're on the path to a first deploy.
+you're on the path to a first deploy. Rebuilding a lost or replacement machine from
+zero (this auth step is step 3 of it) is stitched into one ordered runbook:
+`docs/NEW_MACHINE_BOOTSTRAP.md`.

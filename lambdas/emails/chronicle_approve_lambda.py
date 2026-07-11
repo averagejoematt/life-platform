@@ -7,12 +7,11 @@ Invoked via Lambda Function URL (HTTPS GET):
 
 On approve:
   1. Validates token against DynamoDB draft record
-  2. Writes pre-built blog post + index HTML to S3 (blog/)
-  3. Writes pre-built journal post + posts.json to S3 (site/journal/)
-  4. Creates CloudFront invalidation for affected paths
-  5. Updates DynamoDB status: draft → published
-  6. Invokes chronicle-email-sender to deliver to subscribers
-  7. Returns HTML confirmation page
+  2. Writes pre-built journal post + posts.json to S3 (generated/journal/)
+  3. Creates CloudFront invalidation for affected paths
+  4. Updates DynamoDB status: draft → published
+  5. Invokes chronicle-email-sender to deliver to subscribers
+  6. Returns HTML confirmation page
 
 On request_changes:
   1. Validates token
@@ -125,34 +124,6 @@ def _publish_to_s3(item: dict) -> list[str]:
     """Write pre-built HTML artifacts to S3. Returns list of invalidated CF paths."""
     invalidation_paths = []
 
-    # Blog post
-    blog_post_key = item.get("draft_blog_post_key", "")
-    blog_post_html = item.get("draft_blog_post_html", "")
-    blog_index_html = item.get("draft_blog_index_html", "")
-
-    if blog_post_key and blog_post_html:
-        s3.put_object(
-            Bucket=S3_BUCKET,
-            Key=blog_post_key,
-            Body=blog_post_html,
-            ContentType="text/html",
-            CacheControl="max-age=3600",
-        )
-        logger.info("S3: wrote %s", blog_post_key)
-        invalidation_paths.append("/" + blog_post_key)
-
-    if blog_index_html:
-        s3.put_object(
-            Bucket=S3_BUCKET,
-            Key="blog/index.html",
-            Body=blog_index_html,
-            ContentType="text/html",
-            CacheControl="max-age=300",
-        )
-        logger.info("S3: wrote blog/index.html")
-        invalidation_paths.append("/blog/")
-        invalidation_paths.append("/blog/index.html")
-
     # Journal post
     journal_post_key = item.get("draft_journal_post_key", "")
     journal_post_html = item.get("draft_journal_post_html", "")
@@ -232,7 +203,7 @@ def _mark_published(date_str: str) -> None:
             Key={"pk": CHRONICLE_PK, "sk": f"DATE#{date_str}"},
             UpdateExpression=(
                 "SET #s = :published, approved_at = :now "
-                "REMOVE approval_token, draft_blog_post_html, draft_blog_index_html, "
+                "REMOVE approval_token, "
                 "draft_journal_post_html, draft_journal_posts_json, draft_email_html, draft_recap_json, "
                 "draft_share_kit_json"
             ),
