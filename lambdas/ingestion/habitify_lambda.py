@@ -162,16 +162,25 @@ def fetch_moods(api_key, target_date):
 
 
 def fetch_notes(api_key, habit_id, target_date):
-    """#422: per-habit notes for one date (GET /notes/{habit_id}?target_date=...).
+    """#422: per-habit notes for one date (GET /notes/{habit_id}?from=...&to=...).
+
+    #950: the notes endpoint requires a from/to RANGE — it 412s on target_date
+    ("Unable to find to, from. Expect to, from in query"), which silently killed
+    this channel since ship (non-fatal contract swallowed every call). We send the
+    target day's UTC bounds using the same ISO-8601 `+00:00` convention the
+    journal/moods endpoints use.
 
     Non-fatal by contract — notes are the causality layer, never worth failing the whole
     habit ingest over. Returns ``[{"content": str, "created_at": str}]`` (verbatim, clipped),
     filtered to notes actually created on ``target_date`` so a note is never smeared across
-    every day if the API ignores the date param.
+    every day if the API returns a wider range than requested.
     """
-    date_str = f"{target_date}T00:00:00+00:00"
+    params = {
+        "from": f"{target_date}T00:00:00+00:00",
+        "to": f"{target_date}T23:59:59+00:00",
+    }
     try:
-        raw_notes = api_get(f"/notes/{habit_id}", api_key, {"target_date": date_str})
+        raw_notes = api_get(f"/notes/{habit_id}", api_key, params)
     except Exception as e:
         logger.warning("Notes fetch failed for habit %s on %s (non-fatal): %s", habit_id, target_date, e)
         return []
