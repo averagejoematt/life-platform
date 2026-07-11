@@ -56,6 +56,7 @@ sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from source_registry import catalog_entries  # noqa: E402 — the authoritative device list
+from v4_chrome import doors_nav, site_footer  # noqa: E402 — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402 — shared .loop-ribbon (#578)
 
 SLUG = "gear"
@@ -278,44 +279,18 @@ MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 # ships a dead toggle — #904 does better with a real, self-wiring module init).
 THEME_SCRIPT = '<script type="module">import { initTheme } from "/assets/js/theme.js"; initTheme();</script>'
 
-DOORS = [
-    ("/now/", "the cockpit", "cockpit", "Today's live instrument — your daily numbers, read back to you"),
-    ("/data/", "the data", "data", "Every source the platform reads — trends now and over time"),
-    ("/coaching/", "the coaching", "coaching", "The AI team & their arguments — stances, track records, disagreements"),
-    ("/protocols/", "the protocols", "protocols", "The levers — supplements, experiments, challenges, discoveries"),
-    ("/story/", "the story", "story", "The writing & the why — chronicle, journal, timeline, about"),
-]
 
-
-def door_icon(key: str) -> str:
-    return f'<svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-{key}"></use></svg>'
-
-
+# Doors nav + footer are the shared chrome partial (#1009). /gear/ is a footer-tier page
+# (not one of the five doors) — no door is marked current, and there's no follow pill.
 def topbar() -> str:
-    # /gear/ is a footer-tier page, not one of the five doors — no door is marked current.
-    links = "".join(f'<a href="{href}" title="{esc(title)}">{door_icon(key)}{label}</a>' for href, label, key, title in DOORS)
     return (
         '<header class="ev-top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span>'
         '<span class="brand-name">averagejoematt</span> <span class="brand-door label">gear</span></a>'
-        f'<nav class="doors" aria-label="Doors">{links}'
-        '<button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav></header>'
+        f"{doors_nav(None, with_follow=False)}</header>"
     )
 
 
-FOOTER = (
-    '<footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map">'
-    '<div class="sf-col"><p class="sf-h label">The Story</p>'
-    '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/about/">About</a></div>'
-    '<div class="sf-col"><p class="sf-h label">The Data</p>'
-    '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a></div>'
-    '<div class="sf-col"><p class="sf-h label">The Protocols</p>'
-    '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
-    '<div class="sf-col"><p class="sf-h label">The Coaching</p>'
-    '<a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>'
-    '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
-    '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/gear/">The gear</a><a href="/method/">The method</a><a href="/privacy/">Privacy</a></div>'
-    '</nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p></footer>'
-)
+FOOTER = site_footer()
 
 # Page-specific styling only — scoped under .gr-*, tokens-only (no hardcoded colour/
 # spacing), additive per DESIGN_SYSTEM_V5 §3 ("reuse what already exists" first: this

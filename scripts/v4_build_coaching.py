@@ -2,6 +2,12 @@
 """
 v4_build_coaching.py — generate Door 4 "The Coaching" (/coaching/).
 
+CHROME NOTE (#1009): the `<nav class="doors">` and `<footer class="site-foot">` emitted
+inline below are NOT the source of truth — `scripts/v4_apply_chrome.py` re-flattens them
+to `scripts/v4_chrome.py` on every deploy (it runs last in `deploy/sync_site_to_s3.sh`).
+Edit the doors nav / footer in `v4_chrome.py`, not here; the inline copy here will be
+normalized away.
+
 Promoted out of the Story tabs (2026-06-20, Option A) into its own top-level door:
 the AI team that reads the data — "My Team" → each coach (master-detail) → the AI
 lab notes (the Third Wall). Emits an app shell at site/coaching/index.html AND a
