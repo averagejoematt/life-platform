@@ -1,129 +1,107 @@
-# HANDOVER — Cycle-5 reset executed early with a live countdown: stall audits → 8 PRs (honesty machinery) → nuke-now, genesis Sunday 2026-07-12 — 2026-07-10/11
+# HANDOVER — Overnight full-platform sweep: 13-lens survey → 67/70 verified → 34 issues filed → 10-fix wave shipped live on launch eve — 2026-07-11
 
-> Instruction: "another platform reset, new start date Sunday July 12 … review the reset
-> protocols and make sure it's fully complete … BEFORE the plan, review the actual content
-> of all web pages — 2 weeks of not logging while Whoop/EightSleep kept flowing: do the
-> coaches sound accurate? … character should be sad, levels dropping … run it past
-> psychology/medical/sports-science/biohacking/product/reader experts." Mid-session:
-> "I approve all merges and deploys, green light in advance" → "why can't we have
-> everything nuked NOW and the site becomes a countdown to Sunday?" → executed. Also:
-> "the platform (other than the reset page) must NOT know it's another attempt — no
-> reset article, intro podcast treats it as the start."
+> Instruction: "plan our usual /uplevel and full sweep of the platform — bug bash, hackathon,
+> missing features, code quality, doc drift, content/AI generation, the throughline, the purpose,
+> the database. Also a deliberate session on the character gamification mathematics — every
+> source's contribution, defensible growth AND retraction over a year+ across pillars. Also:
+> how much does Claude fully understand the platform, and what SDLC/context/subagent changes
+> would maximize efficacy. Full sweep → issues in the backlog, make no mistakes." Mid-session:
+> "I approve all merges, edits, deploys this session — I'll be sleeping, wake me to it done."
 
-## What shipped (all merged + deployed + live)
+## What ran (the machine)
 
-**The investigation (4 audits + 6-seat expert panel + 47-agent truth-audit workflow):**
-`docs/reviews/EDITORIAL_ACCURACY_REVIEW_2026-07-10.md` — 34 verified serious findings
-(4 critical, incl. two live privacy leaks). Headline: the AI coach layer mostly named the
-15-day stall honestly (presence engine #892 was live); the deterministic/front-end layer
-papered over it, and the character LEVELED UP 8→13 during total silence (up-gate scale
-bug, `character_engine.py:896`-class). Plan: `docs/restart/RESET_PLAN_2026-07-12.md`.
+Plan-mode recon (3 explorers) → 13-lens Workflow survey (~1.5M tokens, 70 raw findings, every
+lens seeded with evidence rules + §13b + the open-issue list) → driver dedup (8 merge groups) →
+12-batch finding-verifier pass (**67 CONFIRMED / 2 REFUTED / 1 PLAUSIBLE — vs the historical
+~50% FP rate; the seeding is why**) → 34 issues filed per ADR-099 (#945–#978, labels+milestones+
+score lines, char-math epic #956 with 9 linked stories) → 10 worktree-implementers in parallel →
+serial reconcile-merge queue → fleet deploy 95/95 + site-api redeploy + 2 green site-deploys +
+config sync/invalidations → live verification. The ritual is now reusable:
+**`.claude/commands/platform-review.md`** (+ `.claude/agents/issue-filer.md`).
 
-**8 PRs, all merged + deployed tonight:**
-- **#920** privacy hotfix — LPA genotype stripped from public labs API (153→152, live-verified);
-  real-person recommenders (Huberman/Attia/Murthy/Conti/Patrick/Norton/Galpin) remapped to the
-  fictional cast on challenges + supplements (both S3 mirrors synced, CF invalidated).
-- **#921** presence hardening — habitify gap bug (wrote a record daily → gap read 0 through a
-  14-day zero-completion stall; now counts only `total_completed>0` days), registry-owned
-  engagement channels facet (+withings measurement channel), severity ladder
-  (soft/loud/alarm), ONE shared presence block injected into every narrative prompt
-  (coaches/chronicle/panelcast/brief/State-of-Matthew), deterministic acknowledgment gate
-  (ADR-108 pattern), per-domain recency stats kill aggregate dilution, authoritative-facts
-  fixes (dark-week synthesis, past-tense scale-dark rule, no-arithmetic counts).
-- **#919** character neglect-honesty — up-gate scale bug fixed (+14-dark-days ⇒ zero level-ups
-  regression test), engagement atrophy (×0.98^(gap−3) on behavioral pillars, planned-pause
-  exempt), visible XP debt, deterministic `character_mood` (thriving/steady/fading/dormant),
-  dormant/fading hero UI, celebrations suppressed in a lull.
-- **#922** staleness pack — 13 dead-source honesty fixes (family panel "nothing logged for N
-  days", as-of weight labels, layoff states on training/nutrition, circadian unmeasured
-  anchors, machine-spec leak translated, field-note fabrication bug (read a nonexistent
-  field → "6 of 7 days" over a 0-of-7 week), eightsleep UTC double-date (framework now PT)).
-- **#918** reset-protocol clean sweep — wipe coverage crash fixed (6 missing sources), fail-fast
-  pipeline, outgoing-genesis literal sweep (`--old-genesis`), v4 chronicle page archival,
-  `--close-cycle` (CYCLE_GENESES + SSM bump + `docs/restart/RESET_LOG.md`), stance-tombstone
-  filtering (pre-start coach mode can engage), `restart_media_reset.py` (panelcast/debrief),
-  verify gate rebuilt to the 40-URL v4 surface.
-- **#917** coach check-in MCP loop — `get_coach_checkin_queue`/`log_coach_checkin` (62→64 tools),
-  COACH# CHECKIN# records w/ cycle stamps, asking-coach picked by most-overdue channel,
-  psychology-panel rules encoded (autonomy-supportive, zero-penalty skip, barriers-not-guilt).
-  Follow-ups open: CHECKIN# taxonomy line + `recent_checkins_block` prompt injection.
-- **#939** pre-start countdown — `pre_start`/`days_until_start` payload contract
-  (journey/snapshot/pulse; baseline-dependent claims nulled), countdown hero/cockpit banner,
-  "starts in N days" stamps, character "record begins Day 1", inert-while-genesis-past proven.
-- **#941** reset-aware tests — sweep tests onto synthetic fixtures (they ate themselves after a
-  real reset), pre-genesis window pins (genesis monkeypatched, never wall-clock-coupled).
+## What shipped (all merged + deployed + live-verified; main green 4607/0)
 
-**THE RESET RAN (2026-07-10 ~21:40–23:10 PT):** `restart_pipeline.py --genesis 2026-07-12
---override-weight-lbs 300.8 --apply` (+ resume with `--skip-deploy` after one abort — see
-gotchas). Cycle 4→5 closed (SSM=5, RESET_LOG appended), ~2.2k records tombstoned (archived,
-never deleted; raw timeseries phase-tagged `pilot`, cycle-stamped), ledger rolled to
-LIFETIME#+CYCLE_TOTALS#004, both origin lead-ins upleveled in DDB (grounding-diff verified,
-backups in `docs/restart/leadin_backups/` + S3) and re-dated Jul 6/7, rendered via new
-`deploy/restart_leadin_pages.py` (week-01/02 + posts.json manifest), OG images regenerated,
-character recomputed fresh (Level 1 Foundation). **Verify gate 40/40.** Site is LIVE in
-countdown state: "T−2 days … first baseline: Sunday's weigh-in." Site-deploy + smoke +
-visual-QA green end-to-end after the pre-start gate fixes.
+- **#944** un-red main: reset-aware proof-snapshot assertion (baseline was 1-red from the reset's honest refresh).
+- **#945/PR983 privacy** — genome identifiers purged from repo test fixtures (synthetic sentinel), supplements registry (both mirrors + root S3 + CF invalidation + container recycle), build beats. Live-verified gene-free (the last "hit" was grep matching the empty `genome_snps` key itself).
+- **#946/PR986 reset singletons** — `singleton_visible()` guard on every `get_item` reader (orchestrator, expert analyzer, character fallback, 4 site-api sites, chronicle/Elena); NARRATIVE#arc restarts `early_baseline` when `entered_date` < genesis (was: week 1 narrated under cycle-4 "setback" with no exit but "breakthrough"); Elena PERSONA + arc wipe coverage.
+- **#947/PR980** — character `fetch_date`/`load_previous_state` phase-filtered; pilot records can't chain xp_debt/streaks/mood into Day-1 compute.
+- **#948/PR988 pre-start contracts** — observatory_week (inverted-window fabrication), future `as_of` stamps, journey ghost weight, cycles degenerate copy, waveform day clamp, weekly_priority, forecast flag; all #939-pattern, self-disarming post-genesis. Playwright 12/12.
+- **#949/PR989 countdown content** — coaching door cycle-4 board read, podcast bet ledger, home-hero 315-lbs hardcode (now live-bound), discovery ticker, story deks (+ render-parity twin in the Wednesday publisher), public_stats pre-start contract in site_writer, subscribe CTA + protocols banner riders. Mechanism-level (re-arms every reset). Render-QA 142 checks/0 fail.
+- **#950/PR979** — habitify notes 412-since-ship fixed (from/to range params) — the #898 "why missed" channel actually ingests for cycle 5.
+- **#951/PR987 (also closed #930)** — phase taxonomy made TOTAL (all 83 live pk families classify; protects Sunday's pipeline re-run from KeyError), SSM cycle-bump ordering, subscribe rate-limit TTL attr, prologue cycle re-stamp at resurrect.
+- **#952/PR985 AI trio** — few-shot examples stripped from the ADR-104 fabrication allow-list; `[AI_UNAVAILABLE]` sentinel held (never gate-passed/cached/rendered); BoD intro derives identity/phase from the profile (dropped the stale age token + frozen Phase-1 targets).
+- **#953/PR981** — repo-walk isolation test skips `.claude`/`cdk.out` (audited all 15 walkers); `scripts/validate_beats.py` wired into /wrap.
+- **#954/PR984 character gates** — up-gate vs UNboosted EMA target (cross-pillar bonuses froze boosted pillars at L1 forever); XP demotion buffer monotone (was `%100`, wrapped upward on decline). ENGINE_VERSION 1.3.1. Re-sim: steady-good now L71 with metabolic climbing (was L49/frozen); the "oscillator out-levels steady" inversion is gone.
+- **PR982 docs** — `docs/engines/CHARACTER_MATH_AUDIT_2026-07.md` (verdict table + 420-day sim `scripts/character_sim_year.py`), `docs/reviews/CLAUDE_PLATFORM_UNDERSTANDING_2026-07.md` (the self-assessment Matthew asked for), `/platform-review` skill, `issue-filer` agent, CLAUDE.md drift fixes, R22 charter EXECUTED stamp.
+- **PR990** — #946×#951 PERSONA#elena semantic collision (elena = experiment_scoped per the verified bug; margaret stays cross_phase) + order-proofed the observatory test (dual module identity `web.site_api_common` vs `site_api_common`).
+- **PR991** — §13b resolved rows + `docs/reviews/SWEEP_MANIFEST_2026-07-11.json` (anti-re-flag).
+
+## The backlog Matthew wakes up to (24 open, all scored/labeled/milestoned)
+
+**Now:** #955 (presence-across-genesis DECISION — the ack-gate will force the pre-genesis ~17-day
+gap into week-1 narratives unless clamped or embraced; bites Monday), #957 (climb-during-darkness
+CRITICAL — blend floor 15.6 re-opens the up-gate after ~15 dark days; a never-logging fresh
+character reaches L16 in 60 days while mood=dormant; needs a model decision), #976 (cycle-5
+pre-registration moment — decays fast after Day 1), #741, #942.
+**Next:** char-math epic #956 stories (#958 XP zero-point at raw 80 / #959 30-day dark ≈ 2 levels /
+#960 Elite unreachable / #961 post-engine bypasses / #962 dead inputs / #964 phantom debt /
+#965 hevy-reading-todoist wiring — movement is blind to lifting), AI gates (#966 daily-brief
+ADR-104 hole, #967 presence-block gaps, #968 quality-gate coverage), #969–#970 cleanups,
+#973 doc-drift gate-gap class, #974–#975 cockpit levers + manual-input instrumentation,
+#977 permissions kernel, #978 protocols tense. **Later:** #963, #971, #972, #748.
 
 ## Verified
-Full suite green on main post-#941 (4471 passed; hevy-isolation passes in clean checkouts —
-locally polluted by the wiki session's live worktree). Site-deploy workflow: success (3rd
-attempt; first two auto-rollbacks were the gates correctly rejecting pre-start states the
-site didn't render yet). Live checks: `/api/journey` pre_start=true days_until_start=2;
-pulse narrative T−2; `/api/labs` genotype-free; `/journal/posts.json` = 2 Prologue entries;
-engagement STATE#current severity=alarm gap=15 w/ habitify gap 13 (was 0); coach reasons
-reader-readable. CI/CD run on the #941 merge: was in progress at wrap — check
-`gh run list --workflow=ci-cd.yml` (all gates it covers were green locally).
+
+Full suite green on main post-everything: **4607 passed, 74 skipped, 10 xfailed, 0 failed**
+(creds-blanked). CI on main: green (deploy skipped where nothing to deploy). Fleet deploy
+95 updated/0 skipped/0 failed @ 5f434c6d; site-api redeployed (handler-import verified);
+site-deploy workflow green TWICE (privacy purge, countdown sweep) — smoke + visual-AI QA
+passed, zero rollbacks. Live checks: /api/supplements + /config registry + beats.json
+gene-free; /api/weekly_priority null+pre_start; /api/observatory_week honest null (no
+inverted window); /api/journey current_weight null, pre_start true, days_until_start 1;
+/api/character as_of clamped to today; home hero 315-free; version.json == HEAD-era build.
 
 ## Gotchas (durable ones also in memory)
-- **DDB reserved keyword `hidden`** in the resurrect UpdateExpression — dry-run can't catch
-  UpdateItem validation; alias via ExpressionAttributeNames (fixed in-flight).
-- **Pipeline resume loses the outgoing genesis**: after constants regenerate, a re-run
-  snapshots old-genesis = new genesis and the literal sweep no-ops. Re-ran
-  `restart_site_copy_sync.py --old-genesis 2026-06-14 --apply` manually. Durable fix idea:
-  persist outgoing genesis to the report dir on first run.
-- **`aws lambda invoke` payload**: raw `{}` WITH `--cli-binary-format raw-in-base64-out`
-  (base64+flag sends the literal base64 string → exit 254). Fixed in site_copy_sync.
-- **The site-deploy gates assume a running experiment**: smoke required weight_lbs,
-  visual-QA required a non-empty lab-notes pane → two auto-rollbacks until smoke became
-  pre_start-aware + BOTH dispatches.js and coaching.js (same bug, two modules) render honest
-  empty states into `[data-dx-read]`.
-- **Cross-session collision**: wiki PR #926 (branched pre-my-commit) reverted my 3 docs from
-  main without meaning to — restored in 2059db49. Also its beat used string PRs in
-  beats.json (schema wants label/url objects) → broke test_build_dispatches for everyone.
-- **restart_docs_update prepend** buried the new wiki `> **Status:**` header on CHANGELOG →
-  wiki index gate red. Prepend is now header-aware.
-- Coherence sentinel ALARMS during any pre-start window (week underflow) — expected through
-  Sat; bounded pre-start grace filed as **#942**. Remediation agent (07:45 PT Sat) should
-  treat it as expected.
 
-## Next picks / residuals
-1. **Matthew, Sunday morning:** weigh in fasted, then re-run
-   `python3 deploy/restart_pipeline.py --genesis 2026-07-12 --apply` (idempotent; re-anchors
-   baseline from the real weigh-in, replacing the 300.8 override). Everything else self-runs.
-2. **Matthew (blocked-by-classifier one-liner):** delete 3 verified-duplicate eightsleep
-   records: `for d in 2026-06-27 2026-07-03 2026-07-11; do aws dynamodb delete-item --table-name life-platform --key "{\"pk\":{\"S\":\"USER#matthew#SOURCE#eightsleep\"},\"sk\":{\"S\":\"DATE#$d\"}}"; done`
-3. Intro podcast EP0 (week 1, quality-gated): a true introduction — the experiment, the
-   coaches, Day-0 baselines, each coach's dated ledger-logged prediction. **NO prior-cycle
-   references, no stall story** (fresh-start rule; /data/cycles/ is the only reset-aware page).
-4. #942 coherence pre-start grace; #917 follow-ups (CHECKIN# taxonomy line,
-   recent_checkins_block injection into expert/brief prompts).
-4b. **LATE ADDITION (post-wrap, same night): the pre-launch content calendar (#943, merged
-   + applied live).** Matthew: "prequels on a declared schedule — X days before chronicle 1,
-   Y before podcast prequel — part of updating dates; the platform must not know it's
-   another attempt." PRELAUNCH_CALENDAR in restart_chronicle_handler.py now drives the arc:
-   G−6 "Before the Numbers" (the recovered week-00 Prologue — its DDB record was a 3-word
-   S3 pointer; restart_leadin_repair.py extracted + vetted the real 1242-word article),
-   G−4 "The Empty Journal", G−3 "The Body Votes First", G−2 the wk0 Elena-preview podcast
-   (resurrected from archive — transcript vetted clean). restart_leadin_pages.py is now a
-   pipeline step (chronicle → media → pages). LIVE: 3 Prologue chapters + EP0 preview,
-   verify 40/40. Gotchas: the scorecard noscript bakes evaluator_live_since from
-   scripts/proof_snapshot.json when the live API is empty — refresh that fallback at reset;
-   an agent quoted the scrubbed private details in the PUBLIC PR body (#943 — scrubbed) and
-   committed the unvetted original backup (removed; backups now go to private S3 + /tmp
-   only, never the repo).
-5. Watch first post-genesis cron cycle (Mon morning computes) + the first evening-window
-   ingests under the PT framework fix; first coach check-in via MCP to seed qualitative context.
-6. Prior sessions' still-gated items: PRE-13, HN #741, /verify/ profile URLs, HAE straggler.
+- **Chaining `git rebase` in one command block** — a conflict mid-chain let `sync_doc_metadata
+  --apply` + commit + push run against a half-rebased tree TWICE (#986, #988). Rebase must be
+  its own command; resolve; only then continue.
+- **`gh pr merge --delete-branch` from an agent worktree** tangled the PRIMARY checkout
+  (HEAD file on the branch while worktree bookkeeping said main) → fixed with
+  `git symbolic-ref HEAD refs/heads/main` + `update-ref`. Merge without `--delete-branch`
+  from worktrees; prune branches separately.
+- **Concurrent-PR semantic collisions are real** even with file boundaries: #946 (elena
+  experiment_scoped) vs #951 (generic PERSONA# cross_phase + a test asserting it for elena);
+  and the doc-sync literal needs re-`--apply` per merge, serially.
+- **Green-solo/red-in-suite**: the observatory test failed only after tests a–g — dual module
+  identity means patching a module global can miss the object the handler reads; patch the
+  called symbol. (The wall-clock pre-start state was masking it — a time bomb defused.)
+- **Warm-container config caches have no TTL** (`_supp_metadata_cache`) — an S3 config fix
+  isn't live until containers recycle (deploy_site_api.sh) AND CF invalidates (+ note CF's
+  cache key ignores query strings on /api/*, so cache-busting curls lie).
+- **grep-based privacy scans false-positive on JSON key names** (`genome_snps` ≠ a leak);
+  verify with exact term counts before alarming.
+- Workflow tool: `args` must be real JSON (a placeholder string silently no-ops the fan-out —
+  caught because the run finished in 30ms with 0 agents).
 
-**Build beat:** 2026-07-11-cycle5-countdown-reset
-**Docs:** CLAUDE.md (genesis/restart section), SCHEMA.md (CHECKIN#/engagement severity/character mood+xp_debt), PHASE_TAXONOMY.md (benchmarks/CHALLENGE_FOLLOWS), engines/CHARACTER.md (atrophy/up-gate), RUNBOOK.md (reset follow-ups incl. leadin pages + --old-genesis)
+## Matthew's queue (numbered, everything blocked-on-you)
+
+1. **Sunday morning (unchanged):** weigh in fasted → `python3 deploy/restart_pipeline.py
+   --genesis 2026-07-12 --apply`. It now also: wipes the 23 pre-genesis singleton/derived
+   rows (improved date-fallbacks), re-stamps prologue cycle stamps, republishes lead-in deks.
+2. **One-liner after the pipeline:** `python3 deploy/fix_prologue_cycle_and_subscribe_ttl.py --apply`
+   (553 stranded SUBSCRIBE#rate_limit rows get TTL; dry-run verified). The classifier blocked
+   me from DDB mass-mutations — deliberate.
+3. **Still yours from before:** eightsleep 3-row dupe delete; PRE-13; HN #741; /verify/ URLs.
+4. **Decisions to make (filed):** #955 presence-across-genesis posture (before Monday's
+   narratives if possible); #957 climb-during-darkness model fix (critical, fable-class);
+   #976 pre-registration moment (value decays after Day 1); #977 permissions kernel.
+
+## Watch items
+
+First post-genesis crons Mon ~16:30/17:00 UTC (character compute now phase-filtered + gate-fixed;
+brief's public_stats now pre-start-aware — today's 17:00 UTC run regenerates it honestly).
+Coherence sentinel pre-start ALARM stays expected through Saturday (#942). EP0 podcast = week 1.
+
+**Build beat:** 2026-07-11-launch-eve-sweep
+**Docs:** CHARACTER_MATH_AUDIT_2026-07 + CLAUDE_PLATFORM_UNDERSTANDING_2026-07 (new), CLAUDE.md (cadence/verify-count), REVIEW_PROMPT_R22 (EXECUTED stamp), §13b + SWEEP_MANIFEST_2026-07-11.json, engines/CHARACTER.md verified-date + gate deltas, SCHEMA/PHASE_TAXONOMY (via #951), platform-review skill + issue-filer agent
