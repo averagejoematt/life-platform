@@ -16,6 +16,11 @@ v1.0.0 — 2026-03-02
 v1.1.0 — 2026-03-30  (Statistical review: F-01 through F-15)
 v1.2.0 — 2026-07-03  (ADR-104 believability: behavioral absence scores 0,
                       coverage gate on level changes, per-pillar drivers)
+v1.3.0 — 2026-07-10  (#913 neglect honesty: up-gate compares raw to the TARGET
+                      level (scale fix — level 8→13 climbed during a 14-day dark
+                      stretch because raw 9 beat "current_level + 1"), presence-
+                      driven atrophy on behavioral pillars, visible XP debt
+                      instead of a silent 0-floor, deterministic character_mood)
 """
 
 import json
@@ -34,7 +39,7 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.2.0"
+ENGINE_VERSION = "1.3.0"
 
 # ── ADR-104: coverage floor below which a day carries no leveling signal ──
 DEFAULT_LEVEL_CHANGE_MIN_COVERAGE = 0.5
@@ -174,10 +179,20 @@ def get_tier(level: int, config: Optional[dict[str, Any]] = None) -> dict[str, A
     return tiers[-1] if level > 80 else tiers[0]
 
 
-def _compute_xp(raw_score, previous_xp, config, day_number=None):
-    """Compute XP delta with daily decay. Returns (xp_earned, xp_delta, new_xp_total). [F-02]
+def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0):
+    """Compute XP delta with daily decay.
+
+    Returns (xp_earned, xp_delta, new_xp_total, new_xp_debt). [F-02, #913]
     C2: Grace period — decay scales linearly over first 14 days to avoid
-    punishing new users before data stabilizes."""
+    punishing new users before data stabilizes.
+
+    #913 XP debt: the old ``max(0, ...)`` floor made sustained decay invisible —
+    5 of 7 pillars sat at 0 XP and every further bad day looked identical. The
+    signed balance is now split into xp_total (the positive part, so every
+    downstream ``% xp_per_level`` consumer is untouched) and xp_debt (the hole
+    dug below zero, capped at leveling.xp_debt_cap — default one level's worth —
+    so a long dark stretch stays climbable). Good days pay debt down before XP
+    grows again; the UI renders the debt as the visible bleed."""
     bands = config.get(
         "xp_bands",
         [
@@ -203,9 +218,14 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None):
             break
 
     xp_delta = earned - daily_decay
-    new_xp = max(0, (previous_xp or 0) + earned - daily_decay)
+    # Signed balance: pay existing debt first, then grow XP; a shortfall deepens
+    # the debt instead of vanishing under a silent 0-floor. [#913]
+    debt_cap = leveling.get("xp_debt_cap", leveling.get("xp_per_level", DEFAULT_XP_PER_LEVEL))
+    balance = (previous_xp or 0) - (previous_debt or 0) + xp_delta
+    new_xp = max(0, balance)
+    new_debt = min(debt_cap, max(0, -balance))
 
-    return earned, xp_delta, new_xp
+    return earned, xp_delta, new_xp, new_debt
 
 
 # ==============================================================================
@@ -866,6 +886,129 @@ def compute_ema_level_score(raw_scores_history: list[float], config: dict[str, A
     return round(total / total_w, 1) if total_w > 0 else 50.0
 
 
+def _behavioral_weight_share(pillar_cfg: dict[str, Any]) -> float:
+    """Fraction of a pillar's component weight that is flagged ``behavioral``.
+
+    #913: neglect atrophy only applies to pillars that are substantially made of
+    behaviors Matthew either does or doesn't do — sleep/metabolic keep their
+    device-measured semantics (a wearable gap is not detraining).
+    """
+    components = (pillar_cfg or {}).get("components", {})
+    total = 0.0
+    behavioral = 0.0
+    for cfg in components.values():
+        if not isinstance(cfg, dict):
+            continue
+        w = cfg.get("weight", 0) or 0
+        total += w
+        if cfg.get("behavioral"):
+            behavioral += w
+    return behavioral / total if total > 0 else 0.0
+
+
+def neglect_decay_state(engagement: Optional[dict[str, Any]], config: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """#913: derive the day's atrophy multiplier from the presence signal.
+
+    Returns None when no decay applies (engaged / short gap / planned pause /
+    no presence record), else {"multiplier", "gap_days", "n_grace_days", "rate"}.
+
+    ADR-104 framing: this models real detraining and evidence loss — after a
+    sustained dark stretch the platform genuinely knows less and the body
+    genuinely detrains — never punishment. Knobs live in config
+    leveling.neglect_decay: n_grace_days (dark days before decay starts), rate
+    (per-day multiplier), floor (absolute level_score floor; the day's own
+    raw_score is always a floor too), min_behavioral_share (which pillars
+    qualify). A planned pause (sick/travel per engagement_core) never decays.
+    """
+    if not engagement:
+        return None
+    nd = (config.get("leveling", {}) or {}).get("neglect_decay", {}) or {}
+    n_grace = nd.get("n_grace_days", 3)
+    rate = nd.get("rate", 0.98)
+    if engagement.get("presence_class") != "dark" or engagement.get("planned_pause"):
+        return None
+    gap = engagement.get("gap_days")
+    try:
+        gap = float(gap)
+    except (TypeError, ValueError):
+        return None
+    if gap <= n_grace:
+        return None
+    multiplier = rate ** (gap - n_grace)
+    return {
+        "multiplier": round(multiplier, 4),
+        "gap_days": gap,
+        "n_grace_days": n_grace,
+        "rate": rate,
+    }
+
+
+# #913: the four deterministic character moods, worst-first for readability.
+CHARACTER_MOODS = ("dormant", "fading", "steady", "thriving")
+
+
+def compute_character_mood(
+    engagement: Optional[dict[str, Any]],
+    pillar_raw_scores: dict[str, float],
+    raw_score_histories: dict[str, list[float]],
+) -> dict[str, Any]:
+    """#913: one deterministic mood — thriving / steady / fading / dormant.
+
+    Pure code, no LLM (ADR-105): f(presence gap, 7d composite raw-score trend,
+    presence_class). Returns {"mood", "inputs"} where inputs carries the exact
+    numbers the verdict came from.
+
+    Rules, first match wins:
+      dormant  — presence_class == "dark" (a real multi-day logging fall-off)
+      fading   — presence_class == "quiet", OR the 7d composite raw trend
+                 (mean of last 3 days minus mean of the 4 before) <= -5
+      thriving — actively logging (present/light), trend >= +3, composite >= 55
+      steady   — everything else
+    """
+    presence_class = (engagement or {}).get("presence_class") or "present"
+    gap_days = (engagement or {}).get("gap_days")
+
+    # 7d composite raw series: day-wise mean across pillars of the trailing
+    # histories (each history already ends with today's raw score when called
+    # from compute_character_sheet).
+    series = []
+    histories = [h for h in (raw_score_histories or {}).values() if h]
+    if histories:
+        depth = min(7, min(len(h) for h in histories))
+        for i in range(-depth, 0):
+            vals = [h[i] for h in histories if h[i] is not None]
+            if vals:
+                series.append(sum(vals) / len(vals))
+    trend = None
+    if len(series) >= 5:
+        recent = series[-3:]
+        prior = series[:-3]
+        trend = round(sum(recent) / len(recent) - sum(prior) / len(prior), 1)
+    composite = None
+    scores = [v for v in (pillar_raw_scores or {}).values() if v is not None]
+    if scores:
+        composite = round(sum(scores) / len(scores), 1)
+
+    if presence_class == "dark":
+        mood = "dormant"
+    elif presence_class == "quiet" or (trend is not None and trend <= -5):
+        mood = "fading"
+    elif presence_class in ("present", "light") and trend is not None and trend >= 3 and composite is not None and composite >= 55:
+        mood = "thriving"
+    else:
+        mood = "steady"
+
+    return {
+        "mood": mood,
+        "inputs": {
+            "presence_class": presence_class,
+            "gap_days": gap_days,
+            "trend_7d": trend,
+            "composite_raw": composite,
+        },
+    }
+
+
 def _level_step(delta: float, leveling: dict[str, Any]) -> int:
     """Step size for a level move given the gap between target and current.
 
@@ -900,9 +1043,21 @@ def evaluate_level_changes(
       neutral 50, which must never be climbable; nor should a pillar crash
       on no information).
     - a level-up additionally requires the day's own raw_score to be at the
-      new level: the EMA decides the target, but you climb only on days you
-      actually performed. This stops a pillar from continuing to level up on
-      EMA momentum after the behavior stopped.
+      TARGET level: the EMA decides the target, but you climb only on days you
+      actually performed at it. This stops a pillar from continuing to level up
+      on EMA momentum after the behavior stopped.
+
+      #913 scale fix: the gate used to be ``raw_score >= current_level + 1`` —
+      a 0-100 daily score compared against a 1-100 level that is still
+      CONVERGING from 1. Early in a cycle the level is small (say 8) purely
+      because streak gates are slow, so a crashed raw score of 9 still "beat"
+      it and the character climbed 8→13 through 14 days of total logging
+      silence. Levels and scores share the 0-100 scale by construction
+      (``target_level = round(level_score)``), so the like-for-like rule is
+      against the target itself: today's raw performance must be at least the
+      score the EMA says the pillar deserves. Strictly tighter than the old
+      gate whenever target > current + 1, never looser; a below-target day
+      HOLDS the up-streak (it doesn't reset it), so honest climbs still land.
     """
     leveling = config.get("leveling", {})
 
@@ -936,9 +1091,12 @@ def evaluate_level_changes(
     min_coverage = leveling.get("level_change_min_coverage", DEFAULT_LEVEL_CHANGE_MIN_COVERAGE)
     coverage_hold = data_coverage is not None and data_coverage < min_coverage
 
-    # ADR-104: the EMA sets the target, but climbing also requires the day
-    # itself to have performed at the next level — no up-credit on EMA momentum.
-    day_supports_up = raw_score is None or raw_score >= current_level + 1
+    # ADR-104/#913: the EMA sets the target, but climbing also requires the day
+    # itself to have performed AT the target — no up-credit on EMA momentum, and
+    # never a comparison against the still-converging (small) current level.
+    # round() on both sides: target_level is round(level_score), so the raw
+    # side gets the same treatment (raw 86.9 must not lose to its own EMA's 87).
+    day_supports_up = raw_score is None or round(raw_score) >= target_level
 
     if coverage_hold:
         pass  # hold both streaks; levels frozen until real data returns
@@ -1204,9 +1362,11 @@ def compute_character_sheet(
 
     # Step 3: EMA level scores — per-pillar lambda [F-03]
     pillar_level_scores = {}
+    histories_with_today = {}
     for pillar_name in pillar_raw_scores:
         history = list(raw_score_histories.get(pillar_name, []))
         history.append(pillar_raw_scores[pillar_name])
+        histories_with_today[pillar_name] = history
         pillar_level_scores[pillar_name] = compute_ema_level_score(history, config, pillar_name)
 
     # Step 4: Cross-pillar effects — ALL modifiers multiplicative [F-05]
@@ -1220,6 +1380,30 @@ def compute_character_sheet(
         else:
             adjusted_level_scores[pillar_name] = ls
 
+    # Step 4.5 (#913): neglect atrophy — a sustained dark stretch (presence
+    # signal from adaptive_mode's engagement_state, passed in via
+    # data["engagement_state"]) drags behavioral-heavy pillars' level scores
+    # DOWN, floored at the day's own raw score (the decay can never say less
+    # than the day itself measured) and at the configured absolute floor.
+    # Models real detraining + evidence loss (ADR-104), never punishment.
+    engagement = data.get("engagement_state")
+    decay = neglect_decay_state(engagement, config)
+    neglect_cfg = (config.get("leveling", {}) or {}).get("neglect_decay", {}) or {}
+    min_share = neglect_cfg.get("min_behavioral_share", 0.3)
+    abs_floor = neglect_cfg.get("floor", 0)
+    pillar_neglect = {}
+    if decay:
+        for pillar_name, ls in adjusted_level_scores.items():
+            share = _behavioral_weight_share(pillar_configs.get(pillar_name, {}))
+            if share < min_share:
+                continue
+            raw = pillar_raw_scores.get(pillar_name)
+            floor = max(abs_floor, raw if raw is not None else 0)
+            decayed = max(floor, ls * decay["multiplier"])
+            if decayed < ls:
+                adjusted_level_scores[pillar_name] = round(decayed, 1)
+                pillar_neglect[pillar_name] = dict(decay, applied=True, behavioral_share=round(share, 3))
+
     # Step 5: Level changes per pillar
     prev_pillars = {}
     if previous_day_state:
@@ -1231,6 +1415,7 @@ def compute_character_sheet(
                 "streak_above": pp.get("streak_above", 0),
                 "streak_below": pp.get("streak_below", 0),
                 "xp_total": pp.get("xp_total", 0),
+                "xp_debt": pp.get("xp_debt", 0),  # #913: the visible bleed carries over
             }
 
     all_events = []
@@ -1247,7 +1432,10 @@ def compute_character_sheet(
         )
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
-        xp_earned, xp_delta, new_xp = _compute_xp(pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number)
+        prev_debt = prev_state.get("xp_debt", 0) if prev_state else 0
+        xp_earned, xp_delta, new_xp, new_debt = _compute_xp(
+            pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number, previous_debt=prev_debt
+        )
         level_state["xp_total"] = new_xp
 
         pillar_results[pillar_name] = {
@@ -1259,6 +1447,12 @@ def compute_character_sheet(
             "xp_total": level_state["xp_total"],
             "xp_delta": xp_delta,
             "xp_earned": xp_earned,
+            # #913: the visible bleed — XP owed below the 0-floor, paid down
+            # before xp_total grows again. 0 on healthy days.
+            "xp_debt": new_debt,
+            # #913: presence-driven atrophy applied to this pillar today (None
+            # when engaged / planned pause / not a behavioral-heavy pillar).
+            "neglect_decay": pillar_neglect.get(pillar_name),
             "confidence": pillar_details[pillar_name].get("_confidence"),
             "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
             # #747: deterministic, engine-computed — True only when every
@@ -1312,6 +1506,11 @@ def compute_character_sheet(
         all_events.append({"type": "character_level_down", "old_level": prev_char_level, "new_level": character_level})
 
     total_xp = sum(pr["xp_total"] for pr in pillar_results.values())
+    total_xp_debt = sum(pr.get("xp_debt", 0) or 0 for pr in pillar_results.values())
+
+    # #913: deterministic character mood — thriving/steady/fading/dormant from
+    # the presence signal + the 7d composite raw trend. Pure code, ADR-105.
+    mood_verdict = compute_character_mood(engagement, pillar_raw_scores, histories_with_today)
 
     # Confidence stats [F-01]
     confidences: list[float] = [pr["confidence"] for pr in pillar_results.values() if pr.get("confidence") is not None]
@@ -1324,6 +1523,10 @@ def compute_character_sheet(
         "character_tier": character_tier["name"],
         "character_tier_emoji": character_tier.get("emoji", "🔨"),
         "character_xp": total_xp,
+        "character_xp_debt": total_xp_debt,  # #913: the visible bleed, summed
+        "character_mood": mood_verdict["mood"],  # #913: deterministic, never narrated
+        "character_mood_inputs": mood_verdict["inputs"],
+        "neglect_decay": decay,  # #913: today's atrophy state (None when engaged)
         "min_confidence": min_confidence,
         "avg_confidence": avg_confidence,
         "active_effects": active_effects,

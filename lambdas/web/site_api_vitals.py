@@ -389,6 +389,20 @@ def handle_character(date: str | None = None) -> dict:
                 "not_instrumented": bool(pd.get("not_instrumented", False)),
                 "not_instrumented_note": pd.get("not_instrumented_note"),
                 "absent_behaviors": [str(b) for b in (pd.get("absent_behaviors") or [])],
+                # #913 neglect honesty — the visible XP bleed (owed below the
+                # 0-floor) and today's presence-driven atrophy on this pillar
+                # (None when engaged / planned pause / not behavioral-heavy).
+                # Absent on pre-v1.3.0 records → honest 0/None defaults.
+                "xp_debt": float(pd.get("xp_debt", 0) or 0),
+                "neglect_decay": (
+                    {
+                        "applied": True,
+                        "multiplier": float(pd["neglect_decay"].get("multiplier", 1)),
+                        "gap_days": float(pd["neglect_decay"].get("gap_days", 0)),
+                    }
+                    if isinstance(pd.get("neglect_decay"), dict)
+                    else None
+                ),
                 "drivers": {
                     "top": [str(x) for x in (_drivers.get("top") or [])],
                     "dragging": [str(x) for x in (_drivers.get("dragging") or [])],
@@ -435,6 +449,13 @@ def handle_character(date: str | None = None) -> dict:
                 "tier": record.get("character_tier", "Foundation"),
                 "tier_emoji": record.get("character_tier_emoji", "🔨"),
                 "xp_total": float(record.get("character_xp", 0)),
+                # #913: the visible bleed + the deterministic mood (engine-
+                # computed, ADR-105). Absent on pre-v1.3.0 records → 0 / None.
+                "xp_debt": float(record.get("character_xp_debt", 0) or 0),
+                "character_mood": record.get("character_mood"),
+                "character_mood_inputs": (
+                    record.get("character_mood_inputs") if isinstance(record.get("character_mood_inputs"), dict) else None
+                ),
                 "as_of_date": date_str,
                 "composite_score": round(composite, 1),
                 "composite_delta_1d": composite_delta_1d,
@@ -507,6 +528,8 @@ _CHAR_CONFIG_LEVELING_KEYS = (
     "xp_per_level",
     "daily_xp_decay",
     "xp_buffer_threshold",
+    "xp_debt_cap",  # #913: the visible-bleed cap
+    "neglect_decay",  # #913: atrophy knobs (n_grace_days/rate/floor/min_behavioral_share)
     "tier_streak_overrides",
 )
 

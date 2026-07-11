@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "version": "1.2.0",
-    "description": "Character Sheet v1.2.0 (ADR-104): behavioral components score 0 when absent (an unlogged habit is a miss, a device gap is not), and days below the coverage floor carry no leveling signal. Progressive difficulty, confidence scoring, XP-as-buffer, per-pillar EMA retained.",
-    "last_updated": "2026-07-03",
+    "version": "1.3.0",
+    "description": "Character Sheet v1.3.0 (#913 neglect honesty, on ADR-104's v1.2.0 base): level-ups require the day's raw score to reach the TARGET level (scale fix), sustained dark presence atrophies behavioral-heavy pillars (leveling.neglect_decay), XP below zero is tracked as visible xp_debt (capped at xp_debt_cap), and a deterministic character_mood rides the daily record.",
+    "last_updated": "2026-07-10",
     "review_ref": "docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md"
   },
   "baseline": {
@@ -217,6 +217,13 @@
     "xp_per_level": 100,
     "daily_xp_decay": 2,
     "xp_buffer_threshold": 20,
+    "xp_debt_cap": 100,
+    "neglect_decay": {
+      "n_grace_days": 3,
+      "rate": 0.98,
+      "floor": 0,
+      "min_behavioral_share": 0.3
+    },
     "tier_streak_overrides": {
       "Foundation": {
         "up": 3,
