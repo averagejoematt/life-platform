@@ -4,7 +4,7 @@
 */
 import { lineChart, stackedBar, correlationChip, dualLineChart, sparkline, targetSpine, stackedDayColumns, dumbbell } from "/assets/js/charts.js";
 import { explainMount } from "/assets/js/explain.js";
-import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, todayPT, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
 
 // §0 Forecast hero (P0.1) — the circadian-compliance forecast, PROMOTED to lead. A 0→100
 // "tonight's odds" gauge + the four anchors (each with the lever to pull now) + two-voice.
@@ -12,7 +12,18 @@ import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, lastNightDate, fig, figs,
 export function circadianForecast(circ) {
   if (!circ || !circ.available) return "";
   const comps = Object.entries(circ.components || {});
+  // Staleness honesty (truth audit 2026-07-10): an anchor the lambda couldn't measure
+  // (no meal log, no journal, thin sleep history) is UNKNOWN, not a scored default —
+  // it renders grey and unscored, and the composite is computed over measured anchors
+  // only. `measured === false` is the new explicit flag; legacy records (no flag)
+  // keep their old all-four read.
+  const measuredN = comps.filter(([, c]) => c.measured !== false).length;
   const anchors = comps.map(([name, c]) => {
+    if (c.measured === false) {
+      return `<div class="suf-row fc-unmeasured"><span class="suf-l">${esc(ttl(name))}</span>` +
+        `<span class="suf-track"></span>` +
+        `<span class="suf-v mono">unknown — no signal</span></div>`;
+    }
     const pct = c.max ? Math.max(0, Math.min(1, c.score / c.max)) : 0;
     const tone = pct >= 0.7 ? "suf-ember" : "suf-ink"; // ember on-track, muted at-risk — never red
     const weak = name === circ.weakest_component;
@@ -22,11 +33,14 @@ export function circadianForecast(circ) {
   }).join("");
   const score = circ.score;
   const atRisk = score != null && score < 60;
-  const machine = [score != null ? `tonight ${fmt(score)}/100` : null, circ.category && ttl(circ.category),
-    circ.weakest_component && `lever: ${ttl(circ.weakest_component)}`].filter(Boolean).join(" · ");
-  const serif = (circ.prescription && !isBad(circ.prescription)) ? circ.prescription
-    : (atRisk ? "Tonight's set-up is soft — the lever above is the one to pull before bed." : "Today's behaviours have tonight pointed the right way. The night below is the evidence, not the verdict.");
-  const gauge = (score != null) ? targetSpine(score, 100, { valueLabel: "tonight", targetLabel: "100", unit: "", label: "Circadian compliance — what today's behaviours set up for tonight" }) : "";
+  const machine = [score != null ? `tonight ${fmt(score)}/100` : null, circ.category && circ.category !== "unmeasured" && ttl(circ.category),
+    comps.length ? `${measuredN} of ${comps.length} anchors measured` : null,
+    score != null && circ.weakest_component && `lever: ${ttl(circ.weakest_component)}`].filter(Boolean).join(" · ");
+  const serif = measuredN === 0
+    ? "No circadian anchor carried a real signal today — no forecast is scored from defaults. It returns when a meal log, a journal entry, or enough sleep history lands."
+    : (circ.prescription && !isBad(circ.prescription)) ? circ.prescription
+      : (atRisk ? "Tonight's set-up is soft — the lever above is the one to pull before bed." : "Today's behaviours have tonight pointed the right way. The night below is the evidence, not the verdict.");
+  const gauge = (score != null) ? targetSpine(score, 100, { valueLabel: "tonight", targetLabel: "100", unit: "", label: `Circadian compliance — what today's behaviours set up for tonight (${measuredN} of ${comps.length || 4} anchors measured)` }) : "";
   return sec("Tonight's odds — the forecast",
     gauge + (anchors ? `<div class="suf-rows fc-anchors">${anchors}</div>` : "") +
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
@@ -123,11 +137,21 @@ export async function renderSleep(d) {
       `<p class="rd-meta label">In a calorie deficit, sleep is what protects recovery, HRV and a low resting heart rate — the buffer that lets the training still land. RHR drifting down is the win here. See <a href="/data/training/">Training</a> for what it buys.</p>`));
   }
   // §6b — last-meal-time cross-link (P1.2): reuse the nutrition eating window, observation-only.
+  // Staleness honesty (truth audit 2026-07-10): "avg last meal 19:06" built entirely from a
+  // log that stopped weeks ago must say so — computed from nutrition.as_of vs today (PT).
   const _ew = nut && nut.eating_window;
   if (_ew && _ew.avg_last_meal) {
+    const _nutMeta = (nut && nut.nutrition) || {};
+    const _nutAsOf = String(_nutMeta.as_of || "").slice(0, 10);
+    const _nutStale = _nutMeta.stalled === true ||
+      (/^\d{4}-\d{2}-\d{2}$/.test(_nutAsOf) && (Date.parse(todayPT()) - Date.parse(_nutAsOf)) / 86400000 > 4);
+    const _mealCap = _nutStale && _nutAsOf ? `avg last meal · from logs ending ${fmtShort(_nutAsOf)} — paused` : "avg last meal";
+    const _mealNote = _nutStale && _nutAsOf
+      ? `Eating late can blunt deep sleep — but the <a href="/data/nutrition/">nutrition</a> log this average comes from stopped on ${esc(fmtShort(_nutAsOf))}, so it describes the last logged stretch, not the current evenings. It resumes with the log.`
+      : `Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/data/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.`;
     parts.push(sec("Last meal → sleep — the cross-link",
-      figs([fig(esc(_ew.avg_last_meal), "avg last meal"), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
-      `<p class="rd-meta label">Eating late can blunt deep sleep. Average last meal lands at ${esc(_ew.avg_last_meal)}, pulled from the <a href="/data/nutrition/">nutrition</a> log — observation only; the day-lagged version lives in the board below once the overlap is deep enough.</p>`));
+      figs([fig(esc(_ew.avg_last_meal), _mealCap), _ew.avg_hours != null && fig(fmt(_ew.avg_hours) + "h", "eating window")]) +
+      `<p class="rd-meta label">${_mealNote}</p>`));
   }
   // §8 — the cross-source signal board (P2.1+).
   const board = sleepCorrelationBoard(corr && corr.cards);

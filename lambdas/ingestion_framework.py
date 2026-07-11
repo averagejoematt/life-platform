@@ -65,6 +65,14 @@ from decimal import Decimal
 
 import boto3
 
+# Truth audit 2026-07-10 (EIGHTSLEEP UTC double-stamp): platform data is keyed by the
+# PACIFIC calendar day, but the framework derived "today" in UTC — after 5 PM PT the
+# UTC day has already rolled, so refresh_today fetched TOMORROW's PT date and sources
+# like Eight Sleep wrote the same night under two DATE# keys. All day-selection here
+# goes through pacific_time (the single source of truth for the platform's "today");
+# instant TIMESTAMPS (fetched_at/ingested_at) stay UTC ISO on purpose.
+from pacific_time import pacific_now, pacific_today
+
 # ADR-058 (2026-05-25): tag every DDB write with phase=pilot|experiment so the
 # read-path phase_filter can default-deny pre-genesis data. Without this, every
 # ingestion run leaves untagged records that need a periodic
@@ -378,7 +386,10 @@ def _find_missing_dates(table, config, logger):
     from boto3.dynamodb.conditions import Key
 
     pk = f"USER#{config.user_id}#SOURCE#{config.source_name}"
-    today = datetime.now(timezone.utc).date()
+    # Pacific day, not UTC: after 5 PM PT a UTC "today" is tomorrow's DATE# key, and
+    # refresh_today then double-stamps the same night under two dates (truth audit
+    # 2026-07-10, Eight Sleep — every refresh_today source shared the exposure).
+    today = pacific_now().date()
     today_str = today.strftime("%Y-%m-%d")
     check_dates = set()
     for i in range(1, config.lookback_days + 1):
@@ -521,7 +532,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
     logger = _init_logger(config.source_name)
     table, s3, secrets_client = _init_aws(config)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = pacific_today()  # DATE# keys are Pacific calendar days (truth audit 2026-07-10)
     logger.set_date(today)
 
     logger.info(f"Ingestion starting: source={config.source_name}")
@@ -637,8 +648,8 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
                 ),
             }
     else:
-        # Mode 3: Default — yesterday + today
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        # Mode 3: Default — yesterday + today (Pacific calendar days, like the DATE# keys)
+        yesterday = (pacific_now() - timedelta(days=1)).strftime("%Y-%m-%d")
         dates_to_ingest = [yesterday, today]
 
     # ── Ingest each date ──

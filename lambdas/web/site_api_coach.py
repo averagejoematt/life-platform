@@ -117,6 +117,27 @@ def _latest_weight_lbs():
     return None
 
 
+def _reader_reason(raw):
+    """Reader-facing translation of machine-spec eval reasons (truth audit 2026-07-10).
+
+    ~32 LEARNING# records carry internal grader notation like
+    "[null-threshold machine spec re-routed to directional] recovery_score trend=down
+    (slope=-0.0480), predicted=up" — that leaked verbatim onto 6 of 8 public report
+    cards. Translate at the API boundary ONLY (storage untouched): the known
+    directional re-route form becomes plain reader copy; any other bracketed
+    machine-spec prefix is stripped."""
+    import re
+
+    txt = str(raw or "")
+    stripped = re.sub(r"^\s*\[[^\]]*\]\s*", "", txt).strip()
+    if stripped != txt.strip():  # a bracketed machine-spec prefix was present
+        m = re.match(r"^(\w+)\s+trend=(\w+)\s*\(slope=[-+\d.eE]+\)\s*,\s*predicted=(\w+)\s*$", stripped)
+        if m:
+            metric = m.group(1).replace("_", " ")
+            return f"graded on direction — no numeric threshold was set; {metric} trended {m.group(2)}, the call said {m.group(3)}"
+    return stripped
+
+
 def _track_record(coach_id):
     """Confirmed/refuted hit-rate from the COACH#<id>/LEARNING# eval trail (CC-02).
     Honest pre-D-05: empty -> hit_rate None, preliminary True. Always labelled
@@ -146,7 +167,7 @@ def _track_record(coach_id):
                         "date": it.get("date") or it.get("sk", "").replace("LEARNING#", "").split("#")[0],
                         "status": st,
                         "metric": it.get("metric"),
-                        "reason": it.get("reason", ""),
+                        "reason": _reader_reason(it.get("reason", "")),
                     }
                 )
     except Exception as _e:

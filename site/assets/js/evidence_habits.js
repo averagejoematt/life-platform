@@ -3,7 +3,7 @@
   of evidence.js (#581) — no behavior change.
 */
 import { lineChart, correlationChip, sparkline, heatStrip } from "/assets/js/charts.js";
-import { esc, tryJSON, has, fmt, ttl, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
 
 export function renderLedger(d) {
   const t = d.totals || {};
@@ -212,9 +212,17 @@ export function habitsGoalLinkage(groupAvgs) {
 export function habitsIdentity(perHabit, rate, daysTracked) {
   const auto = (perHabit || []).filter((h) => h.adherence_pct != null).sort((a, b) => b.adherence_pct - a.adherence_pct)[0];
   if (!auto && rate == null) return "";
-  const machine = [daysTracked != null && `${fmt(daysTracked)} days tracked`, rate != null && `consistency ${fmt(rate)}%`, auto && `top: ${ttl(auto.name)} ${fmt(auto.adherence_pct)}%`].filter(Boolean).join(" · ");
+  // Staleness honesty (truth audit 2026-07-10): "it's just who shows up" praise for a
+  // habit whose last completion is weeks old is fiction — a window average survives a
+  // stall long after the firing stopped. >7 days since the last completion flips the copy.
+  const _lastFired = auto && String(auto.last_completed || "").slice(0, 10);
+  const _staleDays = /^\d{4}-\d{2}-\d{2}$/.test(_lastFired || "") ? Math.round((Date.parse(todayPT()) - Date.parse(_lastFired)) / 86400000) : null;
+  const _identityStale = _staleDays != null && _staleDays > 7;
+  const machine = [daysTracked != null && `${fmt(daysTracked)} days tracked`, rate != null && `consistency ${fmt(rate)}%`, auto && `top: ${ttl(auto.name)} ${fmt(auto.adherence_pct)}%${_identityStale ? ` · last fired ${fmtShort(_lastFired)}` : ""}`].filter(Boolean).join(" · ");
   const serif = auto
-    ? `${fmt(daysTracked)} days in, the most automatic habit is ${ttl(auto.name)} — firing ${fmt(auto.adherence_pct)}% of the days it's due. That one isn't willpower anymore; it's just who shows up. Identity is the set of habits that fire without a decision, and the data says which have crossed over.`
+    ? (_identityStale
+      ? `${fmt(daysTracked)} days in, the historically most-kept habit is ${ttl(auto.name)} at ${fmt(auto.adherence_pct)}% of the days it was due — but it last fired ${fmtShort(_lastFired)}, ${_staleDays} days ago. Nothing is automatic right now: identity is the set of habits that fire without a decision, and lately none have. The rate above is the record, not the present.`
+      : `${fmt(daysTracked)} days in, the most automatic habit is ${ttl(auto.name)} — firing ${fmt(auto.adherence_pct)}% of the days it's due. That one isn't willpower anymore; it's just who shows up. Identity is the set of habits that fire without a decision, and the data says which have crossed over.`)
     : `${fmt(daysTracked)} days in at ${fmt(rate)}% consistency — the identity is whatever the heatmap keeps proving, not a slogan.`;
   return sec("Identity — who the data says you are",
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);

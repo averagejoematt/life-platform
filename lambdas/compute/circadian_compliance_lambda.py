@@ -192,14 +192,12 @@ def score_morning_light(today_str, journal_entries):
       (b) Strava activity in first 2h of day with sport type Walk/Run
       (c) Apple Health UV/light exposure (if available)
 
-    Scoring:
-      Clear morning light evidence     → 25 pts
-      Probable (walk but no light mention) → 15 pts
-      No evidence                      → 5 pts (can't confirm, not penalized heavily)
+    Scoring (staleness honesty, truth audit 2026-07-10 — each scorer returns
+    (score, evidence, measured); no data is UNMEASURED, never a scored default):
+      Clear morning light evidence     → 25 pts, measured
+      Probable (walk but no light mention) → 15 pts, measured
+      No evidence                      → unmeasured (score None)
     """
-    score = 5  # default: unknown
-    evidence = "No morning light signal found — unable to confirm"
-
     # Check journal for morning light keywords
     light_keywords = ["morning light", "sunlight", "sunrise", "outside", "walk", "outdoor", "sun exposure"]
     for entry in journal_entries:
@@ -207,9 +205,7 @@ def score_morning_light(today_str, journal_entries):
         template = (entry.get("template") or "").lower()
         if template == "morning" or "morning" in raw_text[:50]:
             if any(kw in raw_text for kw in light_keywords):
-                score = 25
-                evidence = "Journal confirms morning light exposure"
-                return score, evidence
+                return 25, "Journal confirms morning light exposure", True
 
     # Check Strava for early walk/run (proxy for outdoor exposure)
     strava = fetch_source_date("strava", today_str)
@@ -219,11 +215,9 @@ def score_morning_light(today_str, journal_entries):
             start_time = act.get("start_date_local") or act.get("start_time") or ""
             hour = _parse_time_to_hour(start_time)
             if sport in ("walk", "run", "hike") and hour is not None and hour < 10.0:
-                score = 15
-                evidence = f"Early {sport} detected ({start_time[:16] if start_time else 'unknown time'}) — probable outdoor light"
-                return score, evidence
+                return 15, f"Early {sport} detected ({start_time[:16] if start_time else 'unknown time'}) — probable outdoor light", True
 
-    return score, evidence
+    return None, "No morning light signal found — unmeasured, not scored", False
 
 
 def score_meal_timing(today_str):
@@ -233,20 +227,20 @@ def score_meal_timing(today_str):
     core body temperature drop enabling deep sleep.
 
     Scoring:
-      ≥4h before target sleep    → 25 pts
-      3-4h                       → 18 pts
-      2-3h                       → 10 pts
-      <2h                        → 3 pts
-      No data                    → 12 pts (neutral)
+      ≥4h before target sleep    → 25 pts (measured)
+      3-4h                       → 18 pts (measured)
+      2-3h                       → 10 pts (measured)
+      <2h                        → 3 pts (measured)
+      No data                    → unmeasured (score None — never a neutral default)
     """
     mf = fetch_source_date("macrofactor", today_str)
     if not mf:
-        return 12, "No MacroFactor data for today — meal timing unknown"
+        return None, "No MacroFactor data for today — meal timing unmeasured", False
 
     # MacroFactor stores food_log as list with timestamps
     food_log = mf.get("food_log") or mf.get("meals") or []
     if not food_log:
-        return 12, "No food log entries today — meal timing unknown"
+        return None, "No food log entries today — meal timing unmeasured", False
 
     # Find latest meal timestamp
     last_meal_hour = None
@@ -258,19 +252,19 @@ def score_meal_timing(today_str):
                 last_meal_hour = hour
 
     if last_meal_hour is None:
-        return 12, "Meal times not available in food log — timing unknown"
+        return None, "Meal times not available in food log — timing unmeasured", False
 
     hours_before_bed = TARGET_SLEEP_ONSET_HOUR - last_meal_hour
     last_meal_str = f"{int(last_meal_hour):02d}:{int((last_meal_hour % 1) * 60):02d}"
 
     if hours_before_bed >= 4.0:
-        return 25, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (excellent)"
+        return 25, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (excellent)", True
     elif hours_before_bed >= 3.0:
-        return 18, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (good)"
+        return 18, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (good)", True
     elif hours_before_bed >= 2.0:
-        return 10, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (marginal)"
+        return 10, f"Last meal ~{last_meal_str} — {hours_before_bed:.1f}h before target sleep (marginal)", True
     else:
-        return 3, f"Last meal ~{last_meal_str} — only {max(0, hours_before_bed):.1f}h before target sleep (too close)"
+        return 3, f"Last meal ~{last_meal_str} — only {max(0, hours_before_bed):.1f}h before target sleep (too close)", True
 
 
 def score_screen_windown(journal_entries):
@@ -284,9 +278,9 @@ def score_screen_windown(journal_entries):
     Penalty keywords: phone, screens, scrolling, netflix, tv, bright light.
 
     Scoring:
-      Explicit wind-down mention   → 25 pts
-      No signal                    → 15 pts (neutral — can't confirm either way)
-      Screen use mentioned         → 5 pts
+      Explicit wind-down mention   → 25 pts (measured)
+      Screen use mentioned         → 5 pts (measured)
+      No signal                    → unmeasured (score None — never a neutral default)
     """
     windown_positive = [
         "reading",
@@ -323,11 +317,11 @@ def score_screen_windown(journal_entries):
         template = (entry.get("template") or "").lower()
         if "evening" in template or "evening" in raw_text[:50]:
             if any(kw in raw_text for kw in windown_negative):
-                return 5, "Evening journal mentions screen use — blue light risk before bed"
+                return 5, "Evening journal mentions screen use — blue light risk before bed", True
             if any(kw in raw_text for kw in windown_positive):
-                return 25, "Evening journal confirms screen-free wind-down"
+                return 25, "Evening journal confirms screen-free wind-down", True
 
-    return 15, "No evening wind-down signal in journal — neutral"
+    return None, "No evening wind-down signal in journal — unmeasured", False
 
 
 def score_sleep_consistency(today_str):
@@ -361,7 +355,7 @@ def score_sleep_consistency(today_str):
             onset_hours.append(h)
 
     if len(onset_hours) < 7:
-        return 12, f"Only {len(onset_hours)} nights of sleep onset data — insufficient for consistency scoring"
+        return None, f"Only {len(onset_hours)} nights of sleep onset data — unmeasured (needs 7)", False
 
     mean_onset = sum(onset_hours) / len(onset_hours)
     variance = sum((h - mean_onset) ** 2 for h in onset_hours) / len(onset_hours)
@@ -370,15 +364,15 @@ def score_sleep_consistency(today_str):
     sd_str = f"{sd_minutes:.0f} min SD over {len(onset_hours)} nights"
 
     if sd_minutes < 20:
-        return 25, f"Excellent circadian anchor — {sd_str}"
+        return 25, f"Excellent circadian anchor — {sd_str}", True
     elif sd_minutes < 30:
-        return 20, f"Good timing consistency — {sd_str}"
+        return 20, f"Good timing consistency — {sd_str}", True
     elif sd_minutes < 45:
-        return 12, f"Moderate variability — {sd_str} (Huberman: aim for <30 min SD)"
+        return 12, f"Moderate variability — {sd_str} (Huberman: aim for <30 min SD)", True
     elif sd_minutes < 60:
-        return 6, f"High variability — {sd_str} — inconsistent anchor weakens sleep pressure"
+        return 6, f"High variability — {sd_str} — inconsistent anchor weakens sleep pressure", True
     else:
-        return 2, f"Very irregular bedtimes — {sd_str} — circadian rhythm likely disrupted"
+        return 2, f"Very irregular bedtimes — {sd_str} — circadian rhythm likely disrupted", True
 
 
 # ==============================================================================
@@ -387,55 +381,72 @@ def score_sleep_consistency(today_str):
 
 
 def compute_circadian_score(today_str):
-    """Compute all 4 components and return unified score + prescription."""
+    """Compute all 4 components and return unified score + prescription.
+
+    Staleness honesty (truth audit 2026-07-10): the old composite summed a NO-DATA
+    default for every unmeasured anchor (5+12+15+12 = a "44/100, at risk — act now"
+    verdict scored almost entirely from absence). Now each scorer declares
+    measured/unmeasured, the composite is normalized over MEASURED anchors only
+    (0–100), and a day with zero measured anchors refuses to produce a score at all.
+    """
     journal = fetch_journal_today(today_str)
 
-    light_score, light_note = score_morning_light(today_str, journal)
-    meal_score, meal_note = score_meal_timing(today_str)
-    screen_score, screen_note = score_screen_windown(journal)
-    consist_score, consist_note = score_sleep_consistency(today_str)
+    components = [
+        ("morning_light", *score_morning_light(today_str, journal)),
+        ("meal_timing", *score_meal_timing(today_str)),
+        ("screen_wind_down", *score_screen_windown(journal)),
+        ("sleep_consistency", *score_sleep_consistency(today_str)),
+    ]
+    measured = [c for c in components if c[3]]
+    measured_count = len(measured)
 
-    total = light_score + meal_score + screen_score + consist_score
+    if measured_count:
+        total = round(sum(c[1] for c in measured) / (25 * measured_count) * 100)
+    else:
+        total = None
 
-    if total >= 85:
+    anchors_note = (
+        f" ({measured_count} of 4 anchors measured — the rest carried no signal and are not scored.)" if measured_count < 4 else ""
+    )
+    if total is None:
+        category = "unmeasured"
+        prescription = (
+            "No circadian anchor carried a real signal today — no forecast is scored from defaults. "
+            "It returns when a meal log, a journal entry, or enough sleep history lands."
+        )
+    elif total >= 85:
         category = "optimal"
-        prescription = "Tonight you're set up for excellent sleep. All four circadian anchors are firing."
+        prescription = f"Tonight you're set up for excellent sleep. The measured circadian anchors are firing.{anchors_note}"
     elif total >= 65:
         category = "good"
-        prescription = "Tonight should be a good sleep night. One or two anchors could be stronger."
+        prescription = f"Tonight should be a good sleep night. One or two anchors could be stronger.{anchors_note}"
     elif total >= 45:
         category = "fair"
-        prescription = "Tonight's sleep setup is mediocre. Address the lowest-scoring component now."
+        prescription = f"Tonight's sleep setup is mediocre. Address the lowest-scoring measured anchor.{anchors_note}"
     else:
         category = "poor"
-        prescription = "Tonight's sleep is at risk. Multiple circadian disruptions detected — act now."
+        prescription = f"The measured anchors point at a rough night — the lever below is the one to pull.{anchors_note}"
 
-    # Lowest-scoring component = tonight's priority
-    components = [
-        ("morning_light", light_score, light_note),
-        ("meal_timing", meal_score, meal_note),
-        ("screen_wind_down", screen_score, screen_note),
-        ("sleep_consistency", consist_score, consist_note),
-    ]
-    weakest = min(components, key=lambda c: c[1])
-    prescription += f" Priority tonight: {weakest[0].replace('_', ' ')} ({weakest[1]}/25 pts)."
+    # Lowest-scoring MEASURED component = tonight's priority (never an unmeasured one).
+    weakest = min(measured, key=lambda c: c[1]) if measured else None
+    if weakest is not None:
+        prescription += f" Priority tonight: {weakest[0].replace('_', ' ')} ({weakest[1]}/25 pts)."
 
     return {
         "date": today_str,
         "score": total,
         "category": category,
         "prescription": prescription,
+        "measured_count": measured_count,
         "components": {
-            "morning_light": {"score": light_score, "max": 25, "note": light_note},
-            "meal_timing": {"score": meal_score, "max": 25, "note": meal_note},
-            "screen_wind_down": {"score": screen_score, "max": 25, "note": screen_note},
-            "sleep_consistency": {"score": consist_score, "max": 25, "note": consist_note},
+            name: {"score": score, "max": 25, "note": note, "measured": is_measured} for name, score, note, is_measured in components
         },
-        "weakest_component": weakest[0],
+        "weakest_component": weakest[0] if weakest else None,
         "huberman_note": (
             "Circadian compliance score is predictive, not retrospective — it tells you "
             "what tonight's sleep will likely look like based on today's behaviors. "
-            "All 4 anchors must fire for consistently optimal sleep architecture."
+            "The score covers only the anchors that carried a real signal today; an "
+            "unmeasured anchor is unknown, never scored as a default."
         ),
     }
 
@@ -451,6 +462,7 @@ def store_circadian_score(result):
         "category": result["category"],
         "prescription": result["prescription"],
         "weakest_component": result["weakest_component"],
+        "measured_count": Decimal(str(result.get("measured_count", 0))),
         "computed_at": datetime.now(timezone.utc).isoformat(),
     }
     # Encode components
@@ -460,6 +472,7 @@ def store_circadian_score(result):
             "score": _to_dec(comp_data["score"]),
             "max": Decimal(str(comp_data["max"])),
             "note": comp_data["note"],
+            "measured": bool(comp_data.get("measured", True)),
         }
     item["components"] = components_enc
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at
@@ -470,7 +483,7 @@ def store_circadian_score(result):
     except ImportError:
         pass
     table.put_item(Item=item)
-    logger.info("BS-SL2: Stored circadian score for %s: %d/100 (%s)", date_str, result["score"], result["category"])
+    logger.info("BS-SL2: Stored circadian score for %s: %s/100 (%s)", date_str, result["score"], result["category"])
 
 
 # ==============================================================================
@@ -498,7 +511,7 @@ def _lambda_handler_impl(event, context):
     store_circadian_score(result)
 
     elapsed = time.time() - t0
-    logger.info("Done in %.1fs — score=%d (%s)", elapsed, result["score"], result["category"])
+    logger.info("Done in %.1fs — score=%s (%s)", elapsed, result["score"], result["category"])
 
     return {
         "statusCode": 200,

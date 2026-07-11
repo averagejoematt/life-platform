@@ -1513,11 +1513,15 @@ def handle_habits() -> dict:
             if _is_blocked_vice(hname):
                 continue
             st = st if isinstance(st, dict) else {}
-            a = _habit_agg.setdefault(hname, {"scheduled": 0, "completed": 0, "group": st.get("group") or "Other"})
+            a = _habit_agg.setdefault(hname, {"scheduled": 0, "completed": 0, "group": st.get("group") or "Other", "last_completed": None})
             if st.get("scheduled_today", True):
                 a["scheduled"] += 1
                 if st.get("status") == "completed":
                     a["completed"] += 1
+                    # Staleness honesty: the date a habit LAST fired — so the front-end
+                    # can stop calling a 2-week-silent habit "automatic".
+                    if not a["last_completed"] or date_key > a["last_completed"]:
+                        a["last_completed"] = date_key
             # #422 EVR-01/02: lift in-app Habitify notes into captured causality. A note on a
             # completed day is driver context (trigger/reward); on a missed day it's the why.
             _absorb_habitify_notes(_causality, hname, date_key, st)
@@ -1678,6 +1682,14 @@ def handle_habits() -> dict:
             d = day.get("date")
             if d not in char_by_date:
                 continue
+            # Staleness honesty (truth audit 2026-07-10): a day where NOTHING was
+            # logged (every group pct 0 and zero tier-0 completions) is an absence,
+            # not an observation — including those days inflated n (26 vs ~12) past
+            # the n>=14 gate on a correlation that had no behavioral variance in it.
+            _day_groups = day.get("groups") or {}
+            _all_zero = _day_groups and all((not isinstance(v, (int, float))) or v == 0 for v in _day_groups.values())
+            if _all_zero and not day.get("t0_done"):
+                continue
             cs_score = char_by_date[d]
             for gname, gpct in (day.get("groups") or {}).items():
                 if isinstance(gpct, (int, float)):
@@ -1731,7 +1743,15 @@ def handle_habits() -> dict:
             state = "holding"
         else:
             state = "needs_attention"
-        ph = {"name": hname, "group": a["group"], "scheduled_days": sched, "completed_days": comp, "adherence_pct": pct, "state": state}
+        ph = {
+            "name": hname,
+            "group": a["group"],
+            "scheduled_days": sched,
+            "completed_days": comp,
+            "adherence_pct": pct,
+            "state": state,
+            "last_completed": a.get("last_completed"),
+        }
         # #422: attach captured causality (drivers + why-missed, both channels). Only
         # present when a real note/reflection exists — the cell stays honestly empty
         # otherwise (no inferred causes, ADR-104).
@@ -2602,6 +2622,10 @@ def handle_circadian() -> dict:
             "score": c.get("score"),
             "max": c.get("max"),
             "note": c.get("note"),
+            # Staleness honesty (truth audit 2026-07-10): False = the lambda had no
+            # real signal for this anchor — render "unknown", never a scored default.
+            # Legacy records predate the flag; absent means measured (old behavior).
+            "measured": c.get("measured", True),
         }
         for name, c in comps.items()
     }
@@ -2616,6 +2640,7 @@ def handle_circadian() -> dict:
             "category": item.get("category"),
             "prescription": item.get("prescription"),
             "weakest_component": item.get("weakest_component"),
+            "measured_count": item.get("measured_count"),
             "components": components,
         },
         cache_seconds=900,

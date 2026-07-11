@@ -898,6 +898,10 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .nut-lead.lead-warn .lead-k::before { content: "▼ "; }
 .nut-lead.lead-ok .lead-v { color: var(--ink); }
 
+/* Staleness-honest as-of line (truth audit 2026-07-10) — a stalled manual log reads
+   as a calm ember-edged statement, never red panic. */
+.nut-asof.nut-stalled { color: var(--ember); border-left: 2px solid var(--ember); padding-left: var(--sp-3); }
+
 /* Two-voice verdict (SIGNATURE 2) — mono states, serif judges. */
 .two-voice { margin-top: var(--sp-4); display: grid; gap: var(--sp-2);
   border-left: 2px solid var(--ember); padding-left: var(--sp-4); }
