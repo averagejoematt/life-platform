@@ -39,6 +39,39 @@
    10. Minimal base (applies the tokens)
 */
 
+/* ════════════════════════════════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS — the canonical scale (#1006)
+   ════════════════════════════════════════════════════════════════════════════
+   CSS custom properties cannot be used inside @media queries (and this site runs
+   with no CSS build step), so these are documented NAMED CONSTANTS, not var()s.
+   Every @media (max-width|min-width) in the site's CSS uses one of these six
+   boundaries — nothing else. (Before #1006: 17 ad-hoc values across 6 files, incl.
+   near-dupes 759/760 + 819/820 and four competing "phone" boundaries, so a 580px
+   viewport got mobile chrome with desktop grids.)
+
+     --bp-xs   360   tiny-phone last resort — hide the brand tag, shrink door labels
+     --bp-sm   480   small phone — stack tight 2-ups, drop non-essential columns
+     --bp-md   600   PHONE / CHROME boundary — the bottom app-bar, single-column
+                     grids, and the "is this a phone" decision ALL flip here
+     --bp-lg   760   tablet — 2-col content grids, sticky side rails begin
+     --bp-tw   820   tablet-wide — the evidence 2-col reading layout (rail + readout)
+     --bp-xl   900   desktop — 3-col grids and the hero / subscribe split-screens
+
+   MIN/MAX CONVENTION (avoids the boundary double-fire a naïve collapse reintroduces):
+     • max-width queries use the token exactly       → 360 480 600 760 820
+     • min-width queries use the token + 1px         → 601 761 821 901
+   so a min/max pair straddling a boundary never both fire at the same pixel.
+
+   USAGE RULE — pick the boundary by JOB, not pixel-taste:
+     chrome / one-column vs. not  → 600 (max)
+     content grid 1→2 col         → 761 (min)
+     evidence reading split        → 820 (max) / 821 (min)
+     grid 2→3 col / hero split      → 901 (min)
+     phone fit-and-finish          → 480 / 360 (max)
+   A new page MUST reuse these — do not invent an 18th boundary. The mobile section
+   of docs/DESIGN_SYSTEM_V5.md restates this rule (#1011).
+   ════════════════════════════════════════════════════════════════════════════ */
+
 /* ── 1. Palette — dark (primary) ─────────────────────────────────────────── */
 :root {
   color-scheme: dark;
@@ -633,7 +666,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .dis-call { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--rule); }
 .dis-call-k { text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ember); display: block; margin-bottom: var(--sp-1); }
 .dis-call .dis-text { color: var(--ink); }
-@media (max-width: 640px) { .dis-cols { grid-template-columns: 1fr; } .dis-vs { justify-self: start; } }
+@media (max-width: 760px) { .dis-cols { grid-template-columns: 1fr; } .dis-vs { justify-self: start; } }
 /* ── /evidence/vitals/ — glance-first instrument panel (P0.1+) ───────────────────
    Component rings + status band. tone: ember=good, muted=neutral/forming, alert=RED STATE
    (reserved). Red never encodes a direction. */
@@ -685,7 +718,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .sm-v { font-size: var(--fs-small); }
 .sm-trend { color: var(--ink-muted); }
 .sm-empty { color: var(--ink-faint); padding: var(--sp-3) 0; text-align: center; }
-@media (max-width: 640px) { .sm-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) { .sm-grid { grid-template-columns: repeat(2, 1fr); } }
 /* P2.4 — hub links */
 .vh-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: var(--sp-3) 0; }
 .vh-link { display: inline-block; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--rule); border-radius: var(--radius-xs); text-decoration: none; color: var(--ink); font-size: var(--fs-small); }
@@ -698,7 +731,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .vr-alert .vr-v { color: var(--alert); }
 .vr-sub { color: var(--ink-faint); font-size: 0.6rem; }
 .vr-l { text-transform: lowercase; color: var(--ink-muted); }
-@media (max-width: 520px) { .vr-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .vr-row { grid-template-columns: repeat(2, 1fr); } }
 /* P0.2 — now/7d/30d ladder, aligned under the ring grid. */
 .vl-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin-top: calc(-1 * var(--sp-2)); }
 .vl-cell { display: flex; justify-content: center; gap: var(--sp-3); }
@@ -706,7 +739,7 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .vl-k { color: var(--ink-faint); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
 .vl-v { font-size: var(--fs-small); }
 .vl-v.vl-base { color: var(--ink-muted); }
-@media (max-width: 520px) { .vl-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .vl-row { grid-template-columns: repeat(2, 1fr); } }
 /* ── /evidence/mind/ — restraint (P0.1). NO RED anywhere on this page (the reserved-red rule
    is explicitly excluded here). Ember = held/earned; muted ink = reset/future. No alarm. */
 .mr-cum { display: flex; align-items: baseline; gap: var(--sp-3); margin: var(--sp-2) 0 var(--sp-3); }
@@ -852,7 +885,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .suf-ink { background: var(--ink-muted); }
 .suf-v { color: var(--ink-faint); white-space: nowrap; font-size: var(--fs-label, 0.78rem); }
 .suf-amt { color: var(--ink-faint); margin-left: var(--sp-2); }
-@media (max-width: 560px) { .suf-amt { display: none; } .suf-row { grid-template-columns: minmax(4rem, 6rem) 1fr auto; } }
+@media (max-width: 600px) { .suf-amt { display: none; } .suf-row { grid-template-columns: minmax(4rem, 6rem) 1fr auto; } }
 
 /* Autonomic 2×2 grid (#414, RQA-06) — the COMPUTED nervous-system view (Flow/Stress/
    Recovery/Burnout), a plain-HTML 2×2 distinct from the vitals page's strain-vs-recovery
@@ -881,7 +914,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .zsport { list-style: none; padding: 0; margin: var(--sp-3) 0 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .zsport li { display: flex; justify-content: space-between; gap: var(--sp-3); border-bottom: 1px solid var(--ink-faint); padding-bottom: var(--sp-2); }
 .zsport .mono { color: var(--ink-faint); }
-@media (max-width: 560px) { .zdist-row { grid-template-columns: minmax(5.5rem, 8rem) 1fr auto; } }
+@media (max-width: 600px) { .zdist-row { grid-template-columns: minmax(5.5rem, 8rem) 1fr auto; } }
 
 /* Protein lead (nutrition §2, P0.2) — the failing metric weighted as the headline.
    Ember = attention/warning when under floor (giant figure + ▼ + "under floor"),
@@ -920,7 +953,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .ewin-ref { position: absolute; top: 0; height: 100%; background: var(--ink-faint); opacity: 0.35; border-radius: 3px; }
 .ewin-bar { position: absolute; top: 0; height: 100%; background: var(--ember); border-radius: 3px; }
 .ewin-v { color: var(--ink-faint); white-space: nowrap; font-size: var(--fs-label, 0.78rem); }
-@media (max-width: 560px) { .ewin-v { font-size: 0.6rem; } .ewin-row { grid-template-columns: minmax(2.5rem, 3.5rem) 1fr auto; } }
+@media (max-width: 600px) { .ewin-v { font-size: 0.6rem; } .ewin-row { grid-template-columns: minmax(2.5rem, 3.5rem) 1fr auto; } }
 
 /* Per-day macro composition columns by energy (nutrition §3, P0.7) — ember = protein
    (the floor), muted inks for carbs/fat. Refuses < 4 points in the chart kit. */
@@ -959,7 +992,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 /* ── Shared footer mega-menu (CC-05) — on all three doors ─────────────────── */
 .site-foot { border-top: var(--border-hair); margin-top: var(--sp-7); padding: var(--sp-6) var(--gutter) var(--sp-5); }
 .site-foot-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); max-width: var(--container); margin-inline: auto; }
-@media (min-width: 720px) { .site-foot-cols { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 761px) { .site-foot-cols { grid-template-columns: repeat(4, 1fr); } }
 .sf-col { display: grid; gap: var(--sp-2); align-content: start; }
 .sf-col a { font-size: var(--fs-small); color: var(--ink-muted); text-decoration: none; }
 .sf-col a:hover { color: var(--ember); }
@@ -1110,7 +1143,7 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .loop-node .ln-name { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.1; }
 .loop-node .ln-role { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.45; }
 .loop-arrow { align-self: center; color: var(--ember); font-family: var(--font-mono); flex: 0 0 auto; }
-@media (max-width: 720px) { .loop { flex-direction: column; } .loop-arrow { transform: rotate(90deg); } }
+@media (max-width: 760px) { .loop { flex-direction: column; } .loop-arrow { transform: rotate(90deg); } }
 
 /* ── .provenance — every number says where it came from and how fresh. The
    "elite / trustworthy" signal, standardized so it's free on every readout. */

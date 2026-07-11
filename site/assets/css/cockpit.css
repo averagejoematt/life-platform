@@ -173,7 +173,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .predict-actual { color: var(--ink); }            /* the outcome — neutral ink, never red */
 .predict-hit { color: var(--ember); }
 .predict-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
-@media (max-width: 420px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
+@media (max-width: 480px) { .predict-vote { flex-direction: column; } .predict-btn { flex: none; } }
 
 /* uplevel P4 — the time-travel day-slider (the date input stays as fallback). */
 .scrub-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
@@ -501,7 +501,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cockpit[data-state="ready"] .shimmer { animation: none; }
 
 /* ── Desktop: the deep read gets two columns for the domains ─────────────── */
-@media (min-width: 680px) {
+@media (min-width: 761px) {
   .domains { grid-template-columns: 1fr 1fr; }
   .domain { border-top: 0; }
   .panel-body { padding: var(--sp-7) var(--sp-7) var(--sp-6); }
