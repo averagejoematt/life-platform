@@ -74,8 +74,11 @@ def doors_nav(current_door: str | None = None, with_follow: bool = False) -> str
 def site_footer() -> str:
     """The canonical `.site-foot` footer — one site map on every page.
 
-    This is the dominant footer (the one on the ~51 data/method/protocols pages),
-    adopted verbatim as the single source of truth per #1009.
+    Based on the dominant footer (the ~51 data/method/protocols pages) but unified
+    UP for the coaching column: it carries the FULLER "The Coaching" set (The Read /
+    By Coach / Scorecard / The Team / AI lab notes) so no live coaching link is lost
+    site-wide, and it fixes the dominant footer's mislabel (/coaching/ is "The Read",
+    /coaching/team/ is "The Team"). Additive for the dominant pages (#1009 review).
     """
     return (
         '<footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map">'
@@ -91,7 +94,9 @@ def site_footer() -> str:
         '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a>'
         '<a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
         '<div class="sf-col"><p class="sf-h label">The Coaching</p>'
-        '<a href="/coaching/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div>'
+        '<a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a>'
+        '<a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a>'
+        '<a href="/coaching/lab-notes/">AI lab notes</a></div>'
         '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
         '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>'
         '<a href="/method/">The method</a><a href="/story/about/">About</a>'
