@@ -4,7 +4,7 @@
 
 .sub-main { max-width: var(--container); margin-inline: auto; padding: var(--sp-6) var(--gutter) var(--sp-9);
   display: grid; gap: clamp(2rem, 1rem + 4vw, 4rem); align-items: start; }
-@media (min-width: 860px) { .sub-main { grid-template-columns: 1.05fr 0.95fr; } }
+@media (min-width: 901px) { .sub-main { grid-template-columns: 1.05fr 0.95fr; } }
 
 .sub-eyebrow { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
   text-transform: uppercase; color: var(--ember); }
@@ -34,7 +34,7 @@
 
 /* form card */
 .sub-card { border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
-@media (min-width: 860px) { .sub-card { position: sticky; top: var(--sp-6); } }
+@media (min-width: 901px) { .sub-card { position: sticky; top: var(--sp-6); } }
 .sub-card-h { padding: var(--sp-4); border-bottom: var(--border-hair); font-family: var(--font-mono);
   font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ember); }
 .sub-card-b { padding: var(--sp-6) var(--sp-5); display: grid; gap: var(--sp-4); }

@@ -37,8 +37,8 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .ev-group { margin-top: var(--sp-7); }
 .ev-group > .label { color: var(--ink-faint); display: block; padding-bottom: var(--sp-3); border-bottom: var(--border-hair); }
 .ev-list { margin-top: var(--sp-4); display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; }
-@media (min-width: 560px) { .ev-list { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 920px) { .ev-list { grid-template-columns: 1fr 1fr 1fr; } }
+@media (min-width: 601px) { .ev-list { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 901px) { .ev-list { grid-template-columns: 1fr 1fr 1fr; } }
 
 /* The archival index card, indexed by a measuring-rule tick */
 .ev-card { position: relative; display: block; text-decoration: none; color: inherit;
@@ -112,7 +112,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* Supplements — what / why / what's-backed cards */
 .supp-grid { display: grid; gap: var(--bento-gap); }
-@media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 761px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
 .supp { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
 /* Grid so a long dose ("spectrum + intra-workout") can never overprint the title:
    title wraps in col 1; dose + timing stack right-aligned in col 2. */
@@ -170,7 +170,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* Protocol / experiment cards */
 .rd-cards { display: grid; gap: var(--bento-gap); margin-top: var(--sp-3); }
-@media (min-width: 720px) { .rd-cards { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 761px) { .rd-cards { grid-template-columns: 1fr 1fr; } }
 .rd-card { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
 .rd-cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
 .rd-cardname { font-family: var(--font-serif); font-size: var(--fs-h3); line-height: 1.12; }
@@ -192,8 +192,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* Vice streak cards — a big day-count + a progress bar toward the next milestone. */
 .vice-grid { display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; margin-top: var(--sp-4); }
-@media (min-width: 560px) { .vice-grid { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 920px) { .vice-grid { grid-template-columns: 1fr 1fr 1fr; } }
+@media (min-width: 601px) { .vice-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 901px) { .vice-grid { grid-template-columns: 1fr 1fr 1fr; } }
 .vice-card { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); border-left: 3px solid var(--rule); }
 .vice-card.vice-hold { border-left-color: #16a34a; }
 .vice-card.vice-broke { border-left-color: color-mix(in oklch, var(--ember) 60%, var(--ink-faint)); }
@@ -236,8 +236,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* The board — AI expert roster */
 .board-kicker { color: var(--ember); display: block; margin-bottom: var(--sp-2); }
 .coach-grid { display: grid; gap: var(--bento-gap); grid-template-columns: 1fr; }
-@media (min-width: 560px) { .coach-grid { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 880px) { .coach-grid { grid-template-columns: 1fr 1fr 1fr; } }
+@media (min-width: 601px) { .coach-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 901px) { .coach-grid { grid-template-columns: 1fr 1fr 1fr; } }
 .coach { display: flex; align-items: center; gap: var(--sp-3); border: var(--border-hair); border-left: 2px solid var(--coach, var(--ember)); border-radius: var(--radius); background: var(--surface); padding: var(--sp-3) var(--sp-4); }
 .coach-badge { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ember)); border: 1px solid var(--coach, var(--ember-line)); background: color-mix(in oklch, var(--coach, var(--ember)) 10%, transparent); }
 .coach-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
@@ -289,11 +289,11 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 
 /* Two-pane layout */
 .ev-layout { display: grid; gap: clamp(1.25rem, 0.5rem + 3vw, 3rem); margin-top: var(--sp-5); align-items: start; }
-@media (min-width: 820px) { .ev-layout { grid-template-columns: 264px 1fr; } }
+@media (min-width: 821px) { .ev-layout { grid-template-columns: 264px 1fr; } }
 
 /* Left tiles */
 .ev-side { display: grid; gap: var(--sp-2); position: sticky; top: var(--sp-4); }
-@media (max-width: 819px) { .ev-side { position: static; grid-auto-flow: column; grid-auto-columns: min(62vw, 220px); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--sp-2); } .ev-side .ev-tile { scroll-snap-align: start; } }
+@media (max-width: 820px) { .ev-side { position: static; grid-auto-flow: column; grid-auto-columns: min(62vw, 220px); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: var(--sp-2); } .ev-side .ev-tile { scroll-snap-align: start; } }
 .ev-tile { text-align: left; cursor: pointer; background: var(--surface); border: var(--border-hair); border-left: 2px solid transparent;
   border-radius: var(--radius); padding: var(--sp-3) var(--sp-4); display: grid; gap: 3px; transition: border-color var(--dur-fast), background var(--dur-fast); color: inherit; }
 .ev-tile:hover { border-color: var(--rule-strong); }
@@ -336,7 +336,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .doors { gap: var(--sp-2); }
   .doors a { font-size: 0.5625rem; }
 }
-@media (max-width: 819px) {
+@media (max-width: 820px) {
   .ev-layout { grid-template-columns: minmax(0, 1fr); }
   .ev-side { min-width: 0; }
   .rd-sec { overflow-x: auto; }
@@ -394,7 +394,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* v5 render-QA: wide data tables (e.g. inference "by model", 5 numeric cols) overflowed
    the 390px viewport with values clipped off-screen. Let any readout table scroll
    horizontally inside its own box on small screens instead of clipping. */
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .readout .rd-tbl { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
@@ -481,7 +481,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .cst-node.cst-recent circle { fill: var(--ember); }
 .rdg-cst figcaption { color: var(--ink-faint); text-align: center; margin-top: 0.5rem; }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .wh-row { grid-template-columns: 5rem 1fr 1.75rem; }
 }
 
@@ -613,7 +613,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* Follow the level-ups. */
 .ch-sub .ask-row { max-width: 30rem; }
 
-@media (max-width: 819px) {
+@media (max-width: 820px) {
   .ch-stage { grid-template-columns: 1fr; }
   .ch-id { text-align: center; }
   .ch-emblem { margin-inline: auto; }
@@ -667,7 +667,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-comp-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; }
 .ch-comp-w { font-size: var(--fs-small); color: var(--ink); text-align: right; }
 .ch-comp-t { grid-column: 1 / -1; color: var(--ink-faint); }
-@media (max-width: 819px) {
+@media (max-width: 820px) {
   .ch-band { grid-template-columns: 4.5rem 5.5rem minmax(0, 1fr); }
   .ch-comp { grid-template-columns: minmax(0, 1fr) 3rem; }
   .ch-comp-bar { grid-column: 1 / -1; }
@@ -692,7 +692,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 @media (prefers-reduced-motion: no-preference) {
   .ch-rbar i { transition: width 0.7s var(--ease-out); }
 }
-@media (max-width: 819px) {
+@media (max-width: 820px) {
   .ch-bgrid { grid-template-columns: repeat(2, 1fr); }
   .ch-tt [data-ch-scrub-label] { min-width: 7rem; }
 }
