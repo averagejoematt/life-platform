@@ -21,6 +21,7 @@ import { sparkline } from "/assets/js/charts.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
+import { preStart } from "/assets/js/coach_popover.js"; // #931 — the pre-start countdown state
 
 const API = "/api";
 
@@ -1003,6 +1004,9 @@ async function load(dateStr) {
     ]);
 
     const snapV = snap.status === "fulfilled" ? snap.value : null;
+    // #931 pre-start: snapshot's top level carries the countdown contract; client
+    // GENESIS is the fallback. Truthy only in the staged-reset window (T−N days).
+    const pre = preStart(snapV);
     const charBody = snapV?.character || null;   // handle_character body (or {error} on 503)
     const character = charBody?.character || (charBody && !charBody.error ? charBody : null);
     const pillarList = charBody?.pillars || character?.pillars || [];
@@ -1028,6 +1032,17 @@ async function load(dateStr) {
     renderReading();    // fire-and-forget; hides itself if no book in hand
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
 
+    if (pre) {
+      // #931 pre-start banner — the same calm voice as the rest of the cockpit:
+      // the countdown owns the verdict slot (a stale-cycle board read pre-genesis
+      // would be about wiped data), and the spine's day index reads T−N.
+      bind("verdict").innerHTML = preStartLine(pre);
+      const bl = bind("boardline");
+      if (bl) bl.hidden = true;
+      const d = bind("day");
+      if (d) d.textContent = `T−${pre.daysUntil}`;
+    }
+
     if (character.as_of_date) bind("asof").textContent = `as of ${character.as_of_date}`;
     main.dataset.state = "ready";
     $(".panel").setAttribute("aria-busy", "false");
@@ -1037,15 +1052,27 @@ async function load(dateStr) {
     // author display rules on .domains/.band/.voice). The score recomputes daily.
     main.dataset.state = "ready";
     const gone = (sel) => { const el = typeof sel === "string" ? $(sel) : sel; if (el) el.style.display = "none"; };
+    // #931: pre-start with no sheet at all is still a countdown, not a shrug.
+    const preC = preStart();
     bind("level").textContent = "—";
     bind("tier").textContent = "";
-    bind("day").textContent = "";
+    bind("day").textContent = preC ? `T−${preC.daysUntil}` : "";
     gone(bind("movement")); gone(bind("honest")); gone(bind("boardline"));
     gone("[data-readiness]"); gone(".cap-today");
     gone(".domains"); gone(".band"); gone(".voice.human"); gone("[data-circadian]"); gone("[data-predict]");
-    bind("verdict").innerHTML = "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
+    bind("verdict").innerHTML = preC
+      ? preStartLine(preC)
+      : "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
     $(".panel").setAttribute("aria-busy", "false");
   }
+}
+
+// #931 — the pre-start verdict line, shared by the loaded and empty paths.
+// T−N, quiet confidence, and the concrete anchor: the first baseline weigh-in.
+function preStartLine(pre) {
+  const dow = escapeHTML(pre.startDow);
+  return `<span class="mark">&rsaquo;</span> T&minus;${pre.daysUntil} day${pre.daysUntil === 1 ? "" : "s"}. ` +
+    `The instruments are on; the experiment starts ${dow}. First baseline: ${dow}'s weigh-in.`;
 }
 
 function escapeHTML(s) {

@@ -22,9 +22,44 @@ export function genesisCount() {
   const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
   return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since June 14 2026` };
 }
+
+// Pre-start countdown (#931). A reset can stage a FUTURE genesis (constants + this
+// file's GENESIS literal regenerate together the night before Day 1) — for that
+// window every door counts down to Day 1 instead of rendering a broken Day 0.
+// Payload-first: the API's journey/snapshot/pulse blocks carry
+// {pre_start, days_until_start, start_date}; the client GENESIS is the fallback so
+// the state can't be missed while a cached payload lags. Returns null once the
+// experiment has started (dayN >= 1 and no pre_start payload) — the inert path.
+function _preShape(daysUntil, d) {
+  return {
+    daysUntil,
+    startLabel: d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
+    startDow: d.toLocaleDateString("en-US", { weekday: "long" }),
+  };
+}
+export function preStart(payload) {
+  if (payload && payload.pre_start && payload.start_date) {
+    const d = new Date(`${payload.start_date}T00:00:00`);
+    const n = Number(payload.days_until_start);
+    if (!isNaN(d.getTime()) && Number.isFinite(n) && n >= 1) return _preShape(n, d);
+  }
+  const { dayN } = genesisCount();
+  if (dayN >= 1) return null;
+  return _preShape(1 - dayN, GENESIS);
+}
+
 export function stampGenesis(root = document, suffix = "") {
   const el = root.querySelector('[data-bind="genesisStamp"]');
   if (!el) return;
+  // Pre-start (#931): the stamp becomes the countdown — calm, dated, no urgency.
+  const pre = preStart();
+  if (pre) {
+    el.textContent = pre.daysUntil === 1
+      ? `The experiment begins tomorrow — ${pre.startLabel}`
+      : `The experiment begins in ${pre.daysUntil} days — ${pre.startLabel}`;
+    el.hidden = false;
+    return;
+  }
   const { dayN, base } = genesisCount();
   if (dayN < 1) return;
   el.textContent = base + (suffix || "");

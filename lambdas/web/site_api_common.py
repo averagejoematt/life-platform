@@ -22,7 +22,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -158,6 +158,25 @@ def _clamp_today(date_str: str) -> str:
     No-op once genesis <= today. Use this for ANY genesis-derived query lower
     bound that bypasses _query_source (which has its own start>end guard)."""
     return min(date_str, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+
+
+def pre_start_meta() -> dict | None:
+    """The pre-start countdown contract (#931). A reset can stage a FUTURE genesis
+    (constants regenerate the night before Day 1), and for that window the site is
+    an ANTICIPATED LAUNCH, not a broken Day 0. When EXPERIMENT_START > today (PT)
+    this returns the shared payload block:
+
+        {"pre_start": True, "days_until_start": N, "start_date": EXPERIMENT_START}
+
+    where N = whole PT calendar days until genesis (always >= 1 — on genesis day
+    itself the experiment has started). Returns None once genesis <= today: the
+    normal path is a structural no-op, proven by tests/test_pre_start_countdown.py.
+    Consumers: /api/journey, /api/snapshot, /api/pulse (+ the front-end doors)."""
+    today = datetime.now(PT).date()
+    start = date.fromisoformat(EXPERIMENT_START)
+    if start <= today:
+        return None
+    return {"pre_start": True, "days_until_start": (start - today).days, "start_date": EXPERIMENT_START}
 
 
 def _experiment_date(days_back=30):

@@ -41,6 +41,7 @@ from web.site_api_common import (
     _ok,
     _query_source,
     logger,
+    pre_start_meta,
     table,
 )
 
@@ -1361,9 +1362,25 @@ def handle_pulse() -> dict:
                 }
             )
 
+    # PRE-START (#931): between a staged reset and its FUTURE genesis the pulse is a
+    # countdown, not a broken Day 0 — deterministic copy (no LLM), and no from-start
+    # weight delta (there is no baseline until Day 1's weigh-in creates one). Inert
+    # once genesis <= today (pre_start_meta returns None and nothing here changes).
+    _pre = pre_start_meta()
+    if _pre:
+        _n = _pre["days_until_start"]
+        _start_dt = datetime.strptime(EXPERIMENT_START, "%Y-%m-%d")
+        narrative = (
+            f"T−{_n} day{'s' if _n != 1 else ''}. The instruments are on; the experiment begins "
+            f"{_start_dt.strftime('%A, %B')} {_start_dt.day}. First baseline: that morning's weigh-in."
+        )
+        glyphs["scale"]["delta"] = None
+        glyphs["scale"]["delta_label"] = None
+
     return _ok(
         {
             "pulse": {
+                **(_pre or {"pre_start": False}),
                 "day_number": _pulse_day,
                 "date": today_pt,
                 "status": status,

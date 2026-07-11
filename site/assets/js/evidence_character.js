@@ -7,6 +7,7 @@ import { sparkline, ring, pillarRing, pillarRingCpts, radarChart } from "/assets
 import { badgeMark, tierEmblem } from "/assets/js/sigils.js";
 import { domainIcon } from "/assets/js/icons.js";
 import { esc, tryJSON, has, fmt, ttl, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { preStart } from "/assets/js/coach_popover.js"; // #931 — the pre-start countdown state
 import { dfBody } from "/assets/js/evidence_datafigure.js";
 // #420: one share affordance — the character sheet's own linkable moment travels.
 import { shareMount } from "/assets/js/share.js";
@@ -103,7 +104,8 @@ export function chHeroHtml(ch, pillars, jj, wave, mood) {
           Number.isFinite(composite) && fig(fmt(composite), "composite", ch.composite_delta_1d != null ? `${Number(ch.composite_delta_1d) >= 0 ? "+" : ""}${fmt(ch.composite_delta_1d)} d/d` : ""),
           ch.xp_total != null && fig(fmt(ch.xp_total), "xp"),
           Number(ch.xp_debt) > 0 && fig(`−${fmt(ch.xp_debt)}`, "xp debt"),
-          !ch.time_travel && (wave && wave.day_n) != null && fig(`day ${wave.day_n}`, "of the experiment"),
+          // #931: day 0 is pre-start, not a day of the experiment — the fig waits for Day 1.
+          !ch.time_travel && Number(wave && wave.day_n) >= 1 && fig(`day ${wave.day_n}`, "of the experiment"),
         ])}
         <p class="ch-share">${shareMount("/data/character/", shareText)}</p>
       </div>
@@ -190,7 +192,13 @@ export function chStatHtml(pillars, hist) {
 export async function renderCharacter(d) {
   const ch = (d && d.character) || {};
   const pillars = ((d && d.pillars) || []).slice().sort((a, b) => CH_ORDER.indexOf(a.name) - CH_ORDER.indexOf(b.name));
-  if (!pillars.length) return empty("The character sheet computes nightly — it fills in as the first days of data land.");
+  if (!pillars.length) {
+    // #931 pre-start: no sheet yet is the EXPECTED state — say when the record begins.
+    const pre0 = preStart();
+    return empty(pre0
+      ? `A fresh cycle at Level 1 — the record begins Day 1, ${pre0.startLabel}. The first character sheet computes after the first night of data.`
+      : "The character sheet computes nightly — it fills in as the first days of data land.");
+  }
   const [stats, wave, j, cfgRaw, ach, pres] = await Promise.all([
     tryJSON("/data/character_stats.json"), tryJSON("/api/journey_waveform"), tryJSON("/api/journey"),
     tryJSON("/api/character_config"), tryJSON("/api/achievements"), tryJSON("/api/presence"),
@@ -205,24 +213,36 @@ export async function renderCharacter(d) {
   const hist = (stats && stats.pillar_history) || [];
   _chCtx = { jj, wave, hist, genesis: (wave && wave.genesis) || null };
 
+  /* #931 pre-start: launch eve reads as ANTICIPATION — never dormant/atrophy
+     (that grammar is for a life gone quiet mid-cycle, not one that hasn't
+     started). Payload-first off the journey block; client GENESIS fallback. */
+  const pre = preStart(jj);
+
   /* #913 · the deterministic mood drives the hero's visual state, the share
      copy, and the celebration gating below. */
-  const mood = chMood(ch, pres);
-  const lullNow = !!(pres && pres.available && pres.in_lull && Number(pres.gap_days) >= 2);
+  const mood = pre ? "steady" : chMood(ch, pres);
+  const lullNow = !pre && !!(pres && pres.available && pres.in_lull && Number(pres.gap_days) >= 2);
 
   const hero = chHeroHtml(ch, pillars, jj, wave, mood);
   /* ADR-104/#913: the quiet stretch as a structural state banner — same calm
      voice, muted ember (never alarm-red), but persistent and specific: the
-     gap-day counter plus exactly which pillars are decaying right now. */
+     gap-day counter plus exactly which pillars are decaying right now.
+     #931: pre-start the same slot carries the countdown instead — the record
+     begins Day 1, and nothing below is dormant, just unwritten. */
   const decaying = pillars.filter((p) => (p.neglect_decay && p.neglect_decay.applied) || (p.absent_behaviors || []).length);
   const graceDays = Number(cfg && cfg.leveling && cfg.leveling.neglect_decay && cfg.leveling.neglect_decay.n_grace_days) || 3;
-  const quiet = lullNow
-    ? `<section class="rd-sec ch-state" data-mood="${esc(mood)}" aria-label="Quiet-stretch state">
+  const quiet = pre
+    ? `<section class="rd-sec ch-state" data-mood="steady" aria-label="Pre-start state">
+        <p class="ch-state-line"><strong class="num">${esc(String(pre.daysUntil))}</strong><span class="label"> day${pre.daysUntil === 1 ? "" : "s"} until Day 1 — the experiment begins ${esc(pre.startLabel)}</span></p>
+        <p class="ch-state-detail">A fresh cycle at Level 1: nothing carried over, nothing pre-earned. Every level below gets earned from the first night of data, and the first baseline is that morning's weigh-in. The record begins Day 1.</p>
+      </section>`
+    : lullNow
+      ? `<section class="rd-sec ch-state" data-mood="${esc(mood)}" aria-label="Quiet-stretch state">
         <p class="ch-state-line"><strong class="num">${esc(String(Math.round(Number(pres.gap_days))))}</strong><span class="label"> days since a manual log</span>${pres.passive_still_flowing ? `<span class="label"> · the wearables keep flowing</span>` : ""}</p>
         ${decaying.length ? `<p class="ch-state-detail">Decaying while the logging is dark: ${decaying.map((p) => `<strong style="color:var(--pillar-${esc(p.name)},var(--ember))">${esc(ttl(p.name))}</strong>`).join(", ")}.</p>` : ""}
         <p class="ch-state-detail">The sheet doesn't look away: behaviors that aren't happening score zero, XP bleeds into visible debt, and after ${esc(String(graceDays))} dark days the levels themselves atrophy — modeling real detraining and evidence loss, not punishment. The levels below are what the data actually earns.</p>
       </section>`
-    : "";
+      : "";
   const statblock = chStatHtml(pillars, hist);
 
   /* 12 · Time travel — scrub the sheet to any past day (the cockpit's own

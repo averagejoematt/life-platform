@@ -56,12 +56,15 @@ export function vitalsStatusRead(comps, p, dayNum) {
   else if (ember >= 3) { word = "RECOVERED"; line = "the body's ready — push if you've got it."; tone = "ember"; }
   else { word = "MIXED"; line = "a split signal — read the parts, not a single verdict."; tone = "muted"; }
   const thin = (dayNum != null && dayNum < 14);
-  const stamp = thin ? `<span class="vs-stamp label">${dayNum} days in — baseline still forming</span>` : "";
+  // #931 pre-start: "0 days in" would read broken — the stamp counts down to Day 1 instead.
+  const stamp = (p && p.pre_start && p.days_until_start != null)
+    ? `<span class="vs-stamp label">${Number(p.days_until_start)} day${Number(p.days_until_start) === 1 ? "" : "s"} to Day 1 — the baseline starts with the first weigh-in</span>`
+    : thin ? `<span class="vs-stamp label">${dayNum} days in — baseline still forming</span>` : "";
   const rings = `<div class="vr-row">${comps.map((c) => ring({ value: c.value, sub: c.sub || "", label: c.label, fill: c.fill, tone: c.tone, thin })).join("")}</div>`;
   return sec("Today's read",
     `<div class="vs-band vs-${tone}"><div class="vs-word"><span class="vs-w">${esc(word)}</span><span class="vs-line">${esc(line)}</span></div>${stamp}</div>` +
     rings +
-    `<p class="rd-meta label">The status is the sum of the rings below it — recovery, HRV, resting HR, sleep — not a black-box grade. Each is <strong>last night's</strong> read, setting up today. Ember = good, muted = neutral or still forming${thin ? "; on day " + dayNum + " of a fresh cut the baseline is thin, so the rings show their state without overclaiming." : "."}</p>`);
+    `<p class="rd-meta label">The status is the sum of the rings below it — recovery, HRV, resting HR, sleep — not a black-box grade. Each is <strong>last night's</strong> read, setting up today. Ember = good, muted = neutral or still forming${thin && dayNum >= 1 ? "; on day " + dayNum + " of a fresh cut the baseline is thin, so the rings show their state without overclaiming." : "."}</p>`);
 }
 
 // P0.2 — now vs 7-day vs 30-day ladder under each ring: "am I above/below my own normal?"

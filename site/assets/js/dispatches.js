@@ -9,7 +9,7 @@
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
 import { initTheme } from "/assets/js/theme.js";
-import { enhanceCoachNames, stampGenesis } from "/assets/js/coach_popover.js";
+import { enhanceCoachNames, stampGenesis, preStart } from "/assets/js/coach_popover.js"; // + #931 pre-start countdown
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait, wireSpeakingAudio } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 semantic states
@@ -244,8 +244,13 @@ async function renderRead(s, id) {
     // The chronicle installment that narrates a given date = the soonest week ending on/after it.
     const postFor = (date) => { let best = null; for (const p of posts) { if (!p.date) continue; if (p.date >= date && (!best || p.date < best.date)) best = p; } return best || posts[0] || null; };
     const TYPE = { weight: "wt", level_up: "lv", experiment: "ex", discovery: "dx", correlation: "co", milestone: "ms", life_event: "le" };
-    // Stat line (always shown): Day/Week/lbs + the jump link.
-    const statLine = `<p class="tl-recap-h">Day ${dayN} · Week ${weekN}${lost != null ? ` · <span class="tl-recap-em">${lost} lbs down</span>` : ""}</p>` +
+    // Stat line (always shown): Day/Week/lbs + the jump link. #931 pre-start: the
+    // Day-N clamp above would read "Day 1 · Week 1" on launch eve — count down instead.
+    const pre = preStart((jr && jr.journey) || jr);
+    const statHead = pre
+      ? `<p class="tl-recap-h">Day 1 is ${pre.startLabel} — ${pre.daysUntil} day${pre.daysUntil === 1 ? "" : "s"} out</p>`
+      : `<p class="tl-recap-h">Day ${dayN} · Week ${weekN}${lost != null ? ` · <span class="tl-recap-em">${lost} lbs down</span>` : ""}</p>`;
+    const statLine = statHead +
       `<p class="tl-recap-s">${events.length} key moment${events.length === 1 ? "" : "s"}, newest first.${events.length ? ` <a href="#tl-genesis">Jump to Day 1 ↓</a>` : ""}</p>`;
     // Phase 3: prefer Elena's "previously on" cold-open when /api/recap has one; else
     // fall back to the front-end-derived stat aside (no regression pre-recap).
