@@ -1089,6 +1089,41 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .nav-follow:hover { color: var(--ember); border-color: var(--ember); }
 /* nav-follow is hidden on mobile inside @layer chrome above (no !important needed). */
 
+/* ════════════════════════════════════════════════════════════════════════════
+   TAP-TARGET FLOOR (#1010) — 44px effective hit areas on touch
+   ════════════════════════════════════════════════════════════════════════════
+   Interactive controls the mobile review measured below the 44px floor. Expanded
+   WITHOUT visual redesign: an isolated icon/button gets a transparent, centered
+   ::after overlay that enlarges its clickable region while the visible mark is
+   unchanged; a form control gets min-height; a checkbox is tapped via its wrapping
+   <label> (pseudo-elements don't render on replaced inputs). Documented in the
+   DESIGN_SYSTEM_V5 mobile section (#1011); the visual_qa tap-target audit (#1013)
+   reports any future regressions. Only on touch-width so desktop hover is untouched. */
+@media (max-width: 600px) {
+  /* Isolated icon/button controls — invisible hit overlay, visual unchanged. Expands
+     VERTICALLY to 44px (width stays 100% of the control) so the overlay never pushes
+     past the viewport — the app-bar toggle sits at the right edge, and a horizontal
+     overlay there would overflow the fixed bar. The intro "×" gets the same. */
+  .theme-toggle, .cockpit-intro__x, .ev-intro__x { position: relative; }
+  .theme-toggle::after, .cockpit-intro__x::after, .ev-intro__x::after {
+    content: ""; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 100%; height: max(100%, 44px);
+  }
+  /* Form controls — the time-travel scrubber (the cockpit's headline interaction) and
+     the day/scrub selects: a taller box = a thumb-draggable/tappable target. */
+  .scrub, .scrub-days, .df-scrub { min-height: 44px; }
+  /* Text buttons ("got it" / "place me" / dismiss-go) — pad to the floor. */
+  .cockpit-intro__go, .ev-intro__go, .okay-cta, .place-btn { min-height: 44px; padding-block: 11px; }
+  /* Checkbox: tap the whole label row (the input itself is a 13px replaced element). */
+  .cv-all { min-height: 44px; display: inline-flex; align-items: center; gap: var(--sp-2); }
+  .cv-all input[type="checkbox"] { width: 20px; height: 20px; }
+  /* Inline evidence-link pills + breadcrumbs — vertical padding extends the tap area
+     without shifting the line box (inline padding doesn't reflow prose), so the visual
+     stays put but the thumb target grows. Not an inline-flex 44px block (that reads as
+     a broken gap in prose) and not an overlay (that would swallow taps on adjacent text). */
+  .supp-ev-link, [data-crumb] a, .dx-crumb a { padding-block: 12px; }
+}
+
 /* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */
 /* muted, but NOT below AA: --ink-faint is AA-tuned (4.9:1 on paper); the old opacity:0.6 dropped it to 2.34. */
 .build-stamp { display: block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: 11px; color: var(--ink-faint); }
