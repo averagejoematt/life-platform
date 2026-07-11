@@ -1111,6 +1111,24 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .prose.prose-sm { font-size: var(--fs-body); }
 .prose.prose-sm > * + * { margin-top: var(--sp-3); }
 
+/* ── Responsive table primitive (#1008) ───────────────────────────────────────
+   ONE shared pattern for wide data tables: on a narrow viewport a table keeps its
+   natural column widths and scrolls INSIDE its own box (a horizontal swipe strip)
+   instead of squeezing columns until headers truncate ("FLAG" → "FL") or blowing
+   the page out. The block-scroll trick needs no wrapper element — set on the
+   <table> itself; rows keep their table layout, columns stay aligned.
+
+   Two ways to use it:
+     • add class="table-scroll" to any <table> (or a wrapping <div>), OR
+     • use the shared .rd-tbl readout-table class — it inherits this behaviour at
+       ≤ --bp-tw (820) automatically (see the readout-table rule in evidence.css).
+   Desktop is untouched: full column layout, no scrollbar, until the tablet width.
+   Documented in the mobile section of docs/DESIGN_SYSTEM_V5.md (#1011). */
+.table-scroll {
+  display: block; max-width: 100%; width: auto;
+  overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+
 /* ── .trust-doc — the static skeptic's contract on /method/ (#731). Container
    geometry only; all typography comes from .prose. Deliberately server-rendered
    static HTML — it must read with JS off, so it never depends on evidence.js. */
