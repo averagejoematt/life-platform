@@ -4,7 +4,6 @@
 
 > Action sequence for a new engineer on day 1: auth, run tests, deploy a single Lambda, verify daily-brief output, roll back if needed.
 > For mental model + concepts, see `docs/ONBOARDING.md`. For full operations, see `docs/RUNBOOK.md`.
-> Last updated: 2026-05-19 (v8.0.0)
 
 ---
 
@@ -12,44 +11,39 @@
 
 | Tool | Version | Verify |
 |------|---------|--------|
-| Python | 3.12 (not 3.13 — Lambda runtime is 3.12) | `python3 --version` |
-| Node.js | 18+ (CDK requirement) | `node --version` |
+| Python | **3.12 exactly** (not 3.13 — the Lambda runtime is 3.12; tests must run on what production runs) | `python3 --version` |
+| Node.js | 18+ (CDK CLI requirement) | `node --version` |
 | AWS CLI | 2.x | `aws --version` |
 | npm | Bundled with Node | `npm --version` |
 
-CDK is installed via `cdk/requirements.txt` (Python package), not as a global npm package.
+The CDK **CLI** is a global npm package pinned to CI's version (see "CDK setup"
+below); the CDK **libraries** (`aws-cdk-lib`/`constructs`) are Python packages
+from `cdk/requirements.txt`. Both directions are pinned (#814).
 
 ---
 
 ## 1. Authenticate to AWS
 
 The platform runs in AWS account `205930651321`, region `us-west-2` (Oregon).
+Human access — IAM Identity Center SSO (primary) or break-glass `matthew-admin`
+keys — has one authoritative home: **`docs/AWS_ACCESS.md`**. Follow it, then
+verify: `aws sts get-caller-identity` → `Account: 205930651321`. (CI/CD uses
+OIDC federation — no long-lived keys in GitHub; roles inventoried in AWS_ACCESS.md §4.)
+
+### Clone + install
 
 ```bash
-# Configure credentials (ask Matthew for access key + secret key)
-aws configure
-# AWS Access Key ID: <from Matthew>
-# AWS Secret Access Key: <from Matthew>
-# Default region: us-west-2
-# Default output format: json
-
-# Verify
-aws sts get-caller-identity
-# Should show: Account: 205930651321, Arn: ...matthew-admin...
-```
-
-The IAM user is `matthew-admin`. CI/CD uses OIDC federation (no long-lived keys in GitHub).
-
-### Clone + install Python deps
-
-```bash
+git clone git@github.com:averagejoematt/life-platform.git ~/Documents/Claude/life-platform
 cd ~/Documents/Claude/life-platform
-python3 -m venv .venv
+python3 -m venv .venv                 # python3 must be 3.12.x — see table above
 source .venv/bin/activate
-pip install -r cdk/requirements.txt
-pip install -r requirements-dev.txt   # pytest, flake8, etc.
-pip install boto3 anthropic
+pip install -r requirements-dev.txt   # pytest, black, ruff, playwright, boto3 — pinned to match CI's gates
+pip install -r cdk/requirements.txt   # aws-cdk-lib + constructs (pinned)
+playwright install chromium           # browser for tests/visual_qa.py (local visual QA)
+bash scripts/install_hooks.sh         # pre-commit hook: black/ruff format gate + doc-metadata sync (sync_doc_metadata.py --apply)
 ```
+
+(No `pip install anthropic` — runtime inference is AWS Bedrock via boto3/IAM, ADR-062.)
 
 ### CDK setup (first time only)
 

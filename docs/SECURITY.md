@@ -27,23 +27,24 @@ Lower-probability but mentioned in ADR-053/055/057:
 
 - ✅ **Per-Lambda execution roles** (one role per function, scoped least-privilege)
 - ✅ **OIDC federation for GitHub Actions** — no long-lived AWS access keys committed
+- ✅ **Human access = IAM Identity Center SSO** (short-lived sessions); long-lived `matthew-admin` keys are break-glass only — the single authoritative procedure is `docs/AWS_ACCESS.md`
 - ✅ **AWS root account locked down** with MFA — used only for billing
 - ✅ **Inline policies preferred** over managed policies (smaller blast radius)
 - ✅ **Resource ARNs scoped** — e.g. `secretsmanager:GetSecretValue` restricted to `life-platform/*`
 - ❌ **No IAM Access Analyzer findings remediation** — manual sweep monthly
 
 **Rotation cadence:**
-- AWS access keys: 90 days (calendar reminder)
+- AWS access keys (break-glass `matthew-admin` only — see `docs/AWS_ACCESS.md` §3): 90 days (calendar reminder)
 - Lambda execution role permissions: reviewed each ADR
 - 5 orphan roles deleted 2026-05-19 (life-platform-digest-role, og-image-role, measurements-ingestion-role, pipeline-health-check-role, subscriber-onboarding-role)
 
 ### Layer 2 — Secrets management
 
 - ✅ **Secrets Manager only** — never `.env` files, never hardcoded
-- ✅ **`life-platform/*` namespace** — 12 active secrets + 3 in deletion window
+- ✅ **`life-platform/*` namespace** — 21 active secrets, 0 in deletion window (reconciled 2026-07-10; inventory in `docs/SECRETS_MAP.md`)
 - ✅ **15-min in-Lambda caching** via `secret_cache.py` — reduces SM API calls ~90%
 - ✅ **mcp-api-key auto-rotates** every 90 days via `key_rotator_lambda`
-- ⚠️ **anthropic-api-key NO programmatic rotation** — manual at console.anthropic.com (Anthropic doesn't expose a rotation API)
+- ⚠️ **Legacy Anthropic keys (`ai-keys`, `site-api-ai-key`) — NO programmatic rotation** — manual at console.anthropic.com (Anthropic doesn't expose a rotation API); runtime inference is Bedrock/IAM (ADR-062), so these are fallback paths
 - ⚠️ **OAuth tokens (Whoop, Garmin, Strava, Withings)** — auto-refreshed on use; manual fallback ~180 days
 - ✅ **No tokens in CloudWatch logs** — confirmed via grep of recent log streams
 
