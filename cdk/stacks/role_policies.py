@@ -2334,10 +2334,14 @@ def mcp_server() -> list[iam.PolicyStatement]:
         iam.PolicyStatement(
             sid="HevySsmParams",
             # ADR-066: cron + add-load gates read from SSM.
+            # #915: + experiment-cycle — coach check-in records are stamped with
+            # the current cycle at write time (ADR-077 navigability; fail-soft
+            # in code, so the stamp is simply absent until this deploys).
             actions=["ssm:GetParameter"],
             resources=[
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/cron_enabled",
                 f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/hevy/autoreg_add_load_enabled",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle",
             ],
         ),
         iam.PolicyStatement(

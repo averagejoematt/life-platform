@@ -7,6 +7,9 @@ from mcp.config import RAW_DAY_LIMIT, SOURCES
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import tool_get_benchmark
 from mcp.tools_cgm import tool_get_cgm
+
+# #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
+from mcp.tools_coach_checkin import tool_get_coach_checkin_queue, tool_log_coach_checkin
 from mcp.tools_coach_intelligence import tool_evaluate_prediction, tool_get_coach_thread, tool_get_coach_track_record, tool_get_predictions
 from mcp.tools_correlation import tool_get_zone2_breakdown
 from mcp.tools_data import (
@@ -1704,6 +1707,62 @@ TOOLS = {
                     },
                 },
                 "required": ["habit"],
+            },
+        },
+    },
+    # ── #915: ad-hoc coach check-in loop (coaches ask, Matthew answers verbatim) ──
+    "get_coach_checkin_queue": {
+        "fn": tool_get_coach_checkin_queue,
+        "schema": {
+            "name": "get_coach_checkin_queue",
+            "description": (
+                "#915: Up to 3 open check-in questions FROM Matthew's AI coaches — qualitative questions whose "
+                "verbatim answers pair with (or explain the absence of) the quantitative data. Open questions "
+                "persist: re-calls return the SAME queue; fresh questions are generated (Bedrock, in the asking "
+                "coach's persona, grounded in live presence/adaptive-mode/manual-source context) only when the "
+                "queue is empty. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is "
+                "always valid with zero penalty — never nag. "
+                "Use for: 'what do my coaches want to know?', 'coach check-in', periodic qualitative catch-ups."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "coach_id": {
+                        "type": "string",
+                        "description": (
+                            "Optional: have a specific coach ask (sleep, nutrition, training, mind, physical, "
+                            "glucose, labs, explorer). Default: auto-picked from the most informative signal."
+                        ),
+                    },
+                    "count": {"type": "integer", "description": "Questions to generate when the queue is empty (1-3, default 3)."},
+                },
+                "required": [],
+            },
+        },
+    },
+    "log_coach_checkin": {
+        "fn": tool_log_coach_checkin,
+        "schema": {
+            "name": "log_coach_checkin",
+            "description": (
+                "#915: Record Matthew's answer to a coach check-in question VERBATIM (his words, never a "
+                "paraphrase — ADR-104), or an explicit skip (always valid, zero penalty). The answer becomes "
+                "durable qualitative context stored with the coach's records. "
+                "Use after get_coach_checkin_queue, once Matthew has responded (or declined)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "checkin_id": {
+                        "type": "string",
+                        "description": "The question's checkin_id from get_coach_checkin_queue (starts with 'CHECKIN#').",
+                    },
+                    "coach_id": {"type": "string", "description": "Optional: the asking coach's id — speeds up the lookup."},
+                    "answer": {"type": "string", "description": "Matthew's answer, verbatim. Omit when skip=true."},
+                    "skip": {"type": "boolean", "description": "true = Matthew declines this question (zero penalty)."},
+                    "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional topic tags (max 5)."},
+                },
+                "required": ["checkin_id"],
             },
         },
     },
