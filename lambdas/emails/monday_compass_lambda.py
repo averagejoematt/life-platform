@@ -167,12 +167,6 @@ def safe_float(rec, field, default=None):
     return default
 
 
-def get_secret():
-    """ADR-062: Bedrock IAM auth — sentinel dict. Only anthropic_api_key is
-    read downstream (line ~792); see task #90 for full removal."""
-    return {"anthropic_api_key": "_BEDROCK_IAM_"}
-
-
 def fetch_profile():
     from intelligence_common import fetch_profile as _shared_fetch_profile
 
@@ -554,13 +548,12 @@ def _fallback_board_context(week_state):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def call_anthropic(system_prompt, user_message, api_key, max_tokens=3000):
+def call_anthropic(system_prompt, user_message, max_tokens=3000):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,
-        api_key=api_key,
         max_tokens=max_tokens,
         system=system_prompt,
         temperature=0.4,
@@ -830,13 +823,10 @@ def record_email_send(table, lambda_name):
 def lambda_handler(event, context):
     logger.info("Monday Compass v1.0.0 starting...")
 
-    secret = get_secret()
-    api_key = secret.get("anthropic_api_key")
-    todoist_token = secret.get("todoist_api_token") or secret.get("todoist")
-
-    if not api_key:
-        logger.error("No Anthropic API key found")
-        return {"statusCode": 500, "body": "Missing Anthropic API key"}
+    # ADR-062: Bedrock IAM auth — no Anthropic key. The Todoist token was never
+    # populated here (the old get_secret() was a Bedrock-IAM sentinel), so the
+    # Todoist block below stays a no-op exactly as before.
+    todoist_token = None
 
     profile = fetch_profile()
     if not profile:
@@ -863,7 +853,7 @@ def lambda_handler(event, context):
     system = SYSTEM_PROMPT.format(journey_context=journey_context)
 
     try:
-        ai_content = call_anthropic(system, user_message, api_key, max_tokens=3500)
+        ai_content = call_anthropic(system, user_message, max_tokens=3500)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
         ai_content = (

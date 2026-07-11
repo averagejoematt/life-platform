@@ -194,7 +194,6 @@ def _call_haiku(system, user_message, max_tokens=2500, temperature=0.2):
         data=json.dumps(body).encode(),
         headers={
             "Content-Type": "application/json",
-            "x-api-key": "_BEDROCK_IAM_",
             "anthropic-version": "2023-06-01",
         },
         method="POST",

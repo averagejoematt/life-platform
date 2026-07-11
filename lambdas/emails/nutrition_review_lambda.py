@@ -90,15 +90,6 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     if isinstance(obj, list):
         return [d2f(i) for i in obj]
@@ -617,13 +608,12 @@ def build_user_message(data):
     return json.dumps(payload, indent=2, default=str)
 
 
-def call_anthropic(system_prompt, user_message, api_key):
+def call_anthropic(system_prompt, user_message):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,
-        api_key=api_key,
         max_tokens=4096,
         system=system_prompt,
         temperature=0.3,
@@ -862,10 +852,9 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning(f"IC-16 failed: {e}")
 
-    api_key = get_anthropic_key()
     logger.info("Calling Sonnet for analysis...")
     try:
-        ai_content = call_anthropic(system, user_message, api_key)
+        ai_content = call_anthropic(system, user_message)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
         ai_content = '<div style="background:#16213e;border-radius:8px;padding:20px;color:#e0e0e0;">AI analysis unavailable. Review data table above.</div>'

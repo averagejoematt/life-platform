@@ -276,7 +276,7 @@ class TestCheckPath:
         legacy = self._pending()
         del legacy["test_spec"]
         rows = _rows(24, cond_fn=lambda i: 180 if i % 2 else 100, out_fn=lambda i: 2.0 if i % 2 else 1.0)
-        updates = eng.check_pending_hypotheses([legacy], rows, api_key=None)
+        updates = eng.check_pending_hypotheses([legacy], rows)
         assert updates == []
 
     def test_contradicted_resolves_refuted(self, monkeypatch):
@@ -286,7 +286,7 @@ class TestCheckPath:
         # Rows dated 2026-06-01..24; hypothesis created 2026-06-01 → 30+ days old vs "now",
         # but contradiction resolves regardless of window state.
         (hyp, status, evidence, stats, resolution), *_ = eng.check_pending_hypotheses(
-            [self._pending(created="2026-06-01T00:00:00+00:00")], rows, api_key=None
+            [self._pending(created="2026-06-01T00:00:00+00:00")], rows
         )
         assert status == "refuted" and resolution == "refuted"
         assert stats["verdict"] == "contradicted"
@@ -303,9 +303,7 @@ class TestCheckPath:
         for i in range(10):
             d = (created_dt + timedelta(days=i)).strftime("%Y-%m-%d")
             rows.append({"date": d, "protein_g": 180 if i % 2 else 100, "deep_sleep_hrs": (2.0 if i % 2 else 1.0) + rng.gauss(0, 0.05)})
-        (hyp, status, evidence, stats, resolution), *_ = eng.check_pending_hypotheses(
-            [self._pending(created=created_dt.isoformat())], rows, api_key=None
-        )
+        (hyp, status, evidence, stats, resolution), *_ = eng.check_pending_hypotheses([self._pending(created=created_dt.isoformat())], rows)
         assert stats["verdict"] == "supported"
         assert status == "confirming" and resolution is None
 
@@ -314,6 +312,6 @@ class TestCheckPath:
         rng = random.Random(7)
         rows = _rows(24, cond_fn=lambda i: 180 if i % 2 else 100, out_fn=lambda i: 1.5 + rng.gauss(0, 0.5))
         (hyp, status, evidence, stats, resolution), *_ = eng.check_pending_hypotheses(
-            [self._pending(created="2026-06-01T00:00:00+00:00")], rows, api_key=None
+            [self._pending(created="2026-06-01T00:00:00+00:00")], rows
         )
         assert status == "archived" and resolution == "expired_undecided"

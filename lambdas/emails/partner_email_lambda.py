@@ -77,11 +77,6 @@ secrets = boto3.client("secretsmanager", region_name=_REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_api_key():
-    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     if isinstance(obj, list):
         return [d2f(i) for i in obj]
@@ -466,7 +461,6 @@ Be warm. Be honest. Be human."""
 
 
 def build_commentary(data):
-    api_key = get_api_key()
     mood = data["mood"]
     sl = data["sleep"]
     tr = data["training"]
@@ -517,7 +511,7 @@ def build_commentary(data):
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
         method="POST",
     )
 
