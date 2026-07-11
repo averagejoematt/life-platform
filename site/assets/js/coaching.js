@@ -867,7 +867,7 @@ async function selectSection(key, preId, push = true) {
   let data = await secFetch(s);
   if (s.kind === "bycoach" || s.kind === "team") data = await enrichCoachLive(data);
   const entries = entriesFor(s, data);
-  if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = ""; return; }
+  if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-prose">Nothing to read yet. This section fills in once the experiment is underway — the first entries land after Day 1.</p>`; return; }
   listEl.innerHTML = entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}</span><span class="dx-item-d label">${esc(e.date || "")}</span>${e.sub ? `<span class="dx-item-sub">${esc(String(e.sub).slice(0, 90))}</span>` : ""}</button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
