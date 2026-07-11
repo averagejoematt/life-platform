@@ -101,15 +101,6 @@ CALORIE_TARGET = 1800
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 # d2f, avg, fmt imported from digest_utils
 
 
@@ -505,7 +496,7 @@ def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
-def call_haiku_monthly(data, goals, api_key):
+def call_haiku_monthly(data, goals):
     clean_data = d2f(data)
     clean_goals = d2f(goals)
 
@@ -540,7 +531,7 @@ def call_haiku_monthly(data, goals, api_key):
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
         method="POST",
     )
     resp = call_anthropic_with_retry(req, timeout=60)
@@ -1014,10 +1005,9 @@ def lambda_handler(event, context):
     windows = data["windows"]
     logger.info(f"{windows['month_label']} | {windows['cur_start']} → {windows['cur_end']}")
 
-    api_key = get_anthropic_key()
     logger.info("Calling Haiku for monthly council commentary...")
     try:
-        commentary = call_haiku_monthly(data, goals, api_key)
+        commentary = call_haiku_monthly(data, goals)
     except Exception as e:
         logger.warning(f"Haiku failed: {e}")
         commentary = (

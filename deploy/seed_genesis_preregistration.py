@@ -352,7 +352,6 @@ def generate_predictions_via_bedrock(goals):
         try:
             raw = call_anthropic_api(
                 prompt,
-                api_key="",  # ignored — Bedrock IAM auth (ADR-062)
                 max_tokens=900,
                 system=_GEN_SYSTEM,
                 model=AI_MODEL,  # narrative-tier (Sonnet): a one-off, permanent public artifact

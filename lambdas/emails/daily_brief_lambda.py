@@ -182,15 +182,6 @@ ai_calls.init(
 # ==============================================================================
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     if isinstance(obj, list):
         return [d2f(i) for i in obj]
@@ -1195,7 +1186,6 @@ def _daily_brief_ai_allowed() -> bool:
 def _run_ai_coach_pipeline(
     data,
     profile,
-    api_key,
     day_grade_score,
     grade,
     component_scores,
@@ -1207,10 +1197,10 @@ def _run_ai_coach_pipeline(
 ):
     """Runs the full AI coach pipeline (8 v2 coaches + ensemble digest kick-off +
     Board of Directors + Training/Nutrition + Journal + TL;DR/Guidance) and
-    returns a dict of the generated fields. Gated on both `api_key` presence
-    and `_daily_brief_ai_allowed()` (budget tier 3 / ADR-125 Band 3,
-    "daily_brief_ai") — when either is false, returns all-empty defaults so
-    the caller's existing data-only rendering path is exercised unchanged."""
+    returns a dict of the generated fields. Gated on `_daily_brief_ai_allowed()`
+    (budget tier 3 / ADR-125 Band 3, "daily_brief_ai") — when false, returns
+    all-empty defaults so the caller's existing data-only rendering path is
+    exercised unchanged."""
     result = {
         "bod_insight": "",
         "training_nutrition": {},
@@ -1225,8 +1215,6 @@ def _run_ai_coach_pipeline(
         "labs_coach_v2_text": "",
         "explorer_coach_v2_text": "",
     }
-    if not api_key:
-        return result
     if not _daily_brief_ai_allowed():
         return result
 
@@ -1245,7 +1233,7 @@ def _run_ai_coach_pipeline(
         ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
     ]:
         try:
-            _result = _call_fn(data, profile, api_key) or ""
+            _result = _call_fn(data, profile) or ""
             if _cid == "sleep":
                 result["sleep_coach_v2_text"] = _result
             elif _cid == "nutrition":
@@ -1304,7 +1292,6 @@ def _run_ai_coach_pipeline(
             day_grade_score,
             grade,
             component_scores,
-            api_key,
             character_sheet=character_sheet,
             brief_mode=brief_mode,
             shared_system=shared_system,
@@ -1314,14 +1301,14 @@ def _run_ai_coach_pipeline(
         logger.warning("BoD failed: " + str(e))
 
     try:
-        result["training_nutrition"] = ai_calls.call_training_nutrition_coach(data, profile, api_key, shared_system=shared_system)
+        result["training_nutrition"] = ai_calls.call_training_nutrition_coach(data, profile, shared_system=shared_system)
         logger.info("Training/Nutrition coach returned")
     except Exception as e:
         logger.warning("Training/Nutrition coach failed: " + str(e))
 
     if data.get("journal_entries"):
         try:
-            journal_coach_text = ai_calls.call_journal_coach(data, profile, api_key, shared_system=shared_system)
+            journal_coach_text = ai_calls.call_journal_coach(data, profile, shared_system=shared_system)
             # V2 P3.5 (2026-05-17): substitute a stub if LLM returned empty
             # (validator blocks empty + falls through). Stub keeps the section
             # rendered with a graceful no-op rather than a missing block.
@@ -1347,7 +1334,7 @@ def _run_ai_coach_pipeline(
             component_details,
             readiness_score,
             readiness_colour,
-            api_key,
+            "",  # ADR-062: api_key positional is ignored (Bedrock IAM); ai_calls has no default here
             shared_system=shared_system,
         )
         logger.info("TL;DR+Guidance: " + str(result["tldr_guidance"].get("tldr", ""))[:80])
@@ -1754,20 +1741,13 @@ def lambda_handler(event, context):
     data["labs_coaching_ctx"] = _labs_ctx
     data["genome_coaching_ctx"] = _genome_ctx
 
-    # AI calls (all optional — brief works without them). Gated by both API-key
-    # availability and the explicit budget_guard.allow("daily_brief_ai") check
-    # inside _run_ai_coach_pipeline (Band 3 / ADR-125, #810) — at tier 3 this
-    # returns all-empty defaults and the brief below renders data-only.
-    api_key = None
-    try:
-        api_key = get_anthropic_key()
-    except Exception as e:
-        logger.warning("Could not get API key: " + str(e))
-
+    # AI calls (all optional — brief works without them). Gated by the explicit
+    # budget_guard.allow("daily_brief_ai") check inside _run_ai_coach_pipeline
+    # (Band 3 / ADR-125, #810) — at tier 3 this returns all-empty defaults and
+    # the brief below renders data-only.
     _ai = _run_ai_coach_pipeline(
         data,
         profile,
-        api_key,
         day_grade_score,
         grade,
         component_scores,
@@ -1822,7 +1802,7 @@ def lambda_handler(event, context):
         logger.warning(f"HP-12: elena_hero_line generation failed: {_e}")
 
     # AI-3: Validate all AI outputs before delivery
-    if api_key and _HAS_AI_VALIDATOR:
+    if _HAS_AI_VALIDATOR:
         try:
             _primary_whoop = data.get("primary_whoop") or data.get("whoop") or {}
             _health_ctx = {

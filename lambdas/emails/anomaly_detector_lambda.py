@@ -162,15 +162,6 @@ METRICS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     if isinstance(obj, list):
         return [d2f(i) for i in obj]
@@ -467,7 +458,7 @@ def call_anthropic_with_retry(req, timeout=30, max_attempts=None, backoff_s=None
     return call_anthropic_raw(req, timeout=timeout)
 
 
-def call_haiku_hypothesis(flagged, context, api_key):
+def call_haiku_hypothesis(flagged, context):
     payload = json.dumps(
         {
             "model": AI_MODEL_HAIKU,
@@ -485,7 +476,7 @@ def call_haiku_hypothesis(flagged, context, api_key):
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
         method="POST",
     )
     resp = call_anthropic_with_retry(req, timeout=25)
@@ -995,9 +986,8 @@ def lambda_handler(event, context):
         logger.info(f"Multi-source anomaly -- {len(flagged)} metrics across {source_count} sources. Severity: {severity}")
 
         try:
-            api_key = get_anthropic_key()
             context_data = build_context(yesterday)
-            hypothesis = call_haiku_hypothesis(flagged, context_data, api_key)
+            hypothesis = call_haiku_hypothesis(flagged, context_data)
             logger.info(f"Hypothesis: {hypothesis[:100]}...")
             # AI-3: Validate hypothesis output
             if _HAS_AI_VALIDATOR and hypothesis:

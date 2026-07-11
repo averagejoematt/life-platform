@@ -80,15 +80,6 @@ LOOKBACK_DAYS = 14
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     """Convert DynamoDB Decimals to float/int."""
     if isinstance(obj, Decimal):
@@ -345,7 +336,7 @@ Respond ONLY with valid JSON:
 }"""
 
 
-def generate_challenges(context, api_key):
+def generate_challenges(context):
     """Call Claude Sonnet to generate challenge candidates."""
     user_message = f"""Here is the current platform data for challenge generation.
 Today is {datetime.now(timezone.utc).strftime('%Y-%m-%d')} ({datetime.now(timezone.utc).strftime('%A')}).
@@ -385,7 +376,6 @@ If no clear signal exists, return 0 challenges. Quality over quantity."""
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "anthropic-beta": "prompt-caching-2024-07-31",
         },
@@ -513,11 +503,8 @@ def lambda_handler(event, context):
 
         logger.info(f"Context gathered: journal={journal_count}, character={has_character}, habits={has_habits}")
 
-        # 2. Get API key
-        api_key = get_anthropic_key()
-
-        # 3. Generate challenges
-        result = generate_challenges(ctx, api_key)
+        # 2. Generate challenges
+        result = generate_challenges(ctx)
         if not result or "challenges" not in result:
             logger.warning("No challenges generated or invalid response")
             return {"status": "completed", "generated": 0, "reason": "no_signal"}

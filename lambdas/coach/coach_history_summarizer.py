@@ -154,15 +154,6 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # SECRET CACHING
 # ══════════════════════════════════════════════════════════════════════════════
 
-_api_key_cache = {"key": None, "ts": 0}
-_API_KEY_TTL = 900  # 15 minutes
-
-
-def _get_api_key():
-    """ADR-062: Bedrock IAM auth — sentinel; see task #90 for full plumbing removal."""
-    return "_BEDROCK_IAM_"
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -234,8 +225,6 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
     Returns parsed JSON dict if the response is valid JSON, otherwise raw text.
     Raises on final failure after all retry attempts.
     """
-    api_key = _get_api_key()
-
     body = {
         "model": AI_MODEL_HAIKU,
         "max_tokens": max_tokens,
@@ -251,7 +240,6 @@ def _call_haiku(system, user_message, max_tokens=1500, temperature=0.2):
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "anthropic-beta": "prompt-caching-2024-07-31",
         },

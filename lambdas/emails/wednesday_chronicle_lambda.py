@@ -125,15 +125,6 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     if isinstance(obj, list):
         return [d2f(i) for i in obj]
@@ -1061,13 +1052,12 @@ Write in clean paragraphs. No bullet points. No numbered lists. No headers withi
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def call_anthropic(system_prompt, user_message, api_key):
+def call_anthropic(system_prompt, user_message):
     # Delegates to retry_utils for exponential backoff + CloudWatch metrics (P1.8/P1.9)
     import retry_utils
 
     return retry_utils.call_anthropic_api(
         prompt=user_message,
-        api_key=api_key,
         max_tokens=4096,
         system=system_prompt,
         temperature=0.6,
@@ -1210,8 +1200,7 @@ def build_recap(data, new_installment_md=None, new_meta=None):
             logger.info("[recap] no published installments — skipping recap")
             return None
 
-        api_key = get_anthropic_key()
-        raw = call_anthropic(_RECAP_SYSTEM_PROMPT, "\n".join(src), api_key)
+        raw = call_anthropic(_RECAP_SYSTEM_PROMPT, "\n".join(src))
         recap = _parse_recap_json(raw)
         if not recap:
             logger.warning("[recap] could not parse recap JSON — skipping")
@@ -2328,7 +2317,6 @@ def _margaret_haiku_call(system, user):
 
     return retry_utils.call_anthropic_api(
         prompt=user,
-        api_key=get_anthropic_key(),
         max_tokens=1500,
         system=system,
         temperature=0.3,
@@ -2544,10 +2532,9 @@ def lambda_handler(event: dict, context) -> dict:
             logger.warning(f"IC-16 failed: {e}")
 
     # Call Sonnet
-    api_key = get_anthropic_key()
     logger.info("Calling Sonnet 4.5 for Elena's installment...")
     try:
-        raw_installment = call_anthropic(elena_prompt, user_message, api_key)
+        raw_installment = call_anthropic(elena_prompt, user_message)
     except Exception as e:
         logger.error(f"Anthropic failed: {e}")
         return {"statusCode": 500, "body": f"AI generation failed: {e}"}
@@ -2567,7 +2554,7 @@ def lambda_handler(event: dict, context) -> dict:
         _allowed = _gg.allowed_numbers(elena_prompt, user_message)
         _draft_before_gate = raw_installment  # #812/#744: keep the pre-gate draft for retention
         _findings_fn = lambda t: installment_grounding_findings(elena_prompt, user_message, t)  # noqa: E731
-        _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr, api_key)  # noqa: E731
+        _regen_fn = lambda corr: call_anthropic(elena_prompt, user_message + "\n\n" + corr)  # noqa: E731
         raw_installment, _residual, _corrected = _gg.regen_once(raw_installment, _findings_fn, _regen_fn)
         if _corrected:
             logger.info(f"[ADR-104] chronicle corrected once; residual findings: {len(_residual)}")
@@ -2611,7 +2598,7 @@ def lambda_handler(event: dict, context) -> dict:
             raw_installment, _ack_finding = _epa(
                 raw_installment,
                 _presence_sig,
-                regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note, api_key),
+                regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note),
             )
             if _ack_finding:
                 logger.warning(f"[#914] chronicle presence-ack gate fired: {_ack_finding.get('detail')}")

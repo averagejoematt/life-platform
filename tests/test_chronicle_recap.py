@@ -52,10 +52,7 @@ def _data(prev=None, arc=None):
 
 
 def _mock_llm(monkeypatch, payload):
-    monkeypatch.setattr(chron, "get_anthropic_key", lambda: "k")
-    monkeypatch.setattr(
-        chron, "call_anthropic", lambda system, user, key: json.dumps(payload) if isinstance(payload, (dict, list)) else payload
-    )
+    monkeypatch.setattr(chron, "call_anthropic", lambda system, user: json.dumps(payload) if isinstance(payload, (dict, list)) else payload)
 
 
 # ── build_recap: shape + grounding ───────────────────────────────────────────
@@ -153,9 +150,7 @@ def test_privacy_gate_drops_recap(monkeypatch):
 
 
 def test_build_recap_is_failsoft(monkeypatch):
-    monkeypatch.setattr(chron, "get_anthropic_key", lambda: "k")
-
-    def _raise(system, user, key):
+    def _raise(system, user):
         raise RuntimeError("bedrock down")
 
     monkeypatch.setattr(chron, "call_anthropic", _raise)

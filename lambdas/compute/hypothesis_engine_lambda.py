@@ -170,15 +170,6 @@ MAX_LAG_DAYS = 3
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def get_anthropic_key():
-    """ADR-062: Bedrock uses IAM auth — this fetch is dead. Returns a truthy
-    sentinel so callers' `api_key = get_anthropic_key()` + `if api_key:`
-    availability gates work; the value is never used for authentication
-    (ai_calls/retry_utils route to bedrock_client.invoke which uses IAM).
-    Full plumbing removal tracked as task #90."""
-    return "_BEDROCK_IAM_"
-
-
 def d2f(obj):
     """Convert DynamoDB Decimals to float/int."""
     if isinstance(obj, Decimal):
@@ -787,13 +778,11 @@ def write_calibration_row(hyp, stats, outcome):
         logger.warning(f"write_calibration_row failed (non-fatal): {e}")
 
 
-def narrate_resolution(hyp, det_evidence, new_status, api_key):
+def narrate_resolution(hyp, det_evidence, new_status):
     """#530: Haiku narrates a resolution the deterministic test already decided
     (ADR-104 pattern). Fail-soft: any error returns '' and the stored evidence
     stays the deterministic sentence. Only called on resolutions, so v2's check
     path costs ~nothing in normal weeks."""
-    if not api_key:
-        return ""
     prompt = (
         f"A pre-registered health hypothesis just resolved as {new_status.upper()}.\n"
         f"Hypothesis: {hyp.get('hypothesis', '')}\n"
@@ -806,7 +795,7 @@ def narrate_resolution(hyp, det_evidence, new_status, api_key):
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
         data=payload,
-        headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        headers={"Content-Type": "application/json", "anthropic-version": "2023-06-01"},
         method="POST",
     )
     try:
@@ -919,7 +908,7 @@ def format_journal_candidates(candidates):
     )
 
 
-def generate_hypotheses(daily_rows, existing_hypotheses, api_key, profile=None, journal_candidates=None):
+def generate_hypotheses(daily_rows, existing_hypotheses, profile=None, journal_candidates=None):
     """Run Claude to generate new cross-domain hypotheses from 14 days of data."""
     p = profile or {}
     start_w = p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS)
@@ -1004,7 +993,6 @@ test_spec field notes:
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "anthropic-beta": "prompt-caching-2024-07-31",
         },
@@ -1040,7 +1028,7 @@ test_spec field notes:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
+def check_pending_hypotheses(pending_hypotheses, daily_rows):
     """#530: Evaluate each pending hypothesis DETERMINISTICALLY against its frozen
     test_spec (ADR-105 rule 3). The LLM never sees the data and never decides.
 
@@ -1105,7 +1093,7 @@ def check_pending_hypotheses(pending_hypotheses, daily_rows, api_key):
 
         evidence = deterministic_evidence(spec, stats)
         if resolution:
-            narration = narrate_resolution(hyp, evidence, new_status, api_key)
+            narration = narrate_resolution(hyp, evidence, new_status)
             if narration:
                 evidence = f"{evidence} {narration}"
             time.sleep(0.5)
@@ -1200,8 +1188,6 @@ def lambda_handler(event, context):
     try:
         logger.info("IC-18: Hypothesis Engine v2.0.0 (#530: deterministic specs + calibration) starting...")
 
-        api_key = get_anthropic_key()
-
         # 1. Gather data + profile
         data = gather_data()
         if not data:
@@ -1239,7 +1225,7 @@ def lambda_handler(event, context):
         updates_made = 0
         resolutions = 0
         if pending_hypotheses:
-            updates = check_pending_hypotheses(pending_hypotheses, daily_rows, api_key)
+            updates = check_pending_hypotheses(pending_hypotheses, daily_rows)
             for hyp, new_status, evidence_note, stats, resolution in updates:
                 update_hypothesis_status(hyp.get("sk", ""), new_status, evidence_note, stats=stats)
                 updates_made += 1
@@ -1265,7 +1251,7 @@ def lambda_handler(event, context):
             if journal_candidates:
                 logger.info(f"[#506] Seeding generation with {len(journal_candidates)} journal candidates")
             result = generate_hypotheses(
-                daily_rows[-GENERATION_DAYS:], all_hypotheses, api_key, profile=profile, journal_candidates=journal_candidates
+                daily_rows[-GENERATION_DAYS:], all_hypotheses, profile=profile, journal_candidates=journal_candidates
             )
 
             if result and "hypotheses" in result:
