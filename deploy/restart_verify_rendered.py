@@ -14,8 +14,9 @@ partitions leaks through. This script catches that class of bug.
 Exit code 0 if all checks pass; 1 otherwise.
 
 Usage:
-    python3 deploy/restart_verify_rendered.py
+    python3 deploy/restart_verify_rendered.py [--old-genesis YYYY-MM-DD]
 """
+import argparse
 import re
 import sys
 import urllib.request
@@ -28,39 +29,60 @@ from lambdas.constants import EXPERIMENT_START_DATE
 
 BASE = "https://averagejoematt.com"
 
-# Pages to fetch and inspect. Add new pages here as the site grows.
+# Pages to fetch and inspect — the v4 "Measured Life" surface (ADR-071), aligned
+# with tests/visual_qa.py PAGES + scripts/v4_build_sitemap.py. The previous list
+# here was the PRE-v4 page map (all of it 301s now), so the token grep ran
+# against redirect targets it didn't intend (2026-07-10 clean-sweep audit).
 PAGES = [
     "/",
-    "/mission/",
-    "/character/",
-    "/achievements/",
-    "/field-notes/",
-    "/recap/",
-    "/week/",
-    "/weekly/",
-    "/chronicle/",
-    "/live/",
-    "/physical/",
-    "/glucose/",
-    "/nutrition/",
-    "/mind/",
-    "/training/",
-    "/sleep/",
-    "/experiments/",
-    "/discoveries/",
-    "/journal/",
-    "/labs/",
-    "/habits/",
+    "/now/",
     "/story/",
-    "/builders/",
+    "/story/chronicle/",
+    "/story/journal/",
+    "/story/about/",
+    "/story/agents/",
+    "/data/",
+    # /data/ Evidence topics (tests/visual_qa.py EVIDENCE_TOPICS)
+    "/data/vitals/",
+    "/data/physical/",
+    "/data/labs/",
+    "/data/glucose/",
+    "/data/sleep/",
+    "/data/training/",
+    "/data/nutrition/",
+    "/data/habits/",
+    "/data/character/",
+    # /method/ door (visual_qa METHOD_TOPICS + the character explainer)
+    "/method/character/",
+    "/method/board/",
+    "/method/pipeline/",
+    "/method/intelligence/",
+    "/method/predictions/",
+    "/method/scenarios/",
+    "/method/benchmarks/",
+    # /protocols/ door
+    "/protocols/",
+    "/protocols/experiments/",
+    "/protocols/challenges/",
+    "/protocols/supplements/",
+    # /coaching/ door
+    "/coaching/",
+    "/coaching/by-coach/",
+    "/coaching/scorecard/",
+    "/coaching/team/",
+    "/coaching/lab-notes/",
 ]
 
-# JSON endpoints to fetch and inspect for stale fields.
+# JSON endpoints to fetch and inspect for stale fields. cycle_compare must show
+# the NEW cycle; the two feed indexes must not carry prior-cycle entries.
 JSON_ENDPOINTS = [
     "/api/journey",
     "/api/vitals",
     "/api/character",
     "/api/timeline",
+    "/api/cycle_compare",
+    "/panelcast/episodes.json",
+    "/journal/posts.json",
 ]
 
 # Forbidden patterns. Each entry: (label, regex, allowed-on which path or '*').
@@ -72,15 +94,11 @@ FORBIDDEN_TOKENS = [
     ("Day-30+ counter", re.compile(r"\bDay\s+(?:[3-9][0-9]|[1-9][0-9]{2,})\b"), []),
     # Old baseline weight
     ("Old baseline (307)", re.compile(r"\b307\s*(?:lbs?|pounds|→|to\s+\d{3})"), []),
-    # Old genesis literal
-    (
-        "Old genesis literal",
-        re.compile(r"\b2026-04-01\b"),
-        [
-            "/mission/",  # meta description currently still says "Starting April 1"
-            "/about/",
-        ],
-    ),
+    # Cycle-1 genesis literal (the original launch date; kept as a static token —
+    # the OUTGOING genesis for the current reset is appended dynamically from
+    # --old-genesis in main()). The cycle-compare + timeline APIs legitimately
+    # list every past genesis (CYCLE_GENESES is their whole point).
+    ("Cycle-1 genesis literal", re.compile(r"\b2026-04-01\b"), ["/api/cycle_compare", "/api/timeline"]),
     # Error sentinel value
     ("999.0 sentinel", re.compile(r"\b999\.0\b"), []),
     # Earned achievements / milestones (pre-genesis state leak)
@@ -147,8 +165,36 @@ def check_body(path: str, body: str) -> list[tuple[str, list[str]]]:
     return hits
 
 
+def _old_genesis_tokens(old_genesis: str) -> list:
+    """Dynamic forbidden tokens for the OUTGOING genesis: the ISO literal plus its
+    short prose forms ('June 14' / 'Jun 14') — the forms the JS sweep rewrites."""
+    from datetime import date as _d
+
+    if not old_genesis or old_genesis == EXPERIMENT_START_DATE:
+        return []
+    o = _d.fromisoformat(old_genesis)
+    # cycle_compare / timeline legitimately list every past genesis (ISO only).
+    iso_allowed = ["/api/cycle_compare", "/api/timeline"]
+    return [
+        (f"Outgoing genesis literal ({old_genesis})", re.compile(rf"\b{re.escape(old_genesis)}\b"), iso_allowed),
+        (f"Outgoing genesis prose ({o.strftime('%B')} {o.day})", re.compile(rf"\b{o.strftime('%B')}\s+{o.day}\b"), []),
+        (f"Outgoing genesis prose ({o.strftime('%b')} {o.day})", re.compile(rf"\b{o.strftime('%b')}\s+{o.day}\b(?![a-zA-Z])"), []),
+    ]
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--old-genesis",
+        default=None,
+        help="The OUTGOING genesis (YYYY-MM-DD) — its ISO + prose forms become forbidden tokens. Passed by restart_pipeline.",
+    )
+    args = parser.parse_args()
+    FORBIDDEN_TOKENS.extend(_old_genesis_tokens(args.old_genesis))
+
     print(f"\nrestart_verify_rendered — checking public surfaces against genesis={EXPERIMENT_START_DATE}\n")
+    if args.old_genesis:
+        print(f"  (outgoing-genesis tokens active for {args.old_genesis})\n")
 
     total_pages = 0
     failed_pages = 0

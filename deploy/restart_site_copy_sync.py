@@ -103,7 +103,15 @@ JOURNEY_BLOCK_RE = re.compile(r"  journey: \{\n.*?\n  \},", re.DOTALL)
 
 
 def rewrite_site_constants(apply: bool) -> tuple[str, str]:
-    """Returns (before, after) text for site_constants.js."""
+    """Returns (before, after) text for site_constants.js.
+
+    v4 note (2026-07-10): the v4 cutover DELETED site/assets/js/site_constants.js
+    (window.AMJ only exists under the frozen /legacy tree now). The v4 surface
+    carries its genesis as static consts in individual JS modules, handled by
+    rewrite_js_files + rewrite_genesis_prose. Skip cleanly when absent instead of
+    crashing the whole sync (which is what happened before the fail-fast audit)."""
+    if not SITE_CONSTANTS_JS.exists():
+        return "", ""
     text = SITE_CONSTANTS_JS.read_text()
     start_int = int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))
     new_journey = journey_block(start_int)
@@ -182,7 +190,8 @@ def rewrite_html_files(apply: bool) -> list[str]:
     ]
 
     for html in (REPO_ROOT / "site").rglob("*.html"):
-        if "/archive/" in str(html):
+        # /legacy is the verbatim-preserved rollback snapshot (ADR-071) — never sweep it.
+        if "/archive/" in str(html) or "/legacy/" in str(html):
             continue
         original = html.read_text()
         new = original
@@ -195,54 +204,90 @@ def rewrite_html_files(apply: bool) -> list[str]:
     return touched
 
 
-def rewrite_js_files(apply: bool) -> list[str]:
-    """Sweep all site/ JS files for hardcoded `'YYYY-MM-DD'` literals near
-    start_date / journey / experiment / Date( and replace with a runtime
-    expression that reads window.AMJ.journey.start_date with a fallback to
-    the current EXPERIMENT_START_DATE.
+def rewrite_js_files(apply: bool, old_genesis: str) -> list[str]:
+    """Sweep site/ JS for hardcoded ISO literals of the OUTGOING genesis (passed
+    by the pipeline as --old-genesis, snapshotted from lambdas/constants.py
+    BEFORE the constants regen) and rewrite them to the NEW genesis literal.
 
-    Idempotent: only rewrites bare-literal forms, not already-dynamic ones.
+    History (2026-07-10 clean-sweep audit): this sweep was hardcoded to the
+    cycle-1 literal "2026-04-01", so every later cycle's genesis literal (the
+    cycle-4 "2026-06-14" in coach_popover.js / evidence_body.js / dispatches.js
+    / evidence_habits.js) survived each reset. It also rewrote literals into a
+    `window.AMJ.journey.start_date` runtime lookup — but the v4 cutover deleted
+    site_constants.js, so window.AMJ no longer exists on v4 pages and that
+    expression always fell through to its own hardcoded fallback. A static
+    old→new literal rewrite is equivalent, simpler, and doesn't nest across
+    cycles; each reset's --old-genesis catches the previous one.
+
+    site/legacy/ is skipped: the old site is preserved verbatim as a private
+    rollback snapshot (ADR-071) — sweeping it violates "verbatim" for zero
+    reader benefit (nothing links to it).
     """
     touched = []
-    fallback = EXPERIMENT_START_DATE
-    dynamic = "((window.AMJ && window.AMJ.journey && window.AMJ.journey.start_date) " f"|| '{fallback}')"
+    if old_genesis == EXPERIMENT_START_DATE:
+        return touched  # re-converge run, nothing to rewrite
+    # Quoted ISO literal, with or without a time suffix ('2026-06-14',
+    # "2026-06-14T00:00:00") — only the exact OUTGOING genesis is touched.
+    pat = re.compile(rf"(['\"]){re.escape(old_genesis)}(T[^'\"]*)?\1")
 
-    # Two patterns:
-    #   1. Bare quoted ISO date like '2026-04-01' or "2026-04-01"
-    #   2. ISO date with time suffix like '2026-04-01T07:00:00-07:00'
-    # We restrict to single 4-digit-year ISO strings to avoid touching IDs.
-    bare_pat = re.compile(r"(['\"])(\d{4}-\d{2}-\d{2})\1")
-    iso_time_pat = re.compile(r"(['\"])(\d{4}-\d{2}-\d{2})(T[^'\"]+)\1")
-
-    # Skip site_constants.js — it's where the genesis value is DEFINED.
-    # Rewriting it would create a circular dynamic-lookup of itself.
-    SKIP_FILES = {"site_constants.js"}
+    def repl(m):
+        q, suffix = m.group(1), m.group(2) or ""
+        return f"{q}{EXPERIMENT_START_DATE}{suffix}{q}"
 
     for f in (REPO_ROOT / "site").rglob("*.js"):
-        if "/archive/" in str(f):
-            continue
-        if f.name in SKIP_FILES:
+        if "/archive/" in str(f) or "/legacy/" in str(f):
             continue
         text = f.read_text()
+        new = pat.sub(repl, text)
+        if new != text:
+            touched.append(str(f.relative_to(REPO_ROOT)))
+            if apply:
+                f.write_text(new)
+    return touched
 
-        # Pass 1: T-suffix variants — only rewrite the OLD genesis literal
-        def repl_iso_time(m):
-            q, date, suffix = m.group(1), m.group(2), m.group(3)
-            if date != "2026-04-01":
-                return m.group(0)  # preserve other dates as-is
-            return f"{dynamic} + {q}{suffix}{q}"
 
-        new = iso_time_pat.sub(repl_iso_time, text)
+def _genesis_prose_patterns(old_iso: str, new_iso: str) -> list[tuple[re.Pattern, str]]:
+    """Prose forms of the outgoing genesis → prose forms of the new one.
 
-        # Pass 2: bare literals — only rewrite the OLD genesis literal
-        def repl_bare(m):
-            _q, date = m.group(1), m.group(2)
-            if date != "2026-04-01":
-                return m.group(0)
-            return dynamic
+    Handles: "June 14, 2026" · "June 14 2026" · bare "June 14" · bare "Jun 14"
+    (the coach_popover.js "since June 14 2026" stamp and the evidence_habits.js
+    "cut starting Jun 14" caption were exactly these forms). Ordered so the
+    with-year forms consume their text before the bare forms run; the bare
+    forms use a lookahead so they never half-match a with-year occurrence.
+    """
+    from datetime import date as _d
 
-        new = bare_pat.sub(repl_bare, new)
+    o, n = _d.fromisoformat(old_iso), _d.fromisoformat(new_iso)
+    o_full, n_full = o.strftime("%B"), n.strftime("%B")
+    o_abbr, n_abbr = o.strftime("%b"), n.strftime("%b")
+    return [
+        (re.compile(rf"\b{o_full}\s+{o.day},\s*{o.year}\b"), f"{n_full} {n.day}, {n.year}"),
+        (re.compile(rf"\b{o_full}\s+{o.day}\s+{o.year}\b"), f"{n_full} {n.day} {n.year}"),
+        (re.compile(rf"\b{o_full}\s+{o.day}\b(?!\s*,?\s*\d)"), f"{n_full} {n.day}"),
+        (re.compile(rf"\b{o_abbr}\s+{o.day}\b(?!\s*,?\s*\d)"), f"{n_abbr} {n.day}"),
+    ]
 
+
+def rewrite_genesis_prose(apply: bool, old_genesis: str) -> list[str]:
+    """Sweep site/ JS + HTML for prose forms of the OUTGOING genesis (and, in
+    HTML only, the bare ISO literal — JS ISO literals become dynamic lookups in
+    rewrite_js_files) and rewrite them to the new genesis. Runs each cycle with
+    --old-genesis so the sweep follows the genesis forward instead of only ever
+    knowing the cycle-1 date."""
+    if old_genesis == EXPERIMENT_START_DATE:
+        return []  # re-converge run, nothing to rewrite
+    touched = []
+    prose = _genesis_prose_patterns(old_genesis, EXPERIMENT_START_DATE)
+    html_iso = re.compile(rf"\b{re.escape(old_genesis)}\b")
+    for f in list((REPO_ROOT / "site").rglob("*.js")) + list((REPO_ROOT / "site").rglob("*.html")):
+        if "/archive/" in str(f) or "/legacy/" in str(f):
+            continue
+        text = f.read_text()
+        new = text
+        for pat, repl in prose:
+            new = pat.sub(repl, new)
+        if f.suffix == ".html":
+            new = html_iso.sub(EXPERIMENT_START_DATE, new)
         if new != text:
             touched.append(str(f.relative_to(REPO_ROOT)))
             if apply:
@@ -374,6 +419,13 @@ def invalidate_cloudfront(apply: bool, paths: list[str]):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run)")
+    parser.add_argument(
+        "--old-genesis",
+        default="2026-04-01",
+        help="The OUTGOING genesis (YYYY-MM-DD) whose literals get swept out of site JS/HTML. "
+        "The pipeline snapshots this from lambdas/constants.py before the constants regen. "
+        "Default is the cycle-1 launch date for back-compat with manual runs.",
+    )
     parser.add_argument("--skip-cloudfront", action="store_true", help="Skip CloudFront invalidation step")
     parser.add_argument(
         "--orphans-only",
@@ -414,11 +466,17 @@ def main():
     for h in touched_html:
         print(f"    - {h}")
 
-    # 4. JS files (ADR-058 launch-eve: was missing)
-    touched_js = rewrite_js_files(args.apply)
+    # 4. JS files (ADR-058 launch-eve: was missing) + prose-form genesis sweep
+    touched_js = rewrite_js_files(args.apply, args.old_genesis)
     print(f"[4/8] JS files updated: {len(touched_js)}")
     for j in touched_js:
         print(f"    - {j}")
+    touched_prose = rewrite_genesis_prose(args.apply, args.old_genesis)
+    print(f"[4b/8] prose/ISO genesis sweep (old={args.old_genesis}): {len(touched_prose)} file(s)")
+    for j in touched_prose:
+        print(f"    - {j}")
+    # merge for the sync list, de-duped, order preserved
+    touched_js = touched_js + [t for t in touched_prose if t not in touched_js]
 
     # 5. builders/ Feb-22 strip
     builders_changed = strip_builders_feb22(args.apply)
@@ -458,6 +516,7 @@ def main():
         f"content_manifest_changed    = {cm_changed}\n"
         f"html_files_touched          = {len(touched_html)}\n"
         f"js_files_touched            = {len(touched_js)}\n"
+        f"prose_genesis_files_touched = {len(touched_prose)} (old_genesis={args.old_genesis})\n"
         f"builders_feb22_removed      = {builders_changed}\n"
         f"orphan_s3_tombstoned        = {len(orphans)}\n"
         f"regen_lambdas_invoked       = {len([r for r in regen_results if r[1] == 'ok'])}/{len(regen_results)}\n"

@@ -809,9 +809,16 @@ def _board_facts_block(ctx: dict = None) -> str:
 
 def _coach_stance_bits(pid: str) -> str:
     """The coach's own current read (STANCE#latest, written weekly by the
-    coach-opinion engine) — one headline + stage label. Empty pre-data."""
+    coach-opinion engine) — one headline + stage label. Empty pre-data.
+
+    Honors the restart tombstone (tombstone=true / phase=pilot, stamped by
+    restart_intelligence_wipe with reason experiment_restart_<genesis>) — get_item
+    bypasses the query-level phase filter, so without this guard the old cycle's
+    stance leaked into board prompts post-reset. Same guard as site_api_coach._stance_latest."""
     try:
         item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "STANCE#latest"}).get("Item") or {}
+        if item.get("tombstone") or item.get("phase") == "pilot":
+            return ""
         item = _decimal_to_float(item)
         bits = []
         if item.get("headline_read"):

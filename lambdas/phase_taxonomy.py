@@ -91,6 +91,9 @@ SOURCE_CLASS: dict[str, str] = {
     # long-run scoreboard ("do high-confidence bets confirm more often?") is a measurement of
     # the PLATFORM, not of a cycle; wiping it at reset would destroy the only data that can
     # answer the calibration question. Rows carry pre_registered_at so per-cycle views filter by date.
+    "benchmarks": CROSS_PHASE,  # BENCH-1 (ADR-089): cut-benchmarking history — each row is a
+    # completed-cut episode measured against the literature. Like "calibration", it's a long-run
+    # cross-cycle record (the whole point is comparing cuts across resets), so it survives every reset.
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "habit_scores": EXPERIMENT_SCOPED,  # see vice_streaks split note in ADR-077 dec G
@@ -201,6 +204,10 @@ _PK_RULES: list = [
     (lambda pk, sk: pk.startswith("SUBSCRIBE#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("VOTES#"), SYSTEM_STATE),
     (lambda pk, sk: pk.startswith("EXPERIMENT_FOLLOWS"), SYSTEM_STATE),
+    # Challenge-follow interest records (site_api_social.handle_challenge_follow) —
+    # reader emails awaiting a "challenge started" notification. Audience state like
+    # SUBSCRIBE#/VOTES#: kept across resets, ignored by the phase machinery.
+    (lambda pk, sk: pk.startswith("CHALLENGE_FOLLOWS"), SYSTEM_STATE),
 ]
 
 

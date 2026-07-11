@@ -117,6 +117,15 @@ def main():
         "--full-unwind", action="store_true", help="Remove ALL phase tags + tombstones (whether from this restart or not). Total reset."
     )
     parser.add_argument("--apply", action="store_true", help="Commit writes (default: dry-run)")
+    parser.add_argument(
+        "--override-weight-lbs",
+        type=float,
+        default=None,
+        help="Baseline weight to pass through to restart_pipeline when re-running against "
+        "--to-genesis. Omit to let the pipeline re-read the genesis-day Withings record from "
+        "DDB (it fails cleanly if none exists). Replaces the old hardcoded 297.24 placeholder, "
+        "which silently wrote a WRONG baseline into configs + the DDB profile.",
+    )
     args = parser.parse_args()
 
     if not args.to_genesis and not args.full_unwind:
@@ -149,20 +158,17 @@ def main():
     # ── 3. If rolling back to a specific genesis, kick off the pipeline ──
     if args.to_genesis and args.apply:
         print(f"\n[3] Re-running pipeline against new genesis {args.to_genesis}")
-        proc = subprocess.run(
-            [
-                "python3",
-                "deploy/restart_pipeline.py",
-                "--genesis",
-                args.to_genesis,
-                "--apply",
-                "--override-weight-lbs",
-                "297.24",
-            ],  # caller can re-run pipeline manually for the correct weight
-            cwd=REPO_ROOT,
-        )
+        cmd = ["python3", "deploy/restart_pipeline.py", "--genesis", args.to_genesis, "--apply"]
+        if args.override_weight_lbs is not None:
+            cmd += ["--override-weight-lbs", str(args.override_weight_lbs)]
+            print(f"  baseline weight: --override-weight-lbs {args.override_weight_lbs} (explicit)")
+        else:
+            print(
+                f"  baseline weight: re-read from the {args.to_genesis} Withings DDB record "
+                "(pipeline exits 2 if none exists — pass --override-weight-lbs to force one)"
+            )
+        proc = subprocess.run(cmd, cwd=REPO_ROOT)
         print(f"  pipeline exit={proc.returncode}")
-        print("  NOTE: weight defaulted to 297.24 placeholder; re-run restart_pipeline with --override or wait for genesis-day Withings.")
 
     # Report
     report = REPO_ROOT / "docs" / "restart" / "_rollback_report.txt"

@@ -75,7 +75,6 @@ WEEK_RE = re.compile(r"(\d{4})-W(\d{2})")
 PARTITIONS = [
     # All entries tombstoned regardless of date (intelligence-layer state):
     ("chronicle", "all", {"hidden": True}),
-    ("predictions", "all", {}),
     ("hypotheses", "all", {}),
     ("decisions", "all", {}),
     ("insights", "all", {}),
@@ -119,6 +118,18 @@ PARTITIONS = [
     # /explorer/ page. The site-api now also guards against this at render time
     # (handle_ai_analysis returns null when days_in_experiment > current day_n).
     ("ai_analysis", "all", {}),
+    # 2026-07-10 clean-sweep audit: six EXPERIMENT_SCOPED sources added to the taxonomy
+    # after the wipe's list was last touched — the coverage assertion below correctly
+    # refused to run until they were covered here (which meant the whole wipe performed
+    # ZERO writes). Date-keyed daily/weekly recompute outputs are "pregenesis" (post-
+    # genesis records accumulate from Day 1); singleton STATE#/SNAPSHOT# records are
+    # "all" (their next post-genesis compute overwrites them clean).
+    ("forecast", "pregenesis", {}),  # DATE#-keyed daily EWMA expectations (#541)
+    ("state_of_matthew", "pregenesis", {}),  # DATE#-keyed weekly synthesis brief (#552)
+    ("scenarios", "pregenesis", {}),  # DATE#-keyed nightly what-followed distributions (#550)
+    ("engagement_state", "all", {}),  # STATE#current singleton — presence/quiet-stretch
+    ("what_changed", "all", {}),  # SNAPSHOT#current + first-seen ledger (SS-08)
+    ("panelcast", "all", {}),  # The Panel series_state singleton (open bets, recent topics)
 ]
 
 # Full-pk entries OUTSIDE the USER#matthew#SOURCE# namespace. The original tagger
@@ -134,6 +145,10 @@ FULL_PK_PARTITIONS = [
     # Cross-coach synthesis intelligence — pre-genesis April cycles leaked through.
     ("ENSEMBLE#digest", "ensemble_digest", "pregenesis", {}, ""),
     ("ENSEMBLE#disagreements", "ensemble_disagree", "all", {}, ""),
+    # Inter-coach dispute threads (#540, sk THREAD#{iso-week}#{topic}) — cycle
+    # intelligence like ENSEMBLE#disagreements; was scoped in phase_taxonomy but
+    # absent here (2026-07-10 clean-sweep audit).
+    ("ENSEMBLE#dispute", "ensemble_dispute", "all", {}, ""),
     # Narrative arc: tombstone pre-genesis HISTORY# snapshots. STATE#current has no
     # date in its sk so pregenesis-mode skips it — it is left for the first
     # post-genesis coach-state run to recompute (avoids the phase="plateau" /
@@ -253,7 +268,13 @@ def build_update(extra_attrs: dict, now_iso: str, cycle: int):
 def assert_registry_coverage():
     """ADR-077: every EXPERIMENT_SCOPED source in the registry must be wiped here,
     and the known non-SOURCE scoped pks must be covered. Fail loudly on a gap so a
-    new scoped partition can never silently survive a restart (the root-cause bug)."""
+    new scoped partition can never silently survive a restart (the root-cause bug).
+
+    Also checked in the reverse direction (2026-07-10): every PARTITIONS entry must
+    be a real taxonomy source — a phantom partition (the old "predictions" entry,
+    which never existed as a source) is dead weight that masks the list drifting.
+    Runs in CI via tests/test_restart_wipe_coverage.py so taxonomy↔wipe drift fails
+    at PR time, never at reset time."""
     covered_sources = {src for src, _m, _e in PARTITIONS}
     missing = [s for s in taxonomy.SCOPED_SOURCES if s not in covered_sources]
     if missing:
@@ -261,8 +282,16 @@ def assert_registry_coverage():
             "restart_intelligence_wipe: EXPERIMENT_SCOPED sources missing from the "
             f"wipe (ADR-077 coverage gap): {sorted(missing)}. Add them to PARTITIONS."
         )
+    # platform_memory is legitimately in PARTITIONS but not in SCOPED_SOURCES —
+    # it is split by category (MEMORY_SCOPED_CATEGORIES), not classified whole.
+    phantom = [s for s in covered_sources if s not in taxonomy.SCOPED_SOURCES and s != "platform_memory"]
+    if phantom:
+        raise SystemExit(
+            "restart_intelligence_wipe: PARTITIONS entries that are not EXPERIMENT_SCOPED "
+            f"taxonomy sources (phantom/misclassified): {sorted(phantom)}. Fix PARTITIONS or the taxonomy."
+        )
     covered_pks = {pk for pk, *_ in FULL_PK_PARTITIONS} | {pk for pk, *_ in COACH_PARTITIONS}
-    required_pks = {f"USER#{USER_ID}", "ENSEMBLE#digest", "ENSEMBLE#disagreements", "NARRATIVE#arc"} | {
+    required_pks = {f"USER#{USER_ID}", "ENSEMBLE#digest", "ENSEMBLE#disagreements", "ENSEMBLE#dispute", "NARRATIVE#arc"} | {
         f"COACH#{c}"
         for c in (
             "sleep_coach",
