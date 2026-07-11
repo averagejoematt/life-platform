@@ -187,7 +187,20 @@
       "Bash(aws budgets *)",
       "Bash(python3 -m pytest tests/test_wiring_coverage.py tests/test_sync_doc_metadata_check.py -q)",
       "Bash(python3 deploy/sync_doc_metadata.py --check)",
-      "Bash(python3 scripts/generate_mcp_tool_catalog.py)"
+      "Bash(python3 scripts/generate_mcp_tool_catalog.py)",
+      "Bash(python3 -)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(k\\) for k in d.keys\\(\\)]\")",
+      "Bash(python3)",
+      "Bash(python3 scripts/check_doc_index.py)",
+      "Bash(python3 deploy/restart_verify_rendered.py --old-genesis 2026-06-14)",
+      "Bash(python3 -m black tests/test_v4_proof.py --quiet)",
+      "Bash(python3 -m pytest tests/test_v4_proof.py -q)",
+      "Bash(python3 -m pytest tests/test_character_engine.py tests/test_character_neglect.py -q)",
+      "Bash(python3 -m black --check scripts/character_sim_year.py docs)",
+      "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE python3 -m pytest tests/ -q)",
+      "Bash(python3 deploy/sync_doc_metadata.py)"
     ]
   },
   "enableAllProjectMcpServers": true,
