@@ -288,7 +288,23 @@ def rewrite_index(s3, index_key: str, apply: bool):
     return placeholder
 
 
-def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool):
+def _current_cycle() -> int | None:
+    """Current cycle from SSM /life-platform/experiment-cycle (None if unreadable).
+
+    By the time this handler runs inside the restart pipeline, the SSM bump has
+    already happened, so this IS the new run's number — exactly what a live
+    (visible, phase=experiment) record should carry per the ADR-077 write-time
+    stamping convention.
+    """
+    try:
+        ssm = boto3.client("ssm", region_name=REGION)
+        return int(ssm.get_parameter(Name="/life-platform/experiment-cycle")["Parameter"]["Value"])
+    except Exception as e:  # standalone runs without SSM access keep working
+        print(f"    (warn: could not read experiment-cycle from SSM — cycle stamp skipped: {e})")
+        return None
+
+
+def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool, cycle: int | None = None):
     """Untombstone a chronicle DDB record, re-date it, and force it VISIBLE.
 
     The record's content stays — only flags update. ADR-077 fix: the wipe stamped
@@ -296,20 +312,35 @@ def untombstone_and_redate(ddb_table, sk: str, new_date: str, apply: bool):
     phase=pilot, so the read filter (phase=pilot OR tombstone → hidden) still hid
     the "resurrected" article. We now also SET phase=experiment so a kept issue is
     genuinely visible as a pinned pre-genesis lead-in.
+
+    #951: also re-stamp `cycle` to the CURRENT run. The wipe stamps the closing
+    cycle onto every tombstoned chronicle; resurrecting without re-stamping left a
+    live phase=experiment Prologue chapter carrying the OLD cycle (DATE#2026-02-28
+    kept cycle=4 while its freshly-written Prologue siblings carried 5), breaking
+    the ADR-077 "archive navigable by reset generation" promise for that row.
     """
     if apply:
+        if cycle is None:
+            cycle = _current_cycle()
+        update_expr = (
+            "REMOVE tombstone, tombstoned_at, tombstoned_reason, #h " "SET #d = :d, #p = :exp, redated_at = :ts, redated_from_sk = :osk"
+        )
+        names = {"#d": "date", "#p": "phase", "#h": "hidden"}
+        values = {
+            ":d": new_date,
+            ":exp": "experiment",
+            ":ts": datetime.now(timezone.utc).isoformat(),
+            ":osk": sk,
+        }
+        if cycle is not None:
+            update_expr += ", #cyc = :cyc"
+            names["#cyc"] = "cycle"
+            values[":cyc"] = cycle
         ddb_table.update_item(
             Key={"pk": "USER#matthew#SOURCE#chronicle", "sk": sk},
-            UpdateExpression=(
-                "REMOVE tombstone, tombstoned_at, tombstoned_reason, #h " "SET #d = :d, #p = :exp, redated_at = :ts, redated_from_sk = :osk"
-            ),
-            ExpressionAttributeNames={"#d": "date", "#p": "phase", "#h": "hidden"},
-            ExpressionAttributeValues={
-                ":d": new_date,
-                ":exp": "experiment",
-                ":ts": datetime.now(timezone.utc).isoformat(),
-                ":osk": sk,
-            },
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=values,
         )
 
 
@@ -346,6 +377,8 @@ def main():
     s3 = boto3.client("s3", region_name=REGION)
     ddb = boto3.resource("dynamodb", region_name=REGION).Table("life-platform")
     now_iso = datetime.now(timezone.utc).isoformat()
+    # #951: one SSM read for the run — every resurrected record gets the same stamp.
+    current_cycle = _current_cycle() if args.apply else None
 
     # ── 1. Archive all chronicle HTML across every chronicle prefix ──
     archived_count = 0
@@ -390,7 +423,7 @@ def main():
             if e["kind"] == "chronicle":
                 print(f"  {e['date']}  chronicle  {e['sk']}  \"{desc}\"  (genesis−{e['days_before']}, phase=experiment, visible)")
                 if args.apply:
-                    untombstone_and_redate(ddb, e["sk"], e["date"], args.apply)
+                    untombstone_and_redate(ddb, e["sk"], e["date"], args.apply, cycle=current_cycle)
                 resurrected += 1
             elif e["kind"] == "podcast":
                 print(
@@ -408,7 +441,7 @@ def main():
         for sk, new_date in zip(args.resurrect_sk, new_dates):
             print(f"  {sk} → re-dated to {new_date} (phase=experiment, visible)")
             if args.apply:
-                untombstone_and_redate(ddb, sk, new_date, args.apply)
+                untombstone_and_redate(ddb, sk, new_date, args.apply, cycle=current_cycle)
             resurrected += 1
     else:
         print("\n[3/3] --no-default-leadins: blank chronicle, fresh start on next Wed cycle.")

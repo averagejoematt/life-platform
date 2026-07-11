@@ -155,13 +155,18 @@ def _check_subscribe_rate_limit(source_ip: str) -> tuple[bool, int]:
     bucket = now_epoch // _RATE_LIMIT_WINDOW_SEC
     sk = f"IP#{ip_hash}#BUCKET#{bucket}"
     # TTL one hour past bucket end — long enough for DDB cleanup, short enough
-    # to not waste storage.
+    # to not waste storage. #951: the table's TTL is configured on attribute
+    # `ttl` (mirrors rate_limiter.py, whose RATE# buckets ARE reaped) — this
+    # wrote `expires_at` for months, so SUBSCRIBE#rate_limit rows accumulated
+    # forever. deploy/fix_prologue_cycle_and_subscribe_ttl.py backfills the
+    # stranded rows.
     ttl = (bucket * _RATE_LIMIT_WINDOW_SEC) + 3600
 
     try:
         result = table.update_item(
             Key={"pk": _RATE_LIMIT_PK, "sk": sk},
-            UpdateExpression="ADD req_count :one SET expires_at = if_not_exists(expires_at, :ttl)",
+            UpdateExpression="ADD req_count :one SET #t = if_not_exists(#t, :ttl)",
+            ExpressionAttributeNames={"#t": "ttl"},
             ExpressionAttributeValues={":one": 1, ":ttl": ttl},
             ReturnValues="UPDATED_NEW",
         )

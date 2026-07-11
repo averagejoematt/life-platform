@@ -112,7 +112,7 @@ Where multiple sources measure the same thing:
 
 ## Key-Family Catalog
 
-Every pk/sk family in the `life-platform` table, derived from code (writers = `put_item`/`update_item` call sites) and cross-checked against the ADR-077 phase registry (`lambdas/phase_taxonomy.py`). **Live?** = verified 2026-07-10 with a read-only `Query(Limit=1)`; "empty" = the query succeeded but the partition has no rows yet; "n/v" = pk contains a generated id, so existence is code-defined, not verified live. Families marked **⚠ not in registry** would raise `KeyError` in `phase_taxonomy.classify()`.
+Every pk/sk family in the `life-platform` table, derived from code (writers = `put_item`/`update_item` call sites) and cross-checked against the ADR-077 phase registry (`lambdas/phase_taxonomy.py`). **Live?** = verified 2026-07-10 with a read-only `Query(Limit=1)`; "empty" = the query succeeded but the partition has no rows yet; "n/v" = pk contains a generated id, so existence is code-defined, not verified live. Every family below classifies via `phase_taxonomy.classify()` without raising (registry gap closed by #930/#951 — see "Registry coverage" below).
 
 ### The `USER#matthew#SOURCE#<source>` backbone
 
@@ -202,8 +202,8 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `VOTES#experiment_library` / `LIB#<id>`, `VOTES#challenges` / `CH#<id>`, `VOTES#predict_week`, `VOTES#rate_limit` | reader votes + vote rate buckets | `web/site_api_social.py` | same | system_state | ✓ (challenges) |
 | `EXPERIMENT_FOLLOWS` / `EMAIL#<hash>#EXP#<id>`, `CHALLENGE_FOLLOWS` / `CHFOLLOW#…` | follow-interest records | `web/site_api_social.py` | same | system_state | empty |
 | `SUBSCRIBE#rate_limit` / — | subscribe rate counters | `web/email_subscriber_lambda.py` | same | system_state | n/v |
-| `RATE#<endpoint>#<ip_hash>` / `HOUR#<bucket>` | per-IP atomic rate counters (ask/board_ask) | `lambdas/rate_limiter.py` | same | **⚠ not in registry** (TTL ops state) | n/v |
-| `BOARDSESS#<token>` / — | TTL'd board Q&A follow-up sessions (#546) | `web/site_api_ai_lambda.py` | same | **⚠ not in registry** (TTL ops state) | n/v |
+| `RATE#<endpoint>#<ip_hash>` / `HOUR#<bucket>` | per-IP atomic rate counters (ask/board_ask) | `lambdas/rate_limiter.py` | same | system_state (#951) | n/v |
+| `BOARDSESS#<token>` / — | TTL'd board Q&A follow-up sessions (#546) | `web/site_api_ai_lambda.py` | same | system_state (#951) | n/v |
 | `USER#matthew` / `PROFILE#v1` | the user profile (targets, weights, habit registry) | manual/setup | everything | cross_phase | ✓ |
 | `USER#matthew` / `SOURCE#coach_thread…` | coach conversation memory | coach modules | coach pipeline | experiment_scoped | n/v |
 | `USER#matthew` / `SOURCE#intelligence_quality…` | intelligence quality tracker | quality tracker | `get_intelligence_quality` | system_state | n/v |
@@ -213,15 +213,15 @@ Every pk/sk family in the `life-platform` table, derived from code (writers = `p
 | `PULSE` / `DATE#<d>` | site pulse cache | pulse writer | site | system_state | ✓ |
 | `CACHE#<…>` / — | generation/template caches | `generation_cache.py`, `hevy_template_cache.py` | same | system_state | n/v |
 | `…SOURCE#{journal_analysis, health_check, dropbox_tracker, hevy_id_map, routine_index, email_log#<type>, google_calendar, composite_scores, sleep_unified}` | caches, trackers, sent-mail archive, dead partitions | various (email_log: email lambdas; hevy_id_map: routine_repo) | various | system_state | ✓ (email_log#daily_brief) |
-| `INGEST_HEALTH#<source>`, `CANARY#<…>`, `ALERTSTATE#<…>`, `ENTITY_REGISTRY#current`, `BEHAVIOR_REGISTRY#current`, `USER#admin#SOURCE#deletion_log` | ingest liveness, synthetic monitors, alert dedup, static registries, deletion audit | ingestion_framework, operational lambdas | freshness checker, monitors | **⚠ not in registry** (ops state, not traversed by restart tooling) | n/v |
+| `INGEST_HEALTH#<source>`, `CANARY#<…>`, `ALERTSTATE#<…>`, `ENTITY_REGISTRY#current`, `BEHAVIOR_REGISTRY#current`, `USER#admin#SOURCE#deletion_log` | ingest liveness, synthetic monitors, alert dedup, static registries, deletion audit | ingestion_framework, operational lambdas | freshness checker, monitors | system_state (#951 — INGEST_HEALTH#/ALERTSTATE#/registries are sks on already-classified pks; CANARY#* and `deletion_log` classified directly) | n/v |
 
-### ⚠ Families NOT in the phase-taxonomy registry
+### Registry coverage (closed by #930/#951)
 
-`phase_taxonomy.classify()` would raise `KeyError` on these — real coverage gaps for the restart tooling (the SOURCE# ones) or deliberate ops-state exclusions (the rest):
+The former "families NOT in the phase-taxonomy registry" gap is closed — every catalogued family now classifies without raising (`tests/test_phase_taxonomy.py` pins each one). The 2026-07-11 sweep's additions:
 
-- **`USER#matthew#SOURCE#weight_episodes`** — written by `compute/episode_detect_lambda.py`, **live rows exist** (verified). Not in `SOURCE_CLASS`.
-- **`USER#matthew#SOURCE#training_reference`** — same writer, **live rows exist** (verified). Not in `SOURCE_CLASS`.
-- Non-SOURCE ops pks with no `_PK_RULES` predicate: `RATE#*`, `BOARDSESS#*`, `INGEST_HEALTH#*`, `CANARY#*`, `ALERTSTATE#*`, `ENTITY_REGISTRY#*`, `BEHAVIOR_REGISTRY#*`, `SYSTEM#dlq-ledger`, `USER#admin#SOURCE#deletion_log`, `PERSONA#*`, `OAUTH#*`. These are TTL/ops records the restart tooling does not traverse today, but they are unclassified by the registry.
+- **SOURCE families** (were live-but-unclassified — a restart tagger `KeyError` risk): `weight_episodes` + `training_reference` (cross_phase — BENCH-1 14-year reference, per the writer's contract), `macrofactor_meals` + `training_notes` (raw_timeseries — derived projections of raw facts, following their parent partitions), `coach_gen_cache` + `ingest_liveness` + `personal_baselines` + `experiment_suggestions` + `email_digest` (system_state), plus writer-backed-but-empty `food_responses`/`life_events`/`ruck_log` (raw_timeseries) and `deletion_log` (system_state).
+- **Non-SOURCE ops pks**, now `_PK_RULES` entries: `EVALUATOR#*`, `RATE#*`, `BOARDSESS#*`, `CANARY#*`, `SYSTEM#*` (dlq-ledger), `OAUTH#*` — all system_state; `PERSONA#*` (Elena/Margaret narrator state) — cross_phase, preserving the de-facto spans-cycles behavior.
+- `INGEST_HEALTH#*`, `ALERTSTATE#*`, `ENTITY_REGISTRY#*`, `BEHAVIOR_REGISTRY#*` needed no rule: they are **sk families on already-classified pks** (`USER#system`, `apple_health`, `journal_analysis`).
 
 ---
 

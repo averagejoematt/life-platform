@@ -127,6 +127,36 @@ LIVE_FAMILIES = [
     ("READING#IDEA#idea1", "META"),
     ("READING#IDEA#idea1", "EDGE#idea2"),
     ("READING#NUDGE", "RECALL_QUEUE#current"),  # Phase D recall sweep snapshot
+    # ── #930 + #951: the families the 2026-07-11 sweep verified live-but-unclassified,
+    # plus the ops pks #930 catalogued (pk-only scan of 32,309 items diffed vs the registry).
+    ("USER#matthew#SOURCE#weight_episodes", "DATE#2026-06-14"),  # BENCH-1 episode ledger
+    ("USER#matthew#SOURCE#training_reference", "DATE#2026-06-14"),  # BENCH-1 singleton
+    ("USER#matthew#SOURCE#macrofactor_meals", "DATE#2026-07-01#MEAL#01"),  # derived meal projection
+    ("USER#matthew#SOURCE#training_notes#EXERCISE#79dad4ee", "DATE#2026-07-01#WORKOUT#f62548ef"),
+    ("USER#matthew#SOURCE#training_notes#CACHE", "NOTE#abcd1234"),  # LLM extraction bookkeeping
+    ("USER#matthew#SOURCE#coach_gen_cache", "COACH#explorer_coach#daily_brief"),
+    ("USER#matthew#SOURCE#ingest_liveness", "DATE#2026-07-01"),
+    ("USER#matthew#SOURCE#personal_baselines", "SNAPSHOT#LATEST"),
+    ("USER#matthew#SOURCE#experiment_suggestions", "SUGGESTION#2026-07-01T00:00:00"),
+    ("USER#matthew#SOURCE#email_digest", "STATE#between_chronicle"),
+    ("USER#admin#SOURCE#deletion_log", "DATE#2026-07-01T00:00:00#USER#x"),
+    ("EVALUATOR#coach_prediction", "STATE#last_decided"),
+    ("RATE#ask#0123456789abcdef", "HOUR#1751328000"),
+    ("BOARDSESS#some-opaque-token", "SESSION#state"),
+    ("CANARY#matthew", "CANARY#2026-07-01T00:00:00Z"),
+    ("SYSTEM#dlq-ledger", "MSG#stable-id"),
+    ("OAUTH#matthew", "CODE#abc123"),
+    ("OAUTH#matthew", "SESSION#bearer-token"),
+    ("PERSONA#elena", "THREAD#2026-07-01#slug"),
+    ("PERSONA#elena", "CALLBACK#2026-07-01#slug"),
+    ("PERSONA#margaret", "STATE#current"),
+    # sk-level families #930 catalogued that live on already-classified partitions —
+    # pinned here to prove classify() covers them via their pk.
+    ("USER#system", "INGEST_HEALTH#whoop"),
+    ("USER#matthew#SOURCE#apple_health", "ALERTSTATE#ah_activity_degraded"),
+    ("USER#matthew#SOURCE#apple_health", "DATATYPE_LIVENESS"),
+    ("USER#matthew#SOURCE#journal_analysis", "ENTITY_REGISTRY#current"),
+    ("USER#matthew#SOURCE#journal_analysis", "BEHAVIOR_REGISTRY#current"),
 ]
 
 
@@ -159,6 +189,18 @@ def test_unknown_pk_raises():
         ("chronicling", pt.CROSS_PHASE),  # dec D — frozen "before" archive
         ("subscribers", pt.CROSS_PHASE),
         ("benchmarks", pt.CROSS_PHASE),  # BENCH-1 cut-benchmarking history — cross-cycle by design
+        ("weight_episodes", pt.CROSS_PHASE),  # #930/#951 BENCH-1 — 14y reference, survives resets
+        ("training_reference", pt.CROSS_PHASE),  # #930/#951 BENCH-1 — proven prescription singleton
+        ("macrofactor_meals", pt.RAW_TIMESERIES),  # #951 — meal facts, follows raw macrofactor
+        ("training_notes", pt.RAW_TIMESERIES),  # #951 — user-authored note facts, follows raw hevy
+        ("food_responses", pt.RAW_TIMESERIES),  # #951 — logged glycemic-response facts
+        ("life_events", pt.RAW_TIMESERIES),  # #951 — user-logged annotations
+        ("ruck_log", pt.RAW_TIMESERIES),  # #951 — logged workouts
+        ("coach_gen_cache", pt.SYSTEM_STATE),  # #951 — fingerprint-busting generation cache
+        ("ingest_liveness", pt.SYSTEM_STATE),  # #951 — pipeline-health snapshots
+        ("personal_baselines", pt.SYSTEM_STATE),  # #951 — recomputable percentile-band snapshot
+        ("experiment_suggestions", pt.SYSTEM_STATE),  # #951 — audience state like VOTES#
+        ("email_digest", pt.SYSTEM_STATE),  # #951 — digest dedup marker
         ("forecast", pt.EXPERIMENT_SCOPED),
         ("state_of_matthew", pt.EXPERIMENT_SCOPED),
         ("engagement_state", pt.EXPERIMENT_SCOPED),
@@ -234,6 +276,19 @@ def test_pk_rules():
     assert pt.classify("READING#abc", "STATE") == pt.CROSS_PHASE
     assert pt.classify("READING#REC", "REC#2026-06-29T20:00:00+00:00") == pt.CROSS_PHASE
     assert pt.classify("READING#IDEA#x", "EDGE#y") == pt.CROSS_PHASE
+    # #930/#951: the ops pk families — all system_state (TTL/ops records, never traversed)
+    assert pt.classify("EVALUATOR#coach_prediction", "STATE#last_decided") == pt.SYSTEM_STATE
+    assert pt.classify("RATE#ask#0123456789abcdef", "HOUR#1751328000") == pt.SYSTEM_STATE
+    assert pt.classify("BOARDSESS#token", "SESSION#state") == pt.SYSTEM_STATE
+    assert pt.classify("CANARY#matthew", "CANARY#2026-07-01T00:00:00Z") == pt.SYSTEM_STATE
+    assert pt.classify("SYSTEM#dlq-ledger", "MSG#x") == pt.SYSTEM_STATE
+    assert pt.classify("OAUTH#matthew", "SESSION#tok") == pt.SYSTEM_STATE
+    # narrator persona state deliberately spans cycles (#951 — preserves de-facto behavior)
+    assert pt.classify("PERSONA#elena", "THREAD#2026-07-01#slug") == pt.CROSS_PHASE
+    assert pt.classify("PERSONA#margaret", "STATE#current") == pt.CROSS_PHASE
+    # suffixed training_notes pks resolve to the base source (#951)
+    assert pt.classify("USER#matthew#SOURCE#training_notes#EXERCISE#79dad4ee", "DATE#2026-07-01#WORKOUT#x") == pt.RAW_TIMESERIES
+    assert pt.classify("USER#admin#SOURCE#deletion_log", "DATE#2026-07-01T00:00:00#USER#x") == pt.SYSTEM_STATE
 
 
 def test_helper_predicates():
