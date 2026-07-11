@@ -159,7 +159,25 @@ def _load_canonical_facts():
         # Sentinel checks the narrative against. No more per-site dict construction.
         from canonical_facts import build_canonical_facts
 
-        facts = build_canonical_facts(_latest_item("computed_metrics") or {})
+        _cm = _latest_item("computed_metrics") or {}
+        facts = build_canonical_facts(_cm)
+        # #914-B: weight-rate honesty riders. The live incident: "maintained a
+        # 7.3 lb/week trajectory" cited 14 days after the last weigh-in (the rate's
+        # 12-day span ENDED 2026-06-26 — nothing was being "maintained"). Carry the
+        # producer's provisional flag + the real scale recency so the facts block
+        # (grounded_generation.authoritative_facts_block) can force past-tense,
+        # dated rate language once the scale goes dark.
+        facts["rate_provisional"] = bool(_cm.get("rate_provisional"))
+        _w = _latest_item("withings") or {}
+        _w_date = str(_w.get("sk", ""))[5:15] if str(_w.get("sk", "")).startswith("DATE#") else None
+        if _w_date:
+            facts["last_weighin_date"] = _w_date
+            try:
+                facts["days_since_weighin"] = max(
+                    0, (datetime.now(timezone.utc).date() - datetime.strptime(_w_date, "%Y-%m-%d").date()).days
+                )
+            except ValueError:
+                pass
     except Exception as _e:
         logger.warning("canonical facts load failed: %s", _e)
     _CANON_FACTS_CACHE["facts"] = facts
@@ -187,6 +205,31 @@ def _latest_date(items):
     """Newest DATE# present in a list of records (by sk), or None."""
     dates = [str(i.get("sk", ""))[5:15] for i in items if str(i.get("sk", "")).startswith("DATE#")]
     return max(dates) if dates else None
+
+
+def _item_dates(items):
+    """Distinct DATE# days in a list of records (by sk)."""
+    return {str(i.get("sk", ""))[5:15] for i in items if str(i.get("sk", "")).startswith("DATE#")}
+
+
+def _recency_stats(day_strings, today):
+    """(days_since_last, count_last_14d) over a set/list of 'YYYY-MM-DD' days.
+
+    #914 — kills aggregate dilution: whole-experiment totals ("9 sessions across
+    4 weeks") can mask "0 in the last 15 days", so every domain snapshot carries
+    a per-domain recency read alongside its totals. (None, 0) when no days."""
+    days = sorted(d for d in (day_strings or ()) if d)
+    if not days:
+        return None, 0
+    try:
+        base = datetime.strptime(today, "%Y-%m-%d").date()
+        latest = datetime.strptime(days[-1], "%Y-%m-%d").date()
+        since = max(0, (base - latest).days)
+        floor_14 = (base - timedelta(days=14)).isoformat()
+        last_14 = sum(1 for d in days if d >= floor_14)
+        return since, last_14
+    except ValueError:
+        return None, 0
 
 
 def _read_movement_ingest_health(sources=("strava", "garmin")):
@@ -243,10 +286,14 @@ def gather_data_for_expert(expert_key):
             vals = [float(s.get("som_avg_valence", 0)) for s in som_items if s.get("som_avg_valence") is not None]
             avg_valence = round(sum(vals) / len(vals), 2) if vals else 0
 
+        # #914 anti-dilution: recency alongside the whole-window totals.
+        _j_since, _j_14 = _recency_stats(_item_dates(ja_items), today)
         return {
             "expert_key": "mind",
             "period": f"experiment days 1-{days_in_experiment}",
             "journal_entry_count": len(ja_items),
+            "days_since_last_journal": _j_since,
+            "journal_entries_last_14d": _j_14,
             "top_themes": [{"theme": t, "count": c} for t, c in top_themes],
             "avg_sentiment": avg_sentiment,
             "mood_readings": len(som_items),
@@ -264,6 +311,8 @@ def gather_data_for_expert(expert_key):
                 "expert_key": "nutrition",
                 "period": f"experiment days 1-{days_in_experiment}",
                 "note": "No nutrition data available",
+                "days_since_last_food_log": None,
+                "food_logs_last_14d": 0,
                 "recency_note": _recency_note,
             }
         cal_vals = [float(i["total_calories_kcal"]) for i in items if i.get("total_calories_kcal")]
@@ -278,9 +327,13 @@ def gather_data_for_expert(expert_key):
         protein_target = int(_facts.get("protein_g_target") or 190)
         adherence = sum(1 for v in pro_vals if v >= protein_target) / max(len(pro_vals), 1) * 100
         zero_cal_days = sum(1 for i in items if i.get("total_calories_kcal") is not None and float(i.get("total_calories_kcal", 0)) == 0)
+        # #914 anti-dilution: recency alongside the whole-window averages.
+        _f_since, _f_14 = _recency_stats(_item_dates(items), today)
         return {
             "expert_key": "nutrition",
             "period": f"experiment days 1-{days_in_experiment}",
+            "days_since_last_food_log": _f_since,
+            "food_logs_last_14d": _f_14,
             "avg_calories": avg_cal,
             "avg_protein_g": avg_pro,
             "avg_fiber_g": avg_fiber,
@@ -359,10 +412,16 @@ def gather_data_for_expert(expert_key):
         hevy_summary = (
             f"{hevy_sessions} Hevy session(s), {hevy_sets} sets, {hevy_min} min over {len(hevy_dates)} day(s)" if hevy_sessions else ""
         )
+        # #914 anti-dilution: recency alongside the whole-window totals — so
+        # "9 sessions across 4 weeks" can't mask "0 in the last 15 days".
+        _lift_since, _ = _recency_stats(hevy_dates, today)
+        _, _sessions_14 = _recency_stats(training_dates, today)
         return {
             "expert_key": "training",
             "period": f"experiment days 1-{days_in_experiment}",
             "training_days": len(training_dates),
+            "days_since_last_lift": _lift_since,
+            "sessions_last_14d": _sessions_14,
             "hevy_sessions": hevy_sessions,
             "hevy_sets": hevy_sets,
             "hevy_active_min": hevy_min,
@@ -871,66 +930,16 @@ def _presence_block():
     coaches + integrator from claiming perfect adherence / an unbroken streak /
     'zero missed targets' over a window that actually contains a logging gap — the
     exact incoherence the presence feature exists to kill. The REASON for the gap
-    is never included (the coach names the silence and invites the story)."""
-    sig = _load_engagement_signal()
-    if not sig:
+    is never included (the coach names the silence and invites the story).
+
+    #914: the block itself moved verbatim to engagement_core.presence_prompt_block
+    (pure, shared by every narrative surface) — this wrapper keeps the
+    STATE#current read local and the two injection points below unchanged."""
+    try:
+        from engagement_core import presence_prompt_block
+    except ImportError:  # pragma: no cover — bundle always ships engagement_core
         return ""
-    cls = sig.get("presence_class")
-    returned = bool(sig.get("returned"))
-    if cls not in ("light", "quiet", "dark") and not returned:
-        return ""  # present → nothing to say
-
-    def _num(v):
-        try:
-            return int(v)
-        except (TypeError, ValueError):
-            return None
-
-    lines = []
-    if returned:
-        rn = _num(sig.get("resumed_after_days"))
-        lines.append(f"Matthew has JUST RETURNED to logging after ~{rn if rn is not None else 'a few'} days quiet.")
-        wd = sig.get("weight_delta_over_gap")
-        if wd is not None:
-            try:
-                lines.append(f"Weight change over the gap: {float(wd):+g} lb (data, not a verdict).")
-            except (TypeError, ValueError):
-                pass
-        lines.append("Acknowledge the return SUPPORTIVELY — never punitive; the goal is to help him restart.")
-    else:
-        gap = _num(sig.get("gap_days"))
-        last = sig.get("last_food_log_date")
-        gap_txt = f"~{gap} days" if gap is not None else "several days"
-        lines.append(
-            f"Matthew's OWN logging has gone quiet — it has been {gap_txt} since his last food log"
-            + (f" (last logged {last})" if last else "")
-            + "."
-        )
-        quiet = sig.get("channels_quiet") or []
-        if quiet:
-            lines.append(f"Channels gone silent: {', '.join(str(q) for q in quiet)}.")
-        if sig.get("passive_still_flowing"):
-            lines.append(
-                "His WEARABLES are still reporting — the passive data (sleep/recovery/RHR) keeps flowing even though he stopped logging, so you can see the consequences but not the cause."
-            )
-        if sig.get("planned_pause"):
-            lines.append(
-                f"This looks like a PLANNED pause ({sig.get('planned_pause_reason') or 'sick/travel'}) — frame it as a break, not falling off."
-            )
-
-    guard = (
-        "CRITICAL: because of this gap, DO NOT claim perfect adherence, an unbroken streak, "
-        "'zero missed targets', or summarize the period as flawless — any window that includes "
-        "these days is INCOMPLETE, and celebrating it would be dishonest. Acknowledge the silence "
-        "honestly in your own voice, ground the day-count in the number above, do NOT invent WHY he "
-        "went quiet (you cannot see it — name the gap and invite the story), and cite only the "
-        "authoritative wearable values you were given for any consequences. "
-        "PLACEMENT: the gap must NOT be your OPENING line unless the quiet channel is your "
-        "own domain's primary signal — one coach opening on it is honest; all eight opening on it "
-        "reads as one templated voice. Open with your own domain's read, then name the gap where "
-        "it genuinely bears on your analysis."
-    )
-    return "PRESENCE / QUIET STRETCH (Matthew's own logging):\n" + "\n".join(f"- {ln}" for ln in lines) + "\n" + guard
+    return presence_prompt_block(_load_engagement_signal())
 
 
 def _build_shared_system_prompt():
@@ -1379,6 +1388,37 @@ def generate_synthesis(all_coach_outputs):
         else ""
     )
 
+    # #914-C: exact deterministic counts. The live integrator conflated numbers —
+    # "I don't know what you actually ate on seventeen of those days" in a sentence
+    # about a 14-day silence, and "ten training sessions" vs the payload's 9. Give
+    # it the labeled counts with a no-arithmetic rule so it cites, never re-derives.
+    _count_bits = []
+    try:
+        _now = datetime.now(timezone.utc)
+        _today_str = _now.strftime("%Y-%m-%d")
+        _day_n = max(1, (_now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+        _count_bits.append(f"experiment day_n = {_day_n}")
+        _d30 = max((_now - timedelta(days=30)).strftime("%Y-%m-%d"), EXPERIMENT_START)
+        _n_sessions = len(_query_source("hevy", _d30, _today_str)) + len(_query_source("strava", _d30, _today_str))
+        _count_bits.append(f"logged training sessions (last 30d, Hevy + Strava) = {_n_sessions}")
+        _count_bits.append(f"food-log days (last 30d) = {len(_item_dates(_query_source('macrofactor', _d30, _today_str)))}")
+        _sig = _load_engagement_signal()
+        for _src, _det in sorted((_sig.get("channel_detail") or {}).items()):
+            if not isinstance(_det, dict):
+                continue
+            _lbl = _det.get("label") or _src
+            _g = _det.get("gap_days")
+            _count_bits.append(
+                f"{_lbl} gap_days = {int(_g)}" if _g is not None else f"{_lbl} gap_days = unknown (nothing logged in window)"
+            )
+    except Exception as _ce:  # noqa: BLE001 — counts are additive, never break synthesis
+        logger.warning("synthesis deterministic counts failed (non-blocking): %s", _ce)
+    if _count_bits:
+        facts_block += (
+            "\nDETERMINISTIC COUNTS (authoritative — cite EXACTLY as given; do NOT re-derive, add, subtract, "
+            "or arithmetic these into any other number, in digits or in words): " + "; ".join(_count_bits) + "\n"
+        )
+
     # Presence / quiet-stretch: the Chair's cross-pillar synthesis is the cockpit's
     # headline verdict, so it MUST notice a real logging gap — otherwise it crowns a
     # flawless week over days Matthew logged nothing (the exact incoherence caught).
@@ -1516,6 +1556,47 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
         return None
 
 
+def _week_behavioral_presence(iso_week):
+    """#914-A (ADR-105 deterministic-before-verdict): per-week behavioral presence,
+    computed from the raw logs BEFORE any prompting. The regenerated week-4 arc
+    celebrated a fully-dark week ('the weight data gap that week is a minor logging
+    problem... best HRV of the entire arc') — HRV was rest-inflated and every
+    behavioral stream was dead. Returns {start, end, lift_days, weigh_ins,
+    habit_completion_days, food_log_days, absence_week} or None on a bad week key.
+    habitify uses the same completion predicate as the presence detector (a record
+    at total_completed=0 is not behavior)."""
+    try:
+        year, wk = int(str(iso_week)[:4]), int(str(iso_week)[6:])
+        monday = datetime.fromisocalendar(year, wk, 1).strftime("%Y-%m-%d")
+        sunday = datetime.fromisocalendar(year, wk, 7).strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        return None
+    try:
+        from engagement_core import channel_counts_as_logged as _cal
+    except ImportError:  # pragma: no cover — bundle always ships engagement_core
+
+        def _cal(_src, _it):
+            return True
+
+    try:
+        lift_days = len(_item_dates(_query_source("hevy", monday, sunday)))
+        weigh_ins = len(_item_dates(_query_source("withings", monday, sunday)))
+        habit_days = len(_item_dates([i for i in _query_source("habitify", monday, sunday) if _cal("habitify", i)]))
+        food_days = len(_item_dates(_query_source("macrofactor", monday, sunday)))
+    except Exception as e:  # noqa: BLE001 — presence is additive, never breaks the arc
+        logger.warning("arc week-presence query failed for %s: %s", iso_week, e)
+        return None
+    return {
+        "start": monday,
+        "end": sunday,
+        "lift_days": lift_days,
+        "weigh_ins": weigh_ins,
+        "habit_completion_days": habit_days,
+        "food_log_days": food_days,
+        "absence_week": (lift_days + weigh_ins + habit_days + food_days) == 0,
+    }
+
+
 def generate_experiment_arc():
     """
     Cross-week synthesis (C-1): Dr. Kai Nakamura reads the board's weekly lab notes
@@ -1548,13 +1629,23 @@ def generate_experiment_arc():
         logger.info("Experiment-arc skipped — only %d week(s) of lab notes (need >=2)", len(weeks))
         return None
 
-    # Compose the week-by-week material the board has already written.
+    # Compose the week-by-week material the board has already written — each week
+    # stapled to its DETERMINISTIC behavioral-presence counts (#914-A) so a dark
+    # week cannot be narrated as triumph off rest-inflated recovery numbers.
     blocks = []
     for w in weeks:
         label = w.get("week_label") or w.get("week") or "Week"
         tone = w.get("ai_tone", "mixed")
         present = (w.get("ai_present") or "").strip()
         bits = [f"[{label}] tone={tone}"]
+        pres = _week_behavioral_presence(w.get("week"))
+        if pres is not None:
+            bits.append(
+                f"BEHAVIORAL PRESENCE ({pres['start']}..{pres['end']}, deterministic counts from the raw logs — AUTHORITATIVE): "
+                f"lifting days {pres['lift_days']}, weigh-ins {pres['weigh_ins']}, "
+                f"habit-completion days {pres['habit_completion_days']}, food-log days {pres['food_log_days']}"
+                + (" — AN ABSENCE WEEK (no behavioral data at all)" if pres["absence_week"] else "")
+            )
         if present:
             bits.append(present[:600])
         if w.get("ai_affirming"):
@@ -1597,6 +1688,7 @@ HOW TO JUDGE THE ARC (read before writing):
 - Tell the real story: where this began, what shifted, what held steady, where it stands now. Name the turning points honestly but never catastrophize and never diagnose his character from thin data.
 - Credit the throughline of effort and consistency. If the weeks rhymed (the same pattern recurring), say so plainly — that's the signal.
 - Only {len(weeks)} weeks exist; do not pretend to more history than the notes contain.
+- BEHAVIORAL PRESENCE lines are deterministic counts from the raw logs — they are AUTHORITATIVE and override any rosier read in that week's notes. A week whose counts are zero (or near-zero) is an ABSENCE week: narrate it AS absence — the logging stopped, and that is the week's story — never as progress or triumph. Recovery/HRV that looks good during an absence week is REST-INFLATED (no training, no logged deficit behind it) and must NOT be credited as progress or "the best of the arc". Never call a fully-dark week's missing data "a minor logging problem".
 
 Produce EXACTLY this JSON (no markdown, no preamble):
 {{

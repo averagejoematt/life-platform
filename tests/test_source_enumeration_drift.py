@@ -133,6 +133,40 @@ def test_freshness_surfaces_unchanged_by_498():
         assert k not in reg.behavioral_source_keys()
 
 
+def test_engagement_channels_derive_from_registry_914():
+    """#914: engagement_core's channel set/labels/tolerances were hand-rolled
+    (MANUAL_CHANNELS + CHANNEL_STALE_DAYS) — now a projection of the registry's
+    engagement_channel facet, withings joins as the 'measurement' channel, and
+    the habitify presence predicate is registry-named + resolvable."""
+    import engagement_core as ec
+
+    channels = reg.engagement_channels()
+    assert ec.MANUAL_CHANNELS == {k: v["label"] for k, v in channels.items()}
+    assert ec.CHANNEL_STALE_DAYS == {k: v["stale_days"] for k, v in channels.items()}
+    assert ec.PRIMARY_CHANNEL == reg.engagement_primary_channel() == "macrofactor"
+    # the facet carries the full expected channel set (incl. the NEW withings channel)
+    assert set(channels) == {"macrofactor", "hevy", "habitify", "notion", "withings"}
+    assert channels["withings"]["label"] == "measurement" and channels["withings"]["stale_days"] == 10
+    # exactly one primary
+    assert sum(1 for v in channels.values() if v["primary"]) == 1
+    # every registry-named predicate resolves, and habitify's is the zero-completion guard
+    assert channels["habitify"]["presence_predicate"] == "habitify_completed"
+    for v in channels.values():
+        if v["presence_predicate"]:
+            assert v["presence_predicate"] in ec.PRESENCE_PREDICATES, v["presence_predicate"]
+    # severity thresholds live next to the facet definitions (registry-owned)
+    assert reg.ENGAGEMENT_SEVERITY_LOUD_DARK_DAYS == 5
+    assert reg.ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS == 10
+    assert reg.ENGAGEMENT_SEVERITY_ALARM_QUIET_CHANNELS == 3
+    assert reg.ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS == 7
+    # presence is a narrative surface — the facet must not have changed any
+    # paging/freshness projection (behavioral staleness never pages)
+    assert "withings" in reg.behavioral_source_keys()  # weigh-in lapse still never pages
+    assert "macrofactor" in reg.behavioral_source_keys()
+    assert "notion" not in reg.checker_sources()  # still MCP-visibility only
+    assert "habitify" in reg.checker_sources()  # the PIPE still pages when it breaks
+
+
 def test_weather_joined_freshness_surfaces_470():
     """#470: weather was registry-resident for facets only (freshness=False) —
     a dead weather pipe was invisible everywhere. It now behaves like any other

@@ -226,6 +226,12 @@ def daily_brief_shared_system(
         js_bits.append("themes: " + ", ".join(str(t) for t in js["themes"][:3]))
     if js_bits:
         parts.append(f"- Journal signals (recent entries): {'; '.join(js_bits)}")
+    # #914: the ONE shared presence block (engagement_core.presence_prompt_block,
+    # rendered by the caller from the STATE#current read) — so all 4 daily-brief AI
+    # calls see a real logging gap instead of narrating a normal day over it.
+    _presence = (data or {}).get("presence_block") or ""
+    if _presence:
+        parts.extend(["", _presence])
     parts.extend(
         [
             "",
@@ -1401,6 +1407,7 @@ ENGAGEMENT / PRESENCE: If the generation brief includes `engagement_signal`, Mat
 - If `planned_pause` is true, this looks like a deliberate break (`planned_pause_reason`) — frame it as a planned pause, not falling off.
 - If `returned` is true, he's BACK after `resumed_after_days` days. Acknowledge the return warmly, note any real `weight_delta_over_gap_lbs` plainly (regain is data, not a verdict), and be SUPPORTIVE about re-engaging — never punitive. The point is to help him restart, not to shame the lapse.
 - An absent SAME-DAY log is by-design lag (manual sources arrive end-of-day), never a gap — the signal already accounts for this, so trust `gap_days`.
+- If `severity` is "alarm": this is the single most important fact about this period. Address it in the opening paragraph. Do not narrate a normal week. (At "loud", the gap must be clearly acknowledged in your section; a draft that reads like a normal week will be regenerated or held.)
 {_journal_mood_block}
 
 DATA INTERPRETATION RULES:
@@ -1542,6 +1549,30 @@ Write your {domain_label} coaching section now."""
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
             return None
+
+        # Step 6.2 (#914): presence-acknowledgment gate — at severity loud/alarm a
+        # coach section that narrates a normal week over a real logging stall is
+        # regenerated once, then HELD (the exact ADR-108 regenerate-or-hold shape).
+        # Deterministic anchor-phrase check, no LLM judge. Fail-soft on infra.
+        try:
+            import engagement_core as _ec
+
+            _psig = brief.get("engagement_signal") if isinstance(brief, dict) else None
+            if _psig and output and _ec.presence_ack_required(_psig):
+                output, _ack_finding = _ec.enforce_presence_acknowledgment(
+                    output,
+                    _psig,
+                    regenerate_fn=lambda _note: call_anthropic(
+                        system_prompt + "\n\n" + user_message + "\n\n" + _note, api_key, max_tokens=600
+                    ),
+                )
+                if _ack_finding:
+                    print(f"[COACH-V2:{coach_id}] presence-ack gate fired: {_ack_finding.get('detail')}")
+                if output is None:
+                    print(f"[COACH-V2:{coach_id}] Held by presence-ack gate (#914) — no output published this cycle")
+                    return None
+        except Exception as _ack_e:
+            print(f"[COACH-V2:{coach_id}] presence-ack gate failed (non-blocking): {_ack_e}")
 
         # Step 6.5 (#738): persist this fresh, gate-passed output under its brief
         # fingerprint so an unchanged brief tomorrow reuses it. Only reached on a

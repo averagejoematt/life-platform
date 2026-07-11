@@ -1116,6 +1116,19 @@ def _recap_contains_raw_vitals(text):
     return bool(_RECAP_VITAL_RE.search(text or ""))
 
 
+def _load_engagement_signal():
+    """#914: the presence / quiet-stretch state (engagement_state STATE#current,
+    written by adaptive_mode via engagement_core). Fail-soft → {}. The pure
+    rendering + acknowledgment logic lives in engagement_core; only this read is
+    local (the callers-pass-the-read contract)."""
+    try:
+        resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
+        return resp.get("Item") or {}
+    except Exception as e:  # pragma: no cover — defensive
+        logger.warning(f"engagement signal read failed: {e}")
+        return {}
+
+
 def installment_grounding_findings(elena_prompt, user_message, text):
     """#537/ADR-104 chronicle gate core: every number in the installment must exist
     somewhere in what Elena was given (her prompt + the data packet / user message).
@@ -2774,6 +2787,23 @@ def lambda_handler(event: dict, context) -> dict:
     # Build user message with previous installments for continuity
     user_parts = [data_packet]
 
+    # #914: the ONE shared presence block — when Matthew's own logging has gone
+    # quiet, Elena must not write a normal week over an incomplete window. Same
+    # engagement_core.presence_prompt_block every narrative surface injects; the
+    # acknowledgment gate below enforces it at severity loud/alarm.
+    _presence_sig = {}
+    _presence_block_txt = ""
+    try:
+        from engagement_core import presence_prompt_block as _ppb
+
+        _presence_sig = _load_engagement_signal()
+        _presence_block_txt = _ppb(_presence_sig)
+    except Exception as _pres_e:
+        logger.warning(f"[#914] presence block skipped (non-fatal): {_pres_e}")
+    if _presence_block_txt:
+        user_parts.append("\n\n=== PRESENCE / QUIET STRETCH ===")
+        user_parts.append(_presence_block_txt)
+
     # Editorial guidance — steer toward synthesis, not recounting
     user_parts.append("\n\n=== EDITORIAL GUIDANCE ===")
     user_parts.append("Remember: you are writing a STORY, not a weekly recap.")
@@ -2909,6 +2939,30 @@ def lambda_handler(event: dict, context) -> dict:
     # pass over Elena's grounded draft, before AI-3 validation / parsing / the
     # privacy gate (all of which still run on whatever text comes back here).
     raw_installment = _run_margaret_edit_pass(raw_installment, week_num, data["dates"]["end"], elena_prompt, _allowed)
+
+    # #914: presence-acknowledgment gate (ADR-108 regenerate-or-hold). Runs AFTER
+    # Margaret's edit so her rewrite can't strip the acknowledgment unnoticed. At
+    # severity loud/alarm an installment that narrates a normal week over a real
+    # logging stall is regenerated once, then HELD — no chronicle beats a dishonest
+    # one. Deterministic anchor check, no LLM judge.
+    try:
+        from engagement_core import enforce_presence_acknowledgment as _epa, presence_ack_required as _par
+
+        if _presence_sig and _par(_presence_sig) and raw_installment:
+            raw_installment, _ack_finding = _epa(
+                raw_installment,
+                _presence_sig,
+                regenerate_fn=lambda note: call_anthropic(elena_prompt, user_message + "\n\n" + note, api_key),
+            )
+            if _ack_finding:
+                logger.warning(f"[#914] chronicle presence-ack gate fired: {_ack_finding.get('detail')}")
+            if raw_installment is None:
+                logger.error("[#914] chronicle HELD by presence-ack gate — not publishing this week")
+                return {"statusCode": 500, "body": "[#914] Chronicle held: presence gap unacknowledged at severity loud/alarm"}
+    except ImportError:
+        pass  # engagement_core unavailable — serve as before
+    except Exception as _ack_e:
+        logger.warning(f"[#914] presence-ack gate error (fail-open): {_ack_e}")
 
     # AI-3: Validate output before rendering
     if _HAS_AI_VALIDATOR and raw_installment:

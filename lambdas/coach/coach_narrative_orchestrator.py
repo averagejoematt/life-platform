@@ -776,10 +776,19 @@ def _engagement_for_brief(signal):
         return None
     presence = signal.get("presence_class")
     returned = bool(signal.get("returned"))
-    if presence not in _ENGAGEMENT_LOUD and not returned:
+    # #914: severity travels with the signal (derived for pre-ladder records) so
+    # generation + the acknowledgment gate key off one field.
+    try:
+        from engagement_core import severity_of as _severity_of
+
+        severity = _severity_of(signal)
+    except ImportError:  # pragma: no cover — bundle always ships engagement_core
+        severity = signal.get("severity")
+    if presence not in _ENGAGEMENT_LOUD and not returned and severity not in ("loud", "alarm"):
         return None  # present + no return → nothing to say
     out = {
         "presence_class": presence,
+        "severity": severity,
         "gap_days": signal.get("gap_days"),
         "last_food_log_date": signal.get("last_food_log_date"),
         "channels_quiet": signal.get("channels_quiet") or [],

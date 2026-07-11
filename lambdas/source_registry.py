@@ -108,6 +108,24 @@ DEFAULT_STALE_HOURS = 48
 #                  and the public "manual source dark N days" degraded stamp — a
 #                  dead Whoop token is a device outage the nudge can't fix, so it
 #                  never lands here. Read by manual_capture_sources().
+#   engagement_channel  (#914) the presence / quiet-stretch channel this source
+#                  feeds (engagement_core.compute_presence — the "is Matthew still
+#                  logging?" instrument, a DIFFERENT axis from freshness):
+#                  {label, stale_days[, presence_predicate][, primary]}.
+#                    label       reader-facing channel noun ("food", "training", …)
+#                    stale_days  lag-adjusted days before the channel reads quiet
+#                    presence_predicate  name of the engagement_core predicate that
+#                                decides whether a DDB record counts as Matthew
+#                                actually LOGGING that day (default: any record).
+#                                habitify needs one because its pull writes a
+#                                record EVERY day even at total_completed=0 — a
+#                                14-day zero-completion stall read as gap_days=0.
+#                    primary     True on exactly ONE channel (macrofactor/food) —
+#                                the headline gap anchor.
+#                  Replaces engagement_core's hand-rolled MANUAL_CHANNELS +
+#                  CHANNEL_STALE_DAYS (the #498 drift class). Presence is a
+#                  BEHAVIORAL surface: it narrates, it never pages — adding this
+#                  facet must not touch any checker/paging projection.
 #   hae_datatypes  (apple_health only) per-sub-datatype liveness thresholds for the
 #                  streams that all share the ONE apple_health partition, so a
 #                  partition-level "fresh" can hide a months-dark sensor (D-4/#468).
@@ -156,6 +174,9 @@ SOURCE_REGISTRY = {
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/withings/measurements", "scheme": "date-tree"},
+        # #914: weigh-ins are a manual engagement channel — he has to step on the
+        # scale. Sporadic (~weekly is healthy), so a lenient ~10d before "quiet".
+        "engagement_channel": {"label": "measurement", "stale_days": 10},
     },
     "strava": {
         "label": "Strava",
@@ -298,6 +319,10 @@ SOURCE_REGISTRY = {
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/matthew/habitify", "scheme": "date-tree"},
+        # #914: the pull writes a record EVERY day (behavioral: False above is the
+        # PIPE's classification) — presence must count only days he actually
+        # completed a habit, or a total zero-completion stall reads as gap_days=0.
+        "engagement_channel": {"label": "habits", "stale_days": 2, "presence_predicate": "habitify_completed"},
     },
     "macrofactor": {
         "label": "MacroFactor",
@@ -315,6 +340,9 @@ SOURCE_REGISTRY = {
         "metrics": "Calories, macros, meals",
         "posture": "load-bearing",
         "raw_layout": None,  # CSVs land via the dropbox transport, not a raw/ archive
+        # #914: the PRIMARY presence anchor — the daily-expected manual channel and
+        # the first, most reliable thing to stop when routine breaks.
+        "engagement_channel": {"label": "food", "stale_days": 2, "primary": True},
     },
     "hevy": {
         "label": "Hevy",
@@ -330,6 +358,9 @@ SOURCE_REGISTRY = {
         "metrics": "Strength sets, reps, load, rest times",
         "posture": "load-bearing",
         "raw_layout": {"prefix": "raw/hevy", "scheme": "flat-uuid", "note": "workout-UUID keyed, no date tree (X-9)"},
+        # #914: lifting has legit rest days — lenient so a rest day never reads as
+        # falling off (the interactive workout channel; macrofactor_workouts is a mirror).
+        "engagement_channel": {"label": "training", "stale_days": 4},
     },
     "measurements": {
         "label": "Tape measure",
@@ -421,6 +452,10 @@ SOURCE_REGISTRY = {
         # #476/X-7: raw archive added — date-tree with a per-page suffix
         # (raw/matthew/notion/YYYY/MM/DD-<page_id>.json), since a day holds many entries.
         "raw_layout": {"prefix": "raw/matthew/notion", "scheme": "date-tree", "note": "per-page: DD-<page_id>.json"},
+        # #914: journaling is inherently intermittent — lenient tolerance. (Presence's
+        # 4d "quiet" mark is narrative-only and deliberately tighter than the 14d
+        # evening-nudge threshold above — different surface, different kindness.)
+        "engagement_channel": {"label": "journal", "stale_days": 4},
     },
     "weather": {
         "label": "Weather",
@@ -601,6 +636,53 @@ def raw_layouts() -> dict:
     """{key: raw_layout} for sources with a raw-S3 archive — the X-9 three-
     generation reality, documented instead of guessed. No mass-move."""
     return {k: v["raw_layout"] for k, v in SOURCE_REGISTRY.items() if v.get("raw_layout")}
+
+
+# ── #914: presence / quiet-stretch channels — registry-owned ───────────────────
+# The severity ladder's thresholds live HERE, next to the engagement_channel facet
+# definitions, so channel config and escalation policy are read from one place
+# (engagement_core imports both). Presence NARRATES, it never pages (behavioral rule).
+#
+#   none  — present / light / planned pause: nothing to escalate.
+#   soft  — quiet (primary gap 2-4d): a nudge-worthy lull.
+#   loud  — dark (primary gap ≥ ENGAGEMENT_SEVERITY_LOUD_DARK_DAYS): a real stall
+#           every narrative surface must acknowledge (the acknowledgment gate arms).
+#   alarm — dark ≥ ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS, OR
+#           ≥ ENGAGEMENT_SEVERITY_ALARM_QUIET_CHANNELS channels quiet
+#           ≥ ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS days: the stall IS the
+#           story — narratives must open on it.
+ENGAGEMENT_SEVERITY_LOUD_DARK_DAYS = 5
+ENGAGEMENT_SEVERITY_ALARM_DARK_DAYS = 10
+ENGAGEMENT_SEVERITY_ALARM_QUIET_CHANNELS = 3
+ENGAGEMENT_SEVERITY_ALARM_CHANNEL_QUIET_DAYS = 7
+
+
+def engagement_channels() -> dict:
+    """{key: {label, stale_days, presence_predicate, primary}} for the manual
+    engagement channels (#914) — the sources that STOP when Matthew disengages.
+    Replaces engagement_core's hand-rolled MANUAL_CHANNELS + CHANNEL_STALE_DAYS
+    (the #498 drift class). presence_predicate is a NAME resolved by
+    engagement_core.PRESENCE_PREDICATES (None = any DDB record counts)."""
+    out = {}
+    for k, v in SOURCE_REGISTRY.items():
+        ch = v.get("engagement_channel")
+        if not ch:
+            continue
+        out[k] = {
+            "label": ch["label"],
+            "stale_days": ch["stale_days"],
+            "presence_predicate": ch.get("presence_predicate"),
+            "primary": bool(ch.get("primary")),
+        }
+    return out
+
+
+def engagement_primary_channel() -> str:
+    """The single primary presence anchor (macrofactor/food)."""
+    for k, v in engagement_channels().items():
+        if v["primary"]:
+            return k
+    raise ValueError("no engagement_channel is marked primary")
 
 
 # ── #746: manual-source reliability — staleness surfaced kindly ────────────────

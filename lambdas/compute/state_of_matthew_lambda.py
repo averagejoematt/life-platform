@@ -267,12 +267,43 @@ def assemble_state(forecast, hypotheses, coaches, calibration, as_of: str) -> di
 
 def _narration_payload(state: dict) -> dict:
     """The exact numeric vocabulary the model is allowed to use — every present
-    (non-None) section, nothing else. Also what gets rendered into the prompt."""
+    (non-None) section, nothing else. Also what gets rendered into the prompt.
+    (#914: `presence` rides here too, so the gap-day count is in the allow-list.)"""
     payload = {"as_of": state["as_of"]}
-    for key in ("forecast", "hypotheses", "coaches", "calibration", "highlight"):
+    for key in ("forecast", "hypotheses", "coaches", "calibration", "highlight", "presence"):
         if state.get(key) is not None:
             payload[key] = state[key]
     return payload
+
+
+def gather_presence_section(signal: dict | None) -> dict | None:
+    """#914: trim the engagement_state STATE#current read to what the narration
+    may voice — the presence class, severity, real gap day-count, and which
+    channels went quiet. Never the reason (engagement_core's rule). None when
+    Matthew is present (severity none/soft says nothing on this weekly surface)."""
+    if not signal:
+        return None
+    try:
+        from engagement_core import severity_of
+
+        severity = severity_of(signal)
+    except ImportError:  # pragma: no cover — bundle always ships engagement_core
+        severity = signal.get("severity")
+    if severity not in ("loud", "alarm"):
+        return None
+    gap = signal.get("gap_days")
+    try:
+        gap = int(gap) if gap is not None else None
+    except (TypeError, ValueError):
+        gap = None
+    return {
+        "presence_class": signal.get("presence_class"),
+        "severity": severity,
+        "gap_days": gap,
+        "last_food_log_date": signal.get("last_food_log_date"),
+        "channels_quiet": [str(c) for c in (signal.get("channels_quiet") or [])],
+        "note": "Matthew's own manual logging has been quiet — every number above is computed over an INCOMPLETE window.",
+    }
 
 
 def build_narration_body(state: dict) -> dict:
@@ -291,6 +322,20 @@ def build_narration_body(state: dict) -> dict:
         "do not mention it or apologize for its absence — just work with what's given. Do not open with "
         "the word 'Matthew'."
     )
+    # #914: a loud/alarm logging gap must be acknowledged — the ONE shared
+    # presence directive (severity=alarm additionally demands it lead).
+    presence = state.get("presence")
+    if presence:
+        system += (
+            " IMPORTANT: the JSON includes `presence` — Matthew's own manual logging has been quiet for the "
+            "gap_days shown. Reference this gap plainly (use the exact gap_days number); do NOT speculate why "
+            "he went quiet, and do not describe the period as a normal week."
+        )
+        if presence.get("severity") == "alarm":
+            system += (
+                " SEVERITY: ALARM — this is the single most important fact about this period. "
+                "Address it in the opening sentence. Do not narrate a normal week."
+            )
     data_blob = json.dumps(_narration_payload(state), indent=2, default=str)
     user = "This week's pre-computed platform state:\n\n" + data_blob + "\n\nWrite the connecting narrative."
     return {
@@ -339,6 +384,16 @@ def deterministic_fallback_narrative(state: dict) -> str:
     if cal:
         verdict = (cal.get("calibration") or "ungraded").replace("_", " ")
         parts.append(f"Across {cal.get('n')} graded predictions the platform is {verdict} (Brier {cal.get('brier')}).")
+    # #914: a loud/alarm gap leads even the deterministic fallback — this template
+    # only restates fields already in `state`, so it stays fabrication-free.
+    pres = state.get("presence")
+    if pres:
+        gap = pres.get("gap_days")
+        gap_txt = f"{gap} days" if gap is not None else "several days"
+        parts.insert(
+            0,
+            f"Matthew's own manual logging has been quiet for {gap_txt} — every figure below is computed over an incomplete window.",
+        )
     if not parts:
         return "Not enough resolved data yet this week to summarize the platform's model state."
     return " ".join(parts)
@@ -370,6 +425,21 @@ def narrate(state: dict) -> dict:
 
     if not text:
         return {"narrative": deterministic_fallback_narrative(state), "narrated": False, "model": None, "reason": "empty_response"}
+
+    # #914: presence-acknowledgment check — this surface never regenerates (ONE
+    # weekly call by design), so "regenerate-or-hold" degrades to hold-to-fallback:
+    # the deterministic template, which acknowledges the gap by construction.
+    ack_finding = None
+    if state.get("presence"):
+        try:
+            from engagement_core import presence_ack_finding
+
+            ack_finding = presence_ack_finding(text, state["presence"])
+        except ImportError:  # pragma: no cover — bundle always ships engagement_core
+            ack_finding = None
+    if ack_finding:
+        logger.warning(f"[state-of-matthew] #914 presence-ack check failed ({ack_finding.get('detail')}) — falling back")
+        return {"narrative": deterministic_fallback_narrative(state), "narrated": False, "model": MODEL, "reason": "presence_ack"}
 
     findings, causal_hits = narration_gate(state, text)
     if findings or causal_hits:
@@ -406,6 +476,7 @@ def build_summary_item(state: dict, narration: dict, today_str: str) -> dict:
         "coaches": state.get("coaches"),
         "calibration": state.get("calibration"),
         "highlight": state.get("highlight"),
+        "presence": state.get("presence"),  # #914 — loud/alarm logging gap, else None
         "narrative": narration["narrative"],
         "narrated": narration["narrated"],
         "model": narration.get("model"),
@@ -466,6 +537,18 @@ def fetch_coach_consensus() -> dict | None:
         resp = table.get_item(Key={"pk": AI_ANALYSIS_PK, "sk": "EXPERT#integrator"})
     except Exception as e:
         logger.warning(f"[state-of-matthew] coach consensus fetch failed: {e}")
+        return None
+    item = resp.get("Item")
+    return decimals_to_float(item) if item else None
+
+
+def fetch_engagement_signal() -> dict | None:
+    """#914: the presence / quiet-stretch state (engagement_state STATE#current,
+    written by adaptive_mode via engagement_core). Fail-soft → None."""
+    try:
+        resp = table.get_item(Key={"pk": f"{USER_PREFIX}engagement_state", "sk": "STATE#current"})
+    except Exception as e:
+        logger.warning(f"[state-of-matthew] engagement signal fetch failed: {e}")
         return None
     item = resp.get("Item")
     return decimals_to_float(item) if item else None
@@ -534,6 +617,9 @@ def lambda_handler(event: dict, context) -> dict:
     calibration = gather_calibration_section(calibration_summary)
 
     state = assemble_state(forecast, hypotheses, coaches, calibration, today_str)
+    # #914: presence rides the state so the narration must acknowledge a real
+    # logging stall (and its numbers join the grounding allow-list). Fail-soft.
+    state["presence"] = gather_presence_section(fetch_engagement_signal())
     narration = narrate(state)
     item = build_summary_item(state, narration, today_str)
 
