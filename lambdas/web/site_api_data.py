@@ -1715,6 +1715,7 @@ def handle_habits() -> dict:
     habitify_by_date = {}
     _habit_agg = {}  # P0.5: per-habit window adherence for the state taxonomy
     _causality = {}  # #422: per-habit captured drivers + why-missed (both channels)
+    _habit_days = {}  # #1107: per-habit per-date status for the 30-day dot strip
     for hi in _decimal_to_float(hab_resp.get("Items", [])):
         date_key = hi.get("date") or hi.get("sk", "").replace("DATE#", "")
         by_group = hi.get("by_group", {})
@@ -1728,6 +1729,14 @@ def handle_habits() -> dict:
                 continue
             st = st if isinstance(st, dict) else {}
             a = _habit_agg.setdefault(hname, {"scheduled": 0, "completed": 0, "group": st.get("group") or "Other", "last_completed": None})
+            # #1107: per-date status for the dot strip — done / missed / off (not scheduled).
+            # A date with no habitify entry at all stays "absent" (honest absence, ADR-104).
+            if date_key:
+                if st.get("scheduled_today", True):
+                    _day_status = "done" if st.get("status") == "completed" else "missed"
+                else:
+                    _day_status = "off"
+                _habit_days.setdefault(hname, {})[date_key] = _day_status
             if st.get("scheduled_today", True):
                 a["scheduled"] += 1
                 if st.get("status") == "completed":
@@ -1944,6 +1953,21 @@ def handle_habits() -> dict:
     except Exception as _hc_e:
         logger.warning("[handle_habits] keystone_correlations failed (non-fatal): %s", _hc_e)
 
+    # #1107 — the 30-day dot-strip window, GENESIS-CLAMPED (ADR-077 / #1133 doctrine):
+    # _experiment_date floors the start at EXPERIMENT_START, so on genesis day the strip
+    # is honestly 1 day long — pre-cycle days are clamped out entirely, never rendered
+    # as unlabeled prior-cycle history.
+    strip_start = _experiment_date(29)  # 29 back + today = a 30-day window, max
+    strip_dates = []
+    try:
+        _sd = datetime.strptime(strip_start, "%Y-%m-%d")
+        _ed = datetime.strptime(today, "%Y-%m-%d")
+        while _sd <= _ed:
+            strip_dates.append(_sd.strftime("%Y-%m-%d"))
+            _sd += timedelta(days=1)
+    except ValueError:
+        logger.warning("[handle_habits] dot-strip window parse failed (non-fatal): %s..%s", strip_start, today)
+
     # P0.5 — per-habit state taxonomy inputs: window adherence + a state label.
     per_habit = []
     for hname, a in sorted(_habit_agg.items(), key=lambda kv: -(kv[1]["completed"] / kv[1]["scheduled"] if kv[1]["scheduled"] else -1)):
@@ -1965,6 +1989,9 @@ def handle_habits() -> dict:
             "adherence_pct": pct,
             "state": state,
             "last_completed": a.get("last_completed"),
+            # #1107: the 30-day (genesis-clamped) day-by-day strip. Status per date:
+            # done / missed / off (not scheduled) / absent (no data captured that day).
+            "days": [{"date": _ds, "status": _habit_days.get(hname, {}).get(_ds, "absent")} for _ds in strip_dates],
         }
         # #422: attach captured causality (drivers + why-missed, both channels). Only
         # present when a real note/reflection exists — the cell stays honestly empty
@@ -1984,6 +2011,9 @@ def handle_habits() -> dict:
             "days_tracked": len(history),
             "current_streak": latest_streak,
             "per_habit": per_habit,
+            # #1107: the dot-strip window served explicitly so the front-end can say
+            # WHY a strip is short (genesis-clamped) instead of padding it.
+            "days_window": {"start": strip_start, "end": today, "n_days": len(strip_dates)},
             "history": history,
             "day_of_week_avgs": dow_avgs,
             "best_day": best_dow,

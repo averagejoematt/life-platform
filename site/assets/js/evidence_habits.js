@@ -73,6 +73,22 @@ export function habitFrictionChip(pct) {
   return `<span class="hb-fr ${t[1]}">${t[0]}</span>`;
 }
 
+// #1107 — the per-habit 30-day dot strip. The window arrives genesis-clamped from the API
+// (ADR-077): a short strip early in the cycle is the honest strip — it is NEVER padded with
+// pre-genesis days, so nothing from a prior cycle renders unlabeled. Marks: kept = ember dot ·
+// missed = muted ink dot (never red) · not-scheduled = faint outline · no-data = the
+// honest-absence dash (the "—" convention, in dot form).
+export function habitDotStrip(days) {
+  const ds = (days || []).filter((d) => d && d.date);
+  if (!ds.length) return "";
+  const MARK = { done: ["hd-done", "kept"], missed: ["hd-miss", "missed"], off: ["hd-off", "not scheduled"], absent: ["hd-abs", "no data"] };
+  const dots = ds.map((d) => {
+    const m = MARK[d.status] || MARK.absent;
+    return `<i class="hb-dot ${m[0]}" data-l="${esc(fmtShort(d.date))}: ${m[1]}"></i>`;
+  }).join("");
+  return `<span class="hb-dots" role="img" aria-label="day-by-day, last ${ds.length} day${ds.length > 1 ? "s" : ""} of the cycle" data-cells>${dots}</span>`;
+}
+
 // P1.3 / #422 — the three drivers behind a habit: trigger → friction → reward. Friction is
 // measured (inverse of adherence, P1.2). Trigger and reward are now CAPTURED — verbatim from
 // an in-app Habitify note (at check-off) or a Claude reflection — and rendered when they exist;
@@ -251,8 +267,12 @@ export async function renderHabits(d) {
   if (habits.length) {
     const order = groups.length ? groups : [...new Set(habits.map((h) => h.group || "Other"))];
     const _perBy = {}; for (const ph of d.per_habit || []) _perBy[ph.name] = ph;
-    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
-    list = sec(`Habits I'm tracking (${habits.length})`, body + `<p class="rd-meta label">Time-of-day and do/avoid/maintain are <em>auto-derived</em> from the habit's name (heuristic, not fact). The friction tag is the opposite — read straight from the real adherence rate: kept ~always is automatic, kept rarely is high-friction. Descriptive, not a grade.</p>`);
+    const body = order.map((g) => { const hs = habits.filter((h) => (h.group || "Other") === g); if (!hs.length) return ""; return `<h4 class="hb-group label">${esc(g)} <span class="rd-unit">${hs.length}</span></h4><table class="rd-tbl"><tbody>${hs.map((h) => `<tr><td class="rd-name">${esc(h.name)}${habitTaxonomyChips(h.taxonomy)}${habitFrictionChip((_perBy[h.name] || {}).adherence_pct)}</td><td class="hb-dotcell">${habitDotStrip((_perBy[h.name] || {}).days)}</td><td class="num rd-range">${esc(h.frequency || "daily")}</td></tr>`).join("")}</tbody></table>`; }).join("");
+    const _dw = d.days_window || {};
+    const _stripNote = _dw.n_days
+      ? ` The dot strip is day-by-day over the cycle — up to 30 days, clamped to the cycle start (${_dw.n_days < 30 ? `${fmt(_dw.n_days)} day${_dw.n_days > 1 ? "s" : ""} so far — a short strip is the honest strip, never padded with pre-cycle days` : "the full 30-day window"}): ember dot = kept · ink dot = missed (never red) · outline = not scheduled · dash = no data captured.`
+      : "";
+    list = sec(`Habits I'm tracking (${habits.length})`, body + `<p class="rd-meta label">Time-of-day and do/avoid/maintain are <em>auto-derived</em> from the habit's name (heuristic, not fact). The friction tag is the opposite — read straight from the real adherence rate: kept ~always is automatic, kept rarely is high-friction. Descriptive, not a grade.${_stripNote}</p>`);
   }
   // §2 — 90-day adherence heatmap (P0.3). GitHub-style calendar, ember-saturation = the day's
   // Tier-0 %, cut-start (Jul 12) ringed. Replaces the old green/amber/red 7-day grid (rainbow +
