@@ -409,6 +409,10 @@ async function renderRead(s, id) {
       sec("the gotcha", b.gotcha) +
       sec("the honest miss", b.honest_miss) +
       (prs ? `<p class="dx-disclosure label">the receipts: ${prs}</p>` : "") +
+      // #741 — the standing cross-link to the career artifact: the org design that
+      // produces this log (sessions as employees, deterministic gates, one human
+      // owning the irreversible) is written up in full as an essay.
+      `<p class="dx-disclosure label">how this log gets made: <a href="/journal/essays/org-chart-of-one/">The Org Chart of One Human and N Agents</a></p>` +
       `<div class="imark-rail" aria-hidden="true">${instrumentMark()}</div>`;
     return;
   }
