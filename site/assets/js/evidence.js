@@ -15,7 +15,7 @@ import { mountAsk } from "/assets/js/ask.js";
 import { esc, getJSON, tryJSON, isBad, sec, empty, note } from "/assets/js/evidence_shared.js";
 import { enhanceProvenance } from "/assets/js/provenance_popover.js";
 import { renderSupplements, renderLabs, renderPhysical, renderTraining } from "/assets/js/evidence_body.js";
-import { wireCharacter, renderCharacter } from "/assets/js/evidence_character.js";
+import { wireCharacter, renderCharacter, renderBadges } from "/assets/js/evidence_character.js";
 import { wireDataFigure, moveTrendMarker } from "/assets/js/evidence_datafigure.js";
 import { renderDiscoveries, renderGenome, renderChallenges, renderProtocols, renderExperiments, wireChallenges, wireExperiments, wireDiscoveries } from "/assets/js/evidence_discovery.js";
 import { renderHabits, renderLedger } from "/assets/js/evidence_habits.js";
@@ -64,7 +64,7 @@ const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
 const slugFromPath = () => { const seg = location.pathname.split("/").filter(Boolean); return seg.length ? seg[seg.length - 1] : ""; };
 
 const RENDERERS = {
-  vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, scenarios: renderScenarios };
+  vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, badges: renderBadges, scenarios: renderScenarios };
 
 const WIRE = {
   ask: () => {

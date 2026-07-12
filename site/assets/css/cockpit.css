@@ -605,8 +605,14 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .ach.is-earned { opacity: 1; border-color: var(--ember-line); }
 .ach-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
 .ach.is-earned .ach-dot { background: var(--ember); }
-.ach-label { font-family: var(--font-mono); font-size: var(--fs-small); flex: 1; min-width: 0; }
+/* #1126: min-width:0 lets the label shrink under a sibling earned-date, but mono text
+   kept painting past the shrunk box (label + date overlapped on the first earned badge
+   with a date) — ellipsize instead; the full name lives in the tile's title attr. */
+.ach-label { font-family: var(--font-mono); font-size: var(--fs-small); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ach-when { color: var(--ink-faint); }
+/* #1126: the grid's link-out tile to /data/badges/ — navigation, not a badge state
+   (full opacity, dashed frame, no earned glow). */
+.ach-more { opacity: 1; border-style: dashed; text-decoration: none; color: var(--ink-muted); }
 
 /* View-transition naming for the door + hub (door-to-door continuity) */
 @media (prefers-reduced-motion: no-preference) {

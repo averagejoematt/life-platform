@@ -60,6 +60,8 @@ export const DOMAIN_ICON = {
   relationships: "people", social: "people", people: "people",
   // the character sheet
   character: "character", tier: "character",
+  // the badge wall (#1126) — the milestone flag is the mark for "earned"
+  badges: "milestone",
 };
 
 // domainIcon(key, opts) — convenience: resolve a domain name-space key to its icon.
