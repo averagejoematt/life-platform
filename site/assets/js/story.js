@@ -685,6 +685,18 @@ async function load() {
   // Dynamic wave label — the window now tracks the experiment (genesis→today), not a fixed 42.
   const ww = bind("wave-window");
   if (ww && waveResp && waveResp.day_n) ww.textContent = `${waveResp.day_n} day${waveResp.day_n === 1 ? "" : "s"} · the shape of it`;
+  // Reader-truth (#1094 drill finding): the static claim promises "every day,
+  // including the ones that dipped" — a lie over a 1-dot chart. Under ~2 weeks
+  // the claim speaks in the young-window voice; the static line returns once
+  // there's enough history for "the ones that dipped" to be literally true.
+  const wclaim = bind("wave-claim");
+  const dayN = waveResp && waveResp.day_n;
+  if (wclaim && dayN != null && dayN < 14) {
+    wclaim.textContent =
+      dayN <= 1
+        ? "The climb isn't a straight line — it starts as a single dot. Every day lands here, dips included, as they happen."
+        : `The climb isn't a straight line. ${dayN} days in, every one is here — dips included, as they come.`;
+  }
 
   const charV = character.status === "fulfilled" ? character.value : null;
   const pillars = (charV && (charV.pillars || (charV.character && charV.character.pillars))) || [];
