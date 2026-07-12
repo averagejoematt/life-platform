@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
-**Last updated:** 2026-05-19 (v8.0.0)
+**Last updated:** 2026-07-12 (added `/api/routine`; NB the endpoint list is a curated subset last fully verified 2026-05-19 — newer endpoints like `/api/presence` are documented in their shipping PRs)
 
 > The public-facing HTTP API behind `averagejoematt.com`. Two Lambda functions back it: `life-platform-site-api` (data) and `life-platform-site-api-ai` (AI endpoints). All endpoints route via CloudFront → Lambda Function URLs.
 
@@ -75,6 +75,9 @@ List of active + completed self-experiments.
 
 ### `GET /api/challenges`
 List of active challenges + leaderboard.
+
+### `GET /api/routine`
+Current prescribed training block for the /now/ levers station (added 2026-07-12, #1066). Counts-only projection — block phase, archetype/variant, exercise/set counts, prescription dates; never exercise names, loads, notes, or Hevy ids. Cache 900s.
 
 (Total: 60+ data endpoints. See `lambdas/site_api_lambda.py` `_SIMPLE_ROUTES` and `ROUTES` dispatch tables for the complete list.)
 

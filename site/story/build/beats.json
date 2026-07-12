@@ -916,6 +916,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1068"
         }
       ]
+    },
+    {
+      "id": "2026-07-12-training-lever",
+      "date": "2026-07-12",
+      "title": "Genesis night: the cockpit's last lever, and a day of silently red CI",
+      "shipped": "Hours into Day 1, the levers station got the third row it shipped without: the current training block, backed by a new read-only endpoint that deliberately returns counts only — six exercises, eighteen sets — never exercise names, loads, or private notes. The same sweep resolved a trust contradiction (the privacy page now scopes affiliate arrangements to the gear page's disclosed links, the owner's call) and gave the career essay a measurement instrument: the weekly traffic digest now reports that page's views and external referrers, so if it travels, the travel is on the record. Four pull requests, all merged and live.",
+      "gotcha": "The first merge of the night surfaced that the main CI pipeline had been red for about 26 hours without anyone noticing. A cleanup the previous day archived a one-time migration script; a test still imported it from the old path. Nobody saw it because the site deploys through a separate workflow that stayed green — the pipeline that was failing is the one nobody was watching. The fix was one line; the reflex — check the other pipeline's conclusions at every close — is the real ship.",
+      "honest_miss": "The training lever currently renders an honest placeholder — 'staged for Day 1' — because the first cycle-5 training block hasn't been drafted yet; the row proves the plumbing, not the plan. And a scary-looking token failure from the scale vendor turned out to be transient after diagnosis, but its dead-letter message is still sitting in the queue awaiting a human hand — the automation could diagnose it, but deleting production state stays behind a human approval it didn't get in time.",
+      "prs": [
+        {
+          "label": "PR #1071",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1071"
+        },
+        {
+          "label": "PR #1072",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1072"
+        },
+        {
+          "label": "PR #1073",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1073"
+        },
+        {
+          "label": "PR #1074",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1074"
+        }
+      ]
     }
   ]
 }
