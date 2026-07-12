@@ -223,6 +223,17 @@ PAGE_BINDINGS = [
         ],
     },
     {
+        "path": "/coaching/by-coach/#eli_marsh",
+        "name": "Coaching · By Coach (head coach, lead tier)",
+        "door": "coaching",
+        "narrative_order": 72.1,
+        "story_intent": "the head coach's program page — philosophy, cast sheet, and an honest-empty live record (he files no domain stances)",
+        "endpoints": [
+            {"url": "/api/coach/eli_marsh", "role": "primary", "metrics": []},
+            {"url": "/api/coaches", "role": "secondary", "metrics": []},
+        ],
+    },
+    {
         "path": "/coaching/scorecard/",
         "name": "Coaching · Scorecard (graded track record)",
         "door": "coaching",
