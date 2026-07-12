@@ -25,6 +25,7 @@ from decimal import Decimal  # noqa: F401
 
 import boto3
 import calibration_core  # #538: the ONE prediction-calibration scorer (Brier + reliability)
+import coach_traits  # #1113: authored trait scores for the immersive bios (bundled module)
 from boto3.dynamodb.conditions import Key
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
@@ -265,6 +266,9 @@ def _character(p):
     voice = m.get("voice") or {}
     return {
         "title": m.get("title"),
+        # #1113 prompt transparency: the real source list this coach's prompt reads
+        # (config-authored, public-safe source names — never values).
+        "data_sources": (m.get("data_sources") or [])[:8],
         "principles": (m.get("principles") or [])[:5],
         "voice": {k: voice.get(k) for k in ("tone", "style", "catchphrase") if voice.get(k)},
         "tendencies": (persn.get("tendencies") or [])[:4],
@@ -748,6 +752,9 @@ def handle_coach(event):
                 "type": p.get("type"),
                 "disclosure": _DISCLOSURE,
                 "character": _character(p),
+                # #1113: authored (deterministic, human-written) trait scores — the
+                # cast sheet, labelled as authored fiction-design by its own disclosure.
+                "trait_scores": coach_traits.traits_for(pid),
                 "working_hypotheses": _working_hypotheses(pid),
                 "stance": _stance_block(pid, weight),
                 "stance_history": _stance_history(pid),

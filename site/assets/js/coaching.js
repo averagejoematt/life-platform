@@ -154,6 +154,96 @@ function disclose(summary, innerHTML) {
   return `<details class="coach-more"><summary class="dx-kicker label">${esc(summary)}</summary>${innerHTML}</details>`;
 }
 
+// ── #1113 immersive bios — the three dossier layers ──────────────────────────
+// 1) THE CAST SHEET — authored trait scores. Deterministic config written by the
+//    author (lambdas/coach_traits.py), rendered as position-between-poles bars.
+//    The API payload carries its own disclosure; always shown — never implied
+//    to be measured behavior.
+function coachTraitsHTML(ts) {
+  if (!ts || !Array.isArray(ts.axes) || !ts.axes.length) return "";
+  let h = `<section class="coach-traits"><p class="dx-kicker label">the cast sheet · authored trait scores</p>`;
+  if (ts.note) h += `<p class="ct-note dx-prose">${esc(ts.note)}</p>`;
+  h += `<ul class="ct-list">`;
+  for (const a of ts.axes) {
+    const score = Math.max(0, Math.min(100, Number(a.score) || 0));
+    h += `<li class="ct-row"><span class="ct-axis label">${esc(a.label)}</span>` +
+      `<span class="ct-track" role="img" aria-label="${esc(a.label)}: ${score} of 100 — between ${esc(a.low)} and ${esc(a.high)}">` +
+      `<span class="ct-fill" style="width:${score}%"></span></span>` +
+      `<span class="ct-poles label"><span>${esc(a.low)}</span><span>${esc(a.high)}</span></span></li>`;
+  }
+  h += `</ul>`;
+  if (ts.disclosure) h += `<p class="ct-disclosure label">${esc(ts.disclosure)}</p>`;
+  return h + `</section>`;
+}
+// 2) HOW THIS VOICE IS BUILT — prompt transparency (build-in-public honesty).
+//    Everything here is the coach's actual voice spec (_voice_subset: the same
+//    config/coaches/{id}.json the generation prompt is built from) + the
+//    config-authored source list — surfaced verbatim, never paraphrased by AI.
+function coachBuildHTML(v, c) {
+  v = v || {};
+  const ds = v.decision_style || {};
+  const rows = [
+    ["evidence bar", ds.default_evidence_threshold],
+    ["bold claims", ds.comfort_with_bold_claims],
+    ["when wrong", ds.revision_style],
+  ].filter((r) => typeof r[1] === "string" && r[1].trim());
+  const forbidden = (((v.structural_voice_rules || {}).opening_patterns || {}).forbidden || []).filter((f) => typeof f === "string");
+  const sources = (c && c.data_sources) || [];
+  if (!rows.length && !forbidden.length && !sources.length && !(typeof v.few_shot_example === "string" && v.few_shot_example.trim())) return "";
+  let h = `<section class="coach-build"><p class="dx-kicker label">how this voice is built · the actual prompt spec</p>` +
+    `<p class="dx-prose">This coach is an AI character. What follows isn't marketing copy — it's the working spec the voice is generated from, shown as-is.</p>`;
+  if (sources.length) h += `<p class="cb-sources"><span class="label">reads</span> ${sources.map(esc).join(" · ")} <span class="label">— real data, nothing else</span></p>`;
+  if (rows.length) {
+    h += `<dl class="cb-style">`;
+    for (const [k, val] of rows) h += `<dt class="label">${esc(k)}</dt><dd>${esc(val)}</dd>`;
+    h += `</dl>`;
+  }
+  if (forbidden.length) {
+    h += `<p class="cb-forbid-k label">phrases this coach is forbidden to open with</p><ul class="cb-forbid">` +
+      forbidden.slice(0, 6).map((f) => `<li>“${esc(f)}”</li>`).join("") + `</ul>`;
+  }
+  if (typeof v.few_shot_example === "string" && v.few_shot_example.trim()) {
+    h += `<p class="cb-few-k label">a calibration example from the spec</p><blockquote class="cv-example">${esc(v.few_shot_example)}</blockquote>`;
+  }
+  return h + `</section>`;
+}
+// 3) THE LIVE RECORD — dynamic sections composed from the real records the
+//    coach-opinion engine persists (STANCE#latest / PREDICTION#+THREAD# /
+//    STANCE# trail + OUTPUT# trail). Honest-empty pre-data (ADR-104): early in
+//    a cycle these are absences, and each one says so instead of hiding or
+//    fabricating. `stance.source` distinguishes an evidence-derived stance
+//    ("stance") from the authored starting scaffold ("ladder").
+function coachLiveRecordHTML(d) {
+  const st = d.stance || {};
+  const live = st.source === "stance";
+  let h = `<section class="coach-live"><p class="dx-kicker label">the live record · this cycle</p>`;
+  if (live) {
+    h += coachStanceHTML(st);
+    if (st.as_of) h += `<p class="cl-asof label">evidence-derived stance · as of ${esc(String(st.as_of).slice(0, 10))}</p>`;
+  } else {
+    h += `<p class="cl-empty dx-prose">No evidence-derived stance yet this cycle — the opinion engine writes its first weekly read once the data accrues.` +
+      (st.stage && st.stage.label ? ` Until then the authored starting scaffold has them at <strong>${esc(String(st.stage.label).replace(/[.\s]+$/, ""))}</strong>.` : "") + `</p>`;
+  }
+  const hyps = (d.working_hypotheses || []).filter((x) => x && x.claim);
+  if (hyps.length) h += coachHypothesesHTML(hyps);
+  else h += `<p class="cl-empty dx-prose">No open calls on the board yet — when this coach makes a falsifiable prediction it shows here, then gets graded on the <a href="/coaching/scorecard/">scorecard</a>, hit or miss.</p>`;
+  const trail = (d.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
+  const outs = (d.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
+  if (trail.length) {
+    h += `<p class="cl-trail-k label">how the read has moved</p><ol class="ce-trail">` + trail.slice(0, 6).map((s) =>
+      `<li class="ce-item"><span class="ce-date label">${esc(String(s.as_of || "").slice(0, 10))}${s.stage && s.stage.label ? " · " + esc(s.stage.label) : ""}</span>` +
+      `<p class="ce-say">${esc(s.how_my_read_changed || s.headline_read)}</p></li>`).join("") + `</ol>`;
+  } else if (outs.length) {
+    h += `<p class="cl-trail-k label">recent output trail</p><ol class="ce-trail">` + outs.slice(0, 6).map((o) =>
+      `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
+      (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
+      ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") + `</li>`).join("") + `</ol>`;
+  } else {
+    h += `<p class="cl-empty dx-prose">No output trail yet this cycle — the coach's dated reads accumulate here as the engine runs.</p>`;
+  }
+  return h + `</section>`;
+}
+
 // ── THE TENSIONS BAND — the board's disagreements (reused by The Read) ──
 function tensionsHTML(d) {
   const _tt = (d.tensions || []).filter((t) => t && (t.position_a || t.position_b || t.summary));
@@ -496,9 +586,12 @@ async function renderTeamCoach(read, id) {
   let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(d.board_role || d.domain || "")}</h2><p class="coach-head-name label">${esc(d.name || "")}</p></div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
-  const v = d.voice || {};
-  if (typeof v.few_shot_example === "string" && v.few_shot_example.trim())
-    h += `<section class="coach-voice"><p class="dx-kicker label">voice signature</p><blockquote class="cv-example">${esc(v.few_shot_example)}</blockquote></section>`;
+  // #1113 immersive bio: the cast sheet (authored traits) → the live record
+  // (real engine records, honest-empty pre-data) → how the voice is built
+  // (prompt transparency — the actual spec, including its own few-shot example).
+  h += coachTraitsHTML(d.trait_scores);
+  h += coachLiveRecordHTML(d);
+  h += coachBuildHTML(d.voice, d.character);
   const rel = d.relationships || {};
   const edge = (e) => `${esc(domainOf(e.coach))} (${esc(e.weight)})`;
   if ((rel.leans_on || []).length || (rel.leaned_on_by || []).length) {
