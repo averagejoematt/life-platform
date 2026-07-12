@@ -394,3 +394,63 @@ def test_forecast_inert_when_genesis_past(monkeypatch):
     b = _body(data.handle_forecast())
     assert b["pre_start"] is False
     assert "days_until_start" not in b
+
+
+# ── /api/journey_timeline — the Day-1 anchor (#1021) ─────────────────────────
+# Launch eve: the anchor event was stamped with the CLAMPED query bound (today),
+# so the timeline read "2026-07-11 · Day 1" while the hero counted down to the
+# 12th — the page contradicted itself. The anchor (and the pre-experiment
+# filter) must use the TRUE genesis; the clamp exists only for sk.between().
+
+
+def test_journey_timeline_pre_start_day1_dated_at_genesis(monkeypatch):
+    start = _future(monkeypatch)
+    monkeypatch.setattr(vitals, "table", FakeDdbTable(rows=[]))
+    monkeypatch.setattr(vitals, "_get_profile", lambda: {})
+    b = _body(vitals.handle_journey_timeline())
+    day1 = [e for e in b["events"] if e["title"] == "Day 1"]
+    assert len(day1) == 1
+    assert day1[0]["date"] == start  # never today's (clamped) date on launch eve
+    assert all(e["date"] >= start for e in b["events"])  # nothing pre-genesis
+
+
+def test_journey_timeline_pre_start_excludes_wiped_cycle_events(monkeypatch):
+    # A leftover active experiment stamped launch eve (>= the clamped bound but
+    # < genesis) must not render next to the countdown as if the cycle had begun.
+    start = _future(monkeypatch)
+    eve = _iso(_today_pt())
+    row = {
+        "pk": f"{vitals.USER_PREFIX}experiments",
+        "sk": "EXP#stale",
+        "start_date": eve,
+        "status": "active",
+        "name": "Wiped-cycle straggler",
+        "hypothesis": "should not appear pre-genesis",
+    }
+    monkeypatch.setattr(vitals, "table", FakeDdbTable(rows=[row]))
+    monkeypatch.setattr(vitals, "_get_profile", lambda: {})
+    b = _body(vitals.handle_journey_timeline())
+    assert all(e["date"] >= start for e in b["events"])
+    assert not any("straggler" in e["title"] for e in b["events"])
+
+
+def test_journey_timeline_inert_when_genesis_past(monkeypatch):
+    # Post-boundary (Day 1 onward): genesis == clamped bound, so the anchor keeps
+    # its historical date and the filter admits everything from genesis forward.
+    start = _past(monkeypatch, days=30)
+    d20 = _iso(_today_pt() - timedelta(days=20))
+    row = {
+        "pk": f"{vitals.USER_PREFIX}experiments",
+        "sk": "EXP#real",
+        "start_date": d20,
+        "status": "active",
+        "name": "Mid-cycle experiment",
+        "hypothesis": "runs normally after genesis",
+    }
+    monkeypatch.setattr(vitals, "table", FakeDdbTable(rows=[row]))
+    monkeypatch.setattr(vitals, "_get_profile", lambda: {})
+    b = _body(vitals.handle_journey_timeline())
+    day1 = [e for e in b["events"] if e["title"] == "Day 1"]
+    assert len(day1) == 1
+    assert day1[0]["date"] == start
+    assert any("Mid-cycle experiment" in e["title"] for e in b["events"])

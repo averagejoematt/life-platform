@@ -9,7 +9,7 @@
   native from /api/field_notes; timeline from /api/journey_timeline.
 */
 import { initTheme } from "/assets/js/theme.js";
-import { enhanceCoachNames, stampGenesis, preStart } from "/assets/js/coach_popover.js"; // + #931 pre-start countdown
+import { enhanceCoachNames, stampGenesis, preStart, genesisCount } from "/assets/js/coach_popover.js"; // + #931 pre-start countdown
 import { isNewSince, mountSinceRibbon } from "/assets/js/since.js"; // uplevel P5 — reader-keyed NEW badges
 import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait, wireSpeakingAudio } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 semantic states
@@ -244,9 +244,11 @@ async function renderRead(s, id) {
     const events = (d && d.events ? d.events.slice() : []);
     const posts = (pj && pj.posts) || [];
     events.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));  // newest-first → "walk back"
-    const GEN = "2026-07-12", day1 = Date.parse(GEN), now = Date.now();
-    const dayN = Math.max(1, Math.floor((now - day1) / 864e5) + 1);
-    const weekN = Math.max(1, Math.floor((now - day1) / 6048e5) + 1);
+    // #1021: consume the ONE genesis calc (coach_popover.genesisCount) instead of a
+    // re-implemented Date.parse("YYYY-MM-DD") — that parses as UTC midnight, so this
+    // page's Day-N ran a day ahead of every other door for evening (PT) visitors.
+    const { dayN: _gDay, weekN: _gWeek } = genesisCount();
+    const dayN = Math.max(1, _gDay), weekN = Math.max(1, _gWeek);
     const lost = jr && jr.lost_lbs != null ? Math.round(jr.lost_lbs * 10) / 10 : null;
     const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const moLabel = (mo) => { const m = /^(\d{4})-(\d{2})/.exec(mo || ""); return m ? `${MON[+m[2] - 1]} ${m[1]}` : mo; };
@@ -303,11 +305,22 @@ async function renderRead(s, id) {
     // The quiet stretch (2026-06-30): when the owner's own logging has gone quiet —
     // or he's just returned — the serial spine says so, honestly. Fed by the
     // fail-closed /api/presence. No red; the arc simply acknowledges the lull.
+    // #1021 pre-start: mirror story.js renderQuiet / cockpit.js renderPresence (#931/#955) —
+    // launch eve reads as anticipation, not a lull; the wiped cycle's silence must never
+    // sit next to the Day-1 countdown as if it were a current gap.
     let quiet = "";
-    if (pres && (pres.in_lull || pres.returned)) {
+    if (!pre && pres && (pres.in_lull || pres.returned)) {
       const WD = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       let since = "";
-      if (pres.last_log_date) { const dt = new Date(pres.last_log_date + "T12:00:00"); since = WD[dt.getDay()] || ""; }
+      if (pres.last_log_date) {
+        const dt = new Date(pres.last_log_date + "T12:00:00");
+        // #1021: a bare weekday is ambiguous once the gap exceeds a week ("quiet since
+        // Wednesday — 15 days without an entry" contradicts itself) — name the date instead.
+        const gapN = Math.round(Number(pres.gap_days));
+        since = Number.isFinite(gapN) && gapN > 6
+          ? dt.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+          : (WD[dt.getDay()] || "");
+      }
       let head, line;
       if (pres.returned) {
         head = "the return";

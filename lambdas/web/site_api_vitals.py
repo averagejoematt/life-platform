@@ -797,9 +797,14 @@ def handle_journey_timeline() -> dict:
     events: list = []
 
     # ── 1. Day 1 anchor (ADR-058: copy rewritten in §8 with Elena voice) ─────
+    # #1021: anchor at the TRUE genesis, never the clamped query bound. Pre-genesis
+    # the clamp is today, which stamped launch eve ("2026-07-11 · Day 1") while the
+    # hero counted down to tomorrow — the page contradicted itself. start_date stays
+    # clamped ONLY for the sk.between(lower <= upper) query bounds below; once
+    # genesis <= today the two are equal and nothing changes.
     events.append(
         {
-            "date": start_date,
+            "date": EXPERIMENT_START,
             "type": "milestone",
             "title": "Day 1",
             "body": f"Starting weight: {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))} lbs. Goal: 185.",
@@ -836,7 +841,10 @@ def handle_journey_timeline() -> dict:
                 "date": crossed[thr],
                 "type": "weight",
                 "title": f"Crossed {thr} lbs — {int(lbs_lost)} lbs lost",
-                "body": f"Down {int(lbs_lost)} lbs from {int(round(start_weight))}. {round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal.",
+                "body": (
+                    f"Down {int(lbs_lost)} lbs from {int(round(start_weight))}. "
+                    f"{round((lbs_lost / (start_weight - goal_weight)) * 100)}% of the way to goal."
+                ),
                 "link": "/live/",
             }
         )
@@ -982,8 +990,10 @@ def handle_journey_timeline() -> dict:
     except Exception as e:
         logger.warning("journey_timeline: correlation events failed (non-fatal): %s", e)
 
-    # Exclude pre-experiment events and sort chronologically
-    events = [evt for evt in events if evt["date"] >= start_date]
+    # Exclude pre-experiment events and sort chronologically. #1021: the bar is the
+    # TRUE genesis (pre-genesis the clamped start_date is today, which would admit
+    # wiped-cycle events stamped launch eve); equal to start_date once genesis <= today.
+    events = [evt for evt in events if evt["date"] >= EXPERIMENT_START]
     events.sort(key=lambda evt: evt["date"])
     seen_evt: set = set()
     deduped = []
