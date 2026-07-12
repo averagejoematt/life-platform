@@ -76,7 +76,7 @@ def tool_get_predictions(args):
     partition the daily evaluator grades and the public site serves — NOT the
     legacy `SOURCE#coach_thread#` embedded arrays (those pre-#725 records held
     LLM-authored, ungradeable metadata and were tombstoned to
-    `predictions_voided_726` by `deploy/void_legacy_predictions_726.py`).
+    `predictions_voided_726` by `deploy/archive/onetime/void_legacy_predictions_726.py`).
     MCP and `site_api_coach.handle_predictions` now read the same store.
     """
     status_filter = args.get("status")  # pending, confirmed, refuted, inconclusive, expired, or None

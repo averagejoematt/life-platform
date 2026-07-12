@@ -8,12 +8,12 @@
 #
 # Prerequisites:
 #   1. CERT_ARN_AMJ in cdk/stacks/web_stack.py must be updated (not PLACEHOLDER)
-#      Run: bash deploy/request_amj_cert.sh first
+#      Run: bash deploy/archive/onetime/request_amj_cert.sh first (archived #972 — cert already issued)
 #   2. CDK venv must exist: cd cdk && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 #
 # ⚠️  Cost warning: CloudFront distribution creation is free. Lambda reserved
-#     concurrency=20 is the viral defence cap. WAF is NOT yet wired (see Step 4
-#     in deploy notes) — add it after confirming the site is live.
+#     concurrency=20 is the viral defence cap. No WAF by design — removed 2026-06;
+#     rate limiting is in-Lambda (see web_stack.py "WAF REMOVED (2026-06)" note).
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ cd "$(dirname "$0")/.."
 # Guard: refuse to deploy if cert ARN is still the placeholder
 if grep -q "PLACEHOLDER-request-cert-first" cdk/stacks/web_stack.py; then
   echo "❌ CERT_ARN_AMJ in cdk/stacks/web_stack.py is still a placeholder."
-  echo "   Run: bash deploy/request_amj_cert.sh"
+  echo "   Run: bash deploy/archive/onetime/request_amj_cert.sh"
   echo "   Then update CERT_ARN_AMJ and re-run this script."
   exit 1
 fi

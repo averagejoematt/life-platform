@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DONE-ONCE: executed for #726 (epic #715) — the legacy SOURCE#coach_thread# embedded
+# prediction arrays were tombstoned to `predictions_voided_726`. The canonical
+# PREDICTION# store is live; re-running would be a no-op dry-run scan.
+# ──────────────────────────────────────────────────────────────────────────
 """void_legacy_predictions_726.py — tombstone the legacy prediction corruption (#726, epic #715).
 
 Two prediction stores existed. The canonical one — `COACH#{coach}_coach` /

@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DONE-ONCE: the DNS validation CNAMEs for the averagejoematt.com certificate are in
+# Route 53 and the cert is ISSUED (auto-renews). Companion to request_amj_cert.sh —
+# only needed again in a from-scratch rebuild.
+# ──────────────────────────────────────────────────────────────────────────
 # validate_amj_cert.sh — Add DNS validation CNAME records to Route 53
 #
 # Run this after request_amj_cert.sh once you have the certificate ARN

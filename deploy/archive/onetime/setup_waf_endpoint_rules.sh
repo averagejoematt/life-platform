@@ -1,4 +1,10 @@
 #!/bin/bash
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DECISION-CONTRADICTING: extends the TB7-26 WebACL that was deliberately removed
+# 2026-06 (see cdk/stacks/web_stack.py 'WAF REMOVED (2026-06)'). The endpoint rate
+# limits it added now live in-Lambda (rate_limiter.py). Do NOT run.
+# ──────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 # R18-F06: Add endpoint-specific WAF rate rules for AI endpoints
