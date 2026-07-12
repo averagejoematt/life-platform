@@ -917,6 +917,14 @@ def handle_discoveries() -> dict:
                     "evidence_for": exp.get("evidence_for", []),
                     "evidence_against": exp.get("evidence_against", []),
                     "rationale": exp.get("rationale", ""),
+                    # #1089: these library entries are ONGOING supplement protocols —
+                    # cross_phase by design (ADR-077), deliberately carried across cycle
+                    # resets (active since Feb 2026). They are NOT discoveries or
+                    # current-cycle findings; the front-end must label them as carried
+                    # protocols so the pre-start surface never reads like leaked findings.
+                    "carried_over": True,
+                    "protocol_kind": "ongoing_protocol",
+                    "active_since": exp.get("promoted_date") or None,
                 }
             )
     except Exception as e:

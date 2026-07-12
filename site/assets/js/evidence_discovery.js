@@ -83,8 +83,26 @@ export async function renderDiscoveries(d) {
     const expiredNote = expired ? `<p class="rd-meta label">${expired} earlier bet${expired === 1 ? "" : "s"} expired before the data could decide ${expired === 1 ? "it" : "them"} — shown as the honest cost of betting in public.</p>` : "";
     hs = sec("What the machine suspects", intro + `<div class="rd-cards">${bets.map(hypCard).join("")}</div>` + expiredNote);
   } else {
+    // #1089: these library entries are standing supplement protocols — cross-phase
+    // by design (ADR-077), deliberately carried across cycle resets and active since
+    // Feb 2026. They are NOT discoveries or hypotheses of the current cycle, and
+    // pre-start they must never read as findings of an experiment that hasn't
+    // produced any (ADR-104). Label them as what they are: carried protocols.
+    const noneYet = !fs && !is
+      ? `<p class="rd-meta label">No discoveries from this cycle yet — correlations and graded findings appear here as the data accrues.</p>`
+      : "";
+    const protoIntro = `<p class="rd-meta label">Standing supplement protocols, deliberately carried across cycle resets — long-horizon levers under continuous measurement, not findings of the current cycle.</p>`;
+    const protoCard = (h) => {
+      const meta = [
+        "carried across cycles",
+        h.active_since && `active since ${String(h.active_since).slice(0, 10)}`,
+        h.evidence_tier && `evidence ${h.evidence_tier}`,
+      ].filter(Boolean).join("  ·  ");
+      const body = h.hypothesis || h.description || "";
+      return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(h.name)}</h3><span class="rd-badge">ongoing protocol</span></header>${body ? `<p class="rd-why">${esc(body)}</p>` : ""}<p class="rd-meta label">${esc(meta)}</p></article>`;
+    };
     hs = hyp.length
-      ? sec("Hypotheses under test", `<div class="rd-cards">${hyp.map((h) => card(h.name, h.hypothesis || h.description, h.evidence_tier)).join("")}</div>`)
+      ? sec("Ongoing protocols — carried across cycles", noneYet + protoIntro + `<div class="rd-cards">${hyp.map(protoCard).join("")}</div>`)
       : "";
   }
   // Reader participation: submit a finding — a visitor-spotted correlation goes
