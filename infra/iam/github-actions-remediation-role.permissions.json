@@ -26,10 +26,42 @@
         "cloudwatch:GetMetricData",
         "cloudwatch:GetMetricStatistics",
         "cloudwatch:ListMetrics",
+        "lambda:GetFunction",
         "lambda:GetFunctionConfiguration",
         "lambda:ListFunctions"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "DriftSentinel",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DetectStackDrift",
+        "cloudformation:DescribeStackDriftDetectionStatus",
+        "cloudformation:DescribeStackResourceDrifts",
+        "cloudformation:ListStackResources"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IAMRoleRead",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::205930651321:role/github-actions-deploy-role",
+        "arn:aws:iam::205930651321:role/github-actions-remediation-role",
+        "arn:aws:iam::205930651321:role/github-actions-golden-eval-role",
+        "arn:aws:iam::205930651321:role/github-actions-diagnosis-role"
+      ]
+    },
+    {
+      "Sid": "OIDCProviderRead",
+      "Effect": "Allow",
+      "Action": "iam:GetOpenIDConnectProvider",
+      "Resource": "arn:aws:iam::205930651321:oidc-provider/token.actions.githubusercontent.com"
     },
     {
       "Sid": "DDB",
@@ -53,10 +85,30 @@
       "Resource": "arn:aws:s3:::matthew-life-platform/*"
     },
     {
+      "Sid": "S3BucketPolicyRead",
+      "Effect": "Allow",
+      "Action": "s3:GetBucketPolicy",
+      "Resource": "arn:aws:s3:::matthew-life-platform"
+    },
+    {
+      "Sid": "S3List",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::matthew-life-platform",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": "remediation-log/*"
+        }
+      }
+    },
+    {
       "Sid": "S3Log",
       "Effect": "Allow",
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::matthew-life-platform/remediation-log/*"
+      "Resource": [
+        "arn:aws:s3:::matthew-life-platform/remediation-log/*",
+        "arn:aws:s3:::matthew-life-platform/drift-log/*"
+      ]
     },
     {
       "Sid": "SQS",
