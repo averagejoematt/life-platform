@@ -654,10 +654,18 @@ function _weekdaySince(iso) {
   } catch (e) { return ""; }
 }
 
+// ONE shared /api/presence read (#975) — the lull line and the inputs row both
+// consume it; memoized so the cockpit never fetches the same endpoint twice.
+let _presenceReq = null;
+function fetchPresence() {
+  if (!_presenceReq) _presenceReq = getJSON(`${API}/presence`).catch(() => null);
+  return _presenceReq;
+}
+
 // Presence / quiet-stretch (2026-06-30): an honest line when the OWNER's own
 // logging has gone quiet — or when he's just returned after a lull. No streaks,
 // no shame, no red; the platform simply notices, the way a coach would. Reads the
-// fail-closed /api/presence (no private per-channel detail). Self-hides when present.
+// fail-closed /api/presence. Self-hides when present.
 async function renderPresence(pre) {
   const sec = $("[data-presence]");
   if (!sec) return;
@@ -665,8 +673,7 @@ async function renderPresence(pre) {
   // anticipation, not a lull. The wiped cycle's silence must never sit next to
   // the T−N countdown as if it were a current gap.
   if (pre) { sec.hidden = true; return; }
-  let d = null;
-  try { d = await getJSON(`${API}/presence`); } catch (e) { d = null; }
+  const d = await fetchPresence();
   if (!d || (!d.in_lull && !d.returned)) { sec.hidden = true; return; }
   let line = "", sub = "";
   if (d.returned) {
@@ -689,6 +696,49 @@ async function renderPresence(pre) {
   const subEl = bind("presence-sub");
   if (sub) { subEl.textContent = sub; subEl.hidden = false; } else { subEl.hidden = true; }
   sec.dataset.cls = d.returned ? "returned" : (d.presence_class || "");
+  sec.hidden = false;
+}
+
+/* ── #975: the inputs the machine needs — manual-channel freshness ───────────
+   Cycle 4 died of 14 silent days no standing surface showed: the lull note above
+   only speaks AFTER a quiet stretch is established. This row is the always-visible
+   instrument-health readout for the self-logged channels (food / journal /
+   training / habits — registry-owned via /api/presence `channels`, #914/#921):
+   one last-logged mark per channel, framed exactly like the Data door's source
+   board — DATA FRESHNESS, never a streak, never a nag, no red. A quiet channel
+   gets the site's ember accent, not an alarm. Pre-genesis (#931/#955) the marks
+   read as staged for Day 1 — pre-cycle silence is the archive's story, never
+   scolded here. Complements the lull note; never replaces it. */
+
+// Whole days since an ISO date, in the site's tz (PT) — 0 = logged today.
+function _markDaysPT(iso) {
+  if (!iso) return null;
+  const n = Math.round((new Date(`${_dayPT(new Date())}T12:00:00`) - new Date(`${String(iso).slice(0, 10)}T12:00:00`)) / 864e5);
+  return Number.isFinite(n) ? Math.max(0, n) : null;
+}
+
+async function renderInputs(pre) {
+  const sec = $("[data-inputs]");
+  if (!sec) return;
+  const d = await fetchPresence();
+  const chans = d && Array.isArray(d.channels) ? d.channels.filter((c) => c && c.label) : [];
+  // Post-genesis with nothing computed yet (or a failed read) → hide rather than
+  // fake marks; pre-genesis the registry labels alone are honest (config, not data).
+  if (!chans.length || (!pre && !d.available)) { sec.hidden = true; return; }
+  const note = bind("inputs-note");
+  if (note) note.textContent = pre ? " · staged — marks begin with Day 1's logs" : " · freshness, not a score";
+  bind("input-rows").innerHTML = chans.map((c) => {
+    if (pre) {
+      // Pre-genesis: no dates, no gaps — the row exists, the marks start with Day 1.
+      return `<li class="input-row"><span class="input-ch label">${escapeHTML(c.label)}</span>` +
+        `<span class="input-mark label">from Day 1</span></li>`;
+    }
+    const n = _markDaysPT(c.last_log_date);
+    const mark = n == null ? "no mark yet" : n === 0 ? "today" : `${n}d`;
+    return `<li class="input-row${c.quiet === true ? " is-quiet" : ""}">` +
+      `<span class="input-ch label">${escapeHTML(c.label)}</span>` +
+      `<span class="input-mark num">${escapeHTML(mark)}</span></li>`;
+  }).join("");
   sec.hidden = false;
 }
 
@@ -1117,6 +1167,7 @@ async function load(dateStr) {
     renderBoardline(pri);
     renderBoard();      // #591 fire-and-forget; the inter-coach thread + team stances, self-hiding
     renderPresence(pre); // fire-and-forget; hides itself unless he's gone quiet / just returned (#955: and pre-start)
+    renderInputs(pre);   // fire-and-forget (#975); the always-visible manual-channel freshness row (staged pre-genesis)
     renderSinceLastVisit(); // fire-and-forget; only speaks to a genuine returning visitor
     renderCircadian();  // fire-and-forget; hides itself if no forecast available
     renderForecast();   // fire-and-forget (#541); hides itself until the engine has a summary
@@ -1158,6 +1209,9 @@ async function load(dateStr) {
     // #974: the levers still render without a sheet — the registry and the
     // pre-registered design are real before (and independent of) today's score.
     renderLevers(preC);
+    // #975: same for the inputs row — the manual channels' freshness is exactly
+    // the thing that must stay visible when the daily compute has nothing to say.
+    renderInputs(preC);
     $(".panel").setAttribute("aria-busy", "false");
   }
 }

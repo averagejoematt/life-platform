@@ -132,14 +132,23 @@ POPULATED_GATE_PAGES = [
         # empty-mock pass renders its honest-hidden state, so this pass asserts
         # the populated rows (the stack + the experiment under way) actually
         # mount, and capture_page's mobile pass keeps them inside 390px.
+        # #975: same for the inputs row (manual-channel freshness) — it only
+        # materializes with the /api/presence channels projection; the check holds
+        # in BOTH clock states (pre-genesis it renders the staged marks, after it
+        # the fixture's dated marks), so the gate can't flip at genesis.
         "path": "/now/",
-        "name": "Cockpit · levers [populated]",
+        "name": "Cockpit · levers + inputs [populated]",
         "wait_for": "body",
         "checks": [
             {
                 "selector": ".lever-row",
                 "min_count": 2,
                 "desc": "levers strip renders the stack + experiment rows from the supplements/experiments fixtures (#974)",
+            },
+            {
+                "selector": ".input-row",
+                "min_count": 3,
+                "desc": "the inputs freshness row renders a mark per manual channel from the presence fixture (#975)",
             },
         ],
     },
@@ -171,6 +180,7 @@ POPULATED_API_MOCKS = {
     "**/api/labs": "labs.json",
     "**/api/experiments": "experiments.json",
     "**/api/supplements": "supplements.json",
+    "**/api/presence": "presence.json",
 }
 
 

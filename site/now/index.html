@@ -185,6 +185,21 @@
           <ul class="lever-rows" data-bind="lever-rows"></ul>
         </section>
 
+        <!-- #975: the inputs the machine needs — a standing freshness row for the
+             self-logged channels (food / journal / training / habits). Instrument
+             health in the Data-door source-board sense: one last-logged mark per
+             channel, neutral tones — deliberately NOT a streak, a nag, or anything
+             red (the lull note below stays the narrative voice; this is the gauge).
+             Channels are registry-owned (engagement_channel facet, #914/#921) via
+             the /api/presence `channels` projection. Pre-genesis (#931/#955) the
+             marks read as staged for Day 1 — pre-cycle silence is never scolded.
+             Cycle 4 died of 14 silent days no standing surface showed; this makes
+             Day 2 of a quiet stretch visible, not Day 14. -->
+        <section class="inputs" data-inputs hidden aria-label="The inputs the machine needs — manual-channel freshness">
+          <p class="cap label">the inputs<span class="inputs-note" data-bind="inputs-note"></span></p>
+          <ul class="input-rows" data-bind="input-rows"></ul>
+        </section>
+
         <!-- Tonight's forecast: the circadian-compliance score — predictive, not
              retrospective. What today's light / meal / screen / sleep-timing
              behaviours set tonight's sleep up to be. Present-tense only (hidden

@@ -1,0 +1,21 @@
+{
+  "available": true,
+  "presence_class": "present",
+  "in_lull": false,
+  "gap_days": 0,
+  "last_log_date": "2026-07-01",
+  "channels_quiet_count": 1,
+  "passive_still_flowing": true,
+  "planned_pause": false,
+  "planned_pause_reason": "",
+  "returned": false,
+  "resumed_after_days": null,
+  "weight_delta_over_gap_lbs": null,
+  "as_of": "2026-07-01",
+  "channels": [
+    {"id": "macrofactor", "label": "food", "last_log_date": "2026-07-01", "gap_days": 0, "quiet": false, "primary": true},
+    {"id": "habitify", "label": "habits", "last_log_date": "2026-07-01", "gap_days": 0, "quiet": false, "primary": false},
+    {"id": "hevy", "label": "training", "last_log_date": "2026-06-29", "gap_days": 1, "quiet": false, "primary": false},
+    {"id": "notion", "label": "journal", "last_log_date": "2026-06-25", "gap_days": 5, "quiet": true, "primary": false}
+  ]
+}
