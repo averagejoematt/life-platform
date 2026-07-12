@@ -187,10 +187,23 @@ is content-hashed and immutable, so no version skew is possible. (`legacy/` is s
   2026-06-21, per the comment in `sw.js`).
 - Hashed/static assets → cache-first (immutable filenames make that safe).
 - Audio (`*.wav|mp3|m4a`) and cross-origin → never touched.
-- **How a deploy rolls the cache:** `sw.js` ships with `const VERSION = "v1"`;
-  `sync_site_to_s3.sh` rewrites `VERSION` to the build's short git SHA at deploy time,
-  which renames both cache buckets — `activate` then deletes every cache not ending in
-  the new VERSION. `sw.js` itself is served `max-age=300, must-revalidate` so browsers
+- **Registration scope — the cockpit-PWA island (deliberate, #1020):** only the pages
+  in Matthew's daily-return loop register the worker — **home (`/`), `/now/`, and the
+  `/coaching/` shells** (`v4_build_coaching.py` emits the registration line; home and
+  `/now/` carry it hand-authored). Everything else — `/story/`, `/data/`,
+  `/protocols/`, `/method/`, … — deliberately does **not** register: those are
+  read-and-leave pages with no offline case, and every registering page widens the
+  stale-cache blast radius. Note the worker's *scope* is still `/` once installed
+  (island visitors get its fetch rules site-wide); the island only controls **who
+  installs it**. Don't add the registration snippet to a new page unless you are
+  intentionally extending the island — and then update this paragraph.
+- **How a deploy rolls the cache (never hand-bump):** `sw.js` is committed with the
+  placeholder `const VERSION = "dev"`; `sync_site_to_s3.sh` rewrites `VERSION` to the
+  build's short git SHA at deploy time **and hard-fails the deploy if the rewrite
+  didn't take** (#1020), which renames both cache buckets — `activate` then deletes
+  every cache not ending in the new VERSION. Both deploy paths (attended
+  `sync_site_to_s3.sh` and `site-deploy.yml`, which calls the same script) get this
+  for free. `sw.js` itself is served `max-age=300, must-revalidate` so browsers
   re-check it quickly.
 - **The build fingerprint:** every deploy writes `/version.json` (`no-cache`) containing
   the merged short SHA + UTC time, and stamps `<meta name="build">` into every v4 page.

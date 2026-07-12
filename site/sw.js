@@ -6,10 +6,19 @@
     - Hashed/static assets  → cache-first (filenames are content-hashed → immutable),
       with background revalidate.
     - Audio (/panelcast,/podcast *.wav|*.mp3) → pass through (never cache big media).
-  Same-origin only. Bump VERSION to roll the cache. Served with a short TTL so the
-  browser always re-checks (see deploy/sync_site_to_s3.sh).
+  Same-origin only.
+  VERSION is NOT hand-bumped (#1020): "dev" below is a placeholder — every deploy path
+  goes through deploy/sync_site_to_s3.sh, which rewrites it to the build's git short-SHA
+  (and hard-fails if the rewrite didn't take), so deploying automatically renames both
+  caches and `activate` drops the old ones. Served with a short TTL so the browser
+  always re-checks.
+  Registration scope (#1020, deliberate): only the cockpit-PWA island registers this
+  worker — home (/), /now/, and the /coaching/ shells. /story/, /data/, /protocols/,
+  /method/ etc. do not register (no daily-return offline case; smaller stale-cache
+  blast radius). The worker's SCOPE is still "/" once installed — these fetch rules
+  apply site-wide for island visitors; the island only controls who installs it.
 */
-const VERSION = "v1";
+const VERSION = "dev";
 const SHELL = `tml-shell-${VERSION}`;
 const RUNTIME = `tml-runtime-${VERSION}`;
 const SHELL_URLS = ["/now/", "/", "/manifest.webmanifest", "/assets/icons/icon-192.png", "/assets/icons/icon-512.png", "/favicon.ico"];
