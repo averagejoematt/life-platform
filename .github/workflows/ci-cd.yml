@@ -461,7 +461,7 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          fetch-depth: 2  # Need HEAD~1 for diff
+          fetch-depth: 0  # Full history: HEAD~1 diff + the wiki drift gate's per-file git log (#973 — shallow clones false-drift every engine doc)
 
       - name: Validate lambda_map.json
         run: |

@@ -91,6 +91,20 @@ def _git_last_commit_date(rel_path: str) -> date | None:
         return None
 
 
+def _is_shallow_repository() -> bool:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return out.stdout.strip() == "true"
+    except Exception:
+        return False
+
+
 def check_engine_source_freshness(git_date_fn=_git_last_commit_date):
     """The source-newer-than-verify gate (#973).
 
@@ -104,6 +118,12 @@ def check_engine_source_freshness(git_date_fn=_git_last_commit_date):
     """
     flagged, notes = [], []
     if not ENGINES.is_dir():
+        return flagged, notes
+    if _is_shallow_repository():
+        # A shallow clone reports HEAD's date as every file's last commit, which
+        # false-drifts every engine doc the day after its Verified stamp. The date
+        # is meaningless here — skip loudly rather than flag garbage.
+        notes.append("skip drift gate: shallow git clone — per-file commit dates are unreliable (checkout with fetch-depth: 0)")
         return flagged, notes
     for p in sorted(ENGINES.glob("*.md")):
         rel = f"docs/engines/{p.name}"

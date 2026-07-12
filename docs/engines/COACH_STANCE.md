@@ -1,7 +1,7 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#971/#1052 — key-plumbing removal, terminal HOLD)
-> **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1343-1410), `lambdas/coach/coach_quality_gate.py`
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12 (post-#1138 — phase-context block shifted ai_calls line refs; stance/gate logic unchanged)
+> **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1356-1423), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
 
