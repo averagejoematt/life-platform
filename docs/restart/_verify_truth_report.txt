@@ -1,0 +1,7 @@
+verify_truth report — FAIL at Day 1
+
+    1 HIGH truth finding(s) at Day 1 — the reset surface is lying to readers
+    [high] /cockpit/ (temporal_contradiction): Cockpit shows 'seven days, by instrument' and 'what changed this month' sections, implying at least 7 days and a month of historical data exist. On Day 1 of the experiment, only 1 day of current-experiment data can exist. These sections are either unfilled placeholders or contain impossible claims.
+    [med] / (temporal_contradiction): Home page states 'days into the experiment' with no number filled in (shows '··' placeholder), then immediately describes Day-1 weigh-in at 185 lbs and a 90-day checkpoint. This is inconsistent — on Day 1, the placeholder should either show '1' or the 90-day language should be removed as it's a forw
+    [low] / (duplicated_narrative): The narrative 'Every metric. Every setback. The down weeks shown, not hidden — because that's what makes an experiment of one believable' appears substantively similar to the opening promise 'proof, not promises' and the ethos repeated on coaching and story pages. However, this is core mission copy 
+    [med] /api/vitals (impossible_number): hrv_30d_n is 1, which is correct for Day 1, but hrv_30d_avg is null — this is consistent and acceptable. However, the field name '30d' is misleading on Day 1; this is a labeling issue rather than a data falsehood. The null value correctly reflects insufficient data.

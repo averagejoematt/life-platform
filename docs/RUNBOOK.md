@@ -1325,6 +1325,32 @@ and ALARMs for the entire pre-start window — this is expected, not an incident
 agent should classify it as such); bounded pre-start grace is tracked as issue #942. Everything
 is inert again (`pre_start: false`, no payload change) once genesis ≤ today.
 
+**Pre-reset drill (REQUIRED before any future re-anchor — #1094, first run 2026-07-12):**
+prove the machinery green end-to-end BEFORE the real run. Three commands, all safe against prod:
+
+```bash
+# 1. Dry-run the full folded pipeline against the intended (or a synthetic) genesis —
+#    every step previews, nothing mutates; reports land in docs/restart/_*.txt
+python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <current>
+
+# 2. The deterministic truth gate, standalone (7 assertion groups; #1093)
+python3 deploy/restart_verify_semantic.py
+
+# 3. The AI reader-truth gate, standalone (#1097; skips loudly at budget tier ≥ 1 —
+#    for a full run: tier-0 override, run, restore the honest tier)
+python3 deploy/restart_verify_truth.py
+```
+
+Drill record 2026-07-12 (genesis day, synthetic genesis 2026-08-02): dry-run previewed all
+steps + folded hooks clean; semantic verify **7/7 PASS** (0 poisoned rows across 29 sources);
+reader-truth gate ran full and **correctly FAILED with a real HIGH** — the home waveform's
+static "every day, including the ones that dipped" claim over a 1-dot chart — fixed as
+PR #1156/#1159, plus the cockpit week/month scope caps (same class, PR #1160); re-run
+confirmed the home finding cleared. Known benign residue the gate reports on Day 1:
+static-extraction placeholders ("··" pre-JS shells) read as med-severity — the rendered
+page binds real values; judge against the live rendered page before treating as real.
+Outputs captured in `docs/restart/_verify_semantic_report.txt` + `_verify_truth_report.txt`.
+
 All steps preserve original data (interpretation B for DDB, archive-not-delete for S3).
 Roll back via `deploy/restart_rollback.py` — removes tombstone flags (DDB) or copies back from `*/archive/pilot/` (S3).
 

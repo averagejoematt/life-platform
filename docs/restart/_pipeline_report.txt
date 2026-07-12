@@ -1,68 +1,127 @@
-restart_pipeline report — target=2026-07-12 — mode=APPLY
-generated=2026-07-11T04:54:05.305060+00:00
-old_genesis=2026-07-12 closing_cycle=5 new_cycle=5
+restart_pipeline report — target=2026-08-02 — mode=DRY-RUN
+generated=2026-07-12T18:59:07.716472+00:00
+old_genesis=2026-07-12 closing_cycle=5 new_cycle=6
 
-baseline_weight_lbs = 300.8
-baseline_weight_kg  = 136.441
+baseline_weight_lbs = 314.0
+baseline_weight_kg  = 142.428
 
 === sync_constants_from_config === (exit 0)
 [SYNC] lambdas/constants.py already up to date.
 
 === restart_phase_tag === (exit 0)
-_notes#EXERCISE#ee0911e8-c01        1        0        0          1          0          0        0       0
-training_notes#USAGE                        1        0        0          1          0          0        0       0
-training_reference                          4        0        0          4          0          0        0       0
-weather                                   136      136        0          0        136          0        0       0
-weekly_correlations                        14       14        0          0         14          0        0       0
-weight_episodes                            29        0        0         29          0          0        0       0
-what_changed                                2        1        0          1          1          0        0       0
-whoop                                    4742     4742        0          0       4742          0        0       0
-withings                                 1198     1198        0          0       1198          0        0       0
------------------------------------------------------------------------------------------------------------------
-TOTAL                                   22292    20540       18       1734      20556          2        2       0
+75f  before=None  after='pilot'
 
-=== samples of items that would be updated (up to 5 per partition) ===
+[training_notes#EXERCISE#651F844C]
+  sk=DATE#2026-06-22#WORKOUT#1a06d0c8-ba12-49ce-bd18-89dc6cc270ac  before=None  after='pilot'
 
-[chronicle]
-  sk=DATE#2026-02-22  before='experiment'  after='pilot'
-  sk=DATE#2026-03-03  before='experiment'  after='pilot'
+[training_notes#EXERCISE#9930DF71]
+  sk=DATE#2026-06-22#WORKOUT#1a06d0c8-ba12-49ce-bd18-89dc6cc270ac  before=None  after='pilot'
+
+[training_notes#EXERCISE#BE640BA0]
+  sk=DATE#2026-06-25#WORKOUT#259c2691-4059-4e2b-a543-a482264a1c48  before=None  after='pilot'
+
+[training_notes#EXERCISE#D57C2EC7]
+  sk=DATE#2026-06-21#WORKOUT#36bd9061-190b-43d4-acfd-515f5bb85dd0  before=None  after='pilot'
+
+[training_notes#EXERCISE#D8F7F851]
+  sk=DATE#2026-06-20#WORKOUT#dc3e3b10-dfc6-47be-a5a7-c79dc0b8175f  before=None  after='pilot'
+  sk=DATE#2026-06-21#WORKOUT#36bd9061-190b-43d4-acfd-515f5bb85dd0  before=None  after='pilot'
+  sk=DATE#2026-06-22#WORKOUT#1a06d0c8-ba12-49ce-bd18-89dc6cc270ac  before=None  after='pilot'
+  sk=DATE#2026-06-25#WORKOUT#259c2691-4059-4e2b-a543-a482264a1c48  before=None  after='pilot'
+
+[training_notes#EXERCISE#E53CCBE5]
+  sk=DATE#2026-06-20#WORKOUT#dc3e3b10-dfc6-47be-a5a7-c79dc0b8175f  before=None  after='pilot'
+
+[training_notes#EXERCISE#F1E57334]
+  sk=DATE#2026-06-25#WORKOUT#259c2691-4059-4e2b-a543-a482264a1c48  before=None  after='pilot'
+
+[training_notes#EXERCISE#ee0911e8-c017-42db-b271-633d99e13507]
+  sk=DATE#2026-06-20#WORKOUT#dc3e3b10-dfc6-47be-a5a7-c79dc0b8175f  before=None  after='pilot'
 
 Report written to: docs/restart/_phase_tag_report.txt
 
+(dry-run) — would update 836 item(s). Pass --apply to commit.
+
 === restart_intelligence_wipe === (exit 0)
-ll  1101        0         1101          0         0        0
-coach_training             all  1109        0         1109          0         0        0
-coach_mind                 all  1032        0         1032          0         0        0
-coach_physical             all  1051        0         1051          0         0        0
-coach_glucose              all   958        0          958          0         0        0
-coach_labs                 all   853        0          853          0         0        0
-coach_explorer             all   752        0          752          0         0        0
-coach_compute            prege    55        0           55          0         0        0
-coach_thread             prege   535        0          535          0         0        0
-ensemble_digest          prege    85        0           85          0         0        0
-ensemble_disagree          all    19        0           19          0         0        0
-ensemble_dispute           all     1        0            1          0         0        0
-narrative_arc            prege     4        0            3          1         0        0
-----------------------------------------------------------------------------------------
-TOTAL                          10659        2        10631         26         2        0
+ITMENT#commit_20260711_log_everything_eaten_for_the_next_three
 
-=== samples of items that would be tombstoned (up to 3 per partition) ===
+[coach_physical]
+  sk=BRIEF#2026-07-11
+  sk=BRIEF#2026-07-12
+  sk=COMPRESSED#latest
 
-[chronicle]
-  sk=DATE#2026-02-22
-  sk=DATE#2026-03-03
+[coach_sleep]
+  sk=BRIEF#2026-07-11
+  sk=BRIEF#2026-07-12
+  sk=COMMITMENT#commit_20260711_log_actual_sleep_and_wake_times_each_mor
+
+[coach_thread]
+  sk=SOURCE#coach_thread#labs#2026-07-11
+
+[coach_training]
+  sk=BRIEF#2026-07-11
+  sk=BRIEF#2026-07-12
+  sk=COMMITMENT#commit_20260711_complete_3_mile_walks_on_weekdays_monda
+
+[computed_insights]
+  sk=DATE#2026-07-10
+  sk=DATE#2026-07-11
+
+[computed_metrics]
+  sk=DATE#2026-07-10
+  sk=DATE#2026-07-11
+
+[engagement_state]
+  sk=DATE#2026-07-11
+  sk=DATE#2026-07-12
+  sk=STATE#current
+
+[ensemble_digest]
+  sk=CYCLE#2026-07-11
+
+[field_notes]
+  sk=WEEK#2026-W28
+
+[forecast]
+  sk=DATE#2026-07-11
+
+[habit_scores]
+  sk=DATE#2026-07-10
+  sk=DATE#2026-07-11
+
+[hypotheses]
+  sk=HYPOTHESIS#2026-07-11T15:54:13.351022+00:00
+  sk=HYPOTHESIS#2026-07-11T15:54:13.499383+00:00
+
+[insights]
+  sk=INSIGHT#2026-07-11T17:07:28.940Z#daily_brief
+  sk=INSIGHT#2026-07-11T17:07:28.998Z#daily_brief
+  sk=INSIGHT#2026-07-11T17:07:29.053Z#daily_brief
+
+[narrative_arc]
+  sk=STATE#current
+
+[persona_elena]
+  sk=CALLBACK#2026-06-30#what-happened-tuesday-to-sunday
+  sk=CALLBACK#2026-06-30#will-the-pattern-repeat
+  sk=CALLBACK#2026-07-07#does-silence-correlate-with-crashes
+
+[scenarios]
+  sk=DATE#2026-07-11
 
 Report written to: docs/restart/_intelligence_wipe_report.txt
+
+(dry-run) — would tombstone 245 item(s). Pass --apply to commit.
 
 === restart_ledger_reset === (exit 0)
 ledger reset — cycle=5 — 0 transaction(s); TOTALS#current present; LIFETIME#aggregate present
   closing-run totals: total_donated_usd=0, total_bounties_usd=0, total_punishments_usd=0
   lifetime after roll-forward: total_donated_usd=0, total_bounties_usd=0, total_punishments_usd=0
-  mode: APPLY
-  ✓ rolled LIFETIME (donated=$0); tombstoned 0 txn(s) as cycle 5; TOTALS#current zeroed → run starts at $0.
+  mode: DRY RUN (pass --apply to commit)
+  (dry run — nothing changed; would tombstone txns, roll LIFETIME, zero TOTALS)
 
 === restart_chronicle_handler === (exit 0)
-[APPLY] chronicle handler. genesis=2026-07-12
+[DRY-RUN] chronicle handler. genesis=2026-07-12
 
 [1/3] Archiving chronicle HTML across 4 prefix(es):
   [blog/] 3 file(s):
@@ -71,65 +130,74 @@ ledger reset — cycle=5 — 0 transaction(s); TOTALS#current present; LIFETIME#
   [generated/journal/posts/] 9 file(s):
 
 [2/3] Rewriting chronicle index pages:
-  (wrote) blog/index.html  (3751 bytes, Day-1 placeholder)
-  (wrote) dashboard/chronicle/index.html  (3751 bytes, Day-1 placeholder)
-  (wrote) site/chronicle/index.html  (3751 bytes, Day-1 placeholder)
+  (would write) blog/index.html  (3751 bytes, Day-1 placeholder)
+  (would write) dashboard/chronicle/index.html  (3751 bytes, Day-1 placeholder)
+  (would write) site/chronicle/index.html  (3751 bytes, Day-1 placeholder)
 
-[3/3] Keeping 2 chronicle(s) as pre-genesis lead-ins:
-  DATE#2026-02-22 → re-dated to 2026-07-07 (phase=experiment, visible)
-  DATE#2026-03-03 → re-dated to 2026-07-06 (phase=experiment, visible)
+[3/3] Pre-launch calendar (2 entries, genesis=2026-07-12):
+  2026-07-06  chronicle  DATE#2026-02-28  "Prologue · Before the Numbers"  (genesis−6, phase=experiment, visible)
+  2026-07-10  podcast    wk0  "Prologue — Elena previews the experiment"  (genesis−2 — restart_media_reset.py resurrects it)
 
 Report written to: docs/restart/_chronicle_report.txt
 
+(dry-run) — pass --apply to commit.
+
 === restart_media_reset === (exit 0)
-[APPLY] media reset. genesis=2026-07-12 reason=experiment_restart_2026-07-12
+nerated/podcast/debrief/] 6 object(s) (4 media to archive):
+    already-tombstoned: generated/podcast/debrief/2026-07-07.mp3
+    already-tombstoned: generated/podcast/debrief/2026-07-08.mp3
+    already-tombstoned: generated/podcast/debrief/2026-07-09.mp3
+    would-archive: generated/podcast/debrief/2026-07-10.mp3
+    would-rewrite: generated/podcast/debrief/episodes.json
+    would-rewrite: generated/podcast/debrief/feed.xml
 
-[generated/panelcast/] 14 object(s) (11 media to archive):
-    archived: generated/panelcast/wk0.draft.transcript.txt
-    archived: generated/panelcast/wk0.mp3
-    archived: generated/panelcast/wk0.transcript.json
-    archived: generated/panelcast/wk0.transcript.txt
-    archived: generated/panelcast/wk0.wav
-    archived: generated/panelcast/wk1.transcript.txt
-    archived: generated/panelcast/wk1.wav
-    archived: generated/panelcast/wk2.transcript.txt
-    archived: generated/panelcast/wk2.wav
-    archived: generated/panelcast/wk4.transcript.txt
-    archived: generated/panelcast/wk4.wav
-    rewritten: generated/panelcast/episodes.json
-    rewritten: generated/panelcast/feed.xml
+[prequel resurrection] pre-launch calendar podcast entries:
+    would-restore: generated/panelcast/archive/pilot/wk0.draft.transcript.txt → generated/panelcast/wk0.draft.transcript.txt (5669 bytes)
+    would-restore: generated/panelcast/archive/pilot/wk0.mp3 → generated/panelcast/wk0.mp3 (3465600 bytes)
+    would-restore: generated/panelcast/archive/pilot/wk0.transcript.json → generated/panelcast/wk0.transcript.json (7458 bytes)
+    would-restore: generated/panelcast/archive/pilot/wk0.transcript.txt → generated/panelcast/wk0.transcript.txt (5976 bytes)
+    would-restore: generated/panelcast/archive/pilot/wk0.wav → generated/panelcast/wk0.wav (16631610 bytes)
+    episode: wk0 "Prologue — Elena previews the experiment" dated 2026-07-10 (346s, 3465600 bytes)
+    would-write: generated/panelcast/episodes.json (1 episode(s))
+    would-write: generated/panelcast/feed.xml (1 episode(s))
 
-[generated/podcast/debrief/] 5 object(s) (3 media to archive):
-    archived: generated/podcast/debrief/2026-07-07.mp3
-    archived: generated/podcast/debrief/2026-07-08.mp3
-    archived: generated/podcast/debrief/2026-07-09.mp3
-    rewritten: generated/podcast/debrief/episodes.json
-    rewritten: generated/podcast/debrief/feed.xml
-
-CloudFront invalidation: ['/panelcast/*', '/podcast/debrief/*']
+CloudFront invalidation: ['/panelcast/*', '/podcast/debrief/*'] (would invalidate)
 
 Report written to: docs/restart/_media_reset_report.txt
 
+(dry-run) — pass --apply to commit.
+
+=== restart_leadin_pages === (exit 0)
+Genesis: 2026-07-12 · visible installments: 2
+  2026-07-06 · "Before the Numbers" → generated/journal/posts/week-01/index.html  [Prologue · Part I]  (1243 words)
+  2026-07-11 · "The Plan, On the Record" → generated/journal/posts/week-02/index.html  [Prologue · Part II]  (1401 words)
+  manifest → generated/journal/posts.json (2 posts)
+
+DRY RUN — nothing written. Re-run with --apply to write S3 + invalidate CloudFront.
+
 === restart_character_rebuild === (exit 0)
-[APPLY] character rebuild starting. genesis=2026-07-12
+[DRY-RUN] character rebuild starting. genesis=2026-07-12
 
 [1/3] Stale S3 compute_state files: 0
 
-[2/3] Days to recompute: 0 (2026-07-12 → 2026-07-09)
+[2/3] Days to recompute: 0 (2026-07-12 → 2026-07-11)
+  (would invoke 0 times)
 
 [3/3] Verification hints (run via MCP after apply):
   - get_habits()              → expect streak=0 for all habits
   - get_vice_streaks()        → expect streak_days=0 for every vice
   - get_rewards()             → expect every milestone in active state, 0% progress
-  - get_character(view=sheet) → expect days_active matches day_n(2026-07-09)
+  - get_character(view=sheet) → expect days_active matches day_n(2026-07-11)
 
 Report written to: docs/restart/_character_rebuild_report.txt
 
+(dry-run) — would recompute 0 day(s). Pass --apply to commit.
+
 === restart_site_copy_sync === (exit 0)
-[APPLY] site copy sync. genesis=2026-07-12 baseline=300.8
+[DRY-RUN] site copy sync. genesis=2026-07-12 baseline=300.8
 
 [1/5] site_constants.js: unchanged
-[2/5] content_manifest.json: CHANGED
+[2/5] content_manifest.json: unchanged
 [3/8] HTML files updated: 0
 [4/8] JS files updated: 0
 [4b/8] prose/ISO genesis sweep (old=2026-07-12): 0 file(s)
@@ -144,79 +212,39 @@ Report written to: docs/restart/_character_rebuild_report.txt
     - s3://matthew-life-platform/site/chronicle/posts.json
     - s3://matthew-life-platform/generated/journal/posts.json
     - s3://matthew-life-platform/site/journal/posts.json
-[7/8] S3 sync: 3 key(s)
-       CloudFront invalidation: 13 path(s)
+[7/8] S3 sync: 3 key(s) (would sync)
+       CloudFront invalidation: 13 path(s) (would invalidate)
 [8/8] Regen Lambda invocations: 4
-    - life-platform-daily-brief: err(254)
-    - character-sheet-compute: err(254)
-    - site-stats-refresh: err(254)
-    - og-image-generator: err(254)
+    - life-platform-daily-brief: would-invoke
+    - character-sheet-compute: would-invoke
+    - site-stats-refresh: would-invoke
+    - og-image-generator: would-invoke
 
 Report written to: docs/restart/_site_copy_report.txt
 
+(dry-run) — pass --apply to commit.
+
 === restart_docs_update === (exit 0)
-[APPLY] docs update. genesis=2026-07-12 baseline=300.8
+[DRY-RUN] docs update. genesis=2026-07-12 baseline=300.8
 
   unchanged  docs/DECISIONS.md
-  updated    docs/CHANGELOG.md
+  unchanged  docs/CHANGELOG.md
   unchanged  docs/SCHEMA.md
   unchanged  docs/ARCHITECTURE.md
   unchanged  docs/RUNBOOK.md
   unchanged  docs/BACKLOG.md
-  updated    docs/MCP_TOOL_CATALOG.md
+  unchanged  docs/MCP_TOOL_CATALOG.md
 
 Report written to: docs/restart/_docs_update_report.txt
 
-=== restart_verify_rendered === (exit 1)
+(dry-run) — pass --apply to commit.
 
-restart_verify_rendered — checking public surfaces against genesis=2026-07-12
+=== fix_prologue_cycle_and_subscribe_ttl === (exit 0)
+fix_prologue_cycle_and_subscribe_ttl — current cycle=5 — mode: DRY RUN
+[1/2] chronicle cycle stamps — 14 rows, 1 live row(s) not stamped cycle=5:
+    DATE#2026-02-28: cycle=4 → 5  (dry-run)
 
-  (outgoing-genesis tokens active for 2026-07-12)
+[2/2] SUBSCRIBE#rate_limit TTL backfill — 558 rows, 553 missing `ttl`:
+    would backfill 553 row(s) — all past buckets; DDB's TTL sweeper reaps them within ~48h.
 
-  ✓ /
-  ✓ /now/
-  ✓ /story/
-  ✓ /story/chronicle/
-  ✓ /story/journal/
-  ✓ /story/about/
-  ✓ /story/agents/
-  ✓ /data/
-  ✓ /data/vitals/
-  ✓ /data/physical/
-  ✓ /data/labs/
-  ✓ /data/glucose/
-  ✓ /data/sleep/
-  ✓ /data/training/
-  ✓ /data/nutrition/
-  ✓ /data/habits/
-  ✓ /data/character/
-  ✓ /method/character/
-  ✓ /method/board/
-  ✓ /method/pipeline/
-  ✓ /method/intelligence/
-  ✓ /method/predictions/
-  ✓ /method/scenarios/
-  ✓ /method/benchmarks/
-  ✓ /protocols/
-  ✓ /protocols/experiments/
-  ✓ /protocols/challenges/
-  ✓ /protocols/supplements/
-  ✓ /coaching/
-  ✓ /coaching/by-coach/
-  ✓ /coaching/scorecard/
-  ✓ /coaching/team/
-  ✓ /coaching/lab-notes/
-  ✓ /api/journey
-  ✓ /api/vitals
-  ✓ /api/character
-  ✓ /api/timeline
-  ✓ /api/cycle_compare
-  ✓ /panelcast/episodes.json
-  ✗ /journal/posts.json
-      [Tombstone leak] "tombstone": true
-
-══ summary ══
-  39/40 pages clean
-Report: docs/restart/_verify_rendered_report.txt
-
-STDERR: 
+done. chronicle re-stamped: 1; subscribe ttl backfilled: 553.  (dry-run)
