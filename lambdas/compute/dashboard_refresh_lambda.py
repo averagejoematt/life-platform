@@ -15,7 +15,6 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
@@ -51,24 +50,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-def d2f(obj):
-    """Convert DynamoDB Decimals to floats."""
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
-
-
-def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try:
-            return float(rec[field])
-        except Exception:
-            return default
-    return default
+from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):

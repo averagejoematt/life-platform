@@ -20,6 +20,8 @@ import json
 import logging
 import os
 
+import digest_utils  # shared query_range implementations (#970)
+
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 from datetime import datetime, timedelta, timezone
@@ -90,45 +92,15 @@ except ImportError:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def d2f(obj):
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
-
-
-def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try:
-            return float(rec[field])
-        except Exception:
-            return default
-    return default
+from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def query_range(source, start_date, end_date):
-    pk = f"USER#{USER_ID}#SOURCE#{source}"
-    records = {}
-    kwargs = {
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": pk,
-            ":s": f"DATE#{start_date}",
-            ":e": f"DATE#{end_date}",
-        },
-    }
-    while True:
-        resp = table.query(**with_phase_filter(kwargs))
-        for item in resp.get("Items", []):
-            date_str = item.get("date") or item["sk"].replace("DATE#", "")
-            records[date_str] = d2f(item)
-        if "LastEvaluatedKey" not in resp:
-            break
-        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    """Batch query all records for a source in a date range, as a {date: record} dict.
+
+    Shared paginated, phase-scoped implementation (digest_utils, #970).
+    """
+    return digest_utils.query_range(table, source, start_date, end_date, user_id=USER_ID)
 
 
 def query_all(source):

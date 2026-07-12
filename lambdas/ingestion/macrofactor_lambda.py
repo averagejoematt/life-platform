@@ -125,6 +125,8 @@ except ImportError:
         return obj
 
 
+# #970 KEPT (deliberate): CSV-value coercion contract (val) with string sanitation
+# ("-", "N/A", thousands commas), not digest_utils' record-field contract.
 def safe_float(val):
     if val is None:
         return None

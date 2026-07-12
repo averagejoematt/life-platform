@@ -1,5 +1,5 @@
 """
-digest_utils.py — Shared utilities for digest Lambdas (v1.0.0)
+digest_utils.py — Shared utilities for digest Lambdas (v1.1.0)
 
 Extracted from weekly_digest_lambda.py and monthly_digest_lambda.py to eliminate
 duplication, fix bugs, and ensure consistent behaviour across all digest cadences.
@@ -7,9 +7,13 @@ duplication, fix bugs, and ensure consistent behaviour across all digest cadence
 Consumers:
   - weekly_digest_lambda.py
   - monthly_digest_lambda.py
+  - fleet-wide since #970: d2f / safe_float / query_range / query_range_list are
+    the one sanctioned implementations (the pre-#781 copy-paste family is gone —
+    every bundle ships this module, so import it instead of redefining)
 
 Contents:
   - Pure scalar helpers: d2f, avg, fmt, fmt_num, safe_float
+  - DDB range queries: query_range, query_range_list (paginated, phase-scoped — #970)
   - dedup_activities
   - _normalize_whoop_sleep
   - List-based extractors: ex_whoop_from_list, ex_whoop_sleep_from_list, ex_withings_from_list
@@ -20,6 +24,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import training_load  # shared TSS-like load model + Banister core (layer module, #490)
+from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PURE SCALAR HELPERS
@@ -63,6 +68,71 @@ def safe_float(rec, field, default=None):
         except Exception:
             return default
     return default
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DDB RANGE QUERIES  (paginated, phase-scoped — the one sanctioned implementation, #970)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def query_range(table, source, start_date, end_date, user_id="matthew"):
+    """Query all DATE# records for a source in a date range, as a {date: record} dict.
+
+    Paginates via LastEvaluatedKey (a single query silently truncates at DynamoDB's
+    1MB page) and applies the ADR-058 phase filter. Values are d2f-converted.
+    Records sharing a `date` collapse to the last one — use query_range_list for
+    per-workout schemas (Hevy) where duplicates are legitimate.
+    """
+    pk = f"USER#{user_id}#SOURCE#{source}"
+    records = {}
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}",
+        },
+    }
+    while True:
+        resp = table.query(**with_phase_filter(kwargs))
+        for item in resp.get("Items", []):
+            date_str = item.get("date") or item["sk"].replace("DATE#", "")
+            records[date_str] = d2f(item)
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return records
+
+
+def query_range_list(table, source, start_date, end_date, user_id="matthew"):
+    """Query all DATE# records for a source in a date range, as a flat list.
+
+    Preserves duplicates for per-workout schemas like Hevy (#485) where (a) multiple
+    records can legitimately share the same `date` (two-a-days) — query_range's
+    dict-by-date would silently collapse them, and (b) the sk carries a
+    #WORKOUT#<id> suffix, so a record on the exact end_date sorts AFTER the plain
+    "DATE#{end_date}" upper bound; the trailing "~" (0x7E, higher than any character
+    sk uses) fixes that boundary and is harmless for exact-sk sources.
+
+    Paginates via LastEvaluatedKey and applies the ADR-058 phase filter.
+    """
+    pk = f"USER#{user_id}#SOURCE#{source}"
+    records = []
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+        "ExpressionAttributeValues": {
+            ":pk": pk,
+            ":s": f"DATE#{start_date}",
+            ":e": f"DATE#{end_date}~",
+        },
+    }
+    while True:
+        resp = table.query(**with_phase_filter(kwargs))
+        records.extend(d2f(item) for item in resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return records
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -20,20 +20,11 @@ v1.0.0 — 2026-03-09
 """
 
 from datetime import datetime, timezone
-from decimal import Decimal
 
 SICK_DAYS_SOURCE = "sick_days"
 
 
-def _d2f(obj):
-    """Convert Decimal → float recursively."""
-    if isinstance(obj, list):
-        return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
+from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def check_sick_day(table, user_id, date_str):

@@ -102,15 +102,7 @@ table = dynamodb.Table(TABLE_NAME)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _d2f(obj):
-    """Recursively convert DynamoDB Decimal to float."""
-    if isinstance(obj, list):
-        return [_d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: _d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
+from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
 def _fetch_range(source: str, start: str, end: str) -> list:

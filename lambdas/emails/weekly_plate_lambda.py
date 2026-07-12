@@ -25,9 +25,9 @@ import os
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
+import digest_utils  # shared query_range implementations (#970)
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
@@ -209,45 +209,15 @@ def store_plate_summary(summary, today_str):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def d2f(obj):
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
-
-
-def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try:
-            return float(rec[field])
-        except Exception:
-            return default
-    return default
+from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def query_range(source, start_date, end_date):
-    pk = f"USER#{USER_ID}#SOURCE#{source}"
-    records = {}
-    kwargs = {
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :sk1 AND :sk2",
-        "ExpressionAttributeValues": {
-            ":pk": pk,
-            ":sk1": f"DATE#{start_date}",
-            ":sk2": f"DATE#{end_date}",
-        },
-    }
-    while True:
-        resp = table.query(**with_phase_filter(kwargs))
-        for item in resp.get("Items", []):
-            date_str = item["sk"].replace("DATE#", "")
-            records[date_str] = d2f(item)
-        if "LastEvaluatedKey" not in resp:
-            break
-        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    """Batch query all records for a source in a date range, as a {date: record} dict.
+
+    Shared paginated, phase-scoped implementation (digest_utils, #970).
+    """
+    return digest_utils.query_range(table, source, start_date, end_date, user_id=USER_ID)
 
 
 def fetch_profile():

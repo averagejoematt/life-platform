@@ -53,15 +53,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-def decimal_to_float(obj):
-    if isinstance(obj, list):
-        return [decimal_to_float(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
-
+from digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
 
 # Phase 4.2 (2026-05-16): canonical impl in lambdas/numeric.py.
 try:

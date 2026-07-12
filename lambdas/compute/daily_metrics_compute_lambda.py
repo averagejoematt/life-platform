@@ -72,24 +72,7 @@ table = dynamodb.Table(TABLE_NAME)
 # ==============================================================================
 
 
-def d2f(obj):
-    """Recursively convert DynamoDB Decimal to float."""
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
-
-
-def safe_float(rec, field, default=None):
-    if rec and field in rec:
-        try:
-            return float(rec[field])
-        except Exception:
-            return default
-    return default
+from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def latest_weight_lbs(records):

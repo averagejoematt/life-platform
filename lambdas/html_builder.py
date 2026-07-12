@@ -30,27 +30,7 @@ except ImportError:
 # ==============================================================================
 
 
-def safe_float(rec, field, default=None):
-    """Return ``rec[field]`` coerced to float, or ``default`` if missing/uncastable."""
-    if rec and field in rec:
-        try:
-            return float(rec[field])
-        except Exception:
-            return default
-    return default
-
-
-def d2f(obj):
-    """Recursively convert DynamoDB ``Decimal`` values to floats within lists/dicts."""
-    from decimal import Decimal
-
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
+from digest_utils import safe_float  # shared bundled helpers (#970; the local d2f copy was unused)
 
 
 def avg(vals):
