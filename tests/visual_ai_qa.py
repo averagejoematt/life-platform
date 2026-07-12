@@ -19,6 +19,17 @@ tier 3, AI-QA is skipped with a warning — the deterministic checks still stand
 
 Entry point: `assess_results(results)` — mutates the list in place. Called by
 visual_qa.run_sweep when `--ai-qa` is passed; also runnable standalone on a report.json.
+
+Second entry point (#1095): `assess_reader_truth(results)` — the PHASE-AWARE truth
+pass over the harness's rendered-prose dumps (visual_qa.py --reader-truth). Where
+the vision prompt above deliberately judges rendering only, this one judges whether
+the words/numbers CAN BE TRUE at the current experiment day (temporal contradictions,
+impossible numbers, duplicated narratives across surfaces, audience violations).
+The rubric lives in lambdas/reader_truth_qa.py — shared with the nightly qa_smoke
+hook (#1096) so the two nets can never drift apart. Verdicts merge exactly like
+AI-vision: "high" → FAIL, "med"/"low" → warning. Budget-aware: internal QA pauses
+first (budget_guard feature "reader_truth_qa", tier >= 1 per ADR-125) with an
+honest printed/warned skip, never silent green.
 """
 
 import base64
@@ -141,6 +152,89 @@ def assess_results(results):
         elif sev in ("med", "low"):
             r.setdefault("warnings", []).append(f"AI-vision ({sev}): {summary[:140]}")
 
+    return results
+
+
+def _truth_line(f):
+    return f"Reader-truth ({f['severity']}) [{f['category']}]: {f['note'][:140]}"
+
+
+def assess_reader_truth(results):
+    """Phase-aware reader-truth QA (#1095) over the harness's prose captures; mutates `results`.
+
+    Reads each page's rendered-innerText dump (kind == "prose", written by
+    visual_qa.capture_page(capture_prose=True)), batches 4-6 surfaces per Bedrock
+    call (so duplicated-narrative is checkable), and merges findings like the
+    vision pass: high → issue + FAIL, med/low → warning. Fail-soft on every
+    dependency (Bedrock, budget tier, missing prose) with an explicit skip.
+    """
+    bedrock = _import_bedrock()
+    if not bedrock:
+        for r in results:
+            r.setdefault("warnings", []).append("Reader-truth QA skipped — bedrock_client unavailable")
+        return results
+    try:
+        import reader_truth_qa  # lambdas/ is on sys.path after _import_bedrock()
+    except Exception as e:  # pragma: no cover
+        print(f"  ⚠ Reader-truth QA unavailable — could not import reader_truth_qa: {e}")
+        for r in results:
+            r.setdefault("warnings", []).append(f"Reader-truth QA skipped — reader_truth_qa unavailable: {str(e)[:100]}")
+        return results
+
+    # Budget gate — internal QA pauses FIRST (ADR-125). Honest skip, never silent.
+    try:
+        import budget_guard
+
+        if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
+            tier = budget_guard.current_tier()
+            print(f"  ⏸ Reader-truth QA skipped — budget tier {tier} (internal QA pauses first, ADR-125)")
+            for r in results:
+                r.setdefault("warnings", []).append(f"Reader-truth QA skipped — budget tier {tier} (ADR-125)")
+            return results
+    except ImportError:
+        pass  # fail-open, same posture as the guard itself
+
+    surfaces, by_path = [], {}
+    for r in results:
+        shot = next((s for s in r.get("screenshots", []) if s.get("kind") == "prose"), None)
+        if not shot:
+            continue
+        try:
+            with open(shot["path"]) as f:
+                prose = f.read()
+        except Exception:
+            continue
+        if not prose.strip():
+            continue
+        surfaces.append({"name": r["page"], "path": r["path"], "prose": prose})
+        by_path[r["path"]] = r
+    if not surfaces:
+        print("  ⚠ Reader-truth QA: no prose captures found — run visual_qa.py with --reader-truth")
+        return results
+
+    findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock.invoke)
+    for err in errors:
+        print(f"  ⚠ Reader-truth batch error (fail-soft): {err}")
+
+    for f in findings:
+        r = by_path.get(f["page"])
+        if r is None:
+            # model mangled the path — keep the finding visible on the first surface
+            r = by_path[surfaces[0]["path"]]
+            f = dict(f, note=f"(claimed page {f['page']!r}) {f['note']}"[:300])
+        r.setdefault("truth_findings", []).append(f)
+        line = _truth_line(f)
+        print(f"  {_ICON.get(f['severity'], '?')} truth · {f['page']}: [{f['category']}] {f['note'][:96]}")
+        if f["severity"] == "high":
+            r.setdefault("issues", []).append(line)
+            r["status"] = "FAIL"
+        else:
+            r.setdefault("warnings", []).append(line)
+
+    if not findings:
+        phase = reader_truth_qa.phase_context()
+        day = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
+        print(f"  ✅ Reader-truth: {len(surfaces)} surfaces clean at {day}")
     return results
 
 

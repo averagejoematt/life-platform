@@ -515,6 +515,114 @@ def check_mcp_tool_calls():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 8 — Reader Truth (#1096): phase-aware narrative-truth QA, nightly
+# ---------------------------------------------------------------------------
+# A temporal contradiction ("Day 2" narrating a 30-day trend) can sit live for
+# days BETWEEN deploys with nothing looking at it — the post-deploy CI pass
+# (#1095) only fires on a deploy. This check fetches a small surface set over
+# HTTPS and runs the SAME rubric (lambdas/reader_truth_qa.py, Haiku per ADR-049).
+# Posture: budget-aware (internal QA pauses first, tier >= 1 per ADR-125 —
+# reported as an explicit ⏸ skip, never silent green) and fail-SOFT on Bedrock/
+# fetch errors (a Bedrock outage must never red the nightly). Only a HIGH truth
+# finding is a failure (lands in the alert email); med/low are warnings.
+
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://averagejoematt.com")
+
+# Small, reader-critical set: the cockpit, home, the coaching read, data vitals —
+# plus the two API payloads whose narrative values those pages bind. One Haiku
+# batch (<= 6 surfaces), pennies per night.
+READER_TRUTH_SURFACES = [
+    ("/", "Home"),
+    ("/now/", "Cockpit"),
+    ("/coaching/", "Coaching read"),
+    ("/data/vitals/", "Data · vitals"),
+]
+READER_TRUTH_APIS = [
+    ("/api/vitals", "API · vitals"),
+    ("/api/coaches", "API · coaches"),
+]
+
+
+def _fetch_reader_truth_surfaces():
+    """Fetch the reader-truth surface set. Returns (surfaces, fetch_warnings).
+
+    Pages are tag-stripped to visible-ish text (static-HTML approximation of the
+    browser innerText the CI pass sees); API payloads go in as raw JSON text.
+    Every failure is a warning string, never an exception (fail-soft).
+    """
+    import reader_truth_qa
+
+    surfaces, warnings = [], []
+    for path, name in READER_TRUTH_SURFACES + READER_TRUTH_APIS:
+        try:
+            req = urllib.request.Request(SITE_BASE_URL + path, headers={"User-Agent": "life-platform-qa-smoke"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                body = r.read().decode("utf-8", "replace")
+            prose = body if path.startswith("/api/") else reader_truth_qa.html_to_text(body)
+            surfaces.append({"name": name, "path": path, "prose": prose})
+        except Exception as e:
+            warnings.append(f"{name} ({path}) — fetch failed: {str(e)[:100]}")
+    return surfaces, warnings
+
+
+def check_reader_truth():
+    checks = []
+    verdict = Check("reader_truth:verdict", "Reader Truth")
+
+    # Budget gate — internal QA pauses first (ADR-125). Explicit ⏸, never silent.
+    try:
+        import budget_guard
+        import reader_truth_qa
+
+        if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
+            tier = budget_guard.current_tier()
+            return [verdict.pause(f"Reader Truth AI skipped — budget tier {tier} (internal QA pauses first, ADR-125)")]
+    except Exception as e:
+        # Import/SSM blip: same fail-open posture as budget_guard itself — but if
+        # the shared module is missing the sweep below can't run either, so warn.
+        logger.warning("reader-truth budget gate degraded: %s", e)
+
+    try:
+        import reader_truth_qa
+
+        surfaces, fetch_warnings = _fetch_reader_truth_surfaces()
+        for w in fetch_warnings:
+            checks.append(Check("reader_truth:fetch", "Reader Truth").warn(f"{w} (fail-soft)"))
+        if not surfaces:
+            checks.append(verdict.warn("no surfaces fetched — Reader Truth skipped this run (fail-soft)"))
+            return checks
+
+        import bedrock_client
+
+        findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock_client.invoke)
+        phase = reader_truth_qa.phase_context()
+        day = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
+    except Exception as e:
+        # Bedrock outage / missing module / AccessDenied — an explicit soft skip.
+        checks.append(verdict.warn(f"Reader Truth AI unavailable — skipped this run (fail-soft): {str(e)[:120]}"))
+        return checks
+
+    for err in errors:
+        checks.append(Check("reader_truth:batch", "Reader Truth").warn(f"AI batch error (fail-soft): {err}"))
+
+    def _fmt(f):
+        return f"{f['page']} [{f['category']}] {f['note'][:90]}"
+
+    highs = [f for f in findings if f["severity"] == "high"]
+    lower = [f for f in findings if f["severity"] != "high"]
+    if highs:
+        verdict.fail(f"{len(highs)} high truth finding(s) at {day}: " + "; ".join(_fmt(f) for f in highs[:4]))
+    elif lower:
+        verdict.warn(f"{len(lower)} low/med truth finding(s) at {day}: " + "; ".join(_fmt(f) for f in lower[:4]))
+    elif errors:
+        verdict.warn(f"no verdict at {day} — all {len(errors)} AI batch(es) errored (fail-soft)")
+    else:
+        verdict.ok(f"{len(surfaces)} surfaces clean at {day} — no truth findings")
+    checks.append(verdict)
+    return checks
+
+
+# ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
@@ -599,6 +707,7 @@ def lambda_handler(event, context):
         all_checks += check_lambda_secrets()
         all_checks += check_avatar_assets()  # character avatar visuals — kept (real check)
         all_checks += check_mcp_tool_calls()
+        all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")

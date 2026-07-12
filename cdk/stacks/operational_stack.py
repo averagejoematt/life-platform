@@ -323,7 +323,9 @@ class OperationalStack(Stack):
             source_file="lambdas/operational/qa_smoke_lambda.py",
             handler="operational.qa_smoke_lambda.lambda_handler",
             schedule="cron(30 18 ? * * *)",
-            timeout_seconds=120,
+            # 120 → 240 (#1096): the Reader Truth pass adds 6 HTTPS fetches + one
+            # or two Haiku batches (~20-60s) on top of the existing checks.
+            timeout_seconds=240,
             memory_mb=256,
             environment={
                 "EMAIL_RECIPIENT": "awsdev@mattsusername.com",

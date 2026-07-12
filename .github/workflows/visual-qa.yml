@@ -76,7 +76,7 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         run: |
-          python3 tests/visual_qa.py --screenshot --ai-qa
+          python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         if: always()
