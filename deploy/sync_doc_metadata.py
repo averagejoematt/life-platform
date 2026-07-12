@@ -647,6 +647,76 @@ def _auto_discover_alarm_names() -> set[str] | None:
     return names
 
 
+def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
+    """(page_count, json_endpoint_count) from deploy/restart_verify_rendered.py (#973).
+
+    AST-reads the module-level PAGES / JSON_ENDPOINTS literal string lists that
+    restart_pipeline.py's hard verify gate (step 12, restart_verify_rendered.py)
+    actually fetches — the source of truth behind the "40-URL v4 surface
+    (33 pages + 7 JSON endpoints)" class of inline doc counts (CLAUDE.md restart
+    section, RUNBOOK step 14). AST (not import) so no lambdas.constants import or
+    sys.path side effects run at discovery time.
+
+    Returns None (manual PLATFORM_FACTS fallback) if either list is missing,
+    non-literal, or suspiciously small (pages < 10, endpoints < 3 — the sanity
+    floor mirroring the other discoverers).
+    """
+    path = ROOT / "deploy" / "restart_verify_rendered.py"
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except Exception:
+        return None
+    counts: dict[str, int] = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, (ast.List, ast.Tuple)):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in ("PAGES", "JSON_ENDPOINTS"):
+                    if all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.value.elts):
+                        counts[target.id] = len(node.value.elts)
+    pages = counts.get("PAGES")
+    endpoints = counts.get("JSON_ENDPOINTS")
+    if pages is None or endpoints is None or pages < 10 or endpoints < 3:
+        return None
+    return pages, endpoints
+
+
+_WEEKLY_CRON_RE = re.compile(r"cron\((\d{1,2}) (\d{1,2}) \? \* (SUN|MON|TUE|WED|THU|FRI|SAT) \*\)")
+
+
+def _auto_discover_hypothesis_cadence() -> str | None:
+    """The doc phrase for hypothesis-engine's weekly cadence, e.g. "Sun 19:00 UTC" (#973).
+
+    Resolves the `schedule=` kwarg on the create_platform_lambda(...) call whose
+    function_name is "hypothesis-engine" in cdk/stacks/compute_stack.py and renders
+    the weekly EventBridge cron as the phrase CLAUDE.md's Compute-Lambdas line
+    quotes (crons are fixed UTC by convention, so the render is exact). A missing,
+    non-literal, or non-weekly expression returns None (manual fallback) rather
+    than guessing — if the schedule ever stops being weekly, the doc sentence
+    shape itself needs a human edit, not a literal sync.
+    """
+    path = ROOT / "cdk" / "stacks" / "compute_stack.py"
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except Exception:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "create_platform_lambda":
+            fn = _kwarg_value(node, "function_name")
+            if isinstance(fn, ast.Constant) and fn.value == "hypothesis-engine":
+                sched = _kwarg_value(node, "schedule")
+                if isinstance(sched, ast.Constant) and isinstance(sched.value, str):
+                    m = _WEEKLY_CRON_RE.fullmatch(sched.value)
+                    if m:
+                        minute, hour, day = int(m.group(1)), int(m.group(2)), m.group(3)
+                        return f"{day.title()} {hour:02d}:{minute:02d} UTC"
+                return None
+    return None
+
+
 def _auto_discover_module_count() -> int | None:
     """Count all .py modules in mcp/ (excluding __init__.py)."""
     mcp_dir = ROOT / "mcp"
@@ -887,6 +957,28 @@ def _apply_auto_discovered(facts: dict) -> dict:
             print(f"  [auto] adr_max: {facts.get('adr_max')} → {adr_max_str} (highest ADR-NNN in docs/DECISIONS.md, #817)")
         facts["adr_max"] = adr_max_str
 
+    restart_counts = _auto_discover_restart_url_counts()
+    if restart_counts is not None:
+        pages, endpoints = restart_counts
+        if facts.get("restart_page_count") != pages or facts.get("restart_endpoint_count") != endpoints:
+            print(
+                f"  [auto] restart verify surface: {facts.get('restart_page_count')}+{facts.get('restart_endpoint_count')} → "
+                f"{pages}+{endpoints} (PAGES/JSON_ENDPOINTS in deploy/restart_verify_rendered.py, #973)"
+            )
+        facts["restart_page_count"] = pages
+        facts["restart_endpoint_count"] = endpoints
+    # Derived either way, so the fallback triple can't be internally inconsistent.
+    facts["restart_url_count"] = facts["restart_page_count"] + facts["restart_endpoint_count"]
+
+    hypothesis_cadence = _auto_discover_hypothesis_cadence()
+    if hypothesis_cadence is not None:
+        if facts.get("hypothesis_cadence") != hypothesis_cadence:
+            print(
+                f"  [auto] hypothesis_cadence: {facts.get('hypothesis_cadence')!r} → {hypothesis_cadence!r} "
+                "(schedule cron on hypothesis-engine in cdk/stacks/compute_stack.py, #973)"
+            )
+        facts["hypothesis_cadence"] = hypothesis_cadence
+
     # Recompute derived facts
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
@@ -916,6 +1008,10 @@ PLATFORM_FACTS = {
     "cdk_stacks": 9,
     "iam_roles": 43,
     "adr_max": "132",  # fallback: auto-discovered from docs/DECISIONS.md (#817, _auto_discover_adr_max)
+    "restart_page_count": 33,  # fallback: len(PAGES) in deploy/restart_verify_rendered.py (#973, _auto_discover_restart_url_counts)
+    "restart_endpoint_count": 7,  # fallback: len(JSON_ENDPOINTS) in deploy/restart_verify_rendered.py (#973)
+    "restart_url_count": 40,  # derived: restart_page_count + restart_endpoint_count (always recomputed)
+    "hypothesis_cadence": "Sun 19:00 UTC",  # fallback: hypothesis-engine schedule cron in cdk/stacks/compute_stack.py (#973)
     # Secret state
     "api_keys_status": "PERMANENTLY DELETED 2026-03-14",
     # Cost
@@ -1052,6 +1148,24 @@ RULES = [
         "CLAUDE.md",
         r"ADRs \(ADR-001 through ADR-\d+\)",
         "ADRs (ADR-001 through ADR-{adr_max})",
+    ),
+    # The two #973 discovered literals — live drift instances found by the
+    # 2026-07-11 sweep (the hypothesis cadence + the 27-vs-40-page verify count
+    # both drifted in prose while their sources moved).
+    (
+        "CLAUDE.md",
+        r"`hypothesis-engine` runs weekly \([A-Za-z]{3} \d{1,2}:\d{2} UTC\)",
+        "`hypothesis-engine` runs weekly ({hypothesis_cadence})",
+    ),
+    (
+        "CLAUDE.md",
+        r"verifies the \d+-URL v4 surface \(\d+ pages \+ \d+ JSON endpoints",
+        "verifies the {restart_url_count}-URL v4 surface ({restart_page_count} pages + {restart_endpoint_count} JSON endpoints",
+    ),
+    (
+        "docs/RUNBOOK.md",
+        r"hard gate over the \d+-URL v4 surface",
+        "hard gate over the {restart_url_count}-URL v4 surface",
     ),
     # ── DECISIONS.md header count line ───────────────────────────────────────
     (

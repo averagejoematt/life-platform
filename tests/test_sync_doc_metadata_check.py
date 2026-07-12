@@ -187,3 +187,91 @@ def test_sync_alarm_inventory_flags_missing_markers(tmp_path, monkeypatch):
 
     result = sync._sync_alarm_inventory(dry_run=True)
     assert result and result[0].startswith("  !")
+
+
+# ── #973: restart verify-surface counts + hypothesis-engine cadence ────────────
+
+
+def test_restart_url_counts_match_the_verify_script():
+    """The discoverer reads the SAME lists restart_verify_rendered.py actually fetches.
+
+    Loads the verify script as a module and compares len(PAGES)/len(JSON_ENDPOINTS)
+    against the AST-discovered pair — self-updating, so adding a page to the verify
+    surface can never silently diverge from what the docs claim.
+    """
+    import importlib.util
+
+    counts = sync._auto_discover_restart_url_counts()
+    assert counts is not None
+    spec = importlib.util.spec_from_file_location("_rvr", os.path.join(_REPO, "deploy", "restart_verify_rendered.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert counts == (len(mod.PAGES), len(mod.JSON_ENDPOINTS))
+
+
+def test_restart_url_counts_sanity_floor(tmp_path, monkeypatch):
+    """A suspiciously small parse (e.g. a truncated file) falls back to None."""
+    (tmp_path / "deploy").mkdir()
+    (tmp_path / "deploy" / "restart_verify_rendered.py").write_text(
+        'PAGES = ["/", "/now/"]\nJSON_ENDPOINTS = ["/api/vitals"]\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    assert sync._auto_discover_restart_url_counts() is None
+
+
+def test_restart_url_counts_none_on_non_literal_lists(tmp_path, monkeypatch):
+    """A computed (non-literal) list can't be counted statically — fall back, don't guess."""
+    (tmp_path / "deploy").mkdir()
+    (tmp_path / "deploy" / "restart_verify_rendered.py").write_text(
+        "PAGES = [f'/data/{t}/' for t in TOPICS]\nJSON_ENDPOINTS = ['/a', '/b', '/c']\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    assert sync._auto_discover_restart_url_counts() is None
+
+
+def test_hypothesis_cadence_from_real_cdk():
+    """Against the real compute_stack.py: a weekly 'Day HH:MM UTC' phrase comes back."""
+    import re as _re
+
+    cadence = sync._auto_discover_hypothesis_cadence()
+    assert cadence is not None
+    assert _re.fullmatch(r"(Sun|Mon|Tue|Wed|Thu|Fri|Sat) \d{2}:\d{2} UTC", cadence)
+
+
+def test_hypothesis_cadence_renders_weekly_cron(tmp_path, monkeypatch):
+    """cron(30 7 ? * MON *) → 'Mon 07:30 UTC' (zero-padded, day title-cased)."""
+    stacks = tmp_path / "cdk" / "stacks"
+    stacks.mkdir(parents=True)
+    (stacks / "compute_stack.py").write_text(
+        "create_platform_lambda(\n"
+        "    self,\n"
+        '    "HypothesisEngine",\n'
+        '    function_name="hypothesis-engine",\n'
+        '    schedule="cron(30 7 ? * MON *)",\n'
+        ")\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    assert sync._auto_discover_hypothesis_cadence() == "Mon 07:30 UTC"
+
+
+def test_hypothesis_cadence_none_when_not_weekly(tmp_path, monkeypatch):
+    """A daily cron no longer fits the 'runs weekly (…)' sentence — fall back, don't guess."""
+    stacks = tmp_path / "cdk" / "stacks"
+    stacks.mkdir(parents=True)
+    (stacks / "compute_stack.py").write_text(
+        'create_platform_lambda(self, "HypothesisEngine", function_name="hypothesis-engine", schedule="cron(0 19 * * ? *)")\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    assert sync._auto_discover_hypothesis_cadence() is None
+
+
+def test_restart_url_count_fact_is_recomputed_as_sum(monkeypatch):
+    """The headline 40 is always page_count + endpoint_count, even off the fallbacks."""
+    monkeypatch.setattr(sync, "_auto_discover_restart_url_counts", lambda: (35, 8))
+    monkeypatch.setattr(sync, "_auto_discover_hypothesis_cadence", lambda: None)
+    facts = sync._apply_auto_discovered(dict(sync.PLATFORM_FACTS))
+    assert facts["restart_page_count"] == 35
+    assert facts["restart_endpoint_count"] == 8
+    assert facts["restart_url_count"] == 43
