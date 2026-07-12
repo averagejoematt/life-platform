@@ -318,7 +318,9 @@ async function renderByCoach(read, id) {
     wantsTraining ? tryJSON("/api/training_overview") : Promise.resolve(null),
   ]);
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
-  let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><p class="dx-kicker label">${esc(coach.board_role || coach.domain || "")}</p><h2 class="dx-title">${esc(coach.name || "")}</h2></div></div>`;
+  // #1102 — coach-card header inversion (Matthew's product call): the specialty leads
+  // big, the name follows small. Coach-scoped classes; dx-kicker/dx-title untouched.
+  let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(coach.board_role || coach.domain || "")}</h2><p class="coach-head-name label">${esc(coach.name || "")}</p></div></div>`;
 
   // 0) THE STANCE — the coach's evolving, evidence-derived read of Matthew (the
   //    durable "where I think you are", above this week's domain detail).
@@ -490,7 +492,8 @@ async function renderTeamCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the profile…</span></p>`;
   const d = await tryJSON(`/api/coach/${encodeURIComponent(id)}`);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load this profile just now.</p>`; return; }
-  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><p class="dx-kicker label">${esc(d.board_role || d.domain || "")}</p><h2 class="dx-title">${esc(d.name || "")}</h2></div></div>`;
+  // #1102 — same inversion at the second call site (team profile view).
+  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(d.board_role || d.domain || "")}</h2><p class="coach-head-name label">${esc(d.name || "")}</p></div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
   h += coachCharacterHTML(d.character);
   const v = d.voice || {};

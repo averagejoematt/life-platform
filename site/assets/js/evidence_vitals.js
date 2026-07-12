@@ -81,7 +81,9 @@ export function vitalsLadder(comps, hist) {
     const has30 = arr.length >= 30;
     return `<div class="vl-cell"><span class="vl-pair"><span class="vl-k label">now</span><span class="vl-v mono">${esc(fmtv(c.raw, c.key))}</span></span>` +
       `<span class="vl-pair"><span class="vl-k label">7d</span><span class="vl-v mono vl-base">${esc(fmtv(a7, c.key))}</span></span>` +
-      `<span class="vl-pair"><span class="vl-k label">30d</span><span class="vl-v mono vl-base">${has30 ? esc(fmtv(avg(arr.slice(-30)), c.key)) : "fills in"}</span></span></div>`;
+      // #1099 — a not-yet baseline renders the honest "—" mark, not a long string that
+      // crowds the neighbouring cells; the caption below explains that 30d fills in.
+      `<span class="vl-pair"><span class="vl-k label">30d</span><span class="vl-v mono vl-base">${has30 ? esc(fmtv(avg(arr.slice(-30)), c.key)) : "—"}</span></span></div>`;
   }).join("");
   return `<div class="vl-row">${cells}</div>` +
     `<p class="rd-meta label">Each ring read against your <em>own</em> normal — today vs the trailing 7-day average, with a 30-day baseline that fills in as the days accrue (${hist.length} so far). The baseline is the honest "is this a good day for me," not a population chart.</p>`;

@@ -20,12 +20,8 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 }
 .skip:focus { top: var(--sp-2); left: var(--sp-2); }
 
-.cockpit-top {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--sp-4); flex-wrap: wrap;
-  padding: var(--sp-4) var(--gutter);
-  max-width: var(--container); width: 100%; margin-inline: auto;
-}
+/* .cockpit-top is the shared top-bar chrome rule in tokens.css (#1105) — sticky,
+   full-bleed, --sp-3/--gutter padding, doors right-aligned like every other door. */
 
 /* #578: slim the shared .page-hero on the cockpit — it's the dense daily
    instrument, so trim the standard hero padding to a thin orientation strip. */
@@ -40,7 +36,14 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .brand-name { font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.02em; }
 .brand-door { color: var(--ember); }
 
-.top-controls { display: flex; align-items: center; gap: var(--sp-3); }
+/* #1105 — the scope switcher's own row: the doors moved up into the shared top
+   bar, so the global time-scope control sits on its own line, right-aligned. */
+.top-controls {
+  display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap;
+  gap: var(--sp-3);
+  max-width: var(--container); width: 100%; margin-inline: auto;
+  padding: var(--sp-3) var(--gutter) 0;
+}
 
 /* Time-scope: one global control that re-scopes everything */
 .scope { display: inline-flex; gap: 2px; padding: 3px; border: var(--border-hair); border-radius: var(--radius-sm); }
@@ -55,7 +58,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .scope-btn.is-active { color: var(--ink); background: color-mix(in oklch, var(--ink) 8%, transparent); }
 /* P2.2 — Month/Journey are deeper scopes: quieter by default so the cockpit opens calm. */
 .scope-sep { width: 1px; align-self: stretch; margin: 0 var(--sp-1); background: var(--rule); }
-.scope-btn.scope-deep { opacity: 0.6; font-size: 0.9em; }
+.scope-btn.scope-deep { opacity: 0.6; font-size: 0.9em; /* fs-ok: deliberate de-emphasis below the label size */ }
 .scope-btn.scope-deep.is-active { opacity: 1; }
 /* P2.2 — the composite level decomposes to its pillars (anti-black-box). */
 .hub-decomp { text-align: center; margin: var(--sp-2) 0 0; }
@@ -121,13 +124,13 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cockpit-intro__k { margin: 0; color: var(--ember); }
 .cockpit-intro__h {
   font-family: var(--font-serif); font-weight: var(--weight-med);
-  font-size: clamp(1.15rem, 2.4vw, 1.4rem); line-height: 1.1;
+  font-size: var(--fs-h3); line-height: 1.1;
   margin: var(--sp-2) 0 var(--sp-4); max-width: 28ch;
 }
 .cockpit-intro__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
 .cockpit-intro__list li { color: var(--ink-muted); line-height: 1.5; max-width: 64ch; }
 .cockpit-intro__list strong { color: var(--ink); font-weight: var(--weight-med); }
-.cockpit-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: 0.85em; color: var(--ember); }
+.cockpit-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); }
 .cockpit-intro__go {
   appearance: none; cursor: pointer; margin-top: var(--sp-5);
   font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.04em;
@@ -140,7 +143,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cockpit-intro__x {
   position: absolute; top: var(--sp-3); right: var(--sp-3);
   appearance: none; cursor: pointer; background: transparent; border: 0;
-  font-size: 20px; line-height: 1; color: var(--ink-muted); padding: 2px 8px;
+  font-size: var(--fs-body-lg); line-height: 1; color: var(--ink-muted); padding: 2px 8px;
   border-radius: var(--radius-xs); transition: color var(--dur-fast);
 }
 .cockpit-intro__x:hover { color: var(--ink); }
@@ -162,7 +165,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   border-radius: var(--radius-sm); padding: var(--sp-2) var(--sp-3);
   font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.02em;
   transition: background var(--dur-fast), border-color var(--dur-fast); }
-.predict-btn .pb-g { color: var(--ember); font-size: 1.05em; }
+.predict-btn .pb-g { color: var(--ember); font-size: var(--fs-small); }
 .predict-btn:hover { background: color-mix(in oklch, var(--ember) 16%, transparent); border-color: var(--ember); }
 .predict-btn:disabled { opacity: 0.5; cursor: progress; }
 .predict-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
@@ -196,7 +199,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 }
 .spine-day {
   display: block; text-align: center;
-  font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em;
+  font-family: var(--font-mono); font-size: 9px; /* fs-ok: measuring-rule spine geometry */ letter-spacing: 0.12em;
   color: var(--ink-faint);
 }
 .spine::after {
@@ -326,7 +329,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .row .track { flex: 1; height: 2px; background: var(--rule); border-radius: 2px; overflow: hidden; }
 .row .track i { display: block; height: 100%; background: var(--down-fill); transition: width var(--dur) var(--ease-out); }
 .row.up .track i { background: var(--up-fill); }
-.row .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1rem; width: 30px; text-align: right; }
+.row .val { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-body); width: 32px; text-align: right; }
 .row .tr { font-family: var(--font-mono); font-size: var(--fs-small); width: 16px; text-align: center; color: var(--ink-faint); }
 .row.up .tr { color: var(--ember); }
 .row .chev { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); width: 12px; text-align: center; transition: transform var(--dur-fast); }
@@ -390,7 +393,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 /* RQA-04 — stored readiness score + component breakdown. Band worded + ember-toned, never
    alarm-red; component bars are ember on an ink track. */
 .rd-score { display: flex; align-items: baseline; gap: var(--sp-3); margin-top: var(--sp-3); }
-.rd-score-v { font-family: var(--font-mono); font-size: var(--fs-data-xl, 2.2rem); line-height: 1; color: var(--ember); }
+.rd-score-v { font-family: var(--font-mono); font-size: var(--fs-data-xl); line-height: 1; color: var(--ember); }
 .rd-score-band { text-transform: lowercase; }
 .rd-score-band.rd-band-high { color: var(--ember); }
 .rd-score-band.rd-band-mid { color: color-mix(in oklch, var(--ember) 70%, var(--ink)); }
@@ -398,7 +401,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .rd-comp { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .rd-comp-row { display: grid; grid-template-columns: 5.5em 1fr 2em; align-items: center; gap: var(--sp-3); }
 .rd-comp-row .label { text-transform: lowercase; color: var(--ink-faint); }
-.rd-comp-track { height: 6px; background: var(--surface-2, color-mix(in oklch, var(--ink) 10%, transparent)); border-radius: 3px; overflow: hidden; }
+.rd-comp-track { height: 6px; background: color-mix(in oklch, var(--ink) 10%, transparent); border-radius: 3px; overflow: hidden; }
 .rd-comp-fill { display: block; height: 100%; background: var(--ember); }
 .rd-comp-v { font-family: var(--font-mono); font-size: var(--fs-label); color: var(--ink-muted); text-align: right; }
 /* A computed zero is real input, shown honestly — but de-emphasized (hairline
@@ -479,7 +482,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .rl-now { display: block; margin-top: var(--sp-2); text-decoration: none; }
 .rl-now .rl-title { font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); }
 .rl-now:hover .rl-title { color: var(--ember); }
-.rl-now .rl-author { font-family: var(--font-mono); font-size: 0.7em; color: var(--ink-faint); }
+.rl-now .rl-author { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
 .rl-streak { margin-top: var(--sp-1); color: var(--ink-faint); }
 
 /* ── #974: the levers — the Protocols station in the daily slice ─────────────
@@ -497,7 +500,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .lever-row + .lever-row .lever-link { border-top: var(--honest-border); }
 .lever-k { min-width: 5.5em; color: var(--ink-muted); }
 .lever-what { font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); }
-.lever-what .num { font-family: var(--font-mono); font-size: 0.85em; font-variant-numeric: tabular-nums; }
+.lever-what .num { font-family: var(--font-mono); font-size: 0.85em; /* fs-ok: relative de-emphasis inside the clamp-sized serif line */ font-variant-numeric: tabular-nums; }
 .lever-none { color: var(--ink-muted); font-style: italic; }
 .lever-meter {
   flex: 1; min-width: 64px; max-width: 160px; height: 3px; align-self: center;
@@ -588,7 +591,6 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   .cockpit-top .doors a:hover { color: var(--ember); }
   .cockpit-top .doors a[aria-current="page"] { color: var(--ember); border-bottom: 1px solid var(--ember); padding-bottom: 1px; cursor: default; }
 }
-.top-controls { flex-wrap: wrap; }
 
 /* Explicit, always-visible keyboard focus */
 .scope-btn:focus-visible, .row:focus-visible, .band:focus-visible,

@@ -20,14 +20,7 @@ body { overflow-x: hidden; }
 /* @layer chrome-base: the desktop nav chrome. Lives in a lower layer so the mobile
    app-bar (@layer chrome, tokens.css) wins at ≤600 WITHOUT !important. (#1007) */
 @layer chrome-base {
-  .story-top {
-    position: sticky; top: 0; z-index: var(--z-sticky);
-    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
-    padding: var(--sp-3) var(--gutter);
-    background: color-mix(in oklch, var(--page) 82%, transparent);
-    backdrop-filter: blur(10px);
-    border-bottom: var(--border-hair);
-  }
+  /* .story-top itself is the shared top-bar chrome rule in tokens.css (#1105). */
   .brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
   .brand-mark { width: 11px; height: 11px; border-radius: 2px; background: var(--ember); box-shadow: 0 0 0 3px var(--ember-wash); }
   .brand-name { font-family: var(--font-mono); font-size: var(--fs-small); }
@@ -125,15 +118,15 @@ body { overflow-x: hidden; }
 /* Uninstrumented pillar (no measured coupling yet) — honestly recessed, dashed. */
 .constellation .node.quiet circle { stroke-dasharray: 3 3; opacity: 0.5; }
 .constellation .node.quiet .nlabel { opacity: 0.55; }
-.constellation .node text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-muted); text-anchor: middle; }
-.constellation .node .score { fill: var(--ink); font-size: 11px; }
+.constellation .node text { font-family: var(--font-mono); font-size: 9px; /* fs-ok: SVG viewBox units */ fill: var(--ink-muted); text-anchor: middle; }
+.constellation .node .score { fill: var(--ink); font-size: 11px; } /* fs-ok: SVG viewBox units */
 .constellation figcaption { color: var(--ink-faint); max-width: 40ch; }
 
 /* Hover/focus DOOR affordance — the pillar icon rises + an "open →" cue, so the
    node reads as an entrance, not just a dot. Hidden until interaction. */
 .constellation .node .door { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
 .constellation .node .door .door-ico { display: block; color: var(--ember); line-height: 0; }
-.constellation .node .door .door-cue { font-family: var(--font-mono); font-size: 8px; fill: var(--ember); text-anchor: middle; letter-spacing: 0.04em; }
+.constellation .node .door .door-cue { font-family: var(--font-mono); font-size: 8px; /* fs-ok: SVG viewBox units */ fill: var(--ember); text-anchor: middle; letter-spacing: 0.04em; }
 .constellation a { cursor: pointer; }
 .constellation a:hover .node .door, .constellation a:focus-visible .node .door { opacity: 1; }
 .constellation a:hover .node circle, .constellation a:focus-visible .node circle { stroke: var(--ember); stroke-width: 1.5; }
@@ -212,7 +205,7 @@ body { overflow-x: hidden; }
 .beat-wall .wall { margin-top: var(--sp-5); border-left: 2px solid var(--ember-line); padding-left: var(--sp-5); }
 .wall .voice { display: grid; gap: var(--sp-1); padding: var(--sp-3) 0; }
 .wall .who { font-family: var(--voice-who-font); font-size: var(--voice-who-size); letter-spacing: var(--voice-who-tracking); text-transform: uppercase; color: var(--ink-faint); }
-.wall .voice.machine .what { font-family: var(--voice-machine-font); font-size: 1rem; line-height: 1.6; color: var(--ink); }
+.wall .voice.machine .what { font-family: var(--voice-machine-font); font-size: var(--fs-body); line-height: 1.6; color: var(--ink); }
 .wall .voice.human { border-top: var(--honest-border); padding-top: var(--sp-3); margin-top: var(--sp-1); }
 .wall .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); }
 .wall-foot { margin-top: var(--sp-3); color: var(--ink-faint); }
@@ -226,12 +219,12 @@ body { overflow-x: hidden; }
 .story-feat { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-4); border: var(--honest-border); border-radius: var(--radius-sm); text-decoration: none; transition: border-color 0.15s; }
 .story-feat:hover { border-color: var(--ember-line); }
 .sf-kick { color: var(--ember); text-transform: uppercase; letter-spacing: var(--tracking-label); }
-.sf-title { font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-h4, 1.1rem); color: var(--ink); line-height: 1.25; }
+.sf-title { font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-body-lg); color: var(--ink); line-height: 1.25; }
 .story-feat .sf-sub { color: var(--ink-muted); }
 @media (max-width: 760px) { .story-features { grid-template-columns: 1fr; } }
 /* P2.4 — Coaching: readable disagreement cards (positions head-to-head + the integrator's call). */
 .tt-card { list-style: none; border: var(--honest-border); border-radius: var(--radius-sm); padding: var(--sp-4); margin-bottom: var(--sp-3); }
-.tt-topic { margin: 0 0 var(--sp-3); font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-h4, 1.05rem); }
+.tt-topic { margin: 0 0 var(--sp-3); font-family: var(--font-serif, Fraunces), serif; font-size: var(--fs-body-lg); }
 .tt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
 .tt-who { color: var(--ember); text-transform: uppercase; letter-spacing: var(--tracking-label); display: block; margin-bottom: var(--sp-1); }
 .tt-text { margin: 0; color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
@@ -270,7 +263,7 @@ body { overflow-x: hidden; }
   border-left: 2px solid transparent; border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); display: grid; gap: 2px; color: inherit; }
 .dx-item:hover { border-color: var(--rule-strong); }
 .dx-item.is-active { border-left-color: var(--ember); background: color-mix(in oklch, var(--ember) 7%, var(--surface)); }
-.dx-item-t { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.15; }
+.dx-item-t { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.15; }
 .dx-item-d { color: var(--ink-faint); }
 .dx-empty { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); padding: var(--sp-3) 0; }
 .dx-read { min-width: 0; }
@@ -327,7 +320,7 @@ body { overflow-x: hidden; }
 /* full article, rendered inline in the v4 reader */
 .dx-fulltext { margin-top: var(--sp-4); max-width: var(--measure); }
 .dx-fulltext p { font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); color: var(--ink); margin-top: var(--sp-4); }
-.dx-fulltext p:first-of-type::first-letter { font-family: var(--font-serif); font-size: 3.4em; line-height: 0.82; float: left; margin: 0.05em var(--sp-2) 0 0; color: var(--ember); }
+.dx-fulltext p:first-of-type::first-letter { font-family: var(--font-serif); font-size: 3.4em; /* fs-ok: drop cap, scales with its paragraph */ line-height: 0.82; float: left; margin: 0.05em var(--sp-2) 0 0; color: var(--ember); }
 .dx-fulltext h2, .dx-fulltext h3 { font-family: var(--font-serif); font-weight: var(--weight-med); margin-top: var(--sp-6); line-height: 1.15; }
 .dx-fulltext blockquote { border-left: 2px solid var(--ember); padding-left: var(--sp-4); margin-top: var(--sp-4); color: var(--ink-muted); font-style: italic; }
 .dx-fulltext a { color: var(--ember); }
@@ -337,7 +330,7 @@ body { overflow-x: hidden; }
 .dx-read .voice { display: grid; gap: var(--sp-1); padding: var(--sp-3) 0; border-top: var(--border-hair); }
 .dx-read .voice:first-of-type { border-top: 0; }
 .dx-read .voice .who { font-family: var(--voice-who-font); font-size: var(--voice-who-size); letter-spacing: var(--voice-who-tracking); text-transform: uppercase; color: var(--ink-faint); }
-.dx-read .voice.machine .what { font-family: var(--voice-machine-font); font-size: 1rem; line-height: 1.6; color: var(--ink); }
+.dx-read .voice.machine .what { font-family: var(--voice-machine-font); font-size: var(--fs-body); line-height: 1.6; color: var(--ink); }
 .dx-read .voice.human { border-top: var(--honest-border); }
 .dx-read .voice.human .what { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); }
 /* Pending Matthew-response placeholder — honest "not yet" state, visually de-emphasised. */
@@ -348,7 +341,7 @@ body { overflow-x: hidden; }
 .voice-pending .pending-lead { font-family: var(--voice-human-font); font-style: italic; font-size: var(--fs-quote); line-height: 1.45; color: var(--ink); margin: 0; }
 .voice-pending .pending-sub { color: var(--ink-muted); margin: var(--sp-2) 0 0; line-height: 1.5; }
 /* Podcast "next episode pending" notice — surfaces a skipped/held week instead of silence. */
-.dx-read .panel-pending { border: var(--border-hair); border-radius: var(--radius-2, 8px); padding: var(--sp-3); margin-bottom: var(--sp-4); background: var(--surface-2, rgba(255,255,255,0.02)); }
+.dx-read .panel-pending { border: var(--border-hair); border-radius: var(--radius-sm); padding: var(--sp-3); margin-bottom: var(--sp-4); background: var(--surface); }
 .dx-read .panel-pending .dx-prose { margin: var(--sp-1) 0 0; color: var(--ink-muted); }
 
 /* Close */
@@ -396,20 +389,20 @@ body { overflow-x: hidden; }
 .dxt-item:first-child { border-top: 0; }
 .dxt-item::before { content: ""; position: absolute; left: calc(-1 * var(--sp-5) - 4px); top: calc(var(--sp-3) + 6px); width: 7px; height: 7px; border-radius: 50%; background: var(--ember); }
 .dxt-date { color: var(--ink-faint); }
-.dxt-title { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.2; }
+.dxt-title { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.2; }
 .dxt-note { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); margin-top: 2px; }
 
 /* ── The serial journey timeline (the "walk backwards" spine) ──────────────── */
 .tl-recap { margin: var(--sp-5) 0 var(--sp-4); padding: var(--sp-3) var(--sp-4); border: var(--border-hair);
   border-radius: var(--radius); background: color-mix(in oklch, var(--ember) 5%, var(--surface)); }
 .tl-recap-k { color: var(--ink-faint); margin: 0; }
-.tl-recap-h { font-family: var(--font-mono); font-size: 1.05rem; color: var(--ink); margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.tl-recap-h { font-family: var(--font-mono); font-size: var(--fs-body); color: var(--ink); margin: 2px 0 0; font-variant-numeric: tabular-nums; }
 .tl-recap-em { color: var(--ember); }
 .tl-recap-s { color: var(--ink-muted); font-size: var(--fs-small); margin: var(--sp-1) 0 0; }
 .tl-recap-s a, .tl-x { color: var(--ember); }
 /* Phase 3 — Elena's "previously on" cold-open (richer than the stat aside) */
 .tl-recap-elena { border-left: 3px solid var(--ember); }
-.tl-recap-story { color: var(--ink); font-size: 1.02rem; line-height: 1.6; margin: var(--sp-2) 0 0; }
+.tl-recap-story { color: var(--ink); font-size: var(--fs-body); line-height: 1.6; margin: var(--sp-2) 0 0; }
 .tl-recap-beats { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: grid; gap: var(--sp-1); }
 .tl-recap-beat { color: var(--ink-muted); font-size: var(--fs-small); line-height: 1.5; }
 .tl-recap-beat-k { color: var(--ink-faint); margin-right: var(--sp-1); }
@@ -425,7 +418,7 @@ body { overflow-x: hidden; }
   border-radius: var(--radius); background: color-mix(in oklch, var(--ember) 4%, var(--surface)); }
 .tl-quiet[data-cls="dark"] { border-left-color: var(--ember); }
 .tl-quiet-k { color: var(--ink-faint); margin: 0; }
-.tl-quiet-line { color: var(--ink); font-size: 1.02rem; line-height: 1.6; margin: var(--sp-2) 0 0; font-style: italic; }
+.tl-quiet-line { color: var(--ink); font-size: var(--fs-body); line-height: 1.6; margin: var(--sp-2) 0 0; font-style: italic; }
 .tl { list-style: none; margin: var(--sp-4) 0 0; padding-left: var(--sp-5); border-left: var(--border-hair); display: grid; gap: 0; }
 .tl-month { margin: var(--sp-4) 0 var(--sp-1); }
 .tl-month:first-child { margin-top: 0; }
@@ -435,7 +428,7 @@ body { overflow-x: hidden; }
 .tl-dot { position: absolute; left: calc(-1 * var(--sp-5) - 4px); top: calc(var(--sp-3) + 7px); width: 8px; height: 8px;
   border-radius: 50%; background: var(--ink-faint); box-shadow: 0 0 0 3px var(--page); transition: transform var(--dur-fast) var(--ease-out); }
 .tl-date { color: var(--ink-faint); display: block; }
-.tl-title { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.25; margin: 1px 0 0; }
+.tl-title { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.25; margin: 1px 0 0; }
 .tl-note { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); margin-top: 2px; }
 .tl-x { display: inline-block; margin-top: var(--sp-1); font-family: var(--font-mono); font-size: var(--fs-label);
   letter-spacing: 0.03em; text-decoration: none; border-bottom: 1px solid var(--ember-line); }
@@ -462,7 +455,7 @@ body { overflow-x: hidden; }
 .dx-prevlink { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-2); background: transparent;
   border: 0; padding: 2px 0; cursor: pointer; text-align: left; }
 .dx-prev-lbl { color: var(--ember); flex: none; }
-.dx-prev-t { font-family: var(--font-serif); color: var(--ink-muted); font-size: 1rem; }
+.dx-prev-t { font-family: var(--font-serif); color: var(--ink-muted); font-size: var(--fs-body); }
 .dx-prevlink:hover .dx-prev-t { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
 
 /* Coach "how this read evolved" trail — dated commentary, newest-first. */
@@ -482,15 +475,15 @@ body { overflow-x: hidden; }
    brand/top-bar bits still apply (nothing in chrome competes with them). (#1007) ── */
 @layer chrome-base {
   @media (max-width: 480px) {
-    .story-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+    /* .story-top's narrow padding now comes from the shared rule (tokens.css, #1105) */
     .brand-door { display: none; }   /* drop the section tag; keep wordmark + nav */
     .doors { gap: var(--sp-3); }
-    .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
+    .doors a { font-size: 0.625rem; /* fs-ok: deliberate sub-label mobile step */ letter-spacing: 0.04em; }
   }
   @media (max-width: 360px) {
     .brand-name, .brand-door { display: none; }   /* keep the mark; reclaim ~100px */
     .doors { gap: var(--sp-2); }
-    .doors a { font-size: 0.5625rem; }
+    .doors a { font-size: 0.5625rem; } /* fs-ok: deliberate sub-label mobile step */
   }
 }
 
@@ -504,6 +497,12 @@ body { overflow-x: hidden; }
 .panel-host .portrait { inline-size: 100%; block-size: 100%; }
 
 /* ── The Coaches (CC-01/02) — per-coach page in the reader pane ───────────── */
+/* #1102 — coach-card header INVERSION (Matthew's product call): the specialty/board
+   role leads as the big title, the doctor's name follows as the small line. This is a
+   DELIBERATE divergence from the sitewide eyebrow convention, scoped to the coach card
+   with its own classes — the shared .dx-kicker/.dx-title semantics are untouched. */
+.coach-head-role { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h2); line-height: 1.12; margin: 0; }
+.coach-head-name { color: var(--ember); margin: var(--sp-1) 0 0; }
 .dx-disclosure { display: block; margin-top: var(--sp-2); color: var(--ink-faint); font-style: italic; max-width: var(--measure); }
 .coach-stance, .coach-progress, .coach-report, .coach-voice, .coach-rel, .coach-char, .coach-hyp {
   margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair);
@@ -602,7 +601,7 @@ body { overflow-x: hidden; }
 .team-lead { margin: var(--sp-4) 0; padding: var(--sp-4); border: 1px solid var(--ember-line); border-left: 3px solid #0ea5e9; background: var(--surface-raised); border-radius: var(--radius-sm); }
 .team-lead .label { font-family: var(--font-mono); }
 .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-1); }
-.tl-name { font-family: var(--font-serif); font-size: var(--fs-h4, 1.25rem); font-weight: 600; color: var(--ink); }
+.tl-name { font-family: var(--font-serif); font-size: var(--fs-h3); font-weight: 600; color: var(--ink); }
 .tl-role { color: var(--ink-dim); }
 .tl-bio { margin-top: var(--sp-2); font-family: var(--font-serif); }
 .tl-philosophy { margin: var(--sp-3) 0 0; padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-family: var(--font-serif); font-style: italic; color: var(--ink); max-width: var(--measure); }
@@ -612,7 +611,7 @@ body { overflow-x: hidden; }
 .panel-ledger { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--ember-line); }
 .pl-list { list-style: none; padding: 0; margin: var(--sp-2) 0 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .pl-list li { font-family: var(--font-serif); color: var(--ink); line-height: var(--lh-relaxed); }
-.pl-tag { font-family: var(--font-mono); font-size: var(--fs-tiny, .72rem); padding: 1px 6px; border-radius: var(--radius-sm); margin-right: var(--sp-2); white-space: nowrap; }
+.pl-tag { font-family: var(--font-mono); font-size: var(--fs-label); padding: 1px 6px; border-radius: var(--radius-sm); margin-right: var(--sp-2); white-space: nowrap; }
 .pl-won .pl-tag { background: rgba(34,197,94,.15); color: #16a34a; }
 .pl-lost .pl-tag { background: rgba(239,68,68,.15); color: #dc2626; }
 .pl-open .pl-tag { background: rgba(234,179,8,.15); color: #b45309; }
@@ -690,7 +689,7 @@ body { overflow-x: hidden; }
 .sv-more { color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); white-space: nowrap; }
 .nu-line { margin-top: var(--sp-2); color: var(--ink-faint); }
 .dx-since { margin-top: var(--sp-4); }
-.dx-new { color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 0 5px; margin-left: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.85em; vertical-align: 1px; }
+.dx-new { color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 0 5px; margin-left: 4px; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.85em; /* fs-ok: relative badge, scales with context */ vertical-align: 1px; }
 
 /* ── The machinery ribbon (uplevel P3) — one quiet line above the coaching tabs
    surfacing the live disagreement + the falsifiable record. Ember only when a
@@ -719,7 +718,7 @@ body { overflow-x: hidden; }
 .cv-head { display: flex; align-items: center; gap: var(--sp-3); }
 .cv-head .sigil-md svg, .cv-head .coach-mark svg { width: 40px; height: 40px; display: block; }
 .cv-who { display: grid; gap: 1px; }
-.cv-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
+.cv-name { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.1; }
 .cv-title { color: var(--ink-faint); text-transform: none; letter-spacing: 0; }
 .cv-text { margin-top: var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); max-width: var(--measure); }
 .cv-text.cv-unavailable { color: var(--ink-faint); font-style: italic; }
@@ -749,7 +748,7 @@ body { overflow-x: hidden; }
    you now; By Coach = the read on top of the domain data. Reuses dx-/coach-/tt- tokens. */
 .read-priority { margin: var(--sp-4) 0; padding: var(--sp-4) var(--sp-5); border-left: 3px solid var(--ember);
   background: var(--ember-wash); border-radius: var(--radius-sm); }
-.rp-text { margin: var(--sp-2) 0 0; font-family: var(--font-serif); font-size: var(--fs-h4); line-height: var(--lh-relaxed); color: var(--ink); }
+.rp-text { margin: var(--sp-2) 0 0; font-family: var(--font-serif); font-size: var(--fs-body-lg); line-height: var(--lh-relaxed); color: var(--ink); }
 .read-digest { margin-top: var(--sp-5); }
 .rd-list { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: grid; gap: var(--sp-2); }
 .rd-card { list-style: none; }
@@ -780,7 +779,7 @@ body { overflow-x: hidden; }
 .bc-stat { margin: var(--sp-2) 0 0; }
 .bc-statn { font-family: var(--font-mono); font-size: var(--fs-h3); color: var(--ink); }
 .bc-delta { color: var(--ink-muted); }
-.bc-spark { margin: var(--sp-2) 0 0; color: var(--ink-faint); font-size: var(--fs-tiny, 0.72rem); word-spacing: 2px; }
+.bc-spark { margin: var(--sp-2) 0 0; color: var(--ink-faint); font-size: var(--fs-label); word-spacing: 2px; }
 .bc-datalink { margin: var(--sp-3) 0 0; }
 .bc-datalink a, .bc-track { color: var(--ember); }
 .bc-track { display: block; margin: var(--sp-3) 0; }
@@ -799,11 +798,11 @@ body { overflow-x: hidden; }
 .exp-tone { color: var(--ink-muted); }
 .exp-tone.tone-cautionary, .exp-tone.tone-urgent { color: var(--ember); }
 .exp-date { color: var(--ink-faint); }
-.exp-headline { display: block; font-family: var(--font-sans); color: var(--ink); font-size: 0.95em; margin-top: 2px; }
+.exp-headline { display: block; font-family: var(--font-sans); color: var(--ink); font-size: 0.95em; /* fs-ok: relative de-emphasis under .exp-wkn */ margin-top: 2px; }
 /* The board's cross-week arc synthesis above the week list (C-1). */
 .exp-synth { margin: var(--sp-4) 0 var(--sp-5); padding: var(--sp-4) var(--sp-5); border-left: 2px solid var(--ember); background: var(--surface); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .exp-synth-k { color: var(--ember); margin: 0 0 var(--sp-2); }
-.exp-throughline { font-family: var(--font-serif); font-size: 1.18em; line-height: 1.4; color: var(--ink); margin: 0 0 var(--sp-3); }
+.exp-throughline { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.4; color: var(--ink); margin: 0 0 var(--sp-3); }
 /* Cardio-vs-lifts + per-muscle balance on the training coach (C-2). */
 .bc-modality, .bc-muscle { margin: var(--sp-4) 0; padding: var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
 .bc-mod-h { margin: var(--sp-2) 0 var(--sp-1); color: var(--ember); }
@@ -817,9 +816,9 @@ body { overflow-x: hidden; }
 /* The Scorecard — the board's graded track record (C-3). */
 .sc-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); margin: var(--sp-4) 0 var(--sp-5); }
 .sc-tile { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); text-align: center; }
-.sc-n { font-family: var(--font-mono); font-size: 1.6em; line-height: 1; color: var(--ink); }
+.sc-n { font-family: var(--font-mono); font-size: var(--fs-data-lg); line-height: 1; color: var(--ink); }
 .sc-l { color: var(--ink-faint); }
-.sc-note { color: var(--ink-soft); }
+.sc-note { color: var(--ink-muted); }
 .sc-sub { margin-top: var(--sp-5); }
 .sc-coachlist { list-style: none; margin: var(--sp-2) 0; padding: 0; display: grid; gap: 4px; }
 .sc-coachbtn { width: 100%; display: grid; grid-template-columns: 1fr auto auto; gap: var(--sp-3); align-items: baseline; padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: transparent; color: inherit; cursor: pointer; text-align: left; }
@@ -827,13 +826,13 @@ body { overflow-x: hidden; }
 .sc-coach { font-family: var(--font-sans); color: var(--ink); }
 .sc-rate { font-family: var(--font-mono); color: var(--ink); }
 .sc-mix { color: var(--ink-faint); }
-.sc-call { margin: var(--sp-2) 0; padding: var(--sp-3); border-left: 2px solid var(--border); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface); }
+.sc-call { margin: var(--sp-2) 0; padding: var(--sp-3); border-left: 2px solid var(--rule); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface); }
 .sc-call-top { display: flex; gap: var(--sp-2); align-items: baseline; flex-wrap: wrap; margin-bottom: 4px; }
 .sc-call-st { text-transform: uppercase; letter-spacing: 0.04em; }
 .sc-call-claim { margin: 0; font-family: var(--font-serif); color: var(--ink); }
 .sc-call-why { color: var(--ink-faint); margin: 4px 0 0; }
-.sc-confirmed { border-left-color: var(--good, #5a8f6b); }
-.sc-confirmed .sc-call-st { color: var(--good, #5a8f6b); }
+.sc-confirmed { border-left-color: #5a8f6b; }
+.sc-confirmed .sc-call-st { color: #5a8f6b; }
 .sc-refuted { border-left-color: var(--ember); }
 .sc-refuted .sc-call-st { color: var(--ember); }
 .sc-call-m { font-family: var(--font-mono); color: var(--ink-faint); }

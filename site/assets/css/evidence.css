@@ -14,8 +14,8 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
   color: var(--ink); padding: var(--sp-2) var(--sp-4); border: var(--border-hair); border-radius: var(--radius-sm); }
 .skip:focus { top: var(--sp-2); left: var(--sp-2); }
 
-.ev-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4);
-  padding: var(--sp-3) var(--gutter); border-bottom: var(--border-hair); max-width: var(--container); width: 100%; margin-inline: auto; }
+/* .ev-top is the shared top-bar chrome rule in tokens.css (#1105) — sticky,
+   full-bleed, --sp-3/--gutter padding, doors right-aligned; identical on every door. */
 /* @layer chrome-base: desktop nav chrome — lower layer so the mobile app-bar
    (@layer chrome, tokens.css) wins at ≤600 without !important. (#1007) */
 @layer chrome-base {
@@ -145,7 +145,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* Paused supplements: dimmed + an honest badge, so a compound Matthew stopped
    taking can't read as part of the active stack (truth-audit Phase 4b). */
 .supp--paused { opacity: 0.62; }
-.supp-flag { grid-column: 2; justify-self: end; color: var(--ink-faint); border: 1px solid var(--border-hair-color, currentColor); border-radius: var(--radius-xs); padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
+.supp-flag { grid-column: 2; justify-self: end; color: var(--ink-faint); border: 1px solid currentColor; border-radius: var(--radius-xs); padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap; }
 .supp-paused-note { margin-top: var(--sp-1); color: var(--ink-faint); font-style: italic; }
 .supp-ev { margin-top: var(--sp-3); display: flex; align-items: center; gap: var(--sp-3); }
 .supp-evlabel { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
@@ -162,8 +162,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .arch-svg .ab { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
 .arch-svg .abk { stroke: var(--ember); stroke-width: 1.5; }
 .arch-svg .abg { stroke-dasharray: 3 3; }
-.arch-svg .at { fill: var(--ink); font-size: 13px; font-weight: 600; text-anchor: middle; }
-.arch-svg .as { fill: var(--ink-faint); font-size: 9.5px; text-anchor: middle; }
+.arch-svg .at { fill: var(--ink); font-size: 13px; /* fs-ok: SVG viewBox units */ font-weight: 600; text-anchor: middle; }
+.arch-svg .as { fill: var(--ink-faint); font-size: 9.5px; /* fs-ok: SVG viewBox units */ text-anchor: middle; }
 .arch-svg .aa { stroke: var(--ink-faint); stroke-width: 1.5; }
 .arch-svg .ad { stroke: var(--ember); stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
 .rd-figcap { margin-top: var(--sp-2); color: var(--ink-faint); }
@@ -175,7 +175,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-tbl { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: var(--fs-small); }
 .rd-tbl th { text-align: left; color: var(--ink-faint); font-weight: var(--weight-reg); letter-spacing: 0.04em;
   text-transform: uppercase; font-size: var(--fs-label); padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-hair); }
-.rd-tbl td { padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-hair); font-variant-numeric: tabular-nums; vertical-align: baseline; }
+.rd-tbl td { padding: var(--sp-2) var(--sp-3); border-bottom: var(--border-hair); font-variant-numeric: tabular-nums; vertical-align: middle; } /* #1100: middle at the shared rule — fixes the class */
 .rd-tbl .rd-name { font-family: var(--font-sans); color: var(--ink); }
 .rd-unit { color: var(--ink-faint); }
 .rd-range { color: var(--ink-faint); }
@@ -261,7 +261,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 @media (min-width: 901px) { .coach-grid { grid-template-columns: 1fr 1fr 1fr; } }
 .coach { display: flex; align-items: center; gap: var(--sp-3); border: var(--border-hair); border-left: 2px solid var(--coach, var(--ember)); border-radius: var(--radius); background: var(--surface); padding: var(--sp-3) var(--sp-4); }
 .coach-badge { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--coach, var(--ember)); border: 1px solid var(--coach, var(--ember-line)); background: color-mix(in oklch, var(--coach, var(--ember)) 10%, transparent); }
-.coach-name { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
+.coach-name { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.1; }
 .coach-title { color: var(--ink-faint); text-transform: none; letter-spacing: 0; margin-top: 2px; }
 /* clickable expert picker + the selected coach's read */
 .coach-pick { cursor: pointer; text-align: left; width: 100%; font: inherit; }
@@ -282,7 +282,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .wlog-sum::before { content: "\203a"; font-family: var(--font-mono); color: var(--ink-faint); transition: transform var(--dur-fast); }
 .wlog[open] .wlog-sum::before { transform: rotate(90deg); }
 .wlog-sum:focus-visible { outline: 2px solid var(--ember); outline-offset: -2px; }
-.wlog-t { font-family: var(--font-serif); font-size: 1.0625rem; }
+.wlog-t { font-family: var(--font-serif); font-size: var(--fs-body); }
 .wlog-m { color: var(--ink-faint); margin-left: auto; }
 .wlog-ex { padding: var(--sp-2) var(--sp-4) var(--sp-3); border-top: var(--border-hair); }
 .wlog-ex-n { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-muted); margin-bottom: var(--sp-1); }
@@ -343,7 +343,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   .ev-side.is-list .ev-side-h:first-child { margin-top: 0; }
 }
 .ev-tile.is-active { border-left-color: var(--ember); background: color-mix(in oklch, var(--ember) 7%, var(--surface)); }
-.ev-tile-t { font-family: var(--font-serif); font-size: 1.0625rem; line-height: 1.1; }
+.ev-tile-t { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.1; }
 .ev-tile-b { font-family: var(--font-sans); font-size: var(--fs-small); color: var(--ink-faint); line-height: 1.35; }
 .ev-tile.is-active .ev-tile-t { color: var(--ink); }
 
@@ -378,12 +378,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
     .ev-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
     .brand-door { display: none; }   /* drop the section tag; keep wordmark + nav */
     .doors { gap: var(--sp-3); }
-    .doors a { font-size: 0.625rem; letter-spacing: 0.04em; }
+    .doors a { font-size: 0.625rem; /* fs-ok: deliberate sub-label mobile step */ letter-spacing: 0.04em; }
   }
   @media (max-width: 360px) {
     .brand-name, .brand-door { display: none; }   /* keep the mark; reclaim ~100px */
     .doors { gap: var(--sp-2); }
-    .doors a { font-size: 0.5625rem; }
+    .doors a { font-size: 0.5625rem; } /* fs-ok: deliberate sub-label mobile step */
   }
 }
 @media (max-width: 820px) {
@@ -401,10 +401,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .df-svg { width: 100%; height: auto; display: block; }
 .df-fig { fill: var(--ink); transition: none; }
 .df-readout { display: flex; justify-content: space-between; align-items: baseline; width: 100%; max-width: 300px; margin-top: var(--sp-3); }
-.df-weight { font-family: var(--font-mono); font-size: var(--fs-h2, 32px); font-weight: 600; color: var(--ink); }
+.df-weight { font-family: var(--font-mono); font-size: var(--fs-h2); font-weight: 600; color: var(--ink); }
 .df-weight small { font-size: var(--fs-small); color: var(--ink-muted); font-weight: 400; margin-left: 4px; }
 .df-togoal { text-align: right; }
-.df-togoal .num { display: block; font-family: var(--font-mono); color: var(--ember); font-size: var(--fs-base, 16px); }
+.df-togoal .num { display: block; font-family: var(--font-mono); color: var(--ember); font-size: var(--fs-body); }
 .df-scrub { width: 100%; max-width: 300px; margin: var(--sp-4) 0 var(--sp-2); accent-color: var(--ember); }
 .df-axis { display: flex; justify-content: space-between; width: 100%; max-width: 300px; }
 .df-buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: var(--sp-3); }
@@ -436,7 +436,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .scn-chip.is-on { color: var(--ember); border-color: var(--ember); }
 .scn-rows { display: grid; gap: var(--sp-5); margin-top: var(--sp-4); max-width: var(--measure); }
 .scn-rowhead { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
-.scn-med { font-family: var(--font-mono); font-size: var(--fs-data); color: var(--ink); }
+.scn-med { font-family: var(--font-mono); font-size: var(--fs-data-lg); color: var(--ink); }
 .scn-band { display: block; width: 100%; max-width: 340px; height: 26px; margin-top: var(--sp-2); }
 .scn-axis { stroke: var(--rule); stroke-width: 1; }
 .scn-iqr { fill: color-mix(in oklch, var(--ember) 30%, transparent); }
@@ -471,13 +471,13 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ev-intro__k { margin: 0; color: var(--ember); }
 .ev-intro__h {
   font-family: var(--font-serif); font-weight: var(--weight-med);
-  font-size: clamp(1.15rem, 2.4vw, 1.4rem); line-height: 1.1;
+  font-size: var(--fs-h3); line-height: 1.1;
   margin: var(--sp-2) 0 var(--sp-4); max-width: 30ch;
 }
 .ev-intro__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
 .ev-intro__list li { color: var(--ink-muted); line-height: 1.5; max-width: 64ch; }
 .ev-intro__list strong { color: var(--ink); font-weight: var(--weight-med); }
-.ev-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: 0.85em; color: var(--ember); }
+.ev-intro__list em { font-style: normal; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ember); }
 /* #1016 — the topic rail sits to the LEFT only at ≥821px (--bp-tw, the evidence
    reading split); below it renders ABOVE the readout as a swipe strip. Swap the
    intro's directional word to match so phone readers aren't told to look left at a
@@ -501,7 +501,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ev-intro__x {
   position: absolute; top: var(--sp-3); right: var(--sp-3);
   appearance: none; cursor: pointer; background: transparent; border: 0;
-  font-size: 20px; line-height: 1; color: var(--ink-muted); padding: 2px 8px;
+  font-size: var(--fs-body-lg); line-height: 1; color: var(--ink-muted); padding: 2px 8px;
   border-radius: var(--radius-xs); transition: color var(--dur-fast);
 }
 .ev-intro__x:hover { color: var(--ink); }
@@ -511,7 +511,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* Ported from mind.css so the reading readout matches the rest of the Data door.       */
 .rdg-now { display: flex; gap: 1rem; align-items: flex-start; }
 .rdg-now-cover { width: 84px; height: auto; border-radius: 4px; flex: 0 0 auto; box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.5); }
-.rdg-now-title { font-family: var(--font-serif); font-size: 1.3rem; color: var(--ink); margin: 0 0 0.1rem; }
+.rdg-now-title { font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ink); margin: 0 0 0.1rem; }
 .rdg-now-author { margin: 0 0 0.5rem; }
 
 .rdg-shelf { display: flex; flex-wrap: wrap; gap: 1rem; }
@@ -526,9 +526,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 }
 .rdg-face:hover { transform: translateY(-3px); box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.6); }
 .rdg-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.rdg-spine-t { font-family: var(--font-serif); font-size: 0.78rem; line-height: 1.15; color: var(--ink); }
-.rdg-spine-a { margin-top: auto; font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); }
-.rdg-cap { display: block; margin-top: 0.35rem; font-size: 0.62rem; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rdg-spine-t { font-family: var(--font-serif); font-size: 0.78rem; /* fs-ok: book-spine geometry */ line-height: 1.15; color: var(--ink); }
+.rdg-spine-a { margin-top: auto; font-family: var(--font-mono); font-size: 0.6rem; /* fs-ok: book-spine geometry */ color: var(--ink-faint); }
+.rdg-cap { display: block; margin-top: 0.35rem; font-size: var(--fs-label); color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rdg-rating { color: var(--ember); margin-left: 0.3rem; }
 .rdg-finished .rdg-face { border-left-color: var(--ink-faint); }
 .rdg-abandoned .rdg-face { border-left-color: var(--ink-faint); opacity: 0.72; }
@@ -556,12 +556,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 /* The reader's own words — intention (why), reflections, takeaways. Loudest type. */
 .rdg-notes { margin-top: 0.9rem; }
 .rdg-note-label { color: var(--ember); margin: 0 0 0.25rem; }
-.rdg-note-text { font-family: var(--font-serif); font-size: 1.05rem; line-height: 1.5; color: var(--ink); margin: 0 0 0.5rem; white-space: pre-line; }
+.rdg-note-text { font-family: var(--font-serif); font-size: var(--fs-body); line-height: 1.5; color: var(--ink); margin: 0 0 0.5rem; white-space: pre-line; }
 .rdg-fin-list { display: flex; flex-direction: column; gap: 1.5rem; }
 .rdg-fin { border-left: 2px solid color-mix(in srgb, var(--ink-faint) 30%, transparent); padding-left: 1rem; }
 .rdg-fin-head { display: flex; gap: 0.9rem; align-items: center; margin-bottom: 0.5rem; }
 .rdg-fin-cover { width: 48px; height: auto; border-radius: 3px; flex: 0 0 auto; box-shadow: 0 2px 8px -3px rgba(0, 0, 0, 0.5); }
-.rdg-fin-title { font-family: var(--font-serif); font-size: 1.15rem; color: var(--ink); margin: 0; }
+.rdg-fin-title { font-family: var(--font-serif); font-size: var(--fs-body-lg); color: var(--ink); margin: 0; }
 
 /* ── The character sheet (/data/character/, §8.6) ─────────────────────────── */
 /* Hero: the figure held in the pillar ring, the tier emblem beside it. */
@@ -572,7 +572,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .pring-seg { opacity: 0.14; }
 .pring-fill { transition: stroke-dashoffset 0.9s var(--ease-out); }
 .ch-body { fill: var(--ink); stroke: none; }
-.ch-center { font-size: 84px; fill: var(--ink); font-family: var(--font-mono); }
+.ch-center { font-size: 84px; /* fs-ok: SVG viewBox units */ fill: var(--ink); font-family: var(--font-mono); }
 .ch-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-3); color: var(--ink-faint); }
 .ch-leg { display: inline-flex; align-items: center; gap: 5px; }
 .ch-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -599,7 +599,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   background: none; border-top: 1px dashed var(--ink-faint); opacity: 0.6; transform: translateY(-50%);
 }
 .ch-rraw { font-size: var(--fs-small); color: var(--ink); text-align: right; }
-.ch-rraw small { color: var(--ink-faint); font-size: 0.72em; }
+.ch-rraw small { color: var(--ink-faint); font-size: 0.72em; } /* fs-ok: relative small within the data figure */
 .ch-d { font-family: var(--font-mono); font-size: var(--fs-label); text-align: right; }
 .ch-dup { color: var(--ember); }
 .ch-d0 { color: var(--ink-faint); }
@@ -608,7 +608,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-rspark .spark { width: 72px; height: 26px; display: block; }
 /* ADR-104 provenance — the honest per-pillar "why" line + the levels-held marker. */
 .ch-rwhy { margin: calc(-1 * var(--sp-2)) 0 0 calc(22px + var(--sp-2)); color: var(--ink-faint); font-size: var(--fs-label); line-height: 1.4; max-width: var(--measure-narrow); }
-.ch-hold { margin-left: var(--sp-1); padding: 0 4px; border: var(--border-hair); border-radius: 3px; color: var(--ink-faint); font-size: 0.85em; letter-spacing: 0.04em; }
+.ch-hold { margin-left: var(--sp-1); padding: 0 4px; border: var(--border-hair); border-radius: 3px; color: var(--ink-faint); font-size: 0.85em; /* fs-ok: relative badge, scales with context */ letter-spacing: 0.04em; }
 .ch-quiet { max-width: var(--measure-narrow); }
 
 /* ── #913 · neglect states — calm and muted, never alarm-red (--alert stays
@@ -646,7 +646,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .radar-chart svg { width: 100%; height: auto; display: block; }
 .radar-grid { stroke: var(--rule); }
 .radar-poly { fill: color-mix(in oklch, var(--ember) 14%, transparent); stroke: var(--ember-line); stroke-width: 1.5; }
-.radar-lbl { font-family: var(--font-mono); font-size: 10px; fill: var(--ink-faint); letter-spacing: 0.08em; }
+.radar-lbl { font-family: var(--font-mono); font-size: 10px; /* fs-ok: SVG viewBox units */ fill: var(--ink-faint); letter-spacing: 0.08em; }
 
 /* The tier ladder. */
 .ch-ladder { display: grid; gap: var(--sp-2); }
@@ -669,7 +669,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .ch-tl-lv { color: var(--ember); margin-left: auto; }
 .ch-heat { display: grid; gap: 3px; margin: var(--sp-4) 0; }
 .ch-heat-row { display: grid; grid-template-columns: 26px repeat(auto-fit, minmax(18px, 34px)); gap: 3px; align-items: center; }
-.ch-heat-head .label { color: var(--ink-faint); font-size: 9px; text-align: center; }
+.ch-heat-head .label { color: var(--ink-faint); font-size: 9px; /* fs-ok: heat-grid geometry */ text-align: center; }
 .ch-heat-lbl .ico { width: 15px; height: 15px; display: block; }
 .ch-cell { display: block; height: 18px; border-radius: 3px; border: 1px solid color-mix(in oklch, var(--rule) 60%, transparent); }
 .ch-wave { margin: var(--sp-4) 0 0; }

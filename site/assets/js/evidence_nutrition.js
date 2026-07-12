@@ -178,12 +178,12 @@ export function nutritionReconciliation(rc) {
 // §8 CGM × meals — a designed empty state (no live binding): a ghosted glucose curve with
 // meal markers + "sensor not active — fills in when you wear one." The glucose page owns
 // the live view; this is the nutrition-page placeholder for the eventual overlay.
-export function cgmEmptyState() {
+export function cgmEmptyState(opts = {}) {
   const W = 600, H = 130;
   const curve = "M8 92 C 60 90, 95 48, 145 60 S 225 98, 272 72 C 320 52, 352 96, 402 86 S 505 56, 560 80";
   const meals = [72, 252, 432];
   const markers = meals.map((x) => `<line class="cgm-meal" x1="${x}" y1="16" x2="${x}" y2="120"/><circle class="cgm-meal-dot" cx="${x}" cy="16" r="3"/>`).join("");
-  return sec("Glucose × meals — coming online",
+  return sec(opts.title || "Glucose × meals — coming online",
     `<div class="nut-coming cgm-ghost"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" class="cgm-svg" aria-hidden="true">${markers}<path class="cgm-curve" d="${curve}" vector-effect="non-scaling-stroke"/></svg>` +
     `<p class="rd-archive">When a CGM sensor is active, this marries each meal to its glucose response — the peak, the rise, the return to baseline, with the meal markers above. <strong>Sensor not active — fills in when you wear one.</strong> <span class="confidence conf-low">no sensor yet</span></p></div>`);
 }
@@ -426,4 +426,24 @@ export async function renderNutrition(d) {
   return parts.join("") + note("Correlative — intake vs the deficit.");
 }
 
-export async function renderGlucose(d) { const [mg, mr] = await Promise.all([tryJSON("/api/meal_glucose"), tryJSON("/api/meal_responses")]); const cur = d && d.glucose; const rows = ((mr && mr.meals) || (mg && mg.meals) || []); const head = figs([cur && cur.avg != null && fig(fmt(cur.avg), "avg mg/dL"), cur && cur.tir != null && fig(cur.tir + "%", "time in range"), (mg && mg.has_cgm != null) && fig(mg.has_cgm ? "yes" : "no", "cgm active")]); const mealSec = rows.length ? sec("Meal glucose response", `<table class="rd-tbl"><thead><tr><th>meal</th><th>peak</th><th>Δ rise</th></tr></thead><tbody>${rows.slice(0, 25).map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.peak ?? m.peak_mgdl)}</td><td class="num">${fmt(m.delta ?? m.rise)}</td></tr>`).join("")}</tbody></table>`) : ""; const trendChart = sec("Glucose trend", lineChart(d.glucose_trend || [], { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." })); if (!head.includes("fig-v") && !mealSec && !(d.glucose_trend || []).length) return trendChart + empty("No CGM data yet — once a sensor is active, this marries each meal to its glucose response (peak, rise, return-to-baseline)."); return head + trendChart + mealSec + note("Correlative — how specific meals moved glucose. Not diagnostic."); }
+export async function renderGlucose(d) {
+  const [mg, mr] = await Promise.all([tryJSON("/api/meal_glucose"), tryJSON("/api/meal_responses")]);
+  const cur = d && d.glucose;
+  const rows = ((mr && mr.meals) || (mg && mg.meals) || []);
+  const trend = (d && d.glucose_trend) || [];
+  const mealSec = rows.length ? sec("Meal glucose response", `<table class="rd-tbl"><thead><tr><th>meal</th><th>peak</th><th>Δ rise</th></tr></thead><tbody>${rows.slice(0, 25).map((m) => `<tr><td class="rd-name">${esc(m.name || m.meal)}</td><td class="num">${fmt(m.peak ?? m.peak_mgdl)}</td><td class="num">${fmt(m.delta ?? m.rise)}</td></tr>`).join("")}</tbody></table>`) : "";
+  // #1098 — no sensor: the head figure row is SKIPPED (no fig("no") chip) and the
+  // designed ghost-curve empty state holds the space — an honest "sensor not active"
+  // instrument read, never a mysteriously absent panel. (The old !head.includes("fig-v")
+  // gate was dead code here: the yes/no fig always made the head non-empty.)
+  if (!(mg && mg.has_cgm)) {
+    const ghost = cgmEmptyState({ title: "Glucose — sensor not active" });
+    if (!mealSec && !trend.length) return ghost;
+    // Historical CGM data with no live sensor: state the sensor's state, keep the record.
+    return ghost + sec("Glucose trend", lineChart(trend, { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." })) + mealSec +
+      note("Correlative — how specific meals moved glucose. Not diagnostic.");
+  }
+  const head = figs([cur && cur.avg != null && fig(fmt(cur.avg), "avg mg/dL"), cur && cur.tir != null && fig(cur.tir + "%", "time in range")]);
+  const trendChart = sec("Glucose trend", lineChart(trend, { valueKey: "value", label: "Glucose", emptyMsg: "The glucose curve fills once a CGM sensor is active." }));
+  return (head.includes("fig-v") ? head : "") + trendChart + mealSec + note("Correlative — how specific meals moved glucose. Not diagnostic.");
+}
