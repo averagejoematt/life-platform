@@ -158,17 +158,24 @@ def test_craft_check_passes_clean_dialogue():
     assert panel._craft_check(turns) == []
 
 
-def test_craft_check_allows_three_but_flags_four_in_a_row():
-    # Calibrated: 3 short turns reads fine; 4+ is the floor-hog that fails.
+def test_craft_check_allows_two_but_flags_three_in_a_row():
+    # #1171 re-calibration (2026-07-12): the Haiku judge's rubric failed every script
+    # containing 3-in-a-row, so the deterministic bound now agrees — 2 same-speaker
+    # turns read fine; 3+ is the floor-hog that fails BOTH graders.
+    two = [
+        {"speaker": "elena_voss", "line": "One."},
+        {"speaker": "eli_marsh", "line": "Two."},
+        {"speaker": "eli_marsh", "line": "Three."},
+        {"speaker": "elena_voss", "line": "Four."},
+    ]
+    assert panel._craft_check(two) == []  # exactly 2 eli in a row — allowed
     three = [
         {"speaker": "elena_voss", "line": "One."},
         {"speaker": "eli_marsh", "line": "Two."},
         {"speaker": "eli_marsh", "line": "Three."},
         {"speaker": "eli_marsh", "line": "Four."},
     ]
-    assert panel._craft_check(three) == []  # exactly 3 eli in a row — allowed
-    four = three + [{"speaker": "eli_marsh", "line": "Five."}]
-    fails = panel._craft_check(four)
+    fails = panel._craft_check(three)
     assert fails and "in a row" in fails[0]
 
 
@@ -274,11 +281,15 @@ def test_run_intro_holds_on_qa_fails_never_publishes(monkeypatch):
     monkeypatch.setattr(
         panel, "_publish_episode_audio", lambda *a, **k: (_ for _ in ()).throw(AssertionError("published despite QA fails"))
     )
+    # #1172: exhaustion now escalates via ONE email — keep it offline here and assert it fired once.
+    emails = []
+    monkeypatch.setattr(panel._repair, "send_exhaustion_email", lambda *a, **k: emails.append(a) or {"sent": 1})
 
     out = panel._run_intro(dry_run=False)
     assert out.get("held") is True
     assert held["week"] == 0 and held["hold_class"] == "quality"
     assert any("qa-judge-error" in r or "intro-qa" in r for r in held["reasons"])
+    assert len(emails) == 1
 
 
 # ── #374: podcast-standard feed + per-run reason codes ───────────────────────

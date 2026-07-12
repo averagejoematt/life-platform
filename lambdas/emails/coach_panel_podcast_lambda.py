@@ -755,6 +755,13 @@ except ImportError:  # bundle stages lambdas/ at the zip root
         _qa_review,
     )
 
+# #1170/#1171/#1172 (ADR-135): the no-touch contract mechanics — deterministic seam
+# repair, convergent revision, per-attempt ledger, bounded escalation email.
+try:
+    from emails import panelcast_repair as _repair
+except ImportError:  # bundle stages lambdas/ at the zip root
+    import panelcast_repair as _repair
+
 
 # The weekly read-aloud bar: a real listener should believe this is a human-made podcast and
 # recommend it. Encodes Matt's acceptance test (2026-06-21) — Turing-pass transcript, guest
@@ -794,12 +801,13 @@ def _run_intro(dry_run: bool = False) -> dict:
         "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the Principal Investigator who runs the AI coach team)."
     )
 
-    def _candidate():
-        ts = _gate_intro(_build_intro_script(bible), allowed)
+    def _prep(raw):
+        """Gate a raw script — a fresh generation OR a #1171 revision — identically:
+        speaker mapping + Day-Zero + ER-03 line gates, then the launch locks (enforce
+        "Matt"; prepend the fixed cold-open if the LLM didn't name Elena in line 1)."""
+        ts = _gate_intro(raw or [], allowed)
         if len(ts) < 8:
             return None
-        # Launch lock: enforce "Matt" (the model occasionally reverts to "Matthew") and,
-        # if the LLM didn't name Elena in line 1, prepend the fixed warm cold-open.
         for t in ts:
             t["line"] = re.sub(r"\bMatthew\b", "Matt", t["line"])
         first = ts[0]["line"].lower()
@@ -807,34 +815,71 @@ def _run_intro(dry_run: bool = False) -> dict:
             ts.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
         return ts
 
-    # QA retry loop: generate, run the craft + judge gate, re-roll on failure (generation
-    # is non-deterministic, so a re-roll usually clears it). Keep the cleanest candidate.
+    def _line_ok(line):
+        # The intro path's per-line gates, applied to #1170 repair-generated lines too.
+        return not _HALLUCINATION_RE.search(line) and er03_gate.er03_check(line, allowed_numbers=allowed, n=None)[0]
+
+    import bedrock_client
+
+    # #1170/#1171/#1172 bounded convergence: _QA_MAX_ATTEMPTS generations, each with a
+    # deterministic seam-repair pass + up to MAX_REVISIONS judge-feedback revisions (the
+    # weekly path's self-correcting mechanism, ported here — today's 15 blind re-rolls
+    # never told the writer WHY it failed). After every repair/revision the FULL
+    # unchanged gate (deterministic craft + Haiku judge, the same composition as
+    # _qa_gate) re-judges — the gate stays the sole fail-closed arbiter.
+    ledger = []
     turns, qa_fails = None, ["no candidate generated"]
     for attempt in range(_QA_MAX_ATTEMPTS):
-        cand = _candidate()
-        if not cand:
-            continue
-        fails = _qa_gate(cand, _INTRO_RUBRIC, bio_truth)
-        if turns is None or len(fails) < len(qa_fails):
-            turns, qa_fails = cand, fails
-        if not fails:
-            logger.info("[panel] intro: clean QA on attempt %d (%d turns)", attempt + 1, len(cand))
+        cand = _prep(_build_intro_script(bible))
+        for rev in range(_repair.MAX_REVISIONS + 1):
+            if not cand:
+                ledger.append(_repair.ledger_entry(attempt + 1, rev, ["no usable candidate (parse/too-few-turns)"], []))
+                break
+            cand, _seams, _fixed = _repair.repair_structure(
+                cand, {ELENA, INTRO_GUEST_ID}, bedrock_client.invoke, INTRO_MODEL, _extract_json, logger, line_ok=_line_ok
+            )
+            det = _craft_check(cand)
+            judge = _qa_review(cand, _INTRO_RUBRIC, bio_truth)[1]
+            fails = det + judge  # same composition as _qa_gate; split only for the ledger
+            ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed))
+            if turns is None or len(fails) < len(qa_fails):
+                turns, qa_fails = cand, fails
+            if not fails:
+                logger.info("[panel] intro: clean QA on attempt %d rev %d (%d turns)", attempt + 1, rev, len(cand))
+                break
+            logger.info("[panel] intro QA attempt %d/%d rev %d failed: %s", attempt + 1, _QA_MAX_ATTEMPTS, rev, fails)
+            if rev < _repair.MAX_REVISIONS:
+                cand = _prep(_repair.revise_intro(cand, fails, bedrock_client.invoke, INTRO_MODEL, _extract_json, logger))
+        if not qa_fails:
             break
-        logger.info("[panel] intro QA attempt %d/%d failed: %s", attempt + 1, _QA_MAX_ATTEMPTS, fails)
+    _repair.log_ledger(logger, "intro", 0, ledger)
 
     if turns is None:
         logger.warning("[panel] intro: no usable candidate after %d attempts", _QA_MAX_ATTEMPTS)
         return {"statusCode": 500, "body": json.dumps({"intro": "too few turns"})}
     if qa_fails:
-        # HARD gate (#1122): QA fails after all re-rolls make the episode structurally
-        # unpublishable (ADR-087 fail-closed posture — regenerate-or-hold, matching the
-        # weekly path). Pre-#1122 the "best" candidate published anyway, which is how the
-        # wk0 prologue shipped with a conversational hole. Dry-run still writes the draft
-        # transcript below so the failing script stays reviewable.
+        # HARD gate (#1122): QA fails after the whole attempt budget make the episode
+        # structurally unpublishable (ADR-087 fail-closed posture — regenerate-or-hold,
+        # matching the weekly path). #1172: exhaustion is loud — ONE needs-human email
+        # carries the verdict ledger; never a silent miss, never a bad publish. Dry-run
+        # still writes the draft transcript below so the failing script stays reviewable.
         logger.warning("[panel] intro: best candidate still has %d QA flag(s): %s", len(qa_fails), qa_fails)
         if not dry_run:
+            _repair.send_exhaustion_email(
+                ses,
+                SENDER,
+                os.environ.get("EMAIL_RECIPIENT", ""),
+                0,
+                "intro",
+                ledger,
+                logger,
+                hold_uri=f"s3://{S3_BUCKET}/{HOLD_PREFIX}/wk0.json",
+            )
             return _hold_and_alert(
-                0, ["intro-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": turns, "qa_fails": qa_fails}, hold_class="quality"
+                0,
+                ["intro-qa: " + "; ".join(str(f) for f in qa_fails)[:300]],
+                {"turns": turns, "qa_fails": qa_fails, "qa_ledger": ledger},
+                hold_class="quality",
             )
 
     # Deterministic close (ADR-087 voice-bleed mitigation): strip any LLM-baked
@@ -1192,37 +1237,8 @@ def _write_show_memory(week, title, pull_quote, guest_id, guest_name, open_bet) 
     _psv2.write_show_memory(table, USER_ID, logger, week, title, pull_quote, guest_id, guest_name, open_bet)
 
 
-def _revise_weekly_script(turns: list, fails: list, beats: dict, bible: dict) -> dict:
-    """Self-correction: hand the writer its own draft + the QA judge's exact failures and ask for
-    a fixed full script (same JSON shape). This is the loop that lets the show reach the read-aloud
-    bar on its own before falling back to a human HOLD."""
-    import bedrock_client
-
-    guest = beats.get("guest") or {}
-    script_text = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
-    system = (
-        f'You are the head writer revising a draft of "{bible.get("show_name", "The Measured Life")}". Fix EVERY issue '
-        "listed below and keep everything that already works. THE BAR: the transcript must read as a real, human-made "
-        "podcast — no AI tells. Stay grounded (invent nothing — no facts, scenes, times of day, or numbers not already "
-        f"present); keep the guest as {guest.get('name')}; introduce a guest the audience hasn't met; every question gets "
-        "an answer in the next turn; no body weight (numeric or spelled-out). Return ONLY the same JSON shape: "
-        '{"turns":[{"speaker":"elena"|"coach","line":"..."}],"open_bet":"...","last_bet_result":{"outcome":"won"|"lost"|"open"|"none"},'
-        '"pull_quote":"..."}. 14–22 turns. No fences.'
-    )
-    user = (
-        "ISSUES TO FIX (every one):\n- "
-        + "\n- ".join(str(f) for f in fails)
-        + f"\n\nDRAFT TO REVISE:\n{script_text}\n\nReturn the fixed JSON now."
-    )
-    try:
-        body = {"model": WRITER_MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
-        resp = bedrock_client.invoke(body, model_name=WRITER_MODEL)
-        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
-        parsed = _extract_json(text)
-        return parsed if isinstance(parsed, dict) and parsed.get("turns") else {}
-    except Exception as e:
-        logger.warning("[panel] weekly revision failed — %s", e)
-        return {}
+# NB: the weekly targeted-revision writer (_revise_weekly_script) moved to
+# panelcast_repair.revise_weekly (#1171 — the same mechanism now serves both paths).
 
 
 def _editor_review(turns: list, bible: dict) -> dict:
@@ -1649,35 +1665,8 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
 
     guest_id = (beats.get("guest") or {}).get("id") or persona_registry.OPERATIONAL_COACH_IDS[0]
     guest_name = (beats.get("guest") or {}).get("name", "Coach")
-    # #547: two-pass first (each speaker in-voice, real disputes, show memory);
-    # v1 single-call stays as the fail-soft fallback so an upgrade bug can't
-    # kill the show.
-    script = _build_weekly_script_v2(beats, bible) or _build_weekly_script(beats, bible)
-    turns = script.get("turns") or []
-    # Craft re-roll (cheap, deterministic): if the draft is monologue-y or one speaker
-    # holds the floor too long, re-roll the writer once (generation is non-deterministic).
-    # The editor + safety gate + HOLD below remain the hard floor; this just lifts quality.
-    _cfails = _craft_check(turns)
-    if _cfails:
-        logger.info("[panel] wk%s: craft re-roll — %s", week, _cfails)
-        alt = _build_weekly_script(beats, bible)
-        if (alt.get("turns") or []) and not _craft_check(alt["turns"]):
-            script, turns = alt, alt["turns"]
-    if len(turns) < 6:
-        if dry_run:
-            return _dry(week, "HOLD", stage="writer", reasons=["too few turns"], turns=len(turns))
-        return _hold_and_alert(week, ["writer produced too few turns"], script, hold_class="quality")
+    import bedrock_client
 
-    review = _editor_review(turns, bible)
-    if review.get("verdict") == "hold":
-        if dry_run:
-            return _dry(week, "HOLD", stage="editor", reasons=review.get("issues", []))
-        return _hold_and_alert(
-            week, ["editor: " + "; ".join(review.get("issues", []))[:300]], {"turns": turns, "review": review}, hold_class="quality"
-        )
-
-    for t in turns:
-        t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
     # #914: the presence note is part of the writer's source material, so its real
     # gap-day count is an allowed number (a spoken "eleven days quiet" must pass).
     # #1086: likewise the phase block — a spoken "day three, week one" must pass.
@@ -1690,60 +1679,115 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         + " "
         + beats.get("phase_block", "")
     )
+    _gt = (beats.get("chronicle", "")[:1500] + "\n" + "\n".join(f"{c['name']}: {c['summary']}" for c in beats.get("coach_reads", [])))[
+        :4000
+    ]
 
     def _valid(ts):
         return [t for t in ts if isinstance(t, dict) and (t.get("line") or "").strip()]
 
-    clean, hold = _weekly_gate(turns, allowed, guest_id)
-    # A turn DROPPED by the ER-03 gate (a number not in the source) mid-conversation leaves a hole —
-    # e.g. Elena asks a question and the guest's dropped answer leaves it dangling. Don't voice a
-    # holey transcript: re-roll the writer once for a gap-free pass, else HOLD for a human.
-    if not hold and len(clean) < len(_valid(turns)):
-        logger.info("[panel] wk%s: gate dropped %d turn(s) — re-roll for a gap-free script", week, len(_valid(turns)) - len(clean))
-        alt = _build_weekly_script(beats, bible)
-        aturns = alt.get("turns") or []
-        aclean, ahold = _weekly_gate(aturns, allowed, guest_id)
-        if not ahold and len(aclean) == len(_valid(aturns)) and len(aclean) >= 6:
-            script, turns, clean, hold = alt, aturns, aclean, ahold
-        else:
-            if dry_run:
-                return _dry(week, "HOLD", stage="gate-drop", reasons=["gate dropped turns; re-roll did not produce a gap-free script"])
-            return _hold_and_alert(week, ["gate dropped turns (holey transcript); re-roll failed"], {"turns": turns}, hold_class="quality")
-    if hold:
-        if dry_run:
-            return _dry(week, "HOLD", stage="safety-gate", reasons=hold)
-        return _hold_and_alert(week, hold, {"turns": turns}, hold_class="safety")
-    if len(clean) < 6:
-        if dry_run:
-            return _dry(week, "HOLD", stage="gate-thin", reasons=["too few clean turns after gate"], clean=len(clean))
-        return _hold_and_alert(week, ["too few clean turns after gate"], {"turns": turns}, hold_class="quality")
+    def _line_ok(line):
+        # The weekly path's per-line safety gate, applied to #1170 repair-generated lines too.
+        return not _safety_gate(line)
 
-    # Weekly read-aloud QA (the Turing bar): guest introduced, no dangling thread, grounded,
-    # humour, no AI tells. Self-correcting loop — feed the judge's exact failures back to the
-    # writer and re-judge (up to 2 revisions). Only a draft that still fails after that HOLDs for
-    # a human. This is the mechanism that moves the show toward running hands-off.
-    _gt = (beats.get("chronicle", "")[:1500] + "\n" + "\n".join(f"{c['name']}: {c['summary']}" for c in beats.get("coach_reads", [])))[
-        :4000
-    ]
-    qa_fails = _qa_gate(clean, _WEEKLY_RUBRIC, _gt)
-    for _rev in range(2):
-        if not qa_fails:
+    # #1170/#1171/#1172 (ADR-135): the bounded no-touch loop — up to _QA_MAX_ATTEMPTS
+    # generations (dry_run: one, no extra spend on a pre-flight), each with a
+    # deterministic seam-repair pass + up to MAX_REVISIONS judge-feedback revisions
+    # (the existing self-correcting mechanism, now inside a fixed budget). SAFETY
+    # failures stay immediate-hold and never consume budget or retry; quality failures
+    # consume an attempt; exhaustion HOLDs + escalates with ONE needs-human email.
+    # After every repair/revision the FULL unchanged gate (deterministic craft + Haiku
+    # judge, the same composition as _qa_gate) re-judges — sole fail-closed arbiter.
+    ledger, ready, draft_turns = [], None, None
+    last_fails = ["no candidate generated"]
+    for attempt in range(1 if dry_run else _QA_MAX_ATTEMPTS):
+        # #547: two-pass first (each speaker in-voice, real disputes, show memory);
+        # v1 single-call stays as the fail-soft fallback so an upgrade bug can't
+        # kill the show.
+        script = _build_weekly_script_v2(beats, bible) or _build_weekly_script(beats, bible)
+        turns = script.get("turns") or []
+        if len(_valid(turns)) < 6:
+            last_fails = ["writer produced too few turns"]
+            ledger.append(_repair.ledger_entry(attempt + 1, 0, last_fails, []))
+            continue
+        review = _editor_review(turns, bible)
+        if review.get("verdict") == "hold":
+            # An editor hold is a quality failure mode — it consumes an attempt (the
+            # SS-02 sweep already regenerates quality holds; #1172 does it in-budget).
+            last_fails = ["editor: " + "; ".join(review.get("issues", []))[:300]]
+            ledger.append(_repair.ledger_entry(attempt + 1, 0, [], last_fails))
+            continue
+        for rev in range(_repair.MAX_REVISIONS + 1):
+            for t in turns:
+                t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
+            clean, hold = _weekly_gate(turns, allowed, guest_id)
+            if hold:
+                # Safety fails CLOSED immediately, exactly as before #1172 — a
+                # sensitivity/compassion hit is never "retried away".
+                if dry_run:
+                    return _dry(week, "HOLD", stage="safety-gate", reasons=hold)
+                return _hold_and_alert(week, hold, {"turns": turns, "qa_ledger": ledger}, hold_class="safety")
+            if len(clean) < len(_valid(turns)) or len(clean) < 6:
+                # A turn DROPPED by the ER-03/empty gate leaves a hole mid-conversation —
+                # never voice a holey transcript (#1122); it costs the attempt instead.
+                last_fails = ["gate dropped turns (holey transcript)"]
+                ledger.append(_repair.ledger_entry(attempt + 1, rev, last_fails, []))
+                break
+            draft_turns = clean
+            # #1170: deterministic seam repair (zero-cost when the script already
+            # alternates), then the FULL unchanged gate on the repaired script.
+            clean, _seams, _fixed = _repair.repair_structure(
+                clean, {ELENA, guest_id}, bedrock_client.invoke, WRITER_MODEL, _extract_json, logger, line_ok=_line_ok
+            )
+            det = _craft_check(clean)
+            judge = _qa_review(clean, _WEEKLY_RUBRIC, _gt)[1]
+            fails = det + judge  # same composition as _qa_gate; split only for the ledger
+            ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed))
+            last_fails, draft_turns = fails, clean
+            if not fails:
+                ready = (script, clean, review)
+                break
+            logger.info("[panel] wk%s: QA fails (attempt %d rev %d) — %s", week, attempt + 1, rev, fails)
+            if rev < _repair.MAX_REVISIONS:
+                revised = _repair.revise_weekly(
+                    clean,
+                    fails,
+                    guest_name,
+                    bible.get("show_name", "The Measured Life"),
+                    bedrock_client.invoke,
+                    WRITER_MODEL,
+                    _extract_json,
+                    logger,
+                )
+                if not (revised.get("turns") or []):
+                    break  # revision failed/parse-broke — spend the next generation instead
+                script, turns = revised, revised["turns"]
+        if ready:
             break
-        logger.info("[panel] wk%s: QA fails (revision %d) — %s", week, _rev + 1, qa_fails)
-        revised = _revise_weekly_script(clean, qa_fails, beats, bible)
-        rturns = revised.get("turns") or []
-        for t in rturns:
-            t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
-        rclean, rhold = _weekly_gate(rturns, allowed, guest_id)
-        if rhold or len(rclean) < 6:
-            continue  # revision broke something — keep the prior draft, re-judge, likely HOLD
-        clean, script = rclean, revised
-        qa_fails = _qa_gate(clean, _WEEKLY_RUBRIC, _gt)
-    if qa_fails:
-        logger.info("[panel] wk%s: weekly QA HOLD after revisions — %s", week, qa_fails)
+    _repair.log_ledger(logger, "weekly", week, ledger)
+    if not ready:
+        logger.info("[panel] wk%s: weekly QA HOLD — budget exhausted (%d ledger rows) — %s", week, len(ledger), last_fails)
         if dry_run:
-            return _dry(week, "HOLD", stage="weekly-qa", reasons=qa_fails)
-        return _hold_and_alert(week, ["weekly-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": clean}, hold_class="quality")
+            return _dry(week, "HOLD", stage="weekly-qa", reasons=last_fails, qa_ledger=ledger)
+        # #1172: exhaustion is loud — publish NOTHING (the HOLD below, unchanged) and
+        # send ONE needs-human email carrying the per-attempt verdict ledger.
+        _repair.send_exhaustion_email(
+            ses,
+            SENDER,
+            os.environ.get("EMAIL_RECIPIENT", ""),
+            week,
+            "weekly",
+            ledger,
+            logger,
+            hold_uri=f"s3://{S3_BUCKET}/{HOLD_PREFIX}/wk{week}.json",
+        )
+        return _hold_and_alert(
+            week,
+            ["weekly-qa: " + "; ".join(str(f) for f in last_fails)[:300]],
+            {"turns": draft_turns or [], "qa_ledger": ledger},
+            hold_class="quality",
+        )
+    script, clean, review = ready
 
     if dry_run:
         preview = "\n".join(f"{('Elena' if t['speaker'] == ELENA else guest_name)}: {t['line']}" for t in clean[:6])

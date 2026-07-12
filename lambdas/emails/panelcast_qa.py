@@ -24,7 +24,12 @@ MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
 _QA_MAX_ATTEMPTS = int(os.environ.get("PANEL_QA_MAX_ATTEMPTS", "3"))
 _QA_MAX_WORDS_PER_TURN = 130  # a turn longer than this reads as a monologue, not dialogue
 _QA_HOOK_MAX_WORDS = 180  # turn 0 is the cold-open hook — a solo turn by design, allowed to run longer
-_QA_MAX_CONSECUTIVE = 3  # 4+ turns from one speaker is a floor-hog; 3 short turns reads fine (calibrated 2026-06-17)
+# #1171 calibration (measured 2026-07-12): the original bound allowed 3 same-speaker turns
+# in a row while the Haiku judge's rubric failed every script containing exactly that
+# pattern — the two graders disagreed on the line, so a deterministically-"clean" draft
+# could never converge. The graders must agree: 2 is the bound, and the judge rubrics
+# below state the SAME number (test-enforced in tests/test_panelcast_repair.py).
+_QA_MAX_CONSECUTIVE = 2
 
 # #1122: a turn that ASKS something (interrogative or an explicit challenge) must get a
 # reply from the OTHER speaker in the very next turn. The observed wk0 defect: a gate
@@ -36,42 +41,68 @@ _CHALLENGE_RE = re.compile(r"\b(convince me|push back|here'?s where|prove it)\b"
 _INTERROGATIVE_RE = re.compile(r"\?[\"'”’)\]]*\s*$")
 
 
-def _continuity_check(turns: list) -> list:
-    """Deterministic conversational-continuity gate (#1122; deterministic-before-LLM, ADR-105).
-    Flags any turn that is interrogative (ends '?') or an explicit challenge whose NEXT turn
-    is the SAME speaker — i.e. the reply is missing, the tell of a dropped turn. Runs on the
-    post-drop script (the gates can delete turns and leave exactly this hole). Turn 0 is
+def _speaker_runs(turns: list) -> list:
+    """Inclusive (start, end) spans of consecutive same-speaker turns, length >= 2.
+    The ONE detection primitive behind both the craft check's floor-hog bound and the
+    #1170 repair pass's seam list — gate and repair can never disagree on adjacency."""
+    runs, start = [], 0
+    for i in range(1, len(turns) + 1):
+        if i == len(turns) or turns[i].get("speaker") != turns[i - 1].get("speaker"):
+            if i - 1 > start:
+                runs.append((start, i - 1))
+            start = i
+    return runs
+
+
+def _dangling_pairs(turns: list) -> list:
+    """(index, what) for each turn that is interrogative (ends '?') or an explicit challenge
+    whose NEXT turn is the SAME speaker — i.e. the reply is missing (#1122). Turn 0 is
     exempt: the solo cold-open hook closes on a rhetorical question by design, and the fixed
     Elena cold-open may be prepended in front of her own hook. The final turn is never
     flagged — closing on the series' open question is the intended ending."""
-    fails = []
+    out = []
     for i in range(1, len(turns) - 1):
-        spk = turns[i].get("speaker")
-        if spk != turns[i + 1].get("speaker"):
+        if turns[i].get("speaker") != turns[i + 1].get("speaker"):
             continue
         line = (turns[i].get("line") or "").strip()
         if _INTERROGATIVE_RE.search(line):
-            what = "asks a question"
+            out.append((i, "asks a question"))
         elif _CHALLENGE_RE.search(line):
-            what = "issues a challenge"
-        else:
-            continue
-        fails.append(f"dangling thread: turn {i} ({spk}) {what} but the reply is missing — turn {i + 1} is {spk} again")
-    return fails
+            out.append((i, "issues a challenge"))
+    return out
+
+
+def _continuity_check(turns: list) -> list:
+    """Deterministic conversational-continuity gate (#1122; deterministic-before-LLM, ADR-105).
+    Runs on the post-drop script (the gates can delete turns and leave exactly this hole).
+    Detection lives in _dangling_pairs, shared with the #1170 repair pass."""
+    return [
+        f"dangling thread: turn {i} ({turns[i].get('speaker')}) {what} but the reply is missing — turn {i + 1} is "
+        f"{turns[i].get('speaker')} again"
+        for i, what in _dangling_pairs(turns)
+    ]
+
+
+def structural_seams(turns: list) -> list:
+    """#1170: the same-speaker adjacency spans the deterministic gate flags — the repair
+    pass's work list, as inclusive (start, end) index spans. A run is a seam if it is longer
+    than _QA_MAX_CONSECUTIVE (the craft floor-hog bound) or contains a dangling thread (the
+    continuity check). Built from the gate's own primitives, never a parallel detection."""
+    dangling = {i for i, _ in _dangling_pairs(turns)}
+    return [(s, e) for s, e in _speaker_runs(turns) if (e - s + 1) > _QA_MAX_CONSECUTIVE or any(s <= i <= e for i in dangling)]
 
 
 def _craft_check(turns: list) -> list:
     """Deterministic, zero-cost craft gate. Returns a list of failure reasons (empty = pass).
     Catches exactly the pacing problems an LLM judge is unreliable at: monologue dumps and
-    one speaker holding the floor too long. Calibrated 2026-06-17: 4+ consecutive turns is the
-    real floor-hog (3 short turns reads fine), and turn 0 is the intentional solo cold-open hook
-    (a longer ceiling, not the dialogue cap)."""
+    one speaker holding the floor too long (bound: _QA_MAX_CONSECUTIVE, aligned with the
+    judge rubric per #1171). Turn 0 is the intentional solo cold-open hook (a longer
+    ceiling, not the dialogue cap)."""
     fails = []
-    run = 1
-    for i in range(1, len(turns)):
-        run = run + 1 if turns[i].get("speaker") == turns[i - 1].get("speaker") else 1
+    for s, e in _speaker_runs(turns):
+        run = e - s + 1
         if run > _QA_MAX_CONSECUTIVE:
-            fails.append(f"{turns[i].get('speaker')} speaks {run} turns in a row (max {_QA_MAX_CONSECUTIVE}) — break it up")
+            fails.append(f"{turns[e].get('speaker')} speaks {run} turns in a row (max {_QA_MAX_CONSECUTIVE}) — break it up")
             break
     for i, t in enumerate(turns):
         wc = len((t.get("line") or "").split())
@@ -112,12 +143,16 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
         return False, [f"qa-judge-error (fail-closed): {e}"]
 
 
+# NB (#1171): both rubrics state the consecutive-turns bound as f"{_QA_MAX_CONSECUTIVE}"
+# so the judge is instructed to fail exactly what the deterministic check fails — a
+# calibration test asserts the constant and the rubric text agree.
 _INTRO_RUBRIC = (
     "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the "
     "Principal Investigator who built the platform). MATT is the third-person SUBJECT of the experiment; he is NOT "
     "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
     "1. Opens on a genuine HOOK in turn 0, not a flat self-introduction.\n"
-    "2. After the opening, it's a real two-person conversation (no long stretch of one person talking).\n"
+    "2. After the opening, it's a real two-person conversation — no long stretch of one person talking; more than "
+    f"{_QA_MAX_CONSECUTIVE} consecutive turns from one speaker fails this item.\n"
     "3. At least one point of GENUINE friction/disagreement — Eli is not just agreeing with Elena throughout.\n"
     "4. Dr. Eli Marsh (the PI) names the over-optimization / 'measuring a life instead of living it' RISK himself, in his own words.\n"
     "5. No abrupt, unbridged topic jumps.\n"
@@ -143,7 +178,8 @@ _WEEKLY_RUBRIC = (
     "2. GUEST INTRODUCTION: the guest is introduced for the audience early (who they are + what they work on), UNLESS "
     "they were the guest in the immediately previous episode. A guest who just starts talking with no introduction FAILS.\n"
     "3. NO DANGLING THREAD: every question Elena asks is actually answered in the next turn; no topic the SCRIPT itself "
-    "raises is then dropped; no abrupt unbridged jump; never two same-speaker turns where a reply is clearly missing. "
+    "raises is then dropped; no abrupt unbridged jump; never two same-speaker turns where a reply is clearly missing; more "
+    f"than {_QA_MAX_CONSECUTIVE} consecutive turns from one speaker fails this item. "
     "(Coverage is NOT required — do NOT flag a ground-truth fact that simply goes unmentioned; only flag a thread the "
     "script opens and abandons.)\n"
     "4. REAL HOOK: turn 0 earns attention — not a flat 'welcome to the show'.\n"
