@@ -30,9 +30,15 @@ import { mountSectionToc } from "/assets/js/section_toc.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 
+// BYSLUG keeps EVERY entry — an unlisted topic's direct URL (/data/ledger/) must
+// still route + render. Only the menu surfaces below use the LISTED view (#1109).
 const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
 
-const GROUPS = [...new Set(REG.map((t) => t.group))];
+// #1109: entries flagged `unlisted` in the build registry are deliberately off the
+// tile rail, the group tabs and the "all N topics" count — footer/direct-URL only.
+const LISTED = REG.filter((t) => !t.unlisted);
+
+const GROUPS = [...new Set(LISTED.map((t) => t.group))];
 
 // v5: one engine serves three archive pillars (/data/, /protocols/, /method/).
 // The builder sets the route base + door label per page; defaults keep the
@@ -121,12 +127,12 @@ const $ = (s) => document.querySelector(s);
 // topics are shallow enough to thumb-scroll, and the /data/ hub keeps its rail.
 const TOC_SLUGS = new Set(["labs", "character"]);
 
-let current = window.__START_SLUG__ || (REG[0] && REG[0].slug);
+let current = window.__START_SLUG__ || (LISTED[0] && LISTED[0].slug);
 
 function buildTabs() {
   const g = BYSLUG[current] ? BYSLUG[current].group : GROUPS[0];
   $("[data-tabs]").innerHTML = GROUPS.map((grp) => `<button class="ev-tab ${grp === g ? "is-active" : ""}" data-group="${esc(grp)}">${esc(grp)}</button>`).join("");
-  document.querySelectorAll(".ev-tab").forEach((b) => b.addEventListener("click", () => { const grp = b.dataset.group; const first = REG.find((t) => t.group === grp); if (first) select(first.slug); }));
+  document.querySelectorAll(".ev-tab").forEach((b) => b.addEventListener("click", () => { const grp = b.dataset.group; const first = LISTED.find((t) => t.group === grp); if (first) select(first.slug); }));
 }
 
 /* #1014 — tiles are REAL anchors (open-in-new-tab / long-press / crawl all work);
@@ -141,8 +147,8 @@ function buildSide() {
   const g = BYSLUG[current] ? BYSLUG[current].group : GROUPS[0];
   side.classList.toggle("is-list", listOpen);
   side.innerHTML = listOpen
-    ? GROUPS.map((grp) => `<p class="ev-side-h label">${esc(grp)}</p>` + REG.filter((t) => t.group === grp).map(tileHTML).join("")).join("")
-    : REG.filter((t) => t.group === g).map(tileHTML).join("");
+    ? GROUPS.map((grp) => `<p class="ev-side-h label">${esc(grp)}</p>` + LISTED.filter((t) => t.group === grp).map(tileHTML).join("")).join("")
+    : LISTED.filter((t) => t.group === g).map(tileHTML).join("");
   side.querySelectorAll(".ev-tile").forEach((a) => a.addEventListener("click", (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // let the browser do link things
     e.preventDefault();
@@ -168,7 +174,7 @@ function setList(open) {
   const btn = document.querySelector("[data-railtoggle]");
   if (btn) {
     btn.setAttribute("aria-expanded", String(open));
-    btn.querySelector("[data-railtoggle-label]").textContent = open ? "close the index" : `all ${REG.length} topics`;
+    btn.querySelector("[data-railtoggle-label]").textContent = open ? "close the index" : `all ${LISTED.length} topics`;
   }
   buildSide();
 }
@@ -189,12 +195,12 @@ function updateRailPos() {
 
 function mountRailbar() {
   const side = $("[data-side]");
-  if (!side || REG.length < 2 || document.querySelector("[data-railbar]")) return;
+  if (!side || LISTED.length < 2 || document.querySelector("[data-railbar]")) return;
   if (!side.id) side.id = "ev-topics";
   const bar = document.createElement("div");
   bar.className = "ev-railbar";
   bar.setAttribute("data-railbar", "");
-  bar.innerHTML = `<button class="ev-railbar-toggle" type="button" data-railtoggle aria-expanded="false" aria-controls="${side.id}"><span data-railtoggle-label>all ${REG.length} topics</span></button><span class="ev-railbar-pos" data-railpos aria-hidden="true"></span>`;
+  bar.innerHTML = `<button class="ev-railbar-toggle" type="button" data-railtoggle aria-expanded="false" aria-controls="${side.id}"><span data-railtoggle-label>all ${LISTED.length} topics</span></button><span class="ev-railbar-pos" data-railpos aria-hidden="true"></span>`;
   side.insertAdjacentElement("beforebegin", bar);
   bar.querySelector("[data-railtoggle]").addEventListener("click", () => setList(!listOpen));
   let raf = 0;
@@ -251,7 +257,7 @@ function select(slug, push = true) {
   document.title = `${BYSLUG[slug].title} — The ${DOORTITLE} — averagejoematt`;
   buildTabs(); buildSide(); renderCenter();
 }
-window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || slugFromPath() || (REG[0] && REG[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
+window.addEventListener("popstate", (e) => { const slug = (e.state && e.state.slug) || slugFromPath() || (LISTED[0] && LISTED[0].slug); current = BYSLUG[slug] ? slug : current; buildTabs(); buildSide(); renderCenter(); });
 
 
 /* ── First-run orientation — mirrors the Cockpit's PG-02 card ─────────────────

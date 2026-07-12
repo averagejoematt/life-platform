@@ -13,7 +13,9 @@
 
 **Home + 5 doors:** `the cockpit · the data · the coaching · the protocols · the story`.
 **Method** is footer-tier (no top-nav door) — the "under the hood" pages, reachable from the
-footer + About. Old `/evidence/*` URLs 301 to their new pillar homes.
+footer's "The Technology" column (#1110: the /method/ hub, the build log, platform/pipeline/cost,
+/gear/) + About. The build log lives at `/story/build/` (URL unchanged) but is menu-homed under
+The Technology, not the story sub-nav. Old `/evidence/*` URLs 301 to their new pillar homes.
 
 Three pillars (`/data/`, `/protocols/`, `/method/`) are served by **one base-aware engine**
 (`site/assets/js/evidence.js` + `scripts/v4_build_evidence.py`, split by registry group).
@@ -40,7 +42,8 @@ Coaching (`/coaching/`) and Story (`/story/`) are their own master-detail apps
 ### The Data — `/data/` · the engine
 - **Loop role:** the engine — every source, now & over time. **Audience:** health/QS enthusiasts + Matthew.
 - **Sections:** *The body* (vitals, weight/composition, bloodwork, glucose, sleep, training, nutrition),
-  *Mind & accountability* (mind, habits, vice streaks, the ledger).
+  *Mind & accountability* (mind, habits, vice streaks — plus the ledger, registry-flagged
+  `unlisted` (#1109): off the tile rail by intent, reachable via the footer Data column + direct URL).
 - **Must deliver:** dense, honest, explorable readouts — rings, trends (interactive), correlations —
   each showing *now + over time*, flagged when thin. Live source-freshness.
 - **Good looks like:** elite data journalism a QS skeptic trusts; charts you can hover/scrub.

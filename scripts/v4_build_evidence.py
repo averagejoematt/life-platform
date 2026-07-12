@@ -27,9 +27,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
-# slug, title, blurb, group, mode, endpoint, root, legacy
+# slug, title, blurb, group, mode, endpoint, root, legacy[, "unlisted"]
 #   mode: data (fetch+render) · interactive (render+wire, no fetch) ·
 #         editorial (authored content) · archive (link to preserved legacy)
+#   "unlisted" (optional 9th element, #1109): the page is DELIBERATELY off the tile
+#   rail / group tabs / topic count — reachable by direct URL + footer link only.
+#   evidence.js keeps unlisted entries in BYSLUG (the direct URL still renders) but
+#   excludes them from every menu surface. The flag records intent: every registry
+#   page is either menu-listed or explicitly unlisted, never silently orphaned.
 REGISTRY = [
     # ── The body ───────────────────────────────────────────────────────────
     (
@@ -169,6 +174,9 @@ REGISTRY = [
         "/legacy/accountability/",
     ),
     (
+        # #1109: deliberately unlisted — linked from the footer Data column, not the
+        # tile rail. The entry must stay (deleting it breaks /data/ledger/'s own
+        # readout — evidence.js routes the direct URL through BYSLUG).
         "ledger",
         "The ledger",
         "Skin in the game — bounties earned, punishments donated.",
@@ -177,6 +185,7 @@ REGISTRY = [
         "/api/ledger",
         None,
         "/legacy/ledger/",
+        "unlisted",
     ),
     # ── The character ──────────────────────────────────────────────────────
     # The live RPG sheet, resurrected from the legacy site (2026-07). Same slug as
@@ -744,7 +753,9 @@ PILLARS = [
 
 def registry_json(groups):
     out = []
-    for slug, title, blurb, group, mode, endpoint, root, legacy in REGISTRY:
+    for entry in REGISTRY:
+        slug, title, blurb, group, mode, endpoint, root, legacy = entry[:8]
+        flags = set(entry[8:])  # optional trailing flags — today just "unlisted" (#1109)
         if group not in groups:
             continue
         e = {
@@ -757,6 +768,8 @@ def registry_json(groups):
             "root": root,
             "legacy": legacy,
         }
+        if "unlisted" in flags:
+            e["unlisted"] = True
         if mode == "editorial":
             e["editorial"] = EDITORIAL.get(slug, "")
         out.append(e)
