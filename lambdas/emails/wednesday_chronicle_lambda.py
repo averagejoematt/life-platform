@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 import boto3
 import digest_utils  # shared query_range implementations (#970)
 import privacy_guard  # deterministic real-name + vice gate (layer module)
+from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
 
@@ -350,14 +351,19 @@ def build_data_packet(data):
     packet.append("=== THE MEASURED LIFE — WEEKLY DATA PACKET ===")
     packet.append(f"Week ending: {dates['end']}")
 
-    # --- Compute week number from journey start ---
-    journey_start = profile.get("journey_start_date", EXPERIMENT_START_DATE)
-    try:
-        js = datetime.strptime(journey_start, "%Y-%m-%d").date()
-        end_date = datetime.strptime(dates["end"], "%Y-%m-%d").date()
-        week_num = max(1, ((end_date - js).days // 7) + 1)
-    except Exception:
-        week_num = 1
+    # --- Week number + phase context (#1086) ---
+    # The ONE shared experiment-phase block replaces this surface's own week
+    # math: same genesis anchor, identical week arithmetic (d days after
+    # genesis → d//7 + 1 for both), plus the pre-start state, the audience
+    # descriptor, and the cannot-exist-yet guardrail every narrative surface
+    # now carries. Anchored to the week-ENDING date, not "today".
+    pctx = build_experiment_phase_context(profile, dates["end"])
+    journey_start = pctx["start_date"]
+    # A pre-genesis lead-in still labels/publishes as week 1 — week_num feeds
+    # filenames and DDB keys downstream, never the narrative clock (the phase
+    # block + the TIMELINE guard below own that).
+    week_num = pctx["week_num"] or 1
+    packet.append(format_experiment_phase_context(pctx))
 
     # Week number is anchored to the experiment GENESIS (journey_start) — never the count of
     # installments. Pre-genesis "prologue" lead-ins (dated before genesis) are backstory and must

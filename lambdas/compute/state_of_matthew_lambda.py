@@ -46,6 +46,7 @@ from datetime import datetime, timedelta, timezone
 
 import boto3
 import calibration_core  # #538: shared Brier + reliability scorer (layer module)
+from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
 from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
@@ -245,6 +246,16 @@ def pick_highlight(forecast, hypotheses, coaches, calibration) -> dict | None:
     return None
 
 
+def _phase_section(as_of: str) -> dict:
+    """#1086: the experiment-phase facts the narration may voice — day/week/
+    stage + the pre-start countdown state, trimmed to numbers-and-labels (no
+    coaching principles; they're a coaching-surface concern). Riding in the
+    narration payload puts the day/week numbers in the ADR-104 allow-list, so
+    a narrated "Day 3 of the experiment" passes the grounding gate."""
+    pctx = build_experiment_phase_context(None, as_of)
+    return {k: pctx[k] for k in ("pre_start", "days_until_start", "start_date", "as_of", "days_in", "week_num", "stage")}
+
+
 def assemble_state(forecast, hypotheses, coaches, calibration, as_of: str) -> dict:
     """Combine the four (possibly-None) sections into one structure. This is
     the whole "deterministic assembly" step — no math happens past this point,
@@ -262,15 +273,17 @@ def assemble_state(forecast, hypotheses, coaches, calibration, as_of: str) -> di
         "coaches": coaches,
         "calibration": calibration,
         "highlight": pick_highlight(forecast, hypotheses, coaches, calibration),
+        "phase": _phase_section(as_of),  # #1086 — mandatory experiment-phase context
     }
 
 
 def _narration_payload(state: dict) -> dict:
     """The exact numeric vocabulary the model is allowed to use — every present
     (non-None) section, nothing else. Also what gets rendered into the prompt.
-    (#914: `presence` rides here too, so the gap-day count is in the allow-list.)"""
+    (#914: `presence` rides here too, so the gap-day count is in the allow-list;
+    #1086: `phase` likewise, so the day/week numbers are allowed vocabulary.)"""
     payload = {"as_of": state["as_of"]}
-    for key in ("forecast", "hypotheses", "coaches", "calibration", "highlight", "presence"):
+    for key in ("forecast", "hypotheses", "coaches", "calibration", "highlight", "presence", "phase"):
         if state.get(key) is not None:
             payload[key] = state[key]
     return payload
@@ -310,6 +323,11 @@ def build_narration_body(state: dict) -> dict:
     """The Anthropic Messages body for the one weekly Haiku call. No section of
     this prompt asks the model to compute anything — only to narrate numbers
     it is handed verbatim."""
+    # #1086: the phase section is mandatory — inject it if the caller assembled
+    # `state` by hand (fixtures/evals), so the rendered block and the ADR-104
+    # allow-list (via _narration_payload) always agree on the day/week numbers.
+    if state.get("phase") is None:
+        state["phase"] = _phase_section(state.get("as_of"))
     system = (
         'You are the narrator of "State of Matthew," a weekly one-paragraph brief that connects four '
         "independent measurement systems on a personal health-data platform: a statistical forecast "
@@ -322,6 +340,9 @@ def build_narration_body(state: dict) -> dict:
         "do not mention it or apologize for its absence — just work with what's given. Do not open with "
         "the word 'Matthew'."
     )
+    # #1086: no cache_control on this once-weekly call, so the daily-changing
+    # block is safe in the system string (COST-OPT-2 cache rule respected).
+    system += "\n\n" + format_experiment_phase_context(build_experiment_phase_context(None, state.get("as_of")))
     # #914: a loud/alarm logging gap must be acknowledged — the ONE shared
     # presence directive (severity=alarm additionally demands it lead).
     presence = state.get("presence")
@@ -477,6 +498,7 @@ def build_summary_item(state: dict, narration: dict, today_str: str) -> dict:
         "calibration": state.get("calibration"),
         "highlight": state.get("highlight"),
         "presence": state.get("presence"),  # #914 — loud/alarm logging gap, else None
+        "phase": state.get("phase"),  # #1086 — the experiment-phase facts the narration grounded on
         "narrative": narration["narrative"],
         "narrated": narration["narrated"],
         "model": narration.get("model"),

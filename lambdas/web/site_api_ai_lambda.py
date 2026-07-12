@@ -35,8 +35,10 @@ import boto3
 import privacy_guard  # deterministic real-name + vice scrub (layer module)
 from ai_context import (
     board_grounding_receipts,
+    build_experiment_phase_context,
+    format_experiment_phase_context,
     wrap_untrusted_reader_text,
-)  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts
+)  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts; #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
@@ -613,6 +615,16 @@ def _ask_question_safe(question: str) -> tuple:
     return True, ""
 
 
+def _phase_context_block() -> str:
+    """#1086: the ONE shared experiment-phase block (day/week/stage, pre-start
+    state, audience, cannot-exist-yet guardrail) for the public AI surfaces.
+    Anchored to "now" (PT) — these are live-request prompts. Rendered into the
+    UNCACHED prompt parts only: /api/ask's plain system string and the board's
+    user turn — never the board's cache_control-wrapped persona system block
+    (COST-OPT-2: the block changes daily; the persona block stays byte-stable)."""
+    return format_experiment_phase_context(build_experiment_phase_context())
+
+
 def _ask_build_prompt(ctx: dict) -> str:
     pillars_str = ""
     if "pillars" in ctx:
@@ -626,6 +638,8 @@ def _ask_build_prompt(ctx: dict) -> str:
     reads_section = f"\nCOMPUTED READS (precomputed by the platform's analysis pipeline):\n{reads_block}\n" if reads_block else ""
     return f"""You are the AI behind Matthew Walker's Life Platform — a personal health intelligence system tracking \
 {_LIVE_SOURCE_COUNT} live data sources ({_PAUSED_SOURCE_COUNT} paused).
+
+{_phase_context_block()}
 
 CURRENT DATA:
   Weight: {ctx.get('weight_lbs', '?')} lbs (started {ctx.get('start_weight', EXPERIMENT_BASELINE_WEIGHT_LBS)}, goal {ctx.get('goal_weight', 185)})
@@ -1552,6 +1566,9 @@ def _handle_board_ask(event: dict) -> dict:
             episodic = _coach_recent_interactions(pid)
             user_msg = (
                 f"CURRENT DATA (authoritative — cite only these numbers): {facts}\n"
+                # #1086: the phase block rides the user turn (volatile), never
+                # the cached persona system block — COST-OPT-2.
+                + f"{_phase_context_block()}\n"
                 + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
                 + (f"YOUR MEMORY (the compressed history your weekly summarizer maintains): {memory}\n" if memory else "")
                 + (
@@ -1759,6 +1776,8 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
     memory = _coach_memory_bits(persona)
     context_block = (
         f"CURRENT DATA (authoritative — cite only these numbers): {facts}\n"
+        # #1086: phase block in the (volatile) user turn, never the cached system.
+        + f"{_phase_context_block()}\n"
         + (f"YOUR CURRENT READ (your own published stance): {stance}\n" if stance else "")
         + (f"YOUR MEMORY (the compressed history your weekly summarizer maintains): {memory}\n" if memory else "")
         + "You are continuing a live thread with THIS reader — you may reference what you already told them.\n"

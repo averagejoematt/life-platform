@@ -11,7 +11,7 @@ import re
 from datetime import date as _date_cls
 
 from ai_summaries import _avg, _safe_float  # noqa: F401
-from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # noqa: F401
+from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE, EXPERIMENT_TZ  # noqa: F401
 
 # ── Untrusted reader-input delimiter (R22-SEC-04 / #811) ──────────────────────
 # Reader-submitted text (public /api/ask + /api/board_ask questions) is stored
@@ -145,6 +145,154 @@ def _format_journey_context(jctx):
     lines.append("Stage-appropriate coaching principles:")
     for p in jctx["coaching_principles"]:
         lines.append(f"  • {p}")
+    return "\n".join(lines)
+
+
+# ==============================================================================
+# #1086: EXPERIMENT PHASE CONTEXT — the ONE mandatory grounding block for every
+# AI narrative prompt builder (daily-brief coaches, State of Matthew, chronicle,
+# panelcast, /api/ask + board_ask). Fuses the journey stage
+# (_build_journey_context) with the pre-start/countdown state (mirrors
+# web/site_api_common.pre_start_meta semantics WITHOUT importing web/ into the
+# compute path), an explicit audience descriptor, and a "numbers that cannot
+# exist yet at this phase" guardrail (ADR-104 honest numbers / ADR-105 rigor).
+#
+# Every narrative surface injects the FORMATTED block
+# (format_experiment_phase_context) into its prompt;
+# tests/test_phase_context_coverage.py enforces that no builder omits it — a
+# new narrative prompt builder cannot ship without the block.
+#
+# CACHE RULE (COST-OPT-2): the block changes daily. Place it in the USER
+# message — or an uncached system string — NEVER inside a
+# cache_control-wrapped system block (site_api_ai's per-persona system is kept
+# byte-stable for exactly this reason; the block rides in the user turn there).
+# ==============================================================================
+
+PHASE_CONTEXT_MARKER = "EXPERIMENT PHASE CONTEXT"
+
+# The audience is BOTH Matthew and the public readers of averagejoematt.com —
+# a narrative surface must introduce context, never assume the reader saw the
+# data (or any earlier installment/brief).
+PHASE_AUDIENCE_LINE = "AUDIENCE: written for Matthew AND public readers — introduce context, never assume the reader saw the data."
+
+# days_in at/below this = the early-cycle window where multi-week numbers
+# cannot exist yet, so the guardrail line is included (always included
+# pre-start). Two weeks: past that, 7d/14d windows are genuinely full.
+EARLY_PHASE_GUARDRAIL_DAYS = 14
+
+
+def _phase_today_pt():
+    """Today as a PT calendar date — mirrors pre_start_meta's PT day boundary
+    (user-facing dates are Pacific) without importing web/ into this pure module."""
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    return _dt.now(ZoneInfo(EXPERIMENT_TZ)).date()
+
+
+def build_experiment_phase_context(profile=None, current_date_str=None):
+    """The fused experiment-phase context every AI narrative surface grounds on.
+
+    Journey stage (from _build_journey_context) + the pre-start countdown state
+    (a reset can stage a FUTURE genesis — the site runs an anticipated-launch
+    countdown, #931; this mirrors pre_start_meta's PT-day semantics without a
+    web/ import) + the audience descriptor + the cannot-exist-yet guardrail.
+
+    `current_date_str` (YYYY-MM-DD) anchors the block to a specific narrative
+    date (a chronicle's week-ending date, a brief's data date); when omitted,
+    "today" is the PT calendar date. Never raises: bad inputs fall back to the
+    constants genesis / PT today.
+
+    Returns a dict:
+      pre_start (bool), days_until_start, start_date, as_of, days_in, week_num,
+      stage, stage_label, start_weight, goal_weight, coaching_principles,
+      early_phase (guardrail flag), audience
+    """
+    profile = profile or {}
+    start_str = str(profile.get("journey_start_date") or EXPERIMENT_START_DATE)
+    try:
+        start = _date_cls.fromisoformat(start_str)
+    except (TypeError, ValueError):
+        start_str = EXPERIMENT_START_DATE
+        start = _date_cls.fromisoformat(start_str)
+    try:
+        today = _date_cls.fromisoformat(current_date_str) if current_date_str else _phase_today_pt()
+    except (TypeError, ValueError):
+        today = _phase_today_pt()
+
+    if start > today:  # pre-start countdown window (pre_start_meta semantics: N >= 1)
+        days_until = (start - today).days
+        return {
+            "pre_start": True,
+            "days_until_start": days_until,
+            "start_date": start_str,
+            "as_of": today.isoformat(),
+            "days_in": 0,
+            "week_num": 0,
+            "stage": "Pre-Start",
+            "stage_label": f"Pre-start — genesis {start_str} is {days_until} day(s) away",
+            "start_weight": profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS),
+            "goal_weight": profile.get("goal_weight_lbs", 185),
+            "coaching_principles": [],
+            "early_phase": True,
+            "audience": PHASE_AUDIENCE_LINE,
+        }
+
+    jctx = _build_journey_context(profile, today.isoformat())
+    return {
+        "pre_start": False,
+        "days_until_start": 0,
+        "start_date": start_str,
+        "as_of": today.isoformat(),
+        "days_in": jctx["days_in"],
+        "week_num": jctx["week_num"],
+        "stage": jctx["stage"],
+        "stage_label": jctx["stage_label"],
+        "start_weight": jctx["start_weight"],
+        "goal_weight": jctx["goal_weight"],
+        "coaching_principles": jctx["coaching_principles"],
+        "early_phase": jctx["days_in"] <= EARLY_PHASE_GUARDRAIL_DAYS,
+        "audience": PHASE_AUDIENCE_LINE,
+    }
+
+
+def format_experiment_phase_context(pctx, coaching_principles=False):
+    """Render the phase-context dict as the mandatory prompt block.
+
+    coaching_principles=True additionally renders the start→goal weights and
+    the stage-appropriate coaching principles (the old journey block) — for the
+    private COACHING surfaces (daily brief). Public narrative surfaces keep the
+    core block: the panelcast's safety gate bans ANY body weight, so the core
+    block deliberately carries no weight numbers.
+    """
+    lines = [f"{PHASE_CONTEXT_MARKER} (grounding — every claim must be consistent with this):"]
+    if pctx.get("pre_start"):
+        lines.append(
+            f"  • PRE-START: the experiment has NOT begun. As of {pctx['as_of']}, genesis ({pctx['start_date']}) is "
+            f"{pctx['days_until_start']} day(s) away."
+        )
+        lines.append(
+            "  • NUMBERS THAT CANNOT EXIST YET: there is NO experiment data at this phase — no day counts, streaks, "
+            "averages, trends, or progress numbers. Never state or imply any; write anticipation, not results."
+        )
+    else:
+        lines.append(
+            f"  • Today ({pctx['as_of']}) is Day {pctx['days_in']} of the experiment — Week {pctx['week_num']}, "
+            f"{pctx['stage']} stage. Genesis: {pctx['start_date']}."
+        )
+        if pctx.get("early_phase"):
+            d = pctx["days_in"]
+            lines.append(
+                f"  • NUMBERS THAT CANNOT EXIST YET: only {d} day(s) of this cycle's data exist. Any multi-week "
+                f"trend, any streak or average longer than {d} day(s), any 'weeks of...' framing, or any "
+                "month-over-month comparison cannot exist yet — never state or imply one. The window is thin: "
+                "say so rather than extrapolate."
+            )
+        if coaching_principles:
+            lines.append(f"  • Weight journey: {pctx['start_weight']}→{pctx['goal_weight']} lbs.")
+            for p in pctx.get("coaching_principles", []):
+                lines.append(f"  • {p}")
+    lines.append(f"  • {pctx['audience']}")
     return "\n".join(lines)
 
 

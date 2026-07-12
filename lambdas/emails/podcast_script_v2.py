@@ -25,6 +25,8 @@ to v1: the show never dies to an upgrade.
 import json
 from datetime import datetime, timezone
 
+from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
+
 SHOW_MEMORY_SK = "SHOW#memory"
 MAX_CALLBACKS = 10
 MAX_GUEST_HISTORY = 12
@@ -186,8 +188,12 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
     _mem = memory_block(memory)
     # #914: a real logging stall is the week's context, not a detail to skip.
     _presence = f"{beats['presence_note']}\n\n" if beats.get("presence_note") else ""
+    # #1086: the mandatory experiment-phase block — computed here if a caller
+    # hands beats without one, so no path can build this prompt phase-blind.
+    _phase = beats.get("phase_block") or format_experiment_phase_context(build_experiment_phase_context(None, beats.get("date")))
     elena_user = (
         f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n"
+        + f"{_phase}\n\n"
         + (f"CHRONICLE (background only, never quote it):\n{_chron[:3000]}\n\n" if _chron else "NO CHRONICLE THIS WEEK.\n\n")
         + _presence
         + f"GUEST: {guest.get('name')} — their recent read: {guest.get('summary', '')}\n\n"
@@ -227,6 +233,7 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
         + '\n\nOUTPUT ONLY JSON: {"replies":["<reply to line 1>", "<reply to line 2>", ...]} — exactly one reply per Elena line, in order. No fences.'
     )
     coach_user = (
+        f"{_phase}\n\n"  # #1086: the guest sees the same phase clock Elena does
         f"YOUR RECENT READ (your only data source):\n{guest.get('summary', '')}\nThemes: {', '.join(guest.get('themes', []))}\n\n"
         + (
             f"THE SPLIT MATERIAL (real positions on the record — including possibly your own):\n{split_material}\n\n"
