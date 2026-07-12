@@ -1,6 +1,6 @@
 # AWS Access — the authoritative human-access procedure
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 > **Sources of truth:** `grep -h "role-to-assume" .github/workflows/*.yml | sort -u` (CI role inventory) · `aws sts get-caller-identity` (live auth check) · `docs/SECURITY.md` (policy stance) · `docs/OPERATOR_GUIDE.md` (day-1 checklist)
 
 This file is the **single home** for how a human gets AWS access to the platform.
@@ -19,7 +19,7 @@ e.g. ACM certificates — you never authenticate "to" a region differently).
 
 | Principal | Mechanism | Status / notes |
 |---|---|---|
-| **Humans** (Matthew + any successor engineer) | **IAM Identity Center (SSO)** — short-lived sessions via `aws sso login` | Primary path. **Being provisioned as of 2026-07-10** — see the callout in §2. |
+| **Humans** (Matthew + any successor engineer) | **IAM Identity Center (SSO)** — short-lived sessions via `aws sso login` | Primary path. **LIVE since 2026-07-12** — instance ACTIVE in us-west-2, user `awsdev` assigned the `AdministratorAccess` permission set (8h sessions). See §2. |
 | Humans — break-glass | Long-lived access keys on IAM user `matthew-admin` | Legacy path. Acceptable only for SSO outage or initial bootstrap (§3). Rotate every 90 days (`docs/SECURITY.md`). |
 | **CI** (GitHub Actions) | **OIDC federation** — `aws-actions/configure-aws-credentials` with `role-to-assume`; no stored keys anywhere | Four roles, inventoried in §4. |
 | **Remediation agent** (ADR-064/065) | OIDC → `github-actions-remediation-role` | Bedrock + read-only diagnosis + scoped audit-log writes; NO deploy, NO IAM mutate. |
@@ -33,9 +33,13 @@ Human AWS credentials never go there — see the rule at the end of §3.
 
 ## 2. IAM Identity Center (SSO) — the primary path
 
-> ⚠️ **Being provisioned as of 2026-07-10.** Until your admin (Matthew) confirms
-> Identity Center is enabled and you have a user + permission set assigned, use
-> the break-glass path in §3.
+> ✅ **LIVE as of 2026-07-12** (verified: instance ACTIVE, user `awsdev` +
+> `AdministratorAccess` permission set assigned to the account; password set).
+> The access portal URL is on the Identity Center dashboard — get it from your
+> admin (Matthew); it is deliberately not written in this public repo. §2a below
+> is retained as the rebuild procedure. If SSO is unavailable, fall back to §3.
+> Note: users created via the CLI get **no activation email** — send one via
+> Console → Identity Center → Users → *user* → Reset password.
 
 ### 2a. One-time, account-owner side (Matthew)
 
