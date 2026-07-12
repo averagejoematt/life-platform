@@ -1,8 +1,13 @@
 """tests/test_presence_endpoint.py — Phase 3: /api/presence fail-closed projection.
 
-The public presence line must expose ONLY the allowlisted headline fields — never
-the stored record's private per-channel detail. Proves the projection is built
-field-by-field, honest-nulls before the first compute, and surfaces a return.
+The public presence line must expose ONLY the allowlisted headline fields — the
+stored record is never spread. Proves the projection is built field-by-field,
+honest-nulls before the first compute, and surfaces a return.
+
+#975 amendment: per-channel last-logged marks ARE now public (the cockpit's
+"inputs" instrument-health row) via an explicit `channels` projection — registry-
+driven set/labels, mark fields only, `quiet` derived from the registry stale
+tolerance at read time. The RAW stored channel_detail key still never leaks.
 """
 
 import json
@@ -48,12 +53,20 @@ _STORED = {
     "planned_pause": False,
     "planned_pause_reason": "",
     "returned": False,
-    # ↓ private internals that must be dropped by the fail-closed projection
-    "channel_detail": {"macrofactor": {"last_log_date": "2026-06-26", "gap_days": 3}},
+    # ↓ the raw stored keys that must be dropped by the fail-closed projection
+    #   (channel_detail's MARK fields re-emerge via the explicit #975 `channels`
+    #   projection — but the raw key, and anything in it beyond the marks, never do)
+    "channel_detail": {
+        "macrofactor": {"label": "food", "last_log_date": "2026-06-26", "gap_days": 3, "dropout_streak_days": 3},
+        "hevy": {"label": "training", "last_log_date": "2026-06-26", "gap_days": 3, "dropout_streak_days": 3},
+    },
     "passive_read": {"rhr": 64, "recovery_trend": "red"},
 }
 
 _PRIVATE_KEYS = ("channel_detail", "passive_read", "last_manual_log_date", "channels_quiet")
+
+# The explicit per-channel allowlist (#975) — anything else in a channel entry is a leak.
+_CHANNEL_KEYS = {"id", "label", "last_log_date", "gap_days", "quiet", "primary"}
 
 
 def test_projection_is_fail_closed(monkeypatch):
@@ -73,12 +86,42 @@ def test_projection_is_fail_closed(monkeypatch):
     assert "recovery_trend" not in raw and "64" not in raw
 
 
+def test_channels_projection(monkeypatch):
+    """#975 — the per-channel marks: registry-driven set, explicit fields only,
+    quiet from the registry stale tolerance, the primary (food) channel first."""
+    monkeypatch.setattr(sad, "table", _FakeTable(_STORED))
+    body = _body(sad.handle_presence())
+    chans = body["channels"]
+    by_id = {c["id"]: c for c in chans}
+    # Registry-driven: every engagement channel appears, even ones absent from the
+    # stored detail (honest null marks), and nothing outside the registry does.
+    assert set(by_id) == set(sad._ENGAGEMENT_CHANNELS)
+    for c in chans:
+        assert set(c) == _CHANNEL_KEYS, f"unexpected channel fields on {c['id']}: {set(c) - _CHANNEL_KEYS}"
+    # The primary (food) channel leads the row.
+    assert chans[0]["id"] == "macrofactor" and chans[0]["primary"] is True
+    # Marks come from the stored detail; labels from the registry.
+    assert by_id["macrofactor"]["last_log_date"] == "2026-06-26"
+    assert by_id["macrofactor"]["gap_days"] == 3
+    assert by_id["macrofactor"]["label"] == "food"
+    # quiet = gap > registry stale_days: food tolerates 2 (3 → quiet), training 4 (3 → fresh).
+    assert by_id["macrofactor"]["quiet"] is True
+    assert by_id["hevy"]["quiet"] is False
+    # A channel with nothing in the stored window: honest nulls, quiet (nothing seen).
+    assert by_id["notion"]["last_log_date"] is None
+    assert by_id["notion"]["quiet"] is True
+
+
 def test_honest_null_before_first_compute(monkeypatch):
     monkeypatch.setattr(sad, "table", _FakeTable(None))
     body = _body(sad.handle_presence())
     assert body["available"] is False
     assert body["presence_class"] == "present"
     assert body["in_lull"] is False
+    # #975: before the first compute the channel set still exists (registry truth)
+    # but every mark is an honest null and quiet is None — unknown, never a scold.
+    for c in body["channels"]:
+        assert c["last_log_date"] is None and c["gap_days"] is None and c["quiet"] is None
 
 
 def test_surfaces_return(monkeypatch):

@@ -29,6 +29,7 @@ from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 from source_registry import (  # #392: canonical source classification (shared layer)
     DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
+    engagement_channels,
     manual_capture_sources,
     public_board_sources,
     public_paused_sources,
@@ -590,17 +591,28 @@ def handle_last_sync() -> dict:
 # Presence classes the public surface treats as "in a lull" (worth showing a line).
 _PRESENCE_LOUD = {"light", "quiet", "dark"}
 
+# #975: the manual engagement channels (food / journal / training / habits) — the
+# ONE registry facet the engine itself derives from (#914/#921), so the cockpit's
+# "inputs" freshness row can never drift from what the machine actually watches.
+_ENGAGEMENT_CHANNELS = engagement_channels()
+
 
 def handle_presence() -> dict:
     """GET /api/presence — the honest "quiet stretch" state for the cockpit line +
     Story beat: is Matthew actively logging, or has he gone quiet?
 
     FAIL-CLOSED public projection: this builds the response field-by-field from an
-    explicit allowlist and NEVER spreads the stored record — so no private
-    per-channel detail, no passive_read internals, no retention/mood ever leak.
-    Day-counts are already publicly disclosed via /api/source_freshness, so this is
-    consistent with existing disclosure. Honest 'present' default before the first
-    compute (front-end simply hides). Always a shaped 200."""
+    explicit allowlist and NEVER spreads the stored record — no passive_read
+    internals, no retention/mood ever leak. Day-counts are already publicly
+    disclosed via /api/source_freshness, so this is consistent with existing
+    disclosure. Honest 'present' default before the first compute (front-end
+    simply hides). Always a shaped 200.
+
+    #975 amendment: per-channel last-logged marks ARE now public — the cockpit's
+    "inputs" instrument-health row needs them (cycle 4 died of 14 silent days no
+    standing surface showed). They're projected field-by-field below (label +
+    mark only, same day-level granularity as /api/source_freshness), never by
+    spreading the stored channel_detail."""
     try:
         resp = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"})
         rec = resp.get("Item") or {}
@@ -628,6 +640,31 @@ def handle_presence() -> dict:
         "weight_delta_over_gap_lbs": rec.get("weight_delta_over_gap") if returned else None,
         "as_of": rec.get("date"),
     }
+
+    # #975: per-channel freshness marks for the cockpit's "inputs" row. Iterate the
+    # REGISTRY (not the stored record) so the channel set + labels are always the
+    # engine's own, then merge in only the explicitly-projected mark fields from
+    # channel_detail — never a spread. `quiet` derives from the registry stale
+    # tolerance AT READ TIME, so it's correct even for records written before this
+    # projection existed. Before the first compute (or on a failed read) the marks
+    # are honest nulls and quiet is None — "unknown", never a scold.
+    detail = rec.get("channel_detail") or {}
+    channels = []
+    for src, meta in _ENGAGEMENT_CHANNELS.items():
+        det = detail.get(src) or {}
+        gap = det.get("gap_days")
+        channels.append(
+            {
+                "id": src,
+                "label": meta["label"],
+                "last_log_date": det.get("last_log_date"),
+                "gap_days": gap,
+                "quiet": (gap is None or gap > meta["stale_days"]) if rec else None,
+                "primary": bool(meta.get("primary")),
+            }
+        )
+    channels.sort(key=lambda c: not c["primary"])  # the primary (food) leads; stable sort keeps registry order after it
+    out["channels"] = channels
     return _ok(out, cache_seconds=300)
 
 
