@@ -165,6 +165,75 @@ def fetch_journal_entries(date_str):
         return []
 
 
+def fetch_hevy_workout_days(start_date, end_date):
+    """#965: distinct local dates with at least one hevy workout in [start, end].
+
+    Hevy rows live under per-workout sort keys (`DATE#{date}#WORKOUT#{id}`), so a
+    plain BETWEEN … "DATE#{end}" bound would EXCLUDE the end date's workouts
+    (the `#WORKOUT#` suffix sorts after the bare date) — the end bound gets a
+    high sentinel. DELETE#WORKOUT# tombstone markers sort outside the DATE#
+    range and never match. Returns a sorted list of date strings ([] on error —
+    the component is behavioral, so an empty week honestly scores 0).
+    """
+    days = set()
+    try:
+        kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
+                "ExpressionAttributeValues": {
+                    ":pk": USER_PREFIX + "hevy",
+                    ":s": "DATE#" + start_date,
+                    ":e": "DATE#" + end_date + "#zzzz",
+                },
+            }
+        )
+        while True:
+            resp = table.query(**kwargs)
+            for item in resp.get("Items", []):
+                if item.get("tombstone"):
+                    continue
+                sk = item.get("sk", "")
+                day = sk.replace("DATE#", "")[:10]
+                if day:
+                    days.add(day)
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    except Exception as e:
+        logger.warning(f"[character] fetch_hevy_workout_days({start_date}→{end_date}) failed: {e}")
+    return sorted(days)
+
+
+def fetch_reading_session_days(start_date, end_date):
+    """#965: distinct dates with at least one reading SESSION# event in
+    [start, end], via the ADR-097 GSI2 (GSI2PK="READING_SESSION", GSI2SK=iso
+    timestamp). The end bound uses the next calendar day as an exclusive-ish
+    ceiling (any real same-day timestamp sorts below it). Reading rows are
+    CROSS_PHASE — no phase filter applies (reading survives resets by design).
+    Returns a sorted list of date strings ([] on error)."""
+    days = set()
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+
+        end_next = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        kwargs = {
+            "IndexName": "GSI2",
+            "KeyConditionExpression": _Key("GSI2PK").eq("READING_SESSION") & _Key("GSI2SK").between(start_date, end_next),
+        }
+        while True:
+            resp = table.query(**kwargs)
+            for item in resp.get("Items", []):
+                ts = str(item.get("GSI2SK", ""))[:10]
+                if start_date <= ts <= end_date:
+                    days.add(ts)
+            if "LastEvaluatedKey" not in resp:
+                break
+            kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    except Exception as e:
+        logger.warning(f"[character] fetch_reading_session_days({start_date}→{end_date}) failed: {e}")
+    return sorted(days)
+
+
 def _enriched_mood_to_10(raw_1to5):
     """Map an enriched_mood value from its native 1–5 domain onto the 0–10
     scale that `character_engine` consumes for `mood_avg`.
@@ -306,6 +375,15 @@ def assemble_data(yesterday_str):
     # Strava 42d (progressive overload / CTL trend)
     strava_42d_start = (dt - timedelta(days=41)).strftime("%Y-%m-%d")
     data["strava_42d"] = fetch_range("strava", strava_42d_start, yesterday_str)
+
+    # #965: hevy strength days (trailing 7) — movement's strength_sessions
+    data["hevy_workout_days_7d"] = fetch_hevy_workout_days(strava_7d_start, yesterday_str)
+
+    # #965: reading-session days (trailing 7, ADR-097 GSI2) — mind's reading_practice
+    data["reading_session_days_7d"] = fetch_reading_session_days(strava_7d_start, yesterday_str)
+
+    # #965: todoist daily snapshot — consistency's task_follow_through
+    data["todoist"] = fetch_date("todoist", yesterday_str)
 
     # MacroFactor 14d (nutrition consistency)
     mf_14d_start = (dt - timedelta(days=13)).strftime("%Y-%m-%d")

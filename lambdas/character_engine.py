@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.5.0"  # #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
+ENGINE_VERSION = "1.6.0"  # #965: hevy→movement, reading→mind, todoist→consistency wired (ADR-134 amendment)
+# v1.5.0 — #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
 # modifiers/challenge XP are engine inputs, dark down-streaks persist, headline renormalized (ADR-134)
 
 # ── ADR-104: coverage floor below which a day carries no leveling signal ──
@@ -448,6 +449,20 @@ def compute_movement_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[
     step_target = components.get("daily_steps", {}).get("target", 8000)
     scores["daily_steps"] = _pct_of_target(steps, step_target, 1.5) if steps else None
 
+    # Strength sessions (#965/ADR-134 amendment): distinct hevy workout DAYS in
+    # the trailing 7 — days, never sets/volume/tonnage, so logging junk volume
+    # can't buy score (one honest session per day is all that counts). Hevy is
+    # a primary cycle-5 instrument; before this a heavy lifting week read as
+    # movement absence (the pillar was Strava-only). Behavioral per ADR-104
+    # (matches the source registry's classing of hevy): unlogged = didn't lift.
+    if "strength_sessions" in components:
+        strength_days = data.get("hevy_workout_days_7d")
+        strength_target = components.get("strength_sessions", {}).get("target_days_week", 3)
+        # perfect at target+1 days (4/3 for the default target): a fourth
+        # session maxes the component; more days add nothing (cap, anti-gaming)
+        perfect = (strength_target + 1) / strength_target if strength_target else 1.0
+        scores["strength_sessions"] = _pct_of_target(len(strength_days), strength_target, perfect) if strength_days is not None else None
+
     return _weighted_pillar_score(scores, components)
 
 
@@ -702,6 +717,16 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
     else:
         scores["vice_control"] = None
 
+    # Reading practice (#965/ADR-134 amendment): distinct reading-session DAYS
+    # in the trailing 7 (ADR-097 sessions via GSI2), against a 4-day/week
+    # target — days, never minutes/pages, so marathon-logging one book can't
+    # buy a week of score. Behavioral per ADR-104: sessions are manual logs,
+    # an unlogged session didn't happen.
+    if "reading_practice" in components:
+        reading_days = data.get("reading_session_days_7d")
+        reading_target = components.get("reading_practice", {}).get("target_days_week", 4)
+        scores["reading_practice"] = _pct_of_target(len(reading_days), reading_target, 1.25) if reading_days is not None else None
+
     return _weighted_pillar_score(scores, components)
 
 
@@ -921,6 +946,20 @@ def compute_consistency_raw(
         scores["weekend_weekday_stability"] = _clamp(round(100 - abs(1.0 - ww_ratio) * 200, 1))
     else:
         scores["weekend_weekday_stability"] = None
+
+    # Task follow-through (#965/ADR-134 amendment): the todoist overdue queue —
+    # follow-through is measured by NOT letting due work rot, which task-volume
+    # gaming can't improve (creating trivial tasks doesn't clear overdue ones).
+    # Measured-class per ADR-104: the todoist record is an automatic daily API
+    # pull, so a missing record is an ingestion gap (drops out of the weight
+    # sum), never a behavior judgment.
+    if "task_follow_through" in components:
+        todoist = data.get("todoist")
+        if todoist:
+            overdue = _safe_float(todoist, "overdue_count")
+            scores["task_follow_through"] = _clamp(round(100 - (overdue or 0) * 12.5, 1)) if overdue is not None else None
+        else:
+            scores["task_follow_through"] = None
 
     return _weighted_pillar_score(scores, components)
 

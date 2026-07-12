@@ -449,3 +449,80 @@ def test_vice_shield_fires_through_cross_pillar_effects():
 def test_buddy_engagement_component_is_gone():
     scores, details = ce.compute_relationships_raw({"buddy_freshness_days": 2}, {"pillars": {"relationships": {"components": {}}}})
     assert "buddy_engagement" not in details
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #965 · Source wiring: hevy → movement, reading → mind, todoist → consistency
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _wiring_config():
+    return {
+        "pillars": {
+            "movement": {
+                "components": {
+                    "strength_sessions": {"weight": 0.5, "target_days_week": 3, "behavioral": True},
+                    "daily_steps": {"weight": 0.5, "target": 8000},
+                }
+            },
+            "mind": {
+                "components": {
+                    "reading_practice": {"weight": 0.5, "target_days_week": 4, "behavioral": True},
+                    "stress_management": {"weight": 0.5},
+                }
+            },
+            "consistency": {
+                "components": {
+                    "task_follow_through": {"weight": 0.5},
+                    "data_completeness": {"weight": 0.5},
+                }
+            },
+        }
+    }
+
+
+def test_strength_sessions_scores_distinct_hevy_days():
+    """3 lifting days / 3-day target -> ~75 (perfect at 1.34x = 4 days)."""
+    data = {"hevy_workout_days_7d": ["2026-08-01", "2026-08-03", "2026-08-05"]}
+    _raw, details = ce.compute_movement_raw(data, _wiring_config())
+    score = details["strength_sessions"]["score"]
+    assert 70 <= score <= 80
+    data4 = {"hevy_workout_days_7d": ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04"]}
+    _raw4, d4 = ce.compute_movement_raw(data4, _wiring_config())
+    assert d4["strength_sessions"]["score"] == 100.0
+
+
+def test_strength_sessions_unlogged_week_scores_zero_behavioral():
+    """No hevy days -> honest 0 (measured absence of the behavior). A missing
+    data key (fetch failure / legacy caller) -> None -> the behavioral flag
+    scores it 0 at full weight and lists it absent. Both roads end at 0."""
+    _raw, details = ce.compute_movement_raw({"hevy_workout_days_7d": []}, _wiring_config())
+    assert details["strength_sessions"]["score"] == 0.0
+    _raw2, d2 = ce.compute_movement_raw({}, _wiring_config())
+    assert d2["strength_sessions"]["score"] == 0.0
+    assert "strength_sessions" in d2["_absent_behaviors"]
+
+
+def test_reading_practice_scores_session_days():
+    data = {"reading_session_days_7d": ["2026-08-01", "2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05"]}
+    _raw, details = ce.compute_mind_raw(data, _wiring_config())
+    assert details["reading_practice"]["score"] == 100.0  # 5 days = 1.25x the 4-day target
+
+
+def test_task_follow_through_measures_overdue_pressure():
+    _raw, details = ce.compute_consistency_raw({"todoist": {"overdue_count": 0}}, _wiring_config(), {})
+    assert details["task_follow_through"]["score"] == 100.0
+    _raw2, d2 = ce.compute_consistency_raw({"todoist": {"overdue_count": 4}}, _wiring_config(), {})
+    assert d2["task_follow_through"]["score"] == 50.0
+    # Missing record = ingestion gap, drops out (measured class), never a 0.
+    _raw3, d3 = ce.compute_consistency_raw({"todoist": None}, _wiring_config(), {})
+    assert d3["task_follow_through"]["score"] is None
+
+
+def test_wiring_components_inert_without_config_entry():
+    """A config without the new components never reads the new data keys —
+    legacy configs (and the sim's scripted computers) are unaffected."""
+    cfg = {"pillars": {"movement": {"components": {"daily_steps": {"weight": 1.0, "target": 8000}}}}}
+    data = {"hevy_workout_days_7d": ["2026-08-01"], "apple": {"steps": 9000}}
+    _raw, details = ce.compute_movement_raw(data, cfg)
+    assert "strength_sessions" not in details
