@@ -11,7 +11,11 @@ Pins:
     writes (week/title/date/url/bytes/duration_sec/byline/excerpt/transcript_url);
   - restart_pipeline step ordering: chronicle handler → media reset → leadin pages;
   - restart_leadin_pages seq/label logic matches wednesday_chronicle_lambda._seq_for
-    (3 lead-ins → week-01/02/03, the next real publish continues at week-04).
+    (post-#1090: 1 calendar lead-in + the genesis−1 pre-registration chapter →
+    week-01/02, the next real publish continues at week-03);
+  - the #1090 editorial curation: the retired lead-ins are OUT of the calendar,
+    and curate_prelaunch_leadins retires exactly the uncurated pre-genesis
+    records on the live table (never the prereg chapter, never post-genesis).
 """
 
 from __future__ import annotations
@@ -43,6 +47,7 @@ media = _load("restart_media_reset")
 repair = _load("restart_leadin_repair")
 pipeline = _load("restart_pipeline")
 leadin = _load("restart_leadin_pages")
+curate = _load("curate_prelaunch_leadins")
 
 
 # ── 1. Calendar offsets → dates ───────────────────────────────────────────────
@@ -279,21 +284,94 @@ def test_run_step_strips_apply_in_dry_run(monkeypatch):
 # ── 5. Lead-in pages: seq/label parity with the next real publish ────────────
 
 
-def test_leadin_seq_and_labels_continue_at_week_04(monkeypatch):
+def test_leadin_seq_and_labels_continue_at_week_03(monkeypatch):
     monkeypatch.setattr(leadin, "EXPERIMENT_START_DATE", GENESIS)
     resolved = handler.resolve_calendar(GENESIS)
     pre_dates = [e["date"] for e in resolved if e["kind"] == "chronicle"]
-    assert len(pre_dates) == 3, "this parity test assumes the 3-lead-in calendar"
+    assert len(pre_dates) == 1, "#1090 curation: ONE calendar lead-in (Before the Numbers)"
+    prereg_date = "2026-07-11"  # genesis − 1 — publish_genesis_preregistration.py's chapter
     first_publish = "2026-07-15"  # first post-genesis Wednesday
-    all_dates = sorted(pre_dates + [first_publish])
-    # the 3 lead-ins occupy week-01/02/03 in date order…
-    for i, d in enumerate(sorted(pre_dates), start=1):
-        assert leadin.seq_for(d, all_dates, 0) == i
-        assert leadin.series_label(d, all_dates, 0) == f"Prologue · Part {['I', 'II', 'III'][i - 1]}"
+    all_dates = sorted(pre_dates + [prereg_date, first_publish])
+    # the chronicle OPENS on the calendar lead-in, then the prereg chapter (#1090)…
+    assert all_dates[0] == pre_dates[0]
+    assert leadin.seq_for(pre_dates[0], all_dates, 0) == 1
+    assert leadin.series_label(pre_dates[0], all_dates, 0) == "Prologue · Part I"
+    assert leadin.seq_for(prereg_date, all_dates, 0) == 2
+    assert leadin.series_label(prereg_date, all_dates, 0) == "Prologue · Part II"
     # …and the next real publish (wednesday_chronicle_lambda._seq_for uses the same
-    # date-sorted index) continues at week-04, labelled Week 1.
-    assert leadin.seq_for(first_publish, all_dates, 1) == 4
+    # date-sorted index) continues at week-03, labelled Week 1.
+    assert leadin.seq_for(first_publish, all_dates, 1) == 3
     assert leadin.series_label(first_publish, all_dates, 1) == "Week 1"
+
+
+# ── 5b. #1090: the editorial curation of the pre-launch arc ──────────────────
+
+
+def test_calendar_curation_1090_retired_the_two_entries():
+    sks = [e["sk"] for e in handler.PRELAUNCH_CALENDAR if e["kind"] == "chronicle"]
+    assert sks == ["DATE#2026-02-28"], "the chronicle opens with 'Before the Numbers' only"
+    assert "DATE#2026-03-03" not in sks  # The Empty Journal — retired
+    assert "DATE#2026-02-22" not in sks  # The Body Votes First — retired
+    assert any("Before the Numbers" in e.get("label", "") for e in handler.PRELAUNCH_CALENDAR)
+
+
+def test_retirement_plan_targets_only_uncurated_pre_genesis():
+    visible = [
+        {"sk": "DATE#2026-02-28", "date": "2026-07-06", "title": "Before the Numbers"},
+        {"sk": "DATE#2026-03-03", "date": "2026-07-08", "title": "The Empty Journal"},
+        {"sk": "DATE#2026-02-22", "date": "2026-07-09", "title": "The Body Votes First"},
+        {"sk": "DATE#2026-07-11", "date": "2026-07-11", "title": "The Plan, On the Record", "pre_registration": True},
+        {"sk": "DATE#2026-07-15", "date": "2026-07-15", "title": "Week 1"},
+    ]
+    plan = curate.retirement_plan(visible, GENESIS)
+    assert [it["sk"] for it in plan] == ["DATE#2026-03-03", "DATE#2026-02-22"]
+
+
+def test_retirement_plan_protects_prereg_by_sk_even_without_flag():
+    visible = [{"sk": "DATE#2026-07-11", "date": "2026-07-11", "title": "The Plan, On the Record"}]
+    assert curate.retirement_plan(visible, GENESIS) == []
+
+
+def test_retirement_plan_never_touches_post_genesis():
+    visible = [
+        {"sk": "DATE#2026-07-12", "date": "2026-07-12", "title": "Day 1"},
+        {"sk": "DATE#2026-07-16", "date": "2026-07-16", "title": "Week 1"},
+    ]
+    assert curate.retirement_plan(visible, GENESIS) == []
+
+
+def test_retirement_plan_is_idempotent_after_curation():
+    visible = [
+        {"sk": "DATE#2026-02-28", "date": "2026-07-06", "title": "Before the Numbers"},
+        {"sk": "DATE#2026-07-11", "date": "2026-07-11", "title": "The Plan, On the Record", "pre_registration": True},
+    ]
+    assert curate.retirement_plan(visible, GENESIS) == []
+
+
+def test_build_retire_update_inverts_untombstone_and_redate():
+    expr, names, values = curate.build_retire_update("DATE#2026-03-03", "NOW-ISO")
+    assert values[":t"] is True and values[":ts"] == "NOW-ISO"
+    assert values[":r"] == curate.TOMBSTONE_REASON
+    assert values[":pilot"] == "pilot" and values[":h"] is True
+    assert values[":d"] == "2026-03-03"  # date restored to the sk's original date
+    assert names == {"#p": "phase", "#h": "hidden", "#d": "date"}
+    assert "REMOVE redated_at, redated_from_sk" in expr
+
+
+def test_orphan_week_pages_sweep_targets_only_stale_article_pages():
+    keys = [
+        "generated/journal/posts/week-01/index.html",
+        "generated/journal/posts/week-02/index.html",
+        "generated/journal/posts/week-03/index.html",
+        "generated/journal/posts/week-04/index.html",
+        "generated/journal/posts.json",  # the manifest is never swept
+        "generated/journal/archive/pilot/posts/week-02/index.html",  # archived — different prefix, never listed/swept
+    ]
+    assert curate.orphan_week_pages(keys, 2) == [
+        ("generated/journal/posts/week-03/index.html", 3),
+        ("generated/journal/posts/week-04/index.html", 4),
+    ]
+    assert curate.orphan_week_pages(keys, 4) == []
 
 
 # ── 6. #949: the pre-genesis dek is reframed on every rendered surface ────────

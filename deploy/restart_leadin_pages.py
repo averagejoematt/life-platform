@@ -15,10 +15,12 @@ deploy/restart_pipeline.py AFTER restart_chronicle_handler (which resurrects +
 re-dates the PRELAUNCH_CALENDAR chronicle lead-ins) and AFTER restart_media_reset
 (which resurrects the calendar's podcast prequel) — order: chronicle → media →
 leadin pages — so the pages it renders reflect the fully re-dated arc. It covers
-ALL visible (phase=experiment, non-tombstoned) chronicle records: with 3 lead-ins
-it writes week-01/02/03 in date order, and the next real Wednesday publish
+ALL visible (phase=experiment, non-tombstoned) chronicle records in date order —
+post-#1090 curation that is the one PRELAUNCH_CALENDAR lead-in (week-01 "Before
+the Numbers") plus, once publish_genesis_preregistration.py has run, the genesis−1
+pre-registration chapter (week-02) — and the next real Wednesday publish
 (wednesday_chronicle_lambda._seq_for indexes the same date-sorted list) continues
-at week-04. Standalone use:
+at the next slot (week-03). Standalone use:
 
     python3 deploy/restart_leadin_pages.py            # dry-run (default): print the plan
     python3 deploy/restart_leadin_pages.py --apply    # write S3 + CloudFront invalidation
