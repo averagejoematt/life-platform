@@ -143,6 +143,13 @@ aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platfo
   s3://matthew-life-platform/claude-memory-backup/ --region us-west-2
 ```
 
+**Automated since 2026-07-11 (#1026):** the daily launchd agent
+`com.matthewwalker.claude-memory-backup` (`backup/install.sh`) runs this sync plus a
+`datadrops/` → `s3://…/datadrops-archive/` sweep — RPO is now ~1 day instead of
+"whenever the last wrap ran". The wrap-step sync stays as belt-and-suspenders.
+Caveat: the datadrops leg needs `/bin/bash` granted Full Disk Access (macOS TCC blocks
+launchd from ~/Documents; the same block is silently failing the ingest watcher).
+
 **Never commit this directory (or its export) to the repo — the repo is public** and
 memory files contain personal detail and security-incident narrative by design.
 

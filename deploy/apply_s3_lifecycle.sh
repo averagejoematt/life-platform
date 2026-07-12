@@ -18,6 +18,12 @@
 #   raw/           keep current forever; noncurrent versions 7d (keep 1); abort MPU 7d
 #   uploads/       expire 30d; noncurrent 7d
 #   generated/     keep current forever; noncurrent 7d (keep 1)
+#   claude-memory-backup/  keep current forever; noncurrent 90d (#1026 —
+#                  daily-changing memory files on a versioned bucket would
+#                  otherwise accrete versions unboundedly)
+#   datadrops-archive/     keep current forever; noncurrent 30d (keep 1)
+#                  (#1026 — laptop datadrops originals; NOT under uploads/,
+#                  whose 30d EXPIRATION would silently delete the archive)
 #   config/        keep current forever; noncurrent 30d (keep 3)
 #   cloudtrail/    expire 90d (audit-log class); noncurrent 7d
 #   remediation-log/dispatch-dedupe/  expire 1d (dedupe markers only; the
@@ -80,6 +86,18 @@ aws s3api put-bucket-lifecycle-configuration \
         "Status": "Enabled",
         "Filter": {"Prefix": "generated/"},
         "NoncurrentVersionExpiration": {"NoncurrentDays": 7, "NewerNoncurrentVersions": 1}
+      },
+      {
+        "ID": "claude-memory-backup-expire-noncurrent-90d",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "claude-memory-backup/"},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 90}
+      },
+      {
+        "ID": "datadrops-archive-expire-noncurrent-30d",
+        "Status": "Enabled",
+        "Filter": {"Prefix": "datadrops-archive/"},
+        "NoncurrentVersionExpiration": {"NoncurrentDays": 30, "NewerNoncurrentVersions": 1}
       },
       {
         "ID": "config-expire-noncurrent-30d",
