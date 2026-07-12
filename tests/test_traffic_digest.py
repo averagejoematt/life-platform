@@ -120,6 +120,25 @@ def test_watched_block_zero_views_is_explicit():
     assert "no views this week" in html
 
 
+def test_watched_pages_exist_as_site_pages():
+    """Drift guard (#741): if a watched artifact's permalink ever moves, the
+    travel watch would silently read 0 forever. Every default watched path
+    must be a real permalink page in site/ (what the CF logs will record)."""
+    site = os.path.join(os.path.dirname(__file__), "..", "site")
+    for page in td.WATCHED_PAGES:
+        index = os.path.join(site, page.strip("/"), "index.html")
+        assert os.path.isfile(index), f"watched page {page} has no site page at {index}"
+
+
+def test_build_log_cross_link_targets_a_watched_page():
+    """#741: the build log's standing cross-link must point at a path the
+    travel watch measures — the link and the measurement can't drift apart."""
+    js_path = os.path.join(os.path.dirname(__file__), "..", "site", "assets", "js", "dispatches.js")
+    with open(js_path, encoding="utf-8") as f:
+        js = f.read()
+    assert any(f'href="{p}"' in js for p in td.WATCHED_PAGES), "build log (dispatches.js) does not link any travel-watched page"
+
+
 # ── ADR-133 (#739): the digest also emits UniqueVisitors7d / PageViews7d so
 # cost_governor_lambda can read the trailing 7-day baseline for the surge-mode
 # ceiling rule. lambda_handler pulls its own boto3 clients, so these tests
