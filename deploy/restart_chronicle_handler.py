@@ -83,10 +83,18 @@ CHRONICLE_PREFIXES = [
 # wrong timing references.) Privacy absolutes also hold: no named vices, no
 # genome specifics, no real public figures (tests/test_no_real_names_in_chronicle.py).
 # The reset auto-carries this calendar unless --no-default-leadins.
+#
+# CURATED 2026-07-12 (#1090, Matthew-directed editorial): "The Empty Journal"
+# (DATE#2026-03-03) and "The Body Votes First" (DATE#2026-02-22) are RETIRED.
+# The chronicle now opens on the two strongest beats: "Before the Numbers"
+# (genesis−6, this calendar) followed by "The Plan, On the Record" — the
+# genesis−1 pre-registration chapter, which is NOT a calendar entry: it is
+# re-published after every pipeline run by publish_genesis_preregistration.py
+# (see its WIPE WARNING) and sorts after the calendar lead-ins by date.
+# Retiring the two records on the LIVE table (the 2026-07-10 reset already
+# resurrected them) is deploy/curate_prelaunch_leadins.py's job.
 PRELAUNCH_CALENDAR = [
     {"kind": "chronicle", "sk": "DATE#2026-02-28", "days_before": 6, "label": "Prologue · Before the Numbers"},
-    {"kind": "chronicle", "sk": "DATE#2026-03-03", "days_before": 4, "label": "Prologue · The Empty Journal"},
-    {"kind": "chronicle", "sk": "DATE#2026-02-22", "days_before": 3, "label": "Prologue · The Body Votes First"},
     {"kind": "podcast", "asset": "wk0", "days_before": 2, "title": "Prologue — Elena previews the experiment"},
 ]
 
