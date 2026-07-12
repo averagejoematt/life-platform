@@ -166,7 +166,11 @@ export async function renderChallenges(d) {
   const live = list.filter((c) => c.origin === "live");
   const avail = list.filter((c) => c.origin === "catalog" && c.status === "available");
   const backlog = list.filter((c) => c.origin === "catalog" && c.status === "backlog");
-  const head = figs([fig(sm.active ?? live.length, "active"), fig(avail.length + backlog.length, "in the backlog")]);
+  // #1118 — the loop-station completeness figure (the #1116 supplements pattern):
+  // how many taken-on challenges state their full hypothesis contract. An honest
+  // count, not a claim — unannotated (historical) entries simply render nothing.
+  const withLoop = live.filter((c) => (c.source_detail && !isBad(c.source_detail)) || (c.hoped_outcome && !isBad(c.hoped_outcome)) || (c.verification_method && !isBad(c.verification_method))).length;
+  const head = figs([fig(sm.active ?? live.length, "active"), live.length ? fig(`${withLoop}/${live.length}`, "with stated hypotheses") : null, fig(avail.length + backlog.length, "in the backlog")]);
   // P2.2 — the live card draws its served-but-never-drawn record: the check-in
   // streak grid (one cell per day of the run: checked-in = ember, checked-but-
   // missed = faint, ahead = outline) + the progress figs. Real cells only —
@@ -196,6 +200,19 @@ export async function renderChallenges(d) {
     `<button class="part-btn" type="button" data-checkin-btn="true">Doing this too? Log today — done</button>` +
     `<button class="part-btn" type="button" data-checkin-btn="false">Log today — missed</button>` +
     `</div><p class="part-msg" data-checkin-msg></p>`;
+  // #1118 — the closed loop on the live card face (the protocols grammar shared
+  // with supplements #1116/#1148 and experiments): why the challenge exists NOW
+  // (source_detail — the data trigger that generated it), what should visibly
+  // change if it works (hoped_outcome), and which instrument adjudicates it
+  // (verification_method). Honest-empty per ADR-104: a historical challenge
+  // without a field renders NOTHING for it — no placeholder prose, ever.
+  const VERIFY_LABELS = { self_report: "self-report (daily check-ins)", metric_auto: "automatic metrics (wearable/log data)", hybrid: "self-report + automatic metrics" };
+  const loopBlock = (c) => {
+    const whyNow = c.source_detail && !isBad(c.source_detail) ? `<p class="rd-line supp-why-now"><span class="label">why now</span> ${esc(c.source_detail)}</p>` : "";
+    const hope = c.hoped_outcome && !isBad(c.hoped_outcome) ? `<p class="rd-line supp-hope"><span class="label">hoped outcome</span> ${esc(c.hoped_outcome)}</p>` : "";
+    const vm = c.verification_method && !isBad(c.verification_method) ? `<p class="rd-line supp-measure"><span class="label">measured by</span> ${esc(VERIFY_LABELS[c.verification_method] || c.verification_method)}</p>` : "";
+    return whyNow || hope || vm ? `<div class="supp-loop">${whyNow}${hope}${vm}</div>` : "";
+  };
   const liveCard = (c) => {
     const done = !!c.completed_at || c.status === "completed";
     const active = !done && (c.status === "active" || !!c.activated_at);
@@ -203,7 +220,7 @@ export async function renderChallenges(d) {
     const progFigs = active && pr.duration_days
       ? `<p class="rd-meta label">${[pr.checkin_days != null && `${pr.checkin_days}/${pr.duration_days} days checked in`, pr.completion_pct != null && `${fmt(pr.completion_pct)}% complete`, pr.success_rate != null && `${fmt(pr.success_rate)}% success`].filter(Boolean).join("  ·  ")}</p>`
       : "";
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p>${active ? checkinControl(c) : ""}</article>`;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(c.name || ttl(c.challenge_id || "Challenge"))}</h3><span class="rd-badge ${active ? "rd-badge-live" : ""}">${done ? "completed" : active ? "active" : "candidate"}</span></header>${c.description && !isBad(c.description) ? `<p class="rd-why">${esc(c.description)}</p>` : ""}${loopBlock(c)}${checkinGrid(c)}${progFigs}<p class="rd-meta label">${[c.character_xp_awarded != null && c.character_xp_awarded + " XP", c.badge_earned && `${icon("milestone")} badge`].filter(Boolean).join("  ·  ")}</p>${active ? checkinControl(c) : ""}</article>`;
   };
   // P2.2 — catalog cards carry their evidence: the summary, the tier chip, and
   // the recommending board persona. The served `icon` field is emoji — never drawn (§8).

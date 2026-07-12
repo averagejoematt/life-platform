@@ -305,7 +305,10 @@ SOURCES YOU CAN DRAW FROM:
 
 RULES:
 - Do NOT create challenges that duplicate existing active/candidate challenges
-- Each challenge must specify: name, description, source, source_detail, domain, difficulty, duration_days, protocol, success_criteria
+- Each challenge must specify: name, description, source, source_detail, domain, difficulty, duration_days, protocol, success_criteria, hoped_outcome
+- hoped_outcome states the falsifiable expected result if the challenge works — what should visibly
+  change by the end of the run, in one honest sentence. Modest is fine; "no visible signal is the
+  likely outcome" is a valid expectation. Never promise a number the duration can't produce.
 - Domain must be one of: sleep, movement, nutrition, supplements, mental, social, discipline, metabolic, general
 - Difficulty: easy (habit reinforcement), moderate (behaviour change), hard (significant discomfort)
 - Return 0 challenges if there's insufficient data or no clear signal. Quality over quantity.
@@ -323,6 +326,7 @@ Respond ONLY with valid JSON:
       "duration_days": 7,
       "protocol": "Exactly what to do each day",
       "success_criteria": "How to know you succeeded",
+      "hoped_outcome": "The falsifiable expected result if it works — honest, duration-sized",
       "tags": ["tag1", "tag2"],
       "verification_method": "self_report|metric_auto|hybrid",
       "metric_targets": {}
@@ -332,11 +336,29 @@ Respond ONLY with valid JSON:
 }"""
 
 
-def generate_challenges(context):
-    """Call Claude Sonnet to generate challenge candidates."""
-    user_message = f"""Here is the current platform data for challenge generation.
-Today is {datetime.now(timezone.utc).strftime('%Y-%m-%d')} ({datetime.now(timezone.utc).strftime('%A')}).
+def _phase_context_block():
+    """#1138/#1118: the ONE mandatory experiment-phase grounding block for the
+    generation prompt — hoped_outcome is AI-written narrative, so the writer must
+    know what day/phase it is (a Day-2 challenge can't hope for a 30-day trend).
+    No-arg build reads EXPERIMENT_START_DATE + today (PT). Fail-soft to "" only
+    on an import/runtime error — the bundle always ships ai_context, and
+    tests/test_phase_context_coverage.py pins the block's presence."""
+    try:
+        from ai_context import build_experiment_phase_context, format_experiment_phase_context
 
+        return format_experiment_phase_context(build_experiment_phase_context())
+    except Exception as e:  # noqa: BLE001 — grounding must never hard-fail generation
+        logger.warning("phase-context block unavailable (non-blocking): %s", e)
+        return ""
+
+
+def build_generation_prompt(context):
+    """Build the user message for challenge generation — extracted pure so the
+    #1138 phase-context coverage suite can drive it offline."""
+    phase_block = _phase_context_block()
+    return f"""Here is the current platform data for challenge generation.
+Today is {datetime.now(timezone.utc).strftime('%Y-%m-%d')} ({datetime.now(timezone.utc).strftime('%A')}).
+{phase_block}
 JOURNAL ENTRIES (14 days, enriched fields):
 {json.dumps(context.get('journal_14d', []), indent=2, default=str)[:4000]}
 
@@ -357,6 +379,13 @@ EXISTING CHALLENGES (do NOT duplicate):
 
 Generate 1-5 challenge candidates based on the strongest signals in this data.
 If no clear signal exists, return 0 challenges. Quality over quantity."""
+
+
+def generate_challenges(context):
+    """Call Claude Sonnet to generate challenge candidates."""
+    # COST-OPT-2: the daily-changing phase block rides the USER message — the
+    # cache_control-wrapped SYSTEM_PROMPT must stay byte-stable.
+    user_message = build_generation_prompt(context)
 
     payload = json.dumps(
         {
@@ -450,6 +479,10 @@ def store_challenge(challenge: dict):
         "duration_days": int(challenge.get("duration_days", 7)),
         "protocol": challenge.get("protocol", ""),
         "success_criteria": challenge.get("success_criteria", ""),
+        # #1118 — the protocols-grammar hypothesis: what should visibly change if
+        # the challenge works. Honest-empty ("") if the model omitted it — the
+        # render shows nothing rather than placeholder prose (ADR-104).
+        "hoped_outcome": challenge.get("hoped_outcome", ""),
         "metric_targets": challenge.get("metric_targets", {}),
         "status": "candidate",
         "verification_method": challenge.get("verification_method", "self_report"),

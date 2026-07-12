@@ -149,6 +149,25 @@ POPULATED_GATE_PAGES = [
         ],
     },
     {
+        # #1118 — the protocols grammar on challenges: taken-on cards state their
+        # hypothesis contract — why now (source_detail), hoped outcome, measured
+        # by (verification_method). The fixture carries 3 annotated live entries
+        # + 1 historical UNANNOTATED entry (daily-10k-steps), so this page renders
+        # BOTH states: loop blocks mount on the annotated cards, and the
+        # historical card stays honest-empty (ADR-104 — no placeholder prose).
+        "path": "/protocols/challenges/",
+        "name": "Protocols · challenges [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".rd-card", "min_count": 6, "desc": "taken-on + backlog cards render from the challenges fixture"},
+            {
+                "selector": ".supp-loop",
+                "min_count": 3,
+                "desc": "why-now / hoped-outcome / measured-by loop blocks render on annotated live cards (#1118)",
+            },
+        ],
+    },
+    {
         # #974: the cockpit's levers strip (the Protocols station in the daily
         # slice) only materializes with supplement-registry/experiment data — the
         # empty-mock pass renders its honest-hidden state, so this pass asserts
@@ -202,6 +221,7 @@ POPULATED_API_MOCKS = {
     "**/api/vitals_depth": "vitals_depth.json",
     "**/api/labs": "labs.json",
     "**/api/experiments": "experiments.json",
+    "**/api/challenges": "challenges.json",
     "**/api/supplements": "supplements.json",
     "**/api/presence": "presence.json",
     "**/api/routine": "routine.json",
