@@ -47,7 +47,9 @@
           "rationale": "Heavy training + sweat + deficit increases depletion risk. L-threonate specifically targets the CNS.",
           "impact": "Sleep onset latency, deep sleep %, cognitive clarity",
           "watching": "Eight Sleep score on adherent vs non-adherent nights",
-          "synergy": "sleep_supps"
+          "synergy": "sleep_supps",
+          "hoped_outcome": "Shorter sleep-onset latency and a higher deep-sleep share on adherent nights \u2014 the sleep stack's anchor claim.",
+          "measured_by": "Eight Sleep onset latency + deep-sleep % on adherent vs non-adherent nights; Whoop sleep performance as the cross-check."
         },
         {
           "key": "glycine",
@@ -84,7 +86,9 @@
           "rationale": "Synergistic with Eight Sleep cooling \u2014 both lower core temp via different mechanisms.",
           "impact": "Core temp drop, sleep onset latency, deep sleep %",
           "watching": "Eight Sleep temp data correlation",
-          "synergy": "sleep_supps"
+          "synergy": "sleep_supps",
+          "hoped_outcome": "A faster core-temperature drop at bedtime, showing up as shorter sleep-onset latency.",
+          "measured_by": "Eight Sleep bed-temperature and sleep-onset data \u2014 the same instrument the mechanism acts on."
         },
         {
           "key": "apigenin",
@@ -122,7 +126,9 @@
           "rationale": "Best risk/reward in the sleep stack \u2014 extremely safe with plausible mechanism.",
           "impact": "Sleep onset latency, subjective sleep quality",
           "watching": "Sleep quality trend",
-          "synergy": "sleep_supps"
+          "synergy": "sleep_supps",
+          "hoped_outcome": "Calmer sleep onset as part of the pre-bed stack \u2014 tested as a unit with magnesium and glycine, not expected to be separable on its own.",
+          "measured_by": "Eight Sleep sleep-score trend on stack-adherent vs non-adherent nights."
         },
         {
           "key": "theanine",
@@ -161,7 +167,9 @@
           "watching": "Vivid dream reports in journal",
           "synergy": "sleep_supps",
           "questioning": true,
-          "questionReason": "Individual response varies \u2014 vivid dreams may disrupt sleep for some"
+          "questionReason": "Individual response varies \u2014 vivid dreams may disrupt sleep for some",
+          "hoped_outcome": "A calmer wind-down and easier sleep onset without sedation.",
+          "measured_by": "Sleep-onset latency (Eight Sleep) + wind-down and vivid-dream notes in the journal."
         }
       ]
     },
@@ -204,7 +212,9 @@
           ],
           "rationale": "CGM data will validate whether glucose disposal improves \u2014 clear measurable outcome.",
           "impact": "Glucose variability, insulin sensitivity via CGM",
-          "watching": "CGM glucose disposal post-meals"
+          "watching": "CGM glucose disposal post-meals",
+          "hoped_outcome": "Flatter post-meal glucose and lower overall glucose variability.",
+          "measured_by": "CGM post-meal excursions and variability on adherent vs non-adherent stretches."
         },
         {
           "key": "green_tea",
@@ -242,7 +252,9 @@
           "impact": "Marginal fat oxidation, antioxidant status",
           "watching": "No clear signal expected",
           "questioning": true,
-          "questionReason": "Effect size too small to measure \u2014 pure insurance play"
+          "questionReason": "Effect size too small to measure \u2014 pure insurance play",
+          "hoped_outcome": "A marginal fat-oxidation assist \u2014 honestly small; no visible signal is the likely outcome.",
+          "measured_by": "The weight-trend rate read against the deficit math; a clear null here retires it."
         },
         {
           "key": "probiotics",
@@ -280,11 +292,60 @@
           "impact": "GI comfort, digestion quality",
           "watching": "GI comfort changes on vs off",
           "questioning": true,
-          "questionReason": "Candidate for reassessment \u2014 fermented foods may be food-first approach"
+          "questionReason": "Candidate for reassessment \u2014 fermented foods may be food-first approach",
+          "hoped_outcome": "Steadier GI comfort and digestion quality.",
+          "measured_by": "GI-comfort notes in the journal on vs off; no lab marker is expected to move."
+        }
+      ]
+    },
+    "cognitive": {
+      "name": "Cognitive Support",
+      "icon": "\ud83e\udde0",
+      "desc": "Neuroplasticity, focus, and the cognitive infrastructure.",
+      "items": [
+        {
+          "key": "lions_mane",
+          "name": "Lion's Mane",
+          "dose": "500-1000mg",
+          "timing": "AM",
+          "ev": "emerging",
+          "evPct": 35,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 15,
+          "paused": true,
+          "pausedReason": "Not in the starting stack \u2014 emerging evidence only, held until adherence can be tracked",
+          "why": "Cognitive performance matters. Emerging evidence \u2014 don't stress if missed.",
+          "science": [
+            "Stimulates nerve growth factor (NGF) synthesis",
+            "Supports neuroplasticity and cognitive function",
+            "Not yet confirmed in large RCTs"
+          ],
+          "sources": [
+            {
+              "title": "Lion's mane stimulates nerve growth factor synthesis (preclinical)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/24266378/",
+              "stance": "supports"
+            },
+            {
+              "title": "Hericium erinaceus improves mild cognitive impairment (small RCT)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/18844328/",
+              "stance": "supports"
+            },
+            {
+              "title": "No large-scale human RCTs \u2014 most evidence is preclinical or small samples",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/?term=lion%27s+mane+hericium+erinaceus+cognitive+human+RCT",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Held out of the starting stack. A good N=1 candidate if picked up with real adherence tracking.",
+          "impact": "Subjective cognitive clarity, focus during deep work",
+          "watching": "Journal focus reports",
+          "questioning": true,
+          "questionReason": "Emerging evidence only \u2014 good N=1 candidate"
         }
       ]
     }
   },
   "genome_snps": [],
-  "total_count": 7
+  "total_count": 8
 }
