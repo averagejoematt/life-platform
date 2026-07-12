@@ -1,126 +1,122 @@
-# HANDOVER — First Fable session: character math v2 epic closed + 10-PR backlog paydown, all merged & deployed — 2026-07-11
+# HANDOVER — Second Fable paydown: 11 PRs merged+deployed, cockpit gains its two missing stations, Now/Next backlog nearly empty — 2026-07-11 (late)
 
-> Instruction: "read the memory and handover and plan an efficient session to try and get
-> as much of the open issues paid down" → mid-session: **"i also approve all merges and
-> deploys this session"** (explicit in-session unblock).
+> Instruction: "read memory and handover to form a plan to do as much pay down of open
+> issues in git efficiently, i approve all merges and deploys" (approval upfront).
 
 ## What ran
 
-First Fable 5 session, launch eve T−1 (genesis 2026-07-12 tomorrow). Two tracks in
-parallel: **Track A** — two waves of `worktree-implementer` fan-out over the
-self-contained tier (6 agents wave 1, 2 agents wave 2 after main settled); **Track B** —
-the driver (Fable, main tree) took the character-math epic #956 whole, since its 8
-children interlock in three files and 4 of them were explicitly design calls. Everything
-merged serially via the /reconcile-branch ritual and deployed the same session.
+Second Fable session of launch eve (hours after the char-math-v2 session, genesis at
+midnight). Two tracks: **Track A** — 8 `worktree-implementer` agents (7 wave-1 on
+disjoint surfaces, #975 held to wave 2 because it shares /now/ with #974); **Track B** —
+the driver did #1025 (git-surgery, attended-class), the engine-doc re-verification +
+`check_doc_index --strict` promotion, the serial reconcile-merge queue, all deploys, and
+one fix-forward when the deploy pipeline broke.
 
-## What shipped (10 PRs #1049–#1059, ALL merged + deployed + verified)
+## What shipped (11 PRs #1060–#1065, #1067–#1070, ALL merged + deployed + verified)
 
-**The flagship — epic #956 Character math v2, CLOSED (engine v1.6.0, config v1.5.0, ADR-134):**
-- **PR #1055** (#958/#959/#960/#961/#962/#963/#964): XP zero-point moved to "a decent day"
-  (decay 2→1; slow improver 0 XP/700 debt → 1027 XP/0 debt); XP gated on
-  coverage_hold/not_instrumented (phantom relationships −100 dead); food-delivery modifier
-  + challenge XP became engine inputs with provenance + debt-first paydown; confirmed dark
-  stretches persist the down-streak AND bypass the XP buffer (30-day silent month: ~2
-  headline levels → **12 levels**, 36→24, recovery ~28d, 3-level scar at day 420 — the
-  cycle-4 failure mode is dead); xp_buffer capped at 40; headline weighted-mean
-  renormalizes over instrumented pillars (**Elite reachable at day 362** of sustained ~90,
-  was mathematically impossible at 93-cap); vice_streaks wired + Vice Shield data-driven;
-  streak/weekend consistency inputs derived from stored history; buddy_engagement removed
-  (B-3 precedent); #963 DECIDED: effects stay on EMA scores, narrative reworded.
-- **PR #1056** (#965): source wiring — hevy→movement `strength_sessions` (.20 behavioral),
-  reading→mind `reading_practice` (.10 behavioral, GSI2), todoist→consistency
-  `task_follow_through` (.15 measured) — all day-count metrics, volume-gaming resistant.
-- Validation: all five 420-day sim scenarios monotone-honest (`scripts/character_sim_year.py`
-  is the regression harness); oscillator-beats-steady inversion gone (b L67 < a L76);
-  28 new tests in `tests/test_character_math_v2.py`; 135 char tests green. ADR-134 +
-  amendment in DECISIONS.md; audit-doc verdict table fully resolved; CHARACTER.md rewritten.
+- **#1060** (no issue): re-verified COACH_STANCE/HYPOTHESIS/READINESS/SCORING against
+  their 07-11 sources (one real claim drift fixed: COACH_STANCE now documents #966's
+  terminal CoachHold), then **promoted the #1057 source-newer-than-verify gate advisory →
+  `--strict`** in docs-ci + ci-cd (zero advisories outstanding at flip).
+- **#1061** (#935): real `setup/setup_whoop_auth.py` — callback-server OAuth flow
+  mirroring fix_withings_oauth.py; the premise had shifted (a paste-URL variant existed
+  at deploy/ since 06-13 — moved, rewritten, docs reconciled). Interactive leg untested
+  until the next real re-auth, stated plainly.
+- **#1062** (#1020): **SW is a deliberate cockpit-PWA island** (home + /now/ + coaching);
+  story-page registration was drift — removed via the generators. The issue's "hand-bumped
+  VERSION" premise was stale: build-SHA stamping already existed in both deploy paths —
+  shipped the myth removal + a hard-fail stamp guard. Decision recorded on the issue.
+- **#1063** (#1014): deep-tree sub-nav — evidence-engine tiles are now real `<a>` anchors
+  (new-tab/long-press work), mobile rails gain a live `k/n` position readout + an
+  "all N topics" index toggle; one engine change covers /data/ + /method/ + /protocols/.
+  2-tap reachability measured at 390×844.
+- **#1064** (#1019): skeleton states for /story/agents/ + the /data/ readout (tokens-based
+  shimmer, no spinners), sessionStorage stale-while-revalidate for the agents feed,
+  plus a real fetch-race bug found and fixed in both routers (rapid taps could paint a
+  stale response over the newest selection). SW-level SWR deferred to the #1020 island.
+- **#1065** (#974): **the cockpit levers station** — /now/ now shows the Protocols
+  station (supplement stack + running experiments "day N of D" with meter, linking
+  /protocols/), pre-genesis honest ("staged for Day 1"). Training lever needs a routine
+  endpoint → filed **#1066**.
+- **#1067** (#1015): **section-TOC primitive** (DESIGN_SYSTEM_V5 §10.8) — top-sticky
+  collapsible "on this page" bar with real slug ids (shareable deep links) on
+  /data/labs/ (~19 screens), /data/character/, /gear/; /now/ deferred with reasoning.
+- **#1068** (#968): ADR-108 quality gate on the public board ask/followup surface —
+  evaluate-then-regenerate-once, **fail-open under a hard latency budget** (voice
+  fidelity never becomes a reader-facing timeout), verdicts → CW metric + EVALRET
+  retention (closes the "unmeasured" gap). ask/explain correctly scoped OUT
+  (narrator-voiced, no voice spec). ADR-103 posture row + ADR-108 scope note added.
+  Deployed: `cdk deploy LifePlatformServe` (new gate-invoke IAM) + deploy_site_api.sh.
+- **#1069** (#975): **the inputs station** — per-channel freshness marks on /now/
+  (`food · today`, `journal · 6d`), registry-owned channel set, framed as instrument
+  health (muted ember past registry tolerance, never red/streaks/shame); /api/presence
+  extended with a `channels` projection (raw channel_detail still never leaks).
+  Deployed API-before-frontend.
+- **#1070** (fix-forward): the #1067+#1069 site deploys FAILED at "Building
+  content-hashed assets" — the ADR-098 full-graph hasher treats ANY `/assets/…` path
+  string as a dependency edge **including comments**; section_toc.css's header
+  ("Companion to /assets/js/section_toc.js") + the JS's real self-injection formed a
+  false js→css→js cycle. Live site safely stayed on the last good build (fail happened
+  before QA/rollback). Comment reworded, hasher annotated with the trap, recovery
+  deploy GREEN.
 
-**Track A (8 agent PRs):**
-- **#1051** (#1021, Now): /story/timeline/ launch-eve self-contradictions — pre-start
-  anchor from true `EXPERIMENT_START`, quiet-stretch cut pre-genesis, + a bonus UTC-midnight
-  Day-N bug (hero now uses `genesisCount()`); verified both sides of tomorrow's boundary.
-- **#1050** (#967): presence block injected into daily_debrief/monday_compass/weekly/monthly
-  digests (same daily_brief seam; debrief allow-list moves with the block); 26 tests.
-- **#1052** (#966): grounded-generation gate on the daily brief's 4 legacy AI calls via a
-  `_ground_legacy_output` reuse of the existing harness; **quality-gate HOLD is now terminal**
-  (new `CoachHold` sentinel distinguishes deliberate holds from infra Nones — only errors
-  fall back to legacy).
-- **#1053** (#1018): panelcast 16.6MB WAV → **3.3MB MP3 live** (80kbps mono LAME via new
-  `lambdas/audio_encode.py`, fail-open to WAV); lameenc layer built + attached (CDK email
-  stack deployed); wk0 republished + CDN invalidated. Deviation: MP3 not AAC (no
-  lambda-sized AAC encoder; 250KB lameenc vs ~40MB PyAV). **Spot-listen still owed by Matthew.**
-- **#1054** (#1039): render-gate realistic-data pass (fixtures for vitals/labs/experiments)
-  — proven to catch the #1008 overflow class the empty-mock pass is structurally blind to.
-- **#1049** (#972): 8 done-once/decision-contradicting deploy scripts archived with
-  tombstones; `v4_cutover.sh` correctly KEPT (live redirect tooling per SITE_AUTHORING §6).
-- **#1057** (#973): docs-ci source-newer-than-verify gate (advisory; `--strict` ready) —
-  **caught 4 real drifts day one** (COACH_STANCE ×3, HYPOTHESIS ×1, both verified 07-10 vs
-  sources committed 07-11); + 2 new discovered literals (restart 40-URL surface, hypothesis
-  cadence).
-- **#1058** (#970): d2f ×29 / safe_float ×12 / query_range ×8 consolidated onto
-  digest_utils (+264/−562); fixed hypothesis_engine's unpaginated query_range (silent 1MB
-  truncation) and challenge_generator's missing phase filter (real behavior change, next
-  weekly run).
-
-**Driver-attended:** **#1059** (#1026): daily launchd backup — memory dir →
-`claude-memory-backup/` + datadrops → **top-level `datadrops-archive/`** (NOT uploads/ —
-its 30d lifecycle EXPIRATION would have deleted the archive); lifecycle + delete-protection
-applied; agent loaded, memory leg green FROM launchd; restore drill 0-diff; initial 4.4GB
-sync done (167/167 files).
+**Driver-attended:** **#1025 closed** — dangling tip cf3c5586 verified byte-identical
+already-landed via PR #334 (not pushed); all 3 stashes dropped with recorded rationales
++ recovery SHAs (`45bae08d`/`a6ed1028`/`c307fe04`, recoverable until gc). Stash list now
+empty.
 
 ## Verification
 
-Serial reconcile-merge queue (doc-sync `--apply` per PR, truth gate green at every step,
-`--check` PASSED on final main). **Two fleet deploys (95/95 each)**, config v1.4.0 then
-v1.5.0 pushed to `config/matthew/character_sheet.json`, site-api deployed immediately
-after #1051, site auto-deploys green through smoke+visual-AI QA (2 runs), CDK
-LifePlatformEmail deployed (clean diff read first: 18 `[~]` function updates, no
-destroys). Post-deploy: canary all_pass ×2, MCP 401-boot ×2, character-sheet healthcheck
-200, wk0.mp3 live (200, audio/mpeg, 3465600 bytes). Epic #956 closed with DoD evidence;
-all 12 story issues auto-closed. Session branches + 13 clean worktrees removed; the 3
-stashes + dangling tip (#1025 territory) verified untouched.
+Serial reconcile queue with `git fetch` per leg (last session's lesson); doc-sync
+`--apply` per test-adding PR; truth gate green at every step and `--check` PASSED on
+final main. The #1063/#1064/#1067 triple-overlap in `evidence.js` produced one real
+semantic conflict — hand-merged to keep skeleton + race-guard + TOC mount (TOC mounts
+after the race guard, never on a superseded paint), render gate run on the combined
+tree before merging. Deploys: `cdk deploy LifePlatformServe` (clean diff read first),
+site-api ×2, site auto-deploys (final run GREEN through smoke + visual-AI QA; live
+`/version.json` == main). Post-deploy: canary all_pass, MCP 401-boot, /api/presence
+serving channels, both /now/ stations + section_toc.js live. All 9 issues CLOSED, 0
+open PRs, worktrees/branches removed.
 
 ## Gotchas / new reflexes
 
-- **Fetch before every reconcile leg:** the #1057 reconcile ran against a stale local
-  `origin/main` (fetched before #1059 merged) — harmless here because the branch didn't
-  touch #1059's files, but the same slip on overlapping files would silently revert a
-  merged PR via the squash diff. `git fetch` is part of the ritual, per leg.
-- **`git add -A` on a conflicted tree bakes conflict markers into the commit** (add marks
-  conflicts resolved) — and `sync_doc_metadata --apply` will happily rewrite literals
-  INSIDE both conflict sides first, making them look identical. Resolve markers BEFORE
-  the doc-sync apply/commit.
-- **macOS TCC breaks launchd agents under ~/Documents** — exit 126, "Operation not
-  permitted". The **existing `life-platform-ingest` watcher is silently failing the same
-  way** (predates this session). Fix pattern: stage the script to `~/.local/bin`, keep
-  data legs degrading gracefully; the real cure is Matthew granting `/bin/bash` Full Disk
-  Access (fixes both agents).
-- **uploads/ has a 30-day EXPIRATION lifecycle** — never archive anything durable there.
-- Under the v2 XP economy the uncapped demotion buffer pinned at 100 and silently blocked
-  ALL level-downs for ~40 days — first sim run after the decay retune caught it (drop
-  went −12 → −1 before the buffer cap + dark bypass). The sim harness earns its keep.
+- **The asset hasher reads comments:** any `/assets/js|css/<file>` string in ANY asset
+  is a dependency edge (deliberately conservative, ADR-098) — a prose back-reference in
+  a CSS header hard-failed the deploy as a false cycle. Name files in comments WITHOUT
+  the /assets/ prefix. The hasher now carries a warning comment at ASSET_REF_RE.
+- **A failed "Deploy public site" job is fail-safe:** it dies before S3 sync, so live
+  stays on the previous build and QA/rollback never run — but the tell is site-deploy
+  runs showing `failure` with QA `skipped`, NOT a rollback notification.
+- **The render gate + local suites can't catch deploy-path-only failures** (the hasher
+  runs only in sync_site_to_s3.sh) — for changes adding new asset files, run
+  `python3 deploy/hash_site_assets.py <staged-copy>` locally before merging.
+- Two agents each did a banned stash round-trip (both self-reported, both recovered,
+  stack verified empty at wrap) — the ban needs to be louder in the implementer brief.
 
 ## Next picks / residual
 
-- **Matthew (Sunday, unchanged):** weigh-in → pipeline re-run →
-  `fix_prologue_cycle_and_subscribe_ttl.py --apply` → `seed_genesis_preregistration.py
-  --apply` + `publish_genesis_preregistration.py --apply`. **New:** panelcast wk0
-  spot-listen (quality knob `PANELCAST_MP3_KBPS=96`); grant `/bin/bash` Full Disk Access
-  (enables datadrops backup leg + un-breaks the ingest watcher); **locate the genome
-  original** (datadrops/genome/ is empty and no genome object exists in the bucket — flagged
-  on #1026); decisions #1023 (privacy-vs-gear affiliate copy) / #1029 / #1017.
-- **Next session:** re-verify COACH_STANCE.md + HYPOTHESIS.md (the 4 #1057 advisory
-  drifts), then flip `check_doc_index --strict` in docs-ci; #1025 orphan-commit rescue
-  (attended); #936 DR swap-back drill (attended); #935 whoop script; #741 career artifact
-  (outward-facing); #916 MCP authorize (wait for real refresh cadence); mobile Later
-  epics #1000/#1001 + #748.
-- Post-genesis watch: first real character-sheet run on v1.6.0 (17:35 UTC Sunday) — check
-  `headline_excluded_pillars`, strength/reading/task components score, and that the Day-1
-  record is clean-slate (no pilot chaining).
+- **Matthew (unchanged from last handover):** Sunday pipeline queue + prereg scripts;
+  panelcast wk0 spot-listen; `/bin/bash` Full Disk Access grant; locate the genome
+  original; decisions **#1023** (see below) / #1029 / #1017.
+- **#1023 framed for decision:** /privacy/ says "no affiliate arrangements"; /gear/
+  carries a full affiliate disclosure — but **zero affiliate-tagged links actually exist
+  anywhere on the site** (the gear page has no external product links at all). So
+  /privacy/ states today's truth and /gear/'s disclosure is aspirational. Pick: (a) cut
+  the /gear/ disclosure until affiliate links actually ship, or (b) soften /privacy/ to
+  "no affiliate arrangements beyond disclosed product links on /gear/" if links are
+  coming. One-file change either way.
+- **Open backlog is now: #1029 (owner-gated), #936 (attended DR drill), #741 (outward
+  publish), #916 (wait-condition), #1066 (new: training lever + routine endpoint), #748 +
+  #1017 (post-genesis conditions), + the Later mobile epics #1000/#1001 remnants.**
+- Post-genesis watch (first compute ~17:35 UTC today, it's past midnight UTC):
+  character-sheet v1.6.0 first real run (`headline_excluded_pillars`, new components
+  scoring), /api/board_ask p95 after the #1068 gate, the levers/inputs stations on real
+  Day-1 data.
 
-**Build beat:** char-math-v2 (see `site/story/build/beats.json`) — epic #956 merged + fleet-deployed + config live.
+**Build beat:** cockpit-two-stations (see `site/story/build/beats.json`) — all 11 PRs merged + live.
 
-**Docs:** ADR-134 + amendment (DECISIONS.md, index regenerated), CHARACTER.md rewritten
-(v1.6.0, pins re-verified), CHARACTER_MATH_AUDIT verdict table resolved, CONTINUITY.md §4
-(launchd backup + TCC caveat), apply_s3_lifecycle.sh header (2 new prefixes) — all shipped
-IN the work PRs; docs-ci gates green at every merge and at wrap.
+**Docs:** COACH_STANCE/HYPOTHESIS/READINESS/SCORING re-verified + strict gate flipped
+(#1060); DESIGN_SYSTEM_V5 §10.8 (TOC primitive) + PWA-island paragraph; SITE_AUTHORING
+SW section; SECRETS_ROTATION/SECRETS_MAP whoop-script names; ADR-103 posture row +
+ADR-108 scope note (#1068) — all shipped IN the work PRs; docs-ci strict + all gates
+green at wrap.

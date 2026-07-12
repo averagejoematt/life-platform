@@ -890,6 +890,32 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1056"
         }
       ]
+    },
+    {
+      "id": "2026-07-11-cockpit-two-stations",
+      "date": "2026-07-11",
+      "title": "Hours before Day 1, the cockpit got the two stations it was missing",
+      "shipped": "The morning page showed what happened yesterday but not what's actually in play today — so the loop the home page teaches never closed on the one screen that opens every morning. Eleven pull requests later it does: a levers station lists the supplement stack and any running experiment as 'day N of D' with a progress meter, and an inputs station shows a freshness mark per manual channel — food, journal, training — framed as instrument health, never a streak (the channel list comes from the same registry the pipeline uses, so it can't drift). The silence that quietly ended the last cycle would now be visible on this page by day two. Around those two stations: the deepest pages (a labs readout ~19 screens tall on a phone) got a sticky on-this-page bar with shareable section links, the topic rails got real anchors and a position readout instead of blind swiping, slow fetches got skeletons instead of six seconds of bare text, the service worker's footprint became a decision instead of an accident, and the public ask-the-board surface now runs behind the same coach-voice quality gate as the daily brief — fail-open under a strict time budget, so voice checking can never become a reader-facing timeout.",
+      "gotcha": "Two of the site deploys failed before a single page shipped: the asset pipeline builds a dependency graph by scanning for asset paths, and a stylesheet's header comment politely crediting its companion script read as a circular import. The deploy died safely — the live site never noticed — but the fix was rewording a comment, and the pipeline now carries a warning about the trap.",
+      "honest_miss": "The training lever isn't on the levers station yet — the platform holds the routine data but serves no endpoint for it, so that lever shipped as a filed follow-up instead of a feature. And the new Whoop re-auth script's interactive browser leg is untested until the next real token expiry forces the drill.",
+      "prs": [
+        {
+          "label": "PR #1065",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1065"
+        },
+        {
+          "label": "PR #1069",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1069"
+        },
+        {
+          "label": "PR #1067",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1067"
+        },
+        {
+          "label": "PR #1068",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1068"
+        }
+      ]
     }
   ]
 }
