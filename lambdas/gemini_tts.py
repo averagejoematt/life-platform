@@ -11,7 +11,9 @@ AI Studio key (the managed mattsusername.com domain blocks AI Studio, so the key
 comes from a consumer Google account). Plain API key over urllib, no OAuth.
 
 Output: Gemini returns 16-bit PCM (L16 @ 24 kHz, mono); we wrap it in a WAV header
-(browsers play WAV natively) — no MP3 transcode needed (we have no ffmpeg).
+(browsers play WAV natively). Publishers compress it to spoken-word MP3 via
+lambdas/audio_encode.py (lameenc-layer, #1018) — WAV at ~385 kbps is a 16.6 MB
+cellular toll per 6-min episode; the encoder fails open back to this WAV.
 """
 
 import base64

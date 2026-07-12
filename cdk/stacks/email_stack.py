@@ -29,7 +29,7 @@ from aws_cdk import (
 from constructs import Construct
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, CF_DIST_ID, REGION
+from stacks.constants import ACCT, CF_DIST_ID, LAMEENC_LAYER_ARN, REGION
 from stacks.lambda_helpers import create_platform_lambda
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
@@ -203,6 +203,9 @@ class EmailStack(Stack):
         # publish-or-HOLD are unchanged. Still manually invokable ({} / {"force": true} /
         # {"dry_run": true}) and driven by the hold-sweep rule below. Bedrock script-gen +
         # Google Chirp 3: HD. 900s: Sonnet writer + Haiku judge + Gemini synth.
+        # lameenc dependency layer (#1018): audio_encode compresses the episode WAV
+        # to spoken-word MP3 at publish. Fail-open — a missing layer publishes WAV.
+        lameenc_layer = _lambda.LayerVersion.from_layer_version_arn(self, "LameencLayer", LAMEENC_LAYER_ARN)
         coach_panel_podcast = create_platform_lambda(
             self,
             "CoachPanelPodcast",
@@ -213,6 +216,7 @@ class EmailStack(Stack):
             memory_mb=512,
             environment=_email_env,
             custom_policies=rp.email_coach_panel_podcast(),
+            additional_layers=[lameenc_layer],
             **shared,
         )
 

@@ -304,11 +304,27 @@ def _synthesize_dialogue(turns: list) -> bytes:
     return audio
 
 
+def _publish_episode_audio(week, wav_audio: bytes) -> dict:
+    """Compress + PUT the episode audio (#1018): the Gemini WAV (24 kHz PCM,
+    ~385 kbps — 16.6 MB per 6-min episode on cellular) is encoded to spoken-word
+    MP3 via audio_encode (lameenc-layer). Fail-open: if the encoder is missing
+    or errors, the WAV publishes exactly as before — compression never strands
+    an episode. Returns the url/bytes/duration_sec fields for the episode entry;
+    duration comes from the WAV header BEFORE encoding (the lossless source)."""
+    import audio_encode
+
+    duration = max(1, audio_encode.wav_duration_sec(wav_audio))
+    body, ext, mime = audio_encode.compress_wav(wav_audio)
+    s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}", Body=body, ContentType=mime, CacheControl="max-age=86400, public")
+    return {"url": f"/panelcast/wk{week}.{ext}", "bytes": len(body), "duration_sec": duration}
+
+
 def _episode_exists(week) -> bool:
-    # The weekly publisher writes wk{n}.wav; wk0 (the legacy intro) is .mp3. Check
-    # both so "already published" is never a false negative that re-synthesizes a
-    # week (the .mp3-only check silently missed every .wav episode).
-    for ext in ("wav", "mp3"):
+    # The weekly publisher writes wk{n}.mp3 (compressed since #1018; .wav before
+    # that, and still the fail-open fallback). Check every extension ever
+    # published so "already published" is never a false negative that
+    # re-synthesizes a week (the .mp3-only check silently missed every .wav episode).
+    for ext in ("mp3", "wav", "m4a"):
         try:
             s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}")
             return True
@@ -343,8 +359,9 @@ def _hms(seconds) -> str:
 
 
 def _enclosure_type(url: str) -> str:
-    """MIME from the audio extension — the episodes are .wav (wk1+) or .mp3 (wk0);
-    a hardcoded audio/mpeg on a .wav enclosure is a validator failure."""
+    """MIME from the audio extension — episodes are .mp3 (compressed, #1018) with
+    .wav as the fail-open fallback and in pre-#1018 history; a hardcoded
+    audio/mpeg on a .wav enclosure is a validator failure."""
     u = (url or "").lower()
     if u.endswith(".mp3"):
         return "audio/mpeg"
@@ -451,7 +468,7 @@ CF_DISTRIBUTION_ID = os.environ.get("CF_DISTRIBUTION_ID", "E3S424OXQZ8NBE")
 
 def _invalidate_cdn() -> None:
     """Invalidate /panelcast/* after publishing so a new episode is live immediately.
-    wk*.wav carries a 24h cache header, so without this the CDN serves the prior cut
+    wk*.mp3/.wav carries a 24h cache header, so without this the CDN serves the prior cut
     for up to a day. Fail-open: a publish must never break on a CDN hiccup (the file
     is already in S3; the cache just expires on its own as a fallback).
 
@@ -911,7 +928,7 @@ def _run_intro(dry_run: bool = False) -> dict:
 
     label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in turns]
     audio = gemini_tts.synthesize_dialogue(label_turns, INTRO_GEMINI_VOICES, INTRO_STYLE)
-    s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk0.wav", Body=audio, ContentType="audio/wav", CacheControl="max-age=86400, public")
+    published = _publish_episode_audio(0, audio)
     # Transcript alongside the audio — for review and to verify the guardrails held.
     transcript = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in turns)
     s3.put_object(
@@ -948,9 +965,7 @@ def _run_intro(dry_run: bool = False) -> dict:
         "week": 0,
         "title": "Episode 0 — Welcome to The Measured Life",
         "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-        "url": "/panelcast/wk0.wav",
-        "bytes": len(audio),
-        "duration_sec": max(1, (len(audio) - 44) // (gemini_tts.SAMPLE_RATE * 2)),  # WAV: 16-bit mono PCM
+        **published,  # url/bytes/duration_sec from the compressed publish (#1018)
         "byline": "Elena + Dr. Eli Marsh",
         "excerpt": "Meet Elena, meet Matt, and meet the question this whole experiment is built to answer: can AI and your own data actually make a life better — or is it just over-optimization? The starting line.",
         "transcript_url": "/panelcast/wk0.transcript.json",
@@ -958,8 +973,8 @@ def _run_intro(dry_run: bool = False) -> dict:
     existing = [e for e in existing if e.get("week") != 0] + [ep]
     existing.sort(key=lambda e: e.get("week", 0), reverse=True)
     _write_indexes(existing)
-    logger.info("[panel] intro wk0: %d turns, %d bytes", len(turns), len(audio))
-    return {"statusCode": 200, "body": json.dumps({"intro": True, "turns": len(turns), "bytes": len(audio)})}
+    logger.info("[panel] intro wk0: %d turns, %d bytes at %s", len(turns), published["bytes"], published["url"])
+    return {"statusCode": 200, "body": json.dumps({"intro": True, "turns": len(turns), "bytes": published["bytes"]})}
 
 
 # ── Weekly autonomous pipeline (board-reviewed) ───────────────────────────────
@@ -1783,7 +1798,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
     label_turns = [{"speaker": label_of.get(t["speaker"], "Elena"), "line": t["line"]} for t in clean]
     style = WEEKLY_STYLE
     audio = gemini_tts.synthesize_dialogue(label_turns, voices, style)
-    s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.wav", Body=audio, ContentType="audio/wav", CacheControl="max-age=86400, public")
+    published = _publish_episode_audio(week, audio)
     transcript = "\n\n".join(f"{label_of.get(t['speaker'], 'Elena')}: {t['line']}" for t in clean)
     s3.put_object(
         Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.transcript.txt", Body=transcript.encode("utf-8"), ContentType="text/plain; charset=utf-8"
@@ -1820,9 +1835,7 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         # EP{n} · short hook — episode number == week (intro is EP0). No long sentence titles.
         "title": f"EP{week} · {_hook}" if _hook else f"EP{week}",
         "date": beats["date"],
-        "url": f"/panelcast/wk{week}.wav",
-        "bytes": len(audio),
-        "duration_sec": max(1, (len(audio) - 44) // (gemini_tts.SAMPLE_RATE * 2)),
+        **published,  # url/bytes/duration_sec from the compressed publish (#1018)
         "byline": f"Elena + {label_of[guest_id]}",
         "guest_id": guest_id,  # throughline: front-end links the byline → /story/coaches/<guest_id>
         "guest_name": label_of[guest_id],
@@ -1875,7 +1888,9 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
             _email_subscribers(ep)
         except Exception as e:
             logger.warning("[panel] subscriber blast failed — %s", e)
-    logger.info("[panel] wk%s PUBLISHED — %d turns, %d bytes, guest %s", week, len(clean), len(audio), guest_id)
+    logger.info(
+        "[panel] wk%s PUBLISHED — %d turns, %d bytes at %s, guest %s", week, len(clean), published["bytes"], published["url"], guest_id
+    )
     return {
         "statusCode": 200,
         "body": json.dumps({"week": week, "published": True, "turns": len(clean), "open_bet": bool(script.get("open_bet"))}),

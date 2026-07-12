@@ -37,6 +37,13 @@ PILLOW_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:pillow-layer:{PILLOW_L
 GARTH_LAYER_VERSION = 2
 GARTH_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:garth-layer:{GARTH_LAYER_VERSION}"
 
+# lameenc (LAME MP3 encoder) layer (#1018: the Panel compresses its Gemini-TTS WAV
+# to ~80 kbps spoken-word MP3 before publish — 16.6 MB → ~3.5 MB per episode).
+# Build + publish: deploy/build_lameenc_layer.sh. Attached only to
+# coach-panel-podcast; lambdas/audio_encode.py fails open to WAV without it.
+LAMEENC_LAYER_VERSION = 1
+LAMEENC_LAYER_ARN = f"arn:aws:lambda:{REGION}:{ACCT}:layer:lameenc-layer:{LAMEENC_LAYER_VERSION}"
+
 # ── Privacy mode (averagejoematt.com password gate) ──
 # True  → attach cf-auth Lambda@Edge to AmjDistribution default behavior (HTML pages gated).
 # False → public site, no auth required.
