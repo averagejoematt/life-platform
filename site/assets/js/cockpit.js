@@ -803,14 +803,16 @@ async function renderSinceLastVisit() {
    strip self-hides if neither endpoint answers. Pre-genesis (#931) the same rows
    read as STAGED for Day 1: the registry and the pre-registered design exist
    before the data does, so naming them is honest — but a day count is never
-   faked. Training block: no routine /api/ endpoint exists yet — tracked as the
-   #974 follow-up rather than built here. */
+   faked. Training block (#1066, the #974 follow-up): the third row reads the
+   read-only /api/routine projection — block name + prescription COUNTS only,
+   never loads, exercise names, or notes. */
 async function renderLevers(pre) {
   const sec = $("[data-levers]");
   if (!sec) return;
-  const [supp, exp] = await Promise.all([
+  const [supp, exp, rt] = await Promise.all([
     getJSON(`${API}/supplements`).catch(() => null),
     getJSON(`${API}/experiments`).catch(() => null),
+    getJSON(`${API}/routine`).catch(() => null),
   ]);
   const out = [];
 
@@ -863,6 +865,48 @@ async function renderLevers(pre) {
       `<span class="lever-k label">${icon("milestone", { cls: "dom-ico" })}experiment</span>` +
       `<span class="lever-what lever-none">${pre ? "runs begin with Day 1" : "none running"}</span>` +
       `${ready ? `<span class="lever-note label">${ready} ready on the shelf</span>` : ""}` +
+      `<span class="lever-go" aria-hidden="true">→</span></a></li>`
+    );
+  }
+
+  // The training block (#1066) — what the routine engine has on the sheet, from
+  // the counts-only /api/routine projection (block name + archetype + exercise/set
+  // counts; never loads or notes). Same honesty rules as the rows above: the date
+  // math is server-computed (days_out, PT), pre-genesis a prescription reads as
+  // staged for Day 1, and a real block with nothing prescribed is said plainly —
+  // never a fabricated "today's session".
+  const blk = rt && rt.block;
+  const r = rt && rt.routine;
+  const phase = blk && !isBad(blk.phase) ? String(blk.phase) : "";
+  if (r && !isBad(r.archetype)) {
+    const type = String(r.archetype).replace(/_/g, " ");
+    const nEx = Number(r.exercise_count);
+    const nSets = Number(r.total_sets);
+    const counts = Number.isFinite(nEx) && nEx > 0
+      ? ` — <span class="num">${nEx}</span> exercise${nEx === 1 ? "" : "s"}` +
+        (Number.isFinite(nSets) && nSets > 0 ? ` · ${nSets} set${nSets === 1 ? "" : "s"}` : "")
+      : "";
+    const dOut = Number(r.days_out);
+    const when = String(r.target_date || "");
+    const note = pre
+      ? "staged — prescribed for Day 1"
+      : !Number.isFinite(dOut) ? ""
+        : dOut === 0 ? "on the sheet today"
+          : dOut > 0 ? (when ? `up next · ${escapeHTML(when)}` : "up next")
+            : (when ? `last prescribed ${escapeHTML(when)}` : "");
+    out.push(
+      `<li class="lever-row"><a class="lever-link" href="/protocols/">` +
+      `<span class="lever-k label">${icon("training", { cls: "dom-ico" })}training</span>` +
+      `<span class="lever-what">${phase ? `${escapeHTML(phase)} · ` : ""}${escapeHTML(type)}${counts}</span>` +
+      `${note ? `<span class="lever-note label">${note}</span>` : ""}` +
+      `<span class="lever-go" aria-hidden="true">→</span></a></li>`
+    );
+  } else if (rt && phase && !pre) {
+    // The block is real (phase-registry truth) but nothing is on the sheet.
+    out.push(
+      `<li class="lever-row"><a class="lever-link" href="/protocols/">` +
+      `<span class="lever-k label">${icon("training", { cls: "dom-ico" })}training</span>` +
+      `<span class="lever-what lever-none">${escapeHTML(phase)} block · no session on the sheet</span>` +
       `<span class="lever-go" aria-hidden="true">→</span></a></li>`
     );
   }

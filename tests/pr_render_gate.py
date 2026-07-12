@@ -130,8 +130,9 @@ POPULATED_GATE_PAGES = [
         # #974: the cockpit's levers strip (the Protocols station in the daily
         # slice) only materializes with supplement-registry/experiment data — the
         # empty-mock pass renders its honest-hidden state, so this pass asserts
-        # the populated rows (the stack + the experiment under way) actually
-        # mount, and capture_page's mobile pass keeps them inside 390px.
+        # the populated rows (the stack, the experiment under way, and the #1066
+        # training-block row from the routine fixture) actually mount, and
+        # capture_page's mobile pass keeps them inside 390px.
         # #975: same for the inputs row (manual-channel freshness) — it only
         # materializes with the /api/presence channels projection; the check holds
         # in BOTH clock states (pre-genesis it renders the staged marks, after it
@@ -142,8 +143,8 @@ POPULATED_GATE_PAGES = [
         "checks": [
             {
                 "selector": ".lever-row",
-                "min_count": 2,
-                "desc": "levers strip renders the stack + experiment rows from the supplements/experiments fixtures (#974)",
+                "min_count": 3,
+                "desc": "levers strip renders stack + experiment + training-block rows from their fixtures (#974/#1066)",
             },
             {
                 "selector": ".input-row",
@@ -181,6 +182,7 @@ POPULATED_API_MOCKS = {
     "**/api/experiments": "experiments.json",
     "**/api/supplements": "supplements.json",
     "**/api/presence": "presence.json",
+    "**/api/routine": "routine.json",
 }
 
 

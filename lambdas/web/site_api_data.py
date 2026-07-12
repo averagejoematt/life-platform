@@ -9,6 +9,7 @@ Endpoints in this module:
   /api/correlations, /api/genome_risks
   /api/observatory_week, /api/changes-since
   /api/supplements, /api/vice_streaks, /api/experiments
+  /api/routine (#1066 — the prescribed training block, counts-only projection)
   /api/ledger, /api/discoveries
   /api/status/summary (footer dot)
   /api/labs, /api/protocols
@@ -1339,6 +1340,120 @@ def handle_supplements() -> dict:
         },
         cache_seconds=3600,
     )
+
+
+# ── #1066: the training block — public read of the prescribed Hevy routine ───
+_phase_state_cache = None
+
+# Paired/substitute routine variants (routine_title._NON_COUNTING_VARIANTS) — a
+# floor or re-entry sibling is never "the" prescription for the levers strip.
+_ROUTINE_HIDDEN_VARIANTS = ("floor", "re_entry")
+
+
+def _load_phase_state() -> dict:
+    """config/training_phases.json (ADR-067): the ordered training phases + the
+    current block. Canonical root config/ prefix (not the site/config mirror —
+    that one is purged by experiment resets). Container-cached like the other
+    S3 config reads — phase flips are manual and rare."""
+    global _phase_state_cache
+    if _phase_state_cache is None:
+        _phase_state_cache = _load_s3_json("config/training_phases.json", "training_phases")
+    return _phase_state_cache
+
+
+def handle_routine() -> dict:
+    """GET /api/routine — the current prescribed training block for the cockpit
+    levers strip (#1066, the #974 follow-up).
+
+    FAIL-CLOSED public projection over the ROUTINE# partition (the Hevy routine
+    write-loop's system of record, ADR-066/067): the block name (current phase
+    from the phase registry) + a prescription SUMMARY — archetype, exercise/set
+    counts, target date. Built field-by-field; the stored IR is never spread.
+    Deliberately NOT returned: the IR title (force_title can carry user-authored
+    free text), notes (session cues + private notes), exercise names/loads/reps,
+    rationale, inputs_snapshot (recovery/deficit internals), budget_used, and
+    the Hevy ids. Read-only; always a shaped 200 — the cockpit self-hides when
+    nothing is prescribed. Cache: 900s.
+    """
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+
+    # The current block — registry truth (what phase we're IN), like the stack.
+    state = _load_phase_state() or {}
+    phase = state.get("current") or ((state.get("phases") or [None])[0])
+    block = {"phase": phase, "phase_started": state.get("current_started")} if phase else None
+
+    # Newest index rows first (sk = DATE#<target_date>#ROUTINE#<id>).
+    rows = []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}routine_index"),
+            ScanIndexForward=False,
+            Limit=16,
+        )
+        rows = _decimal_to_float(resp.get("Items", []))
+    except Exception as e:
+        logger.warning("handle_routine index read failed: %s", e)
+
+    rows = [
+        r
+        for r in rows
+        if r.get("routine_id") and (r.get("variant") or "") not in _ROUTINE_HIDDEN_VARIANTS and (r.get("status") or "") != "archived"
+    ]
+    # Prefer the newest prescription on/before today; else the nearest upcoming
+    # one (a session staged for tomorrow / Day 1 is honestly "prescribed") —
+    # rows are newest-first, so the last remaining row is the nearest future date.
+    current = next((r for r in rows if str(r.get("target_date") or "") <= today), None)
+    if current is None and rows:
+        current = rows[-1]
+
+    routine = None
+    if current:
+        ir = {}
+        try:
+            resp = table.get_item(
+                Key={"pk": f"USER#{USER_ID}#ROUTINE#{current['routine_id']}", "sk": "VERSION#current"},
+                ProjectionExpression="target_date, archetype, variant, #st, exercises, branches, hevy_pushed_at",
+                ExpressionAttributeNames={"#st": "status"},
+            )
+            ir = _decimal_to_float(resp.get("Item")) or {}
+        except Exception as e:
+            logger.warning("handle_routine IR read failed: %s", e)
+        src = ir or current
+        # Counts come from the recommended branch's own exercise list when one
+        # exists (that is what the pushed Hevy routine actually shows, #417 2b),
+        # else the routine-level list. Unknown (IR read failed) → honest nulls.
+        exercises = None
+        if ir:
+            for b in ir.get("branches") or []:
+                if b.get("recommended") and b.get("exercises"):
+                    exercises = b["exercises"]
+                    break
+            if exercises is None:
+                exercises = ir.get("exercises") or []
+        target = str(src.get("target_date") or "")
+        try:
+            # NB: datetime.strptime (not a module-level `date` import) — two
+            # handlers in this module use `date` as a loop variable (F402).
+            days_out = (datetime.strptime(target, "%Y-%m-%d") - datetime.strptime(today, "%Y-%m-%d")).days
+        except ValueError:
+            days_out = None
+        routine = {
+            "target_date": target or None,
+            "archetype": src.get("archetype"),
+            "variant": src.get("variant"),
+            "status": src.get("status"),
+            "days_out": days_out,
+            "exercise_count": len(exercises) if exercises is not None else None,
+            "total_sets": sum(len(e.get("sets") or []) for e in exercises) if exercises is not None else None,
+            "pushed": bool(ir.get("hevy_pushed_at")),
+        }
+
+    data = {"available": routine is not None, "as_of_date": today, "block": block, "routine": routine}
+    _pre = pre_start_meta()
+    data["pre_start"] = bool(_pre)
+    if _pre:
+        data.update(_pre)
+    return _ok(data, cache_seconds=900)
 
 
 def handle_vice_streaks() -> dict:
