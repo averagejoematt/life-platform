@@ -1,6 +1,6 @@
 /*
   section_toc.css — the mobile section-TOC / anchor-nav primitive (#1015).
-  Companion to /assets/js/section_toc.js (which self-injects this stylesheet).
+  Companion to section_toc.js (which self-injects this stylesheet).
 
   Placement contract (DESIGN_SYSTEM_V5 §10): the bar is TOP-sticky; the mobile
   app-bar is bottom-fixed (@layer chrome, tokens.css, z-index 60) — they share no

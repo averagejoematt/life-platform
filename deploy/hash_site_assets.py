@@ -42,6 +42,11 @@ import sys
 # Matches a reference to a hashable asset: /assets/js/foo.js or /assets/css/foo.css.
 # Anchored on the /assets/(js|css)/ path so it never touches fonts, images, or the
 # SVG sprite. Group 1 = subdir, group 2 = basename-with-extension.
+# NB: this matches ANY occurrence of an /assets/… path — including inside code
+# COMMENTS. A comment like "companion to /assets/js/foo.js" creates a real graph
+# edge and can hard-fail the deploy as a false import cycle (2026-07-11: a CSS
+# header back-referencing the JS that injects it). Name files in prose without
+# the /assets/ prefix; the deliberate simplicity here is ADR-098's conservatism.
 ASSET_REF_RE = re.compile(r"/assets/(js|css)/([A-Za-z0-9_.-]+\.(?:js|css))")
 
 
