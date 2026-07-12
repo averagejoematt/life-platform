@@ -1,4 +1,4 @@
-# Build dispatch checklist (#380)
+# Build dispatch checklist (#380, why-it-mattered layer #1120)
 
 Every working session already produces a dense, honest engineering record — the
 handover. This checklist distills it into ONE short public beat on the Story
@@ -19,7 +19,7 @@ shipped nothing eligible, the wrap's handover records
 an unexplained empty slot is not — the skip line is what keeps the cadence
 auditable across `handovers/`.
 
-## The template (three beats, ~60–120 words each)
+## The template (four sections, ~60–120 words each)
 
 Append one object to `beats` in `site/story/build/beats.json`:
 
@@ -29,16 +29,31 @@ Append one object to `beats` in `site/story/build/beats.json`:
   "date": "YYYY-MM-DD",
   "title": "A reader-facing title — the change, not the ticket",
   "shipped": "WHAT SHIPPED — the user-visible or platform-visible change, in plain language. Past tense, merged work only.",
+  "why_it_mattered": "WHY IT MATTERED — the stakes: what this bought the experiment, the reader, or the platform's credibility, and what it cost while it was broken/absent. Significance, never fabricated outcomes (#1120).",
   "gotcha": "THE GOTCHA — the thing that bit during the work; the surprise a fellow builder would want to know. One honest paragraph.",
   "honest_miss": "THE HONEST MISS — what didn't work, was cut, remains open, or got measured and found wanting. Never omit this to look good; it's the differentiator.",
   "prs": [{ "label": "PR #NN", "url": "https://github.com/averagejoematt/life-platform/pull/NN" }]
 }
 ```
 
+All four prose sections are REQUIRED — `scripts/validate_beats.py` (wired into
+`/wrap`) and `tests/test_build_dispatches.py` both reject a beat missing any of
+them, so an entry structurally can't ship changelog-grade (#1120).
+
 Distill from `handovers/HANDOVER_LATEST.md` — the shipped line, the gotchas
-section, and the residuals are the three beats' raw material. Write for the
-reader, not the operator: no internal codenames without a gloss, no file paths
-unless they're the story.
+section, and the residuals are the raw material. Write for the reader, not the
+operator: no internal codenames without a gloss, no file paths unless they're
+the story.
+
+**Writing `why_it_mattered`:** it answers "so what?" for a reader who doesn't
+live in this codebase — what the change bought (trust, a closed failure mode,
+a claim made checkable) and what it cost while broken or absent. Ground it in
+the same shipped facts the other sections narrate. It may interpret stakes; it
+may NOT invent outcomes: no reader reactions, no traffic effects, no "this
+improved X" without a measurement to cite. The honest tense for impact that
+hasn't been observed is future-conditional or plain stakes ("a reader who
+catches one inflated label discounts every label after it"), never reported
+fact.
 
 ## Hard rules (in order)
 

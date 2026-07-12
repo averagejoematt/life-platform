@@ -21,14 +21,15 @@ def _beats():
     return json.load(open(BEATS_PATH))
 
 
-def test_feed_shape_and_three_part_format():
+def test_feed_shape_and_four_part_format():
     data = _beats()
     assert isinstance(data.get("beats"), list)
     for b in data["beats"]:
         assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", b["date"]), b
         assert b.get("id") and b.get("title")
-        # The format IS the honesty: shipped + gotcha + honest miss, all present.
-        for key in ("shipped", "gotcha", "honest_miss"):
+        # The format IS the honesty: shipped + why it mattered (#1120) + gotcha
+        # + honest miss, all present.
+        for key in ("shipped", "why_it_mattered", "gotcha", "honest_miss"):
             assert b.get(key) and len(b[key]) > 20, f"beat {b['id']} missing {key}"
 
 
@@ -43,13 +44,14 @@ def test_beats_pass_the_privacy_gate():
     import privacy_guard
 
     for b in _beats()["beats"]:
-        for key in ("title", "shipped", "gotcha", "honest_miss"):
+        for key in ("title", "shipped", "why_it_mattered", "gotcha", "honest_miss"):
             privacy_guard.assert_clean(b.get(key, ""), context=f"{b['id']}.{key}")
 
 
 def test_story_app_has_the_build_section():
     assert '"/story/build/beats.json"' in DISPATCHES_JS
     assert "the honest miss" in DISPATCHES_JS
+    assert "why it mattered" in DISPATCHES_JS  # #1120 — the narrative layer renders
     assert "merged" in DISPATCHES_JS  # the merged-work-only framing is user-visible
 
 
@@ -64,3 +66,4 @@ def test_checklist_carries_the_honesty_rules():
     assert "Merged + deployed only" in doc
     assert "content_policy_scan" in doc
     assert "honest_miss" in doc
+    assert "why_it_mattered" in doc  # #1120 — the checklist carries the section

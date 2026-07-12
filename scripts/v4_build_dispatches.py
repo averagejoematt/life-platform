@@ -45,7 +45,7 @@ SECTIONS = [
     # #1110: `unlisted: true` in dispatches.js — OUT of the story sub-nav (the footer's
     # "The Technology" column links it); the entry stays HERE so /story/build/ keeps
     # regenerating (URL unchanged — pinned by tests/test_build_dispatches.py).
-    ("build", "Build log", "Engineering dispatches — what shipped, the gotcha, the honest miss."),
+    ("build", "Build log", "Engineering dispatches — what shipped, why it mattered, the gotcha, the honest miss."),
     ("about", "About", "The experiment, in context."),
 ]
 
