@@ -362,6 +362,14 @@ body { overflow-x: hidden; }
 .shimmer { color: var(--ink-faint); }
 @media (prefers-reduced-motion: no-preference) { .shimmer { animation: pulse 1.6s var(--ease-inout) infinite; } @keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 0.9; } } }
 
+/* Loading skeletons (#1019) — design-system shimmer blocks, never spinners.
+   Solid hairline-tone fills that pulse with the same rhythm as .shimmer;
+   static (no animation) under prefers-reduced-motion. Page geometry (block
+   sizes/rows) lives next to the page that uses them. */
+.sk { display: flex; flex-direction: column; gap: var(--sp-3); }
+.sk-b { display: block; background: var(--rule); border-radius: var(--radius-sm); opacity: 0.55; }
+@media (prefers-reduced-motion: no-preference) { .sk-b { animation: pulse 1.6s var(--ease-inout) infinite; } }
+
 /* Phase 3: keyboard focus + sharper Third Wall voice separation */
 .dx-tab:focus-visible, .dx-item:focus-visible, .doors a:focus-visible, .theme-toggle:focus-visible, .cta:focus-visible {
   outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);

@@ -129,7 +129,19 @@ function buildSide() {
   document.querySelectorAll(".ev-tile").forEach((b) => b.addEventListener("click", () => select(b.dataset.slug)));
 }
 
+// Loading skeleton (#1019) — a design-system shimmer sketch of the readout
+// anatomy (stat row · chart · prose lines), swapped in synchronously on every
+// topic tap so a slow endpoint never reads as a broken page. Styles: evidence.css.
+const skeletonReadout = () =>
+  `<div class="sk" role="status" aria-label="Loading">` +
+  `<div class="sk-stats" aria-hidden="true">${'<span class="sk-b sk-stat"></span>'.repeat(4)}</div>` +
+  `<span class="sk-b sk-chart" aria-hidden="true"></span>` +
+  `<span class="sk-b sk-line" aria-hidden="true"></span><span class="sk-b sk-line sk-line--short" aria-hidden="true"></span></div>`;
+
+let renderSeq = 0; // rapid topic taps race their async renders — only the latest may paint
+
 async function renderCenter() {
+  const my = ++renderSeq;
   const t = BYSLUG[current]; if (!t) return;
   const main = $("[data-main]");
   main.querySelector("[data-crumb]").innerHTML = `${esc(DOOR)} / ${esc(t.slug)}`;
@@ -141,9 +153,12 @@ async function renderCenter() {
   if (t.mode === "editorial") { ro.innerHTML = t.editorial || empty("—"); return; }
   if (t.mode === "interactive") { ro.innerHTML = (RENDERERS[t.slug] || renderGeneric)({}, t); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro); return; }
   if (t.mode !== "data" || !t.endpoint) { ro.innerHTML = empty(t.archive_note || "This section lives in the archive while it's rebuilt."); return; }
-  ro.innerHTML = `<p class="rd-archive"><span class="shimmer">Loading ${esc(t.title)}…</span></p>`;
-  try { const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t); ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro); }
-  catch (e) { ro.innerHTML = empty("This readout couldn't load its data just now. The preserved view is linked below."); }
+  ro.innerHTML = skeletonReadout();
+  try {
+    const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t);
+    if (my !== renderSeq) return; // superseded by a newer topic selection
+    ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro);
+  } catch (e) { if (my === renderSeq) ro.innerHTML = empty("This readout couldn't load its data just now. The preserved view is linked below."); }
   // Only pull the viewport to the readout on MOBILE (the nav stacks above the
   // content there). On desktop the readout sits beside the sticky nav, so a smooth
   // scroll-to-top just fights the user's own scrolling — the "freezing / pulling
