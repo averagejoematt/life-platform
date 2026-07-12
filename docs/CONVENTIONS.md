@@ -190,6 +190,40 @@ gate) exists in **two** places:
 The two step lists must stay in sync — change one, change both. Run it on demand:
 `gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`).
 
+### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
+
+Concurrent PRs each commit **generator output** (doc-sync literals in
+`lambdas/web/site_api_common.py` + doc headers, `site/method/game/index.html`,
+`site/assets/js/portrait_data.js`, `site/data/data_sources.json`, the ADR index in
+`docs/DECISIONS.md`, the shared chrome block). A PR branched before a sibling's merge
+regenerated one of those asserts staleness *after its own squash-merge* — that was the
+last recurring red class on merge-queue days. Since #1173, `ci-cd.yml`'s **`reconcile`
+job** (Job 0, main pushes only) reruns the enumerated generators on the merged tree
+and, when dirty, pushes a `chore(reconcile): … [skip-reconcile]` bot commit; the whole
+run then lints/tests/deploys that reconciled sha (`needs.reconcile.outputs.build_sha`).
+Only the generator-output **whitelist** may be auto-committed — any other dirty path
+fails the job with no commit. The manual `/reconcile-branch` merge-queue ritual is
+still valid; the bot is the net under it, not a replacement for pre-merge hygiene.
+
+**When the reconcile job itself reds, check in this order:**
+1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
+   Do NOT widen the whitelist reflexively; inspect the generator diff, fix main
+   manually (`git pull` → run the generator → review → push).
+2. **Push rejected** — branch protection: the `github-actions` app must be on
+   `main`'s required-pull-request **bypass list** (one-time repo setting; classic
+   protection: `bypass_pull_request_allowances.apps = ["github-actions"]`). Or a
+   concurrent human push raced it twice — the queued run reconciles next.
+3. **A generator crashed** — same failure the test suite would have shown; fix the
+   generator like any red test. Reproduce locally: run the generators from repo root
+   on a clean main checkout; `git status` must end clean (they are idempotent).
+
+Two gotchas the design already absorbs — don't "fix" them back in: GITHUB_TOKEN pushes
+never retrigger `push` workflows (that's the loop protection), so the job explicitly
+dispatches `site-deploy.yml` when the reconcile commit touches `site/**` (otherwise the
+regenerated page would be merged-but-not-deployed); and `plan` diffs from
+`${GITHUB_SHA}~1` to the reconciled HEAD, so the merged PR's own changes stay in the
+deploy plan even with a reconcile commit stacked on top.
+
 ## 5. The CDK asset-staging trap — a 200 invoke is not proof of a good deploy
 
 A `cdk deploy` can publish a `Code.from_asset` Lambda zip that is **missing every
