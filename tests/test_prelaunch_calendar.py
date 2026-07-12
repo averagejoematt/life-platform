@@ -170,6 +170,27 @@ def test_prequel_episode_entry_schema_and_date():
     assert ep["title"] == entry["title"]
 
 
+def test_prequel_prefers_compressed_mp3_when_archived():
+    # #1018: episodes publish compressed; when the archive holds the .mp3, the
+    # resurrect serves IT (never re-points readers at a 16 MB WAV) while the
+    # duration still comes exactly from the WAV archived alongside.
+    wav_bytes = media.GEMINI_SAMPLE_RATE * 2 * 60 + 44  # exactly 60s of PCM
+    ep = media.build_prequel_episode({"asset": "wk0", "date": "2026-07-10", "title": "Prologue"}, wav_bytes=wav_bytes, mp3_bytes=600_000)
+    assert ep["url"] == "/panelcast/wk0.mp3"
+    assert ep["bytes"] == 600_000
+    assert ep["duration_sec"] == 60  # lossless source, not a bitrate estimate
+    assert 'type="audio/mpeg"' in media._panel_feed_with_items([ep])
+
+
+def test_prequel_mp3_only_archive_estimates_duration():
+    # a post-#1018 reset can archive an mp3 with no wav sibling (fail-open never
+    # fired) -- the entry is still written, duration estimated at MP3_EST_KBPS
+    sixty_sec_bytes = media.MP3_EST_KBPS * 1000 // 8 * 60
+    ep = media.build_prequel_episode({"asset": "wk0", "date": "2026-07-10", "title": "Prologue"}, mp3_bytes=sixty_sec_bytes)
+    assert ep["url"] == "/panelcast/wk0.mp3"
+    assert ep["duration_sec"] == 60
+
+
 def test_prequel_feed_carries_the_item():
     ep = media.build_prequel_episode({"asset": "wk0", "date": "2026-07-10", "title": "Prologue"}, 48044)
     feed = media._panel_feed_with_items([ep])

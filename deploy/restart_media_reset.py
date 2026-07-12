@@ -230,6 +230,7 @@ def rewrite_indexes(s3, prefix: str, feed_builder, apply: bool, now_iso: str, ma
 PANEL_PREFIX = "generated/panelcast/"
 PANEL_ARCHIVE_PREFIX = "generated/panelcast/archive/pilot/"
 GEMINI_SAMPLE_RATE = 24000  # lambdas/gemini_tts.SAMPLE_RATE — wkN.wav is 16-bit mono PCM
+MP3_EST_KBPS = 80  # lambdas/audio_encode.DEFAULT_KBPS (#1018) — duration estimate for an mp3-only archive
 COVER_URL = f"{SITE}/panelcast/cover.jpg"  # series art survives resets (KEEP_BASENAMES)
 
 _RESTORE_CONTENT_TYPES = {
@@ -253,20 +254,35 @@ def _hms(seconds) -> str:
     return f"{s // 3600:d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
 
 
-def build_prequel_episode(entry: dict, wav_bytes: int) -> dict:
+def build_prequel_episode(entry: dict, wav_bytes: int = None, mp3_bytes: int = None) -> dict:
     """The episodes.json entry for a resurrected prequel. Schema matches the wk0
     intro publisher in lambdas/emails/coach_panel_podcast_lambda.py EXACTLY
     (week/title/date/url/bytes/duration_sec/byline/excerpt/transcript_url) so the
-    Panel page + next weekly publish treat it as a first-class episode."""
+    Panel page + next weekly publish treat it as a first-class episode.
+
+    Since #1018 episodes publish compressed (.mp3, ~80 kbps mono; .wav only as
+    the fail-open fallback), so the archive can hold either or both. Serve the
+    .mp3 whenever it exists — never re-point readers at a 16 MB WAV. Duration
+    comes from the WAV when archived alongside (exact: 16-bit mono PCM), else
+    it's a bitrate estimate at MP3_EST_KBPS."""
     asset = entry["asset"]
     week = int(entry.get("week", 0))
+    if mp3_bytes:
+        url, nbytes = f"/panelcast/{asset}.mp3", int(mp3_bytes)
+    else:
+        url, nbytes = f"/panelcast/{asset}.wav", int(wav_bytes)
+    duration = (
+        max(1, (int(wav_bytes) - 44) // (GEMINI_SAMPLE_RATE * 2))  # WAV: 16-bit mono PCM
+        if wav_bytes
+        else max(1, int(mp3_bytes) * 8 // (MP3_EST_KBPS * 1000))
+    )
     return {
         "week": week,
         "title": entry.get("title") or f"EP{week}",
         "date": entry["date"],
-        "url": f"/panelcast/{asset}.wav",
-        "bytes": int(wav_bytes),
-        "duration_sec": max(1, (int(wav_bytes) - 44) // (GEMINI_SAMPLE_RATE * 2)),  # WAV: 16-bit mono PCM
+        "url": url,
+        "bytes": nbytes,
+        "duration_sec": duration,
         "byline": entry.get("byline", "Elena + Dr. Eli Marsh"),
         "excerpt": entry.get(
             "excerpt",
@@ -334,12 +350,15 @@ def resurrect_podcast_prequels(s3, apply: bool, now_iso: str, manual: list[str])
             lines.append(f"WARN {asset}: nothing under {PANEL_ARCHIVE_PREFIX}{asset}.* — cannot resurrect")
             continue
         wav_bytes = None
+        mp3_bytes = None
         for src in archived:
             basename = src[len(PANEL_ARCHIVE_PREFIX) :]
             live_key = f"{PANEL_PREFIX}{basename}"
             head = s3.head_object(Bucket=S3_BUCKET, Key=src)
             if basename == f"{asset}.wav":
                 wav_bytes = head["ContentLength"]
+            elif basename == f"{asset}.mp3":
+                mp3_bytes = head["ContentLength"]
             if not apply:
                 lines.append(f"would-restore: {src} → {live_key} ({head['ContentLength']} bytes)")
                 continue
@@ -364,10 +383,10 @@ def resurrect_podcast_prequels(s3, apply: bool, now_iso: str, manual: list[str])
                     lines.append(f"MANUAL (access denied): {live_key}")
                 else:
                     raise
-        if wav_bytes is None:
-            lines.append(f"WARN {asset}: no {asset}.wav in the archive — episode entry NOT written (mp3-only prequels unsupported)")
+        if wav_bytes is None and mp3_bytes is None:
+            lines.append(f"WARN {asset}: no {asset}.mp3/.wav in the archive — episode entry NOT written")
             continue
-        ep = build_prequel_episode(e, wav_bytes)
+        ep = build_prequel_episode(e, wav_bytes=wav_bytes, mp3_bytes=mp3_bytes)
         episodes.append(ep)
         lines.append(f"episode: wk{ep['week']} \"{ep['title']}\" dated {ep['date']} ({ep['duration_sec']}s, {ep['bytes']} bytes)")
 

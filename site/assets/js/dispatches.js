@@ -154,7 +154,7 @@ async function renderRead(s, id) {
     const ent = all.find((x) => String(x.id) === String(id)) || all[0];
     if (!ent) { read.innerHTML = pendingHTML + `<p class="dx-prose">No episodes yet — the first weekly review drops here once the chronicle's been running a week.</p>`; return; }
     const isWav = /\.wav$/i.test(ent.url || "");
-    const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 2097));  // WAV=24kHz·16-bit·mono; else MP3 est
+    const secs = ent.duration_sec || Math.round((ent.bytes || 0) / (isWav ? 48000 : 10000));  // WAV=24kHz·16-bit·mono; else 80kbps MP3 (#1018)
     const mins = Math.max(1, Math.round(secs / 60));
     // Throughline: when the episode names its guest coach, link the byline to that
     // coach's team profile (/coaching/coaches/#<id>) so the show ties back into the team.
@@ -418,7 +418,7 @@ async function renderRead(s, id) {
   // Duration: trust the real duration_sec first; the byte estimate must be WAV-aware
   // (24kHz·16-bit·mono ≈ 48000 B/s) — the old MP3-only guess labeled a 12.9 MB WAV
   // "~102 min". Mirrors the correct logic at the podcast renderer above.
-  const _epSecs = episode ? (episode.duration_sec || Math.round((episode.bytes || 0) / (/\.wav(\?|$)/i.test(episode.url || "") ? 48000 : 2097))) : 0;
+  const _epSecs = episode ? (episode.duration_sec || Math.round((episode.bytes || 0) / (/\.wav(\?|$)/i.test(episode.url || "") ? 48000 : 10000))) : 0;
   const listen = episode
     ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round(_epSecs / 60))} min)</span></div>`
     : "";
