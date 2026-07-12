@@ -561,6 +561,34 @@ def call_anthropic(system_prompt, user_message, max_tokens=3000):
     )
 
 
+def _presence_block() -> str:
+    """#967: the ONE shared presence / quiet-stretch block (engagement_core,
+    written by adaptive_mode → STATE#current) — the same seam daily_brief uses
+    (daily_brief_lambda.py Phase 2), so a dark stretch is never planned over as
+    a normal week. Empty when Matthew is present. Fail-soft."""
+    try:
+        from engagement_core import presence_prompt_block
+
+        sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        block = presence_prompt_block(sig)
+        if block:
+            logger.info("Presence block injected (class=" + str(sig.get("presence_class")) + ")")
+        return block
+    except Exception as e:
+        logger.warning("presence block skipped (non-fatal): " + str(e))
+        return ""
+
+
+def build_system_prompt(journey_context) -> str:
+    """The compass system prompt + the #967 presence block when Matthew's own
+    logging has gone quiet — mirrors daily_brief's one-block injection."""
+    system = SYSTEM_PROMPT.format(journey_context=journey_context)
+    presence = _presence_block()
+    if presence:
+        system += "\n\n" + presence
+    return system
+
+
 SYSTEM_PROMPT = """You are the author of "The Monday Compass" — Matthew's weekly planning intelligence email. Your job is to connect his health state to his task load and help him start the week with clarity and intention rather than anxiety and noise.
 
 You have three jobs:
@@ -850,7 +878,7 @@ def lambda_handler(event, context):
     board_context = _build_board_context_for_compass(week_state, todoist_data)
 
     user_message, journey_context = build_user_message(week_state, todoist_data, health_data, profile, pillar_map, board_context)
-    system = SYSTEM_PROMPT.format(journey_context=journey_context)
+    system = build_system_prompt(journey_context)
 
     try:
         ai_content = call_anthropic(system, user_message, max_tokens=3500)
