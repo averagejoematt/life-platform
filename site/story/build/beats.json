@@ -872,6 +872,24 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1040"
         }
       ]
+    },
+    {
+      "id": "2026-07-11-char-math-v2",
+      "date": "2026-07-11",
+      "title": "The character's math had to survive a year of adversarial scrutiny — so we simulated the year first",
+      "shipped": "A 420-day simulation harness drove the real character engine through five life trajectories — steady-good, sustained excellence, oscillation, a 30-day silent month, a slow improver — and the numbers didn't survive: a realistic-good year bled a permanent debt badge (the slow improver ended with 0 XP and 700 debt despite reaching level 57), an uninstrumented pillar accrued a phantom −100 forever, the top tier was mathematically unreachable at any horizon, and a fully silent month cost the headline level about 2 points — the exact failure that triggered last cycle's truth audit. One recalibration shipped the fix wave whole: the XP zero-point moved from 'a near-perfect day' to 'a decent day' so debt is something a recovery arc visibly repays; a confirmed dark stretch now keeps pulling the headline down day after day instead of re-arming a fresh grace window per drop (the silent month costs 12 visible levels and leaves a scar); pillars with no data source neither earn nor owe; and the two side doors that skipped every honesty gate — a food-delivery penalty and challenge bonus XP — now enter through the engine with provenance. Lifting, reading, and the task queue finally feed the sheet too, all as day-counts so junk volume buys nothing. Alongside it, nine more backlog items merged and deployed the same session, including a launch-eve timeline that contradicted itself about what day it was.",
+      "gotcha": "The first simulation run after the retune showed the silent month costing NOTHING — the healthier XP economy kept every pillar's demotion buffer pinned at its cap, silently granting about 40 days of immunity. A unit test would never have seen it; the year-scale sim caught it in one run. The buffer is now capped at 40 and a provable absence bypasses it entirely.",
+      "honest_miss": "The tuning was ratified by simulation, not by lived data — cycle 5 starts tomorrow, and the first weeks of real scores may still argue with the curves. The sim harness is now the regression gate for exactly that conversation.",
+      "prs": [
+        {
+          "label": "PR #1055",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1055"
+        },
+        {
+          "label": "PR #1056",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1056"
+        }
+      ]
     }
   ]
 }
