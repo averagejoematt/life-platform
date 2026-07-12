@@ -127,20 +127,57 @@ function renderFeed(data) {
 
 const state = { week: ISO(mondayOf(new Date())) };
 
-async function load() {
-  const host = $("[data-feed]");
+/* ── Loading skeletons + a per-week session cache (#1019) ─────────────────────
+   The feed endpoint can take seconds cold; a bare "Loading…" string reads as
+   broken. Instead: (1) swap to a design-system skeleton synchronously on every
+   week-nav tap, and (2) stale-while-revalidate through sessionStorage — a week
+   already seen this session paints instantly from cache while the fetch
+   refreshes it in the background. Weeks are dated, append-only records (past
+   weeks immutable), so a stale-first paint stays honest. The skeleton markup
+   mirrors the static shell in index.html — keep them in sync. */
+
+const CACHE_PREFIX = "ajm-agents-week-v1:";
+const cacheGet = (k) => { try { const raw = sessionStorage.getItem(k); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } };
+const cachePut = (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode / quota — cache is best-effort */ } };
+
+const SK_EVENT = `<div class="sk-event" aria-hidden="true"><span class="sk-b sk-dot"></span><div class="sk-lines"><span class="sk-b sk-l1"></span><span class="sk-b sk-l2"></span></div></div>`;
+const SK_DAY = `<span class="sk-b sk-day" aria-hidden="true"></span>`;
+const skeletonFeed = () =>
+  `<div class="sk sk-feed" role="status" aria-label="Loading the week's agent activity">${SK_DAY}${SK_EVENT.repeat(3)}${SK_DAY}${SK_EVENT.repeat(2)}</div>`;
+const SK_CARD = `<div class="sk-card" aria-hidden="true"><div class="sk-t"><span class="sk-b sk-sigil"></span><span class="sk-b sk-h"></span></div><span class="sk-b sk-r"></span><span class="sk-b sk-d"></span><span class="sk-b sk-d"></span></div>`;
+const skeletonRoster = () => SK_CARD.repeat(4);
+
+function render(data) {
+  state.week = data.week_start || state.week;
   const range = $("[data-week-range]");
-  if (host) host.innerHTML = `<p class="agents-loading">Loading the week&hellip;</p>`;
+  if (range) range.textContent = prettyRange(data.week_start, data.week_end);
+  renderRoster(data.roster || [], data.summary || {});
+  renderFeed(data);
+  // Don't let readers page into the future.
+  const next = $("[data-week-next]");
+  if (next) next.disabled = addDays(state.week, 7) > ISO(mondayOf(new Date()));
+}
+
+let seq = 0; // rapid week-nav taps race their fetches — only the latest may paint
+async function load() {
+  const my = ++seq;
+  const week = state.week;
+  const host = $("[data-feed]");
+  const roster = $("[data-roster]");
+  const cached = cacheGet(CACHE_PREFIX + week);
+  if (cached) {
+    render(cached); // instant stale paint; the fetch below revalidates it
+  } else {
+    if (host) host.innerHTML = skeletonFeed();
+    if (roster && !roster.querySelector(".agent-card")) roster.innerHTML = skeletonRoster();
+  }
   try {
-    const data = await getJSON(`${API}/agent_activity?week=${encodeURIComponent(state.week)}`);
-    state.week = data.week_start || state.week;
-    if (range) range.textContent = prettyRange(data.week_start, data.week_end);
-    renderRoster(data.roster || [], data.summary || {});
-    renderFeed(data);
-    // Don't let readers page into the future.
-    const next = $("[data-week-next]");
-    if (next) next.disabled = addDays(state.week, 7) > ISO(mondayOf(new Date()));
+    const data = await getJSON(`${API}/agent_activity?week=${encodeURIComponent(week)}`);
+    cachePut(CACHE_PREFIX + week, data);
+    if (my !== seq) return;
+    render(data);
   } catch (err) {
+    if (my !== seq || cached) return; // keep the cached paint if we had one
     if (host) host.innerHTML = `<p class="feed-empty">The activity feed is unavailable right now. Please try again shortly.</p>`;
   }
 }

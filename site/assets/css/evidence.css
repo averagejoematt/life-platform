@@ -105,6 +105,19 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .shimmer { color: var(--ink-faint); }
 @media (prefers-reduced-motion: no-preference) { .shimmer { animation: pulse 1.6s var(--ease-inout) infinite; } @keyframes pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 0.9; } } }
 
+/* Loading skeletons (#1019) — design-system shimmer blocks, never spinners.
+   Solid hairline-tone fills pulsing with the same rhythm as .shimmer; static
+   under prefers-reduced-motion. The readout skeleton sketches the typical
+   readout anatomy: a stat row, a chart, two prose lines. */
+.sk { display: flex; flex-direction: column; gap: var(--sp-4); padding: var(--sp-2) 0; }
+.sk-b { display: block; background: var(--rule); border-radius: var(--radius-sm); opacity: 0.55; }
+@media (prefers-reduced-motion: no-preference) { .sk-b { animation: pulse 1.6s var(--ease-inout) infinite; } }
+.sk-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--sp-3); }
+.sk-stat { height: 72px; }
+.sk-chart { height: 180px; }
+.sk-line { height: 12px; width: 70%; }
+.sk-line--short { width: 40%; }
+
 /* ── Bespoke readouts (the archival / Readout treatment) ──────────────────── */
 .rd-sec { margin-top: var(--sp-7); }
 .rd-grouphead { border-top: var(--border-hair); padding-top: var(--sp-3); }

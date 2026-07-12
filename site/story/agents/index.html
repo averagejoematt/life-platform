@@ -69,8 +69,25 @@
     .event .ev-head{font-size:var(--fs-body);color:var(--ink);margin:.15em 0 0;line-height:var(--lh-snug)}
     .event .ev-details{margin:.35em 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.2em}
     .event .ev-details li{font-family:var(--font-mono);font-size:var(--fs-small);color:var(--ink-muted);word-break:break-word;overflow-wrap:anywhere}
-    .feed-empty,.agents-loading{color:var(--ink-muted);font-size:var(--fs-body);padding:var(--sp-6) 0;text-align:center}
+    .feed-empty{color:var(--ink-muted);font-size:var(--fs-body);padding:var(--sp-6) 0;text-align:center}
     .agents-note{color:var(--ink-faint);font-size:var(--fs-small);line-height:var(--lh-relaxed);max-width:var(--measure);margin:var(--sp-8) auto 0;text-align:center}
+
+    /* Loading skeletons (#1019) — geometry only; the .sk/.sk-b shimmer primitives
+       live in story.css. The markup is emitted twice: statically in this shell
+       (pre-JS first paint) and by agents.js (week-nav swaps) — keep them in sync. */
+    .sk-feed{border-top:1px solid var(--rule);gap:0}
+    .sk-day{width:120px;height:12px;margin:var(--sp-4) 0 var(--sp-2)}
+    .sk-event{display:flex;gap:var(--sp-3);padding:var(--sp-3) 0;border-bottom:1px solid var(--rule)}
+    .sk-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;margin-top:.45em}
+    .sk-lines{flex:1 1 auto;display:flex;flex-direction:column;gap:.5em}
+    .sk-l1{width:90px;height:10px}
+    .sk-l2{width:min(420px,80%);height:14px}
+    .sk-card{border:1px solid var(--rule);border-radius:var(--radius);padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-3);min-height:150px}
+    .sk-card .sk-t{display:flex;align-items:center;gap:var(--sp-3)}
+    .sk-sigil{width:38px;height:38px;border-radius:50%}
+    .sk-h{width:60%;height:16px}
+    .sk-r{width:80%;height:12px}
+    .sk-d{width:100%;height:12px}
   </style>
 </head>
 <body class="dx-page">
@@ -87,7 +104,7 @@
     </div>
 
     <p class="section-label">The roster</p>
-    <div class="roster" data-roster aria-live="polite"></div>
+    <div class="roster" data-roster aria-live="polite"><div class="sk-card" aria-hidden="true"><div class="sk-t"><span class="sk-b sk-sigil"></span><span class="sk-b sk-h"></span></div><span class="sk-b sk-r"></span><span class="sk-b sk-d"></span><span class="sk-b sk-d"></span></div><div class="sk-card" aria-hidden="true"><div class="sk-t"><span class="sk-b sk-sigil"></span><span class="sk-b sk-h"></span></div><span class="sk-b sk-r"></span><span class="sk-b sk-d"></span><span class="sk-b sk-d"></span></div><div class="sk-card" aria-hidden="true"><div class="sk-t"><span class="sk-b sk-sigil"></span><span class="sk-b sk-h"></span></div><span class="sk-b sk-r"></span><span class="sk-b sk-d"></span><span class="sk-b sk-d"></span></div><div class="sk-card" aria-hidden="true"><div class="sk-t"><span class="sk-b sk-sigil"></span><span class="sk-b sk-h"></span></div><span class="sk-b sk-r"></span><span class="sk-b sk-d"></span><span class="sk-b sk-d"></span></div></div>
 
     <p class="section-label">This week's activity</p>
     <div class="week-nav">
@@ -95,7 +112,7 @@
       <span class="week-range" data-week-range>&nbsp;</span>
       <button type="button" data-week-next>later week &rarr;</button>
     </div>
-    <div data-feed><p class="agents-loading">Loading the week&hellip;</p></div>
+    <div data-feed><div class="sk sk-feed" role="status" aria-label="Loading the week's agent activity"><span class="sk-b sk-day" aria-hidden="true"></span><div class="sk-event" aria-hidden="true"><span class="sk-b sk-dot"></span><div class="sk-lines"><span class="sk-b sk-l1"></span><span class="sk-b sk-l2"></span></div></div><div class="sk-event" aria-hidden="true"><span class="sk-b sk-dot"></span><div class="sk-lines"><span class="sk-b sk-l1"></span><span class="sk-b sk-l2"></span></div></div><div class="sk-event" aria-hidden="true"><span class="sk-b sk-dot"></span><div class="sk-lines"><span class="sk-b sk-l1"></span><span class="sk-b sk-l2"></span></div></div><span class="sk-b sk-day" aria-hidden="true"></span><div class="sk-event" aria-hidden="true"><span class="sk-b sk-dot"></span><div class="sk-lines"><span class="sk-b sk-l1"></span><span class="sk-b sk-l2"></span></div></div><div class="sk-event" aria-hidden="true"><span class="sk-b sk-dot"></span><div class="sk-lines"><span class="sk-b sk-l1"></span><span class="sk-b sk-l2"></span></div></div></div></div>
 
     <p class="agents-note">Every line above is lifted from an artifact the platform wrote on its own — the coherence log, the AI-quality canary log, the remediation audit log — and passed through the same privacy and content filters the public Q&amp;A uses before it&rsquo;s shown here. No new inference; nothing invented.</p>
   </main>
