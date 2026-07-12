@@ -420,13 +420,40 @@ export function physicalFullScanExpander(d) {
     note(`Every figure here is from the single ${esc(x.scan_date || "")} pre-cut scan — a dated snapshot, not a trend. Composition velocity unlocks at scan two.`));
 }
 
+// #1119 — the two-tier structure made explicit: a labeled group-head for the fluid
+// (daily) block and for the checkpoint (slow) block. The cadence chips render from the
+// API's measurement metadata (physical_overview.cadences ← source_registry + the DEXA
+// recheck interval), never hand-typed here.
+export function physicalTierHead(title, desc, chips) {
+  const chipHtml = (chips || []).filter(Boolean).map((c) => `<span class="tier-cad label">${esc(c)}</span>`).join("");
+  return `<section class="rd-grouphead tier-head"><div class="tier-row"><h2 class="rd-h">${esc(title)}</h2>${chipHtml}</div>${desc ? `<p class="rd-desc">${esc(desc)}</p>` : ""}</section>`;
+}
+
+// #1119 — cadence labels from the payload's metadata. Fail-soft for an older cached
+// payload without `cadences`: the DEXA interval is derived from the payload's own dates
+// (still metadata, not a hand-typed number); anything underivable is simply omitted.
+export function physicalCadences(d) {
+  const c = (d && d.cadences) || {};
+  const lbl = (k) => (c[k] && c[k].label) || null;
+  const out = { weight: lbl("weight"), dexa: lbl("dexa"), phenoage: lbl("phenoage"), tape: lbl("tape") };
+  if (!out.dexa && d && d.latest_dexa && d.latest_dexa.scan_date && d.next_dexa_recommended) {
+    const days = Math.round((Date.parse(d.next_dexa_recommended) - Date.parse(d.latest_dexa.scan_date)) / 86400000);
+    if (Number.isFinite(days) && days > 0) out.dexa = `DEXA — re-scanned ~every ${days} days`;
+  }
+  return out;
+}
+
 export async function renderPhysical(d) {
   const [wp, wj, pa] = await Promise.all([tryJSON("/api/weight_progress"), tryJSON("/api/journey"), tryJSON("/api/phenoage")]);
   const readings = (wp && wp.weight_progress) || [];
   const j = (wj && wj.journey) || {};
   const goal = j.goal_weight_lbs ?? 185;
+  const cad = physicalCadences(d);
   const parts = [];
-  // ── TIER 1 — the weight cockpit (daily) ──
+  // ── TIER 1 — the weight cockpit (daily) — the fluid block leads the page (#1119) ──
+  parts.push(physicalTierHead("The daily signal",
+    "The fluid layer — the numbers that move morning to morning. Sparse early in a cycle; it thickens with every weigh-in.",
+    [cad.weight]));
   parts.push(physicalTrendHero(readings, j, goal)); // P0.1
   if (j.start_weight_lbs != null && j.current_weight_lbs != null) parts.push(dataFigure(j)); // P0.2 — silhouette scrubber (links to the trend marker)
   parts.push(physicalStatCluster(readings, j, goal)); // P0.3 — stat cluster (replaces DEXA % as top figures)
@@ -457,7 +484,11 @@ export async function renderPhysical(d) {
       `<p class="rd-meta label">A forecast is a cone, never a line. The band is the real ${j.projection_confidence != null ? Math.round(Number(j.projection_confidence) * 100) + "% " : ""}confidence interval on the loss slope — wide because the rate is young, tightening as weigh-ins accrue. The dated bet is the backend's own goal-date range, held honestly and checked against what actually happens.</p>`));
   }
   parts.push(physicalBMI(readings, j)); // P0.7 — BMI (de-emphasized, last in Tier 1)
-  // ── TIER 2 — the composition arc (episodic) — restructured across P1.x ──
+  // ── TIER 2 — the composition arc (episodic) — the checkpoint block, grouped and
+  // labeled with its actual cadence (#1119) ──
+  parts.push(physicalTierHead("The checkpoints",
+    "The slow measurements, grouped and dated — they move on scans and blood draws, not mornings. Read them as chapters, not a feed.",
+    [cad.dexa, cad.phenoage, cad.tape]));
   parts.push(physicalDexaCountdown(d)); // P1.1 — next-DEXA countdown (arc anchor)
   parts.push(physicalDexaBaseline(d)); // P1.2 — dated lean-vs-fat baseline (one scan, not a trend)
   parts.push(physicalVisceralCallout(d)); // P1.3 — visceral fat callout + risk band (dated)
