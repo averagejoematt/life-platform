@@ -544,49 +544,102 @@ def handle_device_agreement() -> dict:
     )
 
 
-# ── #406: intra-day sync freshness (the cockpit's "measured — live" proof) ──
-# REAL ingestion write times only: the latest DATE# records' ingested_at /
-# webhook_ingested_at stamps, never the day-granular DATE key. Passive pipes
-# only — these sync without Matthew's participation, so an "x min ago" here is
-# genuine motion, not implied continuity.
-# #491/M-5: withings included so the cockpit sync strip can carry the weigh-in
-# recency (behavioral cadence — a gap means "didn't step on", not "pipe broke").
-_SYNC_SOURCES = {"whoop": "Whoop", "eightsleep": "Eight Sleep", "apple_health": "Apple Health", "withings": "Withings scale"}
+# ── #406/#1101: intra-day sync freshness (the cockpit's "measured — live" proof) ──
+# EVERY registry source (#1101) — the sync line is a freshness surface, so a stale
+# or paused source is visible, never masked by the freshest one. Per source the
+# best available evidence is reported honestly:
+#   • the REAL last ingestion write (the latest DATE# records' ingested_at /
+#     webhook_ingested_at stamps) when a pipe stamps its writes — precision "instant";
+#   • else the day-granular DATE key (the SAME basis /api/source_freshness uses) —
+#     precision "day", so the client can render day-level "ago" without implying
+#     an instant it doesn't have;
+#   • else nothing — last_seen null, never invented.
+
+
+def _parse_iso_ts(ts):
+    """Best-effort ISO parse → aware UTC datetime, or None (never raises)."""
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
 
 
 def handle_last_sync() -> dict:
-    """GET /api/last_sync — per passive source, the real last ingestion write.
+    """GET /api/last_sync — per registry source, the real last ingestion write + honest status.
 
-    Returns {sources: [{id, label, last_write, stale_hours}], freshest, server_now}.
-    The client computes and ticks the "ago" display (server_now closes clock skew).
-    stale_hours (#589) is the SAME source_registry-derived window /api/source_freshness
-    uses — so the cockpit sync line's pulse is tied to each source's real freshness
-    window, not a flat guess. A source with no write stamp is reported with last_write
-    null — shown honestly or omitted by the front-end, never faked."""
-    now_iso = datetime.now(timezone.utc).isoformat()
+    Returns {sources: [{id, label, last_write, last_seen, precision, stale_hours,
+    status}], server_now}. The client computes and ticks the "ago" display
+    (server_now closes clock skew). stale_hours (#589) is the SAME source_registry-
+    derived window /api/source_freshness uses — so each source's pulse and status
+    are tied to its OWN freshness window (e.g. Todoist's cadence-derived 72h), not
+    a flat guess. status ∈ {fresh, stale, behavioral-stale, paused, unknown} with
+    /api/source_freshness semantics: a behavioral lapse never reads as a broken
+    pipe, a paused source says so, and nothing is faked (#1101)."""
+    now = datetime.now(timezone.utc)
     sources = []
-    for sid, label in _SYNC_SOURCES.items():
+    for sid, meta in _FRESHNESS_SOURCES.items():
         last_write = None
+        last_date = None
+        failed = False
         try:
             kwargs = with_phase_filter(
                 {
                     "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{sid}") & Key("sk").begins_with("DATE#"),
                     "ScanIndexForward": False,
                     "Limit": 3,  # today's record + possible sub-records; max() picks the true latest write
-                    "ProjectionExpression": "ingested_at, webhook_ingested_at",
+                    "ProjectionExpression": "sk, ingested_at, webhook_ingested_at",
                 }
             )
             for it in table.query(**kwargs).get("Items", []):
                 ts = str(it.get("webhook_ingested_at") or it.get("ingested_at") or "")
                 if ts and (last_write is None or ts > last_write):
                     last_write = ts
+                d = str(it.get("sk", "")).replace("DATE#", "")[:10]
+                if d and (last_date is None or d > last_date):
+                    last_date = d
         except Exception as e:
             logger.warning("last_sync: %s failed: %s", sid, e)
+            failed = True
         stale_hours = _FRESHNESS_STALE_HOURS.get(sid, _FRESHNESS_DEFAULT_STALE_HOURS)
-        sources.append({"id": sid, "label": label, "last_write": last_write, "stale_hours": stale_hours})
-    with_writes = [s for s in sources if s["last_write"]]
-    freshest = max(with_writes, key=lambda s: s["last_write"]) if with_writes else None
-    return _ok({"sources": sources, "freshest": freshest, "server_now": now_iso}, cache_seconds=60)
+        last_seen, precision = None, None
+        if last_write:
+            last_seen, precision = last_write, "instant"
+        elif last_date:
+            parsed = _parse_iso_ts(last_date)
+            if parsed:
+                last_seen, precision = parsed.isoformat(), "day"
+        if failed:
+            status = "unknown"
+        else:
+            status = "behavioral-stale" if meta.get("behavioral") else "stale"
+            seen_dt = _parse_iso_ts(last_seen) if last_seen else None
+            if seen_dt and (now - seen_dt).total_seconds() / 3600 <= stale_hours:
+                status = "fresh"
+        sources.append(
+            {
+                "id": sid,
+                "label": meta["label"],
+                "last_write": last_write,
+                "last_seen": last_seen,
+                "precision": precision,
+                "stale_hours": stale_hours,
+                "status": status,
+            }
+        )
+    for sid, meta in _FRESHNESS_PAUSED.items():
+        sources.append(
+            {
+                "id": sid,
+                "label": meta["label"],
+                "last_write": None,
+                "last_seen": None,
+                "precision": None,
+                "stale_hours": None,
+                "status": "paused",
+            }
+        )
+    return _ok({"sources": sources, "server_now": now.isoformat()}, cache_seconds=60)
 
 
 # Presence classes the public surface treats as "in a lull" (worth showing a line).
