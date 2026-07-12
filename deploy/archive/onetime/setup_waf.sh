@@ -1,4 +1,11 @@
 #!/bin/bash
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DECISION-CONTRADICTING: the WAF this creates was deliberately removed 2026-06
+# (~-$8/mo; see the 'WAF REMOVED (2026-06)' note in cdk/stacks/web_stack.py). Rate
+# limiting is now in-Lambda (DDB-backed). Re-running this would recreate the WebACL
+# against that recorded decision. Do NOT run.
+# ──────────────────────────────────────────────────────────────────────────
 # setup_waf.sh — TB7-26: WAF rate limiting on AMJ CloudFront (E3S424OXQZ8NBE)
 #
 # Creates a WAF WebACL in us-east-1 (required for CloudFront) with:

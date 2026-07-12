@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DONE-ONCE: WS-3 cleanup executed — the 2026-02-22 legacy Hevy daily aggregates were
+# tombstoned (tombstone=true, audit trail kept). Idempotent but has no remaining
+# purpose; kept for the historical record.
+# ──────────────────────────────────────────────────────────────────────────
 """
 tombstone_legacy_hevy_aggregates.py — One-shot WS-3 cleanup.
 

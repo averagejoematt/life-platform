@@ -1,4 +1,11 @@
 #!/bin/bash
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DONE-ONCE: R18-F04 alarm creation, executed during the v3.7.82->v4.3.0 sprint.
+# CloudWatch alarms are now CDK-owned (cdk/stacks/monitoring_stack.py; inventory
+# machine-maintained in docs/MONITORING.md per #934) — imperative alarm creation
+# would drift from CDK. Do NOT run.
+# ──────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
 # R18-F04: Add CloudWatch alarms for Lambdas created during the v3.7.82→v4.3.0 sprint

@@ -1,4 +1,10 @@
 #!/bin/bash
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DONE-ONCE: executed successfully 2026-06 (docs/CHANGELOG.md records the run) —
+# the WAF is detached and deleted; the WebACL no longer exists in us-east-1.
+# Re-running is a no-op at best. Kept for the historical record.
+# ──────────────────────────────────────────────────────────────────────────
 # finish_waf_removal.sh — Step 2 of #103: detach + delete the orphaned WAF.
 #
 # PRECONDITION: email-subscriber must already be running the rate-limit code

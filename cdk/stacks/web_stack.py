@@ -57,7 +57,7 @@ INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 
 # ACM certificate for averagejoematt.com (us-east-1 — required for CloudFront)
-# REQUEST THIS FIRST: see deploy/request_amj_cert.sh
+# REQUEST THIS FIRST: see deploy/archive/onetime/request_amj_cert.sh (archived #972 — cert issued, auto-renews)
 # Then update this ARN and run: cdk deploy LifePlatformWeb
 CERT_ARN_AMJ = "arn:aws:acm:us-east-1:205930651321:certificate/e85e4b63-e7d0-4403-a64c-c235bc57084c"
 

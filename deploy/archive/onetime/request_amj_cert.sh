@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# ──────────────────────────────────────────────────────────────────────────
+# ARCHIVED 2026-07-11 (#972) — one-time script, retired from the live deploy/ surface.
+# DONE-ONCE: the averagejoematt.com ACM certificate was issued (CERT_ARN_AMJ in
+# cdk/stacks/web_stack.py holds the real ARN) and auto-renews via its DNS validation
+# records. Only needed again in a from-scratch rebuild in a NEW account/region pair.
+# ──────────────────────────────────────────────────────────────────────────
 # request_amj_cert.sh — Request ACM certificate for averagejoematt.com
 #
 # MUST run in us-east-1 (CloudFront requires ACM certs from us-east-1 only).
