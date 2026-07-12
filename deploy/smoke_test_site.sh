@@ -212,9 +212,9 @@ if [[ "$QUICK" != "--quick" ]]; then
   echo "── API data quality ──────────────────────────────────────"
   # Pre-start (countdown) window: journey serves pre_start=true and baseline-dependent
   # vitals are legitimately absent — accept either state, but only the right one.
-  PRE_START=$(curl -s --max-time 10 "$BASE/api/journey" | python3 -c "import sys,json; d=json.load(sys.stdin); print('1' if d.get('journey',d).get('pre_start') else '0')" 2>/dev/null || echo 0)
+  PRE_START=$(curl -s --max-time 10 "$BASE/api/journey" | python3 -c "import sys,json; d=json.load(sys.stdin); j=d.get('journey',d); print('1' if (j.get('pre_start') or (j.get('day_n') is not None and j.get('day_n') <= 1)) else '0')" 2>/dev/null || echo 0)
   if [ "$PRE_START" = "1" ]; then
-    echo "  ✅ /api/vitals: pre-start window (weight_lbs not required)"; PASS=$((PASS + 1))
+    echo "  ✅ /api/vitals: pre-start/Day-1 window (weight_lbs not required before the first weigh-in)"; PASS=$((PASS + 1))
   elif curl -s --max-time 10 "$BASE/api/vitals" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('vitals',{}).get('weight_lbs') is not None" 2>/dev/null; then
     echo "  ✅ /api/vitals: weight_lbs present"; PASS=$((PASS + 1))
   else
