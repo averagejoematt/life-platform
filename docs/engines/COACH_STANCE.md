@@ -1,7 +1,7 @@
 # Coach Stance Engine + the Coach Quality Gate
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
-> **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1123-1188), `lambdas/coach/coach_quality_gate.py`
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#971/#1052 — key-plumbing removal, terminal HOLD)
+> **Sources of truth:** `lambdas/coach/coach_history_summarizer.py` (stance engine, :940-1360), `lambdas/coach_stance.py` (stage-ladder fallback), `lambdas/ai_calls.py` (`_enforce_quality_gate`, :1343-1410), `lambdas/coach/coach_quality_gate.py`
 
 ## Purpose
 
@@ -31,20 +31,20 @@ One Haiku call (`STANCE_SYSTEM_PROMPT`, :970-1006) emits JSON: `headline_read`,
 
 ## Honesty machinery (in order)
 
-1. **Raw-vitals regex** (`_RAW_VITAL_RE`, :955-960): a stance must never cite numbers (bpm, ms,
+1. **Raw-vitals regex** (`_RAW_VITAL_RE`, :943-1009): a stance must never cite numbers (bpm, ms,
    mg/dl, lbs, kcal, percentages…). A hit ⇒ one strict zero-numbers regeneration, kept only if
    strictly fewer hits; residual hits set `grounding_flag` for the render/Sentinel.
-2. **Change-claim sanitizer** (`_sanitize_stance`, :1127-1144): `how_my_read_changed` is blanked
+2. **Change-claim sanitizer** (`_sanitize_stance`, :1115-1153): `how_my_read_changed` is blanked
    unless grounded in a logged correction or a real stage shift vs the prior stance; first run ⇒
    always blank.
-3. **ADR-104 grounded-generation gate** (#534, `_apply_grounding_gate`, :1167-1206): the shared
+3. **ADR-104 grounded-generation gate** (#534, `_apply_grounding_gate`, :1155-1200): the shared
    allow-list number check over prose fields only, one corrective regen via `regen_once`;
    findings that survive ⇒ **fail-keep-prior** — a stance still citing an ungrounded number is
    never written over a good one.
 
 ## Storage
 
-`_write_stance` (:1268-1275): `pk COACH#<coach_id>` / `sk STANCE#<date>` (immutable history)
+`_write_stance` (:1256-1266): `pk COACH#<coach_id>` / `sk STANCE#<date>` (immutable history)
 **and** `sk STANCE#latest` (live pointer). Phase class: every `COACH#*` pk is EXPERIMENT_SCOPED
 (`phase_taxonomy._PK_RULES`). Readers: `web/site_api_coach.py`, `site_api_ai_lambda.py`,
 chronicle/panelcast emails, `coach_narrative_orchestrator.py` (steers daily generation).
@@ -57,7 +57,7 @@ N-06 #390). The `coach-quality-gate` Lambda is a pure scorer (Haiku): `passed=Fa
 a "generic" suggestion. Findings: anti-pattern phrases, decision-class (evidence-ceiling)
 violations, cross-coach similarity.
 
-**Regenerate-or-hold** (ai_calls.py:1123-1188):
+**Regenerate-or-hold** (ai_calls.py:1343-1410):
 
 ```
 report = sync invoke coach-quality-gate      # fails OPEN on infra errors only
@@ -65,6 +65,9 @@ while not passed and attempts < 1:           # _QUALITY_GATE_MAX_REGENERATIONS =
     regenerate with a corrective note built from the report's findings
     re-score
 if still not passed: return (None, report)   # HOLD — nothing published this cycle
+# …and since #966 the caller turns that None into a CoachHold sentinel (ai_calls.py:1201):
+# a deliberate hold is TERMINAL for the domain — the daily brief no longer publishes the
+# ungated legacy narrative in the held draft's place (only infra-error Nones fall back).
 ```
 
 A held draft emits the `CoachQualityGateHeld` CloudWatch metric and (#744) retains the

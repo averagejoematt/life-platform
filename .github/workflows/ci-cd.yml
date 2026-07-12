@@ -241,7 +241,7 @@ jobs:
         run: |
           python3 scripts/check_doc_links.py
           python3 scripts/check_doc_tombstones.py
-          python3 scripts/check_doc_index.py
+          python3 scripts/check_doc_index.py --strict
           python3 scripts/generate_adr_index.py --check
 
   # ════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 # Hypothesis Engine
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#970: its query_range now the paginated digest_utils implementation — the silent 1MB truncation class is gone; formulas unchanged)
 > **Sources of truth:** `lambdas/compute/hypothesis_engine_lambda.py` (v2, #530/ADR-105), `lambdas/stats_core.py`
 
 ## Purpose

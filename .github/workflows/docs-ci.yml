@@ -71,7 +71,7 @@ jobs:
 
       - name: Index coverage + status headers (+ freshness report)
         if: always()
-        run: python3 scripts/check_doc_index.py
+        run: python3 scripts/check_doc_index.py --strict
 
       - name: ADR index current
         if: always()

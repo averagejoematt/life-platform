@@ -1,6 +1,6 @@
 # Scoring Engine — the Day Grade
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#970 — scoring_engine deliberately KEPT its typed safe_float; formulas unchanged)
 > **Sources of truth:** `lambdas/scoring_engine.py`, `lambdas/compute/daily_metrics_compute_lambda.py`, profile record `USER#matthew / PROFILE#v1` (`day_grade_weights`)
 
 ## Purpose
@@ -19,7 +19,7 @@ One day's gathered data dict (per-source records: `sleep`, `whoop`, `macrofactor
 Eight component scorers, each returning `(score 0–100 | None, details)` (`COMPONENT_SCORERS`,
 `scoring_engine.py:414-423`). A component with no data returns `None` and drops out entirely.
 
-**Day Grade** (`compute_day_grade`, `scoring_engine.py:460-480`): weighted mean over components
+**Day Grade** (`compute_day_grade`, `scoring_engine.py:462-482`): weighted mean over components
 that have both a score and a positive weight; weights re-normalize over the active set.
 
 ```
@@ -32,11 +32,11 @@ recovery 0.15, movement 0.15, habits_mvp 0.15, hydration 0.05, journal 0.05, glu
 
 ### Component formulas (values from code)
 
-- **sleep_quality** (`score_sleep`, :55-90): Whoop `sleep_score`×0.40 + `sleep_efficiency_pct`×0.30
+- **sleep_quality** (`score_sleep`, :57-92): Whoop `sleep_score`×0.40 + `sleep_efficiency_pct`×0.30
   + duration-vs-target×0.30, re-normalized over present parts.
   `dur_score = clamp(100 − |hrs − target|/2.0 × 100)`; target `sleep_target_hours_ideal` (default 7.5).
-- **recovery** (`score_recovery`, :93-97): Whoop `recovery_score`, used directly (clamped).
-- **nutrition** (`score_nutrition`, :100-160): calories 0.40 + protein 0.40 + macro split 0.20.
+- **recovery** (`score_recovery`, :95-99): Whoop `recovery_score`, used directly (clamped).
+- **nutrition** (`score_nutrition`, :102-162): calories 0.40 + protein 0.40 + macro split 0.20.
   - Calories: 100 inside ±`calorie_tolerance_pct` (default 10%) of `calorie_target` (default 1800);
     linear to 0 at `calorie_penalty_threshold_pct` (default 25%) off; **surplus asymmetry:** eating
     above target+tolerance subtracts a further 15 points ("surplus directly stalls weight loss").
@@ -44,17 +44,17 @@ recovery 0.15, movement 0.15, habits_mvp 0.15, hydration 0.05, journal 0.05, glu
     (default 170) and target; below floor `max(0, 80·protein/floor)`.
   - Macros: `clamp(100 − (|fat−60|/60 + |carbs−125|/125) × 50)` (defaults fat 60 g, carbs 125 g;
     50× multiplier ⇒ 100% off on both = 0).
-- **movement** (`score_movement`, :163-192): exercise 0.50 + steps 0.50.
+- **movement** (`score_movement`, :165-194): exercise 0.50 + steps 0.50.
   - Exercise (Strava): any activity ⇒ `min(100, 70 + moving_minutes × 0.5)` (base 70 for showing
     up; 60 min ⇒ 100); no activity ⇒ 0.
   - Steps (Apple): `min(100, steps/step_target × 100)`, `step_target` default 7000.
-- **habits_mvp** (`score_habits_registry`, :195-292): tier-weighted over the profile
+- **habits_mvp** (`score_habits_registry`, :197-294): tier-weighted over the profile
   `habit_registry`. Tier weights **T0 3.0×, T1 1.0×, T2 0.5×**; T0/T1 binary (100/0 per habit),
   T2 scored as rolling 7-day frequency vs `target_frequency`. Weekday-only habits skip weekends;
   `post_training` habits only count on Strava-activity days; per-habit `scoring_weight`
   down-weights emerging-evidence habits. Composite = Σ(tier_avg·tier_w)/Σ tier_w. Falls back to
   the legacy flat `mvp_habits` percentage when the registry is empty.
-- **hydration** (`score_hydration`, :316-329): `min(100, water_ml/target × 100)`, target
+- **hydration** (`score_hydration`, :318-331): `min(100, water_ml/target × 100)`, target
   `water_target_ml` default 2957. Readings **< 500 ml are treated as no-data** (HAE sync
   artifacts deliver ~350 ml on truncated payloads).
 - **journal** (`score_journal`, :332-354): morning AND evening template ⇒ 100; one of them ⇒ 60;
