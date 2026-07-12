@@ -644,7 +644,12 @@ def _build_intro_script(bible: dict) -> list:
         "  - CLOSE on the series' standing open question — the bet this whole show is settling, that every future episode "
         f"moves the needle on: {bible.get('series_question', bible.get('thesis', ''))} Frame it as the reason to come back. "
         "The final exchange must LAND that tension — unresolved, a little uncomfortable, the itch that brings a listener "
-        "back — not a tidy reassurance, a mutual pat on the back, or a summary bow.\n\n"
+        "back — not a tidy reassurance, a mutual pat on the back, or a summary bow.\n"
+        "  - THE RULES ABOVE ARE FLOORS, NOT THE SHOW. The show is two people a total stranger wants to keep listening "
+        "to: give Elena and Eli real personality — at least two genuinely warm or dryly funny beats, an aside or "
+        "callback, a direct address to the listener, a moment of small talk that earns its place, lines worth quoting. "
+        "Read it aloud in your head: if it sounds like a compliant briefing instead of a conversation with texture and "
+        "charm, rewrite it. Never trade personality for compliance — deliver both.\n\n"
         f"HARD GUARDRAILS (breaking any of these ruins the episode):\n{guards}\n\n"
         'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 20–28 turns. '
         "No preamble, no stage directions, no JSON fences."
@@ -798,7 +803,8 @@ def _run_intro(dry_run: bool = False) -> dict:
         "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
         + _chars.get("matthew", "")
         + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
-        "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the Principal Investigator who runs the AI coach team)."
+        "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
+        "team — Matt himself designed and built the experiment and the platform)."
     )
 
     def _prep(raw):
