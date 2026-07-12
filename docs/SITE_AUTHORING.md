@@ -151,8 +151,17 @@ the whole edit — do not touch the ~75 pages by hand, and do not edit the inlin
 `v4_build_coaching.py` / `v4_build_dispatches.py` (they emit their own copy, which the
 apply pass normalizes away). `v4_apply_chrome.py` **runs last in
 `deploy/sync_site_to_s3.sh`** (after every `v4_build_*`), so chrome can't re-drift on a
-deploy; it is idempotent and auto-detects each page's current door + follow pill. Run
-`python3 scripts/v4_apply_chrome.py --check` to assert no page has drifted (CI-friendly).
+deploy; it is idempotent and auto-detects each page's current door + follow pill + the
+footer's home-only live `asof` stamp (#1104). Run
+`python3 scripts/v4_apply_chrome.py --check` to assert no page has drifted —
+`tests/test_site_chrome.py` runs it in the CI Unit Tests gate.
+
+**Footer standardization (#1104):** every doors-nav page carries the canonical
+`.site-foot` — the old slim variants (`.story-foot` on home/404, `.dx-foot-bar` on
+privacy/subscribe/confirm) are retired; the apply pass converts any reappearance back to
+canonical (and would insert the footer on a chrome-bearing page that has none). The two
+0-second redirect stubs (`site/mind/index.html`, `site/subscribe.html`) have no doors nav
+and are deliberately left chrome-free.
 
 ## 4. The module-graph hashing trap (why pages "freeze")
 

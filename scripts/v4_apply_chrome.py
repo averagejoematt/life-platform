@@ -10,6 +10,15 @@ the canonical partial output for that state. Everything else on the page is unto
 It is idempotent (running twice is a no-op) and is the AUTHORITATIVE post-build chrome
 pass: run it after any `v4_build_*` build so generator-local chrome can't re-drift.
 
+Footer standardization (#1104): a page that carries the doors nav is a content page and
+must carry the canonical `.site-foot` footer. Pages that instead ship a historical slim
+variant (`.story-foot` on home/404, `.dx-foot-bar` on privacy/subscribe/confirm) get the
+variant REPLACED in place with the canonical footer; a chrome-bearing page with no footer
+at all gets the canonical footer inserted before `</body>`. Home's live "updated" stamp
+(`data-bind="asof"`) is a third deliberate axis — detected on the old footer (canonical
+or variant) and preserved via `site_footer(with_asof=True)`. Pages with NO doors nav —
+the `/mind/` and `/subscribe.html` redirect stubs — are untouched by construction.
+
   python3 scripts/v4_apply_chrome.py            # rewrite in place, print summary
   python3 scripts/v4_apply_chrome.py --check    # exit 1 if any page would change (CI)
 
@@ -35,8 +44,13 @@ SITE_ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 NAV_RE = re.compile(r'<nav class="doors".*?<button class="theme-toggle"[^>]*>.*?</button>(?:\s*</nav>)?', re.DOTALL)
 NAV_OPEN = '<nav class="doors"'
 FOOT_RE = re.compile(r'<footer class="site-foot".*?</footer>', re.DOTALL)
+# The retired slim variants (#1104): story-foot (home, 404) and dx-foot-bar (privacy,
+# subscribe, subscribe/confirm). On a doors-nav page these are converted to the
+# canonical footer; the regexes stay so a hand-authored regression gets re-flattened.
+VARIANT_FOOT_RE = re.compile(r'<footer class="(?:story-foot|dx-foot-bar)".*?</footer>', re.DOTALL)
 CURRENT_RE = re.compile(r'<a href="([^"]+)"[^>]*aria-current="page"')
 FOLLOW_RE = re.compile(r'class="nav-follow"')
+ASOF_RE = re.compile(r'data-bind="asof"')
 
 
 def iter_html_files(root: str):
@@ -59,8 +73,8 @@ def detect_nav_state(nav_html: str):
 
 
 def rewrite(html: str):
-    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons)."""
-    nav_changed = foot_changed = gained_icons = False
+    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted)."""
+    nav_changed = foot_changed = gained_icons = foot_converted = False
     door = None
     follow = False
 
@@ -79,12 +93,27 @@ def rewrite(html: str):
     foot_m = FOOT_RE.search(html)
     if foot_m:
         old_foot = foot_m.group(0)
-        new_foot = v4_chrome.site_footer()
+        new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(old_foot)))
         if new_foot != old_foot:
             foot_changed = True
             html = html[: foot_m.start()] + new_foot + html[foot_m.end() :]
+    elif nav_m:
+        # #1104: a doors-nav page is a content page — it must carry the canonical
+        # footer. Convert a slim variant (story-foot / dx-foot-bar) in place — keeping
+        # the live asof stamp if the old footer carried one — or, if the page has no
+        # footer at all, insert the canonical one just before </body>.
+        var_m = VARIANT_FOOT_RE.search(html)
+        if var_m:
+            new_foot = v4_chrome.site_footer(with_asof=bool(ASOF_RE.search(var_m.group(0))))
+            html = html[: var_m.start()] + new_foot + html[var_m.end() :]
+        else:
+            body_at = html.rfind("</body>")
+            if body_at == -1:
+                raise RuntimeError("chrome-bearing page has no footer and no </body> — refusing to guess the insert point")
+            html = html[:body_at] + v4_chrome.site_footer() + "\n" + html[body_at:]
+        foot_changed = foot_converted = True
 
-    return html, nav_changed, foot_changed, door, follow, gained_icons
+    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted
 
 
 def main() -> int:
@@ -94,6 +123,7 @@ def main() -> int:
 
     nav_changed = []
     foot_changed = []
+    foot_converted = []
     gained_icons = []
     by_door: dict[str | None, int] = {}
     follow_count = 0
@@ -104,7 +134,7 @@ def main() -> int:
         if '<nav class="doors"' not in original and '<footer class="site-foot"' not in original:
             continue
         total += 1
-        new, nc, fc, door, follow, gi = rewrite(original)
+        new, nc, fc, door, follow, gi, conv = rewrite(original)
         if '<nav class="doors"' in original:
             by_door[door] = by_door.get(door, 0) + 1
             if follow:
@@ -114,6 +144,8 @@ def main() -> int:
             nav_changed.append(rel)
         if fc:
             foot_changed.append(rel)
+        if conv:
+            foot_converted.append(rel)
         if gi:
             gained_icons.append(rel)
         if new != original and not args.check:
@@ -123,6 +155,9 @@ def main() -> int:
     print(f"Scanned {total} chrome-bearing pages under {SITE_ROOT} (legacy excluded).")
     print(f"  nav rewritten:    {len(nav_changed)}")
     print(f"  footer rewritten: {len(foot_changed)}")
+    print(f"  variant/missing footers converted to canonical: {len(foot_converted)}")
+    for rel in foot_converted:
+        print(f"      + {rel}")
     print(f"  icon-less navs that GAINED door icons: {len(gained_icons)}")
     for rel in gained_icons:
         print(f"      + {rel}")
