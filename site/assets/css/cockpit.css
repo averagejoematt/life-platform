@@ -28,6 +28,37 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .cockpit-hero { padding-block: var(--sp-3) var(--sp-2); }
 .cockpit-hero .loop-ribbon { margin-top: var(--sp-2); }
 
+/* ── #1106: the hero instrument strip — small ring() instruments + the faint
+   instrument mark. Deliberately quiet: the tones (ember/muted/alert) come from
+   the .vr primitive in tokens.css and encode the vitals page's established
+   thresholds — nothing here adds glow, shadow, or motion. The strip stays a
+   one-second read; the big score below remains the headline (#578). */
+.hero-instruments {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--sp-4); margin-top: var(--sp-3);
+}
+.hero-instruments .hi-mark { display: flex; flex: none; color: var(--ink-faint); }
+.hero-instruments .hi-imark { width: 30px; height: 30px; opacity: 0.75; }
+.hero-instruments .hi-rings {
+  display: grid; grid-template-columns: repeat(4, minmax(56px, 76px));
+  gap: var(--sp-3); flex: 0 1 auto;
+}
+/* Scale the shared .vr primitive down to hero-strip size (tokens.css owns the
+   tones; only the geometry is overridden here). */
+.hero-instruments .vr { gap: 2px; }
+.hero-instruments .vr-svg { max-width: 60px; }
+.hero-instruments .vr-c { top: calc(50% - 1em); }
+.hero-instruments .vr-v { font-size: 0.8rem; /* fs-ok: deliberate small-instrument scale */ }
+.hero-instruments .vr-sub { font-size: 0.55rem; /* fs-ok: rides the smaller ring */ }
+.hero-instruments .vr-l { font-size: 0.58rem; /* fs-ok: rides the smaller ring */ }
+.hero-instruments .hi-note { flex-basis: 100%; margin: 0; color: var(--ink-faint); }
+@media (max-width: 480px) {
+  .hero-instruments { gap: var(--sp-3); }
+  .hero-instruments .hi-mark { display: none; } /* the rings ARE the mark at phone width */
+  .hero-instruments .hi-rings { grid-template-columns: repeat(4, 1fr); width: 100%; }
+  .hero-instruments .vr-svg { max-width: 54px; }
+}
+
 .brand { display: inline-flex; align-items: center; gap: var(--sp-2); text-decoration: none; }
 .brand-mark {
   width: 11px; height: 11px; border-radius: 2px;
