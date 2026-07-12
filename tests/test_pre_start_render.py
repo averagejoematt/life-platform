@@ -139,7 +139,7 @@ def pre_start_pages():
                 pytest.skip(f"playwright chromium unavailable: {e}")
             context = browser.new_context(viewport={"width": 1440, "height": 900}, service_workers="block")
             _routes(context)
-            for path in ("/", "/now/", "/data/character/"):
+            for path in ("/", "/cockpit/", "/data/character/"):
                 page = context.new_page()
                 errors = []
                 page.on("pageerror", lambda e, _errs=errors: _errs.append(str(e)))
@@ -175,11 +175,11 @@ def test_home_counts_down(pre_start_pages):
 
 
 def test_cockpit_pre_start_banner(pre_start_pages):
-    res = pre_start_pages["/now/"]
+    res = pre_start_pages["/cockpit/"]
     text = res["text"].lower()
     assert "the instruments are on" in text
     assert f"t−{DAYS_UNTIL}" in text
-    _assert_no_leaks(res, "/now/")
+    _assert_no_leaks(res, "/cockpit/")
 
 
 def test_character_sheet_record_begins(pre_start_pages):

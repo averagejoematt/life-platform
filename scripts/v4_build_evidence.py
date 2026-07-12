@@ -603,7 +603,7 @@ EDITORIAL = {
         "<li><strong>Mastery</strong> — levels 61–80. The system runs itself most days.</li>"
         "<li><strong>Elite</strong> — levels 81–100. The far end of what an N=1 can reach.</li>"
         "</ul>"
-        '<p class="rd-prose">So a read like "<strong>Level 13 · Foundation</strong>" means level 13 of 100, still in the first tier: early, building the base, exactly where the opening months should sit. The tier is the chapter; the level is the page. This explainer is static by design — the <em>live</em> number is on <a href="/now/">the cockpit</a> and <a href="/data/character/">the character sheet</a>, never hardcoded here where it would drift stale.</p></section>'
+        '<p class="rd-prose">So a read like "<strong>Level 13 · Foundation</strong>" means level 13 of 100, still in the first tier: early, building the base, exactly where the opening months should sit. The tier is the chapter; the level is the page. This explainer is static by design — the <em>live</em> number is on <a href="/cockpit/">the cockpit</a> and <a href="/data/character/">the character sheet</a>, never hardcoded here where it would drift stale.</p></section>'
         '<section class="rd-sec"><h2 class="rd-h">Why level-ups are rare (and mean something)</h2>'
         '<p class="rd-prose">A level only moves after a sustained shift — roughly <strong>five or more days of real improvement</strong> to go up, and <strong>seven or more of decline</strong> to go down. That deliberate stickiness means a single great (or terrible) day can\'t swing it, and an "up" is earned, not noise. Expect only a handful of level events in a month. When a pillar crosses a tier line, that\'s a genuine milestone — the kind of thing the weekly chronicle writes about.</p>'
         # #913: the neglect-honesty line — the sheet decays under silence, it never coasts on it.
@@ -695,7 +695,7 @@ _ACTIVE_KEY_TO_DOOR = {
     "protocols": "/protocols/",
     "coaching": "/coaching/",
     "story": "/story/",
-    "cockpit": "/now/",
+    "cockpit": "/cockpit/",
 }
 
 

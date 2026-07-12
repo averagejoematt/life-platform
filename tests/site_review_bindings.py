@@ -118,7 +118,7 @@ PAGE_BINDINGS = [
         ],
     },
     {
-        "path": "/now/",
+        "path": "/cockpit/",
         "name": "Cockpit",
         "door": "cockpit",
         "narrative_order": 2,
@@ -399,7 +399,7 @@ def metric_observations():
 
 # ── Coverage guard: new doors must not silently escape the review ────────────────
 # First path segment of a public route → its door.
-_SEGMENT_TO_DOOR = {"": "home", "now": "cockpit", "story": "story", "coaching": "coaching", "evidence": "evidence"}
+_SEGMENT_TO_DOOR = {"": "home", "cockpit": "cockpit", "story": "story", "coaching": "coaching", "evidence": "evidence"}
 
 
 def _sitemap_routes():

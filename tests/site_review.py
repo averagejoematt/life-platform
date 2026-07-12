@@ -24,7 +24,7 @@ Phase-2 panel Lambda can share this module.
 Usage:
     python3 tests/site_review.py                     # full site, today's folder
     python3 tests/site_review.py --door story        # one door (weekly cadence default)
-    python3 tests/site_review.py --page /now/         # single page deep-dive
+    python3 tests/site_review.py --page /cockpit/         # single page deep-dive
     python3 tests/site_review.py --from-report qa-screenshots   # augment a prior CI capture
     python3 tests/site_review.py --date 2026-06-20    # explicit run folder
 """
@@ -333,7 +333,7 @@ def run(args):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Capture + corroborate a site-review packet for averagejoematt.com")
     ap.add_argument("--date", help="Run folder date (YYYY-MM-DD); default today")
-    ap.add_argument("--page", help="Single page path, e.g. /now/")
+    ap.add_argument("--page", help="Single page path, e.g. /cockpit/")
     ap.add_argument("--door", choices=["home", "cockpit", "story", "evidence"], help="Limit to one door")
     ap.add_argument("--from-report", help="Augment an existing capture dir (skip Playwright)")
     ap.add_argument("--no-ai", action="store_true", help="(inert in Phase 1; reserved for the Phase-2 panel)")

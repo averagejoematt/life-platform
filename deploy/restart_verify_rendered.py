@@ -35,7 +35,7 @@ BASE = "https://averagejoematt.com"
 # against redirect targets it didn't intend (2026-07-10 clean-sweep audit).
 PAGES = [
     "/",
-    "/now/",
+    "/cockpit/",
     "/story/",
     "/story/chronicle/",
     "/story/journal/",

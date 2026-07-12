@@ -170,7 +170,7 @@ def _sweep_week_recap(s3, stats):
         body,
         f"/moments/week/{wid}/",
         f"/moments/assets/week-{wid}.png",
-        f"{SITE_BASE}/now/",
+        f"{SITE_BASE}/cockpit/",
     )
     url = _put_moment(s3, "week", wid, card, shell)
     return {"current": url, "id": wid}

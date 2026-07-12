@@ -983,7 +983,7 @@ def handle_coach_analysis(event):
         "labs": "labs_coach",
         "explorer": "explorer_coach",
     }
-    # The Cockpit (/now/) discloses the 7 CHARACTER PILLARS, whose names differ from the
+    # The Cockpit (/cockpit/) discloses the 7 CHARACTER PILLARS, whose names differ from the
     # coach-domain names above — alias them so a pillar click resolves to the right coach.
     _pillar_alias = {"movement": "training", "metabolic": "glucose"}
     # Pillars with no dedicated board coach: return a graceful empty read (200), not a 400,

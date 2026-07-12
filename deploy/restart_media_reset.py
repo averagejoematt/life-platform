@@ -80,7 +80,7 @@ def _empty_debrief_feed() -> str:
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
 <channel>
   <title>The Measured Life — the daily debrief</title>
-  <link>{SITE}/now/</link>
+  <link>{SITE}/cockpit/</link>
   <description>A roughly two-minute, AI-voiced state-of-Matthew briefing every day. A new season starts with the current experiment cycle.</description>
   <language>en-us</language>
   <itunes:author>averagejoematt</itunes:author>

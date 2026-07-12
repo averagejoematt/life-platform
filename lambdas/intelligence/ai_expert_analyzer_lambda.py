@@ -1478,7 +1478,7 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
 
     def _build_req():
         # max_tokens 1200 truncated the JSON mid-string → json.loads threw and the whole
-        # synthesis fail-closed to the previous day's (stale) record (the /now/ "collapsed
+        # synthesis fail-closed to the previous day's (stale) record (the /cockpit/ "collapsed
         # to one session/week" bug). Raised to 2048 to fit the full structured response.
         body = json.dumps({"model": AI_MODEL, "max_tokens": 2048, "messages": [{"role": "user", "content": prompt}]})
         return urllib.request.Request(
@@ -1489,7 +1489,7 @@ For disagreements: only flag GENUINE conflicts where two coaches would give Matt
 
     # Phase 3.4: retry via retry_utils. B4: the model emits subtly-malformed JSON (e.g. a
     # trailing comma / empty value in the nested disagreements array) that threw on json.loads
-    # and fail-closed to yesterday's stale record (the /now/ "collapsed to one session/week"
+    # and fail-closed to yesterday's stale record (the /cockpit/ "collapsed to one session/week"
     # bug). Parse LENIENTLY (strip fences, extract the outermost object, drop trailing commas),
     # and if even that fails, regex-extract weekly_priority so a FRESH record always lands.
     from retry_utils import call_anthropic_raw

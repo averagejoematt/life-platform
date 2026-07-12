@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-v4_build_cockpit_proof.py — bake the cockpit's static proof into /now/ (#788).
+v4_build_cockpit_proof.py — bake the cockpit's static proof into /cockpit/ (#788).
 
-The Cockpit (site/now/index.html) is the flagship page and the first door in the
+The Cockpit (site/cockpit/index.html) is the flagship page and the first door in the
 nav, yet it shipped as a pure JS shell: curl saw only shimmer placeholders and
 "··" dots — blank to no-JS visitors, crawlers, and link bots (R22-UX-01). This
-gives /now/ the same treatment #729/#730 gave the scorecard and chronicle: the
+gives /cockpit/ the same treatment #729/#730 gave the scorecard and chronicle: the
 current character level + tier, the Body/Mind rollups, each pillar score, and an
 honest "as of" stamp, baked into the served HTML inside <noscript>.
 
@@ -20,7 +20,7 @@ Injection is idempotent — the block lives between sentinel comments and is
 replaced in place on every run (the #733 chronicle-noscript pattern). Wired into
 deploy/sync_site_to_s3.sh, so every site deploy refreshes the numbers.
 
-Writes site/now/index.html. Run from repo root:
+Writes site/cockpit/index.html. Run from repo root:
     python3 scripts/v4_build_cockpit_proof.py
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_proof import cockpit_block_html, load_character  # noqa: E402
 
-NOW = Path("site/now/index.html")
+NOW = Path("site/cockpit/index.html")
 
 _START = "<!-- cockpit-proof:start -->"
 _END = "<!-- cockpit-proof:end -->"
@@ -59,7 +59,7 @@ def inject(html: str, block: str) -> str | None:
 
 def main() -> int:
     if not NOW.exists():
-        print("error: site/now/index.html not found — run from repo root.", file=sys.stderr)
+        print("error: site/cockpit/index.html not found — run from repo root.", file=sys.stderr)
         return 2
     block = cockpit_block_html(load_character())
     if not block:
@@ -70,11 +70,11 @@ def main() -> int:
     html = NOW.read_text(encoding="utf-8")
     out = inject(html, block)
     if out is None:
-        print("error: no injection anchor found in site/now/index.html.", file=sys.stderr)
+        print("error: no injection anchor found in site/cockpit/index.html.", file=sys.stderr)
         return 2
     if out != html:
         NOW.write_text(out, encoding="utf-8")
-    print("updated site/now/index.html — cockpit proof baked (level + pillars + as-of).")
+    print("updated site/cockpit/index.html — cockpit proof baked (level + pillars + as-of).")
     return 0
 
 

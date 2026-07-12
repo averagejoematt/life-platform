@@ -1,5 +1,5 @@
 /*
-  cockpit.js — Door 1 behaviour (/now)
+  cockpit.js — Door 1 behaviour (/cockpit)
   ----------------------------------------------------------------------------
   Binds the Cockpit to the live engine. No data is invented: every value comes
   from an existing endpoint, and anything absent is shown honestly or omitted.
@@ -795,7 +795,7 @@ async function renderSinceLastVisit() {
 }
 
 /* ── #974: the levers — the Protocols station in the daily slice ─────────────
-   /now/ rendered Coaching (the board), Data (pillars/trends/forecast) and Story
+   /cockpit/ rendered Coaching (the board), Data (pillars/trends/forecast) and Story
    (log/achievements) but never Protocols — the loop's fourth station. This strip
    is the morning checklist: the supplement stack in protocol and the experiment
    under way, each row a link into /protocols/. Real reads of the EXISTING
@@ -1176,7 +1176,7 @@ async function load(dateStr) {
       const xlink = post ? ` <a href="/story/chronicle/#${escapeHTML(post.date)}">Read ${escapeHTML(post.label || ("Week " + post.week))} &rarr;</a>` : "";
       bind("verdict").innerHTML =
         `<span class="mark">&rsaquo;</span> Time travel — the cockpit as of <strong>${escapeHTML(character.as_of_date || dateStr)}</strong>. ` +
-        `The board speaks only in the present.${xlink} <a href="/now/">Back to today →</a>`;
+        `The board speaks only in the present.${xlink} <a href="/cockpit/">Back to today →</a>`;
       bind("asof").textContent = `as of ${character.as_of_date || dateStr} (history)`;
       main.dataset.state = "ready";
       $(".panel").setAttribute("aria-busy", "false");
@@ -1343,9 +1343,9 @@ function wireScrub() {
   // the boot loader falls back to today's cockpit for those (see module foot) —
   // and the URL is cleaned so the address bar doesn't claim a date we won't show.
   if (fromUrl && fromUrl >= GENESIS_ISO) inp.value = fromUrl;
-  else if (fromUrl) { try { history.replaceState({}, "", "/now/"); } catch (e) {} }
+  else if (fromUrl) { try { history.replaceState({}, "", "/cockpit/"); } catch (e) {} }
   const go = (d) => {
-    const url = d && d < today ? `/now/?date=${d}` : "/now/";
+    const url = d && d < today ? `/cockpit/?date=${d}` : "/cockpit/";
     try { history.replaceState({}, "", url); } catch (e) {}
     if (d && d < today) load(d);
     else { inp.value = ""; load(); }

@@ -77,7 +77,7 @@ REPO = os.path.dirname(HERE)
 GATE_PAGES = [
     {"path": "/", "name": "Home (constellation)", "wait_for": "body"},
     {
-        "path": "/now/",
+        "path": "/cockpit/",
         "name": "Cockpit",
         "wait_for": "body",
         # Exercise the pillar disclosure when data mounted a row; if the mock
@@ -140,7 +140,7 @@ POPULATED_GATE_PAGES = [
         # materializes with the /api/presence channels projection; the check holds
         # in BOTH clock states (pre-genesis it renders the staged marks, after it
         # the fixture's dated marks), so the gate can't flip at genesis.
-        "path": "/now/",
+        "path": "/cockpit/",
         "name": "Cockpit · levers + inputs [populated]",
         "wait_for": "body",
         "checks": [

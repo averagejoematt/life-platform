@@ -3,7 +3,7 @@
 var R = {
 "/about/": "/story/about/",
 "/accountability/": "/data/vices/",
-"/achievements/": "/now/",
+"/achievements/": "/cockpit/",
 "/archive/v1/board/": "/legacy/archive/v1/board/",
 "/archive/v1/board/product/": "/legacy/archive/v1/board/product/",
 "/archive/v1/board/technical/": "/legacy/archive/v1/board/technical/",
@@ -19,7 +19,7 @@ var R = {
 "/board/": "/method/board/",
 "/builders/": "/",
 "/challenges/": "/protocols/challenges/",
-"/character/": "/now/",
+"/character/": "/cockpit/",
 "/chronicle/": "/story/chronicle/",
 "/chronicle/archive/": "/story/chronicle/",
 "/chronicle/sample/": "/story/chronicle/",
@@ -92,8 +92,9 @@ var R = {
 "/methodology/": "/method/methodology/",
 "/mind/": "/data/reading/",
 "/mission/": "/story/about/",
+"/now/": "/cockpit/",
 "/nutrition/": "/data/nutrition/",
-"/observatory/": "/now/",
+"/observatory/": "/cockpit/",
 "/physical/": "/data/physical/",
 "/platform/": "/method/platform/",
 "/platform/data/": "/method/platform/",
@@ -105,15 +106,15 @@ var R = {
 "/sleep/": "/data/sleep/",
 "/stack/": "/data/stack/",
 "/start/": "/",
-"/status/": "/now/",
+"/status/": "/cockpit/",
 "/story/coaches/": "/coaching/coaches/",
 "/story/lab-notes/": "/coaching/lab-notes/",
 "/supplements/": "/protocols/supplements/",
 "/supplements/protocol/": "/protocols/supplements/",
 "/tools/": "/method/tools/",
 "/training/": "/data/training/",
-"/week/": "/now/",
-"/weekly/": "/now/"
+"/week/": "/cockpit/",
+"/weekly/": "/cockpit/"
 };
 function handler(event) {
   var req = event.request;

@@ -2,7 +2,7 @@
   "name": "The Measured Life — averagejoematt",
   "short_name": "Cockpit",
   "description": "One life, measured — live. The daily instrument.",
-  "start_url": "/now/",
+  "start_url": "/cockpit/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0E0C08",

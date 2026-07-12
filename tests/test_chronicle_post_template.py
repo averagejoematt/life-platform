@@ -75,7 +75,7 @@ def _render(monkeypatch, cur_image=None):
 def test_ac1_five_door_story_top_nav(monkeypatch):
     _key, html = _render(monkeypatch)
     assert 'class="story-top"' in html
-    for door in ('href="/now/"', 'href="/data/"', 'href="/coaching/"', 'href="/protocols/"', 'href="/story/"'):
+    for door in ('href="/cockpit/"', 'href="/data/"', 'href="/coaching/"', 'href="/protocols/"', 'href="/story/"'):
         assert door in html, door
     # the story door is the current one (the post lives under it)
     assert 'href="/story/" aria-current="page"' in html

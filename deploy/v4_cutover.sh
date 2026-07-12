@@ -20,8 +20,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIRM BEFORE RUNNING — the 6 judgement calls baked into redirects.map
 # (flip in scripts/v4_migration_inventory.py RULES, then re-run it, if any are wrong):
-#     status        -> Cockpit (/now)        [System if it's uptime/freshness]
-#     achievements  -> Cockpit (/now)        [could surface in Story]
+#     status        -> Cockpit (/cockpit)        [System if it's uptime/freshness]
+#     achievements  -> Cockpit (/cockpit)        [could surface in Story]
 #     field-notes   -> Story (/)             [Cockpit if it's a live panel]
 #     community     -> Story (/)             [System if a functional signup]
 #     results       -> Evidence              [could anchor a Story beat]
@@ -57,7 +57,7 @@ python3 scripts/v4_migration_inventory.py >/tmp/v4_inv.txt 2>&1 || { cat /tmp/v4
 grep -q "PASS: every preserved page maps" /tmp/v4_inv.txt || { cat /tmp/v4_inv.txt; echo "❌ inventory not PASS"; exit 1; }
 echo "  ✓ migration inventory: 0 unmapped"
 
-for f in "$SITE_DIR/index.html" "$SITE_DIR/now/index.html" "$SITE_DIR/evidence/index.html" "$SITE_DIR/assets/css/tokens.css"; do
+for f in "$SITE_DIR/index.html" "$SITE_DIR/cockpit/index.html" "$SITE_DIR/evidence/index.html" "$SITE_DIR/assets/css/tokens.css"; do
   [ -f "$f" ] || { echo "❌ missing required v4 file: $f"; exit 1; }
 done
 echo "  ✓ three doors + tokens present"
@@ -136,7 +136,7 @@ echo "  ✓ invalidation requested"
 
 # ── 5. Verify ────────────────────────────────────────────────────────────────
 echo "[5/5] Cutover deploy done. Verify:"
-echo "  • Doors:    curl -sI https://averagejoematt.com/ ; /now ; /evidence/"
+echo "  • Doors:    curl -sI https://averagejoematt.com/ ; /cockpit ; /evidence/"
 echo "  • Redirect: curl -sI https://averagejoematt.com/training/   # expect 301 -> /evidence/training/"
 echo "  • Legacy:   curl -sI https://averagejoematt.com/legacy/      # preserved, noindex"
 echo "  • Visual:   python3 tests/visual_qa.py            # green across the three doors"

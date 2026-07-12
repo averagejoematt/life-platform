@@ -30,7 +30,7 @@ def test_okay_beat_has_a_no_js_fallback_pointer():
     replaces it with the real read."""
     section = HOME[HOME.find("beat-okay") : HOME.find("</section>", HOME.find("beat-okay"))]
     assert "okay-fallback" in section
-    assert 'href="/now/"' in section
+    assert 'href="/cockpit/"' in section
     assert "data-okay" in section  # the JS mount point
 
 

@@ -22,7 +22,7 @@ SAMPLE = HEADER + "\n".join(
     [
         _row("2026-06-27", "1.1.1.1", "GET", "/", "200", "https://www.reddit.com/r/qs", "Mozilla/5.0 (Mac)"),
         _row("2026-06-27", "1.1.1.1", "GET", "/data/sleep/", "200", "https://averagejoematt.com/", "Mozilla/5.0 (Mac)"),
-        _row("2026-06-28", "1.1.1.1", "GET", "/now/", "200", "-", "Mozilla/5.0 (Mac)"),  # same visitor, 2nd day
+        _row("2026-06-28", "1.1.1.1", "GET", "/cockpit/", "200", "-", "Mozilla/5.0 (Mac)"),  # same visitor, 2nd day
         _row("2026-06-27", "2.2.2.2", "GET", "/", "200", "-", "Mozilla/5.0 (iPhone)"),  # 2nd unique
         _row("2026-06-27", "9.9.9.9", "GET", "/", "200", "-", "Googlebot/2.1"),  # bot → excluded
         _row("2026-06-27", "3.3.3.3", "GET", "/assets/css/tokens.css", "200", "-", "Mozilla/5.0"),  # asset
@@ -36,7 +36,7 @@ SAMPLE = HEADER + "\n".join(
 def test_parse_filters_assets_api_bots_and_non200():
     recs = td.parse_cf_log(SAMPLE)
     uris = sorted(r["uri"] for r in recs)
-    assert uris == ["/", "/", "/data/sleep/", "/now/"]  # 4 page hits, no asset/api/bot/404
+    assert uris == ["/", "/", "/cockpit/", "/data/sleep/"]  # 4 page hits, no asset/api/bot/404
 
 
 def test_aggregate_counts_and_returners():
@@ -88,7 +88,7 @@ SAMPLE_WATCHED = HEADER + "\n".join(
         # internal navigation → counts as a view, not as an external referrer
         _row("2026-07-13", "5.5.5.5", "GET", ESSAY, "200", "https://averagejoematt.com/method/build/", "Mozilla/5.0 (Mac)"),
         # unrelated page traffic must not pollute the watched entry
-        _row("2026-07-13", "6.6.6.6", "GET", "/now/", "200", "https://news.ycombinator.com/", "Mozilla/5.0 (Mac)"),
+        _row("2026-07-13", "6.6.6.6", "GET", "/cockpit/", "200", "https://news.ycombinator.com/", "Mozilla/5.0 (Mac)"),
     ]
 )
 
@@ -100,7 +100,7 @@ def test_watched_page_referrer_attribution():
     assert w["page"] == ESSAY
     assert w["views"] == 5  # 3 canonical + index.html variant + slashless variant
     refs = dict(w["referrers"])
-    assert refs["news.ycombinator.com"] == 2  # attributed to the ESSAY only, not /now/
+    assert refs["news.ycombinator.com"] == 2  # attributed to the ESSAY only, not /cockpit/
     assert refs["t.co"] == 1
     assert "averagejoematt.com" not in refs  # own-host navigation is not travel
     assert w["direct_or_internal"] == 2  # the "-" direct hit + the internal-nav hit

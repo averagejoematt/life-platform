@@ -67,7 +67,7 @@ jobs:
 
       - name: Core v4 doors present
         run: |
-          for f in site/index.html site/now/index.html site/data/index.html site/protocols/index.html site/coaching/index.html site/story/index.html site/assets/css/tokens.css; do
+          for f in site/index.html site/cockpit/index.html site/data/index.html site/protocols/index.html site/coaching/index.html site/story/index.html site/assets/css/tokens.css; do
             test -f "$f" || { echo "::error::missing required v4 file: $f"; exit 1; }
           done
           echo "✓ Home, Cockpit, Data, Protocols, Coaching, Story + tokens present"

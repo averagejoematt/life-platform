@@ -355,7 +355,7 @@ def _write_indexes(episodes: list) -> None:
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
 <channel>
   <title>The Measured Life — the daily debrief</title>
-  <link>{SITE}/now/</link>
+  <link>{SITE}/cockpit/</link>
   <description>A roughly two-minute, AI-voiced state-of-Matthew briefing every day — grade, recovery, training load, and effort, narrated only from numbers the platform computed and stands behind. Grounded generation (ADR-104): the voice connects the data, it never invents it.</description>
   <language>en-us</language>
   <itunes:author>averagejoematt</itunes:author>
