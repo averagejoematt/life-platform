@@ -1,0 +1,107 @@
+dedup report — source=eightsleep — mode=DRY RUN
+generated=2026-07-12T16:15:36.310304+00:00
+
+keep DATE#2023-08-04
+  delete DATE#2023-08-05
+keep DATE#2023-08-31
+  delete DATE#2023-09-01
+keep DATE#2023-09-22
+  delete DATE#2023-09-23
+keep DATE#2023-10-27
+  delete DATE#2023-10-28
+keep DATE#2023-11-18
+  delete DATE#2023-11-19
+keep DATE#2023-11-28
+  delete DATE#2023-11-29
+keep DATE#2023-12-09
+  delete DATE#2023-12-10
+keep DATE#2023-12-14
+  delete DATE#2023-12-15
+keep DATE#2023-12-25
+  delete DATE#2023-12-26
+keep DATE#2024-02-17
+  delete DATE#2024-02-18
+keep DATE#2024-03-09
+  delete DATE#2024-03-10
+keep DATE#2024-04-13
+  delete DATE#2024-04-14
+keep DATE#2024-05-10
+  delete DATE#2024-05-11
+keep DATE#2024-06-13
+  delete DATE#2024-06-14
+keep DATE#2024-06-30
+  delete DATE#2024-07-01
+keep DATE#2024-08-03
+  delete DATE#2024-08-04
+keep DATE#2024-08-07
+  delete DATE#2024-08-08
+keep DATE#2024-09-01
+  delete DATE#2024-09-02
+keep DATE#2024-11-17
+  delete DATE#2024-11-18
+keep DATE#2024-11-28
+  delete DATE#2024-11-29
+keep DATE#2024-12-27
+  delete DATE#2024-12-28
+keep DATE#2025-01-04
+  delete DATE#2025-01-05
+keep DATE#2025-02-08
+  delete DATE#2025-02-09
+keep DATE#2025-02-19
+  delete DATE#2025-02-20
+keep DATE#2025-03-28
+  delete DATE#2025-03-29
+keep DATE#2025-05-12
+  delete DATE#2025-05-13
+keep DATE#2025-05-15
+  delete DATE#2025-05-16
+keep DATE#2025-06-21
+  delete DATE#2025-06-22
+keep DATE#2025-07-16
+  delete DATE#2025-07-17
+keep DATE#2025-08-20
+  delete DATE#2025-08-21
+keep DATE#2025-08-26
+  delete DATE#2025-08-27
+keep DATE#2025-09-02
+  delete DATE#2025-09-03
+keep DATE#2025-09-19
+  delete DATE#2025-09-20
+keep DATE#2025-09-23
+  delete DATE#2025-09-24
+keep DATE#2025-09-30
+  delete DATE#2025-10-01
+keep DATE#2025-10-10
+  delete DATE#2025-10-11
+keep DATE#2025-10-15
+  delete DATE#2025-10-16
+keep DATE#2025-11-14
+  delete DATE#2025-11-15
+keep DATE#2025-11-29
+  delete DATE#2025-11-30
+keep DATE#2025-12-12
+  delete DATE#2025-12-13
+keep DATE#2025-12-21
+  delete DATE#2025-12-22
+keep DATE#2026-01-17
+  delete DATE#2026-01-18
+keep DATE#2026-01-24
+  delete DATE#2026-01-25
+keep DATE#2026-02-13
+  delete DATE#2026-02-14
+keep DATE#2026-03-07
+  delete DATE#2026-03-08
+keep DATE#2026-03-18
+  delete DATE#2026-03-19
+keep DATE#2026-04-01
+  delete DATE#2026-04-02
+keep DATE#2026-05-18
+  delete DATE#2026-05-19
+keep DATE#2026-06-03
+  delete DATE#2026-06-04
+keep DATE#2026-06-06
+  delete DATE#2026-06-07
+keep DATE#2026-06-26
+  delete DATE#2026-06-27
+keep DATE#2026-07-10
+  delete DATE#2026-07-11

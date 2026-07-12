@@ -35,8 +35,35 @@ Steps (each can be skipped with --skip-<name>):
     9. restart_character_rebuild.py
    10. restart_site_copy_sync.py --old-genesis <outgoing>  (JS/HTML literal sweep)
    11. restart_docs_update.py
+   11b. --sync-site (opt-in): bash deploy/sync_site_to_s3.sh — the full-site
+       content-hashed sync + rss.xml regen. Deliberately NOT default (#1092):
+       too heavy + interactive for an unattended sub-step; without the flag it
+       stays a printed next command.
    12. restart_verify_rendered.py --old-genesis <outgoing>  (hard gate, apply only)
-   13. --close-cycle: append one line to docs/restart/RESET_LOG.md
+   12b. restart_verify_semantic.py  (hard gate, apply only — #1093): deterministic
+       assertions on what the LIVE site SAYS pre-start (pre_start flags, zeroed
+       character, no current-cycle findings, dispute null-or-current-cycle,
+       prologue-only journal manifest) + ZERO pre-genesis phase=experiment rows
+       across raw-timeseries sources (the ingestion-poisoning class, 2026-07-12).
+   13. post-verify hooks (#1092 — the former manual Sunday-queue steps, now inside
+       the one command; each respects --apply vs dry-run + fail-fast):
+       a. fix_prologue_cycle_and_subscribe_ttl.py — default ON (issue-sanctioned);
+          it reads SSM /life-platform/experiment-cycle, so it MUST run after the
+          step-6 cycle bump (post-verify satisfies that). --skip-prologue-fix to skip.
+       b. seed_genesis_preregistration.py — opt-in --with-preregistration (re-lands
+          the FROZEN #976 pre-registration after the wipe).
+       c. dedup_source_records.py --source <name> per --dedup-source (repeatable) —
+          raw-timeseries duplicate DATE# rows (the eightsleep UTC-rollover class).
+   14. --close-cycle: append one line to docs/restart/RESET_LOG.md
+
+DELIBERATELY NOT FOLDED (#1092 — each exclusion verified, not an omission):
+  - publish_genesis_preregistration.py — a PERMANENT PUBLIC AI artifact; stays
+    attended under the prereg/frozen-artifact dry-run-review posture. The pipeline
+    prints it as a clearly-labeled attended next step instead.
+  - deploy/restart_verify.py — the POST-genesis Monday health check (asserts
+    day_n >= 1, a genesis weigh-in, a post-genesis character sheet); folding it
+    would structurally fail at reset time. Run it Monday morning.
+  - deploy/sync_site_to_s3.sh — opt-in --sync-site only (see 11b).
 
 FAIL-FAST (2026-07-10): any sub-step exiting nonzero ABORTS the pipeline and
 prints exactly what already ran vs. what didn't; --continue-on-error is the
@@ -292,6 +319,27 @@ def build_sub_scripts(
     return sub_scripts
 
 
+def build_post_verify_hooks(
+    with_preregistration: bool = False, dedup_sources: list[str] | None = None, skip_prologue_fix: bool = False
+) -> list[tuple[str, list[str]]]:
+    """The #1092 post-verify hook sequence — the former manual Sunday-queue steps.
+
+    Ordering constraint (verified): fix_prologue_cycle_and_subscribe_ttl reads SSM
+    /life-platform/experiment-cycle, so it must run AFTER bump_cycle_ssm (which fires
+    right after the intelligence wipe) — every post-verify position satisfies that.
+    fix_prologue is default-ON (issue-sanctioned change to default behavior); the
+    other two hooks only run when their flags are passed, keeping the pipeline
+    byte-compatible when the new flags are absent."""
+    hooks: list[tuple[str, list[str]]] = []
+    if not skip_prologue_fix:
+        hooks.append(("fix_prologue_cycle_and_subscribe_ttl", ["python3", "deploy/fix_prologue_cycle_and_subscribe_ttl.py", "--apply"]))
+    if with_preregistration:
+        hooks.append(("seed_genesis_preregistration", ["python3", "deploy/seed_genesis_preregistration.py", "--apply"]))
+    for src in dedup_sources or []:
+        hooks.append((f"dedup_{src}", ["python3", "deploy/dedup_source_records.py", "--source", src, "--apply"]))
+    return hooks
+
+
 def run_step(name: str, cmd: list[str], apply: bool, log: list[str]) -> int:
     print(f"\n──[ {name} ]──")
     print(f"    $ {' '.join(cmd)}")
@@ -332,6 +380,31 @@ def main():
         "--no-close-cycle",
         action="store_true",
         help="Skip the cycle bookkeeping (CYCLE_GENESES append, SSM cycle bump, RESET_LOG line). Default: ON.",
+    )
+    parser.add_argument(
+        "--with-preregistration",
+        action="store_true",
+        help="#1092 hook (b): re-land the frozen genesis pre-registration after the wipe "
+        "(deploy/seed_genesis_preregistration.py). The PUBLIC publish step stays attended.",
+    )
+    parser.add_argument(
+        "--dedup-source",
+        action="append",
+        default=[],
+        metavar="SOURCE",
+        help="#1092 hook (c): run the raw-timeseries duplicate-DATE# dedup pass for this "
+        "source (repeatable; e.g. --dedup-source eightsleep — the UTC-rollover class).",
+    )
+    parser.add_argument(
+        "--skip-prologue-fix",
+        action="store_true",
+        help="Skip #1092 hook (a) fix_prologue_cycle_and_subscribe_ttl (default: runs after the verify gates).",
+    )
+    parser.add_argument(
+        "--sync-site",
+        action="store_true",
+        help="Run bash deploy/sync_site_to_s3.sh as a pipeline step (default OFF — heavy/interactive; "
+        "without the flag it stays a printed next command).",
     )
     args = parser.parse_args()
     close_cycle = not args.no_close_cycle
@@ -454,6 +527,24 @@ def main():
             if name == "restart_intelligence_wipe" and close_cycle:
                 print(f"    [close-cycle] {bump_cycle_ssm(new_cycle, args.apply)}")
 
+    # Step 11b (opt-in --sync-site, #1092): the full-site sync. Runs BEFORE the
+    # verify gates so they check the freshly-synced surface. Apply-only — the
+    # shell script has no dry-run mode.
+    if args.sync_site:
+        if args.apply:
+            print("\n[11b] Full site sync (--sync-site): bash deploy/sync_site_to_s3.sh")
+            sync_proc = subprocess.run(["bash", "deploy/sync_site_to_s3.sh"], cwd=REPO_ROOT, capture_output=True, text=True)
+            log.append(f"=== sync_site_to_s3 === (exit {sync_proc.returncode})")
+            log.append(sync_proc.stdout[-1500:] if sync_proc.stdout else "")
+            if sync_proc.returncode != 0:
+                log.append(f"STDERR: {sync_proc.stderr[-800:]}")
+            print(sync_proc.stdout[-400:] if sync_proc.stdout else "(no stdout)")
+            if sync_proc.returncode != 0 and not args.continue_on_error:
+                print(f"\n✗ ABORT: sync_site_to_s3.sh failed (exit {sync_proc.returncode}).")
+                sys.exit(sync_proc.returncode)
+        else:
+            print("\n[11b] (dry-run) would run: bash deploy/sync_site_to_s3.sh (--sync-site)")
+
     # Final: bust warm-container caches on read-path Lambdas
     print("\n[final] Busting warm-container caches on public-facing Lambdas")
     bust_lambda_warm_cache(args.apply)
@@ -479,6 +570,35 @@ def main():
             print("   Common causes: CloudFront cache not yet purged, Lambda warm-cache,")
             print("   newly-missed JS/HTML/JSON surface. Re-run after fixing.")
 
+        # #1093: the SEMANTIC gate — what the site SAYS, not just that it renders.
+        # Runs even when the rendered gate failed (one pass = the full picture).
+        print("\n[verify] restart_verify_semantic.py (hard gate)")
+        semantic_rc = run_step("restart_verify_semantic", ["python3", "deploy/restart_verify_semantic.py"], True, log)
+        if semantic_rc != 0:
+            print("\n⚠ SEMANTIC VERIFY GATE FAILED — the site contradicts its own timeline.")
+            print("   Check docs/restart/_verify_semantic_report.txt for the failing assertions.")
+            verify_rc = verify_rc or semantic_rc
+
+    # Post-verify hooks (#1092): the former manual Sunday-queue steps. Fail-fast
+    # like the sub-scripts; skipped (loudly) when a verify gate failed, since the
+    # pipeline is idempotent — fix, re-run, and the hooks run then.
+    hooks = build_post_verify_hooks(args.with_preregistration, args.dedup_source, args.skip_prologue_fix)
+    if hooks and args.apply and verify_rc != 0 and not args.continue_on_error:
+        print(f"\n⚠ post-verify hooks NOT run (verify gate failed): {[n for n, _ in hooks]}")
+        print("   They run automatically on the next successful --apply re-run.")
+    else:
+        for i, (name, cmd) in enumerate(hooks):
+            rc = run_step(name, cmd, args.apply, log)
+            if rc != 0:
+                remaining = [n for n, _ in hooks[i + 1 :]]
+                print(f"\n✗ post-verify hook FAILED: {name} (exit {rc})")
+                print(f"   hooks did NOT run: {remaining or ['(none)']}")
+                if args.continue_on_error:
+                    print("   --continue-on-error: proceeding anyway.")
+                else:
+                    print("   ABORTING (pass --continue-on-error to override). The pipeline is idempotent — fix and re-run.")
+                    sys.exit(rc)
+
     # Close-cycle part (d): the durable one-line-per-reset ledger.
     if close_cycle:
         print(f"\n[close-cycle] RESET_LOG: {append_reset_log(new_cycle, target, wt['weight_lbs'], args.apply)}")
@@ -496,16 +616,25 @@ def main():
     print(f"\n══ pipeline {'COMPLETE' if args.apply else 'DRY-RUN COMPLETE'} ══")
     print("Report: docs/restart/_pipeline_report.txt")
 
-    # Required follow-ups the pipeline deliberately does NOT run itself
-    # (sync_site_to_s3.sh is the attended full-site path — content-hashed sync +
-    # rss.xml regen + invalidation; too heavy + too interactive for a sub-step).
+    # Required follow-ups the pipeline deliberately does NOT run itself (#1092:
+    # each exclusion is verified — see the DELIBERATELY NOT FOLDED docstring block).
     print("\n══ REQUIRED NEXT COMMANDS ══")
-    print("  1. bash deploy/sync_site_to_s3.sh        # full site sync — regenerates rss.xml, hashes the module graph")
+    if not args.sync_site:
+        print(
+            "  1. bash deploy/sync_site_to_s3.sh        # full site sync — regenerates rss.xml, hashes the module graph (or re-run with --sync-site)"
+        )
     if args.skip_deploy:
         print("  2. bash deploy/deploy_site_api.sh        # --skip-deploy was used: CYCLE_GENESES + constants are NOT live yet")
+    if not args.with_preregistration:
+        print("  •  python3 deploy/seed_genesis_preregistration.py --apply   # NOT run (pass --with-preregistration to fold it in)")
+    print("  •  ATTENDED (deliberately never folded — permanent public AI artifact, dry-run-review posture):")
+    print("     python3 deploy/publish_genesis_preregistration.py           # review the dry-run output, THEN --apply")
     print("  •  git status / commit the regenerated files (constants, configs, CYCLE_GENESES, RESET_LOG.md) from MAIN")
+    print(
+        "  •  Monday morning (post-genesis): python3 deploy/restart_verify.py   # deliberately not folded — it asserts post-genesis state"
+    )
     if args.apply and verify_rc != 0:
-        print("\n(exiting nonzero: the rendered-surface verify gate failed — see above)")
+        print("\n(exiting nonzero: a verify gate failed — rendered and/or semantic, see above)")
         if not args.continue_on_error:
             sys.exit(verify_rc)
     if not args.apply:

@@ -42,6 +42,10 @@ adopted for public content.)
 Outstanding manual item (auto-mode blocked, needs Matthew's shell): delete the 3 verified duplicate
 eightsleep records —
 `for d in 2026-06-27 2026-07-03 2026-07-11; do aws dynamodb delete-item --table-name life-platform --key "{\"pk\":{\"S\":\"USER#matthew#SOURCE#eightsleep\"},\"sk\":{\"S\":\"DATE#$d\"}}"; done`
+**Superseded 2026-07-12 (#1092):** the generalized pass is now
+`python3 deploy/dedup_source_records.py --source eightsleep --apply` (or the pipeline's
+`--dedup-source eightsleep`) — session-fingerprint dedup, keeps the earlier date; its dry-run
+found 52 UTC-rollover duplicate pairs across the full 2023-2026 history (incl. two of the three above).
 
 ## 2. Timeline
 
@@ -62,19 +66,22 @@ eightsleep records —
 ### Sunday 2026-07-12 (genesis day)
 6. **Matthew weighs in** (fasted, morning). Fallback: `--override-weight-lbs` or the
    `restart_pivot_when_ready.py` watchdog.
-7. **The one command:** `python3 deploy/restart_pipeline.py --genesis 2026-07-12 --apply`
+7. **The one command (updated 2026-07-12, #1092/#1093 — the former steps 8/8b manual queue is now
+   INSIDE the pipeline):**
+   `python3 deploy/restart_pipeline.py --genesis 2026-07-12 --apply --with-preregistration --dedup-source eightsleep --sync-site`
    (fail-fast; closes cycle 4 → 5: CYCLE_GENESES, SSM, RESET_LOG.md; wipes/archives per taxonomy incl.
    panelcast/debrief media; chronicle archived + lead-ins re-dated; character rebuilt; site copy swept incl.
-   outgoing 2026-06-14 literals; OG/stats regenerated; 40-page verify gate.)
-8. Pipeline's printed follow-ups: `bash deploy/sync_site_to_s3.sh` (RSS), commit regenerated files from
-   main, `restart_verify.py` backend check.
-8b. **Post-pipeline re-seeds (added 2026-07-11 T−1 session — the wipe takes these experiment_scoped
-    records):** `python3 deploy/fix_prologue_cycle_and_subscribe_ttl.py --apply`, then
-    `python3 deploy/seed_genesis_preregistration.py --apply` and
-    `python3 deploy/publish_genesis_preregistration.py --apply` — re-lands the frozen 15-prediction
-    pre-registration (#976) + "Prologue · Part IV: The Plan, On the Record" verbatim
-    (claims frozen in `deploy/generated/genesis_preregistration.json`; Part IV is deliberately NOT
-    in PRELAUNCH_CALENDAR because it's genesis-specific).
+   outgoing 2026-06-14 literals; OG/stats regenerated; full site sync (`--sync-site`); 40-page render gate
+   **+ the #1093 semantic gate** (pre_start contract, zeroed character, no current-cycle findings,
+   dispute null-or-current, prologue-only posts.json, zero pre-genesis experiment-phase rows); then the
+   post-verify hooks: prologue cycle-stamp/TTL repair (default-on), frozen pre-registration re-seed
+   (`--with-preregistration`), eightsleep duplicate-DATE# dedup (`--dedup-source eightsleep`).)
+8. The ONLY attended follow-ups (each a verified #1092 exclusion, printed by the pipeline):
+   `python3 deploy/publish_genesis_preregistration.py` — review the dry-run, THEN `--apply`
+   (permanent public AI artifact: "Prologue · Part IV: The Plan, On the Record"; claims frozen in
+   `deploy/generated/genesis_preregistration.json`; Part IV is deliberately NOT in PRELAUNCH_CALENDAR
+   because it's genesis-specific) — then commit regenerated files from main, and Monday morning run
+   `python3 deploy/restart_verify.py` (post-genesis backend check; deliberately not folded).
 9. `/data/cycles/` gets its honest cycle-5 row (the one reset-aware surface): dates, diagnosis (engagement
    stall + absence-blind narration), fix (presence severity + neglect-honest character).
 10. Verify reader-facing surfaces: home/cockpit/story/OG all read Day 0/1 consistently, no page (other than
