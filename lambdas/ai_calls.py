@@ -51,6 +51,8 @@ from ai_context import (  # noqa: F401
     _format_analysis,
     _format_journey_context,
     _load_insights_context,
+    build_experiment_phase_context,
+    format_experiment_phase_context,
 )
 
 # God-module split (2026-06-08): pure data-summary builders + numeric leaf utils
@@ -198,13 +200,18 @@ def daily_brief_shared_system(
     coach-narrative-orchestrator path DOES hit, and keeps caching on.) This shared
     block is still built once and reused across the 4 calls for consistency.
     """
-    jctx = _build_journey_context(profile, (data or {}).get("date") if data else None)
-    journey_block = _format_journey_context(jctx)
+    # #1086: the ONE shared experiment-phase block (journey + pre-start state +
+    # audience + cannot-exist-yet guardrail) replaces the journey-only block.
+    # Safe in this system string: caching is DISABLED here (see note above), so
+    # the daily-changing block can't churn a cache (COST-OPT-2).
+    pctx = build_experiment_phase_context(profile, (data or {}).get("date") if data else None)
+    phase_block = format_experiment_phase_context(pctx, coaching_principles=True)
     parts = [
         "You are coaching Matthew, a real person on a multi-year health transformation journey.",
         "",
+        phase_block,
+        "",
         "## Profile snapshot (stable across this brief)",
-        f"- Journey: {journey_block}",
         f"- Calorie target: {profile.get('calorie_target', '?')} kcal",
         f"- Protein target: {profile.get('protein_target_g', '?')} g",
         f"- Goals: {', '.join(profile.get('active_goals', [])) or 'unspecified'}",
@@ -437,9 +444,10 @@ def call_training_nutrition_coach(
     _build_weight_context(data, profile)
     recent_training = _build_recent_training_summary(data)
 
-    # P2: Journey context
-    jctx = _build_journey_context(profile, data.get("date"))
-    journey_block = _format_journey_context(jctx)
+    # P2 → #1086: the ONE shared experiment-phase block (journey + pre-start +
+    # audience + cannot-exist-yet guardrail)
+    pctx = build_experiment_phase_context(profile, data.get("date"))
+    phase_block = format_experiment_phase_context(pctx, coaching_principles=True)
 
     # P5: TDEE context
     tdee_ctx = _build_tdee_context(data, profile)
@@ -455,7 +463,9 @@ def call_training_nutrition_coach(
     fat_target = profile.get("fat_target_g", 60)
     carb_target = profile.get("carb_target_g", 125)
 
-    prompt = f"""You are two coaches speaking to Matthew ({journey_block}).
+    prompt = f"""You are two coaches speaking to Matthew ({pctx['stage_label']}).
+
+{phase_block}
 
 {data_quality_block}
 
@@ -479,8 +489,8 @@ MACRO TOTALS: {json.dumps({k: data_summary[k] for k in ["calories", "protein_g",
 TARGETS: {cal_target} cal, P{protein_target}g, F{fat_target}g, C{carb_target}g
 
 TRAINING COACHING RULES (READ CAREFULLY):
-- You are coaching someone at Week {jctx['week_num']} of transformation, starting weight {jctx['start_weight']} lbs.
-- WALKS ARE PRIMARY TRAINING at this stage. A 45-min walk at {jctx['start_weight']}+ lbs carries ~300-400 kcal load and real cardiovascular demand. DO NOT give them "a brief NEAT acknowledgment." Give them real coaching: comment on pace, duration, HR if available, and connect to the aerobic base being built.
+- You are coaching someone at Week {pctx['week_num']} of transformation, starting weight {pctx['start_weight']} lbs.
+- WALKS ARE PRIMARY TRAINING at this stage. A 45-min walk at {pctx['start_weight']}+ lbs carries ~300-400 kcal load and real cardiovascular demand. DO NOT give them "a brief NEAT acknowledgment." Give them real coaching: comment on pace, duration, HR if available, and connect to the aerobic base being built.
 - For strength sessions: comment on exercise selection, volume, intensity (RIR), and how it connects to goals.
 - Consider the 7-day training context. If yesterday was an appropriate rest day after recent training, say so — don't panic about low load.
 - Evaluate distance, pace, and duration improvements relative to bodyweight and stage — NOT relative to absolute athlete benchmarks.
@@ -493,7 +503,7 @@ NUTRITION COACHING RULES:
 - Be specific about what to adjust TODAY. Reference actual food items from the log.
 
 Respond in EXACTLY this JSON format, no other text:
-{{"training": "2-4 sentences from sports scientist. Per-activity analysis. Walks evaluated as primary sessions at Week {jctx['week_num']}. Reference specific metrics.", "nutrition": "2-3 sentences from nutritionist about macro adherence + meal timing + deficit context. Reference specific foods and timestamps. What to adjust today."}}"""
+{{"training": "2-4 sentences from sports scientist. Per-activity analysis. Walks evaluated as primary sessions at Week {pctx['week_num']}. Reference specific metrics.", "nutrition": "2-3 sentences from nutritionist about macro adherence + meal timing + deficit context. Reference specific foods and timestamps. What to adjust today."}}"""
 
     try:
         raw = call_anthropic(prompt, api_key, max_tokens=500, system=shared_system, cache_system=False)
@@ -534,8 +544,9 @@ def call_journal_coach(data: dict[str, Any], profile: dict[str, Any], api_key: s
     obstacles_str = ", ".join(obstacles) if obstacles else "none specified"
     weight_ctx = _build_weight_context(data, profile)
 
-    # P2: Journey context in journal coach too
-    jctx = _build_journey_context(profile, data.get("date"))
+    # P2 → #1086: the ONE shared experiment-phase block in the journal coach too
+    pctx = build_experiment_phase_context(profile, data.get("date"))
+    phase_block = format_experiment_phase_context(pctx)
 
     # Phase 2A: Journal enrichment context
     j_signals = data.get("journal_signals") or {}
@@ -550,9 +561,11 @@ def call_journal_coach(data: dict[str, Any], profile: dict[str, Any], api_key: s
         _defense_ctx += f"\nSTRESS SOURCES: {', '.join(j_signals['stress_sources'])}."
 
     prompt = f"""You are a wise, warm-but-direct inner coach reading Matthew's journal from yesterday.
-He's 36, {jctx['stage_label']} of transformation ({weight_ctx}), battling: {obstacles_str}.
+He's 36, {pctx['stage_label']} of transformation ({weight_ctx}), battling: {obstacles_str}.
 His coaching tone: Jocko's discipline meets Attia's precision meets Brene Brown's vulnerability.
 {_defense_ctx}
+
+{phase_block}
 
 JOURNAL ENTRIES:
 {journal_text}
@@ -810,9 +823,9 @@ def call_board_of_directors(
         if cs_effects:
             character_ctx += "\nACTIVE EFFECTS: " + ", ".join(e.get("name", "") for e in cs_effects)
 
-    # P2: Journey context
-    jctx = _build_journey_context(profile, data.get("date"))
-    journey_block = _format_journey_context(jctx)
+    # P2 → #1086: the ONE shared experiment-phase block
+    pctx = build_experiment_phase_context(profile, data.get("date"))
+    journey_block = format_experiment_phase_context(pctx, coaching_principles=True)
 
     # P4: Habit → outcome patterns
     habit_outcome_ctx = _build_habit_outcome_context(data, profile)
@@ -971,9 +984,9 @@ def call_tldr_and_guidance(
 
     _build_weight_context(data, profile)
 
-    # P2: Journey context
-    jctx = _build_journey_context(profile, data.get("date"))
-    journey_block = _format_journey_context(jctx)
+    # P2 → #1086: the ONE shared experiment-phase block
+    pctx = build_experiment_phase_context(profile, data.get("date"))
+    journey_block = format_experiment_phase_context(pctx, coaching_principles=True)
 
     # P5: TDEE context
     tdee_ctx = _build_tdee_context(data, profile)
@@ -1107,7 +1120,7 @@ RULES:
 - Guidance: 3-4 items, each with an emoji prefix and 1 sentence. SMART — derived from the data above, not static advice. Each item should be something that could ONLY apply to TODAY given this specific data combination.
 - CROSS-PILLAR TRADE-OFFS: If the trade-off analysis above identifies a limiting factor or optimization call, let it shape guidance priority. When pillars conflict, guide toward the constraint, not all pillars simultaneously.
 - TDEE-aware nutrition guidance: use the TDEE context to reason about whether today's intake target should be maintained, increased (recovery day), or whether yesterday's intake looks like a logging gap vs genuine restriction.
-- Walk/movement coaching is STAGE-APPROPRIATE: at Week {jctx['week_num']}, if steps were high, that's a genuine training achievement — acknowledge it as such.
+- Walk/movement coaching is STAGE-APPROPRIATE: at Week {pctx['week_num']}, if steps were high, that's a genuine training achievement — acknowledge it as such.
 - If habit gaps connect to metric outcomes, name the likely correlative pattern (correlation, not proven causal) — e.g. "Wind-down missed again last night — sleep efficiency dropped to 71% (consistent pattern). One habit change tonight may move that number."
 - Avoid repeating daily constants (IF window, supplements, bedtime) unless there is a data-driven reason to modify them today.
 - NEVER suggest hydration tips if hydration shows NO DATA — the sync is broken, not the behaviour.

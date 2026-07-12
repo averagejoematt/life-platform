@@ -26,6 +26,7 @@ import boto3
 import er03_gate
 import google_tts
 import persona_registry
+from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_START_DATE  # ADR-058/077 — current-cycle genesis anchor
 from phase_filter import with_phase_filter
@@ -1133,6 +1134,11 @@ def _gather_week(post: dict, state: dict) -> dict:
         "coach_reads": coach_reads,
         "guest": guest,
         "presence_note": presence_note,
+        # #1086: the ONE shared experiment-phase block, anchored to the reviewed
+        # week's date. Part of the writer's source material, so its day/week
+        # numbers join the ER-03 allowed set. (Deliberately the CORE block —
+        # no body-weight numbers; the safety gate bans any spoken weight.)
+        "phase_block": format_experiment_phase_context(build_experiment_phase_context(None, post.get("date"))),
         "last_open_bet": state.get("open_bet"),
         "recent_topics": state.get("recent_topics", []),
         "prev_guest": (state.get("last_episode") or {}).get("guest_name") or "",
@@ -1222,8 +1228,11 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
     )
     # #914: a real logging stall is the week's context, not a detail to skip.
     _presence_block = f"{beats['presence_note']}\n\n" if beats.get("presence_note") else ""
+    # #1086: the mandatory experiment-phase block — computed here if a caller
+    # hands beats without one, so no path can build this prompt phase-blind.
+    _phase_block = beats.get("phase_block") or format_experiment_phase_context(build_experiment_phase_context(None, beats.get("date")))
     user = (
-        f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n{_chron_block}{_presence_block}"
+        f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n{_phase_block}\n\n{_chron_block}{_presence_block}"
         f"GUEST COACH {guest.get('name')} — recent read: {guest.get('summary', '')}\nThemes: {', '.join(guest.get('themes', []))}\n\n"
         f"OTHER COACHES (for THE SPLIT — find a genuine disagreement):\n{split_material}\n\n"
         f"LAST WEEK'S OPEN BET (score it in RECEIPTS, honestly): {beats.get('last_open_bet') or '(none — this is the first weekly)'}\n\n"
@@ -1769,8 +1778,15 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         t["line"] = re.sub(r"\bMatthew\b", "Matt", t.get("line", ""))
     # #914: the presence note is part of the writer's source material, so its real
     # gap-day count is an allowed number (a spoken "eleven days quiet" must pass).
+    # #1086: likewise the phase block — a spoken "day three, week one" must pass.
     allowed = er03_gate.numbers_in(
-        beats["chronicle"] + " " + " ".join(c["summary"] for c in beats["coach_reads"]) + " " + beats.get("presence_note", "")
+        beats["chronicle"]
+        + " "
+        + " ".join(c["summary"] for c in beats["coach_reads"])
+        + " "
+        + beats.get("presence_note", "")
+        + " "
+        + beats.get("phase_block", "")
     )
 
     def _valid(ts):
