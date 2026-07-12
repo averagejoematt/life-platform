@@ -31,7 +31,7 @@ Default `<date>` = the latest folder under `qa-screenshots/`. If no packet exist
 
 ---
 
-### Mode: a page path (e.g. `/now/`, `/evidence/sleep/`)
+### Mode: a page path (e.g. `/cockpit/`, `/data/sleep/`)
 Single-page deep dive: run `python3 tests/site_review.py --page <path>`, then do the per-page review (step 3 above) for just that page and report findings inline (no full doc unless asked).
 
 ---
