@@ -1733,6 +1733,50 @@ def handle_protein_sources() -> dict:
     )
 
 
+# #1119 — the DEXA recheck interval. ONE constant feeds both next_dexa_recommended and
+# the page's cadence label, so the recommendation and the label can't drift apart.
+DEXA_RECHECK_DAYS = 90
+
+
+def _physical_cadences() -> dict:
+    """#1119 — measurement-cadence metadata for /data/physical/.
+
+    The page's tier labels (the fluid daily block vs the checkpoint block's cadence)
+    render from THIS block, sourced from real metadata — the withings entry in
+    source_registry and the handler's own DEXA recheck interval — never hand-typed
+    in the front-end.
+    """
+    from source_registry import SOURCE_REGISTRY  # shared module (bundled, #781)
+
+    w = SOURCE_REGISTRY.get("withings", {})
+    expected = w.get("expected_days")
+    stale_days = int(w["stale_hours"] // 24) if w.get("stale_hours") else None
+    return {
+        "weight": {
+            "kind": "fluid",
+            "source": "withings",
+            "expected_days_per_week": expected,
+            "stale_days": stale_days,
+            "label": f"weigh-ins — daily scale, ~{expected} days/wk expected" if expected else "weigh-ins — daily scale",
+        },
+        "dexa": {
+            "kind": "checkpoint",
+            "interval_days": DEXA_RECHECK_DAYS,
+            "label": f"DEXA — re-scanned ~every {DEXA_RECHECK_DAYS} days",
+        },
+        "phenoage": {
+            "kind": "checkpoint",
+            "interval_days": None,
+            "label": "PhenoAge — recomputed per blood draw",
+        },
+        "tape": {
+            "kind": "checkpoint",
+            "interval_days": None,
+            "label": "tape — per session, no fixed cadence yet",
+        },
+    }
+
+
 def handle_physical_overview() -> dict:
     """
     GET /api/physical_overview
@@ -1858,7 +1902,7 @@ def handle_physical_overview() -> dict:
         try:
             scan_dt = datetime.strptime(latest_dexa.get("scan_date", ""), "%Y-%m-%d")
             days_since_dexa = (datetime.now(timezone.utc).replace(tzinfo=None) - scan_dt).days
-            next_dt = scan_dt + timedelta(days=90)
+            next_dt = scan_dt + timedelta(days=DEXA_RECHECK_DAYS)  # #1119: one constant with the cadence label
             next_dexa_recommended = next_dt.strftime("%Y-%m-%d")
         except Exception:
             pass
@@ -1976,6 +2020,8 @@ def handle_physical_overview() -> dict:
             "tape_measurements": tape,
             "tape_session_count": tape_session_count,
             "blood_pressure": bp_data,
+            # #1119 — cadence metadata the page's tier labels render from (registry-sourced)
+            "cadences": _physical_cadences(),
         },
         cache_seconds=3600,
     )

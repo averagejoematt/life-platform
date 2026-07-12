@@ -127,6 +127,17 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .rd-grouphead .rd-h { border-top: 0; padding-top: 0; margin-bottom: var(--sp-1); }
 .rd-desc { color: var(--ink-muted); max-width: var(--measure); margin-bottom: var(--sp-4); }
 
+/* #1119 — /data/physical/ tier heads: the fluid (daily) block vs the checkpoint block,
+   each labeled with its cadence. The chips carry metadata-derived cadence strings from
+   /api/physical_overview.cadences — the front-end never hand-types an interval. Chips
+   wrap under the title at narrow widths (390px verified). */
+.tier-head { margin-top: var(--sp-7); }
+.tier-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); }
+.tier-row .rd-h { margin-bottom: 0; }
+.tier-cad { display: inline-block; border: var(--border-hair); border-radius: 999px;
+  padding: 2px 10px; color: var(--ink-muted); max-width: 100%; }
+.tier-head .rd-desc { margin-top: var(--sp-2); margin-bottom: 0; }
+
 /* Supplements — what / why / what's-backed cards */
 /* #978 — pre-start framing line: the catalog is the plan going in, not a progress
    report. Shown only before genesis (keyed off preStart() in evidence_body.js). */
