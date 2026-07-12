@@ -21,7 +21,7 @@ import { sparkline } from "/assets/js/charts.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
-import { preStart } from "/assets/js/coach_popover.js"; // #931 — the pre-start countdown state
+import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #931 pre-start countdown · #1088 scrub-floor fallback
 
 const API = "/api";
 
@@ -645,7 +645,7 @@ async function renderForecast() {
   sec.hidden = false;
 }
 
-// The weekday name for an ISO date ("2026-06-26" → "Friday"), for "since Friday".
+// The weekday name for an ISO date (YYYY-MM-DD → "Friday"), for "since Friday".
 function _weekdaySince(iso) {
   if (!iso) return "";
   try {
@@ -1192,6 +1192,11 @@ async function load(dateStr) {
     // #931 pre-start: snapshot's top level carries the countdown contract; client
     // GENESIS is the fallback. Truthy only in the staged-reset window (T−N days).
     const pre = preStart(snapV);
+    // #1088: the runtime genesis — pre-start the snapshot's top level carries
+    // start_date; started, the journey block does. Re-scopes the time-travel
+    // floor if the cached client fallback lags a re-anchor.
+    const apiGenesis = snapV && (snapV.start_date || (snapV.journey && snapV.journey.started_date));
+    if (apiGenesis) configureScrub(String(apiGenesis).slice(0, 10));
     const charBody = snapV?.character || null;   // handle_character body (or {error} on 503)
     const character = charBody?.character || (charBody && !charBody.error ? charBody : null);
     const pillarList = charBody?.pillars || character?.pillars || [];
@@ -1283,14 +1288,62 @@ function nearestPost(pj, date) {
   return best || arr[0] || null;
 }
 
+/* ── #1088: time-travel scopes to the CURRENT cycle ─────────────────────────
+   The scrub floor is the current experiment genesis, derived at RUNTIME:
+   payload-first (/api/snapshot — top-level start_date pre-start, else
+   journey.started_date), with the client GENESIS_ISO (coach_popover.js, the
+   single swept client literal) as the boot fallback. Never a per-cycle literal
+   here — the old hardcoded cycle-1 floor (April 2026) deliberately spanned all
+   cycles, but it dropped readers into prior-cycle data with no framing, and a stranded
+   genesis literal is exactly what has broken on past re-anchors. Prior cycles
+   are simply out of range for now; an explicit "archive · cycle N" replay mode
+   could return later. Pre-genesis (staged reset, #931) the current cycle has
+   no past mornings yet, so the whole control hides rather than render an
+   empty/broken slider. configureScrub() is re-entrant: load() re-calls it when
+   the API's genesis differs from the client fallback (a cached JS bundle
+   lagging a re-anchor).                                                      */
+const scrubState = { genesis: null, t0: NaN, days: 1 };
+
+function configureScrub(genesisISO) {
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(genesisISO || "") ? genesisISO : GENESIS_ISO;
+  if (iso === scrubState.genesis) return;
+  const inp = document.querySelector("[data-scrub]");
+  if (!inp) return;
+  const wrap = inp.closest(".scrub-wrap");
+  const slider = document.querySelector("[data-scrub-days]");
+  const lab = document.querySelector("[data-scrub-label]");
+  const today = new Date().toISOString().slice(0, 10);
+  if (iso >= today) {
+    // Day 1 or pre-start: nothing behind today inside this cycle — hide, don't break.
+    if (wrap) wrap.hidden = true;
+    return;
+  }
+  scrubState.genesis = iso;
+  scrubState.t0 = Date.parse(`${iso}T12:00:00`);
+  scrubState.days = Math.max(1, Math.round((Date.parse(`${today}T12:00:00`) - scrubState.t0) / 86400000));
+  if (wrap) wrap.hidden = false;
+  inp.max = today;
+  inp.min = iso;
+  if (!slider || !lab) return;
+  slider.max = String(scrubState.days);
+  const fromUrl = new URLSearchParams(location.search).get("date");
+  const cur = fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) && fromUrl >= iso ? fromUrl : today;
+  slider.value = String(Math.max(0, Math.min(scrubState.days, Math.round((Date.parse(`${cur}T12:00:00`) - scrubState.t0) / 86400000))));
+  lab.textContent = cur === today ? "today" : cur;
+  slider.hidden = false;
+  lab.hidden = false;
+}
+
 function wireScrub() {
   const inp = document.querySelector("[data-scrub]");
   if (!inp) return;
   const today = new Date().toISOString().slice(0, 10);
-  inp.max = today;
-  inp.min = "2026-04-01";  // cycle 1 genesis — the first morning with a sheet
   const fromUrl = new URLSearchParams(location.search).get("date");
-  if (fromUrl) inp.value = fromUrl;
+  // A pre-genesis deep link (a prior-cycle URL) doesn't pre-fill the input —
+  // the boot loader falls back to today's cockpit for those (see module foot) —
+  // and the URL is cleaned so the address bar doesn't claim a date we won't show.
+  if (fromUrl && fromUrl >= GENESIS_ISO) inp.value = fromUrl;
+  else if (fromUrl) { try { history.replaceState({}, "", "/now/"); } catch (e) {} }
   const go = (d) => {
     const url = d && d < today ? `/now/?date=${d}` : "/now/";
     try { history.replaceState({}, "", url); } catch (e) {}
@@ -1300,31 +1353,22 @@ function wireScrub() {
   inp.addEventListener("change", () => go(inp.value));
 
   // uplevel P4: the raw date input was the least-elite element on the flagship
-  // instrument. A day-slider over the experiment's real span (min = cycle-1
+  // instrument. A day-slider over the cycle's real span (min = the current
   // genesis) makes time-travel a drag, not a form fill. Debounced so scrubbing
   // doesn't hammer the API; the date input stays as the precise/accessible path.
   const slider = document.querySelector("[data-scrub-days]");
   const lab = document.querySelector("[data-scrub-label]");
-  if (!slider || !lab) return;
-  const t0 = Date.parse("2026-04-01T12:00:00");
-  const days = Math.max(1, Math.round((Date.parse(`${today}T12:00:00`) - t0) / 86400000));
-  slider.max = String(days);
-  const dOf = (i) => new Date(t0 + i * 86400000).toISOString().slice(0, 10);
-  const sync = () => {
-    const cur = fromUrl && /^\d{4}-\d{2}-\d{2}$/.test(fromUrl) ? fromUrl : today;
-    const idx = Math.max(0, Math.min(days, Math.round((Date.parse(`${cur}T12:00:00`) - t0) / 86400000)));
-    slider.value = String(idx);
-    lab.textContent = cur === today ? "today" : cur;
-  };
-  sync();
-  slider.hidden = false; lab.hidden = false;
-  let deb = null;
-  slider.addEventListener("input", () => {
-    const d = dOf(Number(slider.value));
-    lab.textContent = d === today ? "today" : d;
-    clearTimeout(deb);
-    deb = setTimeout(() => { inp.value = d === today ? "" : d; go(d === today ? "" : d); }, 350);
-  });
+  if (slider && lab) {
+    let deb = null;
+    slider.addEventListener("input", () => {
+      if (!scrubState.genesis) return; // hidden pre-genesis; nothing to scrub
+      const d = new Date(scrubState.t0 + Number(slider.value) * 86400000).toISOString().slice(0, 10);
+      lab.textContent = d === today ? "today" : d;
+      clearTimeout(deb);
+      deb = setTimeout(() => { inp.value = d === today ? "" : d; go(d === today ? "" : d); }, 350);
+    });
+  }
+  configureScrub(GENESIS_ISO);
 }
 
 wireScope();
@@ -1334,7 +1378,9 @@ wireLevelHint();
 wireScrub();
 bind("scopeLabel").textContent = "today";
 const _deepDate = new URLSearchParams(location.search).get("date");
-load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) ? _deepDate : undefined);
+// #1088: pre-genesis deep links (prior-cycle URLs) fall back to today's cockpit —
+// time travel is scoped to the current cycle.
+load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) && _deepDate >= GENESIS_ISO ? _deepDate : undefined);
 
 // Build stamp — muted deploy fingerprint in the footer (apples-to-apples in QA). Reads
 // the <meta name="build"> the deploy script injects; no-op locally where it's absent.

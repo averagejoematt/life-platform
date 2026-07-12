@@ -16,7 +16,12 @@ import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || 
 // Day-N/Week stamp consumes this one function — no door re-implements the math (that drift was
 // the original cross-door bug). `genesisCount()` is the pure calc; `stampGenesis()` writes it
 // into any [data-bind="genesisStamp"] element, with an optional per-door suffix.
-const GENESIS = new Date("2026-07-12T00:00:00");
+// Exported (#1088) so the cockpit's time-travel scrub floor shares THIS single
+// client literal as its boot fallback (the API payload is the runtime truth).
+// The reset sweep (deploy/restart_site_copy_sync.py rewrite_js_files) follows
+// the quoted ISO form here — keep it a plain quoted literal.
+export const GENESIS_ISO = "2026-07-12";
+const GENESIS = new Date(`${GENESIS_ISO}T00:00:00`);
 export function genesisCount() {
   const dayN = Math.floor((Date.now() - GENESIS.getTime()) / 86400000) + 1;
   const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
