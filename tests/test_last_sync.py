@@ -1,15 +1,20 @@
-"""#406 — the cockpit's sync strip: real ingestion write times, honest states.
+"""#406/#1101 — the cockpit's sync strip: real ingestion write times, honest states.
 
-Pins: /api/last_sync reads ingested_at / webhook_ingested_at stamps (never the
-day-granular DATE key), covers only the passive pipes, reports a missing stamp
-as null instead of inventing one, and the front-end's glow is gated on each
-source's OWN registry-derived freshness window (#589 — data-fresh-ts/-window,
-via motion.js's shared wireFreshness() primitive) with truthful stale text.
+Pins: /api/last_sync covers EVERY registry source (#1101 — active board sources +
+paused, registry-driven so a new source appears automatically), reads real
+ingested_at / webhook_ingested_at stamps when a pipe stamps its writes, falls back
+to the day-granular DATE key with precision "day" (never implied minutes), reports
+a never-written source honestly (last_seen null), and computes per-source status
+against each source's OWN registry-derived threshold (e.g. Todoist's cadence-derived
+72h — #471/#589), never a global constant. The front-end renders ALL sources (no
+last_write filter), has no "← freshest" marker, and its glow is gated per source
+via motion.js's shared wireFreshness() primitive (data-fresh-ts/-window).
 """
 
 import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("TABLE_NAME", "life-platform")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
@@ -20,6 +25,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(_REPO, "lambdas"))
 
 from fakes import FakeDdbTable  # noqa: E402
+from source_registry import public_board_sources, public_paused_sources, stale_hours_overrides  # noqa: E402
 from web import site_api_data as sad  # noqa: E402
 
 COCKPIT_JS = open(os.path.join(_REPO, "site/assets/js/cockpit.js")).read()
@@ -39,47 +45,104 @@ def _with_fake_table(monkeypatch, per_source_items):
     monkeypatch.setattr(sad, "table", FakeDdbTable(query_hook=_query_hook))
 
 
+def _body(monkeypatch, per_source_items):
+    _with_fake_table(monkeypatch, per_source_items)
+    return json.loads(sad.handle_last_sync()["body"])
+
+
+def test_every_registry_source_rendered(monkeypatch):
+    """#1101 AC: registry-driven — the payload covers EVERY registry source (active
+    + paused), so the sync line renders them all and a new source appears
+    automatically. The front-end applies no filter (pinned below)."""
+    body = _body(monkeypatch, {})
+    ids = [s["id"] for s in body["sources"]]
+    expected = set(public_board_sources()) | set(public_paused_sources())
+    assert set(ids) == expected
+    assert len(ids) == len(expected)  # no dupes, count matches the registry
+
+
 def test_last_sync_reads_real_write_stamps(monkeypatch):
-    _with_fake_table(
+    now = datetime.now(timezone.utc)
+    body = _body(
         monkeypatch,
         {
-            "whoop": [{"ingested_at": "2026-07-04T05:00:00+00:00"}, {"ingested_at": "2026-07-04T04:00:00+00:00"}],
-            "eightsleep": [{"ingested_at": "2026-07-03T20:11:00+00:00"}],
-            "apple_health": [{"webhook_ingested_at": "2026-07-04T05:30:00+00:00"}],
+            "whoop": [
+                {"sk": "DATE#" + now.strftime("%Y-%m-%d"), "ingested_at": (now - timedelta(hours=1)).isoformat()},
+                {"sk": "DATE#" + now.strftime("%Y-%m-%d"), "ingested_at": (now - timedelta(hours=2)).isoformat()},
+            ],
+            "apple_health": [{"sk": "DATE#" + now.strftime("%Y-%m-%d"), "webhook_ingested_at": (now - timedelta(minutes=30)).isoformat()}],
         },
     )
-    body = json.loads(sad.handle_last_sync()["body"])
     by_id = {s["id"]: s for s in body["sources"]}
-    assert by_id["whoop"]["last_write"] == "2026-07-04T05:00:00+00:00"  # the max, not the first
-    assert by_id["apple_health"]["last_write"] == "2026-07-04T05:30:00+00:00"
-    assert body["freshest"]["id"] == "apple_health"
+    assert by_id["whoop"]["last_write"] == (now - timedelta(hours=1)).isoformat()  # the max, not the first
+    assert by_id["whoop"]["precision"] == "instant"
+    assert by_id["whoop"]["status"] == "fresh"
+    assert by_id["apple_health"]["last_write"] == (now - timedelta(minutes=30)).isoformat()
     assert body["server_now"]  # the client's skew anchor
-    # #589: each source carries its OWN registry-derived window — never a flat guess —
-    # so the front-end pulse primitive can be driven honestly per source.
-    assert all(isinstance(s["stale_hours"], (int, float)) for s in body["sources"])
+    # #589: each active source carries its OWN registry-derived window — never a flat
+    # guess — so the front-end pulse primitive can be driven honestly per source.
+    assert all(isinstance(s["stale_hours"], (int, float)) for s in body["sources"] if s["status"] != "paused")
 
 
-def test_missing_stamp_is_null_never_invented(monkeypatch):
-    _with_fake_table(monkeypatch, {"whoop": [{"date": "2026-07-04"}]})  # no write stamps at all
-    body = json.loads(sad.handle_last_sync()["body"])
+def test_missing_stamp_falls_back_to_day_granularity_never_invents(monkeypatch):
+    """A source with DATE# records but no write stamps reports the day-granular
+    DATE key as precision "day" (the /api/source_freshness basis) — last_write
+    stays null, an instant is never invented."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    body = _body(monkeypatch, {"whoop": [{"sk": f"DATE#{today}"}]})
     by_id = {s["id"]: s for s in body["sources"]}
     assert by_id["whoop"]["last_write"] is None
+    assert by_id["whoop"]["precision"] == "day"
+    assert by_id["whoop"]["last_seen"].startswith(today)
+    assert by_id["whoop"]["status"] == "fresh"  # today's record is inside whoop's window
+    # Never written at all: nothing is faked.
     assert by_id["eightsleep"]["last_write"] is None
-    assert body["freshest"] is None
+    assert by_id["eightsleep"]["last_seen"] is None
+    assert by_id["eightsleep"]["status"] == "stale"
 
 
-def test_sync_strip_sources_pinned():
-    """Passive pipes + ONE deliberate behavioral exception: withings (#491/M-5).
-    Weigh-in recency is the honest anchor for every 'current weight' label, so
-    the strip carries it — its 'ago' reads as recency, not a nag, because the
-    scale is the one behavioral source whose staleness the site quotes as fact.
-    Lifts/food logs stay out."""
-    assert set(sad._SYNC_SOURCES) == {"whoop", "eightsleep", "apple_health", "withings"}
+def test_status_uses_each_sources_own_registry_threshold(monkeypatch):
+    """#1101 AC: staleness uses the per-source registry window, not a global
+    constant — a 60h-old write is fresh for Todoist (72h cadence-derived, #471)
+    but stale for Whoop (48h default)."""
+    overrides = stale_hours_overrides(public_board_sources())
+    assert overrides.get("todoist") == 72  # the registry premise this test rides on
+    ts = (datetime.now(timezone.utc) - timedelta(hours=60)).isoformat()
+    body = _body(monkeypatch, {"todoist": [{"sk": "DATE#x", "ingested_at": ts}], "whoop": [{"sk": "DATE#x", "ingested_at": ts}]})
+    by_id = {s["id"]: s for s in body["sources"]}
+    assert by_id["todoist"]["stale_hours"] == 72
+    assert by_id["todoist"]["status"] == "fresh"
+    assert by_id["whoop"]["status"] == "stale"
+
+
+def test_behavioral_lapse_and_paused_states(monkeypatch):
+    """A behavioral source's staleness is a logging lapse (behavioral-stale, never
+    a broken-pipe claim) and a paused source says "paused" — same semantics as
+    /api/source_freshness."""
+    ts = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    body = _body(monkeypatch, {"withings": [{"sk": "DATE#x", "ingested_at": ts}]})
+    by_id = {s["id"]: s for s in body["sources"]}
+    assert by_id["withings"]["status"] == "behavioral-stale"  # 30d > 168h window, behavioral
+    assert by_id["macrofactor"]["status"] == "behavioral-stale"  # never written, behavioral
+    assert by_id["garmin"]["status"] == "paused"
+    assert by_id["garmin"]["last_seen"] is None
+
+
+def test_frontend_renders_all_sources_no_freshest_marker():
+    """#1101: the front-end renders every source the API returns — no truthy-
+    last_write filter — and the "← freshest" marker is gone (CSS rule too)."""
+    assert ".filter((s) => s.last_write)" not in COCKPIT_JS
+    assert "← freshest" not in COCKPIT_JS and "_sync.freshest" not in COCKPIT_JS
+    assert "sync-freshest" not in COCKPIT_JS and "sync-freshest" not in COCKPIT_CSS
+    # Honest non-writer states exist: paused + em-dash for never-written.
+    assert '"paused"' in COCKPIT_JS and '"—"' in COCKPIT_JS
+    # Day-granular sources get day-level wording, never implied minutes.
+    assert "_dayAgoText" in COCKPIT_JS and '"today"' in COCKPIT_JS
 
 
 def test_frontend_ticks_and_earns_the_glow():
     assert "setInterval(renderSyncLine, 30_000)" in COCKPIT_JS  # the ago ticks client-side
-    # #589: the glow is now the shared data-fresh-ts/-window primitive (motion.js's
+    # #589: the glow is the shared data-fresh-ts/-window primitive (motion.js's
     # wireFreshness()), not a flat client-side minute guess — each source earns its
     # own glow from ITS OWN registry-derived window.
     assert "data-fresh-ts=" in COCKPIT_JS and "data-fresh-window=" in COCKPIT_JS

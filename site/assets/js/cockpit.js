@@ -1351,14 +1351,18 @@ load(_deepDate && /^\d{4}-\d{2}-\d{2}$/.test(_deepDate) ? _deepDate : undefined)
   } catch (e) {}
 })();
 
-/* ── #406: the sync strip — "measured, live" made checkable ─────────────────
-   REAL ingestion write times from /api/last_sync (ingested_at stamps, never
-   the day-granular DATE key). The "ago" text ticks client-side every 30s;
-   the data re-fetches every 5 minutes. The pulse dot glows ONLY when a pipe
-   wrote within ITS OWN registry-derived freshness window (#589 — data-fresh-ts
-   + data-fresh-window hand off to motion.js's shared wireFreshness() primitive,
-   replacing the old flat 45-minute guess; nothing is animated to imply data
-   that isn't there); stale states render truthfully ("9h ago"). */
+/* ── #406/#1101: the sync strip — "measured, live" made checkable ────────────
+   EVERY registry source from /api/last_sync (#1101 — a stale or paused source
+   is visible, never masked; the old single-source "freshest" marker is gone). Each
+   source renders its best honest evidence: a ticking "ago" from the REAL
+   ingestion write stamp (precision "instant"), a day-level "ago" when only the
+   day-granular DATE key exists (precision "day" — never implied minutes),
+   "paused" for an intentionally-off pipe, or "—" when nothing was ever written.
+   The "ago" text ticks client-side every 30s; the data re-fetches every 5
+   minutes. The pulse dot glows ONLY when a pipe wrote within ITS OWN
+   registry-derived freshness window (#589 — data-fresh-ts + data-fresh-window
+   hand off to motion.js's shared wireFreshness() primitive; nothing is animated
+   to imply data that isn't there); stale states render truthfully ("9h ago"). */
 let _sync = null;
 let _syncSkewMs = 0;
 
@@ -1373,17 +1377,31 @@ function _agoText(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function _dayAgoText(iso) {
+  // Day-granular sources: honest day-level wording only — "16h ago" off a
+  // midnight-anchored DATE key would imply an instant the pipe never stamped.
+  const ms = Date.now() + _syncSkewMs - Date.parse(iso);
+  if (!Number.isFinite(ms)) return "";
+  const d = Math.floor(ms / 86400000);
+  return d < 1 ? "today" : `${d}d ago`;
+}
+
+function _syncAgo(s) {
+  if (s.status === "paused") return "paused";
+  const ts = s.last_seen || s.last_write; // last_write fallback: renders sanely against a not-yet-redeployed API
+  if (!ts) return "—";
+  return s.precision === "day" ? _dayAgoText(ts) : _agoText(ts);
+}
+
 function renderSyncLine() {
   const el = bind("syncline");
   if (!el) return;
-  const srcs = ((_sync && _sync.sources) || []).filter((s) => s.last_write);
+  const srcs = (_sync && _sync.sources) || [];
   if (!srcs.length) { el.hidden = true; return; }
-  const freshestId = _sync.freshest && _sync.freshest.id;
   el.innerHTML = srcs.map((s) => {
     const windowS = Number.isFinite(Number(s.stale_hours)) ? Math.round(Number(s.stale_hours) * 3600) : "";
-    const star = s.id === freshestId ? ` <span class="sync-freshest">← freshest</span>` : "";
-    return `<span class="sync-src"><span class="sync-dot fr-dot" data-fresh-ts="${escapeHTML(s.last_write)}" data-fresh-window="${windowS}" aria-hidden="true"></span>` +
-      `${escapeHTML(s.label)} <span class="sync-ago num">${escapeHTML(_agoText(s.last_write))}</span>${star}</span>`;
+    return `<span class="sync-src"><span class="sync-dot fr-dot" data-fresh-ts="${escapeHTML(s.last_seen || s.last_write || "")}" data-fresh-window="${windowS}" aria-hidden="true"></span>` +
+      `${escapeHTML(s.label)} <span class="sync-ago num">${escapeHTML(_syncAgo(s))}</span></span>`;
   }).join(`<span class="sync-sep" aria-hidden="true">·</span>`);
   el.hidden = false;
 }
