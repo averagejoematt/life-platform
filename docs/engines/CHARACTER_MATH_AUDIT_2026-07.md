@@ -7,23 +7,25 @@
 
 ## Verdict table
 
-| # | Mechanic | Verdict | Issue |
-|---|---|---|---|
-| 1 | Up-gate vs the confidence-blend floor (climb-during-darkness returns ~day 15–17) | **needs-fix, critical** | #957 |
-| 2 | Up-gate vs cross-pillar-boosted targets (permanent freeze of boosted pillars) | **needs-fix, critical** | #954 (ships now) |
-| 3 | XP demotion buffer `xp_total % 100` (wraps upward as XP declines) | **needs-fix, high** | #954 (ships now) |
-| 4 | XP zero-point at raw 80 (visible-debt spiral under realistic-good living) | **needs-fix, high** | #958 |
-| 5 | XP from uninstrumented pillars (phantom permanent −100 debt) | **needs-fix, medium** | #964 |
-| 6 | Post-engine mutations (food-delivery ×, challenge +XP) bypass all gates | **needs-fix, medium** | #961 |
-| 7 | Dead engine inputs (vice_streaks, buddy_freshness_days, streak_all_above_30th, weekend_weekday_ratio) | **needs-fix, medium** | #962 |
-| 8 | 30-day dark ≈ 2 headline levels (atrophy blind spot on device pillars) | **design-question** | #959 |
-| 9 | Elite tier unreachable at any horizon (L48 after 420 days of raw ~90) | **design-question** | #960 |
-| 10 | Cross-pillar conditions evaluate EMA scores, not levels ("meta-achievement" fires week 1) | **design-question** | #963 |
-| 11 | Pre-genesis pilot records chain into Day-1 compute | **needs-fix, medium** | #947 (ships now) |
-| 12 | Source wiring: hevy/reading/todoist absent — movement is blind to lifting | **design-question** | #965 |
-| — | ADR-104 behavioral-absence semantics; sick-day freeze; EMA anti-flip-flop streaks/steps; coverage-hold; deterministic mood ladder | **defensible** | — |
+> **Resolution column added 2026-07-11 (engine v1.5.0, config v1.4.0, ADR-134 — the epic's fix wave).** Every needs-fix row is resolved; every design-question row carries an explicit decision with reasoning in ADR-134. Numbers cited in the resolutions reproduce from re-running `scripts/character_sim_year.py` on v1.5.0.
 
-Epic: **#956 Character math v2**. The two gate-arithmetic bugs (#954) and the pilot-chaining filter (#947) ship in tonight's wave; everything else is a scored backlog story because it changes the *model*, which is Matthew's call.
+| # | Mechanic | Verdict | Issue | Resolution (2026-07-11) |
+|---|---|---|---|---|
+| 1 | Up-gate vs the confidence-blend floor (climb-during-darkness returns ~day 15–17) | **needs-fix, critical** | #957 | **FIXED v1.4.0** — up-gate judges the unblended raw |
+| 2 | Up-gate vs cross-pillar-boosted targets (permanent freeze of boosted pillars) | **needs-fix, critical** | #954 | **FIXED v1.3.x** — gate compares vs unboosted target |
+| 3 | XP demotion buffer `xp_total % 100` (wraps upward as XP declines) | **needs-fix, high** | #954 | **FIXED v1.3.x** — explicit monotone buffer state |
+| 4 | XP zero-point at raw 80 (visible-debt spiral under realistic-good living) | **needs-fix, high** | #958 | **FIXED v1.5.0** — decay 1: breakeven at 40–59, growth at 60+; slow improver ends 1027 XP / 0 debt (was 0 / 700) |
+| 5 | XP from uninstrumented pillars (phantom permanent −100 debt) | **needs-fix, medium** | #964 | **FIXED v1.5.0** — XP mirrors the level gate (hold/not-instrumented ⇒ no earn, no decay); phantom debt gone |
+| 6 | Post-engine mutations (food-delivery ×, challenge +XP) bypass all gates | **needs-fix, medium** | #961 | **FIXED v1.5.0** — both are engine inputs (modifier pre-EMA with `raw_modifier` provenance; challenge XP debt-first; consume-mark after store) |
+| 7 | Dead engine inputs (vice_streaks, buddy_freshness_days, streak_all_above_30th, weekend_weekday_ratio) | **needs-fix, medium** | #962 | **FIXED v1.5.0** — vice_streaks lifted from habit_scores (Vice Shield data-driven); streak + weekend ratio derived via `derive_consistency_inputs`; buddy_engagement removed (B-3 precedent) |
+| 8 | 30-day dark ≈ 2 headline levels (atrophy blind spot on device pillars) | **design-question** | #959 | **DECIDED v1.5.0** — down-streak persists + buffer bypassed during confirmed dark: silent month now costs ~12 headline levels (36→24), recovery ~28 d after resuming; device pillars still streaming stay honest measurements (ADR-134 §Rejected) |
+| 9 | Elite tier unreachable at any horizon (L48 after 420 days of raw ~90) | **design-question** | #960 | **DECIDED v1.5.0** — headline mean renormalizes over instrumented pillars (never-instrumented @ L1 excluded); Elite at day 362 of sustained raw ~90, a defensible year-plus horizon |
+| 10 | Cross-pillar conditions evaluate EMA scores, not levels ("meta-achievement" fires week 1) | **design-question** | #963 | **DECIDED v1.5.0** — conditions stay on scores (current-state synergies, not achievements); config narrative reworded to match |
+| 11 | Pre-genesis pilot records chain into Day-1 compute | **needs-fix, medium** | #947 | **FIXED** — phase filter on fetch_date |
+| 12 | Source wiring: hevy/reading/todoist absent — movement is blind to lifting | **design-question** | #965 | Open — designed + wired separately (see #965) |
+| — | ADR-104 behavioral-absence semantics; sick-day freeze; EMA anti-flip-flop streaks/steps; coverage-hold; deterministic mood ladder | **defensible** | — | unchanged |
+
+Epic: **#956 Character math v2**. The two gate-arithmetic bugs (#954) and the pilot-chaining filter (#947) shipped in the overnight wave; the remaining rows shipped 2026-07-11 as engine v1.5.0 / config v1.4.0 per **ADR-134** (the model decisions, ratified at merge).
 
 ## What the year-scale simulation showed
 

@@ -45,7 +45,7 @@ from character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.4.0"
+    assert ENGINE_VERSION == "1.5.0"
 
 
 # ── F-01: Confidence scoring ──
