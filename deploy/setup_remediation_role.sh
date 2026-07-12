@@ -25,6 +25,11 @@ JSON
 
 # Read-only diagnosis + Bedrock + scoped audit-log write + SES report. NO deploy,
 # NO lambda update, NO IAM write — the agent proposes fixes via PR; humans/CI deploy.
+#
+# Must stay statement-for-statement identical to the CANONICAL source of truth:
+#   infra/iam/github-actions-remediation-role.permissions.json (#401)
+# deploy/verify_oidc_iam.py diffs that JSON against the live role; this script is
+# just the operator convenience that applies it. If they disagree, the JSON wins.
 PERM=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  {"Sid":"Bedrock","Effect":"Allow",
@@ -35,16 +40,26 @@ PERM=$(cat <<JSON
  {"Sid":"Diagnose","Effect":"Allow","Action":["logs:FilterLogEvents","logs:GetLogEvents",
    "logs:DescribeLogGroups","logs:DescribeLogStreams","cloudwatch:DescribeAlarms",
    "cloudwatch:DescribeAlarmHistory","cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics",
-   "cloudwatch:ListMetrics","lambda:GetFunctionConfiguration","lambda:ListFunctions"],"Resource":"*"},
+   "cloudwatch:ListMetrics","lambda:GetFunction","lambda:GetFunctionConfiguration",
+   "lambda:ListFunctions"],"Resource":"*"},
  {"Sid":"DriftSentinel","Effect":"Allow","Action":["cloudformation:DetectStackDrift",
    "cloudformation:DescribeStackDriftDetectionStatus","cloudformation:DescribeStackResourceDrifts",
-   "cloudformation:DescribeStacks","cloudformation:ListStackResources"],"Resource":"*"},
+   "cloudformation:ListStackResources"],"Resource":"*"},
+ {"Sid":"IAMRoleRead","Effect":"Allow","Action":["iam:GetRole","iam:GetRolePolicy"],
+   "Resource":["arn:aws:iam::${ACCOUNT}:role/github-actions-deploy-role",
+               "arn:aws:iam::${ACCOUNT}:role/github-actions-remediation-role",
+               "arn:aws:iam::${ACCOUNT}:role/github-actions-golden-eval-role",
+               "arn:aws:iam::${ACCOUNT}:role/github-actions-diagnosis-role"]},
+ {"Sid":"OIDCProviderRead","Effect":"Allow","Action":"iam:GetOpenIDConnectProvider",
+   "Resource":"arn:aws:iam::${ACCOUNT}:oidc-provider/token.actions.githubusercontent.com"},
  {"Sid":"DDB","Effect":"Allow","Action":["dynamodb:GetItem","dynamodb:Query"],
    "Resource":"arn:aws:dynamodb:${REGION}:${ACCOUNT}:table/life-platform"},
  {"Sid":"KMS","Effect":"Allow","Action":"kms:Decrypt",
    "Resource":"arn:aws:kms:${REGION}:${ACCOUNT}:key/444438d1-a5e0-43b8-9391-3cd2d70dde4d"},
  {"Sid":"S3Read","Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::matthew-life-platform/*"},
  {"Sid":"S3BucketPolicyRead","Effect":"Allow","Action":"s3:GetBucketPolicy","Resource":"arn:aws:s3:::matthew-life-platform"},
+ {"Sid":"S3List","Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::matthew-life-platform",
+   "Condition":{"StringLike":{"s3:prefix":"remediation-log/*"}}},
  {"Sid":"S3Log","Effect":"Allow","Action":"s3:PutObject",
    "Resource":["arn:aws:s3:::matthew-life-platform/remediation-log/*",
                "arn:aws:s3:::matthew-life-platform/drift-log/*"]},

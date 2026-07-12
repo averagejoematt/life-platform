@@ -32,7 +32,7 @@ Last verified: 2026-07-04
 |-------|------|-------|
 | I4 `test_i4_dynamodb_table_healthy` | DynamoDB ACTIVE + deletion_protection + PITR + GSI1/GSI2 | `tests/test_integration_aws.py` — runs in `post-deploy-checks` CI job |
 | I8 `test_i8_s3_bucket_and_config_files` | S3 bucket accessible + critical config files present | Same job |
-| Weekly drift sentinel | Compares live infra config vs CDK code for Lambda timeout/memory/env drift | `.github/workflows/ci-cd.yml` weekly cron |
+| Weekly drift sentinel | Compares live infra config vs CDK code for Lambda timeout/memory/env drift | `deploy/drift_sentinel.py` — Monday-gated step in `.github/workflows/remediation-agent.yml` (cron `45 14 * * 1,3,5`; self-skips unless Monday UTC or manual dispatch) |
 
 ---
 
