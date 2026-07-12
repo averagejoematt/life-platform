@@ -100,7 +100,15 @@ body { overflow-x: hidden; }
    Width tracks |r| (set inline via stroke-width); significance sets opacity so a
    thin/non-significant pair stays honestly faint. A pillar with no measured edge
    (relationships, today) renders .quiet — recessed, the absence stated not faked. */
-.constellation { display: grid; gap: var(--sp-3); }
+.constellation {
+  display: grid; gap: var(--sp-3);
+  /* #1017 — SVG type in viewBox units; story.js sizeConstellation overrides these on the
+     svg element from the live rendered scale so labels never fall below the 11px mobile
+     type floor (§10.5). These are the desktop-true fallbacks if JS never runs. */
+  --cn-fs-label: 9px;
+  --cn-fs-score: 11px;
+  --cn-fs-cue: 8px;
+}
 .constellation svg { width: 100%; height: auto; aspect-ratio: 1; overflow: visible; }
 
 .constellation .edge { fill: none; stroke-linecap: round; transition: opacity var(--dur) var(--ease-out); }
@@ -111,25 +119,30 @@ body { overflow-x: hidden; }
 /* An active designed cross-pillar effect (rare) — the engine's own coupling, firing now. */
 .constellation .edge.effect { stroke: var(--ember); opacity: 0.95; filter: drop-shadow(0 0 5px var(--ember-soft)); }
 
-.constellation .node circle { fill: var(--surface-raised); stroke: var(--ink-faint); stroke-width: 1; transition: r var(--dur) var(--ease-out), stroke var(--dur-fast); }
+.constellation .node circle:not(.hit) { fill: var(--surface-raised); stroke: var(--ink-faint); stroke-width: 1; transition: r var(--dur) var(--ease-out), stroke var(--dur-fast); }
+/* #1017 — the invisible tap-target expander (§10.4): transparent still catches pointer
+   events; sized to the 44px effective floor by story.js. Touch-only — desktop hover
+   geometry stays exactly the visible node. */
+.constellation .node .hit { fill: transparent; stroke: none; }
+@media (hover: hover) and (pointer: fine) { .constellation .node .hit { display: none; } }
 /* Earned glow — only pillars that are UP get the warm halo (design system §12:
    glow is reserved for "this is up", never decorative). Filters don't affect layout. */
-.constellation .node.up circle { stroke: var(--ember); stroke-width: 1.5; fill: color-mix(in oklch, var(--ember) 18%, var(--surface)); filter: drop-shadow(0 0 8px var(--ember-soft)); }
+.constellation .node.up circle:not(.hit) { stroke: var(--ember); stroke-width: 1.5; fill: color-mix(in oklch, var(--ember) 18%, var(--surface)); filter: drop-shadow(0 0 8px var(--ember-soft)); }
 /* Uninstrumented pillar (no measured coupling yet) — honestly recessed, dashed. */
-.constellation .node.quiet circle { stroke-dasharray: 3 3; opacity: 0.5; }
+.constellation .node.quiet circle:not(.hit) { stroke-dasharray: 3 3; opacity: 0.5; }
 .constellation .node.quiet .nlabel { opacity: 0.55; }
-.constellation .node text { font-family: var(--font-mono); font-size: 9px; /* fs-ok: SVG viewBox units */ fill: var(--ink-muted); text-anchor: middle; }
-.constellation .node .score { fill: var(--ink); font-size: 11px; } /* fs-ok: SVG viewBox units */
+.constellation .node text { font-family: var(--font-mono); font-size: var(--cn-fs-label); /* fs-ok: SVG viewBox units, floored at 11px effective (#1017) */ fill: var(--ink-muted); text-anchor: middle; }
+.constellation .node .score { fill: var(--ink); font-size: var(--cn-fs-score); } /* fs-ok: SVG viewBox units, floored at 12px effective (#1017) */
 .constellation figcaption { color: var(--ink-faint); max-width: 40ch; }
 
 /* Hover/focus DOOR affordance — the pillar icon rises + an "open →" cue, so the
    node reads as an entrance, not just a dot. Hidden until interaction. */
 .constellation .node .door { opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
 .constellation .node .door .door-ico { display: block; color: var(--ember); line-height: 0; }
-.constellation .node .door .door-cue { font-family: var(--font-mono); font-size: 8px; /* fs-ok: SVG viewBox units */ fill: var(--ember); text-anchor: middle; letter-spacing: 0.04em; }
+.constellation .node .door .door-cue { font-family: var(--font-mono); font-size: var(--cn-fs-cue); /* fs-ok: SVG viewBox units, floored at 11px effective (#1017) */ fill: var(--ember); text-anchor: middle; letter-spacing: 0.04em; }
 .constellation a { cursor: pointer; }
 .constellation a:hover .node .door, .constellation a:focus-visible .node .door { opacity: 1; }
-.constellation a:hover .node circle, .constellation a:focus-visible .node circle { stroke: var(--ember); stroke-width: 1.5; }
+.constellation a:hover .node circle:not(.hit), .constellation a:focus-visible .node circle:not(.hit) { stroke: var(--ember); stroke-width: 1.5; }
 .constellation a:hover .node .nlabel { fill: var(--ink); opacity: 1; }
 /* #579 — a real focus ring around the hit area (the thin-stroke change alone is too subtle). */
 .constellation a:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; border-radius: 50%; }
