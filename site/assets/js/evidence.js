@@ -123,10 +123,77 @@ function buildTabs() {
   document.querySelectorAll(".ev-tab").forEach((b) => b.addEventListener("click", () => { const grp = b.dataset.group; const first = REG.find((t) => t.group === grp); if (first) select(first.slug); }));
 }
 
+/* #1014 — tiles are REAL anchors (open-in-new-tab / long-press / crawl all work);
+   an unmodified left-click is intercepted for the no-reload master-detail swap. */
+const tileHTML = (t) =>
+  `<a class="ev-tile ${t.slug === current ? "is-active" : ""}" href="${esc(BASE + t.slug + "/")}" data-slug="${esc(t.slug)}"${t.slug === current ? ' aria-current="page"' : ""}><span class="ev-tile-t">${domainIcon(t.slug, { cls: "dom-ico" })}${esc(t.title)}</span><span class="ev-tile-b">${esc(t.blurb)}</span></a>`;
+
+let listOpen = false; // #1014 — the rail's full-index view (mobile wayfinding)
+
 function buildSide() {
+  const side = $("[data-side]");
   const g = BYSLUG[current] ? BYSLUG[current].group : GROUPS[0];
-  $("[data-side]").innerHTML = REG.filter((t) => t.group === g).map((t) => `<button class="ev-tile ${t.slug === current ? "is-active" : ""}" data-slug="${esc(t.slug)}"><span class="ev-tile-t">${domainIcon(t.slug, { cls: "dom-ico" })}${esc(t.title)}</span><span class="ev-tile-b">${esc(t.blurb)}</span></button>`).join("");
-  document.querySelectorAll(".ev-tile").forEach((b) => b.addEventListener("click", () => select(b.dataset.slug)));
+  side.classList.toggle("is-list", listOpen);
+  side.innerHTML = listOpen
+    ? GROUPS.map((grp) => `<p class="ev-side-h label">${esc(grp)}</p>` + REG.filter((t) => t.group === grp).map(tileHTML).join("")).join("")
+    : REG.filter((t) => t.group === g).map(tileHTML).join("");
+  side.querySelectorAll(".ev-tile").forEach((a) => a.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return; // let the browser do link things
+    e.preventDefault();
+    if (listOpen) setList(false);
+    select(a.dataset.slug);
+  }));
+  // Keep the active tile in view when the rail is a horizontal swipe strip.
+  const act = side.querySelector(".is-active");
+  if (act && !listOpen && side.scrollWidth > side.clientWidth) side.scrollLeft = Math.max(0, act.offsetLeft - 16);
+  updateRailPos();
+}
+
+/* ── #1014: rail wayfinding — index/count readout + a list-view toggle ────────
+   The swipe rail hides most of a 16–29 topic tree behind blind horizontal
+   scrolling (measured 2,044px on /data/, 2,728px on /method/ in a 355px window).
+   This mounts, on mobile only (CSS-gated at the 820 boundary), a bar above the
+   rail: a "k / n" position readout, and an "all N topics" toggle that flips the
+   rail into a vertical, group-labelled index of EVERY topic — so any subpage is
+   two taps from the hub. Injected from JS (like the first-run card) so the
+   generated shells need no rebuild. */
+function setList(open) {
+  listOpen = open;
+  const btn = document.querySelector("[data-railtoggle]");
+  if (btn) {
+    btn.setAttribute("aria-expanded", String(open));
+    btn.querySelector("[data-railtoggle-label]").textContent = open ? "close the index" : `all ${REG.length} topics`;
+  }
+  buildSide();
+}
+
+function updateRailPos() {
+  const side = $("[data-side]"), out = document.querySelector("[data-railpos]");
+  if (!side || !out) return;
+  const tiles = side.querySelectorAll(".ev-tile");
+  const n = tiles.length;
+  if (!n || listOpen || side.scrollWidth <= side.clientWidth + 8) { out.textContent = ""; return; }
+  // First tile whose midpoint is inside the strip, measured strip-relative
+  // (offsetLeft is offsetParent-relative — the static rail's parent, not the strip).
+  const left = side.getBoundingClientRect().left;
+  let idx = 0;
+  for (let i = 0; i < n; i++) { const r = tiles[i].getBoundingClientRect(); if (r.left - left + r.width / 2 > 0) { idx = i; break; } }
+  out.textContent = `${idx + 1} / ${n}`;
+}
+
+function mountRailbar() {
+  const side = $("[data-side]");
+  if (!side || REG.length < 2 || document.querySelector("[data-railbar]")) return;
+  if (!side.id) side.id = "ev-topics";
+  const bar = document.createElement("div");
+  bar.className = "ev-railbar";
+  bar.setAttribute("data-railbar", "");
+  bar.innerHTML = `<button class="ev-railbar-toggle" type="button" data-railtoggle aria-expanded="false" aria-controls="${side.id}"><span data-railtoggle-label>all ${REG.length} topics</span></button><span class="ev-railbar-pos" data-railpos aria-hidden="true"></span>`;
+  side.insertAdjacentElement("beforebegin", bar);
+  bar.querySelector("[data-railtoggle]").addEventListener("click", () => setList(!listOpen));
+  let raf = 0;
+  side.addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; updateRailPos(); }); }, { passive: true });
+  window.addEventListener("resize", updateRailPos);
 }
 
 // Loading skeleton (#1019) — a design-system shimmer sketch of the readout
@@ -225,6 +292,7 @@ function wireFirstRun() {
 
 initTheme();
 wireFirstRun();
+mountRailbar();   // #1014 — rail position readout + all-topics index (mobile)
 buildTabs();
 buildSide();
 renderCenter();
