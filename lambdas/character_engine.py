@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.6.0"  # #965: hevy→movement, reading→mind, todoist→consistency wired (ADR-134 amendment)
+ENGINE_VERSION = "1.6.1"  # #1125: character_level_up events persist their drivers at fire time
+# v1.6.0 — #965: hevy→movement, reading→mind, todoist→consistency wired (ADR-134 amendment)
 # v1.5.0 — #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
 # modifiers/challenge XP are engine inputs, dark down-streaks persist, headline renormalized (ADR-134)
 
@@ -1458,6 +1459,28 @@ def pillar_drivers(details: dict[str, Any], top_n: int = 2) -> dict[str, list[st
     return {"top": top, "dragging": dragging, "absent": absent, "no_data": no_data}
 
 
+def character_level_up_drivers(pillar_results: dict[str, Any], top_n: int = 3) -> list[dict[str, Any]]:
+    """#1125: the persisted "what drove this" attribution for a character-level
+    level-up, computed at EVENT FIRE time from the same day's pillar results.
+
+    Same selection rule as the journey-timeline read-time enrichment
+    (web/site_api_vitals.handle_journey_timeline: top-N pillars by raw_score,
+    zero/absent scores excluded), so on the day the event fires the persisted
+    and reconstructed attributions agree — but the persisted copy survives
+    engine re-tuning and record-shape changes, which read-time reconstruction
+    does not. Historical events without it fall back to read-time enrichment
+    (honest absence — never a fabricated backfill, ADR-104).
+    """
+    scored = []
+    for name, result in pillar_results.items():
+        raw = result.get("raw_score")
+        if raw is None or float(raw) <= 0:
+            continue
+        scored.append({"pillar": name, "raw_score": round(float(raw), 1), "level": result.get("level")})
+    scored.sort(key=lambda d: -d["raw_score"])
+    return scored[:top_n]
+
+
 # ==============================================================================
 # CROSS-PILLAR EFFECTS
 # ==============================================================================
@@ -1852,7 +1875,16 @@ def compute_character_sheet(
 
     prev_char_level = previous_day_state.get("character_level", 1) if previous_day_state else 1
     if character_level > prev_char_level:
-        all_events.append({"type": "character_level_up", "old_level": prev_char_level, "new_level": character_level})
+        all_events.append(
+            {
+                "type": "character_level_up",
+                "old_level": prev_char_level,
+                "new_level": character_level,
+                # #1125: attribution persisted at fire time — the true cause,
+                # kept with the event so it survives engine re-tuning.
+                "drivers": character_level_up_drivers(pillar_results),
+            }
+        )
     elif character_level < prev_char_level:
         all_events.append({"type": "character_level_down", "old_level": prev_char_level, "new_level": character_level})
 

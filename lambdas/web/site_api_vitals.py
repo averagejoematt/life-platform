@@ -801,6 +801,29 @@ def handle_timeline() -> dict:
     )
 
 
+def _persisted_level_up_drivers(item: dict, level) -> list:
+    """#1125: drivers persisted at event-fire time by the character engine
+    (engine >= 1.6.1 — the character_level_up entry in level_events carries a
+    'drivers' list of {pillar, raw_score}). Returns [(Name, score), ...] for
+    the matching level-up, or [] when the record predates persistence — the
+    caller then falls back to the read-time enrichment (honest absence, never
+    a fabricated "fired-with" attribution)."""
+    for ev in item.get("level_events") or []:
+        if not isinstance(ev, dict) or ev.get("type") != "character_level_up":
+            continue
+        try:
+            if int(float(ev.get("new_level", 0) or 0)) != int(float(level)):
+                continue
+        except (TypeError, ValueError):
+            continue
+        return [
+            (str(d.get("pillar") or "").capitalize(), float(d["raw_score"]))
+            for d in ev.get("drivers") or []
+            if isinstance(d, dict) and d.get("raw_score") is not None
+        ]
+    return []
+
+
 def handle_journey_timeline() -> dict:
     """
     GET /api/journey_timeline
@@ -886,13 +909,17 @@ def handle_journey_timeline() -> dict:
             if level and level not in seen_levels:
                 seen_levels.add(level)
                 if level > 1:
-                    # Enrich with top-scoring pillars that drove the level-up
-                    top_pillars = []
-                    for p in _PILLAR_NAMES:
-                        pd = item.get(f"pillar_{p}", {})
-                        if isinstance(pd, dict) and pd.get("raw_score"):
-                            top_pillars.append(((p or "").capitalize(), float(pd["raw_score"])))
-                    top_pillars.sort(key=lambda x: -x[1])
+                    # #1125: prefer the attribution the engine persisted at event
+                    # fire time; the read-time reconstruction below stays as the
+                    # fallback for records written before drivers were persisted.
+                    top_pillars = _persisted_level_up_drivers(item, level)
+                    if not top_pillars:
+                        # Enrich with top-scoring pillars that drove the level-up
+                        for p in _PILLAR_NAMES:
+                            pd = item.get(f"pillar_{p}", {})
+                            if isinstance(pd, dict) and pd.get("raw_score"):
+                                top_pillars.append(((p or "").capitalize(), float(pd["raw_score"])))
+                        top_pillars.sort(key=lambda x: -x[1])
                     drivers = ", ".join(f"{n} ({s:.0f})" for n, s in top_pillars[:3])
                     events.append(
                         {

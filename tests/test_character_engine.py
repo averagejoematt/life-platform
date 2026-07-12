@@ -34,6 +34,7 @@ from character_engine import (
     _roll_xp_buffer,
     _social_quality_to_10,
     _weighted_pillar_score,
+    character_level_up_drivers,
     compute_character_sheet,
     compute_ema_level_score,
     compute_relationships_raw,
@@ -45,7 +46,7 @@ from character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.6.0"
+    assert ENGINE_VERSION == "1.6.1"
 
 
 # ── F-01: Confidence scoring ──
@@ -927,3 +928,58 @@ def test_reported_scenario_down_levels_after_stop():
 
     assert peak_move_level > 1  # it climbed while training was real
     assert record["pillar_movement"]["level"] < peak_move_level  # and gave levels back
+
+
+# ── #1125: character_level_up persists its drivers at event fire time ──
+
+
+def test_character_level_up_drivers_selection():
+    """Top-3 pillars by raw_score; zero/absent scores excluded (same rule as
+    the journey-timeline read-time enrichment it replaces going forward)."""
+    pillar_results = {
+        "sleep": {"raw_score": 82.0, "level": 12},
+        "movement": {"raw_score": 0.0, "level": 3},  # zero performance: never a driver
+        "nutrition": {"raw_score": 91.54, "level": 9},
+        "metabolic": {"raw_score": 55.0, "level": 4},
+        "mind": {"raw_score": 60.0, "level": 5},
+        "relationships": {"raw_score": None, "level": 1},  # no signal: never a driver
+    }
+    drivers = character_level_up_drivers(pillar_results)
+    assert [d["pillar"] for d in drivers] == ["nutrition", "sleep", "mind"]
+    assert drivers[0]["raw_score"] == 91.5  # rounded to .1 like the stored record
+    assert drivers[0]["level"] == 9
+
+
+def test_character_level_up_event_persists_drivers():
+    """#1125: a headline level-up event carries its fire-time attribution —
+    the day's top pillars by raw_score — persisted ON the event, so it
+    survives engine re-tuning (read-time reconstruction does not)."""
+    import json
+
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "config", "character_sheet.json")
+    with open(cfg_path) as f:
+        config = json.load(f)
+
+    pillars = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+    # Yesterday's stored state: pillar levels already earned but the stored
+    # headline lags — today's recomputed weighted floor lands higher, which
+    # fires character_level_up (streak gates hold every pillar at 12 today).
+    prev = {"character_level": 3}
+    for p in pillars:
+        prev[f"pillar_{p}"] = {"level": 12, "tier": "Foundation", "streak_above": 0, "streak_below": 0, "xp_total": 100}
+    rec = compute_character_sheet({"date": "2026-08-01", "apple": {"steps": 11000}}, prev, {}, config)
+
+    ups = [e for e in rec["level_events"] if e["type"] == "character_level_up"]
+    assert len(ups) == 1, rec["level_events"]
+    drivers = ups[0]["drivers"]
+    assert 1 <= len(drivers) <= 3
+    for d in drivers:
+        assert d["pillar"] in pillars
+        assert d["raw_score"] > 0
+    # Exactly the record's own top raw scores, highest first — persisted and
+    # read-time attribution agree on the day the event fires.
+    expected = sorted(
+        ((k.replace("pillar_", ""), rec[k]["raw_score"]) for k in rec if k.startswith("pillar_") and (rec[k]["raw_score"] or 0) > 0),
+        key=lambda t: -t[1],
+    )[:3]
+    assert [(d["pillar"], d["raw_score"]) for d in drivers] == [(n, round(float(s), 1)) for n, s in expected]
