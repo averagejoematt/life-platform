@@ -1097,6 +1097,13 @@ def tool_list_experiments(args):
                 "experiment_type": item.get("experiment_type"),
                 "iteration": item.get("iteration", 1),
                 "reflection": item.get("reflection"),
+                # #1117: the justification contract (nulls on legacy records — honest-empty).
+                "why_now": item.get("why_now"),
+                "why_now_source": item.get("why_now_source"),
+                "priority": item.get("priority"),
+                "hoped_outcome": item.get("hoped_outcome"),
+                "measurement": item.get("measurement"),
+                "evidence_links": decimal_to_float(item.get("evidence_links") or []),
             }
         )
 
