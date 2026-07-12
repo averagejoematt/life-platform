@@ -290,7 +290,11 @@ export async function renderExperiments(d) {
   const lib = xs.filter((x) => x.origin === "library");
   const avail = lib.filter((x) => x.status === "available");
   const backlog = lib.filter((x) => x.status === "backlog");
-  const head = figs([fig(running.length, "running"), avail.length ? fig(avail.length, "ready to run") : "", fig(backlog.length, "in backlog")]);
+  // #1117 — the justification station, mirroring the #1116 supplements figure: how
+  // many live runs state their own justification (why now / hoped outcome / measured
+  // by). An honest completeness count, not a claim — unannotated runs render nothing.
+  const withJust = running.filter((x) => (x.why_now && !isBad(x.why_now)) || (x.hoped_outcome && !isBad(x.hoped_outcome)) || (x.measurement && !isBad(x.measurement))).length;
+  const head = figs([fig(running.length, "running"), running.length ? fig(`${withJust}/${running.length}`, "with stated justification") : "", avail.length ? fig(avail.length, "ready to run") : "", fig(backlog.length, "in backlog")]);
   // P2.1 — running cards carry their served-but-never-drawn instrumentation:
   // the progress bar, the primary metric, the mechanism, compliance; completed
   // runs become "receipt" cards — baseline→result drawn (the effect size), the
@@ -333,7 +337,23 @@ export async function renderExperiments(d) {
       analysis = `<p class="rd-line label">paired analysis: ${esc(String(x.analysis.verdict))} (n ${esc(String(x.analysis.n_window ?? "?"))}/${esc(String(x.analysis.n_baseline ?? "?"))})</p>`;
     }
     const preReg = x.pre_registered_at ? String(x.pre_registered_at).slice(0, 10) : null;
-    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${design}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${analysis}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, preReg && `pre-registered ${preReg}`, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
+    // #1117 — the justification contract, in the #1116 supp-loop grammar: why now
+    // (auto-carried from the promotion trigger where one exists — the meta line names
+    // the provenance), the hoped outcome, the measurement plan, and the evidence
+    // links (dissent tagged, never filtered). Honest-empty per ADR-104: an
+    // unannotated/legacy record renders NOTHING here — no placeholder prose, ever.
+    const evLinks = (Array.isArray(x.evidence_links) ? x.evidence_links : []).filter((l) => l && l.url);
+    const justRows = [
+      x.why_now && !isBad(x.why_now) ? `<p class="rd-line supp-whynow"><span class="label">why now</span> ${esc(x.why_now)}</p>` : "",
+      x.hoped_outcome && !isBad(x.hoped_outcome) ? `<p class="rd-line supp-hope"><span class="label">hoped outcome</span> ${esc(x.hoped_outcome)}</p>` : "",
+      x.measurement && !isBad(x.measurement) ? `<p class="rd-line supp-measure"><span class="label">measured by</span> ${esc(x.measurement)}</p>` : "",
+      evLinks.length ? `<p class="rd-line supp-evlinks"><span class="label">evidence</span> ${evLinks.slice(0, 8).map((l) => `<a class="supp-ev-link" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.title || l.url)}${l.stance === "against" ? " — dissent" : ""} ↗</a>`).join("  ·  ")}</p>` : "",
+    ].join("");
+    const just = justRows ? `<div class="supp-loop">${justRows}</div>` : "";
+    const whyNowProv = x.why_now && !isBad(x.why_now) && x.why_now_source && x.why_now_source !== "explicit"
+      ? (x.why_now_source === "hypothesis" ? "why-now from confirmed hypothesis" : "why-now from library promotion")
+      : null;
+    return `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(x.name)}</h3><span class="rd-badge ${done ? "" : "rd-badge-live"}">${esc(x.status || "")}</span></header>${x.hypothesis ? `<p class="rd-why"><span class="label">hypothesis</span> ${esc(x.hypothesis)}</p>` : ""}${just}${design}${x.mechanism && !isBad(x.mechanism) ? `<p class="rd-line"><span class="label">mechanism</span> ${esc(x.mechanism)}</p>` : ""}${prog}${compliance}${analysis}${finding}${receipt}${reflect}${x.result_summary && !isBad(x.result_summary) && !finding ? `<p class="rd-line">${esc(x.result_summary)}</p>` : ""}<p class="rd-meta label">${[verdict, x.priority && !isBad(x.priority) && "priority " + x.priority, preReg && `pre-registered ${preReg}`, whyNowProv, x.primary_metric && !done && "tracking " + esc(x.primary_metric), x.grade && "grade " + esc(x.grade)].filter(Boolean).map(esc).join("  ·  ")}</p></article>`;
   };
   const libCard = (x) => {
     // P2.1 — evidence_tier gets the evClass chip treatment (strong/moderate/emerging).
