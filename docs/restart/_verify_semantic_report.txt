@@ -1,10 +1,16 @@
 verify_semantic report — genesis=2026-07-12 today=2026-07-12
 
-[PASS] snapshot pre_start
-[PASS] journey pre_start
-[PASS] character zeroed
-[PASS] discoveries clean
-[PASS] coach_team dispute
-[PASS] journal posts curated
-[FAIL] no pre-genesis experiment rows
-    USER#matthew#SOURCE#habitify / DATE#2026-07-09 (phase=experiment, pre-genesis)
+[SKIP] snapshot pre_start
+    offline mode — live-site checks skipped honestly
+[SKIP] journey pre_start
+    offline mode — live-site checks skipped honestly
+[SKIP] character zeroed
+    offline mode — live-site checks skipped honestly
+[SKIP] discoveries clean
+    offline mode — live-site checks skipped honestly
+[SKIP] coach_team dispute
+    offline mode — live-site checks skipped honestly
+[SKIP] journal posts curated
+    offline mode — live-site checks skipped honestly
+[PASS] no pre-genesis experiment rows
+    0 poisoned rows across 29 raw-timeseries sources
