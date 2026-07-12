@@ -1,0 +1,94 @@
+{
+ "_meta": {
+  "generated_at": "2026-06-15T17:00:00+00:00",
+  "cache_seconds": 300,
+  "request_id": "fixture-1039"
+ },
+ "pulse": {
+  "start_date": "2026-06-01",
+  "day_number": 34,
+  "date": "2026-07-04",
+  "status": "good",
+  "status_color": "#3fb950",
+  "signals_reporting": 7,
+  "signals_total": 8,
+  "narrative": "Day 34. Recovery 83% on 7.8h of sleep; weight trend \u221213.9 lbs from baseline. Strong morning to push the deficit.",
+  "since_yesterday": [
+   {
+    "signal": "recovery",
+    "text": "Recovery \u219370%",
+    "delta": -70
+   },
+   {
+    "signal": "sleep",
+    "text": "Sleep \u21931.8h",
+    "delta": -1.8
+   }
+  ],
+  "notable_signals": [
+   {
+    "signal": "recovery",
+    "message": "Recovery is low at 12%. Consider a rest day or light movement only.",
+    "severity": "warning"
+   },
+   {
+    "signal": "sleep",
+    "message": "Sleep was 5.0h \u2014 below the 7h minimum. Prioritize an early bedtime tonight.",
+    "severity": "warning"
+   }
+  ],
+  "glyphs": {
+   "scale": {
+    "state": "green",
+    "value": 271.1,
+    "direction": "down",
+    "delta": -0.4,
+    "delta_label": "-0.4 lbs",
+    "as_of": "2026-07-04"
+   },
+   "water": {
+    "state": "yellow",
+    "liters": 2.1,
+    "target": 3.0,
+    "label": "2.1 of 3.0L",
+    "as_of": "2026-07-04"
+   },
+   "movement": {
+    "state": "green",
+    "value": 12903,
+    "label": "12,903 steps",
+    "as_of": "2026-07-04"
+   },
+   "recovery": {
+    "state": "green",
+    "recovery_pct": 83,
+    "hrv_ms": 52.4,
+    "rhr_bpm": 58,
+    "label": "83%",
+    "as_of": "2026-07-04"
+   },
+   "sleep": {
+    "state": "green",
+    "hours": 7.8,
+    "label": "7.8h",
+    "as_of": "2026-07-04"
+   },
+   "journal": {
+    "state": "gray",
+    "label": null,
+    "as_of": "2026-07-04"
+   },
+   "lift": {
+    "state": "green",
+    "label": "Push day \u00b7 42 sets",
+    "as_of": "2026-07-04"
+   },
+   "mind": {
+    "state": "green",
+    "label": "12 min meditation",
+    "as_of": "2026-07-04"
+   }
+  },
+  "generated_at": "2026-07-12T00:07:42.293631+00:00"
+ }
+}

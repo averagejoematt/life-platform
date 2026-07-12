@@ -1,0 +1,924 @@
+{
+ "_meta": {
+  "generated_at": "2026-06-15T17:00:00+00:00",
+  "cache_seconds": 3600,
+  "request_id": "fixture-1039"
+ },
+ "labs": {
+  "latest_draw_date": "2026-04-03",
+  "lab_provider": "function_health",
+  "total_draws": 8,
+  "biomarkers": [
+   {
+    "name": "Apob",
+    "value": "116",
+    "unit": "mg/dL",
+    "range": "<90 (optimal)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Apob Cardio Iq",
+    "value": "111",
+    "unit": "mg/dL",
+    "range": "Same target as standard ApoB (<90 optimal); Cardio IQ uses different method",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Cholesterol Total",
+    "value": "243",
+    "unit": "mg/dL",
+    "range": "<200",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Ldl C",
+    "value": "163",
+    "unit": "mg/dL",
+    "range": "<100 (calc, Martin-Hopkins)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Non Hdl C",
+    "value": "185",
+    "unit": "mg/dL",
+    "range": "<130 (calc)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Apob Apoa1 Ratio",
+    "value": "0.61",
+    "unit": "ratio",
+    "range": "Lower is better; <0.7 generally favorable",
+    "flag": null,
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Apolipoprotein A1",
+    "value": "183",
+    "unit": "mg/dL",
+    "range": "(no formal range printed)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Lipids"
+   },
+   {
+    "name": "Hdl Large",
+    "value": "6504",
+    "unit": "nmol/L",
+    "range": ">6729 (optimal); 6729-5353 (moderate); <5353 (high)",
+    "flag": "L",
+    "decimals": 0,
+    "category": "Advanced Lipids"
+   },
+   {
+    "name": "Ldl Medium",
+    "value": "611",
+    "unit": "nmol/L",
+    "range": "<215 (optimal); 215-301 (moderate); >301 (high)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Advanced Lipids"
+   },
+   {
+    "name": "Ldl Particle Number",
+    "value": "2128",
+    "unit": "nmol/L",
+    "range": "<1138 (optimal); 1138-1409 (moderate); >1409 (high)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Advanced Lipids"
+   },
+   {
+    "name": "Ldl Peak Size",
+    "value": "221",
+    "unit": "Angstrom",
+    "range": ">222.9 (optimal); 222.9-217.4 (moderate); <217.4 (high)",
+    "flag": "L",
+    "decimals": 0,
+    "category": "Advanced Lipids"
+   },
+   {
+    "name": "Ldl Small",
+    "value": "352",
+    "unit": "nmol/L",
+    "range": "<142 (optimal); 142-219 (moderate); >219 (high)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Advanced Lipids"
+   },
+   {
+    "name": "Ldl Pattern",
+    "value": "A",
+    "unit": "",
+    "range": "Optimal: Pattern A; High: Pattern B",
+    "flag": null,
+    "decimals": 0,
+    "category": "Advanced Lipids"
+   },
+   {
+    "name": "C Peptide",
+    "value": "2.26",
+    "unit": "ng/mL",
+    "range": "0.68-2.16",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Insulin Resistance Score",
+    "value": "75",
+    "unit": "score",
+    "range": "<33 sensitive; 33-66 impaired; >66 resistant",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Adiponectin",
+    "value": "10.9",
+    "unit": "ug/mL",
+    "range": "Male BMI>30: 2.2-12.9; Male BMI 25-30: not specified for males",
+    "flag": null,
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Leptin",
+    "value": "16.8",
+    "unit": "ng/mL",
+    "range": "Adult Lean (BMI 18-25) Males 0.3-13.4; BMI 25-30 Males 1.8-19.9",
+    "flag": null,
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Albumin Globulin Ratio",
+    "value": "1.8",
+    "unit": "ratio",
+    "range": "1.0-2.5 (calc)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Insulin Fasting",
+    "value": "14.3",
+    "unit": "uIU/mL",
+    "range": "<= 18.4 (optimal)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Insulin Intact Lcms",
+    "value": "16",
+    "unit": "uIU/mL",
+    "range": "<=16",
+    "flag": null,
+    "decimals": 0,
+    "category": "Metabolic"
+   },
+   {
+    "name": "Absolute Neutrophils",
+    "value": "2087",
+    "unit": "cells/uL",
+    "range": "1500-7800",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Absolute Lymphocytes",
+    "value": "1307",
+    "unit": "cells/uL",
+    "range": "850-3900",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Absolute Eosinophils",
+    "value": "62",
+    "unit": "cells/uL",
+    "range": "15-500",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Absolute Monocytes",
+    "value": "394",
+    "unit": "cells/uL",
+    "range": "200-950",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Absolute Basophils",
+    "value": "51",
+    "unit": "cells/uL",
+    "range": "0-200",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Platelet Count",
+    "value": "256",
+    "unit": "Thousand/uL",
+    "range": "140-400",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Hematocrit",
+    "value": "44.3",
+    "unit": "%",
+    "range": "39.4-51.1",
+    "flag": null,
+    "decimals": 0,
+    "category": "Complete Blood Count"
+   },
+   {
+    "name": "Alkaline Phosphatase",
+    "value": "64",
+    "unit": "U/L",
+    "range": "36-130",
+    "flag": null,
+    "decimals": 0,
+    "category": "Liver"
+   },
+   {
+    "name": "Bilirubin Total",
+    "value": "0.9",
+    "unit": "mg/dL",
+    "range": "0.2-1.2",
+    "flag": null,
+    "decimals": 0,
+    "category": "Liver"
+   },
+   {
+    "name": "Ast",
+    "value": "24",
+    "unit": "U/L",
+    "range": "10-40",
+    "flag": null,
+    "decimals": 0,
+    "category": "Liver"
+   },
+   {
+    "name": "Alt",
+    "value": "35",
+    "unit": "U/L",
+    "range": "9-46",
+    "flag": null,
+    "decimals": 0,
+    "category": "Liver"
+   },
+   {
+    "name": "Ggt",
+    "value": "31",
+    "unit": "U/L",
+    "range": "3-90",
+    "flag": null,
+    "decimals": 0,
+    "category": "Liver"
+   },
+   {
+    "name": "Albumin Urine",
+    "value": "<0.2",
+    "unit": "mg/dL",
+    "range": "Not established",
+    "flag": null,
+    "decimals": 0,
+    "category": "Kidney"
+   },
+   {
+    "name": "Creatinine",
+    "value": "1.03",
+    "unit": "mg/dL",
+    "range": "0.60-1.26",
+    "flag": null,
+    "decimals": 0,
+    "category": "Kidney"
+   },
+   {
+    "name": "Cystatin C",
+    "value": "0.88",
+    "unit": "mg/L",
+    "range": "0.52-1.31",
+    "flag": null,
+    "decimals": 0,
+    "category": "Kidney"
+   },
+   {
+    "name": "Egfr",
+    "value": "96",
+    "unit": "mL/min/1.73m2",
+    "range": ">= 60",
+    "flag": null,
+    "decimals": 0,
+    "category": "Kidney"
+   },
+   {
+    "name": "Bun",
+    "value": "15",
+    "unit": "mg/dL",
+    "range": "7-25",
+    "flag": null,
+    "decimals": 0,
+    "category": "Kidney"
+   },
+   {
+    "name": "Thyroid Peroxidase Antibodies",
+    "value": "1",
+    "unit": "IU/mL",
+    "range": "<9",
+    "flag": null,
+    "decimals": 0,
+    "category": "Thyroid"
+   },
+   {
+    "name": "Thyroglobulin Antibodies",
+    "value": "2",
+    "unit": "IU/mL",
+    "range": "<= 2",
+    "flag": null,
+    "decimals": 0,
+    "category": "Thyroid"
+   },
+   {
+    "name": "T3 Free",
+    "value": "3.5",
+    "unit": "pg/mL",
+    "range": "2.3-4.2",
+    "flag": null,
+    "decimals": 0,
+    "category": "Thyroid"
+   },
+   {
+    "name": "T4 Free",
+    "value": "1.5",
+    "unit": "ng/dL",
+    "range": "0.8-1.8",
+    "flag": null,
+    "decimals": 0,
+    "category": "Thyroid"
+   },
+   {
+    "name": "Tsh",
+    "value": "2.35",
+    "unit": "mIU/L",
+    "range": "0.40-4.50",
+    "flag": null,
+    "decimals": 0,
+    "category": "Thyroid"
+   },
+   {
+    "name": "Cortisol Total",
+    "value": "10.8",
+    "unit": "mcg/dL",
+    "range": "8AM 4.0-22.0; 4PM 3.0-17.0",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Testosterone Free",
+    "value": "72",
+    "unit": "pg/mL",
+    "range": "35.0-155.0",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Testosterone Total",
+    "value": "361",
+    "unit": "ng/dL",
+    "range": "250-1100",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Dhea Sulfate",
+    "value": "317",
+    "unit": "mcg/dL",
+    "range": "93-415",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Prolactin",
+    "value": "8.3",
+    "unit": "ng/mL",
+    "range": "2.0-18.0",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Estradiol",
+    "value": "32",
+    "unit": "pg/mL",
+    "range": "<= 39",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Fsh",
+    "value": "1.9",
+    "unit": "mIU/mL",
+    "range": "1.4-12.8",
+    "flag": null,
+    "decimals": 0,
+    "category": "Hormones"
+   },
+   {
+    "name": "Crp Hs",
+    "value": "1.4",
+    "unit": "mg/L",
+    "range": "<1.0 (optimal)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Inflammation"
+   },
+   {
+    "name": "Lp Pla2 Activity",
+    "value": "137",
+    "unit": "nmol/min/mL",
+    "range": "<=123",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Inflammation"
+   },
+   {
+    "name": "Fibrinogen",
+    "value": "296",
+    "unit": "mg/dL",
+    "range": "180-350; CVD optimal <=350; high >350",
+    "flag": null,
+    "decimals": 0,
+    "category": "Inflammation"
+   },
+   {
+    "name": "Myeloperoxidase",
+    "value": "268",
+    "unit": "pmol/L",
+    "range": "<470; >=540 elevated MACE risk",
+    "flag": null,
+    "decimals": 0,
+    "category": "Inflammation"
+   },
+   {
+    "name": "Vitamin D 25Oh",
+    "value": "28",
+    "unit": "ng/mL",
+    "range": "30-100 (optimal >=30)",
+    "flag": "L",
+    "decimals": 0,
+    "category": "Vitamins"
+   },
+   {
+    "name": "Methylmalonic Acid",
+    "value": "122",
+    "unit": "nmol/L",
+    "range": "55-335",
+    "flag": null,
+    "decimals": 0,
+    "category": "Vitamins"
+   },
+   {
+    "name": "Magnesium Rbc",
+    "value": "5.9",
+    "unit": "mg/dL",
+    "range": "4.0-6.4",
+    "flag": null,
+    "decimals": 0,
+    "category": "Minerals"
+   },
+   {
+    "name": "Calcium",
+    "value": "9.8",
+    "unit": "mg/dL",
+    "range": "8.6-10.3",
+    "flag": null,
+    "decimals": 0,
+    "category": "Minerals"
+   },
+   {
+    "name": "Zinc",
+    "value": "64",
+    "unit": "mcg/dL",
+    "range": "60-130",
+    "flag": null,
+    "decimals": 0,
+    "category": "Minerals"
+   },
+   {
+    "name": "Carbon Dioxide",
+    "value": "26",
+    "unit": "mmol/L",
+    "range": "20-32",
+    "flag": null,
+    "decimals": 0,
+    "category": "Electrolytes"
+   },
+   {
+    "name": "Potassium",
+    "value": "4.3",
+    "unit": "mmol/L",
+    "range": "3.5-5.3",
+    "flag": null,
+    "decimals": 0,
+    "category": "Electrolytes"
+   },
+   {
+    "name": "Chloride",
+    "value": "102",
+    "unit": "mmol/L",
+    "range": "98-110",
+    "flag": null,
+    "decimals": 0,
+    "category": "Electrolytes"
+   },
+   {
+    "name": "Sodium",
+    "value": "138",
+    "unit": "mmol/L",
+    "range": "135-146",
+    "flag": null,
+    "decimals": 0,
+    "category": "Electrolytes"
+   },
+   {
+    "name": "Psa Free",
+    "value": "0.3",
+    "unit": "ng/mL",
+    "range": "(no defined range)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Prostate"
+   },
+   {
+    "name": "Psa Pct Free",
+    "value": "27",
+    "unit": "%",
+    "range": ">25 (calc)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Prostate"
+   },
+   {
+    "name": "Psa Total",
+    "value": "1.1",
+    "unit": "ng/mL",
+    "range": "<= 4.0",
+    "flag": null,
+    "decimals": 0,
+    "category": "Prostate"
+   },
+   {
+    "name": "Abo Group",
+    "value": "A",
+    "unit": "",
+    "range": "",
+    "flag": null,
+    "decimals": 0,
+    "category": "Blood Type"
+   },
+   {
+    "name": "Rh Type",
+    "value": "RH(D) POSITIVE",
+    "unit": "",
+    "range": "",
+    "flag": null,
+    "decimals": 0,
+    "category": "Blood Type"
+   },
+   {
+    "name": "Allergy Alder",
+    "value": "5.08",
+    "unit": "kU/L",
+    "range": "Class 3 (High Level: 3.50-17.4)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Allergy Birch",
+    "value": "5.07",
+    "unit": "kU/L",
+    "range": "Class 3 (High Level: 3.50-17.4)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Allergy Cat Dander",
+    "value": "0.63",
+    "unit": "kU/L",
+    "range": "Class 1 (Low Level: 0.35-0.69)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Allergy Dog Dander",
+    "value": "0.6",
+    "unit": "kU/L",
+    "range": "Class 1 (Low Level: 0.35-0.69)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Allergy Dust Mite D Farinae",
+    "value": "3.06",
+    "unit": "kU/L",
+    "range": "Class 2 (Moderate Level: 0.70-3.49)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Allergy Dust Mite D Pteronyssinus",
+    "value": "4.85",
+    "unit": "kU/L",
+    "range": "Class 3 (High Level: 3.50-17.4)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Allergy Oak",
+    "value": "1.64",
+    "unit": "kU/L",
+    "range": "Class 2 (Moderate Level: 0.70-3.49)",
+    "flag": "H",
+    "decimals": 0,
+    "category": "Allergies"
+   },
+   {
+    "name": "Rheumatoid Factor",
+    "value": "10",
+    "unit": "IU/mL",
+    "range": "<14",
+    "flag": null,
+    "decimals": 0,
+    "category": "Autoimmune"
+   },
+   {
+    "name": "Ana Screen",
+    "value": "NEGATIVE",
+    "unit": "",
+    "range": "NEGATIVE",
+    "flag": null,
+    "decimals": 0,
+    "category": "Autoimmune"
+   },
+   {
+    "name": "Galleri Predicted Signal Origin",
+    "value": "NO PREDICTED SIGNAL ORIGIN",
+    "unit": "",
+    "range": "(reported only when signal detected)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Cancer Screening"
+   },
+   {
+    "name": "Galleri Cancer Signal",
+    "value": "NO CANCER SIGNAL DETECTED",
+    "unit": "",
+    "range": "No Cancer Signal Detected (negative result)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Cancer Screening"
+   },
+   {
+    "name": "Omega 3 Index",
+    "value": "3.3",
+    "unit": "% by wt",
+    "range": ">5.4 (omegacheck EPA+DPA+DHA)",
+    "flag": "L",
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Omega 3 Total Pct",
+    "value": "3.3",
+    "unit": "% by wt",
+    "range": "(no defined range)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Omega 6 Total Pct",
+    "value": "41.8",
+    "unit": "% by wt",
+    "range": "(no defined range)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Arachidonic Epa Ratio",
+    "value": "17.4",
+    "unit": "ratio",
+    "range": "3.7-40.7",
+    "flag": null,
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Omega 6 Omega 3 Ratio",
+    "value": "12.8",
+    "unit": "ratio",
+    "range": "3.7-14.4",
+    "flag": null,
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Arachidonic Acid",
+    "value": "9.4",
+    "unit": "% by wt",
+    "range": "8.6-15.6",
+    "flag": null,
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Linoleic Acid",
+    "value": "24.5",
+    "unit": "% by wt",
+    "range": "18.6-29.5",
+    "flag": null,
+    "decimals": 0,
+    "category": "Fatty Acids"
+   },
+   {
+    "name": "Mercury Blood",
+    "value": "4",
+    "unit": "mcg/L",
+    "range": "<= 10",
+    "flag": null,
+    "decimals": 0,
+    "category": "Heavy Metals"
+   },
+   {
+    "name": "Lead Venous",
+    "value": "1",
+    "unit": "mcg/dL",
+    "range": "<3.5",
+    "flag": null,
+    "decimals": 0,
+    "category": "Heavy Metals"
+   },
+   {
+    "name": "Iron Binding Capacity",
+    "value": "413",
+    "unit": "mcg/dL",
+    "range": "250-425 (calc)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Iron Metabolism"
+   },
+   {
+    "name": "Iron Saturation Pct",
+    "value": "43",
+    "unit": "%",
+    "range": "20-48 (calc)",
+    "flag": null,
+    "decimals": 0,
+    "category": "Iron Metabolism"
+   },
+   {
+    "name": "Iron Total",
+    "value": "179",
+    "unit": "mcg/dL",
+    "range": "50-180",
+    "flag": null,
+    "decimals": 0,
+    "category": "Iron Metabolism"
+   },
+   {
+    "name": "Ferritin",
+    "value": "279",
+    "unit": "ng/mL",
+    "range": "38-380",
+    "flag": null,
+    "decimals": 0,
+    "category": "Iron Metabolism"
+   },
+   {
+    "name": "Nfl Neurofilament Light Chain",
+    "value": "0.81",
+    "unit": "pg/mL",
+    "range": "<1.29",
+    "flag": null,
+    "decimals": 0,
+    "category": "Neurodegeneration"
+   },
+   {
+    "name": "Amylase",
+    "value": "18",
+    "unit": "U/L",
+    "range": "21-101",
+    "flag": "L",
+    "decimals": 0,
+    "category": "Pancreas"
+   },
+   {
+    "name": "Lipase",
+    "value": "7",
+    "unit": "U/L",
+    "range": "7-60",
+    "flag": null,
+    "decimals": 0,
+    "category": "Pancreas"
+   },
+   {
+    "name": "Urine Specific Gravity",
+    "value": "1.005",
+    "unit": "",
+    "range": "1.001-1.035",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   },
+   {
+    "name": "Urine Appearance",
+    "value": "CLEAR",
+    "unit": "",
+    "range": "CLEAR",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   },
+   {
+    "name": "Urine Glucose",
+    "value": "NEGATIVE",
+    "unit": "",
+    "range": "NEGATIVE",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   },
+   {
+    "name": "Urine Ketones",
+    "value": "NEGATIVE",
+    "unit": "",
+    "range": "NEGATIVE",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   },
+   {
+    "name": "Urine Protein",
+    "value": "NEGATIVE",
+    "unit": "",
+    "range": "NEGATIVE",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   },
+   {
+    "name": "Urine Blood",
+    "value": "NEGATIVE",
+    "unit": "",
+    "range": "NEGATIVE",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   },
+   {
+    "name": "Urine Color",
+    "value": "YELLOW",
+    "unit": "",
+    "range": "YELLOW",
+    "flag": null,
+    "decimals": 0,
+    "category": "Urinalysis"
+   }
+  ],
+  "flagged_count": 24
+ }
+}

@@ -1,0 +1,660 @@
+{
+ "_meta": {
+  "generated_at": "2026-06-15T17:00:00+00:00",
+  "cache_seconds": 3600,
+  "request_id": "fixture-1039"
+ },
+ "experiments": [
+  {
+   "id": "zone2-block-cycle5",
+   "name": "Zone-2 volume block",
+   "status": "running",
+   "origin": "ledger",
+   "hypothesis": "Adding 60 min/wk of Zone-2 for 21 days lifts 7-day HRV average by >=5 ms without raising RHR.",
+   "mechanism": "Aerobic base work shifts autonomic balance parasympathetic \u2014 mitochondrial density up, resting sympathetic tone down.",
+   "primary_metric": "hrv_ms",
+   "planned_duration_days": 21,
+   "days_in": 13,
+   "progress_pct": 62,
+   "compliance_pct": 91.5,
+   "pre_registered_at": "2026-06-20T17:00:00+00:00",
+   "design": {
+    "criterion": {
+     "metric": "hrv_ms",
+     "direction": "up",
+     "min_effect": 5
+    },
+    "baseline_days": 14,
+    "washout_days": 0,
+    "stopping_rule": "Stop early only if RHR rises >4 bpm above baseline for 5 consecutive days."
+   }
+  },
+  {
+   "id": "berberine-glucose",
+   "name": "Berberine \u2014 Glucose Attenuation",
+   "status": "available",
+   "origin": "library",
+   "hypothesis": "500mg Berberine before high-carb meals will reduce CGM peaks above 140 mg/dL by \u226520%.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "strong",
+   "result_summary": "Nature's metformin. The glucose data on this compound is hard to argue with.",
+   "planned_duration_days": 84,
+   "tags": [
+    "supplements",
+    "glucose",
+    "metabolic"
+   ],
+   "votes": 0,
+   "evidence_citation": "Yin et al., Metabolism 2008",
+   "source_url": "https://pubmed.ncbi.nlm.nih.gov/18442638/"
+  },
+  {
+   "id": "creatine-strength",
+   "name": "Creatine Monohydrate \u2014 Strength",
+   "status": "available",
+   "origin": "library",
+   "hypothesis": "5g daily creatine for 56 days will produce \u22658% increase in major lift 1RMs vs pre-supplementation baseline.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "strong",
+   "result_summary": "The most evidence-backed supplement in existence. If you're lifting and not taking creatine, you're leaving gains on the table.",
+   "planned_duration_days": 56,
+   "tags": [
+    "supplements",
+    "strength",
+    "body-composition"
+   ],
+   "votes": 0,
+   "evidence_citation": "Kreider et al., J Int Soc Sports Nutrition 2017",
+   "source_url": "https://pubmed.ncbi.nlm.nih.gov/28615996/"
+  },
+  {
+   "id": "nmn-nad-precursor",
+   "name": "NMN \u2014 NAD+ Precursor Stack",
+   "status": "available",
+   "origin": "library",
+   "hypothesis": "250mg NMN daily for 112 days will produce measurable improvement in HRV (\u22658%) and subjective energy.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "moderate",
+   "result_summary": "NAD+ declines with age. If you can raise it back, the downstream effects touch everything from DNA repair to mitochondrial function.",
+   "planned_duration_days": 112,
+   "tags": [
+    "supplements",
+    "longevity",
+    "metabolic"
+   ],
+   "votes": 0,
+   "evidence_citation": "Yoshino et al., Science 2021",
+   "source_url": "https://pubmed.ncbi.nlm.nih.gov/36482258/"
+  },
+  {
+   "id": "tongkat-ali-recovery",
+   "name": "Tongkat Ali \u2014 Recovery Optimization",
+   "status": "available",
+   "origin": "library",
+   "hypothesis": "400mg daily Tongkat Ali for 84 days will improve WHOOP recovery score by \u22655 points.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "moderate",
+   "result_summary": "One of the few non-prescription compounds with human trial data on testosterone and cortisol modulation.",
+   "planned_duration_days": 84,
+   "tags": [
+    "supplements",
+    "recovery",
+    "hormones"
+   ],
+   "votes": 0,
+   "evidence_citation": "Talbott et al., J Int Soc Sports Nutrition 2013",
+   "source_url": "https://pubmed.ncbi.nlm.nih.gov/23615780/"
+  },
+  {
+   "id": "elimination-dairy",
+   "name": "Dairy Elimination",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Removing dairy for 21 days then reintroducing will reveal whether dairy contributes to inflammation, digestive issues, or skin problems.",
+   "pillar": "nutrition",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "You can't know if dairy affects you without removing it completely. The reintroduction phase is where the signal appears.",
+   "planned_duration_days": 28,
+   "tags": [
+    "dairy",
+    "elimination",
+    "inflammation",
+    "nutrition"
+   ],
+   "votes": 0,
+   "evidence_citation": "Turnbull et al., Journal of the American College of Nutrition 2015",
+   "source_url": null
+  },
+  {
+   "id": "no-screens-before-bed",
+   "name": "No Screens Before Bed",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Eliminating screens 60 minutes before bed for 30 days will reduce subjective sleep onset latency and improve sleep consistency.",
+   "pillar": "sleep",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "The screen is the last thing most people see before sleep and the first thing they see after. Breaking that loop is the simplest sleep intervention that exists.",
+   "planned_duration_days": 30,
+   "tags": [
+    "sleep",
+    "screens",
+    "melatonin",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Chang et al., PNAS 2015",
+   "source_url": null
+  },
+  {
+   "id": "fixed-wake-time",
+   "name": "Fixed Wake Time",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Waking within \u00b115 min of {target_time} for 30 days will improve average HRV by \u22655% and sleep score by \u22653 points vs baseline.",
+   "pillar": "sleep",
+   "difficulty": "hard",
+   "evidence_tier": "strong",
+   "result_summary": "Your body doesn't know it's Saturday. The most powerful sleep hack isn't a supplement \u2014 it's consistency.",
+   "planned_duration_days": 30,
+   "tags": [
+    "sleep",
+    "circadian",
+    "consistency",
+    "advanced"
+   ],
+   "votes": 0,
+   "evidence_citation": "Wittmann et al., Chronobiology International 2006",
+   "source_url": null
+  },
+  {
+   "id": "creatine-timing",
+   "name": "Creatine: Morning vs Evening",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Switching creatine from evening to morning dosing will maintain cognitive benefits without disrupting sleep metrics.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "moderate",
+   "result_summary": "Creatine is one of the most studied supplements. Timing optimization is the next frontier after confirming the dose.",
+   "planned_duration_days": 28,
+   "tags": [
+    "creatine",
+    "timing",
+    "sleep",
+    "cognitive"
+   ],
+   "votes": 0,
+   "evidence_citation": "Avgerinos et al., Experimental Gerontology 2018",
+   "source_url": null
+  },
+  {
+   "id": "morning-mobility",
+   "name": "Morning Mobility Routine",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "A consistent 10-minute morning mobility routine for 30 days will become automatic and improve subjective readiness.",
+   "pillar": "movement",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "The body you wake up in isn't the body you had yesterday. Ten minutes of movement reminds your joints they exist.",
+   "planned_duration_days": 30,
+   "tags": [
+    "movement",
+    "mobility",
+    "morning",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Behm & Chaouachi, European J Applied Physiology 2011",
+   "source_url": null
+  },
+  {
+   "id": "dopamine-fast-weekend",
+   "name": "Dopamine Reset Weekend",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "One low-stimulation weekend per month for 30 days will improve weekday focus and reduce compulsive phone checking.",
+   "pillar": "discipline",
+   "difficulty": "hard",
+   "evidence_tier": "moderate",
+   "result_summary": "Modern life is a firehose of dopamine. Periodic withdrawal teaches your brain to find satisfaction in ordinary experience.",
+   "planned_duration_days": 30,
+   "tags": [
+    "dopamine",
+    "discipline",
+    "screens",
+    "reset"
+   ],
+   "votes": 0,
+   "evidence_citation": "Lembke, Dopamine Nation 2021",
+   "source_url": null
+  },
+  {
+   "id": "40g-protein-breakfast",
+   "name": "40g Protein at Breakfast",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "40g protein at breakfast for 30 days will reduce total daily caloric intake and support weight loss trajectory.",
+   "pillar": "nutrition",
+   "difficulty": "medium",
+   "evidence_tier": "strong",
+   "result_summary": "Front-loading protein changes the entire day. You eat less later without trying.",
+   "planned_duration_days": 30,
+   "tags": [
+    "nutrition",
+    "protein",
+    "breakfast",
+    "satiety",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Leidy et al., American Journal of Clinical Nutrition 2015",
+   "source_url": null
+  },
+  {
+   "id": "breathwork-before-sleep",
+   "name": "Breathwork Before Sleep",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "5 minutes of 4-7-8 breathing before bed for 14 days will increase pre-sleep HRV and reduce sleep onset latency.",
+   "pillar": "sleep",
+   "difficulty": "easy",
+   "evidence_tier": "moderate",
+   "result_summary": "Free. Takes 5 minutes. The extended exhale is a direct parasympathetic lever.",
+   "planned_duration_days": 14,
+   "tags": [
+    "sleep",
+    "breathwork",
+    "parasympathetic",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Ma et al., Frontiers in Psychology 2017",
+   "source_url": null
+  },
+  {
+   "id": "l-theanine-focus",
+   "name": "L-Theanine for Focus",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "200mg L-theanine with morning coffee for 14 days will improve subjective focus and reduce caffeine jitteriness.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "moderate",
+   "result_summary": "The caffeine smoothing agent. Same energy, less edge. The combo is better than either alone.",
+   "planned_duration_days": 14,
+   "tags": [
+    "supplements",
+    "focus",
+    "nootropic",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Owen et al., Nutritional Neuroscience 2008",
+   "source_url": null
+  },
+  {
+   "id": "veggie-volume-loading",
+   "name": "Vegetable Volume Loading",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Adding 2 cups of vegetables to every meal for 30 days will reduce total caloric intake and support weight loss.",
+   "pillar": "nutrition",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "You can't outeat two cups of broccoli. Volume is the satiety lever most people never pull.",
+   "planned_duration_days": 30,
+   "tags": [
+    "nutrition",
+    "vegetables",
+    "satiety",
+    "weight-loss",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Rolls et al., American Journal of Clinical Nutrition 2004",
+   "source_url": null
+  },
+  {
+   "id": "deep-work-block",
+   "name": "Deep Work Block (2 Hours)",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "A daily 2-hour deep work block for 30 days will increase high-quality output and reduce perceived busyness.",
+   "pillar": "mental",
+   "difficulty": "hard",
+   "evidence_tier": "moderate",
+   "result_summary": "Two hours of real focus produces more than eight hours of multitasking. The problem isn't time \u2014 it's attention.",
+   "planned_duration_days": 30,
+   "tags": [
+    "mental",
+    "focus",
+    "productivity",
+    "advanced"
+   ],
+   "votes": 0,
+   "evidence_citation": "Mark et al., CHI 2008; Newport, Deep Work 2016",
+   "source_url": null
+  },
+  {
+   "id": "morning-sunlight-blue-blockers",
+   "name": "Morning Sunlight + Evening Blue Blockers",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Combined morning sunlight + evening blue blockers will reduce sleep onset latency and increase deep sleep %",
+   "pillar": "sleep",
+   "difficulty": "moderate",
+   "evidence_tier": "strong",
+   "result_summary": "Full circadian protocol: morning light + evening protection",
+   "planned_duration_days": 21,
+   "tags": [
+    "circadian",
+    "light",
+    "sleep"
+   ],
+   "votes": 0,
+   "evidence_citation": "Huberman Lab; Chang et al., PNAS 2015",
+   "source_url": null
+  },
+  {
+   "id": "active-recovery-protocol",
+   "name": "Active Recovery Day Protocol",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Replacing passive rest days with active recovery for 30 days will maintain recovery scores above baseline.",
+   "pillar": "movement",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "Rest doesn't mean stillness. The body recovers faster when it moves \u2014 just not hard.",
+   "planned_duration_days": 30,
+   "tags": [
+    "movement",
+    "recovery",
+    "sauna",
+    "intermediate"
+   ],
+   "votes": 0,
+   "evidence_citation": "Laukkanen et al., JAMA Internal Medicine 2015",
+   "source_url": null
+  },
+  {
+   "id": "community-event-monthly",
+   "name": "Community Event Once Per Month",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Attending one community event per month for 90 days will expand the outer social ring by \u22653 acquaintances.",
+   "pillar": "social",
+   "difficulty": "hard",
+   "evidence_tier": "emerging",
+   "result_summary": "Male loneliness is an epidemic. The cure isn't more texting \u2014 it's showing up in a room with other people.",
+   "planned_duration_days": 90,
+   "tags": [
+    "social",
+    "community",
+    "loneliness",
+    "advanced"
+   ],
+   "votes": 0,
+   "evidence_citation": "Dunbar, How Many Friends Does One Person Need? 2010",
+   "source_url": null
+  },
+  {
+   "id": "magnesium-sleep",
+   "name": "Magnesium Glycinate for Sleep",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "400mg magnesium glycinate before bed for 30 days will improve deep sleep % and reduce sleep onset latency.",
+   "pillar": "supplements",
+   "difficulty": "easy",
+   "evidence_tier": "moderate",
+   "result_summary": "Magnesium is involved in 300+ enzymatic reactions. Most Americans are deficient. Sleep is where you notice it first.",
+   "planned_duration_days": 30,
+   "tags": [
+    "magnesium",
+    "sleep",
+    "supplement",
+    "recovery"
+   ],
+   "votes": 0,
+   "evidence_citation": "Abbasi et al., Journal of Research in Medical Sciences 2012",
+   "source_url": null
+  },
+  {
+   "id": "morning-sunlight",
+   "name": "Morning Sunlight Exposure",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "10 minutes of morning sunlight within 30 min of waking for 30 days will improve sleep onset consistency.",
+   "pillar": "sleep",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "Your eyes set your clock. The Pacific Northwest makes this harder \u2014 which makes it more important.",
+   "planned_duration_days": 30,
+   "tags": [
+    "sleep",
+    "circadian",
+    "light",
+    "intermediate"
+   ],
+   "votes": 0,
+   "evidence_citation": "Blume et al., Sleep Medicine Reviews 2019",
+   "source_url": null
+  },
+  {
+   "id": "no-caffeine-after-noon",
+   "name": "No Caffeine After 12pm",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Eliminating caffeine after 12pm for 30 days will reduce sleep latency and increase deep sleep % by \u226510%.",
+   "pillar": "sleep",
+   "difficulty": "hard",
+   "evidence_tier": "strong",
+   "result_summary": "That 2pm coffee costs you 30 minutes of deep sleep tonight. Most people don't feel it \u2014 the data shows it.",
+   "planned_duration_days": 30,
+   "tags": [
+    "sleep",
+    "caffeine",
+    "deep-sleep",
+    "intermediate"
+   ],
+   "votes": 0,
+   "evidence_citation": "Drake et al., J Clin Sleep Med 2013",
+   "source_url": null
+  },
+  {
+   "id": "no-news-before-10am",
+   "name": "No News/Social Media Before 10am",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "No news or social media before 10am for 14 days will improve morning focus and reduce reactive thinking.",
+   "pillar": "mental",
+   "difficulty": "hard",
+   "evidence_tier": "emerging",
+   "result_summary": "The first thing you consume sets the frame for the day. Other people's emergencies are not yours.",
+   "planned_duration_days": 14,
+   "tags": [
+    "mental",
+    "digital",
+    "focus",
+    "intermediate"
+   ],
+   "votes": 0,
+   "evidence_citation": "Clinical consensus; Newport, Digital Minimalism 2019",
+   "source_url": null
+  },
+  {
+   "id": "stranger-conversation",
+   "name": "Talk to a Stranger Daily",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Daily stranger conversations for 14 days will increase social confidence and improve daily mood ratings.",
+   "pillar": "social",
+   "difficulty": "hard",
+   "evidence_tier": "moderate",
+   "result_summary": "Social muscles atrophy. This is the gym for your social confidence. Most people find it's far less scary than expected.",
+   "planned_duration_days": 14,
+   "tags": [
+    "social",
+    "confidence",
+    "strangers",
+    "mood"
+   ],
+   "votes": 0,
+   "evidence_citation": "Epley & Schroeder, Journal of Experimental Psychology 2014",
+   "source_url": null
+  },
+  {
+   "id": "vice-elimination-sprint",
+   "name": "Vice Elimination Sprint",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Eliminating one vice completely for 30 days will extend the vice streak and reveal dependency patterns.",
+   "pillar": "discipline",
+   "difficulty": "hard",
+   "evidence_tier": "moderate",
+   "result_summary": "You don't know what something costs you until you stop paying. Pick the vice you're most afraid to quit \u2014 that's the one.",
+   "planned_duration_days": 30,
+   "tags": [
+    "discipline",
+    "vice",
+    "willpower",
+    "advanced"
+   ],
+   "votes": 0,
+   "evidence_citation": "Baumeister & Tierney, Willpower 2011",
+   "source_url": null
+  },
+  {
+   "id": "meaningful-conversation-daily",
+   "name": "One Meaningful Conversation Per Day",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "One meaningful conversation daily for 30 days will shift social interaction quality measurably upward.",
+   "pillar": "social",
+   "difficulty": "medium",
+   "evidence_tier": "emerging",
+   "result_summary": "Most days are filled with transactional words. One real exchange changes the texture of the entire day.",
+   "planned_duration_days": 30,
+   "tags": [
+    "social",
+    "connection",
+    "depth",
+    "intermediate"
+   ],
+   "votes": 0,
+   "evidence_citation": "Mehl et al., Psychological Science 2010",
+   "source_url": null
+  },
+  {
+   "id": "post-dinner-walk",
+   "name": "Post-Dinner Walk",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Walking 10 minutes after dinner for 30 days will reduce post-meal glucose spikes by \u226520% vs baseline.",
+   "pillar": "movement",
+   "difficulty": "easy",
+   "evidence_tier": "strong",
+   "result_summary": "The post-dinner walk is the most underrated intervention in metabolic health. Ten minutes. No gear. No app. Just gravity and glucose.",
+   "planned_duration_days": 30,
+   "tags": [
+    "movement",
+    "glucose",
+    "metabolic",
+    "beginner"
+   ],
+   "votes": 0,
+   "evidence_citation": "Buffey et al., Sports Medicine 2022",
+   "source_url": null
+  },
+  {
+   "id": "date-night-weekly",
+   "name": "Date Night Per Week",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Weekly date nights for 60 days will improve relationship satisfaction and become a protected ritual.",
+   "pillar": "social",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "Proximity is not connection. A scheduled date night sounds unromantic \u2014 until it becomes the best night of the week.",
+   "planned_duration_days": 60,
+   "tags": [
+    "social",
+    "relationship",
+    "partner",
+    "connection"
+   ],
+   "votes": 0,
+   "evidence_citation": "Dew & Wilcox, J Marriage & Family 2011",
+   "source_url": null
+  },
+  {
+   "id": "fiber-first-meals",
+   "name": "Fiber-First Meal Order",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "Eating fiber/vegetables before carbohydrates for 14 days will reduce average glucose spikes by >20%.",
+   "pillar": "nutrition",
+   "difficulty": "easy",
+   "evidence_tier": "strong",
+   "result_summary": "Same food, different glucose response. This is the simplest dietary hack with the strongest CGM evidence.",
+   "planned_duration_days": 14,
+   "tags": [
+    "glucose",
+    "nutrition",
+    "meal_order",
+    "cgm"
+   ],
+   "votes": 0,
+   "evidence_citation": "Shukla et al., Diabetes Care 2015",
+   "source_url": null
+  },
+  {
+   "id": "weekly-friend-call",
+   "name": "Call a Friend/Family Member Weekly",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "One phone call per week to a friend/family member for 30 days will deepen at least 2 relationships.",
+   "pillar": "social",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "Men are terrible at maintaining friendships. A weekly call is the minimum viable dose for not disappearing from people's lives.",
+   "planned_duration_days": 30,
+   "tags": [
+    "social",
+    "connection",
+    "friendship",
+    "intermediate"
+   ],
+   "votes": 0,
+   "evidence_citation": "Holt-Lunstad et al., PLOS Medicine 2010; Kumar & Epley, J Experimental Psychology 2021",
+   "source_url": null
+  },
+  {
+   "id": "morning-pages",
+   "name": "Morning Pages",
+   "status": "backlog",
+   "origin": "library",
+   "hypothesis": "30 days of morning pages will reduce decision fatigue scores and improve subjective mental clarity.",
+   "pillar": "mental",
+   "difficulty": "medium",
+   "evidence_tier": "moderate",
+   "result_summary": "Externalizes the mental chatter that otherwise runs in background loops. Anecdotally transformative for many practitioners.",
+   "planned_duration_days": 30,
+   "tags": [
+    "journaling",
+    "creativity",
+    "morning_routine",
+    "mental_clarity"
+   ],
+   "votes": 0,
+   "evidence_citation": "Cameron, The Artist's Way 1992",
+   "source_url": null
+  }
+ ]
+}

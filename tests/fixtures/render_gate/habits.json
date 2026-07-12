@@ -1,0 +1,548 @@
+{
+ "_meta": {
+  "generated_at": "2026-06-15T17:00:00+00:00",
+  "cache_seconds": 3600,
+  "request_id": "fixture-1039"
+ },
+ "as_of_date": "2026-07-04",
+ "days_tracked": 34,
+ "current_streak": 6,
+ "per_habit": [
+  {
+   "name": "Morning weigh-in",
+   "pct_90d": 97,
+   "streak": 34
+  },
+  {
+   "name": "10k steps",
+   "pct_90d": 82,
+   "streak": 4
+  },
+  {
+   "name": "Protein target",
+   "pct_90d": 88,
+   "streak": 9
+  },
+  {
+   "name": "No late eating",
+   "pct_90d": 74,
+   "streak": 2
+  },
+  {
+   "name": "Meditation",
+   "pct_90d": 66,
+   "streak": 6
+  },
+  {
+   "name": "Journal",
+   "pct_90d": 58,
+   "streak": 0
+  }
+ ],
+ "history": [
+  {
+   "date": "2026-06-01",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 70,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-02",
+   "tier0_pct": 67,
+   "tier01_pct": 62,
+   "t0_done": 4,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 76,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-03",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 82,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-04",
+   "tier0_pct": 50,
+   "tier01_pct": 50,
+   "t0_done": 3,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 88,
+    "Performance": 86,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-05",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 70,
+    "Performance": 93,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-06",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 76,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-07",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 82,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-08",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 88,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-09",
+   "tier0_pct": 67,
+   "tier01_pct": 62,
+   "t0_done": 4,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 70,
+    "Performance": 86,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-10",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 76,
+    "Performance": 93,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-11",
+   "tier0_pct": 50,
+   "tier01_pct": 50,
+   "t0_done": 3,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 82,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-12",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 88,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-13",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 70,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-14",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 76,
+    "Performance": 86,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-15",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 82,
+    "Performance": 93,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-16",
+   "tier0_pct": 67,
+   "tier01_pct": 62,
+   "t0_done": 4,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 88,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-17",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 70,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-18",
+   "tier0_pct": 50,
+   "tier01_pct": 50,
+   "t0_done": 3,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 76,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-19",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 82,
+    "Performance": 86,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-20",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 88,
+    "Performance": 93,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-21",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 70,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-22",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 76,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-23",
+   "tier0_pct": 67,
+   "tier01_pct": 62,
+   "t0_done": 4,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 82,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-24",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 88,
+    "Performance": 86,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-25",
+   "tier0_pct": 50,
+   "tier01_pct": 50,
+   "t0_done": 3,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 70,
+    "Performance": 93,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-26",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 76,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-27",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 82,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-28",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 88,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-29",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 70,
+    "Performance": 86,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-06-30",
+   "tier0_pct": 67,
+   "tier01_pct": 62,
+   "t0_done": 4,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 76,
+    "Performance": 93,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-07-01",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 82,
+    "Performance": 65,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-07-02",
+   "tier0_pct": 50,
+   "tier01_pct": 50,
+   "t0_done": 3,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 85,
+    "Nutrition": 88,
+    "Performance": 72,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-07-03",
+   "tier0_pct": 100,
+   "tier01_pct": 88,
+   "t0_done": 6,
+   "t0_total": 6,
+   "perfect": true,
+   "groups": {
+    "Recovery": 90,
+    "Nutrition": 70,
+    "Performance": 79,
+    "Growth": 75
+   }
+  },
+  {
+   "date": "2026-07-04",
+   "tier0_pct": 83,
+   "tier01_pct": 75,
+   "t0_done": 5,
+   "t0_total": 6,
+   "perfect": false,
+   "groups": {
+    "Recovery": 80,
+    "Nutrition": 76,
+    "Performance": 86,
+    "Growth": 75
+   }
+  }
+ ],
+ "day_of_week_avgs": [
+  78,
+  84,
+  81,
+  76,
+  88,
+  72,
+  69
+ ],
+ "best_day": "Thursday",
+ "worst_day": "Sunday",
+ "group_90d_avgs": {
+  "Recovery": 84,
+  "Nutrition": 79,
+  "Performance": 71,
+  "Growth": 75
+ },
+ "keystone_group": "Recovery",
+ "keystone_group_pct": 84,
+ "keystone_correlations": [],
+ "causality_captured": 12,
+ "cross_page_days": 21,
+ "cross_page_signals": {
+  "movement": "Performance",
+  "nutrition": "Nutrition",
+  "recovery": "Recovery",
+  "mind": "Growth"
+ }
+}

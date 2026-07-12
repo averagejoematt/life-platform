@@ -31,6 +31,18 @@ in addition to 1440×900 desktop — and asserts the Epic-A failure classes ther
 audit #1010 is advisory). A PR that reintroduces one of those classes fails the gate
 before merge instead of surfacing on the live site.
 
+Realistic-data pass (#1039): the empty-mock pass is structurally blind to DATA-DRIVEN
+layout overflow — PR #1008 passed 8/8 here, then blew out /data/vitals/ by +255px at
+390px under real data (caught only by the post-deploy visual-AI QA + rollback, fixed
+forward in #1034). So a SECOND pass now renders the overflow-prone data pages with
+committed realistic fixtures (tests/fixtures/render_gate/*.json — real API shapes
+captured/derived from lambdas/web/, never fetched live, so the gate stays offline and
+deterministic) registered as specific mocks that win over the catch-all. Both passes
+run the same capture_page assertions (JS errors, overflow @390/360, reveals, chrome).
+Each populated page also carries a min-count marker check, so fixture-shape drift that
+silently re-renders the empty state fails loudly instead of restoring the blind spot.
+The empty-state pass is retained — honest-empty is still a valid state to gate.
+
 This SUPPLEMENTS the post-deploy live QA (ci-cd.yml visual-qa job) — it never
 replaces it. The live sweep still runs against real prod data after deploy.
 
@@ -80,6 +92,42 @@ GATE_PAGES = [
     {"path": "/method/character/", "name": "Method · character", "wait_for": "body"},
 ]
 
+# ── Realistic-data page set (#1039) ───────────────────────────────────────────
+# The data-driven, overflow-prone surfaces the empty-mock pass cannot exercise:
+# the vitals readout (the #1008 +255px incident page — wide stat rows/strips only
+# materialize with history), the labs biomarker tables (the widest 4-col tables on
+# the site), and the experiments backlog (the ~70-card pipeline). Each page carries
+# a marker check so the pass fails loudly if the fixtures stop rendering (shape
+# drift would otherwise silently re-render the empty state = the blind spot back).
+POPULATED_GATE_PAGES = [
+    {
+        "path": "/data/vitals/",
+        "name": "Evidence · vitals [populated]",
+        "wait_for": "body",
+        "charts": ["[data-readout] svg"],
+        "checks": [
+            {"selector": ".vr-row", "min_count": 1, "desc": "component rings render from the pulse fixture"},
+            {"selector": ".sm-cell, .vl-row", "min_count": 1, "desc": "history-driven blocks render from pulse_history fixture"},
+        ],
+    },
+    {
+        "path": "/data/labs/",
+        "name": "Evidence · labs [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": "table.rd-tbl", "min_count": 3, "desc": "biomarker category tables render from the labs fixture"},
+        ],
+    },
+    {
+        "path": "/protocols/experiments/",
+        "name": "Protocols · experiments [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".rd-card", "min_count": 20, "desc": "running + backlog pipeline cards render from the experiments fixture"},
+        ],
+    },
+]
+
 # ── API mocks ─────────────────────────────────────────────────────────────────
 # The site's fetch layer is heavily try/caught + defensively coded (optional
 # chaining, `|| []`, `?? 0`), so an empty object is a safe universal default: a
@@ -94,12 +142,35 @@ CLEAN_PUBLIC_STATS = {
     "vitals": {"recovery_pct": 74.0},
 }
 
+# Realistic-data fixtures (#1039) — committed JSON matching the real endpoint shapes
+# (captured from the live API / derived from the lambdas/web/ handlers, values
+# in-range for the accuracy rubric). Registered AFTER the catch-all so they win.
+FIXTURES_DIR = os.path.join(HERE, "fixtures", "render_gate")
+POPULATED_API_MOCKS = {
+    "**/api/pulse": "pulse.json",
+    "**/api/pulse_history": "pulse_history.json",
+    "**/api/habits": "habits.json",
+    "**/api/vitals_depth": "vitals_depth.json",
+    "**/api/labs": "labs.json",
+    "**/api/experiments": "experiments.json",
+}
 
-def _install_routes(context, extra_stats=None):
+
+@functools.lru_cache(maxsize=None)
+def _load_fixture(name):
+    with open(os.path.join(FIXTURES_DIR, name)) as fh:
+        return json.load(fh)
+
+
+def _install_routes(context, extra_stats=None, fixtures=None):
     """Wire the API mocks onto the browser context.
 
     ORDER MATTERS: the catch-all is registered FIRST so the specific mocks
     registered after it take precedence (reverse-order matching).
+
+    `fixtures` (#1039): optional {url_glob: fixture_filename} map — realistic-data
+    payloads from tests/fixtures/render_gate/, registered LAST so they beat both
+    the catch-all and the generic specific mocks.
     """
     stats = extra_stats if extra_stats is not None else CLEAN_PUBLIC_STATS
 
@@ -121,6 +192,10 @@ def _install_routes(context, extra_stats=None):
     # Generated JSON that lives in the S3 `generated/` prefix, not committed under
     # site/ — mock it empty so the static serve doesn't log a spurious 404 warning.
     context.route("**/journal/**", _make({}))
+
+    # 3) realistic-data fixtures (#1039) — registered last, so they win over everything.
+    for pattern, fname in (fixtures or {}).items():
+        context.route(pattern, _make(_load_fixture(fname)))
 
 
 # ── Local static server ───────────────────────────────────────────────────────
@@ -180,12 +255,31 @@ def run_gate(site_dir, screenshot_dir, keep=False):
     import accuracy_audit as AA
 
     os.makedirs(screenshot_dir, exist_ok=True)
+    # Populated-pass captures land in a subdir: /data/vitals/ renders in BOTH passes,
+    # so a shared dir would collide on the slug and overwrite the empty-state evidence.
+    populated_dir = os.path.join(screenshot_dir, "populated")
+    os.makedirs(populated_dir, exist_ok=True)
     results = []
+
+    def _drive(context, pages, out_dir):
+        for page_def in pages:
+            # capture_prose=True writes <slug>.txt (the visitor-facing text) so
+            # the accuracy sentinel scan reads exactly what rendered.
+            res = VQ.capture_page(context, page_def, out_dir, save_screenshots=True, capture_prose=True)
+            results.append(res)
+            icon = "✅" if not res["issues"] else "❌"
+            print(f"  {icon} {res['page']} ({res['path']})")
+            for x in res["issues"]:
+                print(f"      → {x}")
+            for w in res["warnings"]:
+                print(f"      ⚠ {w}")
+
     try:
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
+            # ── pass 1: empty mocks — the honest-empty render (unchanged) ──
             # service_workers="block" — SW-handled fetches bypass page.route.
             context = browser.new_context(
                 viewport={"width": 1440, "height": 900},
@@ -193,18 +287,22 @@ def run_gate(site_dir, screenshot_dir, keep=False):
                 service_workers="block",
             )
             _install_routes(context)
+            print("— pass 1: empty-state mocks —")
+            _drive(context, GATE_PAGES, screenshot_dir)
+            context.close()
 
-            for page_def in GATE_PAGES:
-                # capture_prose=True writes <slug>.txt (the visitor-facing text) so
-                # the accuracy sentinel scan reads exactly what rendered.
-                res = VQ.capture_page(context, page_def, screenshot_dir, save_screenshots=True, capture_prose=True)
-                results.append(res)
-                icon = "✅" if not res["issues"] else "❌"
-                print(f"  {icon} {res['page']} ({res['path']})")
-                for x in res["issues"]:
-                    print(f"      → {x}")
-                for w in res["warnings"]:
-                    print(f"      ⚠ {w}")
+            # ── pass 2 (#1039): realistic-data fixtures on the overflow-prone pages ──
+            # Same assertions, populated render — catches the #1008 class (layout
+            # overflow that only manifests under real data volume) before merge.
+            context = browser.new_context(
+                viewport={"width": 1440, "height": 900},
+                color_scheme="dark",
+                service_workers="block",
+            )
+            _install_routes(context, fixtures=POPULATED_API_MOCKS)
+            print("— pass 2: realistic-data fixtures —")
+            _drive(context, POPULATED_GATE_PAGES, populated_dir)
+            context.close()
             browser.close()
     finally:
         shutdown()
@@ -216,6 +314,9 @@ def run_gate(site_dir, screenshot_dir, keep=False):
     # (b) leaked NaN/undefined/[object Object] in the rendered visitor prose we just
     #     captured (a render bug that stringifies a bad value shows up HERE).
     accuracy += AA.sanity_scan(screenshot_dir)
+    # (c) same leak scan over the populated-pass prose (#1039) — a formatter that
+    #     stringifies a bad value only shows itself when the data is actually there.
+    accuracy += AA.sanity_scan(populated_dir)
 
     render_ok = all(not r["issues"] for r in results)
     acc_high = [f for f in accuracy if f.get("severity") == "high"]
