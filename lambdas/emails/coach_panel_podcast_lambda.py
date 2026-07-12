@@ -718,6 +718,39 @@ _QA_MAX_WORDS_PER_TURN = 130  # a turn longer than this reads as a monologue, no
 _QA_HOOK_MAX_WORDS = 180  # turn 0 is the cold-open hook — a solo turn by design, allowed to run longer
 _QA_MAX_CONSECUTIVE = 3  # 4+ turns from one speaker is a floor-hog; 3 short turns reads fine (calibrated 2026-06-17)
 
+# #1122: a turn that ASKS something (interrogative or an explicit challenge) must get a
+# reply from the OTHER speaker in the very next turn. The observed wk0 defect: a gate
+# dropped Eli's answer, leaving Elena's "convince me this isn't just a beautiful
+# dashboard" followed by Elena's own "here's where I push back" — a conversational hole
+# the 4-in-a-row check can't see (it's only 2 same-speaker turns).
+_CHALLENGE_RE = re.compile(r"\b(convince me|push back|here'?s where|prove it)\b", re.IGNORECASE)
+# Interrogative = the line ends on a question mark, allowing trailing quotes/brackets.
+_INTERROGATIVE_RE = re.compile(r"\?[\"'”’)\]]*\s*$")
+
+
+def _continuity_check(turns: list) -> list:
+    """Deterministic conversational-continuity gate (#1122; deterministic-before-LLM, ADR-105).
+    Flags any turn that is interrogative (ends '?') or an explicit challenge whose NEXT turn
+    is the SAME speaker — i.e. the reply is missing, the tell of a dropped turn. Runs on the
+    post-drop script (the gates can delete turns and leave exactly this hole). Turn 0 is
+    exempt: the solo cold-open hook closes on a rhetorical question by design, and the fixed
+    Elena cold-open may be prepended in front of her own hook. The final turn is never
+    flagged — closing on the series' open question is the intended ending."""
+    fails = []
+    for i in range(1, len(turns) - 1):
+        spk = turns[i].get("speaker")
+        if spk != turns[i + 1].get("speaker"):
+            continue
+        line = (turns[i].get("line") or "").strip()
+        if _INTERROGATIVE_RE.search(line):
+            what = "asks a question"
+        elif _CHALLENGE_RE.search(line):
+            what = "issues a challenge"
+        else:
+            continue
+        fails.append(f"dangling thread: turn {i} ({spk}) {what} but the reply is missing — turn {i + 1} is {spk} again")
+    return fails
+
 
 def _craft_check(turns: list) -> list:
     """Deterministic, zero-cost craft gate. Returns a list of failure reasons (empty = pass).
@@ -738,13 +771,16 @@ def _craft_check(turns: list) -> list:
         if wc > cap:
             label = "cold-open hook" if i == 0 else "monologue"
             fails.append(f"turn {i} is a {wc}-word {label} (max {cap}) — make it conversational")
+    fails.extend(_continuity_check(turns))
     return fails
 
 
 def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
-    """LLM craft+accuracy judge (Haiku, cheap). Returns (ok, [reasons]). FAIL-OPEN:
-    any judge/infra error returns (True, []) so a flaky judge never blocks a publish —
-    the deterministic safety gates remain the hard floor."""
+    """LLM craft+accuracy judge (Haiku, cheap). Returns (ok, [reasons]). FAIL-CLOSED
+    (#1122, ADR-087/108 posture): a judge/infra error returns a failure reason so the
+    episode HOLDs instead of publishing unreviewed — judge failure means silence, not a
+    broken episode. (Was fail-open pre-#1122; the wk0 prologue shipped with a
+    conversational hole partly because nothing hard-blocked on QA.)"""
     import bedrock_client
 
     script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
@@ -764,8 +800,8 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
             return True, []
         return False, [str(r) for r in (verdict.get("fails") or ["failed QA rubric"])][:6]
     except Exception as e:
-        logger.warning("[panel] QA judge unavailable (fail-open): %s", e)
-        return True, []
+        logger.warning("[panel] QA judge unavailable — failing CLOSED (hold, don't publish): %s", e)
+        return False, [f"qa-judge-error (fail-closed): {e}"]
 
 
 _INTRO_RUBRIC = (
@@ -781,7 +817,10 @@ _INTRO_RUBRIC = (
     "7. ACCURACY — applies ONLY to MATT (the subject): the script must not assert any specific life event, loss, "
     "death, illness, relocation, city, or date about MATT that isn't in the GROUND TRUTH. Do NOT flag the names, "
     "titles, or roles of Elena Voss or Dr. Eli Marsh — they are real show personas, not inventions. Only invented "
-    "facts about MATT fail this item."
+    "facts about MATT fail this item.\n"
+    "8. NO DANGLING THREAD: every question or challenge one speaker raises is actually answered in the next turn; "
+    "no topic the SCRIPT itself raises is then dropped; never two same-speaker turns where a reply is clearly "
+    "missing. (Coverage is NOT required — only flag a thread the script opens and abandons.)"
 )
 
 
@@ -884,7 +923,16 @@ def _run_intro(dry_run: bool = False) -> dict:
         logger.warning("[panel] intro: no usable candidate after %d attempts", _QA_MAX_ATTEMPTS)
         return {"statusCode": 500, "body": json.dumps({"intro": "too few turns"})}
     if qa_fails:
+        # HARD gate (#1122): QA fails after all re-rolls make the episode structurally
+        # unpublishable (ADR-087 fail-closed posture — regenerate-or-hold, matching the
+        # weekly path). Pre-#1122 the "best" candidate published anyway, which is how the
+        # wk0 prologue shipped with a conversational hole. Dry-run still writes the draft
+        # transcript below so the failing script stays reviewable.
         logger.warning("[panel] intro: best candidate still has %d QA flag(s): %s", len(qa_fails), qa_fails)
+        if not dry_run:
+            return _hold_and_alert(
+                0, ["intro-qa: " + "; ".join(str(f) for f in qa_fails)[:300]], {"turns": turns, "qa_fails": qa_fails}, hold_class="quality"
+            )
 
     # Deterministic close (ADR-087 voice-bleed mitigation): strip any LLM-baked
     # "I'm Elena Voss" sign-off from the last turn, then append a fixed Elena sign-off

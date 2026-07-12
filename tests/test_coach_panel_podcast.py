@@ -188,9 +188,10 @@ def test_craft_check_flags_monologue_but_exempts_hook():
     assert panel._craft_check(hook) == []
 
 
-def test_qa_review_fails_open_on_judge_error(monkeypatch):
-    # If the judge/Bedrock blows up, QA must NOT block a publish (deterministic
-    # safety gates are the hard floor) — returns (True, []).
+def test_qa_review_fails_closed_on_judge_error(monkeypatch):
+    # #1122: if the judge/Bedrock blows up, QA must fail CLOSED — the episode holds
+    # instead of publishing unreviewed (judge failure means silence, not a broken
+    # episode). Inverts the pre-#1122 fail-open behavior.
     import bedrock_client
 
     def _boom(*a, **k):
@@ -198,7 +199,86 @@ def test_qa_review_fails_open_on_judge_error(monkeypatch):
 
     monkeypatch.setattr(bedrock_client, "invoke", _boom)
     ok, fails = panel._qa_review([{"speaker": "elena_voss", "line": "hi"}], "1. anything")
-    assert ok is True and fails == []
+    assert ok is False
+    assert fails and "fail-closed" in fails[0] and "bedrock down" in fails[0]
+
+
+# ── #1122: deterministic conversational-continuity gate ──────────────────────
+
+
+def test_continuity_flags_missing_reply_to_challenge():
+    # The observed wk0 defect: Elena challenges ("convince me...") and the guest's
+    # reply was dropped, so the NEXT turn is Elena again ("here's where I push back").
+    turns = [
+        {"speaker": "elena_voss", "line": "Here's the hook that got me."},
+        {"speaker": "eli_marsh", "line": "A good place to start."},
+        {"speaker": "elena_voss", "line": "Convince me this isn't just a beautiful dashboard."},
+        {"speaker": "elena_voss", "line": "And here's where I push back the hardest."},
+        {"speaker": "eli_marsh", "line": "That's fair."},
+    ]
+    fails = panel._continuity_check(turns)
+    assert fails and "dangling thread" in fails[0] and "turn 2" in fails[0]
+    # And it surfaces through the combined deterministic craft gate (post-drop entry point).
+    assert any("dangling thread" in f for f in panel._craft_check(turns))
+
+
+def test_continuity_flags_post_drop_question_hole():
+    # A gate dropped the answer to a direct question, leaving asker→asker adjacency.
+    turns = [
+        {"speaker": "elena_voss", "line": "Welcome back to the show."},
+        {"speaker": "eli_marsh", "line": "Glad to be here."},
+        {"speaker": "elena_voss", "line": "So what does the data actually show this week?"},
+        # eli's answer was dropped by a safety/number gate →
+        {"speaker": "elena_voss", "line": "Let's talk about the week ahead."},
+        {"speaker": "eli_marsh", "line": "Happy to."},
+    ]
+    fails = panel._continuity_check(turns)
+    assert fails and "asks a question" in fails[0] and "turn 2" in fails[0]
+
+
+def test_continuity_passes_healthy_script_and_sanctioned_solo_turns():
+    # Healthy alternating dialogue — including a question that IS answered — passes.
+    healthy = [
+        {"speaker": "elena_voss", "line": "Can a system catch what willpower misses?"},  # turn-0 hook: exempt by design
+        {"speaker": "elena_voss", "line": "I'm Elena Voss, and that's the question I couldn't put down."},
+        {"speaker": "eli_marsh", "line": "It's the right question to open on."},
+        {"speaker": "elena_voss", "line": "So convince me this isn't theater."},
+        {"speaker": "eli_marsh", "line": "Here's my honest case for why it isn't."},
+        {"speaker": "elena_voss", "line": "Does the tech genuinely make a life better, or is it theater?"},  # closing question: exempt
+    ]
+    assert panel._continuity_check(healthy) == []
+    assert panel._craft_check(healthy) == []
+
+
+def test_run_intro_holds_on_qa_fails_never_publishes(monkeypatch):
+    # #1122 hard gate: a best candidate that still fails QA after all re-rolls must
+    # HOLD (regenerate-or-hold, ADR-087) — never publish. Judge exception drives the
+    # fail here, covering the fail-closed path end-to-end.
+    import bedrock_client
+
+    monkeypatch.setattr(panel, "_load_bible", lambda: {"characters": {"matthew": "an ordinary, technical, curious person"}})
+    clean_script = [
+        {"speaker": ("elena" if i % 2 == 0 else "eli"), "line": "I'm Elena Voss and this is a clean, number-free line of dialogue."}
+        for i in range(10)
+    ]
+    monkeypatch.setattr(panel, "_build_intro_script", lambda bible: [dict(t) for t in clean_script])
+    monkeypatch.setattr(bedrock_client, "invoke", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("judge down")))
+
+    held = {}
+
+    def _fake_hold(week, reasons, draft, hold_class="safety"):
+        held.update({"week": week, "reasons": reasons, "hold_class": hold_class})
+        return {"statusCode": 200, "body": "{}", "held": True}
+
+    monkeypatch.setattr(panel, "_hold_and_alert", _fake_hold)
+    monkeypatch.setattr(
+        panel, "_publish_episode_audio", lambda *a, **k: (_ for _ in ()).throw(AssertionError("published despite QA fails"))
+    )
+
+    out = panel._run_intro(dry_run=False)
+    assert out.get("held") is True
+    assert held["week"] == 0 and held["hold_class"] == "quality"
+    assert any("qa-judge-error" in r or "intro-qa" in r for r in held["reasons"])
 
 
 # ── #374: podcast-standard feed + per-run reason codes ───────────────────────
