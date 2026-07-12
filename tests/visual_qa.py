@@ -25,6 +25,9 @@ Usage:
     python3 tests/visual_qa.py --page /now/         # single page
     python3 tests/visual_qa.py --screenshot         # save full-page + chart crops
     python3 tests/visual_qa.py --screenshot --ai-qa # + Claude semantic verdict per image
+    python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
+                                                    # + phase-aware truth pass over each
+                                                    #   page's rendered prose (#1095)
 
 Cost: $0 for the browser sweep. --ai-qa adds a few Bedrock vision calls (Haiku,
 ~$0.001/image; pennies per run, and it no-ops cleanly if AI is unavailable/budget-paused).
@@ -767,7 +770,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     }
 
 
-def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False):
+def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False, reader_truth=False):
     """Run the v4 visual QA sweep. Returns True if no page FAILED."""
     from playwright.sync_api import sync_playwright
 
@@ -785,7 +788,8 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
 
         for page_def in pages or PAGES:
-            result = capture_page(context, page_def, screenshot_dir, save_screenshots)
+            # --reader-truth needs each page's rendered innerText (the prose dump).
+            result = capture_page(context, page_def, screenshot_dir, save_screenshots, capture_prose=reader_truth)
             results.append(result)
             icon = "✅" if not result["issues"] else "❌"
             n_warn = len(result["warnings"])
@@ -807,6 +811,16 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
             from visual_ai_qa import assess_results
         print("\n── AI-vision QA (Claude / Bedrock) ──")
         assess_results(results)  # mutates results in place: adds ai_verdict + may add issues
+
+    # ── optional phase-aware reader-truth QA over the captured prose (#1095) ──
+    if reader_truth:
+        try:
+            from visual_ai_qa import assess_reader_truth
+        except ImportError:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from visual_ai_qa import assess_reader_truth
+        print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
+        assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
 
     passed = sum(1 for r in results if r["status"] == "PASS")
     failed = sum(1 for r in results if r["status"] == "FAIL")
@@ -841,6 +855,11 @@ if __name__ == "__main__":
     ap.add_argument("--page", help="Test a single page path (e.g. /now/)")
     ap.add_argument("--screenshot", action="store_true", help="Save full-page + chart-crop + mobile screenshots")
     ap.add_argument("--ai-qa", action="store_true", help="Run Claude (Bedrock) semantic QA over the screenshots")
+    ap.add_argument(
+        "--reader-truth",
+        action="store_true",
+        help="Run the phase-aware reader-truth QA over each page's rendered prose (#1095; high severity gates like --ai-qa)",
+    )
     args = ap.parse_args()
 
     pages = None
@@ -851,5 +870,5 @@ if __name__ == "__main__":
             sys.exit(1)
 
     print(f"v4 Visual QA Sweep — {SITE_URL}\n{'=' * 56}")
-    ok = run_sweep(pages=pages, save_screenshots=args.screenshot, ai_qa=args.ai_qa)
+    ok = run_sweep(pages=pages, save_screenshots=args.screenshot, ai_qa=args.ai_qa, reader_truth=args.reader_truth)
     sys.exit(0 if ok else 1)

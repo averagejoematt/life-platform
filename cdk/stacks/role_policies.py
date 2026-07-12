@@ -1683,8 +1683,19 @@ def operational_pip_audit() -> list[iam.PolicyStatement]:
 
 
 def operational_qa_smoke() -> list[iam.PolicyStatement]:
-    """QA smoke: reads DDB + cache, S3, MCP API key, Lambda/Secrets inventory, sends SES report."""
+    """QA smoke: reads DDB + cache, S3, MCP API key, Lambda/Secrets inventory, sends SES report.
+
+    #1096: + Bedrock invoke (the nightly "Reader Truth" Haiku pass) and the
+    budget-tier SSM read so budget_guard.allow("reader_truth_qa") gates it for
+    real (without the grant, the guard's fail-open would silently report tier 0).
+    """
     return [
+        _bedrock_statement(),
+        iam.PolicyStatement(
+            sid="SSMBudgetTier",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+        ),
         iam.PolicyStatement(
             sid="DynamoDB",
             actions=["dynamodb:GetItem", "dynamodb:Query"],

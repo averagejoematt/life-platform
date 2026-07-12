@@ -2,7 +2,7 @@
 ADR-100 + ADR-125 — the degradation ladder sacrifices by AUDIENCE, readers last.
 
 Simulated budget-tier escalation pins the three-band order (ADR-125):
-  band 1 INTERNAL/dev AI          (ensemble, coherence_semantic, chronicle_editor)
+  band 1 INTERNAL/dev AI          (ensemble, coherence_semantic, chronicle_editor, reader_truth_qa)
   band 2 reader NARRATIVE content (coach_narrative, state_of_matthew, chronicle)
   band 3 irreducible reader       (website_ai = /api/ask+board_ask, daily_brief_ai)
 
@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import budget_guard  # noqa: E402
 
 # The audience bands, as the ladder intends them (pause-tier per feature).
-_INTERNAL = ("ensemble", "coherence_semantic", "chronicle_editor")
+_INTERNAL = ("ensemble", "coherence_semantic", "chronicle_editor", "reader_truth_qa")
 _READER_NARRATIVE = ("coach_narrative", "state_of_matthew", "daily_debrief", "chronicle")
 _IRREDUCIBLE_READER = ("website_ai", "daily_brief_ai")
 

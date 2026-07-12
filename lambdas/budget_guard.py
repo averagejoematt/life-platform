@@ -79,6 +79,11 @@ _FEATURE_CUTOFF = {
     # defaulted to cutoff 3 and outlived every reader surface — the exact inversion
     # ADR-125 fixes. An internal QA pass must pause before any reader content.
     "coherence_semantic": 1,
+    # reader_truth_qa (#1095/#1096): the phase-aware reader-truth judge — the CI
+    # post-deploy prose pass (visual_qa --reader-truth) + the nightly qa_smoke
+    # "Reader Truth" category. Internal QA like coherence_semantic: a paused run
+    # is reported as an explicit skip (⏸/warning), never silent green.
+    "reader_truth_qa": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.
