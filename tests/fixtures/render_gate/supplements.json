@@ -1,0 +1,290 @@
+{
+  "as_of_date": "2026-06-20",
+  "groups": {
+    "sleep": {
+      "name": "Sleep Architecture",
+      "icon": "\ud83d\ude34",
+      "desc": "The compounds that protect the master variable. Circadian support, GABA modulation, and core temperature regulation.",
+      "items": [
+        {
+          "key": "l_threonate",
+          "name": "Magnesium L-Threonate",
+          "dose": "144mg elemental",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 12,
+          "experiment": "sleep-stack",
+          "why": "Sleep stack anchor. Combined with Apigenin and Glycine, this is the recommended pre-sleep protocol. Under the training volume ahead, magnesium loss through sweat is a real risk.",
+          "science": [
+            "Only magnesium form shown to cross the blood-brain barrier effectively",
+            "Supports GABA signaling, reduces sleep onset latency",
+            "80% of Americans are magnesium deficient"
+          ],
+          "sources": [
+            {
+              "title": "Magnesium L-threonate enhances learning and memory (original study)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/20152124/",
+              "stance": "supports"
+            },
+            {
+              "title": "Magnesium and sleep quality (systematic review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/35184264/",
+              "stance": "supports"
+            },
+            {
+              "title": "L-threonate form premium pricing vs standard magnesium forms (cost-effectiveness analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/?term=magnesium+L-threonate+bioavailability+comparison",
+              "stance": "challenges"
+            },
+            {
+              "title": "Examine.com analysis: most magnesium sleep benefits apply to deficient populations",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/33865376/",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Heavy training + sweat + deficit increases depletion risk. L-threonate specifically targets the CNS.",
+          "impact": "Sleep onset latency, deep sleep %, cognitive clarity",
+          "watching": "Eight Sleep score on adherent vs non-adherent nights",
+          "synergy": "sleep_supps"
+        },
+        {
+          "key": "glycine",
+          "name": "Glycine",
+          "dose": "2-3g",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 8,
+          "why": "Beautiful synergy with Eight Sleep \u2014 both work by lowering core temperature. Collagen synthesis bonus for joint health during heavy training.",
+          "science": [
+            "2-3g before bed lowers core body temperature",
+            "Primary physiological trigger for sleep onset",
+            "Synergistic with Eight Sleep cooling"
+          ],
+          "sources": [
+            {
+              "title": "Glycine ingestion improves subjective sleep quality (original RCT)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/17693028/",
+              "stance": "supports"
+            },
+            {
+              "title": "Glycine-induced hypothermia and sleep regulation",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22293292/",
+              "stance": "supports"
+            },
+            {
+              "title": "Effect size on sleep is modest in non-deficient populations",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/27253365/",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Synergistic with Eight Sleep cooling \u2014 both lower core temp via different mechanisms.",
+          "impact": "Core temp drop, sleep onset latency, deep sleep %",
+          "watching": "Eight Sleep temp data correlation",
+          "synergy": "sleep_supps"
+        },
+        {
+          "key": "apigenin",
+          "name": "Apigenin",
+          "dose": "50mg",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 10,
+          "experiment": "sleep-stack",
+          "why": "Gentlest member of the sleep stack \u2014 best risk/reward ratio. If you take one sleep supplement, this is it.",
+          "science": [
+            "Flavonoid that modulates GABA-A receptors",
+            "Reduces sleep onset latency and anxiety without grogginess",
+            "No tolerance, no dependence"
+          ],
+          "sources": [
+            {
+              "title": "Apigenin as a GABA-A receptor modulator (preclinical)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/10802676/",
+              "stance": "supports"
+            },
+            {
+              "title": "Chamomile extract (apigenin) for generalized anxiety disorder",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22894890/",
+              "stance": "supports"
+            },
+            {
+              "title": "Limited human clinical trials \u2014 most evidence is preclinical",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/?term=apigenin+sleep+human+clinical+trial",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Best risk/reward in the sleep stack \u2014 extremely safe with plausible mechanism.",
+          "impact": "Sleep onset latency, subjective sleep quality",
+          "watching": "Sleep quality trend",
+          "synergy": "sleep_supps"
+        },
+        {
+          "key": "theanine",
+          "name": "L-Theanine",
+          "dose": "100-200mg",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 66,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 8,
+          "why": "Monitor your response \u2014 if Eight Sleep shows no difference or worse sleep on Theanine nights, candidate for removal.",
+          "science": [
+            "Promotes alpha brain waves, reduces anxiety without sedation",
+            "Synergistic with caffeine during the day",
+            "Some people get disruptive vivid dreams \u2014 individual response varies"
+          ],
+          "sources": [
+            {
+              "title": "L-theanine promotes relaxation without drowsiness",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/18296328/",
+              "stance": "supports"
+            },
+            {
+              "title": "Effects of L-theanine on stress and sleep quality",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/30707852/",
+              "stance": "supports"
+            },
+            {
+              "title": "Vivid dreams may disrupt sleep architecture",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/?term=L-theanine+vivid+dreams+sleep+architecture",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Monitoring via Eight Sleep \u2014 data will determine whether this stays.",
+          "impact": "Subjective anxiety, sleep onset",
+          "watching": "Vivid dream reports in journal",
+          "synergy": "sleep_supps",
+          "questioning": true,
+          "questionReason": "Individual response varies \u2014 vivid dreams may disrupt sleep for some"
+        }
+      ]
+    },
+    "metabolic": {
+      "name": "Metabolic & Body Comp",
+      "icon": "\ud83d\udd2c",
+      "desc": "Supporting the deficit engine. Glucose management, fat oxidation, and gut health.",
+      "items": [
+        {
+          "key": "inositol",
+          "name": "Myo-Inositol",
+          "dose": "2-4g",
+          "timing": "PM",
+          "ev": "moderate",
+          "evPct": 55,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 10,
+          "why": "During metabolic transformation, insulin sensitivity is a key lever. CGM data should validate.",
+          "science": [
+            "Supports insulin signaling and serotonin receptor sensitivity",
+            "Anxiolytic properties",
+            "Evidence for metabolic benefit in insulin-resistant populations"
+          ],
+          "sources": [
+            {
+              "title": "Myo-inositol improves insulin sensitivity (meta-analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/27510537/",
+              "stance": "supports"
+            },
+            {
+              "title": "Inositol and glucose metabolism in metabolic syndrome",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/26905542/",
+              "stance": "supports"
+            },
+            {
+              "title": "Most positive evidence is in PCOS populations \u2014 limited data in metabolically healthy males",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/28954909/",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "CGM data will validate whether glucose disposal improves \u2014 clear measurable outcome.",
+          "impact": "Glucose variability, insulin sensitivity via CGM",
+          "watching": "CGM glucose disposal post-meals"
+        },
+        {
+          "key": "green_tea",
+          "name": "Green Tea Phytosome (EGCG)",
+          "dose": "250mg",
+          "timing": "AM",
+          "ev": "moderate",
+          "evPct": 45,
+          "board": "Dr. Victor Reyes",
+          "cost_monthly": 10,
+          "why": "Marginal fat oxidation support. Insurance, not primary lever. Weight trend won't show it.",
+          "science": [
+            "EGCG supports fat oxidation and thermogenesis",
+            "Antioxidant properties",
+            "Modest effect on fat loss (1-2 lbs over 12 weeks)"
+          ],
+          "sources": [
+            {
+              "title": "Green tea catechins and fat oxidation (meta-analysis)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/19597519/",
+              "stance": "supports"
+            },
+            {
+              "title": "EGCG and thermogenesis in humans",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/10584049/",
+              "stance": "supports"
+            },
+            {
+              "title": "Effect size on fat loss is 1-2 lbs over 12 weeks \u2014 clinically meaningless",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/22747440/",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Insurance play only \u2014 wouldn't supplement for fat loss alone.",
+          "impact": "Marginal fat oxidation, antioxidant status",
+          "watching": "No clear signal expected",
+          "questioning": true,
+          "questionReason": "Effect size too small to measure \u2014 pure insurance play"
+        },
+        {
+          "key": "probiotics",
+          "name": "Probiotics",
+          "dose": "Multi-strain",
+          "timing": "AM empty stomach",
+          "ev": "moderate",
+          "evPct": 45,
+          "board": "Dr. Kai Nakamura",
+          "cost_monthly": 15,
+          "why": "During high-protein deficit, GI comfort matters for adherence. Consider fermented foods instead.",
+          "science": [
+            "Gut microbiome correlates with metabolic health and mood",
+            "Evidence is strain-specific and mixed",
+            "Fermented foods may be superior for diversity"
+          ],
+          "sources": [
+            {
+              "title": "Probiotics and gut microbiome modulation (systematic review)",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/24912386/",
+              "stance": "supports"
+            },
+            {
+              "title": "Probiotics for GI health during dietary restriction",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/25157183/",
+              "stance": "supports"
+            },
+            {
+              "title": "Probiotic supplementation may reduce gut microbiome diversity vs fermented foods",
+              "url": "https://pubmed.ncbi.nlm.nih.gov/34256014/",
+              "stance": "challenges"
+            }
+          ],
+          "rationale": "Candidate for replacement with fermented food strategy.",
+          "impact": "GI comfort, digestion quality",
+          "watching": "GI comfort changes on vs off",
+          "questioning": true,
+          "questionReason": "Candidate for reassessment \u2014 fermented foods may be food-first approach"
+        }
+      ]
+    }
+  },
+  "genome_snps": [],
+  "total_count": 7
+}
