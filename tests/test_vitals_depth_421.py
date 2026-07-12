@@ -142,6 +142,35 @@ def test_deferred_panels_carry_receipts(monkeypatch):
         assert d.get("reason")  # every deferral states why
 
 
+def test_cross_phase_panels_declare_multi_year_scope_1091(monkeypatch):
+    """#1091 — cross-phase provenance is data-driven: every AVAILABLE panel built on the
+    raw_timeseries record (VO2max arc, walking HR, fitness age) declares scope="multi_year"
+    so the renderer labels it 'multi-year history · not reset with the experiment'. Labeling
+    only — the series itself must be untouched (nothing blanked or filtered)."""
+    garmin = _garmin_vo2([("2022-04-25", 45.6), ("2026-04-02", 30.8), ("2026-04-03", 30.5), ("2026-05-19", 33.3)])
+    strava = [
+        _strava_day("2026-07-06", [{"type": "Walk", "average_heartrate": 113.3}]),
+        _strava_day("2026-07-05", [{"type": "Walk", "average_heartrate": 119.1}]),
+    ]
+    monkeypatch.setattr(vd, "_query_source", _fake_query(garmin=garmin, strava=strava))
+    body = json.loads(vd.handle_vitals_depth()["body"])
+    for panel in ("vo2max", "walking_hr", "fitness_age"):
+        assert body[panel]["available"] is True
+        assert body[panel]["scope"] == "multi_year", f"{panel} must carry cross-phase provenance"
+    # labeling only — the full multi-year series still ships (2022 record included, nothing filtered)
+    assert body["vo2max"]["n"] == 4
+    assert body["vo2max"]["series"][0]["date"] == "2022-04-25"
+
+
+def test_unavailable_panels_carry_no_scope_claim(monkeypatch):
+    """An honest-empty panel makes no provenance claim — scope only rides real data."""
+    monkeypatch.setattr(vd, "_query_source", _fake_query())
+    body = json.loads(vd.handle_vitals_depth()["body"])
+    for panel in ("vo2max", "walking_hr", "fitness_age"):
+        assert body[panel]["available"] is False
+        assert "scope" not in body[panel]
+
+
 def test_status_200_and_shape(monkeypatch):
     monkeypatch.setattr(vd, "_query_source", _fake_query())
     resp = vd.handle_vitals_depth()

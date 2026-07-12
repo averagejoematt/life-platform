@@ -108,6 +108,9 @@ POPULATED_GATE_PAGES = [
         "checks": [
             {"selector": ".vr-row", "min_count": 1, "desc": "component rings render from the pulse fixture"},
             {"selector": ".sm-cell, .vl-row", "min_count": 1, "desc": "history-driven blocks render from pulse_history fixture"},
+            # #1091 — cross-phase provenance: VO2max / walking HR / fitness age carry the
+            # "multi-year history · not reset with the experiment" stamp (scope: multi_year).
+            {"selector": ".rd-scope", "min_count": 3, "desc": "cross-phase metrics carry the multi-year provenance stamp (#1091)"},
         ],
     },
     {
