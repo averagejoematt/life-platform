@@ -28,11 +28,12 @@ from aws_cdk import (
 )
 
 from stacks import role_policies as rp
+from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
 from stacks.lambda_helpers import create_platform_lambda
 
 REGION = "us-west-2"
 ACCT = "205930651321"
-LIFE_PLATFORM_TABLE = "life-platform"
+LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"

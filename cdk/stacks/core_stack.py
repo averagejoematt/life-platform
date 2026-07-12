@@ -20,6 +20,8 @@ from aws_cdk import (
 )
 from constructs import Construct
 
+from stacks.constants import TABLE_NAME  # #936: DR cutover — no hardcoded table names
+
 
 class CoreStack(Stack):
 
@@ -32,7 +34,7 @@ class CoreStack(Stack):
         self.table = dynamodb.Table.from_table_name(
             self,
             "LifePlatformTable",
-            table_name=ctx("ddb_table_name") or "life-platform",
+            table_name=ctx("ddb_table_name") or TABLE_NAME,
         )
 
         # ── S3 — lookup only (NOT CDK-managed) ──

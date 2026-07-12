@@ -1,8 +1,8 @@
 # Disaster Recovery
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-**Last updated:** 2026-07-11 (Scenario 8 — stolen/lost laptop: RPO + rotation checklist, from the #1024 audit)
+**Last updated:** 2026-07-12 (Scenario 2 swap-back drilled + Path A made executable, #936)
 
 > What can go catastrophically wrong, and the recovery sequence for each. Not exhaustive — meant as a starter playbook.
 
@@ -15,7 +15,7 @@
 | Single Lambda failure | 5 min (rollback) | Real-time |
 | Lambda code corruption (all functions) | 1h (re-deploy from git HEAD) | Real-time |
 | Single DDB item lost / overwritten | 5 min (PITR query) | 35 days |
-| Full DDB table lost | 30 min (PITR full restore) | 35 days |
+| Full DDB table lost | ~15 min measured (PITR restore 4m32s + one-env-var fleet cutover ≈6 min — drilled 2026-07-12, #936) | 35 days |
 | S3 bucket corruption (specific path) | 5 min (versioned restore) | Versioning enabled — every put |
 | S3 bucket deletion (catastrophic) | ⚠️ NOT RECOVERABLE — cross-region replication not enabled (ADR-057 W-03 deferred) | — |
 | Account compromise | Hours (rotate all secrets + audit CloudTrail) | Depends on compromise window |
@@ -102,7 +102,18 @@ aws dynamodb restore-table-to-point-in-time \
 aws dynamodb scan --table-name life-platform-restored --max-items 5 --region us-west-2
 
 # 4. Swap names (table renaming is not a thing in DDB — use one of two paths):
-#    Path A: leave restored as life-platform-restored; redirect all Lambdas (env var TABLE_NAME)
+#    Path A (VERIFIED 2026-07-12, #936): leave restored as life-platform-restored and
+#    cut the whole fleet over with ONE env-var-prefixed deploy:
+#
+#        cd cdk && TABLE_NAME=life-platform-restored npx cdk deploy --all --require-approval never
+#
+#    Every stack derives table name, env vars AND IAM policy resources from
+#    stacks/constants.py TABLE_NAME (os.environ-driven since #936), so the deploy
+#    moves permissions and configuration together. DO NOT repoint a function's
+#    TABLE_NAME env var by itself: roles are least-privilege scoped to the exact
+#    table ARN, so an env-only repoint gets AccessDenied (proven via
+#    iam simulate-principal-policy in the 2026-07-12 drill — implicitDeny on every
+#    action against the restored table).
 #    Path B: delete corrupted + rename via boto3 export/import (slow)
 
 # 5. Re-enable EventBridge schedules
@@ -110,6 +121,10 @@ aws dynamodb scan --table-name life-platform-restored --max-items 5 --region us-
 ```
 
 **Key insight:** Practice scenario 1 first (cheap, low-stakes); scenario 2 is rare and high-stakes.
+
+**Measured RTO (2026-07-12 drill, #936):** PITR restore to ACTIVE **4m32s** (32k items);
+fleet cutover deploy ≈ **6 min** (CI's `cdk deploy --all` job: 5m31s measured 2026-07-12) —
+call it **~15 min end-to-end** including verification, vs. the 30 min previously asserted.
 
 ---
 
@@ -400,11 +415,12 @@ Document outcomes in `docs/INCIDENT_LOG.md` as "DR drill" entries and in the log
 
 | Date | Scope | Result | Gaps found |
 |---|---|---|---|
+| 2026-07-12 | **Scenario-2 swap-back cutover** (#936) — PITR restore into isolated `life-platform-dr-drill-936` + the previously-unexercised repoint path, exercised without touching prod: (a) restored-table content spot-checked against live (whoop DATE#2026-07-12 matched exactly); (b) `iam simulate-principal-policy` on a prod role (site-stats-refresh) vs the restored table; (c) `TABLE_NAME=life-platform-dr-drill-936 cdk diff` on Serve showing IAM + env repointing together; (d) default-`TABLE_NAME` diff showing zero infra change. Drill table torn down after. | ✅ **Cutover path now executable + measured.** Restore to ACTIVE **4m32s**; fleet cutover ≈ 6 min (CI `cdk deploy --all` = 5m31s); **measured RTO ~15 min** vs the asserted 30. | (1) **The documented Path A was broken as written** — every role is least-privilege scoped to the exact `table/life-platform` ARN, so an env-only repoint gets implicitDeny (proven by simulation). (2) **7 hardcoded `"TABLE_NAME": "life-platform"` env literals + 4 `LIFE_PLATFORM_TABLE` literals + core/web/monitoring fallbacks** would have partially reverted any cutover — all now derive from `stacks/constants.py TABLE_NAME` (#936 fix), making Path A a one-env-var deploy. Scenario 2 step 4 rewritten. |
 | 2026-07-10 | **DDB PITR restore** (Scenario 1/2) — `restore-table-to-point-in-time --use-latest-restorable-time` into isolated `life-platform-dr-drill`; **+ S3 versioned restore** (Scenario 3) — prior version of `generated/public_stats.json` copied into isolated `backups/dr-drill/` prefix | ✅ **Both paths work.** Restored table ACTIVE in ~10 min (32,152 items ≈ prod's 32,162); spot-checked partition `USER#matthew#SOURCE#whoop / DATE#2026-07-01` matched prod exactly (recovery 88, hrv 52.87, rhr 56). S3 prior version restored to the drill prefix; **live object untouched**. Both drill artifacts torn down after verification. First verifiably-exercised DDB PITR restore (#755). | (1) This doc's pre-emptive "Snapshot the layer" step referenced the retired `life-platform-shared-utils` layer (#781) — **fixed**. (2) `--use-latest-restorable-time` is simpler than the hardcoded `--restore-date-time` in the Scenario 1/2 examples for a drill; examples left as-is (a real incident restores to *before* the bad write). No functional gaps in the restore procedures themselves. | **Scope caveat:** the drill exercised restore-to-isolated-table only — the Scenario-2 swap-back (repoint prod `TABLE_NAME` / export-import) and its 30-min RTO remain UNEXERCISED; tracked in #936.
 
 ---
 
-**Verified:** 2026-07-11 (Scenario 8 stolen/lost-laptop added from the #1024 audit; DR drill 2026-07-10 — first DDB PITR restore + S3 versioned restore)
+**Verified:** 2026-07-12 (Scenario-2 swap-back drill #936; measured RTO ~15 min; prior: Scenario 8 added 2026-07-11, first PITR drill 2026-07-10)
 
 
 ## GitHub repo-configuration reconstruction

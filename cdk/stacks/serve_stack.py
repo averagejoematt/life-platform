@@ -37,12 +37,13 @@ from aws_cdk import (
 )
 
 from stacks import role_policies as rp
+from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
 from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
 
 REGION = "us-west-2"
 ACCT = "205930651321"
-LIFE_PLATFORM_TABLE = "life-platform"
+LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
 
@@ -85,7 +86,7 @@ class ServeStack(Stack):
             memory_mb=256,
             environment={
                 "USER_ID": "matthew",
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
                 "AI_SECRET_NAME": "life-platform/site-api-ai-key",
                 "S3_BUCKET": "matthew-life-platform",
                 "S3_REGION": "us-west-2",
@@ -132,7 +133,7 @@ class ServeStack(Stack):
             memory_mb=256,
             environment={
                 "USER_ID": "matthew",
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
                 "AI_SECRET_NAME": "life-platform/site-api-ai-key",
                 "S3_BUCKET": "matthew-life-platform",
                 "S3_REGION": "us-west-2",

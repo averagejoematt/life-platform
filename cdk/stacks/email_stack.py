@@ -29,11 +29,11 @@ from aws_cdk import (
 from constructs import Construct
 
 from stacks import role_policies as rp
-from stacks.constants import ACCT, CF_DIST_ID, LAMEENC_LAYER_ARN, REGION
+from stacks.constants import ACCT, CF_DIST_ID, LAMEENC_LAYER_ARN, REGION, TABLE_NAME
 from stacks.lambda_helpers import create_platform_lambda
 
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
-LIFE_PLATFORM_TABLE = "life-platform"
+LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"

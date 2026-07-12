@@ -266,7 +266,7 @@ class IngestionStack(Stack):
             environment={
                 "SECRET_NAME": "life-platform/hevy",
                 "S3_BUCKET": "matthew-life-platform",
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
             },
             alarm_name="ingestion-error-hevy-backfill",
             custom_policies=rp.ingestion_hevy_backfill(),
