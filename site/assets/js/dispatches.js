@@ -393,8 +393,9 @@ async function renderRead(s, id) {
     return;
   }
   if (s.kind === "build") {
-    // #380 — one beat: what shipped · the gotcha · the honest miss. All three
-    // sections are the format; a beat missing one simply omits it.
+    // #380/#1120 — one beat: what shipped · why it mattered · the gotcha · the
+    // honest miss. All four sections are the format; a beat missing one simply
+    // omits it (honest absence, never a placeholder).
     const data = await secFetch(s);
     const b = ((data && data.beats) || []).find((x) => String(x.id || x.date) === String(id));
     if (!b) { read.innerHTML = `<p class="dx-prose">That beat isn't here.</p>`; return; }
@@ -404,6 +405,7 @@ async function renderRead(s, id) {
       `<p class="dx-kicker label">build log · ${esc(b.date || "")} · merged &amp; deployed work only</p>` +
       `<h2 class="dx-title">${esc(b.title || "")}</h2>` +
       sec("what shipped", b.shipped) +
+      sec("why it mattered", b.why_it_mattered) +
       sec("the gotcha", b.gotcha) +
       sec("the honest miss", b.honest_miss) +
       (prs ? `<p class="dx-disclosure label">the receipts: ${prs}</p>` : "") +

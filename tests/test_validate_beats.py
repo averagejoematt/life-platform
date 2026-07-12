@@ -20,6 +20,7 @@ _GOOD_BEAT = {
     "date": "2026-07-11",
     "title": "A test beat",
     "shipped": "x" * 30,
+    "why_it_mattered": "w" * 30,
     "gotcha": "y" * 30,
     "honest_miss": "z" * 30,
     "prs": [{"label": "PR #953", "url": "https://github.com/averagejoematt/life-platform/pull/953"}],
@@ -41,6 +42,14 @@ def test_string_prs_rejected():
     bad["prs"] = ["#923", "#924"]
     errors = validate_beats.validate({"beats": [bad]})
     assert any("prs[0]" in e and "object" in e for e in errors), errors
+
+
+def test_missing_why_it_mattered_rejected():
+    """#1120 — a changelog-grade beat (no why-it-mattered layer) can't ship."""
+    bad = copy.deepcopy(_GOOD_BEAT)
+    del bad["why_it_mattered"]
+    errors = validate_beats.validate({"beats": [bad]})
+    assert any("'why_it_mattered'" in e for e in errors), errors
 
 
 def test_missing_prose_and_bad_url_rejected():

@@ -7,12 +7,13 @@ session (2026-07-10) wrote string PRs (`"prs": ["#923", ...]`) where the schema
 wants label/url objects, breaking tests/test_build_dispatches.py repo-wide.
 
 Schema per beat (docs/content/BUILD_DISPATCH_CHECKLIST.md):
-    id            non-empty string, unique across the feed
-    date          YYYY-MM-DD
-    title         non-empty string
-    shipped       string, > 20 chars  (three-part honesty format)
-    gotcha        string, > 20 chars
-    honest_miss   string, > 20 chars
+    id               non-empty string, unique across the feed
+    date             YYYY-MM-DD
+    title            non-empty string
+    shipped          string, > 20 chars  (four-part honesty format, #1120)
+    why_it_mattered  string, > 20 chars  (the narrative layer — stakes, not fabricated outcomes)
+    gotcha           string, > 20 chars
+    honest_miss      string, > 20 chars
     prs           optional list of {"label": "PR #831", "url": "https://github.com/averagejoematt/life-platform/pull/831"}
 
 Usage: python3 scripts/validate_beats.py   (exit 0 = valid, 1 = errors listed)
@@ -29,7 +30,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BEATS_PATH = os.path.join(REPO, "site", "story", "build", "beats.json")
 PR_URL_PREFIX = "https://github.com/averagejoematt/life-platform/pull/"
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
-PROSE_FIELDS = ("shipped", "gotcha", "honest_miss")
+PROSE_FIELDS = ("shipped", "why_it_mattered", "gotcha", "honest_miss")
 
 
 def validate(data) -> list[str]:
@@ -60,7 +61,7 @@ def validate(data) -> list[str]:
         for key in PROSE_FIELDS:
             val = b.get(key)
             if not isinstance(val, str) or len(val) <= 20:
-                errors.append(f"{where}: '{key}' must be a string > 20 chars (the three-part format IS the honesty)")
+                errors.append(f"{where}: '{key}' must be a string > 20 chars (the four-part format IS the honesty — #1120)")
 
         prs = b.get("prs", [])
         if not isinstance(prs, list):
