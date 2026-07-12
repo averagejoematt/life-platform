@@ -7,11 +7,13 @@ coaching section, per-section base labels, a stray `/gear/` link). This module i
 single source of truth for both, so a chrome edit is a one-file change and
 `v4_apply_chrome.py` can re-flatten every page to it.
 
-Two axes of per-page nav variation are DELIBERATE and are parameters here — nothing else
-varies:
+Three axes of per-page chrome variation are DELIBERATE and are parameters here — nothing
+else varies:
   * `current_door` — the door the page lives under, marked `aria-current="page"`
     (one of "/now/" "/data/" "/coaching/" "/protocols/" "/story/", or None).
   * `with_follow` — the "follow" pill, present on the 15 reader-facing pages.
+  * `with_asof` (footer) — the live `data-bind="asof"` "updated YYYY-MM-DD" stamp in the
+    footer base line; home only (story.js binds it from /api stats metadata, #1104).
 
 The byte layout matches the canonical nav/footer that ships on the ~51 dominant pages
 exactly (HTML-entity apostrophes via `html.escape`, `&amp;`, single-line, no stray
@@ -71,7 +73,10 @@ def doors_nav(current_door: str | None = None, with_follow: bool = False) -> str
     return f'<nav class="doors" aria-label="Doors">{"".join(links)}{follow}{THEME_TOGGLE}</nav>'
 
 
-def site_footer() -> str:
+ASOF_STAMP = '<span class="label asof" data-bind="asof"></span>'
+
+
+def site_footer(with_asof: bool = False) -> str:
     """The canonical `.site-foot` footer — one site map on every page.
 
     Based on the dominant footer (the ~51 data/method/protocols pages) but unified
@@ -79,7 +84,13 @@ def site_footer() -> str:
     By Coach / Scorecard / The Team / AI lab notes) so no live coaching link is lost
     site-wide, and it fixes the dominant footer's mislabel (/coaching/ is "The Read",
     /coaching/team/ is "The Team"). Additive for the dominant pages (#1009 review).
+
+    `with_asof` (home only, #1104) keeps the live "updated YYYY-MM-DD" stamp that
+    home's old slim footer carried: `story.js` binds `data-bind="asof"` from the
+    public-stats metadata, so the stamp rides in the base line between the brand
+    and the home link (the `.sf-base` flex line spaces the three apart).
     """
+    asof = ASOF_STAMP if with_asof else ""
     return (
         '<footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map">'
         '<div class="sf-col"><p class="sf-h label">The Story</p>'
@@ -101,5 +112,5 @@ def site_footer() -> str:
         '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>'
         '<a href="/method/">The method</a><a href="/story/about/">About</a>'
         '<a href="/privacy/">Privacy</a></div>'
-        '</nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p></footer>'
+        f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p></footer>'
     )
