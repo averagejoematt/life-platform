@@ -83,6 +83,32 @@ function effectSources(cond) {
   return Object.keys(NODES).filter((p) => c.includes(p));
 }
 
+// #1017 — the legibility floor. SVG text is sized in viewBox units, so its on-screen size
+// scales with the rendered width: at a 390px viewport the svg draws ~354px wide (scale ≈ 0.98)
+// and the 9px labels land at ~8.9px — below the 11px mobile type floor (DESIGN_SYSTEM_V5 §10.5).
+// Re-derive the user-unit sizes from the live scale so every label meets its effective-px
+// floor; on desktop (scale > 1) max(base, floor/scale) keeps today's sizes — no regression.
+const CN_TYPE = [
+  ["--cn-fs-label", 9, 11], // .nlabel — pillar names: 11px mono-label is the smallest register that ships
+  ["--cn-fs-score", 11, 12], // .score — the numeral keeps its rank above the label
+  ["--cn-fs-cue", 8, 11], // .door-cue — interactive affordance, floored at 11px everywhere
+];
+function sizeConstellation(svg) {
+  const w = svg.getBoundingClientRect().width;
+  if (!w) return; // hidden / not laid out yet → the stylesheet fallbacks stand
+  const scale = w / 360; // viewBox is 0 0 360 360
+  for (const [prop, base, floorPx] of CN_TYPE) {
+    svg.style.setProperty(prop, `${Math.max(base, floorPx / scale).toFixed(2)}px`);
+  }
+  // Tap-target floor (§10.4): the transparent per-node hit circle (touch-only via CSS)
+  // grows to whatever user-space radius yields a ≥44px effective diameter on screen.
+  const hitR = 22 / scale;
+  for (const hit of svg.querySelectorAll(".node .hit")) {
+    // round UP — rounding down can shave the target to 43.9px effective
+    hit.setAttribute("r", String(Math.ceil(Math.max(Number(hit.dataset.baseR) || 0, hitR) * 10) / 10));
+  }
+}
+
 function drawConstellation(pillars, coupling, activeEffects) {
   const svg = $(".constellation svg");
   if (!svg) return;
@@ -138,6 +164,11 @@ function drawConstellation(pillars, coupling, activeEffects) {
     const g = document.createElementNS(SVGNS, "g");
     g.setAttribute("class", "node" + (up ? " up" : "") + (instrumented ? "" : " quiet"));
     g.setAttribute("style", driftVars(name));
+    // #1017 — invisible tap-target expander (§10.4 grammar: bigger hit area, no visual
+    // redesign). Sized up to the 44px effective floor by sizeConstellation; touch-only in CSS.
+    const hit = document.createElementNS(SVGNS, "circle");
+    hit.setAttribute("class", "hit"); hit.setAttribute("cx", pos.x); hit.setAttribute("cy", pos.y);
+    hit.setAttribute("r", r); hit.dataset.baseR = String(r);
     const c = document.createElementNS(SVGNS, "circle");
     c.setAttribute("cx", pos.x); c.setAttribute("cy", pos.y); c.setAttribute("r", r);
     const tScore = document.createElementNS(SVGNS, "text");
@@ -158,7 +189,7 @@ function drawConstellation(pillars, coupling, activeEffects) {
     cue.setAttribute("class", "door-cue"); cue.setAttribute("x", pos.x); cue.setAttribute("y", pos.y + r + 24);
     cue.textContent = "open →";
     door.append(fo, cue);
-    g.append(c, tScore, tLab, door);
+    g.append(hit, c, tScore, tLab, door);
     const href = NODE_LINK[name];
     if (href) {
       const a = document.createElementNS(SVGNS, "a");
@@ -169,6 +200,18 @@ function drawConstellation(pillars, coupling, activeEffects) {
     } else {
       nodeG.appendChild(g);
     }
+  }
+
+  // #1017 — size the type + tap targets for the current rendered width, and keep them
+  // floored across rotations/resizes (one rAF-debounced listener, vars-only — no redraw).
+  sizeConstellation(svg);
+  if (!drawConstellation._resizeWired) {
+    drawConstellation._resizeWired = true;
+    let raf = 0;
+    window.addEventListener("resize", () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => sizeConstellation(svg));
+    });
   }
 }
 
