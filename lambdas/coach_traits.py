@@ -1,4 +1,5 @@
-"""coach_traits.py — AUTHORED trait scores for the 8 operational coaches (#1113).
+"""coach_traits.py — AUTHORED trait scores for the coaching cast (#1113):
+the 8 operational coaches + the head coach (lead tier, #1112).
 
 These are deterministic, human-authored character design — cast sheet numbers,
 NOT AI-generated and NOT derived from data at page-view time. They exist so a
@@ -63,6 +64,14 @@ COACH_TRAITS = {
     "explorer_coach": {
         "scores": {"evidence_bar": 50, "boldness": 30, "revision_speed": 90, "intervention_urge": 15, "range": 95},
         "note": "A low bar to notice, a high bar to act — delighted to be refuted, and every domain is his domain.",
+    },
+    # #1112 — the head coach (lead tier). Authored against the eli_marsh persona
+    # (config/personas.json philosophy) + his board_of_directors.json voice: the
+    # generalist above eight specialists, decisive about the single priority,
+    # rigorous about correlation-vs-verdict, one experiment at a time.
+    "eli_marsh": {
+        "scores": {"evidence_bar": 75, "boldness": 60, "revision_speed": 55, "intervention_urge": 70, "range": 90},
+        "note": "The generalist above eight specialists — turns competing reads into one call, and never runs two experiments at once.",
     },
 }
 

@@ -32,11 +32,14 @@ def _body(resp):
 # ── roster (/api/coaches) ────────────────────────────────────────────────────
 
 
-def test_roster_returns_eight_coaches():
+def test_roster_returns_lead_plus_eight_staff():
+    # #1112: the head coach leads the roster (lead tier), then the 8 operational
+    # coaches in registry order.
     data = _body(api.handle_coaches({}))
-    assert data["count"] == 8
+    assert data["count"] == 9
     ids = [c["persona_id"] for c in data["coaches"]]
-    assert ids == api.persona_registry.OPERATIONAL_COACH_IDS  # registry order preserved
+    assert ids == [api.persona_registry.LEAD_PERSONA_ID] + api.persona_registry.OPERATIONAL_COACH_IDS
+    assert [c["tier"] for c in data["coaches"]] == ["lead"] + ["staff"] * 8
     for c in data["coaches"]:
         for f in ("name", "domain", "short_bio", "emoji", "board_role", "headline_stat"):
             assert c.get(f), f"{c['persona_id']} missing {f}"
@@ -45,8 +48,14 @@ def test_roster_returns_eight_coaches():
 
 def test_roster_headline_is_honest_pre_data():
     data = _body(api.handle_coaches({}))
-    # no predictions decided yet -> every coach reads "accruing", never a fake rate
-    assert all(c["headline_stat"] == "track record accruing" for c in data["coaches"])
+    # no predictions decided yet -> every staff coach reads "accruing", never a fake
+    # rate — and the lead never carries a track-record line at all (he makes no
+    # graded calls; his headline is his role).
+    staff = [c for c in data["coaches"] if c["tier"] == "staff"]
+    assert all(c["headline_stat"] == "track record accruing" for c in staff)
+    lead = data["coaches"][0]
+    assert lead["tier"] == "lead"
+    assert lead["headline_stat"] == "runs the program"
 
 
 # ── coach page (/api/coach/{id}) ─────────────────────────────────────────────
@@ -116,6 +125,43 @@ def test_unknown_coach_404():
     # a board-only persona is not an operational coach
     resp2 = api.handle_coach({"rawPath": "/api/coach/the_chair"})
     assert resp2["statusCode"] == 404
+    # #1112: lead:true opens the door for the head coach ONLY — every other
+    # non-operational persona (the narrator included) still 404s.
+    resp3 = api.handle_coach({"rawPath": "/api/coach/elena_voss"})
+    assert resp3["statusCode"] == 404
+
+
+# ── the head coach (lead tier, #1112) ────────────────────────────────────────
+
+
+def test_lead_coach_detail_route_shape():
+    data = _body(api.handle_coach({"rawPath": "/api/coach/eli_marsh"}))
+    assert data["persona_id"] == api.persona_registry.LEAD_PERSONA_ID
+    assert data["tier"] == "lead"
+    assert data["name"] == "Dr. Eli Marsh"
+    assert "AI character" in data["disclosure"]
+    # lead extras are config-authored persona fields
+    assert data["philosophy"] and "One experiment at a time" in data["philosophy"]
+    assert data["expertise"]
+    # the authored cast sheet covers the lead too (#1113 machinery)
+    ts = data["trait_scores"]
+    assert ts and len(ts["axes"]) == 5 and "uthored" in ts["disclosure"]
+    # the standard dynamic sections are present and honest-empty pre-data:
+    # no ladder scaffold is fabricated for him (source "none", never "ladder")
+    assert data["stance"]["source"] == "none"
+    assert data["working_hypotheses"] == []
+    assert data["stance_history"] == []
+    assert data["recent_outputs"] == []
+    # no generation voice spec exists for the lead — null, never a fabricated spec
+    assert data["voice"] is None
+    # report card scaffold stays shaped + honest (no decided calls, ever, so far)
+    assert data["report_card"]["track_record"]["hit_rate_pct"] is None
+
+
+def test_lead_leads_the_roster_before_staff():
+    data = _body(api.handle_coaches({}))
+    assert data["coaches"][0]["persona_id"] == "eli_marsh"
+    assert data["coaches"][0]["board_role"].startswith("Principal Investigator")
 
 
 # ── My Team (/api/coach_team, CC-10) ─────────────────────────────────────────

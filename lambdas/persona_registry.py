@@ -34,6 +34,13 @@ OPERATIONAL_COACH_IDS = [
 ]
 OPERATIONAL_SHORT_IDS = [c.replace("_coach", "") for c in OPERATIONAL_COACH_IDS]
 
+# The head coach (Principal Investigator) — the lead tier ABOVE the 8 operational
+# coaches (#1112). Non-operational (writes no domain OUTPUT#/STANCE#) but a
+# first-class cast member on the public staff surfaces. MUST stay equal to the
+# single ``lead: true`` persona in config/personas.json (enforced by
+# tests/test_persona_registry.py).
+LEAD_PERSONA_ID = "eli_marsh"
+
 _S3_KEY = "config/personas.json"
 _cache = {"data": None, "ts": 0}
 _TTL_S = 300  # 5 minutes — matches board_loader

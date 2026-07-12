@@ -91,7 +91,9 @@ function entriesFor(s, data) {
     );
   if (!data) return [];
   if (s.kind === "bycoach" || s.kind === "team") {
-    const roster = (data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live }));
+    // #1112: the head coach rides the same roster at lead tier — the card carries
+    // c.tier so the list can render the cast hierarchy (lead treatment + badge).
+    const roster = (data.coaches || []).map((c) => ({ id: c.persona_id, title: String(c.name || "").trim(), date: c.domain ? String(c.domain).replace(/_/g, " ") : "", sub: c._live, tier: c.tier }));
     // The Team leads with the collective read (CC-10, re-mounted from the retired
     // /story/coaches/ surface) — the head coach + huddle live here now.
     return s.kind === "team" ? [{ id: "team", title: "My Team", date: "the team's collective read on you" }].concat(roster) : roster;
@@ -229,16 +231,23 @@ function coachBuildHTML(v, c) {
 function coachLiveRecordHTML(d) {
   const st = d.stance || {};
   const live = st.source === "stance";
+  // #1112: the head coach (lead tier) files no weekly domain stance and makes no
+  // graded calls — the eight specialists do. His honest-empty states say THAT,
+  // instead of promising engine records that are never written for him (ADR-104).
+  const isLead = d.tier === "lead";
   let h = `<section class="coach-live"><p class="dx-kicker label">the live record · this cycle</p>`;
   if (live) {
     h += coachStanceHTML(st);
     if (st.as_of) h += `<p class="cl-asof label">evidence-derived stance · as of ${esc(String(st.as_of).slice(0, 10))}</p>`;
+  } else if (isLead) {
+    h += `<p class="cl-empty dx-prose">No domain stance — the head coach reads the whole program, not one lane. The eight specialists hold the domain stances, on their own pages.</p>`;
   } else {
     h += `<p class="cl-empty dx-prose">No evidence-derived stance yet this cycle — the opinion engine writes its first weekly read once the data accrues.` +
       (st.stage && st.stage.label ? ` Until then the authored starting scaffold has them at <strong>${esc(String(st.stage.label).replace(/[.\s]+$/, ""))}</strong>.` : "") + `</p>`;
   }
   const hyps = (d.working_hypotheses || []).filter((x) => x && x.claim);
   if (hyps.length) h += coachHypothesesHTML(hyps);
+  else if (isLead) h += `<p class="cl-empty dx-prose">No graded calls of his own on the board — the specialists make the falsifiable predictions; his job is the one call for the phase. Their record is the <a href="/coaching/scorecard/">scorecard</a>.</p>`;
   else h += `<p class="cl-empty dx-prose">No open calls on the board yet — when this coach makes a falsifiable prediction it shows here, then gets graded on the <a href="/coaching/scorecard/">scorecard</a>, hit or miss.</p>`;
   const trail = (d.stance_history || []).filter((s) => s && (s.how_my_read_changed || s.headline_read));
   const outs = (d.recent_outputs || []).filter((o) => o && (o.summary || (o.themes || []).length));
@@ -251,6 +260,8 @@ function coachLiveRecordHTML(d) {
       `<li class="ce-item"><span class="ce-date label">${esc(String(o.date || "").slice(0, 10))}</span>` +
       (o.summary ? `<p class="ce-say">${esc(o.summary)}</p>` : "") +
       ((o.themes || []).length ? `<p class="ce-themes label">${(o.themes || []).slice(0, 4).map(esc).join(" · ")}</p>` : "") + `</li>`).join("") + `</ol>`;
+  } else if (isLead) {
+    h += `<p class="cl-empty dx-prose">No dated output trail of his own — the head coach's synthesis surfaces through the staff's weekly reads and the board's one call for the phase.</p>`;
   } else {
     h += `<p class="cl-empty dx-prose">No output trail yet this cycle — the coach's dated reads accumulate here as the engine runs.</p>`;
   }
@@ -451,19 +462,49 @@ async function renderReadExperiment(read) {
 }
 
 // ── BY COACH — the coach's read ON TOP of their domain data (the owner's ask) ──
+// #1112 — the head coach's page (lead tier). He has no single domain: his read IS
+// the program. The lead header, the program block (bio · philosophy · staff focus,
+// the same classes as the team-lead card), the authored cast sheet, the live
+// record (honest-empty — he files no domain stances and makes no graded calls;
+// the eight specialists do), and the character one disclosure down.
+async function renderByCoachLead(read, coach) {
+  const team = await tryJSON("/api/coach_team");
+  let h = `<div class="coach-head coach-head--lead" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(coach.board_role || "")}</h2><p class="coach-head-name label">${esc(coach.name || "")}</p><p class="coach-head-tier label">the head coach · lead tier</p></div></div>`;
+  h += `<section class="team-lead"><p class="dx-kicker label">running the program</p>`;
+  if (coach.short_bio) h += `<p class="dx-prose tl-bio">${esc(coach.short_bio)}</p>`;
+  if (coach.philosophy) h += `<blockquote class="tl-philosophy">${esc(coach.philosophy)}</blockquote>`;
+  const focus = (team && (((team.lead || {}).staff_focus || []).length ? team.lead.staff_focus : team.team_focus)) || [];
+  if (focus.length) h += `<p class="tl-focus label">what he's got the staff focused on: ${focus.slice(0, 3).map(esc).join(" · ")}</p>`;
+  else h += `<p class="tl-focus label">staff focus lands with the coaches' first weekly stances — nothing to synthesize yet.</p>`;
+  if ((coach.expertise || []).length) h += `<p class="cc-focus label">brings: ${coach.expertise.map(esc).join(" · ")}</p>`;
+  h += `</section>`;
+  h += coachTraitsHTML(coach.trait_scores);
+  h += coachLiveRecordHTML(coach);
+  h += disclose("who this coach is · their voice", coachCharacterHTML(coach.character));
+  h += `<p class="bc-datalink label"><a href="/coaching/read/">the board's current read ↗</a> · <a href="/coaching/team/#${esc(coach.persona_id)}">his team profile ↗</a></p>`;
+  read.innerHTML = h;
+  enhanceCoachNames(read);
+  const _pt = read.querySelector(".coach-head .portrait");
+  if (_pt) markStanceChange(_pt, coach.persona_id, coach.stance_history);
+}
+
 async function renderByCoach(read, id) {
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the coach…</span></p>`;
   const dom = domainOf(id);
-  const wantsSession = dom === "training" || dom === "physical";
-  const wantsTraining = dom === "training";
+  // #1112: only the eight domain coaches (…_coach ids) have a domain read/data —
+  // the head coach skips those fetches entirely (his lane is the whole program).
+  const isDomainCoach = /_coach$/.test(String(id));
+  const wantsSession = isDomainCoach && (dom === "training" || dom === "physical");
+  const wantsTraining = isDomainCoach && dom === "training";
   const [coach, analysis, obs, sessions, training] = await Promise.all([
     tryJSON(`/api/coach/${encodeURIComponent(id)}`),
-    tryJSON(`/api/coach_analysis?domain=${encodeURIComponent(dom)}`),
-    OBS_DOMAINS.has(dom) ? tryJSON(`/api/observatory_week?domain=${encodeURIComponent(dom)}`) : Promise.resolve(null),
+    isDomainCoach ? tryJSON(`/api/coach_analysis?domain=${encodeURIComponent(dom)}`) : Promise.resolve(null),
+    isDomainCoach && OBS_DOMAINS.has(dom) ? tryJSON(`/api/observatory_week?domain=${encodeURIComponent(dom)}`) : Promise.resolve(null),
     wantsSession ? tryJSON("/api/workouts") : Promise.resolve(null),
     wantsTraining ? tryJSON("/api/training_overview") : Promise.resolve(null),
   ]);
   if (!coach) { read.innerHTML = `<p class="dx-prose">Couldn't load this coach just now.</p>`; return; }
+  if (coach.tier === "lead") return renderByCoachLead(read, coach);
   // #1102 — coach-card header inversion (Matthew's product call): the specialty leads
   // big, the name follows small. Coach-scoped classes; dx-kicker/dx-title untouched.
   let h = `<div class="coach-head" style="--coach:${esc(coach.color || "")}">${portrait(coach, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(coach, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(coach.board_role || coach.domain || "")}</h2><p class="coach-head-name label">${esc(coach.name || "")}</p></div></div>`;
@@ -639,8 +680,11 @@ async function renderTeamCoach(read, id) {
   const d = await tryJSON(`/api/coach/${encodeURIComponent(id)}`);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load this profile just now.</p>`; return; }
   // #1102 — same inversion at the second call site (team profile view).
-  let h = `<div class="coach-head" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(d.board_role || d.domain || "")}</h2><p class="coach-head-name label">${esc(d.name || "")}</p></div></div>`;
+  // #1112 — the head coach's profile carries the lead-tier header + his philosophy.
+  const isLead = d.tier === "lead";
+  let h = `<div class="coach-head${isLead ? " coach-head--lead" : ""}" style="--coach:${esc(d.color || "")}">${portrait(d, { title: "", cls: "portrait-lg", size: 96 }) || `<span class="sigil-lg">${sigil(d, { title: "" })}</span>`}<div><h2 class="coach-head-role">${esc(d.board_role || d.domain || "")}</h2><p class="coach-head-name label">${esc(d.name || "")}</p>${isLead ? `<p class="coach-head-tier label">the head coach · lead tier</p>` : ""}</div></div>`;
   if (d.disclosure) h += `<p class="dx-disclosure label">${esc(d.disclosure)}</p>`;
+  if (isLead && d.philosophy) h += `<blockquote class="tl-philosophy">${esc(d.philosophy)}</blockquote>`;
   h += coachCharacterHTML(d.character);
   // #1113 immersive bio: the cast sheet (authored traits) → the live record
   // (real engine records, honest-empty pre-data) → how the voice is built
@@ -656,8 +700,13 @@ async function renderTeamCoach(read, id) {
     if ((rel.leaned_on_by || []).length) rh += `<p class="cr-edges"><span class="label">leaned on by</span> ${rel.leaned_on_by.map(edge).join(" · ")}</p>`;
     h += rh + `</section>`;
   }
-  h += disclose("their report card", coachReportHTML(d.report_card));
-  h += `<p class="bc-datalink label"><a href="/coaching/by-coach/#${esc(id)}">→ what they're saying about your ${esc(domainOf(id))}</a></p>`;
+  // #1112: no report card for the lead — he makes no graded calls, and "score
+  // unlocks as predictions resolve" would be a promise the engine never keeps.
+  // The live record above states that honestly instead.
+  if (!isLead) h += disclose("their report card", coachReportHTML(d.report_card));
+  h += isLead
+    ? `<p class="bc-datalink label"><a href="/coaching/by-coach/#${esc(id)}">→ how he runs the program, on the by-coach surface</a></p>`
+    : `<p class="bc-datalink label"><a href="/coaching/by-coach/#${esc(id)}">→ what they're saying about your ${esc(domainOf(id))}</a></p>`;
   read.innerHTML = h;
   enhanceCoachNames(read);
 }
@@ -1036,7 +1085,7 @@ async function selectSection(key, preId, push = true) {
   if (s.kind === "bycoach" || s.kind === "team") data = await enrichCoachLive(data);
   const entries = entriesFor(s, data);
   if (!entries.length) { listEl.innerHTML = `<li class="dx-empty">Nothing here yet — it fills as the experiment runs.</li>`; $("[data-dx-read]").innerHTML = `<p class="dx-prose">Nothing to read yet. This section fills in once the experiment is underway — the first entries land after Day 1.</p>`; return; }
-  listEl.innerHTML = entries.map((e) => `<li><button class="dx-item" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}</span><span class="dx-item-d label">${esc(e.date || "")}</span>${e.sub ? `<span class="dx-item-sub">${esc(String(e.sub).slice(0, 90))}</span>` : ""}</button></li>`).join("");
+  listEl.innerHTML = entries.map((e) => `<li><button class="dx-item${e.tier === "lead" ? " dx-item--lead" : ""}" data-id="${esc(e.id)}"><span class="dx-item-t">${esc(e.title)}</span>${e.tier === "lead" ? `<span class="dx-item-lead label">head coach</span>` : ""}<span class="dx-item-d label">${esc(e.date || "")}</span>${e.sub ? `<span class="dx-item-sub">${esc(String(e.sub).slice(0, 90))}</span>` : ""}</button></li>`).join("");
   listEl.querySelectorAll(".dx-item").forEach((b) => b.addEventListener("click", () => selectEntry(s, b.dataset.id)));
   const initId = preId && entries.some((e) => String(e.id) === String(preId)) ? preId : entries[0].id;
   selectEntry(s, initId, true);
