@@ -778,6 +778,40 @@ def _get_state_of_mind_trend(args):
     }
 
 
+def _load_library_entry(library_id):
+    """#1117: fetch one experiment_library.json entry by id (fail-soft → None).
+
+    The library is the promotion ledger — promoted entries carry rationale,
+    promoted_date, votes and the for/against evidence citations that become the
+    experiment's why_now + evidence_links when no explicit values are given."""
+    try:
+        obj = s3_client.get_object(Bucket=S3_BUCKET, Key="config/experiment_library.json")
+        lib = json.loads(obj["Body"].read())
+        for entry in lib.get("experiments", []):
+            if entry.get("id") == library_id:
+                return entry
+    except Exception as e:  # noqa: BLE001 — fail-soft: no trigger means honest-empty, never a blocked creation
+        logger.warning(f"create_experiment: experiment library lookup failed for '{library_id}': {e}")
+    return None
+
+
+def _find_hypothesis(hyp_id):
+    """#1117: fetch a hypothesis-engine record by hypothesis_id or sk suffix
+    (fail-soft → None). A CONFIRMED record is the hypothesis→experiment promotion
+    trigger; derive_why_now turns it into the experiment's why_now."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}hypotheses") & Key("sk").begins_with("HYPOTHESIS#"),
+            ScanIndexForward=False,
+        )
+        for it in resp.get("Items", []):
+            if it.get("hypothesis_id") == hyp_id or it.get("sk", "").replace("HYPOTHESIS#", "") == hyp_id:
+                return decimal_to_float(it)
+    except Exception as e:  # noqa: BLE001 — fail-soft, same posture as the library lookup
+        logger.warning(f"create_experiment: hypothesis lookup failed for '{hyp_id}': {e}")
+    return None
+
+
 def tool_create_experiment(args):
     """Create a new N=1 experiment.
 
@@ -801,21 +835,54 @@ def tool_create_experiment(args):
     experiment_type = (args.get("experiment_type") or "").strip()
     planned_duration_days = args.get("planned_duration_days")
     design = args.get("design")
+    # #1117: the justification contract — why this experiment, why now, what outcome
+    # is hoped for, how it is measured, and the evidence behind it.
+    why_now = (args.get("why_now") or "").strip()
+    priority = (args.get("priority") or "").strip().lower()
+    hoped_outcome = (args.get("hoped_outcome") or "").strip()
+    measurement = (args.get("measurement") or "").strip()
+    evidence_links = args.get("evidence_links") or []
+    source_hypothesis_id = (args.get("source_hypothesis_id") or "").strip()
 
     if not name:
         raise ValueError("name is required (e.g. 'Creatine 5g daily', 'No caffeine after 10am')")
     if not hypothesis:
         raise ValueError("hypothesis is required (e.g. 'Will improve deep sleep % by >5%')")
 
+    import experiment_design
+
     # #539: pre-registration — the design is validated NOW and frozen on the record.
     # An invalid design rejects the creation outright (a sloppy design silently
     # accepted would be worse than none), and nothing may mutate it afterward.
     if design is not None:
-        import experiment_design
-
         ok, issues = experiment_design.validate_design(design)
         if not ok:
             raise ValueError("invalid design (pre-registration rejected): " + "; ".join(issues))
+
+    # #1117: same posture for the justification fields — invalid values reject the
+    # creation; absent values stay absent (ADR-104 honest-empty, never placeholder).
+    ok, issues = experiment_design.validate_justification(
+        {
+            "why_now": why_now or None,
+            "priority": priority or None,
+            "hoped_outcome": hoped_outcome or None,
+            "measurement": measurement or None,
+            "evidence_links": evidence_links or None,
+        }
+    )
+    if not ok:
+        raise ValueError("invalid justification (rejected): " + "; ".join(issues))
+
+    # #1117: wire why_now to the promotion trigger — provenance is automatic where it
+    # exists. Explicit wins; else a confirmed hypothesis (source_hypothesis_id) or the
+    # promoted library entry supplies it. Lookups fail soft: a missing trigger simply
+    # leaves the field empty, never blocks the creation.
+    lib_entry = _load_library_entry(library_id) if library_id else None
+    hyp_record = _find_hypothesis(source_hypothesis_id) if source_hypothesis_id else None
+    if source_hypothesis_id and hyp_record is None:
+        logger.warning(f"create_experiment: source_hypothesis_id '{source_hypothesis_id}' not found — why_now not derived from it")
+    why_now, why_now_source = experiment_design.derive_why_now(why_now or None, hypothesis=hyp_record, library_entry=lib_entry)
+    evidence_links = experiment_design.derive_evidence_links(evidence_links or None, library_entry=lib_entry)
 
     now = datetime.now(timezone.utc)
     if not start_date:
@@ -869,6 +936,16 @@ def tool_create_experiment(args):
         # Floats → Decimal for DDB (min_effect is commonly fractional).
         "design": json.loads(json.dumps(design), parse_float=Decimal) if design else None,
         "pre_registered_at": now.strftime("%Y-%m-%dT%H:%M:%S") if design else None,
+        # #1117: the justification contract. why_now carries its provenance stamp
+        # (explicit | hypothesis | library); absent fields are simply absent —
+        # ADR-104 honest-empty, the surfaces render nothing for them.
+        "why_now": why_now,
+        "why_now_source": why_now_source,
+        "source_hypothesis_id": source_hypothesis_id or None,
+        "priority": priority or None,
+        "hoped_outcome": hoped_outcome or None,
+        "measurement": measurement or None,
+        "evidence_links": evidence_links or None,
     }
 
     # #728: freeze the pre-registration as a PUBLIC, timestamped S3 artifact —
@@ -891,6 +968,20 @@ def tool_create_experiment(args):
             "experiment_type": experiment_type or None,
             "iteration": iteration,
             "design": design,  # raw JSON floats — this is the public copy, not the DDB one
+            # #1117: the justification is part of the pre-registered thinking — frozen
+            # with the design (present fields only; honest-empty stays empty).
+            **{
+                k: v
+                for k, v in (
+                    ("why_now", why_now),
+                    ("why_now_source", why_now_source),
+                    ("priority", priority or None),
+                    ("hoped_outcome", hoped_outcome or None),
+                    ("measurement", measurement or None),
+                    ("evidence_links", evidence_links or None),
+                )
+                if v is not None
+            },
             "registered_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "contract": (
                 "Frozen at creation, before any results existed. The design above is what "
@@ -935,6 +1026,13 @@ def tool_create_experiment(args):
         "design": design,
         "pre_registered_at": item.get("pre_registered_at"),
         "pre_registration_url": prereg_url,
+        # #1117: the justification contract, echoed with why_now provenance.
+        "why_now": why_now,
+        "why_now_source": why_now_source,
+        "priority": priority or None,
+        "hoped_outcome": hoped_outcome or None,
+        "measurement": measurement or None,
+        "evidence_links": evidence_links or None,
         **({"pre_registration_warning": prereg_warning} if prereg_warning else {}),
         "board_of_directors": {
             "Huberman": "One variable at a time. Track for at least 2 weeks before drawing conclusions. Control for confounders: sleep timing, stress, travel.",

@@ -210,3 +210,134 @@ def analysis_summary(design, stats):
             line += f", d={stats['cohens_d']:g}"
         line += ")"
     return line + f" -> {stats['verdict']}."
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #1117: the justification contract — why_now / priority / hoped_outcome /
+# measurement / evidence_links.
+#
+# An experiment record previously carried its hypothesis but not its
+# justification: WHY this, WHY now, what outcome is hoped for, how it will be
+# measured, and what evidence motivated it. These helpers are the pure core:
+#   - `validate_justification` — what the field set may say (same posture as
+#     `validate_design`: an invalid justification rejects the creation).
+#   - `derive_why_now` — wires `why_now` to the promotion trigger, so the
+#     provenance is automatic where it exists: an explicit value always wins;
+#     else a confirmed hypothesis (the hypothesis-engine promotion path) or a
+#     promoted experiment-library entry (rationale + promoted_date) supplies it.
+#   - `derive_evidence_links` — evidence links carried from the library entry's
+#     for/against citations (dissent kept, per the P2.3 disclosure grammar).
+#
+# ADR-104 honest-empty: every helper returns None/[] when there is no real
+# trigger — callers store nothing and surfaces render nothing.
+# ══════════════════════════════════════════════════════════════════════════════
+
+VALID_PRIORITIES = ("high", "medium", "low")
+MAX_JUSTIFICATION_CHARS = 600
+MAX_EVIDENCE_LINKS = 8
+VALID_LINK_STANCES = ("for", "against")
+
+
+def validate_justification(just):
+    """Validate the justification field set. Returns (is_valid, issues).
+
+    Expected shape (every field optional — honest-empty is a valid state):
+      {"why_now": str, "priority": "high"|"medium"|"low", "hoped_outcome": str,
+       "measurement": str, "evidence_links": [{"url": http(s) str,
+       "title": str?, "stance": "for"|"against"?}]}
+    """
+    issues = []
+    if not isinstance(just, dict):
+        return False, ["justification must be an object"]
+
+    for field in ("why_now", "hoped_outcome", "measurement"):
+        val = just.get(field)
+        if val is None:
+            continue
+        if not isinstance(val, str) or not val.strip() or len(val.strip()) > MAX_JUSTIFICATION_CHARS:
+            issues.append(f"{field} must be a non-empty string of at most {MAX_JUSTIFICATION_CHARS} chars")
+
+    priority = just.get("priority")
+    if priority is not None and priority not in VALID_PRIORITIES:
+        issues.append(f"priority must be one of {VALID_PRIORITIES}")
+
+    links = just.get("evidence_links")
+    if links is not None:
+        if not isinstance(links, list) or len(links) > MAX_EVIDENCE_LINKS:
+            issues.append(f"evidence_links must be a list of at most {MAX_EVIDENCE_LINKS} links")
+        else:
+            for i, link in enumerate(links):
+                if (
+                    not isinstance(link, dict)
+                    or not isinstance(link.get("url"), str)
+                    or not link["url"].startswith(("http://", "https://"))
+                ):
+                    issues.append(f"evidence_links[{i}] must be an object with an http(s) 'url'")
+                    continue
+                if link.get("stance") is not None and link["stance"] not in VALID_LINK_STANCES:
+                    issues.append(f"evidence_links[{i}].stance must be one of {VALID_LINK_STANCES}")
+
+    unknown = set(just) - {"why_now", "priority", "hoped_outcome", "measurement", "evidence_links"}
+    if unknown:
+        issues.append(f"unknown justification fields: {sorted(unknown)}")
+
+    return (len(issues) == 0), issues
+
+
+def derive_why_now(explicit, hypothesis=None, library_entry=None):
+    """Resolve why_now from the promotion trigger. Returns (text, source).
+
+    Precedence: an explicit value ("explicit") > a CONFIRMED hypothesis record
+    ("hypothesis" — the hypothesis-engine promotion path, carrying the measured
+    effect when the deterministic check persisted one, per ADR-104/105) > a
+    promoted experiment-library entry ("library" — rationale + promoted_date).
+    Returns (None, None) when no trigger exists — honest-empty.
+    """
+    if explicit and str(explicit).strip():
+        return str(explicit).strip(), "explicit"
+
+    if isinstance(hypothesis, dict) and hypothesis.get("status") == "confirmed" and str(hypothesis.get("hypothesis") or "").strip():
+        text = f"Promoted from a confirmed hypothesis: {str(hypothesis['hypothesis']).strip()}"
+        confirmed_on = str(hypothesis.get("last_checked") or "")[:10]
+        if confirmed_on:
+            text += f" (confirmed {confirmed_on})"
+        effect = hypothesis.get("effect_size")
+        lo, hi = hypothesis.get("ci95_low"), hypothesis.get("ci95_high")
+        if effect is not None and lo is not None and hi is not None:
+            text += (
+                f" — measured effect {float(effect):+g}, 95% CI [{float(lo):g}, {float(hi):g}], "
+                f"n={int(hypothesis.get('n_condition') or 0)}/{int(hypothesis.get('n_comparison') or 0)} days"
+            )
+        return text + ".", "hypothesis"
+
+    if isinstance(library_entry, dict):
+        rationale = str(library_entry.get("rationale") or "").strip()
+        promoted = str(library_entry.get("promoted_date") or "").strip()
+        if rationale or promoted:
+            text = "Promoted from the experiment library"
+            if promoted:
+                text += f" on {promoted}"
+            text += f": {rationale}" if rationale else "."
+            votes = library_entry.get("votes")
+            if isinstance(votes, (int, float)) and not isinstance(votes, bool) and votes > 0:
+                text += f" ({int(votes)} reader vote{'s' if votes != 1 else ''})"
+            return text, "library"
+
+    return None, None
+
+
+def derive_evidence_links(explicit, library_entry=None):
+    """Resolve evidence links. An explicit list wins; else carry the library
+    entry's for/against citations (URL'd ones only — these are LINKS; the
+    dissent is kept and tagged, never filtered). Returns [] when neither exists."""
+    if explicit:
+        return list(explicit)[:MAX_EVIDENCE_LINKS]
+
+    links = []
+    if isinstance(library_entry, dict):
+        for stance, key in (("for", "evidence_for"), ("against", "evidence_against")):
+            for src in library_entry.get(key) or []:
+                url = isinstance(src, dict) and src.get("url")
+                if url:
+                    links.append({"url": url, "title": str(src.get("title") or "").strip() or url, "stance": stance})
+    return links[:MAX_EVIDENCE_LINKS]

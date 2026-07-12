@@ -159,6 +159,10 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-loop .rd-line { margin-top: var(--sp-1); }
 .supp-loop .rd-line:first-child { margin-top: 0; }
 .supp-hope .label { color: var(--ember); }
+/* #1117 — the same grammar on experiment cards: why now (carried from the
+   promotion trigger) leads the loop; evidence links wrap without overflow. */
+.supp-whynow .label { color: var(--ember); }
+.supp-evlinks { overflow-wrap: anywhere; }
 /* Paused supplements: dimmed + an honest badge, so a compound Matthew stopped
    taking can't read as part of the active stack (truth-audit Phase 4b). */
 .supp--paused { opacity: 0.62; }

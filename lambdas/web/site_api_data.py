@@ -1276,6 +1276,16 @@ def handle_experiments() -> dict:
                 # the page renders this as the before-the-results proof link.
                 "pre_registration_url": item.get("prereg_url"),
                 "analysis": item.get("analysis"),
+                # #1117: the justification contract — why now (with its provenance:
+                # explicit | hypothesis | library), priority, hoped outcome, the
+                # measurement plan, evidence links. Legacy/unannotated records simply
+                # carry nulls and the page renders nothing (ADR-104 honest-empty).
+                "why_now": item.get("why_now"),
+                "why_now_source": item.get("why_now_source"),
+                "priority": item.get("priority"),
+                "hoped_outcome": item.get("hoped_outcome"),
+                "measurement": item.get("measurement"),
+                "evidence_links": item.get("evidence_links") or [],
                 "origin": "live",  # an actual run on the ledger (this experiment cycle)
             }
         )

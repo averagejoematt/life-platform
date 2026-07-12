@@ -750,6 +750,43 @@ TOOLS = {
                         "description": "'measurable' (has biomarker endpoint) or 'behavioral' (compliance tracking).",
                     },
                     "planned_duration_days": {"type": "integer", "description": "Target duration in days."},
+                    "why_now": {
+                        "type": "string",
+                        "description": (
+                            "#1117: why THIS experiment NOW (max 600 chars). If omitted, it auto-derives from the "
+                            "promotion trigger: a confirmed hypothesis (source_hypothesis_id) or the promoted "
+                            "library entry (library_id — rationale + promoted_date). Absent trigger = honest-empty."
+                        ),
+                    },
+                    "priority": {"type": "string", "description": "#1117: 'high', 'medium', or 'low'."},
+                    "hoped_outcome": {"type": "string", "description": "#1117: the outcome hoped for, in plain words (max 600 chars)."},
+                    "measurement": {
+                        "type": "string",
+                        "description": "#1117: the measurement plan — which instrument/metric adjudicates it (max 600 chars).",
+                    },
+                    "evidence_links": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "url": {"type": "string", "description": "http(s) link to the evidence."},
+                                "title": {"type": "string", "description": "Short label for the link."},
+                                "stance": {"type": "string", "description": "'for' or 'against' — dissent is kept, never filtered."},
+                            },
+                            "required": ["url"],
+                        },
+                        "description": (
+                            "#1117: up to 8 evidence links motivating the experiment. If omitted and library_id is "
+                            "set, the library entry's for/against citations are carried automatically."
+                        ),
+                    },
+                    "source_hypothesis_id": {
+                        "type": "string",
+                        "description": (
+                            "#1117: hypothesis_id of the CONFIRMED hypothesis-engine record this experiment was "
+                            "promoted from — why_now then auto-derives from it (with the measured effect + CI)."
+                        ),
+                    },
                     "design": {
                         "type": "object",
                         "description": (
