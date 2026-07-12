@@ -68,7 +68,8 @@ SHELL = """<!DOCTYPE html>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <script>if("serviceWorker" in navigator){{window.addEventListener("load",function(){{navigator.serviceWorker.register("/sw.js").catch(function(){{}});}});}}</script>
+  <!-- PWA island (#1020): /story/ is OUTSIDE the cockpit-PWA island (home + /now/ + /coaching/) —
+       long-form reading has no daily-return offline case, so these shells do NOT register sw.js. -->
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life — read aloud (podcast)" href="/podcast/feed.xml">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life — The Panel (podcast)" href="/panelcast/feed.xml">

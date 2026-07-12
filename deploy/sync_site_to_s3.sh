@@ -190,6 +190,16 @@ echo "→ Build stamp: $BUILD_SHA · $BUILD_AT"
 printf '{"build":"%s","deployed":"%s"}\n' "$BUILD_SHA" "$BUILD_AT" > "$BUILD_DIR/version.json"
 find "$BUILD_DIR" -name "*.html" -not -path "*/legacy/*" -exec sed "${SED_INPLACE[@]}" "s#</head>#<meta name=\"build\" content=\"$BUILD_SHA $BUILD_AT\"></head>#" {} +
 sed "${SED_INPLACE[@]}" -E "s/const VERSION = \"[^\"]*\";/const VERSION = \"$BUILD_SHA\";/" "$BUILD_DIR/sw.js"
+# #1020: the SW cache version is DERIVED, never hand-bumped — if the sed above ever
+# stops matching (a reformat of the VERSION line), a deploy would silently ship the
+# "dev" placeholder and stale caches would never roll. Fail the deploy instead.
+if ! grep -q "const VERSION = \"$BUILD_SHA\";" "$BUILD_DIR/sw.js"; then
+  echo "❌ sw.js cache VERSION was not stamped with the build SHA ($BUILD_SHA) —"
+  echo "   the 'const VERSION = \"...\";' line in site/sw.js no longer matches the rewrite"
+  echo "   pattern above. Fix the line (or the pattern); deploying would ship a service"
+  echo "   worker whose cache never rolls."
+  exit 1
+fi
 
 echo ""
 echo "=== Syncing to s3://$BUCKET/$S3_PREFIX/ ==="

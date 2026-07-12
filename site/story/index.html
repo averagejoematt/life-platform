@@ -23,7 +23,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
+  <!-- PWA island (#1020): /story/ is OUTSIDE the cockpit-PWA island (home + /now/ + /coaching/) —
+       long-form reading has no daily-return offline case, so these shells do NOT register sw.js. -->
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life — read aloud (podcast)" href="/podcast/feed.xml">
   <link rel="alternate" type="application/rss+xml" title="The Measured Life — The Panel (podcast)" href="/panelcast/feed.xml">
@@ -50,7 +51,7 @@
       <p class="ph-promise">The chronicle, the journal, the timeline, and what this whole experiment is for. The live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>, the AI team in <a href="/coaching/">the coaching</a>; this is the why.</p>
       <nav class="loop-ribbon" aria-label="Where this sits in the loop"><a href="/now/">Now</a><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><span class="lr-here" aria-current="page">Story</span><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
     </div>
-    <noscript><section class="proof-static dx-prose" aria-label="Chronicle posts"><p class="label">The weekly chronicle — 3 posts, newest first (as of 2026-07-11)</p><ul><li><a href="/journal/posts/week-03/"><time datetime="2026-07-09">2026-07-09</time> — The Body Votes First</a> · Prologue · Part III</li><li><a href="/journal/posts/week-02/"><time datetime="2026-07-08">2026-07-08</time> — The Empty Journal</a> · Prologue · Part II</li><li><a href="/journal/posts/week-01/"><time datetime="2026-07-06">2026-07-06</time> — Before the Numbers</a> · Prologue · Part I</li></ul></section></noscript>
+    <noscript><section class="proof-static dx-prose" aria-label="Chronicle posts"><p class="label">The weekly chronicle — 4 posts, newest first (as of 2026-07-11)</p><ul><li><a href="/journal/posts/week-04/"><time datetime="2026-07-11">2026-07-11</time> — The Plan, On the Record</a> · Prologue · Part IV</li><li><a href="/journal/posts/week-03/"><time datetime="2026-07-09">2026-07-09</time> — The Body Votes First</a> · Prologue · Part III</li><li><a href="/journal/posts/week-02/"><time datetime="2026-07-08">2026-07-08</time> — The Empty Journal</a> · Prologue · Part II</li><li><a href="/journal/posts/week-01/"><time datetime="2026-07-06">2026-07-06</time> — Before the Numbers</a> · Prologue · Part I</li></ul></section></noscript>
     <nav class="dx-tabs" data-dx-tabs aria-label="Story sections"></nav>
     <div class="dx-layout">
       <ul class="dx-list" data-dx-list aria-label="Entries"></ul>

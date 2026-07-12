@@ -23,6 +23,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <!-- PWA island (#1020): /coaching/ is INSIDE the cockpit-PWA island (home + /now/ + /coaching/) —
+       the daily check-in loop — so these shells deliberately register sw.js. -->
   <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js").catch(function(){});});}</script>
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
     <link rel="preload" href="/assets/fonts/v4/pxiTypc9vsFDm051Uf6KVwgkfoSxQ0GsQv8ToedPibnr0SZe1ZuWi3g.woff2" as="font" type="font/woff2" crossorigin>

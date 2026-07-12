@@ -426,6 +426,9 @@ strips) relies on the section-level `.rd-sec { overflow-x:auto }` scroll — kee
 
 ### 10.7 PWA layer
 
-The Cockpit is an installable PWA: a web manifest + an active service worker (`sw.js`). SW coverage
-and a build-hash cache VERSION are tracked as forward work (#1020). A PR that changes cached assets
-should assume the SW may serve a stale copy until the cache rolls.
+The Cockpit is an installable PWA: a web manifest + an active service worker (`sw.js`). SW
+registration is deliberately scoped to the **cockpit-PWA island** — home (`/`), `/now/`, and the
+`/coaching/` shells (the daily-return loop) — and the cache VERSION is stamped with the build SHA
+at deploy, with a hard-fail guard if the stamp misses (#1020; details in
+`docs/SITE_AUTHORING.md` §4). A PR that changes cached assets should assume the SW may serve a
+stale copy until the cache rolls (≤5 min: `sw.js` is served `max-age=300, must-revalidate`).
