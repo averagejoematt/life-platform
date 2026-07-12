@@ -9,9 +9,9 @@ writes redirects.map (old URL -> v4 home). Exit 1 if any old URL is unmapped,
 so it gates the big-bang cutover and CI.
 
 Destinations:
-  cockpit  -> /now                      (the single daily door; pillar pages fold in)
+  cockpit  -> /cockpit                      (the single daily door; pillar pages fold in)
   story    -> /                         (the scrollytelling door)
-  evidence -> /evidence/<topic>/        (the archival readout; topic page exists)
+  evidence -> /data|/method|/protocols per V5_DOOR (the v5 three-door split, #216)
   legacy   -> /legacy/<path>            (archived v1 — served verbatim, already there)
 System pages (privacy, subscribe, 404) were NOT relocated; they stay at root,
 ported as-is, and need no redirect — so they don't appear here.
@@ -89,6 +89,62 @@ RULES: dict[str, str] = {
 
 DEST_ORDER = ["cockpit", "story", "evidence", "legacy"]
 
+# v5 "Coherence" IA (#216): the flat v4 /evidence/ namespace split into three doors —
+# /data/ (the measurement pillars), /method/ (how the machine works), /protocols/
+# (the levers). This registry is the single slug -> v5-door map; both the legacy-scan
+# targets and the retired /evidence/<slug>/ 301s derive from it. Before #1108 this
+# split lived only in the hand-edited redirects.map — regenerating silently reverted
+# ~60 live redirects to the retired /evidence/ targets; now regeneration reproduces it.
+V5_DOOR: dict[str, str] = {
+    # the data door — measurement pillars
+    "glucose": "data",
+    "habits": "data",
+    "labs": "data",
+    "ledger": "data",
+    "mind": "data",
+    "nutrition": "data",
+    "physical": "data",
+    "sleep": "data",
+    "stack": "data",
+    "training": "data",
+    "vices": "data",
+    "vitals": "data",
+    # the method tier — how the machine works
+    "ask": "method",
+    "benchmarks": "method",
+    "biology": "method",
+    "board": "method",
+    "build": "method",
+    "cost": "method",
+    "cycles": "method",
+    "data": "method",  # the old evidence "data" page = the pipeline explainer
+    "explorer": "method",
+    "inference": "method",
+    "intelligence": "method",
+    "kitchen": "method",
+    "methodology": "method",
+    "mirror": "method",
+    "pipeline": "method",
+    "platform": "method",
+    "postmortems": "method",
+    "predictions": "method",
+    "results": "method",
+    "survival": "method",
+    "tools": "method",
+    "wrong": "method",
+    # the protocols door — the levers
+    "challenges": "protocols",
+    "discoveries": "protocols",
+    "experiments": "protocols",
+    "protocols": "protocols",
+    "supplements": "protocols",
+}
+
+# Old URLs whose top segment is now a LIVE v5 door (or is superseded by a manual 301
+# below) — never emit a scan-derived redirect for these: /data/ and /protocols/ serve
+# the new doors themselves, and /mind/ has a manual 301 to /data/reading/ (#313).
+SCAN_SKIP_URLS = {"/data/", "/protocols/", "/mind/"}
+
 
 def original_url(html_path: Path) -> str:
     """Map site/legacy/<path>/index.html back to the OLD url /<path>/."""
@@ -110,7 +166,7 @@ def classify(url: str) -> str | None:
 
 def new_url(url: str, dest: str) -> str:
     if dest == "cockpit":
-        return "/now/"  # trailing slash: bare /now 302s to /site/now/ via the S3 origin
+        return "/cockpit/"  # trailing slash: bare /cockpit 302s to /site/cockpit/ via the S3 origin
     if dest == "story":
         deep = {
             "chronicle": "/story/chronicle/",
@@ -126,8 +182,8 @@ def new_url(url: str, dest: str) -> str:
         return deep.get(seg_of(url), "/")  # narrative URLs land on their native Story sub-page
     if dest == "evidence":
         remap = {"coaches": "board", "accountability": "vices", "live": "vitals"}
-        seg = seg_of(url)
-        return f"/evidence/{remap.get(seg, seg)}/"  # collapse subpaths; remap rehomed slugs
+        seg = remap.get(seg_of(url), seg_of(url))
+        return f"/{V5_DOOR[seg]}/{seg}/"  # collapse subpaths; remap rehomed slugs; land on the v5 door
     if dest == "legacy":
         return f"/legacy{url}"  # served verbatim from its preserved location
     return url
@@ -158,6 +214,8 @@ def main() -> int:
         # links to them as "Read the full piece" (they only carry excerpts otherwise).
         if url == "/story/" or url.startswith("/story/") or url.startswith("/chronicle/posts/") or url.startswith("/journal/posts/"):
             continue
+        if url in SCAN_SKIP_URLS:  # live v5 doors / manually-301'd — see SCAN_SKIP_URLS
+            continue
         new = new_url(url, dest)
         if new != url:  # legacy pages already live at /legacy/* — still record the 301
             redirects.append((url, new))
@@ -174,11 +232,28 @@ def main() -> int:
     for old in ("/story/lab-notes/", "/dispatches/lab-notes/"):
         redirects.append((old, "/coaching/lab-notes/"))
 
+    # v5 (#216): the v4 /evidence/ door itself retired — 301 its whole namespace to
+    # each page's v5 home. Every slug except "stack" shipped as a v4 /evidence/ page
+    # ("stack" was already /data/stack/ by the v5 cutover, so /evidence/stack/ never
+    # existed). NB /evidence/mind/ -> /data/mind/ (the pillar page), while bare
+    # /mind/ -> /data/reading/ below (the retired standalone reading page, #313).
+    redirects.append(("/evidence/", "/data/"))
+    for slug, door in sorted(V5_DOOR.items()):
+        if slug == "stack":
+            continue
+        redirects.append((f"/evidence/{slug}/", f"/{door}/{slug}/"))
+
     # 2026-07-02: post-v4 page moves that the legacy scan can't discover — these are
     # NEW-era URLs retired later, so a regeneration would silently drop them if they
     # only lived in redirects.map. Every manual 301 belongs here. /mind/ was the
     # standalone reading page, consolidated into the Data door (AUDIT PROD-01).
     redirects.append(("/mind/", "/data/reading/"))
+
+    # 2026-07-12 (#1108): the cockpit door renamed /now/ -> /cockpit/ so the URL
+    # teaches the same vocabulary as the site ("THE COCKPIT"). The legacy-scan
+    # cockpit bucket above already lands straight on /cockpit/ (single hop); this
+    # manual 301 keeps every historical /now/ link alive.
+    redirects.append(("/now/", "/cockpit/"))
 
     print(f"\nv4 migration inventory - {len(pages)} preserved page(s) under {LEGACY_DIR}/\n")
     for d in DEST_ORDER:

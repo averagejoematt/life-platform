@@ -61,7 +61,7 @@ if [ "${1:-}" != "--dry-run" ]; then
   # unreachable. Was NOT wired in before, so the sitemap silently drifted post-less.
   python3 "$(dirname "$0")/../scripts/v4_build_sitemap.py" || echo "  ⚠️  sitemap build skipped (offline?) — keeping existing site/sitemap.xml"
   # #788: bake the cockpit's static proof (character level + pillars + as-of stamp)
-  # into /now/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
+  # into /cockpit/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
   # effort; keeps the last baked block if the live API is unreachable.
   python3 "$(dirname "$0")/../scripts/v4_build_cockpit_proof.py" || echo "  ⚠️  cockpit proof skipped (offline?) — keeping existing baked block"
   # #804: regenerate the /coaching/ shells with the board's live read baked into the

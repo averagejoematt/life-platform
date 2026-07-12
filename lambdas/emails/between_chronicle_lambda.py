@@ -220,7 +220,7 @@ def build_email(digest: dict, sub_email: str) -> tuple:
             )
     parts.append(
         f'<p style="margin-top:22px;font-size:13px;color:#8aaa90;">Every number above is the same one the public site serves. '
-        f'Single-subject experiment (N=1) — patterns, never proof. <a href="{SITE_URL}/now/" style="color:#8aaa90;">The live cockpit →</a></p>'
+        f'Single-subject experiment (N=1) — patterns, never proof. <a href="{SITE_URL}/cockpit/" style="color:#8aaa90;">The live cockpit →</a></p>'
         f'<p style="margin-top:14px;font-family:monospace;font-size:11px;color:#5a7565;">No open tracking on this email. '
         f'<a href="{unsub}" style="color:#5a7565;">unsubscribe</a></p></div>'
     )

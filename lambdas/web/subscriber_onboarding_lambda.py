@@ -41,7 +41,7 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
 # email link, so point straight at the v4 destinations.
 FALLBACK_PAGES = [
     {"label": "The Story", "title": "Why I'm doing this — and what I'm tracking", "path": "/story/"},
-    {"label": "The Cockpit", "title": "Live daily dashboard — weight, sleep, recovery, habits", "path": "/now/"},
+    {"label": "The Cockpit", "title": "Live daily dashboard — weight, sleep, recovery, habits", "path": "/cockpit/"},
     {"label": "The Chronicle", "title": "Weekly dispatches from inside the experiment", "path": "/story/chronicle/"},
 ]
 

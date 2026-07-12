@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # smoke_test_site.sh — Post-deploy verification for averagejoematt.com (v4 "The Measured Life")
 #
-# Verifies the three-door v4 site (ADR-071): Cockpit (/now/), Story (/story/),
+# Verifies the three-door v4 site (ADR-071): Cockpit (/cockpit/), Story (/story/),
 # Evidence (/data/), over the unchanged read-only engine. Checks live pages (200),
 # legacy v3 URLs (301 → v4), assets, API endpoints + freshness, content markers,
 # cache headers, and stale-copy. Run after `bash deploy/sync_site_to_s3.sh`.
@@ -33,6 +33,24 @@ check_status() {
   fi
 }
 
+# 301 + exact Location target (single hop — the destination must be final, never
+# another redirect source). Added for #1108 (/now/ -> /cockpit/).
+check_redirect() {
+  local label="$1"
+  local url="$2"
+  local target="$3"
+  local status location
+  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url")
+  location=$(curl -s -o /dev/null -w "%{redirect_url}" --max-time 10 "$url")
+  if [[ "$status" == "301" && "$location" == "$BASE$target" ]]; then
+    echo "  ✅ $label"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $label — expected 301 → $BASE$target, got $status → $location"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 check_header() {
   local label="$1"
   local url="$2"
@@ -57,7 +75,7 @@ echo ""
 # ── v4 pages (HTTP 200) ───────────────────────────────────────────────────────
 echo "── v4 pages (HTTP 200) ───────────────────────────────────"
 check_status "Home"                 "$BASE/"
-check_status "Cockpit (/now/)"      "$BASE/now/"
+check_status "Cockpit (/cockpit/)"      "$BASE/cockpit/"
 check_status "Story hub"            "$BASE/story/"
 check_status "Evidence hub"         "$BASE/data/"
 check_status "Subscribe"            "$BASE/subscribe/"
@@ -95,6 +113,29 @@ check_status "/board/ → 301"        "$BASE/board/"       "301"
 check_status "/platform/ → 301"     "$BASE/platform/"    "301"
 echo ""
 
+# ── /now/ → /cockpit/ rename (#1108) — single-hop, exact targets ───────────────
+# Deploy ordering (the issue's rule 6): S3 content ships FIRST, the CloudFront
+# v4-redirects function is published SECOND — so there is a sanctioned window where
+# /now/ 404s (object gone, 301 not yet live). Probe for it: while the function is
+# still pending, WARN loudly and skip the strict block instead of failing the
+# site-deploy gate into an auto-rollback; once /now/ answers 301, assert strictly.
+echo "── Cockpit rename (expect 301 → /cockpit/, one hop) ──────"
+NOW_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$BASE/now/")
+if [[ "$NOW_STATUS" == "301" ]]; then
+  check_redirect "/now/ → /cockpit/"          "$BASE/now/"          "/cockpit/"
+  check_redirect "/character/ → /cockpit/"    "$BASE/character/"    "/cockpit/"
+  check_redirect "/observatory/ → /cockpit/"  "$BASE/observatory/"  "/cockpit/"
+  check_redirect "/status/ → /cockpit/"       "$BASE/status/"       "/cockpit/"
+  check_redirect "/week/ → /cockpit/"         "$BASE/week/"         "/cockpit/"
+  check_redirect "/weekly/ → /cockpit/"       "$BASE/weekly/"       "/cockpit/"
+  check_redirect "/achievements/ → /cockpit/" "$BASE/achievements/" "/cockpit/"
+else
+  echo "  ⚠ /now/ returned $NOW_STATUS (not 301) — CloudFront v4-redirects function"
+  echo "    not yet published for #1108. Cockpit redirect assertions SKIPPED."
+  echo "    PUBLISH deploy/generated/v4_redirects_function.js, then re-run this smoke."
+fi
+echo ""
+
 # ── Static assets (non-hashed fallbacks + feeds) ───────────────────────────────
 echo "── Static assets ─────────────────────────────────────────"
 check_status "tokens.css"           "$BASE/assets/css/tokens.css"
@@ -129,7 +170,7 @@ if [[ "$QUICK" != "--quick" ]]; then
   }
 
   HOME_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
-  NOW_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/now/" > "$NOW_FILE"
+  NOW_FILE=$(mktemp);    curl -s --max-time 15 "$BASE/cockpit/" > "$NOW_FILE"
   STORY_FILE=$(mktemp);  curl -s --max-time 15 "$BASE/story/" > "$STORY_FILE"
   EVID_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/data/" > "$EVID_FILE"
   PIPE_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/method/pipeline/" > "$PIPE_FILE"

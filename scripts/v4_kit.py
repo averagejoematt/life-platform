@@ -16,7 +16,7 @@ still orients ("here's the loop, click to enter").
 
 from __future__ import annotations
 
-LOOP_VANTAGE = ("/now/", "Now", "cockpit")
+LOOP_VANTAGE = ("/cockpit/", "Now", "cockpit")
 LOOP_NODES = [
     ("/data/", "Data", "data"),
     ("/coaching/", "Coaching", "coaching"),

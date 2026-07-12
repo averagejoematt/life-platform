@@ -72,7 +72,7 @@ def test_legacy_email_cta_template_uses_h2_not_h3():
 # ── v4 doors: every public door needs a skip link + a <main> landmark ───────
 V4_DOORS = {
     "Home": "index.html",
-    "Cockpit": "now/index.html",
+    "Cockpit": "cockpit/index.html",
     "Data": "data/index.html",
     "Protocols": "protocols/index.html",
     "Coaching": "coaching/index.html",

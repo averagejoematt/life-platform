@@ -351,7 +351,7 @@ def _rollup(pillars: dict, keys: tuple):
 
 def cockpit_block_html(ch: dict) -> str:
     """The cockpit's static proof (#788): the character level + tier, the Body/Mind
-    rollups, each pillar score, and the honest "as of" stamp — baked into /now/'s
+    rollups, each pillar score, and the honest "as of" stamp — baked into /cockpit/'s
     served HTML as <noscript>, the same #729/#730 treatment the scorecard and
     chronicle got.
 

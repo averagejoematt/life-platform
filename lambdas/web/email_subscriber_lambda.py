@@ -408,7 +408,7 @@ Right now, the site is brand new and the data is just starting to accumulate. Th
 A few things worth looking at while you're here:
 
 -> Start from the beginning — the first dispatch: {SITE_URL}/story/chronicle/
--> The live cockpit (today's score, updated every morning): {SITE_URL}/now/
+-> The live cockpit (today's score, updated every morning): {SITE_URL}/cockpit/
 -> The evidence (every number, every source): {SITE_URL}/data/
 -> The Story (why I started): {SITE_URL}/story/
 

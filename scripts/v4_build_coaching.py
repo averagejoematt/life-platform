@@ -91,7 +91,7 @@ SHELL = """<!DOCTYPE html>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Measured Life">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-  <!-- PWA island (#1020): /coaching/ is INSIDE the cockpit-PWA island (home + /now/ + /coaching/) —
+  <!-- PWA island (#1020): /coaching/ is INSIDE the cockpit-PWA island (home + /cockpit/ + /coaching/) —
        the daily check-in loop — so these shells deliberately register sw.js. -->
   <script>if("serviceWorker" in navigator){{window.addEventListener("load",function(){{navigator.serviceWorker.register("/sw.js").catch(function(){{}});}});}}</script>
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
@@ -109,7 +109,7 @@ SHELL = """<!DOCTYPE html>
   <header class="story-top">
     <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the coaching</span></a>
     <nav class="doors" aria-label="Doors">
-      <a href="/now/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+      <a href="/cockpit/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
       <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
       <a href="/coaching/" aria-current="page" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
       <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
@@ -122,7 +122,7 @@ SHELL = """<!DOCTYPE html>
       <p class="ph-kicker label">the coaching · the AI team reading the data</p>
       <p class="hero-day label" data-bind="genesisStamp" hidden></p>
       <h1 class="ph-title">The Coaching</h1>
-      <p class="ph-promise">A board of named AI coaches reads the data and offers different takes on it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/now/">the cockpit</a> and <a href="/data/">the data</a>.</p>
+      <p class="ph-promise">A board of named AI coaches reads the data and offers different takes on it. Start with <strong>the read</strong> — what they're saying about you right now — then go <strong>by coach</strong> to see their take sitting on top of the actual numbers. The weekly lab notes are the Third Wall: the AI's read against how it actually felt. Live data lives in <a href="/cockpit/">the cockpit</a> and <a href="/data/">the data</a>.</p>
       {ribbon}
       <p class="dx-foot label">Coach portraits are commissioned illustrations of openly fictional AI personas — no real people are depicted.</p>
     </div>

@@ -335,7 +335,7 @@ def render_post_html(title, stats_line, body_html, cur_label, date_str, seq):
 <header class="story-top">
   <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">the story</span></a>
   <nav class="doors" aria-label="Doors">
-    <a href="/now/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
+    <a href="/cockpit/" title="Today's live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a>
     <a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a>
     <a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a>
     <a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a>
@@ -368,7 +368,7 @@ def render_post_html(title, stats_line, body_html, cur_label, date_str, seq):
   </aside>
   <nav class="post-nav">
     <a href="/story/chronicle/"><span>&larr; All installments</span>The Measured Life archive</a>
-    <a href="/now/"><span>Today</span>The live cockpit &rarr;</a>
+    <a href="/cockpit/"><span>Today</span>The live cockpit &rarr;</a>
   </nav>
 </div>
 </main>

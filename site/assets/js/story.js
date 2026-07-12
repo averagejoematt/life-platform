@@ -369,13 +369,13 @@ function renderOkay(charV, journeyV, presenceV, pre) {
   }));
   const allAbsent = !inLull && rows.every((r) => r.s.state === "absent");
   const asofLine = asOf
-    ? `<p class="okay-asof label">as of ${esc(asOf)} · plain-language, computed from the same numbers on <a href="/now/">the cockpit</a></p>`
+    ? `<p class="okay-asof label">as of ${esc(asOf)} · plain-language, computed from the same numbers on <a href="/cockpit/">the cockpit</a></p>`
     : `<p class="okay-asof label">plain-language, from the live cockpit numbers</p>`;
 
   if (allAbsent) {
     // Fresh cycle / post-reset: refuse to read a week with no signal. Honest silence.
     wrap.innerHTML =
-      `<p class="okay-lead">This week's numbers are still filling in — too early to read honestly yet. <a href="/now/">The cockpit</a> shows whatever's landed so far.</p>` +
+      `<p class="okay-lead">This week's numbers are still filling in — too early to read honestly yet. <a href="/cockpit/">The cockpit</a> shows whatever's landed so far.</p>` +
       asofLine;
     return;
   }
@@ -427,7 +427,7 @@ function renderWave(days) {
   const lo = scores.length ? Math.min(...scores) : 0;
   const span = Math.max(1, (scores.length ? Math.max(...scores) : 1) - lo);
   const meaningfulSpread = scores.length >= 4 && (Math.max(...scores) - lo) >= 8;
-  // Each scored day deep-links into its own cockpit sheet (/now/?date= — the
+  // Each scored day deep-links into its own cockpit sheet (/cockpit/?date= — the
   // time-travel view that already exists one URL away). The signature honesty
   // artifact stops being inert: tap a dip, read that morning. No-data days stay
   // plain spans — there's no sheet to open.
@@ -448,7 +448,7 @@ function renderWave(days) {
       v: d.score == null ? null : d.score,
     });
     if (linkable) {
-      bar.href = `/now/?date=${encodeURIComponent(d.date)}`;
+      bar.href = `/cockpit/?date=${encodeURIComponent(d.date)}`;
       bar.setAttribute("aria-label", `${d.date} · score ${d.score} — open that day's cockpit`);
     } else {
       bar.setAttribute("aria-hidden", "true");

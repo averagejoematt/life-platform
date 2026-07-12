@@ -72,6 +72,6 @@ export async function mountSinceRibbon(el) {
   const days = Math.max(1, Math.round(gapH / 24));
   el.innerHTML =
     `<p class="sv-line"><span class="sv-k label">since your last visit · ${days === 1 ? "a day" : `${days} days`} away</span> ` +
-    bits.join(" · ") + ` <a class="sv-more" href="/now/">the cockpit has the full read →</a></p>`;
+    bits.join(" · ") + ` <a class="sv-more" href="/cockpit/">the cockpit has the full read →</a></p>`;
   el.hidden = false;
 }

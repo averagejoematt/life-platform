@@ -10,7 +10,7 @@ there (see deploy/setup_remediation_role.sh); this routine adds no new IAM.
 
 Pipeline:
   1. Gate on SSM /life-platform/budget-tier — skip the whole run at tier >= 2.
-  2. Screenshot the three doors + home (/, /now/, /story/, /data/) desktop+mobile,
+  2. Screenshot the three doors + home (/, /cockpit/, /story/, /data/) desktop+mobile,
      reusing tests/visual_qa.py's capture_page() (the same harness the gating
      CI visual-qa job uses). NB: the issue text says "/evidence/" — that's the
      pre-v5 door name; it 301s to /data/ live (checked 2026-07-08), so /data/ is
@@ -55,7 +55,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.environ.get("GITHUB_REPOSITORY", "averagejoematt/life-platform")
 
 # The three doors + home (issue #823's literal scope).
-DOOR_PATHS = ["/", "/now/", "/story/", "/data/"]
+DOOR_PATHS = ["/", "/cockpit/", "/story/", "/data/"]
 
 # tests/visual_qa.py + lambdas/bedrock_client.py (and its budget_guard import)
 # aren't installed packages — add their directories to sys.path like

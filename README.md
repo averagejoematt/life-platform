@@ -22,7 +22,7 @@ A personal **health-intelligence platform** — it ingests data from ~20 wearabl
 | **AWS Bedrock** | Claude Sonnet 4.6 (narrative) + Haiku 4.5 (structured), prompt-cached |
 | **9 CDK stacks** | 100% infrastructure-as-code; OIDC CI/CD with a production-approval gate + auto-rollback |
 | **$85/mo, enforced** | A cost-governor degrades AI by budget tier; an independent AWS Budget backstops it |
-| **v4 site** | Three doors — Cockpit (`/now/`), Story (`/story/`), Evidence (`/evidence/`) |
+| **v4 site** | Three doors — Cockpit (`/cockpit/`), Story (`/story/`), Evidence (`/evidence/`) |
 
 ## Architecture (one line)
 

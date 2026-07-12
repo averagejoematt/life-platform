@@ -22,7 +22,7 @@ The site is PUBLIC (no cf-auth gate) — no authentication needed.
 
 Usage:
     python3 tests/visual_qa.py                      # full sweep, no AI
-    python3 tests/visual_qa.py --page /now/         # single page
+    python3 tests/visual_qa.py --page /cockpit/         # single page
     python3 tests/visual_qa.py --screenshot         # save full-page + chart crops
     python3 tests/visual_qa.py --screenshot --ai-qa # + Claude semantic verdict per image
     python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
@@ -115,7 +115,7 @@ PAGES = [
                 "desc": "7 pillar nodes drawn in the constellation",
             },
             {
-                "selector": "a[href='/now/'], a[href='/story/'], a[href='/data/']",
+                "selector": "a[href='/cockpit/'], a[href='/story/'], a[href='/data/']",
                 "min_count": 2,
                 "desc": "the three door links present",
             },
@@ -123,7 +123,7 @@ PAGES = [
         "charts": [".constellation svg"],
     },
     {
-        "path": "/now/",
+        "path": "/cockpit/",
         "name": "Cockpit",
         "wait_for": "[data-bind='level']",
         "checks": [
@@ -143,7 +143,7 @@ PAGES = [
                 "min_count": 1,
                 "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered",
             },
-            {"selector": "a[href='/data/'], a[href='/now/']", "min_count": 1, "desc": "door links present"},
+            {"selector": "a[href='/data/'], a[href='/cockpit/']", "min_count": 1, "desc": "door links present"},
         ],
     },
     {
@@ -852,7 +852,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="v4 visual QA sweep for averagejoematt.com")
-    ap.add_argument("--page", help="Test a single page path (e.g. /now/)")
+    ap.add_argument("--page", help="Test a single page path (e.g. /cockpit/)")
     ap.add_argument("--screenshot", action="store_true", help="Save full-page + chart-crop + mobile screenshots")
     ap.add_argument("--ai-qa", action="store_true", help="Run Claude (Bedrock) semantic QA over the screenshots")
     ap.add_argument(

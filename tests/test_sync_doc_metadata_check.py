@@ -213,7 +213,7 @@ def test_restart_url_counts_sanity_floor(tmp_path, monkeypatch):
     """A suspiciously small parse (e.g. a truncated file) falls back to None."""
     (tmp_path / "deploy").mkdir()
     (tmp_path / "deploy" / "restart_verify_rendered.py").write_text(
-        'PAGES = ["/", "/now/"]\nJSON_ENDPOINTS = ["/api/vitals"]\n', encoding="utf-8"
+        'PAGES = ["/", "/cockpit/"]\nJSON_ENDPOINTS = ["/api/vitals"]\n', encoding="utf-8"
     )
     monkeypatch.setattr(sync, "ROOT", tmp_path)
     assert sync._auto_discover_restart_url_counts() is None

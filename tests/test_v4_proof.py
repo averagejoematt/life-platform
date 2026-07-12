@@ -191,9 +191,9 @@ class TestCockpitInjection:
         assert self._mod().inject("<html><body>nope</body></html>", "<noscript>x</noscript>") is None
 
     def test_committed_now_page_carries_the_baked_block(self):
-        # The #788 acceptance test: the DELIVERED /now/ HTML carries real static
+        # The #788 acceptance test: the DELIVERED /cockpit/ HTML carries real static
         # content — curl-visible, no JS required.
-        html = (Path(__file__).resolve().parent.parent / "site" / "now" / "index.html").read_text(encoding="utf-8")
+        html = (Path(__file__).resolve().parent.parent / "site" / "cockpit" / "index.html").read_text(encoding="utf-8")
         assert "cockpit-proof:start" in html
         assert "<noscript>" in html
         assert "Character level" in html
@@ -202,7 +202,7 @@ class TestCockpitInjection:
     def test_committed_now_page_carries_the_first_visit_hint(self):
         # #807: the inline explainer markup ships in the HTML (hidden; JS unhides
         # it for first-time visitors only).
-        html = (Path(__file__).resolve().parent.parent / "site" / "now" / "index.html").read_text(encoding="utf-8")
+        html = (Path(__file__).resolve().parent.parent / "site" / "cockpit" / "index.html").read_text(encoding="utf-8")
         assert "data-hub-hint" in html
         assert "1&ndash;100 score" in html
         assert "hub-hint-x" in html

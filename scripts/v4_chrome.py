@@ -10,7 +10,7 @@ single source of truth for both, so a chrome edit is a one-file change and
 Three axes of per-page chrome variation are DELIBERATE and are parameters here — nothing
 else varies:
   * `current_door` — the door the page lives under, marked `aria-current="page"`
-    (one of "/now/" "/data/" "/coaching/" "/protocols/" "/story/", or None).
+    (one of "/cockpit/" "/data/" "/coaching/" "/protocols/" "/story/", or None).
   * `with_follow` — the "follow" pill, present on the 15 reader-facing pages.
   * `with_asof` (footer) — the live `data-bind="asof"` "updated YYYY-MM-DD" stamp in the
     footer base line; home only (story.js binds it from /api stats metadata, #1104).
@@ -27,7 +27,7 @@ import html
 # The five doors, in loop order: cockpit · data · coaching · protocols · story.
 # (href, label, sprite-key, title) — title becomes the hover tooltip, HTML-escaped.
 DOORS = [
-    ("/now/", "the cockpit", "cockpit", "Today's live instrument — your daily numbers, read back to you"),
+    ("/cockpit/", "the cockpit", "cockpit", "Today's live instrument — your daily numbers, read back to you"),
     ("/data/", "the data", "data", "Every source the platform reads — trends now and over time"),
     ("/coaching/", "the coaching", "coaching", "The AI team & their arguments — stances, track records, disagreements"),
     ("/protocols/", "the protocols", "protocols", "The levers — supplements, experiments, challenges, discoveries"),
@@ -59,7 +59,7 @@ def _door_icon(key: str) -> str:
 def doors_nav(current_door: str | None = None, with_follow: bool = False) -> str:
     """The canonical doors nav.
 
-    `current_door` is the door path ("/now/" "/data/" "/coaching/" "/protocols/"
+    `current_door` is the door path ("/cockpit/" "/data/" "/coaching/" "/protocols/"
     "/story/") to mark `aria-current="page"`, or None for pages under no door.
     `with_follow` includes the follow pill immediately before the theme toggle.
     """

@@ -372,7 +372,7 @@ def build_bundle():
 | Content honesty | #786 #787 #802 #803 #806 #821 | recap frozen, coaches self-contradict, no as-of |
 | Bugs/rigor | #783 #800 #801 #819 #820 | weight-grounding, canary judge dead, flat=inconclusive |
 | Cost | #790 #808 #809 #810 #822 | June breached $75; Haiku top line; no CW lever |
-| UX/returnability | #788 #789 #804 #805 #807 | no SSR on /now//coaching/, no "is he okay" surface |
+| UX/returnability | #788 #789 #804 #805 #807 | no SSR on /cockpit//coaching/, no "is he okay" surface |
 | Docs-can't-lie | #795 #816 #817 | alarm_count/GSI/.claude-README drift |
 | Fable opportunities | #791 #812 #813 | drift-reconciler, harness generalize, gradability triage |
 | Security defense-in-depth | #811 #815 | board_ask injection delimiter, site-api origin header |

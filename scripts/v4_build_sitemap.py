@@ -4,7 +4,7 @@ v4_build_sitemap.py — regenerate sitemap.xml for the v4 indexable surface.
 
 After the cutover the old sitemap listed pre-cutover URLs that now 301. This
 emits only what should be indexed: the Story (/), the Evidence index + topic
-pages, and root System pages — EXCLUDING anything noindex (the Cockpit /now and
+pages, and root System pages — EXCLUDING anything noindex (the Cockpit /cockpit and
 the entire /legacy tree) plus assets/api/config/data and the 404.
 
 Scans the real site/ tree, so it self-maintains as Evidence topics are added.
@@ -31,7 +31,7 @@ CHRONICLE_HUB = SITE / "story" / "chronicle" / "index.html"
 
 # NB: "data" is NOT skipped — it's now the Data pillar (HTML pages). The JSON data
 # files under /data/ aren't *.html so they're never picked up regardless.
-SKIP_TOP = {"legacy", "now", "assets", "api", "config", "404"}
+SKIP_TOP = {"legacy", "cockpit", "assets", "api", "config", "404"}
 
 _NOSCRIPT_START = "<!-- noscript-posts:start -->"
 _NOSCRIPT_END = "<!-- noscript-posts:end -->"
@@ -114,7 +114,7 @@ def main() -> int:
     (SITE / "sitemap.xml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(
         f"wrote site/sitemap.xml — {len(urls)} static URL(s) + {len(post_urls)} post URL(s) "
-        f"(Story + Evidence + system; /now and /legacy excluded as noindex)."
+        f"(Story + Evidence + system; /cockpit and /legacy excluded as noindex)."
     )
 
     _update_chronicle_noscript(posts)
