@@ -5,16 +5,24 @@ Every published chronicle installment becomes an audio episode: the DDB
 record's content_markdown is stripped to narration text, synthesized with
 Google Cloud Text-to-Speech (Chirp 3: HD — Elena's persistent voice from the
 persona registry; far more natural than the old Polly neural), and written to
-s3://{bucket}/generated/podcast/wk{N}.mp3. The run then rebuilds
-generated/podcast/episodes.json (consumed by the story page player) and
-generated/podcast/feed.xml (a podcast RSS with enclosures).
+s3://{bucket}/generated/podcast/ep-{date}.mp3. The run then rebuilds
+generated/podcast/episodes.json (consumed by the story page's per-article
+"listen" join — site/assets/js/read_aloud.js) and generated/podcast/feed.xml
+(a podcast RSS with enclosures).
+
+Reset-safe keying (#1121, the ADR-077 key-invalidation class): episodes are
+keyed by the article's publication DATE, never by week number. Week numbers
+repeat across experiment resets, and the old wk{N}.mp3 keys let a new cycle's
+Week N find the PRIOR cycle's MP3 already present, skip the render, and index
+last cycle's voice under the new article. Dates are globally unique across
+cycles, so a stale object can never be mistaken for a new article's audio.
 
 Served publicly at /podcast/* via the S3GeneratedOrigin CloudFront behavior.
 
-Idempotent: weeks that already have an MP3 are skipped (event {"force": true}
-re-renders everything — use this once after the voice swap to re-render the
-back catalogue). Scheduled Wed 15:40 UTC — after the chronicle publishes (15:00)
-and the email sends (15:10).
+Idempotent: articles that already have an MP3 (by date key) are skipped
+(event {"force": true} re-renders everything — use this once after a voice
+swap to re-render the back catalogue). Scheduled Wed 15:40 UTC — after the
+chronicle publishes (15:00) and the email sends (15:10).
 
 Cost: Chirp 3: HD ≈ $30/1M chars with 1M chars/month free → effectively $0.
 """
@@ -75,28 +83,51 @@ def _synthesize(text: str) -> bytes:
 
 
 def _published_posts() -> list:
-    obj = s3.get_object(Bucket=S3_BUCKET, Key="site/chronicle/posts.json")
+    """#1121: the CURRENT chronicle manifest (phase-filtered, current-cycle only) —
+    the same feed the story page renders. site/chronicle/posts.json is the DEAD
+    pre-v4 feed (season-1 posts, Feb–May dates); reading it kept this show frozen
+    on the pre-reset back catalogue. Deliberately NO fallback to the dead feed:
+    if the live manifest can't be read, fail loud (the handler 503s) rather than
+    voice another cycle's articles."""
+    obj = s3.get_object(Bucket=S3_BUCKET, Key="generated/journal/posts.json")
     return json.loads(obj["Body"].read()).get("posts", [])
 
 
-def _content_for(date_str: str) -> str | None:
+def _episode_slug(date_str: str) -> str:
+    """Reset-safe per-article key (#1121): the article's publication date, the
+    same globally-unique id the story reader routes by. Never the week number —
+    weeks repeat across experiment resets (ADR-077), and a week key lets a new
+    cycle's Week N inherit the prior cycle's MP3 via the idempotency check."""
+    return f"ep-{date_str}"
+
+
+def _content_for(date_str: str, title: str) -> str | None:
     """posts.json carries the ISSUE date; the DDB record is keyed by the
-    GENERATION date — usually the same day, sometimes ±1-3 days. Search out."""
+    GENERATION date — usually the same day, sometimes ±1-3 days. Search out,
+    but verify identity by title (#1121): the date-window search alone once
+    landed on a NEIGHBORING record (an unpublished pilot draft) and would have
+    voiced it under this article's name. A near-date record that isn't THIS
+    article is a miss, not a match — skip honestly (no episode) instead."""
     from datetime import timedelta as _td
 
     base = datetime.strptime(date_str, "%Y-%m-%d")
     for off in (0, 1, -1, 2, -2, 3, -3):
         d = (base + _td(days=off)).strftime("%Y-%m-%d")
         r = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#chronicle", "sk": f"DATE#{d}"})
-        md = (r.get("Item") or {}).get("content_markdown")
-        if md:
-            return md
+        item = r.get("Item") or {}
+        md = item.get("content_markdown")
+        if not md:
+            continue
+        rec_title = str(item.get("title") or "").strip().lower()
+        if rec_title and title and rec_title != title.strip().lower():
+            continue  # a different article that happens to sit nearby — keep looking
+        return md
     return None
 
 
-def _episode_exists(week) -> bool:
+def _episode_exists(slug: str) -> bool:
     try:
-        s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.mp3")
+        s3.head_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/{slug}.mp3")
         return True
     except Exception:
         return False
@@ -107,7 +138,9 @@ def _rfc822(date_str: str) -> str:
 
 
 def _write_indexes(episodes: list) -> None:
-    """episodes: [{week, title, date, url, bytes, excerpt}] newest-first."""
+    """episodes: [{week, title, date, url, bytes, excerpt}] newest-first.
+    `date` is the join key the front-end matches articles on (#1121); `week`
+    is informational only — it repeats across resets and must never key."""
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=f"{PREFIX}/episodes.json",
@@ -120,7 +153,7 @@ def _write_indexes(episodes: list) -> None:
     <title>{_xml(e["title"])}</title>
     <description>{_xml(e.get("excerpt") or e["title"])}</description>
     <enclosure url="{SITE}{e["url"]}" length="{e["bytes"]}" type="audio/mpeg"/>
-    <guid isPermaLink="false">measured-life-wk{e["week"]}</guid>
+    <guid isPermaLink="false">measured-life-{e["date"]}</guid>
     <pubDate>{_rfc822(e["date"])}</pubDate>
   </item>"""
         for e in episodes
@@ -162,42 +195,49 @@ def lambda_handler(event, context):
         logger.error(f"podcast: could not load posts.json — {e}")
         return {"statusCode": 503, "body": json.dumps({"error": "posts.json unavailable"})}
 
-    for p in sorted(posts, key=lambda x: x.get("week", 0), reverse=True):
-        week, date_str, title = p.get("week"), p.get("date"), p.get("title", f"Week {p.get('week')}")
-        if week is None or not date_str:
+    # Sort by DATE, newest first — the per-article identity (#1121). The old
+    # week-number sort collides when week labels repeat (two curated prologues
+    # both carry week 0; weeks also restart every cycle).
+    for p in sorted(posts, key=lambda x: x.get("date") or "", reverse=True):
+        date_str, title = p.get("date"), str(p.get("title") or "")
+        if not date_str:
             continue
-        # Per-episode isolation: one Polly/S3 failure must not abort the others
+        slug = _episode_slug(date_str)
+        # Per-episode isolation: one TTS/S3 failure must not abort the others
         # or skip the index rebuild (this runs weekly, unattended).
         try:
-            key = f"{PREFIX}/wk{week}.mp3"
-            if force or not _episode_exists(week):
-                md = _content_for(date_str)
+            key = f"{PREFIX}/{slug}.mp3"
+            if force or not _episode_exists(slug):
+                md = _content_for(date_str, title)
                 if not md:
-                    logger.warning(f"wk{week}: no content_markdown for {date_str} — skipped")
+                    # Honest-empty: no verified content for THIS article → no episode.
+                    logger.warning(f"{slug}: no content_markdown matching '{title}' near {date_str} — skipped")
                     continue
+                # No week number in the permanent audio (weeks repeat across cycles);
+                # the article's own title is its identity.
                 narration = (
-                    f"The Measured Life, issue {week}: {title}. "
+                    f"The Measured Life: {title}. "
                     f"Written by Elena Voss — a language model embedded with the experiment — "
                     f"and read by a synthetic voice.\n\n" + _markdown_to_narration(md)
                 )
                 audio = _synthesize(narration)
                 s3.put_object(Bucket=S3_BUCKET, Key=key, Body=audio, ContentType="audio/mpeg", CacheControl="max-age=86400, public")
                 rendered += 1
-                logger.info(f"wk{week}: rendered {len(audio)} bytes ({len(narration)} chars)")
+                logger.info(f"{slug}: rendered {len(audio)} bytes ({len(narration)} chars)")
             size = s3.head_object(Bucket=S3_BUCKET, Key=key)["ContentLength"]
             episodes.append(
                 {
-                    "week": week,
-                    "title": title,
+                    "week": p.get("week"),  # informational only — never a join key
+                    "title": title or date_str,
                     "date": date_str,
-                    "url": f"/podcast/wk{week}.mp3",
+                    "url": f"/podcast/{slug}.mp3",
                     "bytes": size,
                     "excerpt": p.get("excerpt", ""),
                 }
             )
         except Exception as e:
             errors += 1
-            logger.error(f"wk{week}: episode failed (non-fatal) — {e}")
+            logger.error(f"{slug}: episode failed (non-fatal) — {e}")
 
     try:
         _write_indexes(episodes)

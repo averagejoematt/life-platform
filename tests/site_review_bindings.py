@@ -156,6 +156,7 @@ PAGE_BINDINGS = [
             {"url": "/api/field_notes", "role": "primary", "metrics": []},
             {"url": "/api/coaches", "role": "primary", "metrics": []},
             {"url": "/panelcast/episodes.json", "role": "secondary", "metrics": []},
+            {"url": "/podcast/episodes.json", "role": "secondary", "metrics": []},  # #1121 per-article read-aloud join
             {"url": "/journal/posts.json", "role": "secondary", "metrics": []},
             {"url": "/api/journey_timeline", "role": "secondary", "metrics": []},
         ],
@@ -166,7 +167,10 @@ PAGE_BINDINGS = [
         "door": "story",
         "narrative_order": 4,
         "story_intent": "the weekly essay — Elena Voss narrates the week",
-        "endpoints": [{"url": "/chronicle/posts.json", "role": "primary", "metrics": []}],
+        "endpoints": [
+            {"url": "/chronicle/posts.json", "role": "primary", "metrics": []},
+            {"url": "/podcast/episodes.json", "role": "secondary", "metrics": []},  # #1121 per-article read-aloud join
+        ],
     },
     {
         "path": "/story/journal/",
