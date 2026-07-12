@@ -27,7 +27,7 @@ import json
 import logging
 import math
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -39,14 +39,15 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.4.0"  # #957: up-gate judges the UNBLENDED raw — no-data days can never support a level-up
+ENGINE_VERSION = "1.5.0"  # #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
+# modifiers/challenge XP are engine inputs, dark down-streaks persist, headline renormalized (ADR-134)
 
 # ── ADR-104: coverage floor below which a day carries no leveling signal ──
 DEFAULT_LEVEL_CHANGE_MIN_COVERAGE = 0.5
 
 # ── XP defaults (also in config) [F-02] ──
 DEFAULT_XP_PER_LEVEL = 100
-DEFAULT_DAILY_XP_DECAY = 2
+DEFAULT_DAILY_XP_DECAY = 1  # #958/ADR-134: zero-point at "a decent day" (raw 40-59 nets 0, 60+ positive)
 DEFAULT_XP_BUFFER_THRESHOLD = 20
 
 # ── Tier definitions (also in config, but hardcoded as fallback) ──
@@ -179,7 +180,7 @@ def get_tier(level: int, config: Optional[dict[str, Any]] = None) -> dict[str, A
     return tiers[-1] if level > 80 else tiers[0]
 
 
-def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0):
+def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0, bonus_xp=0):
     """Compute XP delta with daily decay.
 
     Returns (xp_earned, xp_delta, new_xp_total, new_xp_debt). [F-02, #913]
@@ -192,7 +193,20 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0
     downstream ``% xp_per_level`` consumer is untouched) and xp_debt (the hole
     dug below zero, capped at leveling.xp_debt_cap — default one level's worth —
     so a long dark stretch stays climbable). Good days pay debt down before XP
-    grows again; the UI renders the debt as the visible bleed."""
+    grows again; the UI renders the debt as the visible bleed.
+
+    #958 zero-point (ADR-134): with the config's daily_xp_decay of 1, XP breaks
+    even on a 40-59 day and goes positive at 60+ — "a decent day" is the neutral
+    point, not raw 80. The old decay of 2 made every realistic-good trajectory
+    (slow improver, oscillator, post-dark recovery) bleed permanent debt while
+    levels climbed — a 420-day simulated Mastery character wore a maxed debt
+    badge forever. Debt is now a dark-stretch signal a recovery arc visibly
+    repays, never a one-way ratchet.
+
+    #961: ``bonus_xp`` (challenge completions) enters the signed balance like
+    any other XP, so it pays existing debt before growing the total — it can
+    never teleport past the paydown contract or perturb the demotion buffer
+    behind the gates' backs the way the old post-engine ``xp_total +=`` did."""
     bands = config.get(
         "xp_bands",
         [
@@ -217,7 +231,7 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0
             earned = band["xp"]
             break
 
-    xp_delta = earned - daily_decay
+    xp_delta = earned - daily_decay + (bonus_xp or 0)
     # Signed balance: pay existing debt first, then grow XP; a shortfall deepens
     # the debt instead of vanishing under a silent 0-floor. [#913]
     debt_cap = leveling.get("xp_debt_cap", leveling.get("xp_per_level", DEFAULT_XP_PER_LEVEL))
@@ -228,7 +242,7 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0
     return earned, xp_delta, new_xp, new_debt
 
 
-def _roll_xp_buffer(prev_buffer, prev_xp, new_xp, xp_per_level):
+def _roll_xp_buffer(prev_buffer, prev_xp, new_xp, xp_per_level, buffer_cap=None):
     """Roll the level-down XP buffer forward one day. [F-02, #954]
 
     The old buffer was ``xp_total % xp_per_level`` — a modulo that WRAPS UPWARD
@@ -236,16 +250,25 @@ def _roll_xp_buffer(prev_buffer, prev_xp, new_xp, xp_per_level):
     near-maximum demotion immunity (buffer 5 → 99), so a crashed pillar with
     lucky lifetime XP fell 30→28 instead of 30→18 over 60 days. The buffer is
     now explicit state, monotone in the day's XP change: it FILLS by XP gained
-    (capped at one level's worth) and DRAINS by XP lost, floored at 0 — a
-    decline can only ever deplete it. ``prev_buffer=None`` (state stored before
-    this fix, or the first day of a cycle) seeds from the legacy within-level
-    remainder of the PREVIOUS total, the last honest reading before the wrap.
+    and DRAINS by XP lost, floored at 0 — a decline can only ever deplete it.
+    ``prev_buffer=None`` (state stored before this fix, or the first day of a
+    cycle) seeds from the legacy within-level remainder of the PREVIOUS total,
+    the last honest reading before the wrap.
+
+    #958/ADR-134 sizing: the fill caps at ``leveling.xp_buffer_cap`` (default
+    one level's worth for legacy configs). With the v2 XP economy any sustained
+    good stretch pins an uncapped buffer at 100, which — against the ≥20 gate
+    and a −1..−2/day bleed — silently granted 40+ days of demotion immunity.
+    The cap bounds the shield to the anti-flip-flop scale it was meant for
+    (cap 40 ≈ 10–20 days), and a confirmed dark stretch bypasses the gate
+    entirely (see evaluate_level_changes).
     """
     if xp_per_level <= 0:
         return 0
+    cap = float(buffer_cap) if buffer_cap else float(xp_per_level)
     if prev_buffer is None:
-        prev_buffer = (prev_xp or 0) % xp_per_level
-    return round(max(0.0, min(float(prev_buffer) + (float(new_xp) - float(prev_xp or 0)), float(xp_per_level))), 2)
+        prev_buffer = min((prev_xp or 0) % xp_per_level, cap)
+    return round(max(0.0, min(float(prev_buffer) + (float(new_xp) - float(prev_xp or 0)), cap)), 2)
 
 
 # ==============================================================================
@@ -758,12 +781,11 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
     else:
         scores["interaction_quality"] = None
 
-    # Buddy engagement
-    buddy_days = data.get("buddy_freshness_days")
-    if buddy_days is not None:
-        scores["buddy_engagement"] = _clamp(round(100 - (buddy_days / 7) * 100, 1))
-    else:
-        scores["buddy_engagement"] = None
+    # Buddy engagement: REMOVED (#962, B-3 precedent — same disease as the
+    # body-fat component). No producer ever wrote buddy_freshness_days, so the
+    # component could never score and structurally capped relationships
+    # coverage at 0.85. Gone from character_sheet.json too; re-add via a real
+    # producer + config entry if a buddy system ever ships.
 
     # Social mood correlation
     mood = _safe_float(journal, "mood_avg")
@@ -773,6 +795,90 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
         scores["social_mood_correlation"] = None
 
     return _weighted_pillar_score(scores, components)
+
+
+#  Primary pillars whose raw scores feed the derived consistency inputs (#962).
+_STREAK_PILLARS = ("sleep", "movement", "nutrition", "metabolic", "mind")
+
+
+def derive_consistency_inputs(dated_records: list[dict[str, Any]], as_of_date: str) -> dict[str, Any]:
+    """#962: derive the two consistency inputs no producer ever set, from
+    stored character_sheet records (each carrying ``date`` + ``pillar_*``).
+
+    Returns {"streak_all_above_30th": int|None, "weekend_weekday_ratio": float|None}.
+
+    - streak_all_above_30th — consecutive days ending the day before
+      ``as_of_date`` where every instrumented primary pillar's raw_score held
+      ≥ 30 (the "no pillar below 30" floor the consistency protocols coach).
+      A missing day breaks the streak (a gap is not a floor held); pillars
+      flagged not_instrumented that day are skipped, never counted against.
+    - weekend_weekday_ratio — mean composite raw on weekend days / weekday
+      days over the trailing 14 records; None below 2 weekend + 4 weekday
+      days of data (no ratio from nothing, ADR-105).
+
+    Pure function — the compute lambda calls it with the same 21-day record
+    window it already fetches for EMA histories, so no extra reads.
+    """
+    by_date = {}
+    for rec in dated_records or []:
+        d = rec.get("date") or (rec.get("sk", "") or "").replace("DATE#", "")
+        if d:
+            by_date[d[:10]] = rec
+
+    def _day_raws(rec):
+        raws = []
+        for p in _STREAK_PILLARS:
+            pd = rec.get(f"pillar_{p}") or {}
+            if pd.get("not_instrumented"):
+                continue
+            raw = pd.get("raw_score")
+            if raw is not None:
+                try:
+                    raws.append(float(raw))
+                except (TypeError, ValueError):
+                    pass
+        return raws
+
+    try:
+        as_of = datetime.strptime(as_of_date[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return {"streak_all_above_30th": None, "weekend_weekday_ratio": None}
+
+    # ── streak: walk back day by day from yesterday; any gap or sub-30 day breaks ──
+    streak = 0
+    cursor = as_of - timedelta(days=1)
+    while True:
+        rec = by_date.get(cursor.isoformat())
+        if not rec:
+            break
+        raws = _day_raws(rec)
+        if not raws or min(raws) < 30:
+            break
+        streak += 1
+        cursor -= timedelta(days=1)
+        if streak >= 60:  # nothing downstream distinguishes past this; bound the walk
+            break
+
+    # ── weekend/weekday composite ratio over the trailing 14 days ──
+    weekend, weekday = [], []
+    for back in range(1, 15):
+        d = as_of - timedelta(days=back)
+        rec = by_date.get(d.isoformat())
+        if not rec:
+            continue
+        raws = _day_raws(rec)
+        if not raws:
+            continue
+        composite = sum(raws) / len(raws)
+        (weekend if d.weekday() >= 5 else weekday).append(composite)
+
+    ratio = None
+    if len(weekend) >= 2 and len(weekday) >= 4:
+        wk_mean = sum(weekday) / len(weekday)
+        if wk_mean > 0:
+            ratio = round((sum(weekend) / len(weekend)) / wk_mean, 3)
+
+    return {"streak_all_above_30th": streak if streak > 0 else (0 if by_date else None), "weekend_weekday_ratio": ratio}
 
 
 def compute_consistency_raw(
@@ -1062,6 +1168,7 @@ def evaluate_level_changes(
     raw_score: Optional[float] = None,
     unadjusted_level_score: Optional[float] = None,
     raw_score_unblended: Optional[float] = None,
+    presence_dark: bool = False,
 ) -> dict[str, Any]:
     """Level changes with progressive difficulty by tier. [F-15, F-10, F-11, F-02]
 
@@ -1117,6 +1224,18 @@ def evaluate_level_changes(
       silence) — and the up-gate judges THAT. The blend keeps smoothing the
       EMA/display path; it just isn't performance, so it can't buy a climb.
       Legacy callers that don't pass it fall back to the blended raw.
+
+      #959 dark persistence (ADR-134): the fresh-streak-per-drop cadence
+      (streak_below resets to 0 after every level_down) is anti-flip-flop
+      machinery for NOISY ENGAGED data — it exists so one bad week can't
+      saw-tooth a level. A confirmed multi-day dark stretch is not noise; it
+      is a provable sustained absence, and re-demanding a fresh 7-day streak
+      between each single drop let a silent month cost the headline only ~2
+      levels (the cycle-4 failure mode). When the caller passes
+      ``presence_dark=True`` (atrophy-qualifying pillar, presence_class=dark
+      past grace, never a planned pause) the down-streak PERSISTS across
+      drops, so the level keeps stepping down toward the crashed target day
+      by day. Config kill-switch: leveling.neglect_decay.persistent_down_streak.
     """
     leveling = config.get("leveling", {})
 
@@ -1203,8 +1322,11 @@ def evaluate_level_changes(
         streak_below += 1
         streak_above = 0
         if streak_below >= down_streak_needed:
-            # XP buffer gate: can't lose a level until XP buffer is depleted
-            if xp_buffer >= xp_buffer_threshold:
+            # XP buffer gate: can't lose a level until XP buffer is depleted.
+            # #959: a confirmed dark stretch bypasses the buffer — banked XP
+            # is flip-flop insurance for noisy engaged data, never a shield
+            # against a provable sustained absence (ADR-134).
+            if xp_buffer >= xp_buffer_threshold and not presence_dark:
                 pass  # Buffer absorbs the pressure — hold level
             else:
                 delta = current_level - target_level
@@ -1218,7 +1340,11 @@ def evaluate_level_changes(
                 else:
                     old_level = current_level
                     current_level = max(current_level - step, 1)
-                    streak_below = 0
+                    # #959: in a confirmed dark stretch the streak persists —
+                    # a provable absence is not noise, so the anti-flip-flop
+                    # reset must not throttle the honest fall (ADR-134).
+                    if not presence_dark:
+                        streak_below = 0
                     events.append(
                         {
                             "type": "level_down",
@@ -1298,8 +1424,22 @@ def pillar_drivers(details: dict[str, Any], top_n: int = 2) -> dict[str, list[st
 # ==============================================================================
 
 
-def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict). [F-05]"""
+def compute_cross_pillar_effects(
+    pillar_levels: dict[str, float], config: dict[str, Any], vice_streaks: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
+    """Evaluate cross-pillar effects. Returns (active_effects, modifier_dict). [F-05]
+
+    ADR-134 (#963, decided): conditions evaluate EMA level_SCORES, not earned
+    levels — deliberately. Effects model current-state physiology synergies
+    (poor sleep drags today's training capacity), not tier achievements; gating
+    them on the slow-converging earned level would fire Sleep Drag on every
+    fresh-cycle character regardless of how they actually slept. The config
+    narrative is worded to match (thresholds are score thresholds).
+
+    #962: ``vice_streaks`` (the day's {vice: streak_days} dict from
+    habit_scores) makes ``any_vice_streak`` conditions data-driven — they were
+    hardcoded always-False while the config advertised a Vice Shield effect.
+    """
     effects_config = config.get("cross_pillar_effects", [])
     active = []
     modifiers = {}
@@ -1308,7 +1448,7 @@ def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[s
         condition = effect.get("condition", "")
         targets = effect.get("targets", {})
 
-        if _evaluate_condition(condition, pillar_levels):
+        if _evaluate_condition(condition, pillar_levels, vice_streaks=vice_streaks):
             active.append(
                 {
                     "name": effect["name"],
@@ -1333,12 +1473,12 @@ def compute_cross_pillar_effects(pillar_levels: dict[str, float], config: dict[s
     return active, modifiers
 
 
-def _evaluate_condition(condition_str, pillar_levels):
-    """Evaluate a cross-pillar effect condition against current pillar levels.
+def _evaluate_condition(condition_str, pillar_levels, vice_streaks=None):
+    """Evaluate a cross-pillar effect condition against current pillar scores.
 
     Supports "all_pillars <op> <val>", a single "<pillar> <op> <val>" comparison,
-    and " AND "-joined conjunctions. vice_streak conditions are data-driven and
-    always return False here. Returns True if the condition holds.
+    "any_vice_streak <op> <val>" (against the day's vice_streaks dict, #962),
+    and " AND "-joined conjunctions. Returns True if the condition holds.
     """
     if not condition_str:
         return False
@@ -1352,10 +1492,20 @@ def _evaluate_condition(condition_str, pillar_levels):
         return False
 
     if "vice_streak" in condition_str:
-        return False  # Handled via data
+        # #962: was hardcoded False ("handled via data" — nothing handled it).
+        # any_vice_streak <op> <val> holds when ANY tracked vice streak does.
+        parts = condition_str.split()
+        if len(parts) >= 3 and parts[0] == "any_vice_streak" and vice_streaks:
+            try:
+                op, val = parts[1], float(parts[2])
+                streaks = [float(v) for v in vice_streaks.values() if isinstance(v, (int, float))]
+                return any(_compare(s, op, val) for s in streaks)
+            except (ValueError, TypeError):
+                return False
+        return False
 
     if " AND " in condition_str:
-        return all(_evaluate_condition(sc.strip(), pillar_levels) for sc in condition_str.split(" AND "))
+        return all(_evaluate_condition(sc.strip(), pillar_levels, vice_streaks=vice_streaks) for sc in condition_str.split(" AND "))
 
     parts = condition_str.split()
     if len(parts) >= 3:
@@ -1419,10 +1569,35 @@ def compute_character_sheet(
             details["_not_instrumented_note"] = pillar_configs.get(pillar_name, {}).get("not_instrumented_note")
 
     # Step 1: Raw scores for 6 primary pillars
+    # #961 (ADR-134): behavioral modifiers (e.g. the food-delivery penalty/bonus)
+    # arrive as ENGINE INPUTS via data["raw_score_modifiers"] =
+    # {pillar: {"multiplier": m, "source": "..."}} and apply HERE, before the
+    # EMA, XP bands, up-gate, and drivers — so the stored raw_score is exactly
+    # the number the engine scored, with provenance. The old post-engine
+    # overwrite mutated the stored value after every gate had judged the
+    # unmodified one and leaked silently into the next day's EMA history.
+    raw_modifiers = data.get("raw_score_modifiers") or {}
     pillar_raw_scores = {}
     pillar_details = {}
     for pillar_name, compute_fn in PILLAR_COMPUTERS.items():
         raw_score, details = compute_fn(data, config)
+        mod = raw_modifiers.get(pillar_name)
+        if mod and raw_score is not None:
+            try:
+                mult = float(mod.get("multiplier", 1.0))
+            except (TypeError, ValueError):
+                mult = 1.0
+            if mult != 1.0:
+                details["_modifier"] = {
+                    "source": mod.get("source"),
+                    "multiplier": mult,
+                    "pre_modifier_raw": raw_score,
+                }
+                raw_score = round(_clamp(raw_score * mult), 1)
+                if details.get("_raw_unblended") is not None:
+                    # The gate judges the modified performance too — a delivery
+                    # day IS the behavior being scored, not measurement noise.
+                    details["_raw_unblended"] = round(_clamp(details["_raw_unblended"] * mult), 1)
         pillar_raw_scores[pillar_name] = raw_score
         pillar_details[pillar_name] = details
         _attach_not_instrumented_note(pillar_name, details)
@@ -1443,7 +1618,9 @@ def compute_character_sheet(
         pillar_level_scores[pillar_name] = compute_ema_level_score(history, config, pillar_name)
 
     # Step 4: Cross-pillar effects — ALL modifiers multiplicative [F-05]
-    active_effects, modifiers = compute_cross_pillar_effects(pillar_level_scores, config)
+    # #962: vice_streaks (lifted from habit_scores by the caller) makes the
+    # any_vice_streak conditions data-driven instead of hardcoded-False.
+    active_effects, modifiers = compute_cross_pillar_effects(pillar_level_scores, config, vice_streaks=data.get("vice_streaks"))
     adjusted_level_scores = {}
     for pillar_name, ls in pillar_level_scores.items():
         mod = modifiers.get(pillar_name, 0)
@@ -1465,11 +1642,18 @@ def compute_character_sheet(
     min_share = neglect_cfg.get("min_behavioral_share", 0.3)
     abs_floor = neglect_cfg.get("floor", 0)
     pillar_neglect = {}
+    # #959 (ADR-134): pillars whose down-streak persists across drops today —
+    # the same atrophy-qualifying set (dark past grace, behavioral-heavy,
+    # never a planned pause), behind the persistent_down_streak config switch.
+    dark_persist_pillars = set()
     if decay:
+        persist_enabled = bool(neglect_cfg.get("persistent_down_streak", False))
         for pillar_name, ls in adjusted_level_scores.items():
             share = _behavioral_weight_share(pillar_configs.get(pillar_name, {}))
             if share < min_share:
                 continue
+            if persist_enabled:
+                dark_persist_pillars.add(pillar_name)
             raw = pillar_raw_scores.get(pillar_name)
             floor = max(abs_floor, raw if raw is not None else 0)
             decayed = max(floor, ls * decay["multiplier"])
@@ -1492,6 +1676,10 @@ def compute_character_sheet(
                 "xp_buffer": pp.get("xp_buffer"),  # #954: explicit buffer state (None = legacy, seeds from % remainder)
             }
 
+    # #961: challenge bonus XP arrives as an engine input ({pillar: xp}) and
+    # flows through _compute_xp's signed balance — debt pays down first.
+    challenge_bonus = data.get("challenge_bonus_xp") or {}
+
     all_events = []
     pillar_results = {}
     for pillar_name in pillar_raw_scores:
@@ -1509,18 +1697,43 @@ def compute_character_sheet(
             # #957: the up-gate judges the day's UNBLENDED raw (0 in silence) —
             # the confidence blend smooths uncertainty, it never buys a climb.
             raw_score_unblended=pillar_details[pillar_name].get("_raw_unblended"),
+            # #959: a confirmed dark stretch keeps the down-streak armed.
+            presence_dark=pillar_name in dark_persist_pillars,
         )
 
         prev_xp = prev_state.get("xp_total", 0) if prev_state else 0
         prev_debt = prev_state.get("xp_debt", 0) if prev_state else 0
-        xp_earned, xp_delta, new_xp, new_debt = _compute_xp(
-            pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number, previous_debt=prev_debt
-        )
+        bonus_xp = challenge_bonus.get(pillar_name, 0) or 0
+        # #964 (ADR-134): XP mirrors the level gate — a day with no signal for
+        # this pillar (coverage below the floor, or not instrumented at all)
+        # carries no XP judgment in either direction. The uninstrumented
+        # relationships pillar used to feed its 50.0 placeholder into the
+        # bands as "a mediocre day" and bleed a permanent phantom −100 debt,
+        # contradicting ADR-104's "a device gap is not a failure".
+        xp_hold = bool(level_state.get("coverage_hold")) or bool(pillar_details[pillar_name].get("_not_instrumented"))
+        if xp_hold:
+            xp_earned, xp_delta = 0, 0
+            new_xp, new_debt = prev_xp, prev_debt
+            if bonus_xp:  # a completed challenge still credits, debt-first
+                balance = prev_xp - prev_debt + bonus_xp
+                new_xp, new_debt = max(0, balance), max(0, -balance)
+                xp_delta = bonus_xp
+        else:
+            xp_earned, xp_delta, new_xp, new_debt = _compute_xp(
+                pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number, previous_debt=prev_debt, bonus_xp=bonus_xp
+            )
         level_state["xp_total"] = new_xp
         # #954: roll the demotion buffer forward with today's XP change — fills
         # on gain, drains on loss, never the wrap-prone % of lifetime XP.
-        xp_per_level_cfg = (config.get("leveling", {}) or {}).get("xp_per_level", DEFAULT_XP_PER_LEVEL)
-        level_state["xp_buffer"] = _roll_xp_buffer(prev_state.get("xp_buffer") if prev_state else None, prev_xp, new_xp, xp_per_level_cfg)
+        _leveling_cfg = config.get("leveling", {}) or {}
+        xp_per_level_cfg = _leveling_cfg.get("xp_per_level", DEFAULT_XP_PER_LEVEL)
+        level_state["xp_buffer"] = _roll_xp_buffer(
+            prev_state.get("xp_buffer") if prev_state else None,
+            prev_xp,
+            new_xp,
+            xp_per_level_cfg,
+            buffer_cap=_leveling_cfg.get("xp_buffer_cap"),
+        )
 
         pillar_results[pillar_name] = {
             "raw_score": pillar_raw_scores[pillar_name],
@@ -1531,6 +1744,10 @@ def compute_character_sheet(
             "xp_total": level_state["xp_total"],
             "xp_delta": xp_delta,
             "xp_earned": xp_earned,
+            # #961: engine-input provenance — the modifier that scaled today's
+            # raw_score (None when none applied) and any challenge bonus XP.
+            "raw_modifier": pillar_details[pillar_name].get("_modifier"),
+            "challenge_bonus_xp": bonus_xp,
             # #913: the visible bleed — XP owed below the 0-floor, paid down
             # before xp_total grows again. 0 on healthy days.
             "xp_debt": new_debt,
@@ -1573,9 +1790,20 @@ def compute_character_sheet(
         all_events.extend(level_state.get("events", []))
 
     # Step 6: Overall Character Level — floor instead of round [F-14]
+    # #960 (ADR-134): a pillar that has NEVER been instrumented (flagged
+    # not_instrumented today AND still at level 1) is excluded and the weights
+    # renormalize over the pillars that actually measure something. The frozen
+    # relationships pillar (#747) used to sit in the mean at level 1 × 0.07,
+    # silently capping the reachable headline at floor(93.07) = 93 and pushing
+    # Elite out of any horizon. Once a pillar earns its first level it counts
+    # forever — going dark later drags honestly instead of vanishing.
     weighted_level_sum = 0.0
     total_weight = 0.0
+    headline_excluded = []
     for pillar_name, result in pillar_results.items():
+        if result.get("not_instrumented") and result["level"] <= 1:
+            headline_excluded.append(pillar_name)
+            continue
         weight = pillar_configs.get(pillar_name, {}).get("weight", 1.0 / 7)
         weighted_level_sum += result["level"] * weight
         total_weight += weight
@@ -1615,9 +1843,14 @@ def compute_character_sheet(
         "avg_confidence": avg_confidence,
         "active_effects": active_effects,
         "level_events": all_events,
+        # #960: which pillars the headline mean excluded (never-instrumented).
+        "headline_excluded_pillars": headline_excluded,
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "engine_version": ENGINE_VERSION,
     }
+    # #961: record-level challenge summary (site_writer contract).
+    if challenge_bonus:
+        record["challenge_bonus_xp"] = dict(challenge_bonus)
     for pillar_name, result in pillar_results.items():
         record[f"pillar_{pillar_name}"] = result
 

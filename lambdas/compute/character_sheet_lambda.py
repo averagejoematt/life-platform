@@ -267,6 +267,10 @@ def assemble_data(yesterday_str):
     data["journal_entries"] = fetch_journal_entries(yesterday_str)
     data["journal"] = merge_journal_view(data["journal_entries"])
     data["habit_scores"] = fetch_date("habit_scores", yesterday_str)
+    # #962: daily_metrics_compute writes vice_streaks INSIDE the habit_scores
+    # record; the engine's vice_control component and the Vice Shield effect
+    # read a top-level key — lift it (it was never wired, permanently dead).
+    data["vice_streaks"] = (data["habit_scores"] or {}).get("vice_streaks") or None
     # SoM daily aggregates (som_avg_valence) live on the apple_health record, not a
     # separate state_of_mind partition — reuse the already-fetched apple record.
     data["state_of_mind"] = data.get("apple") or {}
@@ -413,8 +417,9 @@ def load_previous_state(yesterday_str):
 def load_raw_score_histories(yesterday_str, window=21):
     """Load up to `window` days of raw_score histories from stored character sheets.
 
-    Returns dict of pillar_name -> list of raw_scores (oldest first).
-    The engine uses these for EMA smoothing.
+    Returns (histories, records): dict of pillar_name -> list of raw_scores
+    (oldest first) for EMA smoothing, plus the raw dated records so the
+    caller can derive the #962 consistency inputs from the same read.
     """
     dt = datetime.strptime(yesterday_str, "%Y-%m-%d")
     start = (dt - timedelta(days=window)).strftime("%Y-%m-%d")
@@ -430,7 +435,7 @@ def load_raw_score_histories(yesterday_str, window=21):
             raw = pdata.get("raw_score")
             histories[p].append(float(raw) if raw is not None else 40.0)
 
-    return histories
+    return histories, records
 
 
 # ==============================================================================
@@ -438,8 +443,15 @@ def load_raw_score_histories(yesterday_str, window=21):
 # ==============================================================================
 
 
-def get_food_delivery_modifier():
-    """Returns a multiplier (0.85-1.10) for the Nutrition pillar based on delivery streak."""
+def get_food_delivery_modifier(target_date_str):
+    """Returns a multiplier (0.85-1.10) for the Nutrition pillar based on delivery streak.
+
+    #961: now an ENGINE INPUT (data["raw_score_modifiers"]) instead of a
+    post-compute overwrite of the stored raw_score — the XP bands, up-gate,
+    drivers, and next-day EMA all see the modified value, with provenance.
+    The delivery-day penalty compares against the date being SCORED, not the
+    wall-clock date the lambda happens to run on.
+    """
     try:
         resp = table.get_item(Key={"pk": "USER#matthew#SOURCE#food_delivery", "sk": "STREAK#current"})
         streak = resp.get("Item", {})
@@ -447,10 +459,9 @@ def get_food_delivery_modifier():
             return 1.0
         streak_days = int(streak.get("streak_days", 0))
         last_order = streak.get("last_order_date", "")
-        from datetime import datetime
 
         # 15% penalty for ordering delivery; graduated bonus at 7/14/30 clean days
-        if last_order == datetime.now(timezone.utc).strftime("%Y-%m-%d"):
+        if last_order == target_date_str:
             return 0.85
         if streak_days >= 30:
             return 1.10
@@ -461,6 +472,76 @@ def get_food_delivery_modifier():
         return 1.0
     except Exception:
         return 1.0
+
+
+# ==============================================================================
+# CHALLENGE BONUS XP — collected pre-compute, credited THROUGH the engine (#961)
+# ==============================================================================
+
+CHALLENGE_DOMAIN_TO_PILLAR = {
+    "sleep": "sleep",
+    "movement": "movement",
+    "nutrition": "nutrition",
+    "supplements": "nutrition",
+    "mental": "mind",
+    "social": "relationships",
+    "discipline": "consistency",
+    "metabolic": "metabolic",
+    "general": "consistency",
+}
+
+
+def collect_challenge_bonus(yesterday_str):
+    """Challenges completed on the target date, not yet XP-consumed.
+
+    Returns ({pillar: total_bonus_xp}, [challenge items to mark consumed]).
+    #961: the bonus is handed to the engine as data["challenge_bonus_xp"] so
+    it flows through the #913 debt-paydown contract instead of being bolted
+    onto xp_total after every gate already ran. Marking xp_consumed_at moves
+    to AFTER the record store succeeds (a failed store no longer eats the XP).
+    """
+    bonus = {}
+    items = []
+    try:
+        from boto3.dynamodb.conditions import Key as _Key
+
+        _ch_pk = USER_PREFIX + "challenges"
+        _ch_kwargs = with_phase_filter(
+            {
+                "KeyConditionExpression": _Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
+            }
+        )
+        _ch_resp = table.query(**_ch_kwargs)
+        for ch in _ch_resp.get("Items", []):
+            if (
+                ch.get("status") in ("completed", "failed")
+                and (ch.get("completed_at", "") or "").startswith(yesterday_str)
+                and not ch.get("xp_consumed_at")
+                and int(d2f(ch.get("character_xp_awarded", 0))) > 0
+            ):
+                xp = int(d2f(ch.get("character_xp_awarded", 0)))
+                pillar = CHALLENGE_DOMAIN_TO_PILLAR.get(ch.get("domain", "general"), "consistency")
+                bonus[pillar] = bonus.get(pillar, 0) + xp
+                items.append(ch)
+                logger.info(f"[character]   CHALLENGE XP: +{xp} to {pillar} from '{ch.get('name', '?')}' ({ch.get('domain', '?')})")
+    except Exception as _ch_err:
+        logger.warning(f"[character] Challenge XP collection failed (non-fatal): {_ch_err}")
+        return {}, []
+    return bonus, items
+
+
+def mark_challenges_consumed(items):
+    """Stamp xp_consumed_at on credited challenges — called only after the
+    character record stored successfully (#961)."""
+    for ch in items:
+        try:
+            table.update_item(
+                Key={"pk": USER_PREFIX + "challenges", "sk": ch["sk"]},
+                UpdateExpression="SET xp_consumed_at = :ts",
+                ExpressionAttributeValues={":ts": datetime.now(timezone.utc).isoformat()},
+            )
+        except Exception as e:
+            logger.warning(f"[character] xp_consumed_at mark failed for {ch.get('sk')}: {e}")
 
 
 # ==============================================================================
@@ -578,9 +659,24 @@ def lambda_handler(event, context):
     else:
         logger.info("[character] No previous state — starting from baseline")
 
-    raw_score_histories = load_raw_score_histories(yesterday_str)
+    raw_score_histories, history_records = load_raw_score_histories(yesterday_str)
     history_depth = max(len(v) for v in raw_score_histories.values()) if raw_score_histories else 0
     logger.info(f"[character] Raw score histories loaded — {history_depth} days of history")
+
+    # #962: derive the consistency inputs no producer ever set, from the same
+    # 21-day record window the EMA histories already fetched.
+    data.update(character_engine.derive_consistency_inputs(history_records, yesterday_str))
+
+    # ── #961: behavioral modifiers + challenge XP are ENGINE INPUTS ──
+    # (previously post-compute mutations that bypassed every honesty gate)
+    fd_modifier = get_food_delivery_modifier(yesterday_str)
+    if fd_modifier != 1.0:
+        data["raw_score_modifiers"] = {"nutrition": {"multiplier": fd_modifier, "source": "food_delivery"}}
+        logger.info(f"[character] Food delivery modifier {fd_modifier} handed to engine as nutrition input")
+    challenge_bonus_xp, _challenge_items = collect_challenge_bonus(yesterday_str)
+    if challenge_bonus_xp:
+        data["challenge_bonus_xp"] = challenge_bonus_xp
+        logger.info(f"[character] Challenge bonus XP handed to engine: {challenge_bonus_xp}")
 
     # ── Compute ──
     try:
@@ -588,15 +684,6 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"[character] compute_character_sheet failed: {e}")
         raise  # surface the failure (DLQ + alarm) — a returned 500 reads as success
-
-    # ── Food delivery modifier — adjust Nutrition pillar raw_score ──
-    fd_modifier = get_food_delivery_modifier()
-    if fd_modifier != 1.0 and "pillar_nutrition" in record:
-        _nut = record["pillar_nutrition"]
-        _orig = float(_nut.get("raw_score", 0))
-        _nut["raw_score"] = round(max(0, min(100, _orig * fd_modifier)), 1)
-        _nut["food_delivery_modifier"] = fd_modifier
-        logger.info(f"[character] Food delivery modifier {fd_modifier} applied to nutrition: {_orig} → {_nut['raw_score']}")
 
     char_level = record.get("character_level", 1)
     char_tier = record.get("character_tier", "Foundation")
@@ -620,67 +707,6 @@ def lambda_handler(event, context):
     if effects:
         for eff in effects:
             logger.info(f"[character]   EFFECT: {eff.get('emoji', '')} {eff.get('name', '')}")
-
-    # ── Phase D: Challenge bonus XP ──────────────────────────────────────
-    # Query challenges completed on the target date that haven't been
-    # XP-consumed yet. Add bonus XP to the relevant pillar.
-    CHALLENGE_DOMAIN_TO_PILLAR = {
-        "sleep": "sleep",
-        "movement": "movement",
-        "nutrition": "nutrition",
-        "supplements": "nutrition",
-        "mental": "mind",
-        "social": "relationships",
-        "discipline": "consistency",
-        "metabolic": "metabolic",
-        "general": "consistency",
-    }
-    challenge_bonus_xp = {}  # pillar → total bonus XP
-    try:
-        from boto3.dynamodb.conditions import Key as _Key
-
-        _ch_pk = USER_PREFIX + "challenges"
-        _ch_kwargs = with_phase_filter(
-            {
-                "KeyConditionExpression": _Key("pk").eq(_ch_pk) & _Key("sk").begins_with("CHALLENGE#"),
-            }
-        )
-        _ch_resp = table.query(**_ch_kwargs)
-        _completed_today = [
-            c
-            for c in _ch_resp.get("Items", [])
-            if c.get("status") in ("completed", "failed")
-            and (c.get("completed_at", "") or "").startswith(yesterday_str)
-            and not c.get("xp_consumed_at")
-            and int(d2f(c.get("character_xp_awarded", 0))) > 0
-        ]
-        for ch in _completed_today:
-            xp = int(d2f(ch.get("character_xp_awarded", 0)))
-            domain = ch.get("domain", "general")
-            pillar = CHALLENGE_DOMAIN_TO_PILLAR.get(domain, "consistency")
-            challenge_bonus_xp[pillar] = challenge_bonus_xp.get(pillar, 0) + xp
-
-            # Apply bonus to pillar in record
-            pillar_key = f"pillar_{pillar}"
-            if pillar_key in record:
-                record[pillar_key]["xp_total"] = record[pillar_key].get("xp_total", 0) + xp
-                record[pillar_key]["challenge_bonus_xp"] = record[pillar_key].get("challenge_bonus_xp", 0) + xp
-                logger.info(f"[character]   CHALLENGE XP: +{xp} to {pillar} from '{ch.get('name', '?')}' ({domain})")
-
-            # Mark challenge as XP-consumed (prevent double-counting)
-            table.update_item(
-                Key={"pk": _ch_pk, "sk": ch["sk"]},
-                UpdateExpression="SET xp_consumed_at = :ts",
-                ExpressionAttributeValues={":ts": datetime.now(timezone.utc).isoformat()},
-            )
-
-        if challenge_bonus_xp:
-            # Recalculate total character XP with bonuses
-            record["character_xp"] = sum(record.get(f"pillar_{p}", {}).get("xp_total", 0) for p in PILLAR_ORDER)
-            record["challenge_bonus_xp"] = challenge_bonus_xp
-            logger.info(f"[character] Challenge bonus XP applied: {challenge_bonus_xp}")
-    except Exception as _ch_err:
-        logger.warning(f"[character] Challenge XP bonus failed (non-fatal): {_ch_err}")
 
     # ── Store (with DATA-2 validation — Item 3, R12) ──
     # validate_item before store_character_sheet, which adds pk/sk and Decimal-converts.
@@ -713,6 +739,11 @@ def lambda_handler(event, context):
     except Exception as e:
         logger.error(f"[character] store_character_sheet failed: {e}")
         raise  # surface the failure (DLQ + alarm) — a returned 500 reads as success
+
+    # #961: only a successfully-stored record consumes challenge XP — a failed
+    # store used to eat the bonus (marked consumed, never credited anywhere).
+    if _challenge_items:
+        mark_challenges_consumed(_challenge_items)
 
     elapsed = time.time() - t0
     logger.info("[character] Done in %.1fs", elapsed)

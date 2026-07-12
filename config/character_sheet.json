@@ -1,9 +1,9 @@
 {
   "_meta": {
-    "version": "1.3.0",
-    "description": "Character Sheet v1.3.0 (#913 neglect honesty, on ADR-104's v1.2.0 base): level-ups require the day's raw score to reach the TARGET level (scale fix), sustained dark presence atrophies behavioral-heavy pillars (leveling.neglect_decay), XP below zero is tracked as visible xp_debt (capped at xp_debt_cap), and a deterministic character_mood rides the daily record.",
-    "last_updated": "2026-07-10",
-    "review_ref": "docs/reviews/REVIEW_CHARACTER_LEVELING_2026-03-30.md"
+    "version": "1.4.0",
+    "description": "Character Sheet v1.4.0 (#956 math v2, ADR-134): XP zero-point at 'a decent day' (daily_xp_decay 1 — raw 40-59 nets 0, 60+ positive, debt repayable by realistic living), down-streaks persist through confirmed dark stretches (neglect_decay.persistent_down_streak), producer-less buddy_engagement removed (B-3 precedent), cross-pillar conditions deliberately evaluate EMA scores (current state, not tier achievement). On v1.3.0's #913 neglect-honesty base.",
+    "last_updated": "2026-07-11",
+    "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
     "start_date": "2026-07-12",
@@ -162,16 +162,13 @@
       "not_instrumented_note": "No relationship data source feeds this pillar yet \u2014 tracked as future work (#747).",
       "components": {
         "social_interaction_frequency": {
-          "weight": 0.4
+          "weight": 0.45
         },
         "interaction_quality": {
-          "weight": 0.3
-        },
-        "buddy_engagement": {
-          "weight": 0.15
+          "weight": 0.35
         },
         "social_mood_correlation": {
-          "weight": 0.15
+          "weight": 0.2
         }
       }
     },
@@ -215,14 +212,16 @@
       }
     ],
     "xp_per_level": 100,
-    "daily_xp_decay": 2,
+    "daily_xp_decay": 1,
     "xp_buffer_threshold": 20,
+    "xp_buffer_cap": 40,
     "xp_debt_cap": 100,
     "neglect_decay": {
       "n_grace_days": 3,
       "rate": 0.98,
       "floor": 0,
-      "min_behavioral_share": 0.3
+      "min_behavioral_share": 0.3,
+      "persistent_down_streak": true
     },
     "tier_streak_overrides": {
       "Foundation": {
@@ -540,7 +539,7 @@
         "Review weekly: which pillar was most volatile? That's your leverage point"
       ],
       "Mastery": [
-        "Target Alignment Bonus (all pillars 41+) \u2014 this is the meta-achievement",
+        "Keep every pillar scoring 41+ to hold the Alignment Bonus \u2014 a current-state synergy, held day by day, never a rank you bank",
         "Consistency at this level is identity, not discipline \u2014 you've become the person",
         "Mentor others: Tom, Partner, future open-source users \u2014 teaching deepens mastery"
       ]
