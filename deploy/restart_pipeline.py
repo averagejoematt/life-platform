@@ -45,6 +45,12 @@ Steps (each can be skipped with --skip-<name>):
        character, no current-cycle findings, dispute null-or-current-cycle,
        prologue-only journal manifest) + ZERO pre-genesis phase=experiment rows
        across raw-timeseries sources (the ingestion-poisoning class, 2026-07-12).
+   12c. restart_verify_truth.py  (hard gate, apply only — #1097): the AI
+       reader-truth pass (the SAME #1140 rubric as CI --reader-truth + the
+       nightly qa_smoke, lambdas/reader_truth_qa.py) over the reset-critical
+       surfaces. A HIGH finding blocks exactly like the render gate; a budget
+       pause (tier >= 1, ADR-125) or Bedrock outage SKIPS LOUDLY, never a
+       silent green. Standalone-runnable for the #1094 reset drill.
    13. post-verify hooks (#1092 — the former manual Sunday-queue steps, now inside
        the one command; each respects --apply vs dry-run + fail-fast):
        a. fix_prologue_cycle_and_subscribe_ttl.py — default ON (issue-sanctioned);
@@ -578,6 +584,18 @@ def main():
             print("\n⚠ SEMANTIC VERIFY GATE FAILED — the site contradicts its own timeline.")
             print("   Check docs/restart/_verify_semantic_report.txt for the failing assertions.")
             verify_rc = verify_rc or semantic_rc
+
+        # #1097: the READER-TRUTH gate — the AI read of the rendered prose, AFTER
+        # the deterministic semantic assertions (same #1140 rubric as CI
+        # --reader-truth + the nightly qa_smoke). A HIGH finding blocks like the
+        # render gate; a budget pause / Bedrock outage skips LOUDLY inside the
+        # script (exit 0 with an explicit SKIP report), never a silent green.
+        print("\n[verify] restart_verify_truth.py (hard gate — AI reader-truth pass)")
+        truth_rc = run_step("restart_verify_truth", ["python3", "deploy/restart_verify_truth.py"], True, log)
+        if truth_rc != 0:
+            print("\n⚠ READER-TRUTH GATE FAILED — high-severity truth finding(s) on the reset surface.")
+            print("   Check docs/restart/_verify_truth_report.txt for the findings.")
+            verify_rc = verify_rc or truth_rc
 
     # Post-verify hooks (#1092): the former manual Sunday-queue steps. Fail-fast
     # like the sub-scripts; skipped (loudly) when a verify gate failed, since the
