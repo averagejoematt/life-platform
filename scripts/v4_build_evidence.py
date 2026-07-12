@@ -202,6 +202,19 @@ REGISTRY = [
         None,
         "/legacy/character/",
     ),
+    # #1126: the dedicated badge wall over the same /api/achievements the cockpit's
+    # Journey lens and the character sheet's Unlocks read — one source of truth,
+    # now a linkable, shareable page of its own.
+    (
+        "badges",
+        "The badges",
+        "Every mark the engine can award — earned ones lit, the rest honestly locked with what unlocks them.",
+        "The character",
+        "data",
+        "/api/achievements",
+        None,
+        None,
+    ),
     # ── Protocol & experiments ─────────────────────────────────────────────
     (
         "supplements",

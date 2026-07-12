@@ -1024,6 +1024,8 @@ async function renderJourney() {
   bind("ach-count").textContent = list.length ? `${sm.earned ?? list.filter((a) => a.earned).length}/${sm.total ?? list.length}` : "";
   bind("achievements").innerHTML = list.length
     ? list.map((a) => `<div class="ach ${a.earned ? "is-earned" : ""}" title="${escapeHTML(a.description || "")}"><span class="ach-dot" aria-hidden="true"></span><span class="ach-label">${escapeHTML(a.label || a.id)}</span>${a.earned && a.earned_date ? `<span class="ach-when label">${escapeHTML(String(a.earned_date).slice(0, 10))}</span>` : ""}</div>`).join("")
+      // #1126: the wall's dedicated, linkable page — same /api/achievements, richer render.
+      + `<a class="ach ach-more" href="/data/badges/"><span class="ach-label">all badges →</span></a>`
     : `<p class="tl-empty">Achievements are defined and ready — they unlock as you go.</p>`;
 }
 

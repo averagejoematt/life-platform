@@ -1327,6 +1327,17 @@ def handle_achievements() -> dict:
             earned_date=today if current_streak >= 7 else None,
             unlock_hint=f"{max(0, 7 - current_streak)} days to unlock" if current_streak < 7 else None,
         ),
+        # #1126: fortnight rung between the week and the month — the first "this is
+        # a pattern, not a good week" mark.
+        badge(
+            "fortnight",
+            "Fortnight",
+            "streak",
+            "14-day Tier 0 habit streak",
+            earned=current_streak >= 14,
+            earned_date=today if current_streak >= 14 else None,
+            unlock_hint=f"{max(0, 14 - current_streak)} days to unlock" if current_streak < 14 else None,
+        ),
         badge(
             "monthly_grind",
             "Monthly Grind",
@@ -1343,6 +1354,15 @@ def handle_achievements() -> dict:
             "90-day Tier 0 habit streak",
             earned=current_streak >= 90,
             unlock_hint=f"{max(0, 90 - current_streak)} days to unlock" if current_streak < 90 else None,
+        ),
+        # #1126: the long hold — half a year without dropping the Tier 0 floor.
+        badge(
+            "half_year_hold",
+            "Half-Year Hold",
+            "streak",
+            "180-day Tier 0 habit streak",
+            earned=current_streak >= 180,
+            unlock_hint=f"{max(0, 180 - current_streak)} days to unlock" if current_streak < 180 else None,
         ),
         # ── Level
         badge(
@@ -1369,7 +1389,33 @@ def handle_achievements() -> dict:
             earned=current_level >= 10,
             unlock_hint=f"Level {current_level} → Level 10 needed" if current_level < 10 else None,
         ),
+        # #1126: the ladder above Journeyman — the streak-gated engine makes these rare.
+        badge(
+            "adept",
+            "Adept",
+            "level",
+            "Reached Character Level 20",
+            earned=current_level >= 20,
+            unlock_hint=f"Level {current_level} → Level 20 needed" if current_level < 20 else None,
+        ),
+        badge(
+            "master_of_the_craft",
+            "Master of the Craft",
+            "level",
+            "Reached Character Level 40",
+            earned=current_level >= 40,
+            unlock_hint=f"Level {current_level} → Level 40 needed" if current_level < 40 else None,
+        ),
         # ── Weight LOSS milestones (every 10 lbs)
+        # #1126: the first honest rung — 5 lbs is real motion, not noise, on this frame.
+        badge(
+            "lost_5",
+            "First Five",
+            "milestone",
+            "Lost 5 lbs from starting weight",
+            earned=lost_lbs >= 5,
+            unlock_hint=f"{5 - lost_lbs:.0f} lbs to go" if lost_lbs < 5 else None,
+        ),
         badge(
             "lost_10",
             "Lost 10 lbs",
@@ -1498,6 +1544,16 @@ def handle_achievements() -> dict:
             unlock_hint=f"{current_weight - 200:.0f} lbs to go" if current_weight >= 200 else None,
         ),
         # ── Data
+        # #1126: the first data-consistency rung under the existing 100/365 ladder.
+        badge(
+            "30_days",
+            "Month of Data",
+            "data",
+            "30+ days of habit logging",
+            earned=days_tracked >= 30,
+            earned_date=today if days_tracked >= 30 else None,
+            unlock_hint=f"{max(0, 30 - days_tracked)} days to unlock" if days_tracked < 30 else None,
+        ),
         badge(
             "100_days",
             "100 Days Tracked",

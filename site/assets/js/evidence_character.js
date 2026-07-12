@@ -14,6 +14,10 @@ import { shareMount } from "/assets/js/share.js";
 
 export const CH_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"];
 
+// #1126: one category vocabulary for every badge surface (the sheet's Unlocks
+// wall + the dedicated /data/badges/ page) — shared so the two can't drift.
+export const BADGE_CAT_TTL = { streak: "Streaks", level: "Level milestones", milestone: "Milestones", data: "Data consistency", challenge: "Challenges", science: "Science" };
+
 export const CH_ABBR = { sleep: "SLP", movement: "MOV", nutrition: "NUT", metabolic: "MET", mind: "MIN", relationships: "REL", consistency: "CON" };
 
 export const CH_FLAVOR = {
@@ -424,11 +428,10 @@ export async function renderCharacter(d) {
   const achList = (ach && (ach.achievements || ach.badges)) || [];
   if (achList.length) {
     const earned = achList.filter((b) => b.earned);
-    const CAT_TTL = { streak: "Streaks", level: "Level milestones", milestone: "Milestones", data: "Data consistency", challenge: "Challenges", science: "Science" };
     const cats = [...new Set(achList.map((b) => b.category || "other"))];
     const groups = cats.map((c) => {
       const items = achList.filter((b) => (b.category || "other") === c);
-      return `<div class="ch-bgroup"><p class="label">${esc(CAT_TTL[c] || ttl(c))}</p><div class="ch-bgrid">` +
+      return `<div class="ch-bgroup"><p class="label">${esc(BADGE_CAT_TTL[c] || ttl(c))}</p><div class="ch-bgrid">` +
         items.map((b) => `<div class="ch-badge${b.earned ? " is-earned" : ""}" title="${esc(b.description || "")}">
           <span class="ch-badge-m">${badgeMark(b.id, { earned: !!b.earned })}</span>
           <span class="ch-badge-n">${esc(b.label || b.id)}</span>
@@ -438,7 +441,9 @@ export async function renderCharacter(d) {
     badges = sec("Unlocks — the map of what's ahead",
       figs([fig(String(earned.length), "earned"), fig(String(achList.length - earned.length), "still locked")]) +
       (earned.length === 0 ? `<p class="rd-archive">Nothing earned yet this cycle — every mark below is drawn the moment it's unlocked, and the engine checks nightly. The wall isn't empty; it's the route.</p>` : "") +
-      groups);
+      groups +
+      // #1126: the wall's dedicated, linkable home.
+      `<p class="rd-archive"><a href="/data/badges/">The full badge page — every mark, and what unlocks each →</a></p>`);
   }
 
   /* 5 · Follow the level-ups. */
@@ -457,6 +462,54 @@ export async function renderCharacter(d) {
     : `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented in full in <a href="/method/game/">The Game, Explained</a> (generated from the engine's actual config) and in plain language on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
 
   return hero + quiet + scrub + statblock + ladder + mechanics + record + badges + sub + math +
+    note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
+}
+
+/* ── #1126: the dedicated badge wall (/data/badges/) ─────────────────────────
+   Reads the SAME /api/achievements the cockpit's Journey lens and the sheet's
+   Unlocks section read — one source of truth, now a linkable page. ADR-104 +
+   the earned-glow rule: a mark lights ONLY when a real record earned it; the
+   all-unearned genesis state is framed honestly as the route ahead, never
+   dressed up. Every mark is generative (badgeMark, seeded by id) — no emoji,
+   no stock art, and any future catalog addition draws itself. */
+export function renderBadges(d) {
+  const list = (d && (d.achievements || d.badges)) || [];
+  if (!list.length) return empty("The badge catalog publishes from the engine's nightly pass — nothing to show yet, and nothing gets faked in the meantime.");
+  const sm = (d && d.summary) || {};
+  const earned = list.filter((b) => b.earned);
+  const locked = list.length - earned.length;
+
+  const lead = `<p class="rd-lede">${earned.length
+    ? `${earned.length} of ${list.length} marks earned — each one lit by a real record, re-checked nightly against the live data.`
+    : `The full catalog, none of it earned yet — every mark below lights the moment the data earns it, and not a day sooner.`}</p>`;
+
+  const stats = figs([
+    fig(String(earned.length), "earned"),
+    fig(String(locked), "still locked"),
+    Number.isFinite(Number(sm.current_streak)) ? fig(String(sm.current_streak), "day streak") : "",
+    Number.isFinite(Number(sm.days_tracked)) ? fig(String(sm.days_tracked), "days tracked · 365d") : "",
+  ]);
+
+  const zero = earned.length === 0
+    ? `<p class="rd-archive">Nothing earned yet this cycle — that's the honest read of a fresh start. The wall isn't empty; it's the route: streaks build a day at a time, the engine re-checks nightly, and the first marks land within weeks of consistent days.</p>`
+    : "";
+
+  const cats = [...new Set(list.map((b) => b.category || "other"))];
+  const groups = cats.map((c) => {
+    const items = list.filter((b) => (b.category || "other") === c);
+    const won = items.filter((b) => b.earned).length;
+    return `<div class="ch-bgroup"><p class="label">${esc(BADGE_CAT_TTL[c] || ttl(c))} · ${won}/${items.length}</p><div class="ch-bgrid">` +
+      items.map((b) => `<div class="ch-badge${b.earned ? " is-earned" : ""}" title="${esc(b.description || "")}">
+        <span class="ch-badge-m">${badgeMark(b.id, { earned: !!b.earned })}</span>
+        <span class="ch-badge-n">${esc(b.label || b.id)}</span>
+        <span class="ch-badge-h label">${b.earned ? esc(String(b.earned_date || "").slice(0, 10)) : esc(b.unlock_hint || b.description || "")}</span>
+      </div>`).join("") + `</div></div>`;
+  }).join("");
+
+  const how = sec("How a mark is earned",
+    `<p class="rd-prose">Every badge is computed from the same records the rest of the site reads — habit streaks, the character level, weigh-ins, completed experiments and challenges. There are no participation trophies: a mark either has a record behind it or it stays locked, with what unlocks it written underneath. The level and streak marks ride the <a href="/data/character/">character sheet</a>'s engine (<a href="/method/character/">how levels work</a>); the day-to-day view is the <a href="/cockpit/">cockpit</a>'s Journey lens.</p>`);
+
+  return lead + stats + zero + sec("The wall", groups) + how +
     note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
 }
 
