@@ -36,7 +36,6 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 
@@ -92,14 +91,7 @@ ses = boto3.client("sesv2", region_name=REGION)
 secrets = boto3.client("secretsmanager", region_name=REGION)
 
 
-def d2f(obj):
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    return obj
+# #970: the local d2f copy here was dead code (never called) — removed; use digest_utils.d2f if needed.
 
 
 def check_source_coverage(source: str, dates: list[str]) -> dict[str, bool]:

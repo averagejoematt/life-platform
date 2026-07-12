@@ -30,8 +30,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import digest_utils  # shared query_range implementations (#970)
 import stats_core  # shared layer (#529): the one sanctioned stats implementation
-from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger
 try:
@@ -61,22 +61,7 @@ LOOKBACK_DAYS = int(os.environ.get("LOOKBACK_DAYS", "90"))
 # HELPERS
 # ==============================================================================
 
-# R13-F10: d2f now imported from digest_utils (shared layer).
-# weekly-correlation-compute added to shared_layer.consumers in ci/lambda_map.json.
-try:
-    from digest_utils import d2f
-except ImportError:
-    # Fallback for local testing without layer
-    from decimal import Decimal as _Decimal
-
-    def d2f(obj):
-        if isinstance(obj, list):
-            return [d2f(i) for i in obj]
-        if isinstance(obj, dict):
-            return {k: d2f(v) for k, v in obj.items()}
-        if isinstance(obj, _Decimal):
-            return float(obj)
-        return obj
+# d2f / pagination / phase filter all live in digest_utils.query_range_list now (R13-F10, #970).
 
 
 def _to_dec(val):
@@ -89,38 +74,20 @@ def _to_dec(val):
 
 
 def fetch_range(source, start_date, end_date):
-    """Paginated DDB query for source records in date range."""
+    """Paginated DDB query for source records in date range, as a list.
+
+    Shared paginated, phase-scoped implementation (digest_utils, #970).
+    Fail-soft ([] on error) preserved: a single source's failure degrades to
+    no-data for that source rather than failing the whole compute run.
+    """
     try:
-        records = []
-        kwargs = {
-            "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-            "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + source,
-                ":s": "DATE#" + start_date,
-                ":e": "DATE#" + end_date,
-            },
-        }
-        while True:
-            r = table.query(**with_phase_filter(kwargs))
-            records.extend(d2f(item) for item in r.get("Items", []))
-            if "LastEvaluatedKey" not in r:
-                break
-            kwargs["ExclusiveStartKey"] = r["LastEvaluatedKey"]
-        return records
+        return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
     except Exception as e:
         logger.warning("fetch_range(%s, %s→%s) failed: %s", source, start_date, end_date, e)
         return []
 
 
-def safe_float(rec, field):
-    """Extract float from record or return None."""
-    if not rec or field not in rec:
-        return None
-    try:
-        return float(rec[field])
-    except (TypeError, ValueError):
-        return None
-
+from digest_utils import safe_float  # shared bundled helpers (#970)
 
 # ==============================================================================
 # PEARSON CORRELATION (math lives in stats_core — #529/ADR-105; only the

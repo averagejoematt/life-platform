@@ -61,6 +61,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import digest_utils  # shared query_range implementations (#970)
 import stats_core  # shared layer (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
@@ -170,41 +171,19 @@ MAX_LAG_DAYS = 3
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def d2f(obj):
-    """Convert DynamoDB Decimals to float/int."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [d2f(v) for v in obj]
-    return obj
-
-
-def safe_float(rec, field, default=None):
-    v = rec.get(field)
-    if v is None:
-        return default
-    try:
-        return float(v)
-    except (ValueError, TypeError):
-        return default
+from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 
 def query_range(source, start_date, end_date):
-    """Query DynamoDB for a source's data in a date range."""
-    from boto3.dynamodb.conditions import Key
+    """Query DynamoDB for a source's data in a date range, as a list.
 
-    pk = f"USER#{USER_ID}#SOURCE#{source}"
+    #970: consolidated onto the shared paginated implementation — the old local
+    copy did not paginate, silently truncating results at DynamoDB's 1MB page.
+    Fail-soft ([] on error) preserved: hypothesis checks degrade to no-data
+    rather than failing the whole run.
+    """
     try:
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"),
-                }
-            )
-        )
-        return d2f(resp.get("Items", []))
+        return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
         return []

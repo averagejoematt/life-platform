@@ -162,15 +162,7 @@ METRICS = [
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def d2f(obj):
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
-
+from digest_utils import d2f, safe_float  # shared bundled helpers (#970)
 
 # ── Travel awareness (v2.1.0) ─────────────────────────────────────────────────
 TRAVEL_PK = f"USER#{USER_ID}#SOURCE#travel"
@@ -219,15 +211,6 @@ def fetch_range(source, start, end):
         return [d2f(item) for item in r.get("Items", [])]
     except Exception:
         return []
-
-
-def safe_float(rec, field):
-    if rec and field in rec:
-        try:
-            return float(rec[field])
-        except Exception:
-            return None
-    return None
 
 
 def is_weekend(date_str):

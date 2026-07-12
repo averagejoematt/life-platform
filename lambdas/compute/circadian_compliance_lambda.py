@@ -87,14 +87,7 @@ def _to_dec(val):
         return None
 
 
-def d2f(obj):
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
+from digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_source_date(source, date_str):

@@ -38,6 +38,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import boto3
+import digest_utils  # shared query_range implementations (#970)
 
 try:
     from platform_logger import get_logger
@@ -80,24 +81,19 @@ LOOKBACK_DAYS = 14
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-def d2f(obj):
-    """Convert DynamoDB Decimals to float/int."""
-    if isinstance(obj, Decimal):
-        return float(obj)
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    return obj
+from digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def query_range(source, start_date, end_date):
-    from boto3.dynamodb.conditions import Key
+    """Query DynamoDB for a source's data in a date range, as a list.
 
-    pk = f"USER#{USER_ID}#SOURCE#{source}"
+    #970: consolidated onto the shared paginated implementation — the old local
+    copy did not paginate (1MB-page truncation) and did not apply the ADR-058
+    phase filter (every platform DDB read must be phase-scoped); both fixed by
+    consolidation. Fail-soft ([] on error) preserved.
+    """
     try:
-        resp = table.query(KeyConditionExpression=Key("pk").eq(pk) & Key("sk").between(f"DATE#{start_date}", f"DATE#{end_date}"))
-        return d2f(resp.get("Items", []))
+        return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
         return []

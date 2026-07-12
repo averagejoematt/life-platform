@@ -67,15 +67,7 @@ s3 = boto3.client("s3", region_name=_REGION)
 # ==============================================================================
 
 
-def d2f(obj):
-    """Convert DynamoDB Decimal to float recursively."""
-    if isinstance(obj, list):
-        return [d2f(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: d2f(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
+from digest_utils import d2f  # shared bundled helpers (#970)
 
 
 def fetch_date(source, date_str):

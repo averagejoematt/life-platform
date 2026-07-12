@@ -29,6 +29,8 @@ ScoreTuple = tuple[Optional[int], dict[str, Any]]
 # ==============================================================================
 
 
+# #970 KEPT (deliberate): typed twin of digest_utils.safe_float — same behavior, but this
+# module is on the mypy tier-2 clean surface (tests/test_mypy_clean_modules.py, ADR-107).
 def safe_float(rec: Optional[dict[str, Any]], field: str, default: Optional[float] = None) -> Optional[float]:
     if rec and field in rec:
         try:

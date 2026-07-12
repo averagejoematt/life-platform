@@ -57,6 +57,8 @@ def decimals_to_float(obj):
     return obj
 
 
+# #970 KEPT (deliberate): scalar-coercion contract (value, default), not digest_utils'
+# record-field contract (rec, field, default) — different helper family.
 def safe_float(value, default=None):
     """Coerce value to float, return default on None or unparseable input."""
     if value is None:

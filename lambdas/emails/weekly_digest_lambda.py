@@ -40,6 +40,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 
 import boto3
+import digest_utils  # shared query_range implementations (#970)
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 
 # ── Shared digest utilities (digest_utils.py) ───────────────────────────────
@@ -112,57 +113,17 @@ def fetch_profile():
 
 
 def query_range(source, start_date, end_date):
-    """Batch query all records for a source in a date range."""
-    pk = f"USER#{USER_ID}#SOURCE#{source}"
-    records = {}
-    kwargs = {
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": pk,
-            ":s": f"DATE#{start_date}",
-            ":e": f"DATE#{end_date}",
-        },
-    }
-    while True:
-        resp = table.query(**with_phase_filter(kwargs))
-        for item in resp.get("Items", []):
-            date_str = item.get("date") or item["sk"].replace("DATE#", "")
-            records[date_str] = d2f(item)
-        if "LastEvaluatedKey" not in resp:
-            break
-        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    """Batch query all records for a source in a date range, as a {date: record} dict.
+
+    Shared paginated, phase-scoped implementation (digest_utils, #970).
+    """
+    return digest_utils.query_range(table, source, start_date, end_date, user_id=USER_ID)
 
 
 def query_range_list(source, start_date, end_date):
-    """Batch query all records for a source in a date range, returned as a flat
-    list rather than a {date: record} dict.
-
-    Needed for per-workout schemas like Hevy (#485) where: (a) multiple records
-    can legitimately share the same `date` field (two-a-days) — query_range's
-    dict-by-date would silently collapse them to one, and (b) the sk carries a
-    #WORKOUT#<id> suffix, so a record on the exact end_date sorts AFTER the plain
-    "DATE#{end_date}" upper bound and would be excluded; the trailing "~" (0x7E,
-    higher than any character sk uses) fixes that boundary for both this and
-    exact-sk sources (harmless there — "DATE#{end_date}" < "DATE#{end_date}~").
-    """
-    pk = f"USER#{USER_ID}#SOURCE#{source}"
-    records = []
-    kwargs = {
-        "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-        "ExpressionAttributeValues": {
-            ":pk": pk,
-            ":s": f"DATE#{start_date}",
-            ":e": f"DATE#{end_date}~",
-        },
-    }
-    while True:
-        resp = table.query(**with_phase_filter(kwargs))
-        records.extend(d2f(item) for item in resp.get("Items", []))
-        if "LastEvaluatedKey" not in resp:
-            break
-        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
-    return records
+    """Like query_range but returns a flat list, preserving duplicates (per-workout
+    schemas like Hevy, #485). Shared paginated implementation (digest_utils, #970)."""
+    return digest_utils.query_range_list(table, source, start_date, end_date, user_id=USER_ID)
 
 
 def query_journal_range(start_date, end_date):

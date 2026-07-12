@@ -114,6 +114,8 @@ except ImportError:
         return obj
 
 
+# #970 KEPT (deliberate): value-coercion contract (val) -> rounded 2dp, not digest_utils'
+# record-field contract (rec, field, default).
 def safe_float(val):
     try:
         return round(float(val), 2) if val is not None else None

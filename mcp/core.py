@@ -12,6 +12,9 @@ from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
 
+# ── Serialisation ──
+from digest_utils import d2f as decimal_to_float  # shared bundled helpers (#970)
+
 from mcp.config import (
     _DEFAULT_SOURCE_OF_TRUTH,
     _LEAN_STRIP,
@@ -28,18 +31,6 @@ from mcp.config import (
     secrets,
     table,
 )
-
-# ── Serialisation ──
-
-
-def decimal_to_float(obj):
-    if isinstance(obj, list):
-        return [decimal_to_float(i) for i in obj]
-    if isinstance(obj, dict):
-        return {k: decimal_to_float(v) for k, v in obj.items()}
-    if isinstance(obj, Decimal):
-        return float(obj)
-    return obj
 
 
 def get_api_key():

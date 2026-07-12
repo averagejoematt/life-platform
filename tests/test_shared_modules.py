@@ -728,6 +728,97 @@ _run("email Lambdas: no direct call_anthropic() bypass", test_email_lambdas_dont
 
 
 # ======================================================================
+# digest_utils.query_range / query_range_list (#970 consolidation)
+# ======================================================================
+
+
+class _FakePagingTable:
+    """Fake DDB table returning two pages via LastEvaluatedKey."""
+
+    def __init__(self, pages):
+        self.pages = list(pages)
+        self.calls = []
+
+    def query(self, **kwargs):
+        self.calls.append(kwargs)
+        page = dict(self.pages[len(self.calls) - 1])
+        return page
+
+
+def test_query_range_paginates_and_returns_dict_by_date():
+    """query_range must follow LastEvaluatedKey — the pre-#970 hypothesis_engine
+    copy silently truncated at DynamoDB's 1MB page."""
+    import digest_utils
+
+    pages = [
+        {
+            "Items": [
+                {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-01", "hrv": Decimal("55.5")},
+                {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-02", "date": "2026-01-02", "hrv": Decimal("60")},
+            ],
+            "LastEvaluatedKey": {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-02"},
+        },
+        {
+            "Items": [
+                {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-01-03", "hrv": Decimal("47")},
+            ],
+        },
+    ]
+    table = _FakePagingTable(pages)
+    out = digest_utils.query_range(table, "whoop", "2026-01-01", "2026-01-03")
+    assert len(table.calls) == 2, "did not paginate via LastEvaluatedKey"
+    assert table.calls[1].get("ExclusiveStartKey") == pages[0]["LastEvaluatedKey"]
+    assert sorted(out.keys()) == ["2026-01-01", "2026-01-02", "2026-01-03"]
+    assert out["2026-01-01"]["hrv"] == 55.5 and isinstance(out["2026-01-01"]["hrv"], float), "Decimals must be d2f-converted"
+
+
+def test_query_range_applies_phase_filter_and_bounds():
+    """Every platform DDB read is phase-scoped (ADR-058); dict form uses the plain
+    end bound, list form extends it with the '~' suffix for per-workout sks (#485)."""
+    import digest_utils
+
+    table = _FakePagingTable([{"Items": []}])
+    digest_utils.query_range(table, "whoop", "2026-01-01", "2026-01-07")
+    kwargs = table.calls[0]
+    assert "FilterExpression" in kwargs and ":phase_experiment" in kwargs["ExpressionAttributeValues"]
+    assert kwargs["ExpressionAttributeValues"][":e"] == "DATE#2026-01-07"
+
+    table2 = _FakePagingTable([{"Items": []}])
+    digest_utils.query_range_list(table2, "hevy", "2026-01-01", "2026-01-07")
+    kwargs2 = table2.calls[0]
+    assert "FilterExpression" in kwargs2
+    assert kwargs2["ExpressionAttributeValues"][":e"] == "DATE#2026-01-07~"
+
+
+def test_query_range_list_paginates_and_preserves_duplicates():
+    """List form keeps two records sharing one date (two-a-day workouts) and paginates."""
+    import digest_utils
+
+    pages = [
+        {
+            "Items": [
+                {"pk": "USER#matthew#SOURCE#hevy", "sk": "DATE#2026-01-01#WORKOUT#a", "date": "2026-01-01", "volume": Decimal("1000")},
+            ],
+            "LastEvaluatedKey": {"pk": "USER#matthew#SOURCE#hevy", "sk": "DATE#2026-01-01#WORKOUT#a"},
+        },
+        {
+            "Items": [
+                {"pk": "USER#matthew#SOURCE#hevy", "sk": "DATE#2026-01-01#WORKOUT#b", "date": "2026-01-01", "volume": Decimal("500")},
+            ],
+        },
+    ]
+    table = _FakePagingTable(pages)
+    out = digest_utils.query_range_list(table, "hevy", "2026-01-01", "2026-01-01")
+    assert len(out) == 2, "duplicates on one date must be preserved (and pagination followed)"
+    assert [r["volume"] for r in out] == [1000.0, 500.0]
+
+
+_run("digest_utils.query_range: paginates + dict-by-date + d2f", test_query_range_paginates_and_returns_dict_by_date)
+_run("digest_utils.query_range: phase filter + range bounds", test_query_range_applies_phase_filter_and_bounds)
+_run("digest_utils.query_range_list: paginates + preserves duplicates", test_query_range_list_paginates_and_preserves_duplicates)
+
+
+# ======================================================================
 # Summary
 # ======================================================================
 passed = sum(1 for s, _ in results if s == PASS)
