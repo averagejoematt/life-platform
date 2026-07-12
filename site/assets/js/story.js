@@ -690,12 +690,12 @@ async function load() {
   // the claim speaks in the young-window voice; the static line returns once
   // there's enough history for "the ones that dipped" to be literally true.
   const wclaim = bind("wave-claim");
-  const dayN = waveResp && waveResp.day_n;
-  if (wclaim && dayN != null && dayN < 14) {
+  const waveDayN = waveResp && waveResp.day_n;
+  if (wclaim && waveDayN != null && waveDayN < 14) {
     wclaim.textContent =
-      dayN <= 1
+      waveDayN <= 1
         ? "The climb isn't a straight line — it starts as a single dot. Every day lands here, dips included, as they happen."
-        : `The climb isn't a straight line. ${dayN} days in, every one is here — dips included, as they come.`;
+        : `The climb isn't a straight line. ${waveDayN} days in, every one is here — dips included, as they come.`;
   }
 
   const charV = character.status === "fulfilled" ? character.value : null;
