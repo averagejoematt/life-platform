@@ -1069,6 +1069,10 @@ async function renderWeek() {
   bind("verdict").textContent = rows.length
     ? `Seven days, ${rows.length} of ${WEEK_DOMAINS.length} instruments reporting — deltas read against the week before.`
     : "The week view fills in as the record deepens.";
+  // Reader-truth (#1094 drill): "seven days" over a young window is a lie —
+  // the cap speaks in the filling-in voice until instruments actually report.
+  const wkcap = bind("week-cap");
+  if (wkcap) wkcap.textContent = rows.length ? "seven days, by instrument" : "the week, by instrument — filling in from Day 1";
 }
 
 // Month scope (SS-08): "what changed" — real trailing-30d-vs-prior deltas + correlations
@@ -1112,6 +1116,10 @@ async function renderMonth() {
   } else {
     bind("verdict").textContent = "The month view fills in as the record deepens.";
   }
+  // Reader-truth (#1094 drill): same class as the week cap — no month of data,
+  // no "this month" claim.
+  const mocap = bind("month-cap");
+  if (mocap) mocap.textContent = (drows.length || urows.length || (wc && wc.honest_null)) ? "what changed this month" : "the month's motion — filling in from Day 1";
 }
 
 /* ── scope + theme controls ──────────────────────────────────────────────── */

@@ -276,13 +276,13 @@
 
         <!-- Week scope: six instruments, seven days (S-03) — real /api/observatory_week reads -->
         <section class="weekview" data-weekview hidden aria-label="The week's instruments">
-          <p class="cap label">seven days, by instrument</p>
+          <p class="cap label" data-bind="week-cap">seven days, by instrument</p>
           <ul class="wk-rows" data-bind="weekrows"></ul>
         </section>
 
         <!-- Month scope: SS-08 "what changed" — real 30d-vs-prior deltas + newly-unlocked correlations -->
         <section class="monthview" data-monthview hidden aria-label="What changed this month">
-          <p class="cap label">what changed this month</p>
+          <p class="cap label" data-bind="month-cap">what changed this month</p>
           <ul class="mo-rows" data-bind="month-deltas"></ul>
           <div class="mo-unlocks" data-bind="month-unlocks"></div>
         </section>
