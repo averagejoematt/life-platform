@@ -1,7 +1,7 @@
 # Readiness Score
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
-> **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :297-337), `mcp/tools_health.py` (`tool_get_readiness_score`), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :184-199)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#970 helper consolidation — formulas unchanged)
+> **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-320), `mcp/tools_health.py` (`tool_get_readiness_score`), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :184-199)
 
 ## Purpose
 
@@ -31,7 +31,7 @@ colour: green ≥ 80 · yellow ≥ 60 · red < 60
 ```
 
 Sleep is 25% (not 30%) deliberately, to stay aligned with the MCP model so the cross-check is a
-true drift detector (comment at :299-302).
+true drift detector (comment at :282-285).
 
 **TSB input:** Banister model in `lambdas/training_load.py` — CTL (42-day fitness), ATL (7-day
 fatigue), `TSB = CTL − ATL`, over a 60-day Strava+Hevy window; loads are TSS-like points
