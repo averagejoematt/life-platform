@@ -15,6 +15,7 @@ import { instrumentMark } from "/assets/js/sigils.js";
 import { portrait, wireSpeakingAudio } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c); #594 semantic states
 import { icon } from "/assets/js/icons.js";
 import { wireTabList, markActiveTab } from "/assets/js/tabs.js"; // #579 — real ARIA tabs
+import { readAloudFor } from "/assets/js/read_aloud.js"; // #1121 — per-article, reset-safe audio join
 
 // NB (2026-06-20): "The Coaches" + "AI lab notes" moved OUT to their own top-level
 // door, /coaching/ (assets/js/coaching.js). The coach/fieldnotes renderer functions
@@ -44,28 +45,28 @@ const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-let _podcastEpisodes = null;  // current-cycle feed; loaded once, fails silent
+let _readAloudEpisodes = null;  // per-article read-aloud feed; loaded once, fails silent
 async function podcastEpisode(ent) {
-  // The chronicle's "listen" join used to read the SEASON-1 feed (/podcast/
-  // episodes.json — pre-reset episodes, weeks 5..-4, Feb–May dates) keyed by
-  // bare week number. Week numbers repeat across experiment resets, so the
-  // moment the current chronicle reached Week 5 it would have inherited a May
-  // episode about a previous cycle. Now: the current-cycle feed (/panelcast/,
-  // the same one the Podcast tab reads) + a date-window guard on the join.
-  if (_podcastEpisodes === null) {
+  // #1121 — the chronicle's "listen" join, take three. Take one read the
+  // SEASON-1 read-aloud feed keyed by bare week number — week numbers repeat
+  // across experiment resets, so a new cycle's Week 5 would have inherited a
+  // May episode about a previous cycle. Take two borrowed the Panel feed
+  // (/panelcast/) with a week + 14-day-window guard: reset-safer, but it
+  // attached the PANEL DISCUSSION (a different show) to the article as if it
+  // were the article read aloud — and two curated prologues sharing week 0
+  // both matched the SAME panel episode. Now: the per-article read-aloud feed
+  // (/podcast/episodes.json — one episode per installment, Elena's voice)
+  // joined by the article's own date (readAloudFor), the same reset-safe key
+  // this reader already routes by. A stale pre-reset feed can never match a
+  // current article's date, so the miss renders honest-empty (no player) —
+  // never another cycle's voice. The Podcast TAB still reads /panelcast/.
+  if (_readAloudEpisodes === null) {
     try {
-      const d = await getJSON("/panelcast/episodes.json");
-      _podcastEpisodes = d.episodes || [];
-    } catch (e) { _podcastEpisodes = []; }
+      const d = await getJSON("/podcast/episodes.json");
+      _readAloudEpisodes = d.episodes || [];
+    } catch (e) { _readAloudEpisodes = []; }
   }
-  if (!ent) return undefined;
-  const w = ent.week ?? ent.id;
-  return _podcastEpisodes.find((e) => {
-    if (String(e.week) !== String(w)) return false;
-    if (!ent.date || !e.date) return true; // nothing to compare — trust the week
-    const gap = Math.abs(Date.parse(e.date) - Date.parse(ent.date)) / 86400000;
-    return Number.isFinite(gap) ? gap <= 14 : true; // same-cycle window
-  });
+  return readAloudFor(ent, _readAloudEpisodes);
 }
 
 async function getJSON(p) { const r = await fetch(p, { headers: { accept: "application/json" } }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
@@ -423,8 +424,10 @@ async function renderRead(s, id) {
   // (24kHz·16-bit·mono ≈ 48000 B/s) — the old MP3-only guess labeled a 12.9 MB WAV
   // "~102 min". Mirrors the correct logic at the podcast renderer above.
   const _epSecs = episode ? (episode.duration_sec || Math.round((episode.bytes || 0) / (/\.wav(\?|$)/i.test(episode.url || "") ? 48000 : 10000))) : 0;
+  // #1121 honest-empty: no matching per-article episode → no player at all.
+  // Nothing on the page may claim audio that doesn't exist for THIS article.
   const listen = episode
-    ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · AI-voiced (~${Math.max(1, Math.round(_epSecs / 60))} min)</span></div>`
+    ? `<div class="dx-listen"><audio controls preload="none" src="${esc(episode.url)}"></audio><span class="label">listen · this installment read aloud, AI-voiced (~${Math.max(1, Math.round(_epSecs / 60))} min)</span></div>`
     : "";
   const art = ent.image_url
     ? `<figure class="editorial-img"><img class="img-duotone" src="${esc(ent.image_url)}" alt="" loading="lazy">${ent.image_credit ? `<figcaption class="img-credit label">${esc(ent.image_credit)}</figcaption>` : ""}</figure>`

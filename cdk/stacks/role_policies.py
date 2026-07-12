@@ -968,14 +968,22 @@ def email_nutrition_review() -> list[iam.PolicyStatement]:
 
 
 def email_chronicle_podcast() -> list[iam.PolicyStatement]:
-    """Chronicle podcast: DDB read (content_markdown), S3 read posts.json +
-    write generated/podcast/*. Voice via Google Chirp 3: HD (API key in
-    life-platform/google-tts) — Polly dropped 2026-06-14."""
+    """Chronicle podcast: DDB read (content_markdown), S3 read the LIVE chronicle
+    manifest (generated/journal/posts.json — #1121; site/chronicle/posts.json is
+    the dead pre-v4 feed that froze the show on the pre-reset back catalogue) +
+    read/write generated/podcast/* (HeadObject drives the per-article idempotency
+    check and the enclosure byte sizes; it needs s3:GetObject or every head
+    AccessDenies and no episode ever indexes). Voice via Google Chirp 3: HD
+    (API key in life-platform/google-tts) — Polly dropped 2026-06-14."""
     return _email_base(
         needs_s3_write=["generated/podcast/*"],
         extra_secrets=["life-platform/google-tts"],
         extra_statements=[
-            iam.PolicyStatement(sid="ChroniclePostsRead", actions=["s3:GetObject"], resources=[f"{BUCKET_ARN}/site/chronicle/posts.json"]),
+            iam.PolicyStatement(
+                sid="ChroniclePostsRead",
+                actions=["s3:GetObject"],
+                resources=[f"{BUCKET_ARN}/generated/journal/posts.json", f"{BUCKET_ARN}/generated/podcast/*"],
+            ),
         ],
     )
 
