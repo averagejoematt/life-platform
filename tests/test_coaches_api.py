@@ -72,6 +72,29 @@ def test_coach_page_shape_and_stance_rung():
     # voice + relationships keys present (content may be empty offline)
     assert set(["decision_style", "structural_voice_rules", "few_shot_example"]) <= set(data["voice"])
     assert set(["leans_on", "leaned_on_by"]) <= set(data["relationships"])
+    # #1113: the authored cast sheet rides the payload (bundled module, works offline)
+    ts = data["trait_scores"]
+    assert len(ts["axes"]) == 5
+    for a in ts["axes"]:
+        assert a["label"] and a["low"] and a["high"] and 0 <= a["score"] <= 100
+    assert "uthored" in ts["disclosure"]
+
+
+def test_coach_page_character_carries_data_sources(monkeypatch):
+    """#1113 prompt transparency: _character surfaces the config-authored source
+    list (what the coach's prompt actually reads). Offline the S3 board config
+    isn't reachable, so feed the local file through the loader seam."""
+    import json as _json
+
+    def _local_s3_json(key, name):
+        if key == "config/board_of_directors.json":
+            with open(os.path.join(_REPO, "config", "board_of_directors.json")) as f:
+                return _json.load(f)
+        return {}
+
+    monkeypatch.setattr(api, "_load_s3_json", _local_s3_json)
+    data = _body(api.handle_coach({"rawPath": "/api/coach/sleep_coach"}))
+    assert data["character"]["data_sources"] == ["whoop", "eightsleep"]
 
 
 def test_coach_page_id_via_query_param():

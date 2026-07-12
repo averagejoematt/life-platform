@@ -504,7 +504,8 @@ body { overflow-x: hidden; }
 .coach-head-role { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h2); line-height: 1.12; margin: 0; }
 .coach-head-name { color: var(--ember); margin: var(--sp-1) 0 0; }
 .dx-disclosure { display: block; margin-top: var(--sp-2); color: var(--ink-faint); font-style: italic; max-width: var(--measure); }
-.coach-stance, .coach-progress, .coach-report, .coach-voice, .coach-rel, .coach-char, .coach-hyp {
+.coach-stance, .coach-progress, .coach-report, .coach-voice, .coach-rel, .coach-char, .coach-hyp,
+.coach-traits, .coach-live, .coach-build {
   margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair);
 }
 /* The character — personality/background that shapes the coach's prompt. */
@@ -545,6 +546,28 @@ body { overflow-x: hidden; }
 .cr-tuning .label { color: var(--ink-faint); }
 .cv-example { margin-top: var(--sp-3); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); max-width: var(--measure); }
 
+/* ── #1113 immersive bios — cast sheet · live record · how the voice is built ── */
+.ct-note { margin-top: var(--sp-2); }
+.ct-list { list-style: none; margin: var(--sp-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-3); max-width: var(--measure); }
+.ct-row { display: grid; gap: 2px; }
+.ct-axis { color: var(--ember); }
+.ct-track { display: block; position: relative; block-size: 6px; border-radius: 3px; background: var(--surface-raised); border: var(--border-hair); overflow: hidden; }
+.ct-fill { display: block; block-size: 100%; background: var(--ember); border-radius: inherit; }
+.ct-poles { display: flex; justify-content: space-between; color: var(--ink-faint); font-size: var(--fs-label); }
+.ct-disclosure { display: block; margin-top: var(--sp-3); color: var(--ink-faint); font-style: italic; }
+.cl-asof { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
+.cl-empty { margin-top: var(--sp-3); color: var(--ink-muted); }
+.cl-trail-k, .cb-forbid-k, .cb-few-k { display: block; margin-top: var(--sp-4); color: var(--ember); }
+.coach-live .coach-stance, .coach-live .coach-hyp { margin-top: var(--sp-3); padding-top: 0; border-top: 0; }
+.cb-sources { margin-top: var(--sp-3); color: var(--ink); }
+.cb-sources .label { color: var(--ink-faint); }
+.cb-style { margin: var(--sp-3) 0 0; max-width: var(--measure); display: grid; grid-template-columns: auto 1fr; gap: var(--sp-2) var(--sp-3); }
+.cb-style dt { color: var(--ember); }
+.cb-style dd { margin: 0; color: var(--ink); line-height: var(--lh-relaxed); }
+.cb-forbid { list-style: none; margin: var(--sp-2) 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.cb-forbid li { font-family: var(--font-serif); font-style: italic; font-size: var(--fs-small); color: var(--ink-muted); padding: var(--sp-1) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface-raised); text-decoration: line-through; text-decoration-color: var(--ember-line); }
+@media (max-width: 520px) { .cb-style { grid-template-columns: 1fr; gap: var(--sp-1) 0; } .cb-style dd { margin-bottom: var(--sp-2); } }
+
 /* ── "My Team" (CC-10) — the collective read on Matthew ───────────────────── */
 .team-focus, .team-tension, .team-huddle { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
 .tf-list { list-style: none; padding: 0; margin: var(--sp-3) 0 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
@@ -584,7 +607,8 @@ body { overflow-x: hidden; }
    rates, chips, names stay mono (machine & data). */
 .coach-stance, .coach-progress, .coach-report, .coach-journey, .coach-rel,
 .coach-daily, .team-focus, .team-tension, .team-huddle,
-.coach-char, .coach-hyp, .coach-voice, .coach-more, .team-lead { font-family: var(--font-sans); }
+.coach-char, .coach-hyp, .coach-voice, .coach-more, .team-lead,
+.coach-traits, .coach-live, .coach-build { font-family: var(--font-sans); }
 /* genuine "voice" moments stay serif (these win by being more specific) */
 .cd-text, .tl-bio, .tl-philosophy, .cv-example,
 .coach-voice blockquote, .coach-char blockquote, .coach-hyp blockquote { font-family: var(--font-serif); }
@@ -592,7 +616,8 @@ body { overflow-x: hidden; }
    stays a mono kicker like every other section header. One type system. */
 .coach-more { margin-top: var(--sp-4); }
 .coach-more > summary { cursor: pointer; }
-.coach-char .label, .coach-hyp .label, .coach-voice .label, .coach-more .label { font-family: var(--font-mono); }
+.coach-char .label, .coach-hyp .label, .coach-voice .label, .coach-more .label,
+.coach-traits .label, .coach-live .label, .coach-build .label { font-family: var(--font-mono); }
 .coach-stance .label, .coach-progress .label, .coach-report .label, .coach-journey .label,
 .coach-rel .label, .coach-daily .label, .team-focus .label, .team-tension .label,
 .team-huddle .label, .cr-rate, .tf-list li, .th-name, .cj-date { font-family: var(--font-mono); }
