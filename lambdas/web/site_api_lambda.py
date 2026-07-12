@@ -72,6 +72,7 @@ from web.site_api_coach import (
     handle_coaches,
     handle_experiment_synthesis,
     handle_field_notes,
+    handle_month_rollup,
     handle_panel_ledger,
     handle_predictions,
     handle_recap,
@@ -412,6 +413,7 @@ ROUTES = {
     "/api/ai_analysis": None,  # GET with ?expert= query param, handled in lambda_handler
     "/api/coach_analysis": None,  # GET with ?domain= query param, handled in lambda_handler (Coach Intelligence)
     "/api/weekly_priority": None,  # GET — integrator synthesis, handled in lambda_handler
+    "/api/month_rollup": handle_month_rollup,  # #1115 — integrator month rollup (trailing ~4 weeks)
     "/api/experiment_synthesis": handle_experiment_synthesis,  # C-1 — cross-week experiment arc
     "/api/recap": handle_recap,  # Phase 3 — Elena's "previously on" cold-open
     # BL-03: The Ledger / Snake Fund

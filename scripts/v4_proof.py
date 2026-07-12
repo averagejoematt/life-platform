@@ -456,7 +456,9 @@ def coaching_read_block_html(read: dict) -> str:
     if priority:
         coach_name = str(wp.get("coach_name") or "").strip()
         who = f" · {_esc(coach_name)}" if coach_name else ""
-        lines.append(f'<p class="label">The one priority{who}</p>')
+        # #1115: labeled at its true altitude — this is the integrator's WEEKLY
+        # call (the Week lens's read), never presented as today's line.
+        lines.append(f'<p class="label">The week\'s call{who}</p>')
         lines.append(f"<blockquote>{_esc(priority)}</blockquote>")
     if coaches:
         lines.append('<p class="label">Each coach\'s read</p>')

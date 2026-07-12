@@ -6,7 +6,10 @@
 
   Endpoints (all read-only, already published):
     /api/snapshot          vitals + journey + character in one call
-    /api/weekly_priority    The Chair's cross-pillar synthesis (Dr. Kai Nakamura)
+    /public_stats.json      the DAILY one-liner (elena_hero_line, minted each morning
+                            by the daily brief) — #1115: the Today verdict speaks at
+                            day altitude; the integrator's weekly call lives on the
+                            Week lens of /coaching/, never here
     /api/coach_analysis?domain=<pillar>   lazy per-pillar read on disclosure
 
   Two jobs (LOCKED): the glance answers "am I winning + the one thing"; a pillar
@@ -208,15 +211,18 @@ function heldSince(iso) {
   return weeks >= 1 ? `held since ${date} · ~${weeks} wk${weeks > 1 ? "s" : ""}` : `held since ${date}`;
 }
 
-function renderVerdict(priority) {
-  // uplevel P3 — the verdict was an 11-line static wall of mono text. Same words,
-  // staged: attributed to the coach who wrote it (name + title from the payload,
-  // never invented) and split on sentence boundaries into ≤3 beats that reveal in
-  // sequence (CSS gated on html.mo — reduced-motion reads it all at once).
+function renderVerdict(stats) {
+  // #1115 — the Today verdict is the DAILY one-liner (public_stats.json
+  // elena_hero_line, minted each morning by the daily brief), NOT the
+  // integrator's weekly priority: each timeframe speaks at its own altitude,
+  // and the same sentence never appears under two different labels. The weekly
+  // call lives on the Week lens of /coaching/. Presentation unchanged from
+  // uplevel P3: staged ≤3 beats (CSS gated on html.mo — reduced-motion reads
+  // it all at once).
   const v = bind("verdict");
-  const text = priority && priority.weekly_priority;
+  const text = stats && stats.elena_hero_line;
   if (isBad(text)) {
-    v.innerHTML = `<span class="mark">&rsaquo;</span> The board's weekly read isn't in yet — it posts after the next briefing.`;
+    v.innerHTML = `<span class="mark">&rsaquo;</span> Today's line isn't in yet — it posts with the morning brief.`;
     return;
   }
   // Decimal-safe sentence split: the old /[^.!?]+[.!?]+/ regex treated the "." in
@@ -228,15 +234,12 @@ function renderVerdict(priority) {
   const beats = [];
   const per = Math.ceil(sentences.length / Math.min(3, sentences.length));
   for (let i = 0; i < sentences.length; i += per) beats.push(sentences.slice(i, i + per).join("").trim());
-  // #591: the read is attributed AND time-stamped — a signed mark for the author
-  // and the honest hour it was written. Presence without fake liveness.
-  const stamp = writtenStamp(priority.generated_at);
-  const who = priority.coach_name
-    ? `<p class="vd-who label">` +
-      `<span class="vd-mark" aria-hidden="true">${coachMark({ name: priority.coach_name, coach_id: priority.coach_id }, 22)}</span>` +
-      `${escapeHTML(priority.coach_name)}${priority.coach_title ? ` · ${escapeHTML(priority.coach_title)}` : ""}` +
-      `${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`
-    : "";
+  // #591: the read is time-stamped — the honest hour the brief was written.
+  // #1115: attributed to "the morning brief", not a named coach persona — the
+  // TL;DR is written by the brief's intelligence engine, and a persona byline
+  // it didn't earn would be a fabricated attribution (ADR-104).
+  const stamp = writtenStamp(stats && stats._meta && stats._meta.generated_at);
+  const who = `<p class="vd-who label">the daily line · from the morning brief${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`;
   v.innerHTML = who + beats.map((b, i) =>
     `<span class="vd-beat" style="--vd-delay:${(i * 0.45).toFixed(2)}s">${i === 0 ? `<span class="mark">&rsaquo;</span> ` : ""}${escapeHTML(b)}</span>`
   ).join(" ");
@@ -528,15 +531,12 @@ async function loadPillarRead(key) {
 }
 
 /* ── board one-liner (the interpretation layer, made glanceable) ─────────── */
-function renderBoardline(priority) {
-  const notes = priority && priority.cross_domain_notes;
-  const line = notes && (typeof notes === "string" ? notes : Object.values(notes).find(Boolean));
-  if (line && !isBad(line)) {
-    const who = (priority.coach_name || "The integrator");
-    bind("boardline").textContent = `“${String(line).trim()}” — ${who}`;
-    bind("boardline").hidden = false;
-  }
-}
+// renderBoardline — REMOVED (#1115). It quoted the integrator's weekly
+// cross-domain notes into the daily slice — the same weekly narrative the
+// verdict was reusing, at the wrong altitude. The weekly material renders on
+// the Week lens of /coaching/ ("domain by domain"); the cockpit's daily slice
+// carries only daily artifacts. The [data-bind="boardline"] element stays in
+// the shell (hidden) so scope-switch code that hides it keeps a target.
 
 /* ── Predict the week (PG-ENG-1) ─────────────────────────────────────────────
    A reader bets which way a leading SIGNAL moves this week — not the outcome.
@@ -1135,7 +1135,7 @@ function wireScope() {
         // Today: restore what hideDaily() inline-hid (children of .dialogue —
         // restoring the parent alone leaves them display:none), then reload.
         const hr = $(".voice.human"); if (hr) hr.style.display = "";
-        const wm = $(".voice.machine .who"); if (wm) wm.textContent = "The board";
+        const wm = $(".voice.machine .who"); if (wm) wm.textContent = "Today"; // #1115 — the slot holds the daily line, matching Week/Month scope labels
         showJourney(false); load();
       }
     });
@@ -1163,7 +1163,7 @@ function wireFirstRun() {
     <h2 class="cockpit-intro__h">This is one life, measured — live.</h2>
     <ul class="cockpit-intro__list">
       <li><strong>The big number</strong> is today's whole-life score: seven pillars rolled into one, recomputed every morning.</li>
-      <li><strong>&ldquo;The board&rdquo;</strong> is an AI panel reading the week. Labels like <em>preliminary &middot; n=9</em> mean early signal, not proof.</li>
+      <li><strong>The daily line</strong> is the morning brief&rsquo;s one-sentence read of yesterday; an AI coach panel reads each pillar underneath. Labels like <em>preliminary &middot; n=9</em> mean early signal, not proof.</li>
       <li><strong>Today &middot; Week &middot; Month &middot; Journey</strong> (top right) change the time scope; tap any pillar to open its detail.</li>
     </ul>
     <button class="cockpit-intro__go" type="button">Got it &mdash; show me the cockpit</button>
@@ -1242,9 +1242,9 @@ async function load(dateStr) {
       return;
     }
 
-    const [snap, priority] = await Promise.allSettled([
+    const [snap, pubStats] = await Promise.allSettled([
       getJSON(`${API}/snapshot`),
-      getJSON(`${API}/weekly_priority`),
+      getJSON("/public_stats.json"), // #1115 — the daily one-liner for the Today verdict
     ]);
 
     const snapV = snap.status === "fulfilled" ? snap.value : null;
@@ -1272,9 +1272,8 @@ async function load(dateStr) {
     renderDomains();
     // #1106: the hero instrument strip — same snapshot payload, glance-first.
     renderHeroInstruments({ character, readiness: snapV?.readiness, vitals: snapV?.vitals?.vitals, pre });
-    const pri = priority.status === "fulfilled" ? priority.value : null;
-    renderVerdict(pri);
-    renderBoardline(pri);
+    const stats = pubStats.status === "fulfilled" ? pubStats.value : null;
+    renderVerdict(stats);
     renderBoard();      // #591 fire-and-forget; the inter-coach thread + team stances, self-hiding
     renderPresence(pre); // fire-and-forget; hides itself unless he's gone quiet / just returned (#955: and pre-start)
     renderInputs(pre);   // fire-and-forget (#975); the always-visible manual-channel freshness row (staged pre-genesis)

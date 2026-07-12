@@ -68,6 +68,11 @@ KNOWN_OPTIONAL: dict[tuple, str] = {
         "latest",
     ): "#545 the blind voice-fidelity scoreboard — seeded by voice-fidelity-harness's first monthly run; "
     "handle_voice_fidelity tolerates absence (empty/insufficient_data response)",
+    (
+        "USER#matthew#SOURCE#ai_analysis",
+        "EXPERT#integrator_month",
+    ): "#1115 the integrator's month rollup — written by ai-expert-analyzer's weekly pass once >=2 weekly lab "
+    "notes exist (honest-skip before then); handle_month_rollup serves the designed null until it lands",
 }
 
 # Module-level constant values used to resolve f-strings statically.

@@ -237,6 +237,9 @@ class TestCoachingReadBlock:
         # the AC: actual coach voices are carried in the served no-JS HTML.
         assert "Restart your logging this week" in html
         assert "Dr. Kai Nakamura" in html
+        # #1115: the integrator's priority is labeled at its true (week) altitude,
+        # never presented as today's line.
+        assert "The week's call" in html
         assert "Dr. Nathan Reeves" in html and "Psychiatrist" in html
         assert "twelve days of silence" in html
         assert "Dr. Victor Reyes" in html
@@ -255,7 +258,8 @@ class TestCoachingReadBlock:
             {"weekly_priority": {}, "coaches": [{"name": "Dr. X", "title": "", "position_summary": "A read."}], "as_of": "2026-07-07"}
         )
         assert "A read." in html and "Dr. X" in html
-        assert "The one priority" not in html  # no priority block when text is absent
+        # #1115: the priority block is labeled at week altitude now
+        assert "The week's call" not in html and "The one priority" not in html  # no priority block when text is absent
 
     def test_missing_data_omits_block_never_fabricates(self):
         # ADR-104: no content -> no block; the JS view still renders.
