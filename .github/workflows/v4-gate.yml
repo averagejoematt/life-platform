@@ -18,6 +18,9 @@ on:
       - 'tests/pr_render_gate.py'
       - 'tests/visual_qa.py'
       - 'tests/accuracy_audit.py'
+      # #1039: the realistic-data fixtures the render gate's populated pass mocks
+      # with — a fixture-shape change must re-run the gate against itself too.
+      - 'tests/fixtures/render_gate/**'
   push:
     branches: [main]
     paths:

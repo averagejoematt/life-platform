@@ -1,0 +1,298 @@
+{
+ "_meta": {
+  "generated_at": "2026-06-15T17:00:00+00:00",
+  "cache_seconds": 3600,
+  "request_id": "fixture-1039"
+ },
+ "vo2max": {
+  "available": true,
+  "source": "Garmin",
+  "unit": "ml/kg/min",
+  "series": [
+   {
+    "date": "2025-10-27",
+    "value": 39.1
+   },
+   {
+    "date": "2025-10-30",
+    "value": 39.1
+   },
+   {
+    "date": "2025-10-31",
+    "value": 39.0
+   },
+   {
+    "date": "2025-11-02",
+    "value": 38.2
+   },
+   {
+    "date": "2025-11-04",
+    "value": 38.1
+   },
+   {
+    "date": "2025-11-05",
+    "value": 38.2
+   },
+   {
+    "date": "2025-11-06",
+    "value": 38.1
+   },
+   {
+    "date": "2025-11-07",
+    "value": 37.9
+   },
+   {
+    "date": "2025-11-08",
+    "value": 37.8
+   },
+   {
+    "date": "2026-02-24",
+    "value": 36.5
+   },
+   {
+    "date": "2026-02-25",
+    "value": 33.8
+   },
+   {
+    "date": "2026-02-26",
+    "value": 31.3
+   },
+   {
+    "date": "2026-02-28",
+    "value": 30.9
+   },
+   {
+    "date": "2026-03-01",
+    "value": 30.6
+   },
+   {
+    "date": "2026-03-02",
+    "value": 30.8
+   },
+   {
+    "date": "2026-03-03",
+    "value": 31.0
+   },
+   {
+    "date": "2026-03-05",
+    "value": 31.4
+   },
+   {
+    "date": "2026-03-06",
+    "value": 31.3
+   },
+   {
+    "date": "2026-03-07",
+    "value": 31.1
+   },
+   {
+    "date": "2026-04-01",
+    "value": 31.2
+   },
+   {
+    "date": "2026-04-02",
+    "value": 30.8
+   },
+   {
+    "date": "2026-04-03",
+    "value": 30.5
+   },
+   {
+    "date": "2026-04-04",
+    "value": 30.8
+   },
+   {
+    "date": "2026-05-19",
+    "value": 33.3
+   }
+  ],
+  "n": 287,
+  "current": 33.3,
+  "as_of": "2026-05-19",
+  "peak": 47.9,
+  "low": 30.5,
+  "first": 45.6,
+  "delta": -12.3,
+  "trend": "declining"
+ },
+ "walking_hr": {
+  "available": true,
+  "source": "Strava (Walk activities)",
+  "unit": "bpm",
+  "series": [
+   {
+    "date": "2026-04-09",
+    "value": 115.0,
+    "max_hr": 131.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-04-10",
+    "value": 102.2,
+    "max_hr": 124.0,
+    "name": "Lunch Walk"
+   },
+   {
+    "date": "2026-04-11",
+    "value": 101.8,
+    "max_hr": 120.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-04-12",
+    "value": 98.1,
+    "max_hr": 116.0,
+    "name": "Morning Walk"
+   },
+   {
+    "date": "2026-04-18",
+    "value": 121.7,
+    "max_hr": 148.0,
+    "name": "Morning Walk"
+   },
+   {
+    "date": "2026-05-09",
+    "value": 110.2,
+    "max_hr": 125.0,
+    "name": "Morning Walk"
+   },
+   {
+    "date": "2026-06-14",
+    "value": 108.8,
+    "max_hr": 123.0,
+    "name": "Morning Walk \u00b7 2.9mi \u00b7 10ft \u00b7 108bpm avg"
+   },
+   {
+    "date": "2026-06-15",
+    "value": 118.9,
+    "max_hr": 136.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-16",
+    "value": 111.9,
+    "max_hr": 127.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-18",
+    "value": 107.4,
+    "max_hr": 125.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-20",
+    "value": 111.0,
+    "max_hr": 138.0,
+    "name": "Lunch Walk \u00b7 5.7mi \u00b7 68ft \u00b7 111bpm avg"
+   },
+   {
+    "date": "2026-06-21",
+    "value": 119.2,
+    "max_hr": 165.0,
+    "name": "Lunch Walk \u00b7 5.4mi \u00b7 324ft \u00b7 119bpm avg"
+   },
+   {
+    "date": "2026-06-22",
+    "value": 118.0,
+    "max_hr": 144.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-23",
+    "value": 117.7,
+    "max_hr": 141.0,
+    "name": "Morning Walk"
+   },
+   {
+    "date": "2026-06-23",
+    "value": 109.2,
+    "max_hr": 143.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-23",
+    "value": 110.4,
+    "max_hr": 124.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-23",
+    "value": 113.3,
+    "max_hr": 143.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-24",
+    "value": 109.8,
+    "max_hr": 128.0,
+    "name": "Morning Walk"
+   },
+   {
+    "date": "2026-06-24",
+    "value": 110.3,
+    "max_hr": 124.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-06-25",
+    "value": 112.3,
+    "max_hr": 127.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-07-05",
+    "value": 119.1,
+    "max_hr": 141.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-07-06",
+    "value": 119.0,
+    "max_hr": 133.0,
+    "name": "Lunch Walk"
+   },
+   {
+    "date": "2026-07-06",
+    "value": 121.7,
+    "max_hr": 145.0,
+    "name": "Afternoon Walk"
+   },
+   {
+    "date": "2026-07-06",
+    "value": 113.3,
+    "max_hr": 123.0,
+    "name": "Evening Walk"
+   }
+  ],
+  "n": 51,
+  "n_total": 775,
+  "window_days": 182,
+  "current": 113.3,
+  "as_of": "2026-07-06",
+  "avg": 111.4
+ },
+ "fitness_age": {
+  "available": true,
+  "estimate": 59,
+  "range_low": 56,
+  "range_high": 62,
+  "basis_vo2max": 31.7,
+  "n": 15,
+  "as_of": "2026-05-19",
+  "method": "Fitness age maps your measured VO2max to the age at which it is the median for men (population reference standards; Cooper Institute / ACSM, consistent with the FRIEND registry). Your real age is never used or shown \u2014 only VO2max drives this number.",
+  "citation": "Male VO2max age-percentile reference standards (Cooper Institute / ACSM; FRIEND registry, Kaminsky et al. 2015)"
+ },
+ "deferred": [
+  {
+   "panel": "hourly_habit_glyphs",
+   "reason": "Habitify exposes no per-completion timestamp; the stored completed_at is the hourly poller's observation time, not a true hour-of-day, so a 'versus your average by this hour' benchmark can't be computed from real logged timestamps.",
+   "source": "habitify"
+  },
+  {
+   "panel": "vascular_age",
+   "reason": "No validated vascular-age formula exists in-repo; the only vascular-age datum (Withings measurement type 155) is a provider scrape, gated on explicit sign-off per the bio-age privacy line, and BP capture coverage is not yet confirmed.",
+   "source": "withings (provider-scrape, gated)"
+  }
+ ]
+}
