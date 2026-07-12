@@ -145,6 +145,17 @@ export function vitalsNarrative(p, comps) {
     `<div class="two-voice"><p class="tv-machine"><span class="tv-mark">›</span> ${esc(machine)}</p><p class="tv-human">${esc(serif)}</p></div>`);
 }
 
+// #1091 — cross-phase provenance stamp. VO2max / walking HR / fitness age are raw_timeseries
+// metrics (ADR-077): real multi-year records deliberately KEPT across experiment resets. Without
+// a label they can read as this-cycle data (pre-start, data that "shouldn't exist yet"), so each
+// panel carries a small data-driven stamp keyed off the payload's scope field. Honest context,
+// not a warning — nothing is blanked or filtered.
+export function scopeStamp(o, opts = {}) {
+  if (!o || o.scope !== "multi_year") return "";
+  const asOf = opts.asOf !== false && o.as_of ? ` · as of ${esc(o.as_of)}` : "";
+  return `<div class="rd-meta label rd-scope" style="margin-bottom:.5rem">multi-year history · not reset with the experiment${asOf}</div>`;
+}
+
 // #421 (VIT-03) — VO2max arc. The longevity gold-standard fitness number, a slow-moving arc
 // metric beside the daily vitals. Real recorded Garmin estimates only; the date-positioned trend
 // shows gaps as gaps. Renders nothing (no placeholder) until real estimates exist.
@@ -153,6 +164,7 @@ export function vitalsVo2max(vo) {
   const dirWord = vo.trend === "improving" ? "climbing" : vo.trend === "declining" ? "declining" : "holding";
   const deltaLbl = (vo.delta > 0 ? "+" : "") + fmt(vo.delta, 1);
   return sec("VO₂max — the aerobic arc",
+    scopeStamp(vo) +
     figs([fig(fmt(vo.current, 1), "now · ml/kg/min"), fig(fmt(vo.peak, 1), "recorded peak"), fig(deltaLbl, "arc-to-date")]) +
     arcTrend(vo.series, { valueKey: "value", unit: " ml/kg/min", label: "VO₂max", height: 180, decimals: 1 }) +
     `<p class="rd-meta label">The estimated maximal oxygen uptake from ${esc(vo.source)} — the single best-studied fitness-longevity number. This is an <strong>arc metric</strong>, not a daily dial: ${vo.n} recorded estimates, ${dirWord} (${esc(deltaLbl)} ml/kg/min across the record). The line is positioned by real date, so the sparse recent cadence reads as honest gaps — a device estimate, not a lab CPET, so read the multi-month direction, not any one reading.</p>`);
@@ -165,6 +177,7 @@ export function vitalsWalkingHr(w) {
   if (!w || !w.available) return "";
   const total = w.n_total != null ? w.n_total : w.n;
   return sec("Walking heart rate — what the heart does at a stroll",
+    scopeStamp(w) +
     figs([fig(fmt(w.current, 0), "latest walk · bpm"), fig(fmt(w.avg, 0), `${w.n}-walk avg`)]) +
     arcTrend(w.series, { valueKey: "value", unit: " bpm", label: "Walking HR", height: 150, decimals: 0 }) +
     `<p class="rd-meta label">The average heart rate of your ${esc(w.source)} — the daytime, at-a-stroll signal the overnight resting figure misses. Each dot is one walk (${w.n} in the last ${w.window_days} days, ${total} recorded all-time), positioned by real date so quiet stretches read as gaps. It's a per-walk <strong>average</strong>, not a continuous intraday curve — the platform has no continuous-HR capture, so we don't draw one.</p>`);
@@ -177,7 +190,7 @@ export function vitalsFitnessAge(fa) {
   if (!fa || !fa.available) return "";
   return sec("Fitness age — a complementary age lens",
     ciWhisker(fa.estimate, fa.range_low, fa.range_high, { unit: " yrs", label: "Fitness age", caption: `≈ ${fa.estimate} (${fa.range_low}–${fa.range_high}), the age at which your VO₂max is the male-population median. The band is your own recent VO₂max spread — ${fa.n} reading${fa.n === 1 ? "" : "s"}, not a guessed interval.` }) +
-    `<div class="rd-meta label" style="margin-top:.4rem">${nDots(fa.n, { unit: "VO₂max readings" })} · basis VO₂max ${fmt(fa.basis_vo2max, 1)} ml/kg/min · as of ${esc(fa.as_of)}</div>` +
+    `<div class="rd-meta label" style="margin-top:.4rem">${nDots(fa.n, { unit: "VO₂max readings" })} · basis VO₂max ${fmt(fa.basis_vo2max, 1)} ml/kg/min · as of ${esc(fa.as_of)}${fa.scope === "multi_year" ? `<span class="rd-scope"> · from the multi-year VO₂max record — not reset with the experiment</span>` : ""}</div>` +
     `<p class="rd-meta label">${esc(fa.method)} It's a complementary lens beside PhenoAge, not a replacement — and like every age on this site it follows the privacy line: your <strong>real age is never used or shown</strong>, and no age-gap is derivable. ${esc(fa.citation)}. Vascular age stays deferred — no validated formula in-repo, and the provider-scrape figure is gated on sign-off.</p>`);
 }
 

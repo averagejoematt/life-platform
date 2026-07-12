@@ -6,6 +6,7 @@
  },
  "vo2max": {
   "available": true,
+  "scope": "multi_year",
   "source": "Garmin",
   "unit": "ml/kg/min",
   "series": [
@@ -117,6 +118,7 @@
  },
  "walking_hr": {
   "available": true,
+  "scope": "multi_year",
   "source": "Strava (Walk activities)",
   "unit": "bpm",
   "series": [
@@ -274,6 +276,7 @@
  },
  "fitness_age": {
   "available": true,
+  "scope": "multi_year",
   "estimate": 59,
   "range_low": 56,
   "range_high": 62,

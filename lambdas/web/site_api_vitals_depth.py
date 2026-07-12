@@ -43,6 +43,13 @@ from web.site_api_common import (
 
 # ── Windows ────────────────────────────────────────────────────────────────────────────────
 _ARC_EARLIEST = "2010-01-01"  # far enough back to sweep the full recorded history
+
+# #1091 — cross-phase provenance, made data-driven. These panels are built on RAW_TIMESERIES
+# partitions (ADR-077): real multi-year records deliberately KEPT across experiment resets.
+# Pre-start / week-one they could read as this-cycle data that shouldn't exist yet, so every
+# available panel declares scope="multi_year" and the renderer labels it ("multi-year history ·
+# not reset with the experiment"). Labeling only — the history is real and nothing is blanked.
+_SCOPE_MULTI_YEAR = "multi_year"
 _WALK_WINDOW_DAYS = 182  # the rendered walking-HR trend is the last ~6 months (recent read)
 _FITNESS_BASIS_DAYS = 180  # VO2max readings feeding the fitness-age estimate (recent aerobic state)
 
@@ -144,6 +151,7 @@ def _fitness_age_estimate(vo2_series):
     hi = max(hi, point + 3.0)
     as_of = max(r["date"] for r in recent)
     return {
+        "scope": _SCOPE_MULTI_YEAR,  # #1091 — basis readings come from the cross-cycle VO2max record
         "estimate": round(point),
         "range_low": round(lo),
         "range_high": round(hi),
@@ -185,6 +193,7 @@ def _vo2max_arc():
         trend = "declining"
     return {
         "available": True,
+        "scope": _SCOPE_MULTI_YEAR,  # #1091 — Garmin arc spans cycles; kept across resets
         "source": "Garmin",
         "unit": "ml/kg/min",
         "series": series,
@@ -241,6 +250,7 @@ def _walking_hr():
     vals = [w["value"] for w in window]
     return {
         "available": True,
+        "scope": _SCOPE_MULTI_YEAR,  # #1091 — Strava walk record spans cycles; kept across resets
         "source": "Strava (Walk activities)",
         "unit": "bpm",
         "series": window,
