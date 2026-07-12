@@ -51,6 +51,11 @@ from web.site_api_common import (
     table,
 )
 
+# #1084 / ADR-105: a "30d average" fabricated from one or two readings is not an
+# average. Below this floor the avg field reads None (its n is surfaced alongside)
+# and front-ends self-hide on null.
+_MIN_AVG_N = 3
+
 
 def handle_vitals(date: str | None = None) -> dict:
     """
@@ -72,6 +77,17 @@ def handle_vitals(date: str | None = None) -> dict:
     today = anchor
     d30 = (_anchor_dt - timedelta(days=30)).strftime("%Y-%m-%d")
     d7 = (_anchor_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+    if not ip:
+        # #1084 / ADR-077 "clamped, not hidden": LIVE trailing windows never reach
+        # across genesis into prior-cycle rows — at a reset the window shrinks
+        # honestly instead. (The phase filter hides *tagged* pilot rows, but rows
+        # ingested between reset-tagging and genesis carry no tag; the date clamp
+        # is deterministic either way.) Time-travel (?date=) keeps the full reach —
+        # include_pilot=True is the deliberate ADR-058 contract there. A staged
+        # FUTURE genesis makes start > end, which _query_source treats as "no data
+        # yet" ([]), so this can never 500.
+        d30 = max(d30, EXPERIMENT_START)
+        d7 = max(d7, EXPERIMENT_START)
 
     # Whoop (recovery, HRV, RHR, sleep)
     whoop_7d = _query_source("whoop", d7, today, include_pilot=ip)
@@ -110,6 +126,8 @@ def handle_vitals(date: str | None = None) -> dict:
     withings_latest = _latest_item_asof("withings", today, ip) if date else _latest_item("withings")
     try:
         _ah_start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+        if not ip:
+            _ah_start = max(_ah_start, EXPERIMENT_START)  # #1084: same live genesis clamp as d7/d30
         _ah_7d = _query_source("apple_health", _ah_start, today, include_pilot=ip)
     except Exception:
         _ah_7d = []
@@ -167,7 +185,11 @@ def handle_vitals(date: str | None = None) -> dict:
                 "weight_as_of": weight_as_of,
                 "weight_delta_30d": weight_delta_30d,
                 "hrv_ms": round(float(latest.get("hrv", 0)), 1) if latest.get("hrv") else None,
-                "hrv_30d_avg": round(sum(hrv_vals) / len(hrv_vals), 1) if hrv_vals else None,
+                # #1084 / ADR-105: the claim carries its n — below _MIN_AVG_N the
+                # "30d avg" is None (a 1-2 reading mean isn't an average), and
+                # hrv_30d_n says how much data backs the number when it shows.
+                "hrv_30d_avg": round(sum(hrv_vals) / len(hrv_vals), 1) if len(hrv_vals) >= _MIN_AVG_N else None,
+                "hrv_30d_n": len(hrv_vals),
                 "hrv_trend": trend(hrv_vals),
                 "rhr_bpm": round(float(latest.get("resting_heart_rate", 0)), 0) if latest.get("resting_heart_rate") else None,
                 "rhr_trend": trend(list(reversed(rhr_vals))),  # lower is better

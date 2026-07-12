@@ -1038,6 +1038,17 @@ def handle_deficit_sustainability() -> dict:
     )
 
 
+# ── #1084 honest-numbers read guards (ADR-105 rigor bar) ────────────────────
+# A trailing mean below these floors is noise dressed as an average: per-day
+# averages need >= _MIN_DAILY_AVG_N COMPLETE days (today, still accruing, never
+# counts), and weekly averages need a >= _MIN_WEEKLY_WINDOW_DAYS complete-day
+# genesis-clamped window before dividing. Below the floor the field is None
+# (with an explicit n/reason where the payload carries one) and front-ends
+# self-hide on null.
+_MIN_DAILY_AVG_N = 3
+_MIN_WEEKLY_WINDOW_DAYS = 7
+
+
 def handle_training_overview() -> dict:
     """
     GET /api/training_overview
@@ -1049,6 +1060,14 @@ def handle_training_overview() -> dict:
     d90 = _experiment_date(90)
     d30 = _experiment_date(30)
 
+    # #1084 (ADR-077 "clamped, not hidden"): the "30d" window above is genesis-
+    # clamped by _experiment_date, so early in a cycle it spans far fewer than 30
+    # days. Weekly averages must divide by the REAL window length (the fixed /4.3
+    # understated a 2-day cycle spread over "4.3 weeks") and read None below the
+    # floor rather than extrapolating a day or two out to a week.
+    _win_days = max((datetime.strptime(today, "%Y-%m-%d") - datetime.strptime(d30, "%Y-%m-%d")).days, 0)
+    _win_weeks = _win_days / 7.0 if _win_days >= _MIN_WEEKLY_WINDOW_DAYS else None
+
     # Strava activities (90 days)
     strava_items = _query_source("strava", d90, today)
     strava_30d = [s for s in strava_items if (s.get("date") or s.get("sk", "").replace("DATE#", "")) >= d30]
@@ -1059,6 +1078,13 @@ def handle_training_overview() -> dict:
     z2_minutes_30d = 0
     # Z2 is recalculated after flattening activities below
     z2_target = 150  # minutes/week
+
+    def _z2_weekly_stats(total_min):
+        # #1084: weekly average over the real (genesis-clamped) window — None
+        # below the _MIN_WEEKLY_WINDOW_DAYS floor; z2_pct rides along.
+        wa = round(total_min / _win_weeks) if _win_weeks is not None else None
+        pct = round(wa / z2_target * 100) if (wa is not None and z2_target) else None
+        return wa, pct
 
     # Flatten nested activities lists from day-level Strava records
     all_activities_30d = []
@@ -1106,7 +1132,8 @@ def handle_training_overview() -> dict:
 
     total_workouts_90d = len(all_activities_90d)
     total_workouts_30d = len(all_activities_30d)
-    weekly_avg = round(total_workouts_30d / 4.3, 1) if total_workouts_30d else 0
+    # #1084: real-window weekly rate, None below the floor (was a fixed /4.3).
+    weekly_avg = round(total_workouts_30d / _win_weeks, 1) if _win_weeks is not None else None
 
     # Activity type breakdown (30d)
     type_counts = {}
@@ -1206,8 +1233,7 @@ def handle_training_overview() -> dict:
                 z2_minutes_30d += dur
                 if (a.get("_day_date") or "") >= _d7_cal:
                     z2_trailing_7d += dur
-    z2_weekly_avg = round(z2_minutes_30d / 4.3)
-    z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+    z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_minutes_30d)
 
     # ── Walking stats — per-day step merge, Apple-Health-first ──
     # Garmin is rate-limited/dead and emits a phantom ~298-step record that used to block
@@ -1228,7 +1254,20 @@ def handle_training_overview() -> dict:
             gs = int(float(g["steps"]))
             if _d not in steps_by_date and gs >= _PHANTOM_STEP_FLOOR:
                 steps_by_date[_d] = gs  # Garmin only when Apple Health absent AND plausible
-    avg_daily_steps = round(sum(steps_by_date.values()) / len(steps_by_date)) if steps_by_date else None
+    # #1084 root cause: this mean divided by however few days existed — including
+    # an n=1 "average" of ONLY today's partial count on Day 1 (ADR-105 violation:
+    # no n, no uncertainty). Guard: today never counts (steps accrue until
+    # midnight) and the mean needs _MIN_DAILY_AVG_N complete days; below the
+    # floor it is None with an explicit reason. The per-day trend still charts
+    # today — a labeled daily value, not a fabricated average.
+    _complete_step_days = {d: v for d, v in steps_by_date.items() if d < today}
+    avg_daily_steps_n = len(_complete_step_days)
+    if avg_daily_steps_n >= _MIN_DAILY_AVG_N:
+        avg_daily_steps = round(sum(_complete_step_days.values()) / avg_daily_steps_n)
+        avg_daily_steps_reason = None
+    else:
+        avg_daily_steps = None
+        avg_daily_steps_reason = "insufficient_data"
     daily_steps_trend = []
     for _step_date in sorted(steps_by_date):
         try:
@@ -1243,6 +1282,10 @@ def handle_training_overview() -> dict:
     ]
     walking_data = {
         "avg_daily_steps": avg_daily_steps,
+        # #1084 / ADR-105: the claim carries its n; when the avg is None the
+        # reason says why (front-ends self-hide on the null either way).
+        "avg_daily_steps_n": avg_daily_steps_n,
+        "avg_daily_steps_reason": avg_daily_steps_reason,
         "total_walks_30d": len(walk_activities),
         "total_rucks_30d": len(ruck_activities),
         "total_miles_30d": round(sum(_act_miles(a) for a in walk_activities), 1),
@@ -1345,8 +1388,13 @@ def handle_training_overview() -> dict:
 
     # Whoop strain (30d)
     whoop_30d = _query_source("whoop", d30, today)
-    strain_vals = [float(w["strain"]) for w in whoop_30d if w.get("strain")]
-    avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if strain_vals else None
+    # #1084 sibling guard: day strain accrues until midnight, so today's row is a
+    # partial — exclude it, and require the same complete-day floor as the steps
+    # mean before claiming a 30d average.
+    strain_vals = [
+        float(w["strain"]) for w in whoop_30d if w.get("strain") and (w.get("date") or w.get("sk", "").replace("DATE#", ""))[:10] < today
+    ]
+    avg_strain = round(sum(strain_vals) / len(strain_vals), 1) if len(strain_vals) >= _MIN_DAILY_AVG_N else None
 
     # Whoop workouts — per-workout HR zone data (enriches Strava)
     whoop_workouts = []
@@ -1370,8 +1418,7 @@ def handle_training_overview() -> dict:
                     z2_trailing_7d += z2_from_whoop
         # Recalculate Z2 weekly avg with Whoop data
         if whoop_workouts:
-            z2_weekly_avg = round(z2_minutes_30d / 4.3)
-            z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+            z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_minutes_30d)
     except Exception as e:
         logger.warning(f"[training_overview] Whoop workout query failed (non-fatal): {e}")
 
@@ -1506,8 +1553,7 @@ def handle_training_overview() -> dict:
     # cardio, no HR stream) into the Z2 base alongside Strava + Whoop. Never Strava-only.
     if _hevy_cardio_min:
         z2_minutes_30d += _hevy_cardio_min
-        z2_weekly_avg = round(z2_minutes_30d / 4.3)
-        z2_pct = round(z2_weekly_avg / z2_target * 100) if z2_target else 0
+        z2_weekly_avg, z2_pct = _z2_weekly_stats(z2_minutes_30d)
 
     return _ok(
         {
