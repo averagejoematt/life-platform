@@ -496,6 +496,24 @@ def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
+def _presence_block() -> str:
+    """#967: the ONE shared presence / quiet-stretch block (engagement_core,
+    written by adaptive_mode → STATE#current) — the same seam daily_brief uses
+    (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
+    normal month over the silence. Empty when Matthew is present. Fail-soft."""
+    try:
+        from engagement_core import presence_prompt_block
+
+        sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        block = presence_prompt_block(sig)
+        if block:
+            logger.info("Presence block injected (class=" + str(sig.get("presence_class")) + ")")
+        return block
+    except Exception as e:
+        logger.warning("presence block skipped (non-fatal): " + str(e))
+        return ""
+
+
 def call_haiku_monthly(data, goals):
     clean_data = d2f(data)
     clean_goals = d2f(goals)
@@ -515,6 +533,12 @@ def call_haiku_monthly(data, goals):
         prompt_template = _FALLBACK_MONTHLY_PROMPT
 
     prompt = prompt_template.format(data_json=json.dumps(clean_data, indent=2), goals_json=json.dumps(clean_goals, indent=2))
+
+    # #967: the ONE shared presence block — when Matthew's own logging has gone
+    # quiet, the board must not review a normal month over an incomplete window.
+    presence = _presence_block()
+    if presence:
+        prompt += "\n\n" + presence
 
     # IC-16: Progressive context — quarterly insights window
     if _HAS_INSIGHT_WRITER:

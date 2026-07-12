@@ -149,6 +149,24 @@ def gather_facts(date_str: str) -> dict:
     return facts
 
 
+def _presence_block() -> str:
+    """#967: the ONE shared presence / quiet-stretch block (engagement_core,
+    written by adaptive_mode → STATE#current) — the same seam daily_brief uses
+    (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
+    normal day over the silence. Empty when Matthew is present. Fail-soft."""
+    try:
+        from engagement_core import presence_prompt_block
+
+        sig = table.get_item(Key={"pk": USER_PREFIX + "engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        block = presence_prompt_block(sig)
+        if block:
+            logger.info("Presence block injected (class=" + str(sig.get("presence_class")) + ")")
+        return block
+    except Exception as e:
+        logger.warning("presence block skipped (non-fatal): " + str(e))
+        return ""
+
+
 def _num(v):
     if v is None:
         return None
@@ -206,7 +224,7 @@ def deterministic_fallback_narrative(facts: dict) -> str:
     return " ".join(parts)
 
 
-def build_narration_body(facts: dict) -> dict:
+def build_narration_body(facts: dict, presence_block: str = "") -> dict:
     system = (
         "You are the narrator of the 'Daily Debrief,' a roughly two-minute spoken audio briefing on "
         "one person's health-experiment day. His name is Matt. You are given the exact, already-computed "
@@ -219,16 +237,23 @@ def build_narration_body(facts: dict) -> dict:
         "Do not open with the word 'Matt' or 'Matthew'. Close on a single grounded, forward-looking sentence "
         "without inventing a plan or a number."
     )
+    # #967: the ONE shared presence block (engagement_core.presence_prompt_block,
+    # rendered by the caller from the STATE#current read) — so the debrief sees a
+    # real logging gap instead of narrating a normal day over it.
+    if presence_block:
+        system += "\n\n" + presence_block
     data_blob = json.dumps(facts, indent=2, default=str)
     user = "Today's pre-computed facts for the debrief:\n\n" + data_blob + "\n\nWrite the spoken debrief now."
     return {"model": MODEL, "max_tokens": MAX_TOKENS, "system": system, "messages": [{"role": "user", "content": user}]}
 
 
-def narrate(facts: dict) -> dict:
+def narrate(facts: dict, presence_block: str = "") -> dict:
     """One Haiku call → grounded connecting prose. Budget-gated (tier ≥ 2, matching
     state_of_matthew), fail-soft to the deterministic template on a tier pause, a
     Bedrock error, an empty response, or a failed ADR-104 grounding/causal check.
-    Never regenerates — one call per day."""
+    Never regenerates — one call per day. `presence_block` (#967) is the shared
+    quiet-stretch steering block; its numbers (e.g. the gap length) were handed to
+    the model, so they join the grounding allow-list — honest, never fabricated."""
     try:
         from budget_guard import allow
 
@@ -240,7 +265,7 @@ def narrate(facts: dict) -> dict:
     try:
         import bedrock_client
 
-        resp = bedrock_client.invoke(build_narration_body(facts), model_name=MODEL)
+        resp = bedrock_client.invoke(build_narration_body(facts, presence_block), model_name=MODEL)
         text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
     except Exception as e:
         logger.warning("[debrief] narration call failed — %s", e)
@@ -249,7 +274,7 @@ def narrate(facts: dict) -> dict:
     if not text:
         return {"narrative": deterministic_fallback_narrative(facts), "narrated": False, "model": None, "reason": "empty_response"}
 
-    allowed = allowed_numbers(facts)
+    allowed = allowed_numbers(facts, presence_block or None)
     findings = grounding_findings(text, facts=None, allowed=allowed)
     causal_hits = _causal_language(text)
     if findings or causal_hits:
@@ -404,7 +429,7 @@ def lambda_handler(event: dict, context) -> dict:
         logger.warning("[debrief] %s has no computed facts — skipping", date_str)
         return {"statusCode": 200, "body": json.dumps({"date": date_str, "skipped": "no facts"})}
 
-    narration = narrate(facts)
+    narration = narrate(facts, _presence_block())
     if dry_run:
         return {
             "statusCode": 200,

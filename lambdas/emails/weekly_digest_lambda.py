@@ -1128,6 +1128,24 @@ def call_anthropic_with_retry(req, timeout=55, max_attempts=None, backoff_s=None
     return retry_utils.call_anthropic_raw(req, timeout=timeout)
 
 
+def _presence_block() -> str:
+    """#967: the ONE shared presence / quiet-stretch block (engagement_core,
+    written by adaptive_mode → STATE#current) — the same seam daily_brief uses
+    (daily_brief_lambda.py Phase 2), so a dark stretch is never narrated as a
+    normal week over the silence. Empty when Matthew is present. Fail-soft."""
+    try:
+        from engagement_core import presence_prompt_block
+
+        sig = table.get_item(Key={"pk": f"USER#{USER_ID}#SOURCE#engagement_state", "sk": "STATE#current"}).get("Item") or {}
+        block = presence_prompt_block(sig)
+        if block:
+            logger.info("Presence block injected (class=" + str(sig.get("presence_class")) + ")")
+        return block
+    except Exception as e:
+        logger.warning("presence block skipped (non-fatal): " + str(e))
+        return ""
+
+
 def call_haiku(data, profile):
     clean = d2f(data)
     pd = json.loads(json.dumps(clean))
@@ -1185,23 +1203,25 @@ def call_haiku(data, profile):
     except Exception:
         journey_context = f"JOURNEY STAGE: Week 1 of transformation | {int(round(EXPERIMENT_BASELINE_WEIGHT_LBS))}→185 lbs"
 
+    prompt = BOARD_PROMPT.format(
+        data_json=json.dumps(pd, indent=2, default=str),
+        grade_summary=grade_summary,
+        previous_insights=previous_insights,
+        journey_context=journey_context,
+        start_w=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)),
+        lbs_to_lose=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)) - 185,
+    )
+    # #967: the ONE shared presence block — when Matthew's own logging has gone
+    # quiet, the board must not review a normal week over an incomplete window.
+    presence = _presence_block()
+    if presence:
+        prompt += "\n\n" + presence
+
     payload = json.dumps(
         {
             "model": os.environ.get("AI_MODEL", "claude-sonnet-4-6"),
             "max_tokens": 1500,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": BOARD_PROMPT.format(
-                        data_json=json.dumps(pd, indent=2, default=str),
-                        grade_summary=grade_summary,
-                        previous_insights=previous_insights,
-                        journey_context=journey_context,
-                        start_w=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)),
-                        lbs_to_lose=int(round(EXPERIMENT_BASELINE_WEIGHT_LBS)) - 185,
-                    ),
-                }
-            ],
+            "messages": [{"role": "user", "content": prompt}],
         }
     ).encode()
     req = urllib.request.Request(
