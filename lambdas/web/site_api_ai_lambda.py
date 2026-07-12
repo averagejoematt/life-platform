@@ -39,7 +39,7 @@ from ai_context import (
 )  # R22-SEC-04 (#811): delimit untrusted reader text; #743: reader-facing receipts
 from boto3.dynamodb.conditions import Key
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
-from phase_filter import with_phase_filter  # ADR-058
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1085
 from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
 from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
@@ -817,8 +817,8 @@ def _coach_stance_bits(pid: str) -> str:
     bypasses the query-level phase filter, so without this guard the old cycle's
     stance leaked into board prompts post-reset. Same guard as site_api_coach._stance_latest."""
     try:
-        item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "STANCE#latest"}).get("Item") or {}
-        if item.get("tombstone") or item.get("phase") == "pilot":
+        item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "STANCE#latest"}).get("Item")
+        if not singleton_visible(item):  # #1085: normalized onto the shared #946 predicate
             return ""
         item = _decimal_to_float(item)
         bits = []
@@ -837,7 +837,11 @@ def _coach_memory_bits(pid: str) -> str:
     by the history summarizer) — the same state the daily-brief self reasons
     from. Summary + top concerns, bounded. Empty pre-data / on any error."""
     try:
-        item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "COMPRESSED#latest"}).get("Item") or {}
+        item = table.get_item(Key={"pk": f"COACH#{pid}", "sk": "COMPRESSED#latest"}).get("Item")
+        # #1085 (extends #946): COMPRESSED#latest is experiment-scoped and tombstoned
+        # at reset — unguarded, the WIPED cycle's memory kept grounding board answers.
+        if not singleton_visible(item):
+            return ""
         item = _decimal_to_float(item)
         bits = []
         if item.get("summary"):
@@ -856,9 +860,13 @@ def _coach_recent_interactions(pid: str, limit: int = 2) -> str:
     itself. Empty pre-data / on any error."""
     try:
         resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"COACH#{pid}") & Key("sk").begins_with("INTERACTION#"),
-            ScanIndexForward=False,
-            Limit=limit,
+            **with_phase_filter(
+                {  # #1085 / ADR-058: hide the wiped cycle's board interactions
+                    "KeyConditionExpression": Key("pk").eq(f"COACH#{pid}") & Key("sk").begins_with("INTERACTION#"),
+                    "ScanIndexForward": False,
+                    "Limit": limit,
+                }
+            )
         )
         lines = []
         for it in resp.get("Items", []):

@@ -361,7 +361,7 @@ def _stance_latest(coach_id):
     clean, so this is only the between-reset-and-first-compute window."""
     try:
         item = table.get_item(Key={"pk": f"COACH#{coach_id}", "sk": "STANCE#latest"}).get("Item")
-        if not item or item.get("tombstone") or item.get("phase") == "pilot":
+        if not singleton_visible(item):  # #946/#1085: tombstone + any non-current phase
             return None
         return _decimal_to_float(item)
     except Exception:
@@ -385,6 +385,27 @@ def _integrator_digest():
         if not singleton_visible(item):
             return None
         return _decimal_to_float(item)
+    except Exception:
+        return None
+
+
+def _latest_cycle_digest():
+    """The newest ENSEMBLE#digest CYCLE# record, or None while it's hidden.
+
+    #1085 (extends #946): experiment-scoped like ENSEMBLE#dispute, and this was the
+    one unguarded DDB read on the /api/coach_analysis route — between the reset and
+    the first post-genesis ensemble run, the WIPED cycle's active_disagreements
+    leaked into the response as cross_coach_reference. Newest-hidden means "no
+    current-cycle digest"; we don't skip past it to an older wiped one."""
+    try:
+        items = table.query(
+            KeyConditionExpression=Key("pk").eq("ENSEMBLE#digest") & Key("sk").begins_with("CYCLE#"),
+            ScanIndexForward=False,
+            Limit=1,
+        ).get("Items", [])
+        if not items or not singleton_visible(items[0]):
+            return None
+        return _decimal_to_float(items[0])
     except Exception:
         return None
 
@@ -576,7 +597,9 @@ def handle_panel_ledger(event):
     Shaped-empty 200 before the first weekly episode."""
     try:
         it = table.get_item(Key={"pk": f"{USER_PREFIX}panelcast", "sk": "STATE#current"}).get("Item")
-        state = json.loads(it.get("state_json", "{}")) if it else {}
+        # #1085 (extends #946): panelcast is experiment-scoped — the wiped cycle's
+        # bet ledger kept serving pre-start because get_item bypasses the phase filter.
+        state = json.loads(it.get("state_json", "{}")) if singleton_visible(it) else {}
     except Exception as _e:
         logger.warning(f"[panel_ledger] {_e}")
         state = {}
@@ -598,14 +621,21 @@ def _latest_dispute():
     """#540: the most recent inter-coach dispute thread — an ACTUAL exchange
     (coach B answered coach A's specific claim, gated turns), not a post-hoc
     summary. None when nothing has aired; the page renders nothing rather than
-    inventing a fight."""
+    inventing a fight.
+
+    #1085 (extends #946): the restart wipe stamps tombstone=true + phase=pilot on
+    every ENSEMBLE#dispute thread, but this reader queried the newest record with
+    no guard — /api/coach_team kept serving the WIPED cycle's argument pre-start.
+    The newest thread being hidden means "no current-cycle dispute" (we do NOT
+    skip past it to resurrect an even older one); coach_team serves dispute:null
+    and the front-end self-hides the section."""
     try:
         items = table.query(
             KeyConditionExpression=Key("pk").eq("ENSEMBLE#dispute"),
             ScanIndexForward=False,
             Limit=1,
         ).get("Items", [])
-        if not items:
+        if not items or not singleton_visible(items[0]):
             return None
         t = _decimal_to_float(items[0])
         return {
@@ -758,9 +788,11 @@ def handle_field_notes(event):
     fn_pk = f"{USER_PREFIX}field_notes"
 
     if week_param:
-        # Single entry mode
+        # Single entry mode. #1085 (extends #946): field_notes are experiment-scoped —
+        # list mode is phase-filtered but this get_item bypassed the filter, so a
+        # ?week= request kept serving the WIPED cycle's note verbatim.
         item = table.get_item(Key={"pk": fn_pk, "sk": f"WEEK#{week_param}"}).get("Item")
-        if not item:
+        if not singleton_visible(item):
             return _ok({"entry": None, "week": week_param}, cache_seconds=300)
         item = _decimal_to_float(item)
         return _ok(
@@ -842,7 +874,10 @@ def handle_recap():
     survived a genesis re-anchor) the same way handle_ai_analysis does.
     """
     item = table.get_item(Key={"pk": f"{USER_PREFIX}chronicle", "sk": "RECAP#latest"}).get("Item")
-    if not item:
+    # #1085 (extends #946): the wiped RECAP#latest was only being withheld by the
+    # day-count guard below (record claims day 7 > pre-start day 0) — it would have
+    # resurfaced on day 7 of the NEW cycle. Tombstone/phase guard closes it for good.
+    if not singleton_visible(item):
         return _ok({"recap": None}, cache_seconds=300)
     item = _decimal_to_float(item)
     rec_days = item.get("experiment_day")
@@ -1018,17 +1053,11 @@ def handle_coach_analysis(event):
         except Exception:
             pass
 
-        # 3. Ensemble digest — cross-coach references
+        # 3. Ensemble digest — cross-coach references (#1085: tombstone/phase-guarded)
         cross_coach_reference = None
         try:
-            dig_resp = table.query(
-                KeyConditionExpression=Key("pk").eq("ENSEMBLE#digest") & Key("sk").begins_with("CYCLE#"),
-                ScanIndexForward=False,
-                Limit=1,
-            )
-            dig_items = dig_resp.get("Items", [])
-            if dig_items:
-                digest = _decimal_to_float(dig_items[0])
+            digest = _latest_cycle_digest()
+            if digest:
                 disagreements = digest.get("active_disagreements", [])
                 for d in disagreements:
                     coaches = d.get("coaches", [])
