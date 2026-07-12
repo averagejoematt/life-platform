@@ -1265,17 +1265,48 @@ nonzero aborts the run and prints what already ran; `--continue-on-error` is the
 6. `restart_intelligence_wipe.py --apply` — tombstones newly pre-genesis records, stamping the
    CLOSING cycle number; `--close-cycle` then bumps SSM `/life-platform/experiment-cycle` to N+1
 7. `restart_ledger_reset.py --apply` — rolls the accountability ledger into `LIFETIME#`/`CYCLE_TOTALS#`, zeroes `TOTALS#current`
-8. `restart_chronicle_handler.py --apply` — archives newly pre-genesis chronicle HTML; resurrects `--keep-chronicle` lead-ins
-9. **Manual (not yet wired into the pipeline):** `python3 deploy/restart_leadin_pages.py --apply` —
-   rebuilds the public lead-in article pages + `/journal/posts.json` from the resurrected chronicle
-   records. Run it right after the chronicle handler, or the story hub serves tombstone JSON and the
-   lead-in URLs 404 until the first post-genesis Wednesday publish. S3-only writes; idempotent.
-10. `restart_media_reset.py --apply` — archives + blanks the panelcast/debrief audio feeds
+8. `restart_chronicle_handler.py --apply` — archives newly pre-genesis chronicle HTML; resurrects
+   the `PRELAUNCH_CALENDAR` lead-ins (or explicit `--keep-chronicle` overrides)
+9. `restart_media_reset.py --apply` — archives + blanks the panelcast/debrief audio feeds, resurrects the calendar's podcast prequel
+10. `restart_leadin_pages.py --apply` — rebuilds the public lead-in article pages + `/journal/posts.json`
+    from the resurrected chronicle records (wired into the pipeline; S3-only writes; idempotent)
 11. `restart_character_rebuild.py --apply` — recomputes character sheets from new genesis
 12. `restart_site_copy_sync.py --apply --old-genesis <outgoing>` — JS/JSON/HTML genesis-literal sweep + CloudFront invalidate
 13. `restart_docs_update.py --apply` — doc date/copy sync
-14. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 40-URL v4 surface (apply mode only)
-15. `--close-cycle`: appends one line to `docs/restart/RESET_LOG.md` (the human-readable reset ledger)
+14. With `--sync-site` (opt-in, #1092): `bash deploy/sync_site_to_s3.sh` — the full-site
+    content-hashed sync + rss.xml regen (deliberately NOT default: heavy + interactive;
+    without the flag it stays a printed next command)
+15. `restart_verify_rendered.py --old-genesis <outgoing>` — hard gate over the 40-URL v4 surface (apply mode only)
+16. `restart_verify_semantic.py` — **the #1093 semantic hard gate** (apply mode only): deterministic
+    assertions on what the live site SAYS pre-start (`pre_start` flags on snapshot/journey, zeroed
+    character, no current-cycle findings on /api/discoveries, coach_team dispute null-or-current-cycle,
+    prologue-only `/journal/posts.json`) **plus zero pre-genesis `phase=experiment` rows across every
+    raw-timeseries source** — catches the ingestion-poisoning class (a warm ingestion Lambda with
+    stale constants re-stamping a pre-genesis row after the tagger pass, found 2026-07-12).
+    Standalone: `python3 deploy/restart_verify_semantic.py [--offline]` (`--offline` skips the
+    live-site checks honestly and still runs the read-only DDB check)
+17. Post-verify hooks (#1092 — the former manual Sunday-queue steps, now inside the one command;
+    skipped loudly if a verify gate failed — they run on the next successful re-run):
+    - `fix_prologue_cycle_and_subscribe_ttl.py` — **default ON** (reads the SSM cycle, so it must
+      follow the step-6 bump; `--skip-prologue-fix` to skip)
+    - `seed_genesis_preregistration.py` — opt-in `--with-preregistration` (re-lands the frozen #976
+      pre-registration after the wipe)
+    - `dedup_source_records.py --source <name>` — one pass per `--dedup-source <name>` (repeatable):
+      deletes raw-timeseries duplicate `DATE#` rows (the eightsleep UTC-rollover class — same
+      session written under two dates; keeps the earlier date, requires a session-timestamp anchor
+      so gap-filled `no_data` rows can never group)
+18. `--close-cycle`: appends one line to `docs/restart/RESET_LOG.md` (the human-readable reset ledger)
+
+**The one-command contract (#1092):** everything above is one `restart_pipeline.py --apply`
+invocation. The ONLY steps that deliberately stay outside it (each a verified exclusion, not
+an omission):
+- `publish_genesis_preregistration.py` — a permanent PUBLIC AI artifact; stays **attended**
+  under the prereg/frozen-artifact dry-run-review posture (review the dry-run output, then
+  `--apply`). The pipeline prints it as a labeled next step.
+- `deploy/restart_verify.py` — the **post-genesis Monday** health check (asserts `day_n >= 1`,
+  a genesis weigh-in, a post-genesis character sheet); folding it would structurally fail at
+  reset time. Run it Monday morning.
+- The git commit of regenerated files (constants, configs, `CYCLE_GENESES`, `RESET_LOG.md`) — from MAIN.
 
 **Resume gotcha (`--old-genesis`):** the orchestrator snapshots the outgoing genesis from
 `lambdas/constants.py` BEFORE regenerating it — but a **resumed** run (e.g. re-running with
