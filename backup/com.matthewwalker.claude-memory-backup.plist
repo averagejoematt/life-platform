@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.matthewwalker.claude-memory-backup</string>
+
+    <!-- Runs the ~/.local/bin copy, NOT the repo copy — launchd cannot read
+         ~/Documents without a TCC grant (install.sh stages the copy). -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/matthewwalker/.local/bin/claude-memory-backup.sh</string>
+    </array>
+
+    <!-- Daily at 09:15 local; RunAtLoad catches missed windows on wake/login -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>15</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/matthewwalker/Library/Logs/claude-backup/backup-launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/matthewwalker/Library/Logs/claude-backup/backup-launchd.log</string>
+</dict>
+</plist>
