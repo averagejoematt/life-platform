@@ -431,6 +431,17 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .hb-fr.fr-mid { color: var(--ink-muted); }
 .hb-fr.fr-hard { border-style: dashed; border-color: var(--ink-muted); color: var(--ink-faint); }
 
+/* #1107 — per-habit 30-day dot strip (genesis-clamped window, ADR-077). One ink+ember
+   ramp, never red: kept = ember · missed = muted ink · not-scheduled = faint outline ·
+   no-data = the honest-absence dash (a flattened dash-dot, visually distinct from a miss). */
+.hb-dotcell { vertical-align: middle; }
+.hb-dots { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; max-width: 100%; }
+.hb-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.hb-dot.hd-done { background: var(--ember); }
+.hb-dot.hd-miss { background: var(--ink-muted); }
+.hb-dot.hd-off { background: transparent; border: 1px solid var(--rule); }
+.hb-dot.hd-abs { background: transparent; border-top: 1px dashed var(--ink-faint); border-radius: 0; height: 0; }
+
 /* P1.3 drivers table + P1.4 misses — honest-empty cells read faint/italic, never alarming. */
 .rd-drv th { font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--ink-faint); text-align: left; font-weight: var(--weight-reg); padding-bottom: var(--sp-1); }
 .drv-empty { color: var(--ink-faint); font-style: italic; font-size: var(--fs-small); }
