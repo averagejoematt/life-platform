@@ -83,6 +83,7 @@ check_status "Subscribe"            "$BASE/subscribe/"
 check_status "Story · chronicle"    "$BASE/story/chronicle/"
 check_status "Story · journal"      "$BASE/story/journal/"
 check_status "Coaching · lab-notes" "$BASE/coaching/lab-notes/"
+check_status "Coaching · by-coach"  "$BASE/coaching/by-coach/"
 check_status "Story · timeline"     "$BASE/story/timeline/"
 check_status "Story · about"        "$BASE/story/about/"
 # Evidence topics (sample across groups)
@@ -156,6 +157,8 @@ check_status "/api/pulse"           "$BASE/api/pulse"
 check_status "/api/snapshot"        "$BASE/api/snapshot"
 check_status "/api/source_freshness" "$BASE/api/source_freshness"
 check_status "/api/platform_stats"  "$BASE/api/platform_stats"
+# #1112 — the head coach's detail route (lead tier) must resolve, not 404
+check_status "/api/coach/eli_marsh" "$BASE/api/coach/eli_marsh"
 echo ""
 
 if [[ "$QUICK" != "--quick" ]]; then

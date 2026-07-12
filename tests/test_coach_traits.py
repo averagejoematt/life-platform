@@ -1,10 +1,10 @@
 """tests/test_coach_traits.py — #1113 authored trait scores structure.
 
 The scores themselves are authored character design (a human judgment call, not
-testable); what IS enforceable is the structure: exactly the 8 operational
-coaches, every coach scored on every shared axis, scores in-bounds, and the
-honesty disclosure present so the front-end can never render the cast sheet as
-measured behavior.
+testable); what IS enforceable is the structure: exactly the public cast — the
+8 operational coaches plus the head coach (lead tier, #1112) — every coach
+scored on every shared axis, scores in-bounds, and the honesty disclosure
+present so the front-end can never render the cast sheet as measured behavior.
 """
 
 import os
@@ -19,8 +19,10 @@ import persona_registry  # noqa: E402
 AXIS_KEYS = [a["key"] for a in coach_traits.TRAIT_AXES]
 
 
-def test_every_operational_coach_is_scored_and_nobody_else():
-    assert set(coach_traits.COACH_TRAITS) == set(persona_registry.OPERATIONAL_COACH_IDS)
+def test_every_cast_coach_is_scored_and_nobody_else():
+    # The public cast = the 8 operational coaches + the head coach (#1112).
+    cast = set(persona_registry.OPERATIONAL_COACH_IDS) | {persona_registry.LEAD_PERSONA_ID}
+    assert set(coach_traits.COACH_TRAITS) == cast
 
 
 def test_every_coach_scores_every_shared_axis_in_bounds():

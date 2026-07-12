@@ -466,6 +466,23 @@ def _stance_held_since(coach_id, current_stage_label):
     return held
 
 
+def _stance_from_latest(latest):
+    """Normalize a STANCE#latest record into the public stance shape (the
+    evidence-derived branch of _stance_block; split out so the lead-tier coach
+    page (#1112) can prefer a real stance without the staff ladder fallback)."""
+    return {
+        "source": "stance",
+        "headline_read": latest.get("headline_read", ""),
+        "focused_on_now": latest.get("focused_on_now", []),
+        "set_aside_for_now": latest.get("set_aside_for_now", []),
+        "stage": latest.get("stage", {}) or {},
+        "how_my_read_changed": latest.get("how_my_read_changed", ""),
+        "confidence_note": latest.get("confidence_note", ""),
+        "as_of": latest.get("as_of"),
+        "grounding_flag": bool(latest.get("grounding_flag")),
+    }
+
+
 def _stance_block(coach_id, weight_lbs):
     """The coach's public read of Matthew, in a single normalized shape both the
     coach page (CC-01) and the My Team view (CC-10) consume.
@@ -476,17 +493,7 @@ def _stance_block(coach_id, weight_lbs):
     """
     latest = _stance_latest(coach_id)
     if latest:
-        return {
-            "source": "stance",
-            "headline_read": latest.get("headline_read", ""),
-            "focused_on_now": latest.get("focused_on_now", []),
-            "set_aside_for_now": latest.get("set_aside_for_now", []),
-            "stage": latest.get("stage", {}) or {},
-            "how_my_read_changed": latest.get("how_my_read_changed", ""),
-            "confidence_note": latest.get("confidence_note", ""),
-            "as_of": latest.get("as_of"),
-            "grounding_flag": bool(latest.get("grounding_flag")),
-        }
+        return _stance_from_latest(latest)
 
     # ── Fallback: weight-band ladder, mapped into the same normalized keys ──
     stance = coach_stance.load_stance(coach_id, _S3, _S3_BUCKET) if coach_stance else {}
@@ -519,7 +526,8 @@ def handle_coaches(event):
     if not _COACH_MODULES:
         return _ok({"coaches": [], "count": 0, "disclosure": _DISCLOSURE}, cache_seconds=60)
     try:
-        ops = {k: v for k, v in _registry().get("personas", {}).items() if v.get("operational")}
+        personas = _registry().get("personas", {})
+        ops = {k: v for k, v in personas.items() if v.get("operational")}
         order = persona_registry.OPERATIONAL_COACH_IDS
         coaches = []
         for pid, p in ops.items():
@@ -537,9 +545,29 @@ def handle_coaches(event):
                     "color": p.get("color"),
                     "board_role": p.get("board_role"),
                     "headline_stat": headline,
+                    "tier": "staff",
                 }
             )
         coaches.sort(key=lambda c: order.index(c["persona_id"]) if c["persona_id"] in order else 99)
+        # #1112 — the head coach leads the roster (lead tier, the cast hierarchy).
+        # Non-operational: he files no domain reads and makes no graded calls, so
+        # his headline is his role — never a fabricated track-record line (ADR-104).
+        lead = personas.get(persona_registry.LEAD_PERSONA_ID)
+        if lead and lead.get("lead"):
+            coaches.insert(
+                0,
+                {
+                    "persona_id": persona_registry.LEAD_PERSONA_ID,
+                    "name": lead.get("name"),
+                    "domain": lead.get("domain"),
+                    "short_bio": lead.get("short_bio"),
+                    "emoji": lead.get("emoji"),
+                    "color": lead.get("color"),
+                    "board_role": lead.get("board_role"),
+                    "headline_stat": "runs the program",
+                    "tier": "lead",
+                },
+            )
         return _ok({"coaches": coaches, "count": len(coaches), "disclosure": _DISCLOSURE}, cache_seconds=300)
     except Exception as _e:
         logger.warning(f"[/api/coaches] {_e}")
@@ -738,9 +766,21 @@ def handle_coach(event):
         qs = event.get("queryStringParameters") or {}
         pid = (qs.get("id") or path.rstrip("/").split("/")[-1] or "").strip()
         p = _registry().get("personas", {}).get(pid)
-        if not p or not p.get("operational"):
+        # #1112: the head coach (lead: true) gets a detail page too — every other
+        # non-operational persona (narrator, board-only figures) still 404s.
+        is_lead = bool(p and p.get("lead") and not p.get("operational"))
+        if not p or not (p.get("operational") or is_lead):
             return _error(404, "Unknown coach")
         weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
+        if is_lead:
+            # No weight-band ladder config exists for the lead and the opinion
+            # engine writes him no weekly stance — the staff ladder fallback would
+            # fabricate a scaffold. Serve an explicit source:"none" (honest-empty,
+            # ADR-104); if a STANCE#latest ever lands for him it wins, same as staff.
+            latest = _stance_latest(pid)
+            stance = _stance_from_latest(latest) if latest else {"source": "none", "headline_read": "", "stage": {}}
+        else:
+            stance = _stance_block(pid, weight)
         return _ok(
             {
                 "persona_id": pid,
@@ -751,15 +791,22 @@ def handle_coach(event):
                 "color": p.get("color"),
                 "board_role": p.get("board_role"),
                 "type": p.get("type"),
+                "tier": "lead" if is_lead else "staff",
+                # Lead-tier extras (config-authored persona fields; null for staff —
+                # their character block carries the equivalent material).
+                "philosophy": p.get("philosophy"),
+                "expertise": p.get("expertise", []),
                 "disclosure": _DISCLOSURE,
                 "character": _character(p),
                 # #1113: authored (deterministic, human-written) trait scores — the
                 # cast sheet, labelled as authored fiction-design by its own disclosure.
                 "trait_scores": coach_traits.traits_for(pid),
                 "working_hypotheses": _working_hypotheses(pid),
-                "stance": _stance_block(pid, weight),
+                "stance": stance,
                 "stance_history": _stance_history(pid),
-                "voice": _voice_subset(p["coach_config_key"]),
+                # The lead has no generation voice spec (config/coaches/{id}.json) —
+                # null is the honest value, and the front-end omits the section.
+                "voice": _voice_subset(p["coach_config_key"]) if p.get("coach_config_key") else None,
                 "relationships": _relationships(pid),
                 "report_card": {
                     "track_record": _track_record(pid),

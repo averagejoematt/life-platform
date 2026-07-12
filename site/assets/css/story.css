@@ -632,6 +632,14 @@ body { overflow-x: hidden; }
 .tl-philosophy { margin: var(--sp-3) 0 0; padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); font-family: var(--font-serif); font-style: italic; color: var(--ink); max-width: var(--measure); }
 .tl-focus { margin-top: var(--sp-3); font-family: var(--font-mono); color: var(--ink-dim); }
 
+/* ── #1112 — the head coach at lead tier on the roster + detail surfaces ──────
+   Same sky accent as the .team-lead card above: the cast hierarchy, visually. */
+.dx-item--lead { border-left: 3px solid #0ea5e9; background: color-mix(in oklch, #0ea5e9 6%, var(--surface)); }
+.dx-item--lead.is-active { border-left-color: #0ea5e9; background: color-mix(in oklch, #0ea5e9 12%, var(--surface)); }
+.dx-item-lead { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: #0ea5e9; }
+.coach-head--lead { padding: var(--sp-3); border: 1px solid var(--ember-line); border-left: 3px solid #0ea5e9; background: var(--surface-raised); border-radius: var(--radius-sm); }
+.coach-head-tier { margin: var(--sp-1) 0 0; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: #0ea5e9; }
+
 /* ── The Panel ledger — running bet scoreboard (2026-06-14) ──────────────────── */
 .panel-ledger { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--ember-line); }
 .pl-list { list-style: none; padding: 0; margin: var(--sp-2) 0 0; display: flex; flex-direction: column; gap: var(--sp-2); }

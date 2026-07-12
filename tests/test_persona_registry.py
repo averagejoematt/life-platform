@@ -202,6 +202,14 @@ def test_lead_persona_nonoperational_with_distinct_voice():
     assert v not in taken, f"lead voice {v!r} clashes with an existing persona"
 
 
+def test_lead_constant_matches_the_single_lead_persona():
+    """#1112: persona_registry.LEAD_PERSONA_ID (the hardcoded constant the site-api
+    roster/detail routes key on) must stay equal to the ONE lead:true persona in
+    config/personas.json — same contract as OPERATIONAL_COACH_IDS above."""
+    lead_ids = [k for k, v in _personas().items() if v.get("lead")]
+    assert lead_ids == [persona_registry.LEAD_PERSONA_ID]
+
+
 def test_podcast_voice_map_complete_and_unique():
     """Every operational coach + Elena has a distinct persistent TTS voice (podcasts)."""
     speakers = list(persona_registry.OPERATIONAL_COACH_IDS) + ["elena_voss"]

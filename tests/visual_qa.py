@@ -249,6 +249,18 @@ PAGES.extend(
             "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach read + domain data rendered"}],
         },
         {
+            # #1112 — the head coach (Eli Marsh) at lead tier: the lead header must
+            # mount (config-authored, independent of engine data) alongside the
+            # standard dossier sections (honest-empty pre-data).
+            "path": "/coaching/by-coach/#eli_marsh",
+            "name": "Coaching · By Coach (head coach, lead tier)",
+            "wait_for": "[data-dx-read]",
+            "checks": [
+                {"selector": ".coach-head--lead", "min_count": 1, "desc": "lead-tier header rendered for the head coach"},
+                {"selector": "[data-dx-read] .team-lead", "min_count": 1, "desc": "running-the-program block rendered"},
+            ],
+        },
+        {
             "path": "/coaching/scorecard/",
             "name": "Coaching · Scorecard (graded track record)",
             "wait_for": "[data-dx-read]",
