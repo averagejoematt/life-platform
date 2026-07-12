@@ -42,6 +42,7 @@ from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058
 from source_registry import public_board_sources, public_paused_sources  # #387: derived source count
 
+from web import board_quality_gate as _bqg  # #968: ADR-108 quality gate on the board (see the block comment near the #546 section)
 from web.site_api_common import (
     SITE_API_ORIGIN_SECRET,  # #815 R22-SEC-03: shared with site_api_lambda's SEC-04 guard
     _scrub_blocked_terms as _scrub_blocked_terms_base,  # canonical shared helpers (#368)
@@ -924,6 +925,17 @@ def _write_board_interaction(pid: str, question: str, answer: str, grounded: boo
         logger.warning(f"[board_ask] interaction write-back failed for {pid} (non-fatal): {e}")
 
 
+# ── #968: ADR-108 quality gate on the public board ─────────────────────────
+# The coach-voiced board answers (initial ask + follow-up) run the SAME
+# coach-quality-gate lambda the daily brief enforces — but evaluate-then-
+# regenerate-once under a hard time budget off the real Lambda deadline, and
+# FAIL-OPEN (a reader is synchronously waiting; the fabrication class is
+# already fail-closed via the ADR-104 grounding gate above, so this gate
+# protects voice fidelity only). The full contract, budget mechanics and the
+# ADR-103 scope posture live in `web/board_quality_gate.py` (split out per
+# the 2000-line handler size gate); the `_bqg` alias is imported at the top.
+
+
 # ── #546: board follow-up sessions ─────────────────────────
 # Security posture (this is a PUBLIC, unauthenticated endpoint):
 #   • token is opaque + unguessable (secrets.token_urlsafe) — never sequential
@@ -1026,6 +1038,9 @@ def _append_board_turn(token: str, ip_hash: str, persona: str, question: str, an
 
 def lambda_handler(event: dict, context) -> dict:  # Phase 4.12 type hints
     """Routes /api/ask (POST) and /api/board_ask (POST) only."""
+    # #968: capture the invocation context so the ADR-108 board quality gate
+    # can enforce its hard time budget off the REAL Lambda deadline.
+    _bqg.set_lambda_context(context)
     # Phase 2.2: centralized request envelope validation (Body size cap +
     # injection pattern detection + param format checks). Returns 4xx on abuse.
     try:
@@ -1615,6 +1630,24 @@ def _handle_board_ask(event: dict) -> dict:
             except Exception as _gg_e:
                 logger.warning(f"[board_ask] {pid} grounding gate error (fail-open): {_gg_e}")
 
+            # #968: ADR-108 quality gate (voice/anti-pattern/decision-class) —
+            # only a GROUNDED real answer is worth gating (a refusal is canned
+            # text). Fail-open under a hard time budget; a corrected rewrite
+            # must re-pass the ADR-104 grounding check before it can be served.
+            if _grounded:
+
+                def _qg_regen(_note, _req=req_body, _um=user_msg):
+                    _b = json.loads(_req)
+                    _b["messages"] = [{"role": "user", "content": _um + "\n\n" + _note}]
+                    _r = _bedrock_invoke(_b)
+                    _emit_token_metrics(_r.get("usage", {}), endpoint="api_board_ask")
+                    return _scrub_blocked_terms("".join(b["text"] for b in _r.get("content", []) if b.get("type") == "text"))
+
+                def _qg_grounded(_t, _s=_sys_txt, _u=user_msg):
+                    return not board_grounding_findings(_s, _u, _t)
+
+                _txt = _bqg.enforce(pid, _txt, _qg_regen, _qg_grounded, _retain_board_flag)
+
             # #531: the answer enters the coach's own memory (fail-soft).
             _write_board_interaction(pid, question, _txt, grounded=_grounded)
 
@@ -1817,6 +1850,31 @@ def _handle_board_followup(body: dict, ip_hash: str) -> dict:
         pass  # helper not bundled — serve as before
     except Exception as _gg_e:
         logger.warning(f"[board_ask] follow-up {persona} grounding gate error (fail-open): {_gg_e}")
+
+    # #968: ADR-108 quality gate, per turn — same contract as the initial path
+    # (fail-open, hard time budget, corrected rewrite must re-ground against
+    # the full transcript + prior answers before it can be served).
+    if _grounded:
+
+        def _qg_regen(_note):
+            _corr = list(messages)
+            _corr[-1] = {"role": "user", "content": messages[-1]["content"] + "\n\n" + _note}
+            _r = _bedrock_invoke(
+                {
+                    "model": AI_MODEL_HAIKU,
+                    "max_tokens": 450,
+                    "system": [{"type": "text", "text": _sys_txt, "cache_control": {"type": "ephemeral"}}],
+                    "messages": _corr,
+                }
+            )
+            _emit_token_metrics(_r.get("usage", {}), endpoint="api_board_ask")
+            return _scrub_blocked_terms("".join(b["text"] for b in _r.get("content", []) if b.get("type") == "text"))
+
+        def _qg_grounded(_t):
+            _mt = " ".join(m["content"] for m in messages if isinstance(m.get("content"), str))
+            return not board_grounding_findings(_sys_txt, _mt, _t, prior_answers=prior_answers)
+
+        _txt = _bqg.enforce(persona, _txt, _qg_regen, _qg_grounded, _retain_board_flag, endpoint="board_followup")
 
     # Persist the turn (atomic append + counter bump, re-checks the cap and IP).
     persisted = _append_board_turn(token, ip_hash, persona, question, _txt)

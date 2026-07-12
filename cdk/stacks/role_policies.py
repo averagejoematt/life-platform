@@ -2217,6 +2217,16 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             actions=["secretsmanager:GetSecretValue"],
             resources=[_secret_arn("life-platform/subscriber-token-secret")],
         ),
+        # #968: the coach-voiced board answers run the ADR-108 quality gate
+        # (the same coach-quality-gate lambda the daily brief enforces). Sync
+        # invoke, fail-open in code — but without this grant every gate call
+        # would log AccessDeniedException and the gate would silently never
+        # evaluate (the daily-brief role hit that exact failure mode 2026-05-24).
+        iam.PolicyStatement(
+            sid="CoachQualityGateInvoke",
+            actions=["lambda:InvokeFunction"],
+            resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
+        ),
         _bedrock_statement(),  # ADR-062: /api/ask + /api/board_ask now use Bedrock
     ]
 
