@@ -1,8 +1,8 @@
 # Secrets Rotation Procedures
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
-Last updated: 2026-05-19 (V2 audit operational sweep)
+Last updated: 2026-07-11 (#935 — Whoop re-auth script moved to `setup/setup_whoop_auth.py`, callback-server flow)
 
 Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret is rotated. Used by both the operator (manual rotations) and the freshness checker (staleness alerts).
 
@@ -46,12 +46,13 @@ Whoop/Withings/Strava/Garmin/EightSleep ingestion Lambdas refresh tokens on ever
 ### Manual OAuth re-auth procedures
 
 **Whoop (dead refresh token — full re-auth):**
-The committed script lives in `deploy/` (NOT `setup/` like its siblings — a
-find-it trap that fooled two audits, 2026-07-10):
 ```bash
-python3 deploy/setup_whoop_auth.py
-# Walks the browser OAuth authorization-code flow (localhost callback) and updates
-# life-platform/whoop in place, preserving client_id/client_secret.
+python3 setup/setup_whoop_auth.py
+# Local callback server on http://localhost:3000/callback + browser OAuth consent
+# (same shape as setup/fix_withings_oauth.py); exchanges the code, verifies the new
+# token against /recovery, and updates life-platform/whoop in place, preserving
+# client_id/client_secret. `--manual` = paste-the-URL fallback (headless / port busy);
+# `--backfill` = also trigger whoop-data-ingestion after.
 ```
 Tokens normally never die (auto-refresh + writeback every hourly run; a lost refresh
 response = permanently dead token = the 2026-06 outage). Manual fallback if the
@@ -65,7 +66,7 @@ aws secretsmanager get-secret-value --secret-id life-platform/whoop --query Secr
 # 4. Write the updated JSON (with the new refresh_token) back:
 aws secretsmanager put-secret-value --secret-id life-platform/whoop --secret-string '<updated JSON>'
 ```
-Housekeeping (#935): consider moving/symlinking the script into `setup/` so it sits with its siblings.
+(#935 closed the find-it trap: the script moved `deploy/` → `setup/setup_whoop_auth.py` so it sits with its siblings, and gained the withings-style local callback server.)
 
 **Garmin (the most operationally fraught — 30-day OAuth1 lifetime + rate-limit traps):**
 ```bash
@@ -170,4 +171,4 @@ If a secret is leaked:
 
 ---
 
-**Verified:** 2026-05-19 (V2 audit operational sweep)
+**Verified:** 2026-07-11 (#935 Whoop re-auth procedure; prior full sweep 2026-05-19 V2 audit)

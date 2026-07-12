@@ -1,6 +1,6 @@
 # Secrets Map — central reference for source → secret mapping
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 > **Sources of truth:** `aws secretsmanager list-secrets --region us-west-2` (inventory) · `grep -rln "life-platform/<name>" lambdas/ mcp/ cdk/` (consumers) · `cdk/stacks/role_policies.py` (IAM grants)
 
 **Reconciled against AWS Secrets Manager on 2026-07-10** (wiki-3 access/accounts pass).
@@ -49,7 +49,7 @@ Last reconciled: **2026-07-10**. 21 active, 0 in deletion window, all under `lif
 | Garmin | `life-platform/garmin` | OAuth1 + OAuth2 | ~30 days (OAuth1 refresh) | `setup/setup_garmin_browser_auth.py` (Playwright/Chromium MFA) | ✅ 2026-07-10 |
 | Withings | `life-platform/withings` | OAuth2 | similar to Garmin (manual refresh on rate-limit) | `setup/fix_withings_oauth.py` | ✅ 2026-07-10 |
 | Strava | `life-platform/strava` | OAuth2 | similar pattern | manual refresh script | ✅ 2026-07-10 |
-| Whoop | `life-platform/whoop` | OAuth2 | similar pattern | `python3 deploy/setup_whoop_auth.py` (note: lives in `deploy/`, not `setup/`) | ✅ 2026-07-10 |
+| Whoop | `life-platform/whoop` | OAuth2 | similar pattern | `python3 setup/setup_whoop_auth.py` (localhost:3000 callback server, mirrors `fix_withings_oauth.py`; moved from `deploy/` by #935) | ✅ 2026-07-11 |
 | Eight Sleep | `life-platform/eightsleep` + `life-platform/eightsleep-client` | username/password + client credential | static | rotate manually if exposed | ✅ 2026-07-10 (two secrets — user creds + app client ID) |
 | Habitify | `life-platform/habitify` | API key | static | rotate manually if exposed | ✅ 2026-07-10 (dedicated secret, ADR-014) |
 | Hevy (read) | `life-platform/hevy` | API key | static | regenerate in Hevy app settings | ✅ 2026-07-10 — consumed by `lambdas/hevy_common.py` |
@@ -170,4 +170,4 @@ If this doc drifts from reality, it becomes worse than nothing. Treat divergence
 
 ---
 
-**Verified:** 2026-07-10 (21 live secrets reconciled; consumers re-derived by grep — wiki-3 pass)
+**Verified:** 2026-07-11 (#935 Whoop re-auth row — script now `setup/setup_whoop_auth.py`; secrets inventory last reconciled 2026-07-10, wiki-3 pass)
