@@ -147,8 +147,9 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
 # so the judge is instructed to fail exactly what the deterministic check fails — a
 # calibration test asserts the constant and the rubric text agree.
 _INTRO_RUBRIC = (
-    "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the "
-    "Principal Investigator who built the platform). MATT is the third-person SUBJECT of the experiment; he is NOT "
+    "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the head "
+    "coach MATT cast to lead the coaching staff; MATT himself designed and built the experiment and the platform). "
+    "MATT is the third-person SUBJECT of the experiment; he is NOT "
     "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
     "1. Opens on a genuine HOOK in turn 0, not a flat self-introduction.\n"
     "2. After the opening, it's a real two-person conversation — no long stretch of one person talking; more than "
@@ -163,7 +164,19 @@ _INTRO_RUBRIC = (
     "facts about MATT fail this item.\n"
     "8. NO DANGLING THREAD: every question or challenge one speaker raises is actually answered in the next turn; "
     "no topic the SCRIPT itself raises is then dropped; never two same-speaker turns where a reply is clearly "
-    "missing. (Coverage is NOT required — only flag a thread the script opens and abandons.)"
+    "missing. (Coverage is NOT required — only flag a thread the script opens and abandons.)\n"
+    "9. AUTHORSHIP & METHOD accuracy: fails if the script implies anyone other than MATT designed, built, or runs "
+    "the experiment or the platform (Eli was CAST by Matt to lead the coaching staff — he is not its author or "
+    "Matt's boss), or that Matt merely follows a single daily instruction / 'one next move' — Matt runs many "
+    "parallel protocols (experiments, challenges, habit trials, supplements) and makes his own calls; the coaches "
+    "advise, predict, and get publicly scored.\n"
+    "10. READ-ALOUD TURING TEST: read aloud, it must sound human-written. Flag any AI tell — 'in this episode', "
+    "narrating the format or naming segments, tidy three-item lists, 'not just X, it's Y' symmetry, over-explaining, "
+    "hedge throat-clearing, or a neat summary bow at the end.\n"
+    "11. HUMOUR & HUMAN TEXTURE: this must feel like a show a stranger would keep listening to, not a briefing — "
+    "at least two genuinely warm or dryly funny beats, plus human texture (an aside or callback, direct address to "
+    "the listener, a moment of small talk that earns its place, a quotable line). A script that is merely compliant "
+    "and information-dense — personality-free — fails this item."
 )
 
 
