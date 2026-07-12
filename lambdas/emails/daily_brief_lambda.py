@@ -1222,6 +1222,13 @@ def _run_ai_coach_pipeline(
     # Reset computation cache at start of each daily brief cycle
     ai_calls._comp_results_cache = None
 
+    # #966: domains whose v2 draft was deliberately HELD by a blocking gate
+    # (quality gate N-06, presence-ack #914). A hold is terminal for that
+    # domain this cycle — the legacy fallback narrative is skipped for it, so
+    # "hold, don't publish" actually holds. Error-caused None (infra failure)
+    # keeps the legacy fallback: no gate made a judgment there.
+    _held_domains = set()
+
     for _cid, _call_fn, _label in [
         ("sleep", ai_calls.call_sleep_coach_v2, "Sleep"),
         ("nutrition", ai_calls.call_nutrition_coach_v2, "Nutrition"),
@@ -1233,7 +1240,14 @@ def _run_ai_coach_pipeline(
         ("explorer", ai_calls.call_explorer_coach_v2, "Explorer"),
     ]:
         try:
-            _result = _call_fn(data, profile) or ""
+            _raw = _call_fn(data, profile)
+            if isinstance(_raw, ai_calls.CoachHold):
+                # #966: deliberate gate hold — terminal. Render nothing for this
+                # domain AND suppress its legacy fallback below.
+                _held_domains.add(_cid)
+                logger.info(f"{_label} Coach V2 HELD by {_raw.reason} gate — terminal for this domain, legacy fallback skipped (#966)")
+                _raw = None
+            _result = _raw or ""
             if _cid == "sleep":
                 result["sleep_coach_v2_text"] = _result
             elif _cid == "nutrition":
@@ -1252,7 +1266,7 @@ def _run_ai_coach_pipeline(
                 result["explorer_coach_v2_text"] = _result
             if _result:
                 logger.info(f"{_label} Coach V2: {_result[:80]}")
-            else:
+            elif _cid not in _held_domains:
                 logger.info(f"{_label} Coach V2 returned None — will use legacy")
         except Exception as e:
             logger.warning(f"{_label} Coach V2 failed (non-blocking): {e}")
@@ -1300,11 +1314,23 @@ def _run_ai_coach_pipeline(
     except Exception as e:
         logger.warning("BoD failed: " + str(e))
 
-    try:
-        result["training_nutrition"] = ai_calls.call_training_nutrition_coach(data, profile, shared_system=shared_system)
-        logger.info("Training/Nutrition coach returned")
-    except Exception as e:
-        logger.warning("Training/Nutrition coach failed: " + str(e))
+    # #966: the legacy training/nutrition call is the automatic fallback for the
+    # v2 training/nutrition coaches — but a domain whose v2 draft was HELD by a
+    # blocking gate must stay held (skip the ungated legacy narrative for it).
+    _tn_held = _held_domains & {"training", "nutrition"}
+    if _tn_held == {"training", "nutrition"}:
+        logger.info("Training/Nutrition legacy call skipped — both domains HELD by a blocking gate (#966)")
+    else:
+        try:
+            _tn = ai_calls.call_training_nutrition_coach(data, profile, shared_system=shared_system)
+            if isinstance(_tn, dict) and _tn_held:
+                for _held_key in sorted(_tn_held):
+                    if _tn.pop(_held_key, None) is not None:
+                        logger.info(f"Legacy {_held_key} narrative dropped — {_held_key} coach v2 draft HELD by a blocking gate (#966)")
+            result["training_nutrition"] = _tn
+            logger.info("Training/Nutrition coach returned")
+        except Exception as e:
+            logger.warning("Training/Nutrition coach failed: " + str(e))
 
     if data.get("journal_entries"):
         try:
