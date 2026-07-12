@@ -39,7 +39,7 @@ from aws_cdk import (
     aws_sns as sns,
 )
 
-from stacks.constants import ACCT, REGION, S3_BUCKET  # CONF-01
+from stacks.constants import ACCT, REGION, S3_BUCKET, TABLE_NAME  # CONF-01
 
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
@@ -613,7 +613,7 @@ class MonitoringStack(Stack):
             "Sum",
             1,
             GTE,
-            {"TableName": "life-platform", "Operation": "PutItem"},
+            {"TableName": TABLE_NAME, "Operation": "PutItem"},
         )
 
         # ══════════════════════════════════════════════════════════════

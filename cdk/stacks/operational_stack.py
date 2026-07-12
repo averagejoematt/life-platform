@@ -39,6 +39,7 @@ from aws_cdk import (
 )
 
 from stacks import role_policies as rp
+from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the table name (DR cutover)
 from stacks.lambda_helpers import create_platform_lambda
 
 # ── #793 (2026-07-08): the public serving path moved OUT of this stack ───────
@@ -53,7 +54,7 @@ from stacks.lambda_helpers import create_platform_lambda
 REGION = "us-west-2"
 ACCT = "205930651321"
 INGESTION_DLQ_ARN = f"arn:aws:sqs:{REGION}:{ACCT}:life-platform-ingestion-dlq"
-LIFE_PLATFORM_TABLE = "life-platform"
+LIFE_PLATFORM_TABLE = TABLE_NAME
 LIFE_PLATFORM_BUCKET = "matthew-life-platform"
 ALERTS_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts"
 DIGEST_TOPIC_ARN = f"arn:aws:sns:{REGION}:{ACCT}:life-platform-alerts-digest"
@@ -582,7 +583,7 @@ class OperationalStack(Stack):
             timeout_seconds=300,
             memory_mb=256,
             environment={
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
                 "S3_BUCKET": "matthew-life-platform",
                 "USER_ID": "matthew",
             },
@@ -761,7 +762,7 @@ class OperationalStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             environment={
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
                 "USER_ID": "matthew",
                 "S3_BUCKET": "matthew-life-platform",
                 "PAUSE_MODE_PARAM": "/life-platform/pause-mode",
@@ -815,7 +816,7 @@ class OperationalStack(Stack):
             timeout_seconds=120,
             memory_mb=256,
             environment={
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
                 "USER_ID": "matthew",
                 "S3_BUCKET": "matthew-life-platform",
                 "PAUSE_MODE_PARAM": "/life-platform/pause-mode",

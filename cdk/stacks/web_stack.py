@@ -47,6 +47,7 @@ from stacks.constants import (
     PRIVACY_MODE,
     REGION,
     S3_BUCKET as _CONSTANTS_BUCKET,  # CONF-01
+    TABLE_NAME,  # #936: DR cutover — no hardcoded table names
 )
 from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
@@ -90,7 +91,7 @@ class WebStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # Resolve shared resources (accept injected or import by name)
-        local_table = table or dynamodb.Table.from_table_name(self, "LifePlatformTable", "life-platform")
+        local_table = table or dynamodb.Table.from_table_name(self, "LifePlatformTable", TABLE_NAME)
         local_bucket = bucket or s3.Bucket.from_bucket_name(self, "LifePlatformBucket", BUCKET)
         local_dlq = dlq or sqs.Queue.from_queue_arn(self, "IngestionDLQ", INGESTION_DLQ_ARN)
         local_alerts = alerts_topic or sns.Topic.from_topic_arn(self, "AlertsTopic", ALERTS_TOPIC_ARN)
@@ -313,7 +314,7 @@ class WebStack(Stack):
             memory_mb=256,
             environment={
                 "USER_ID": "matthew",
-                "TABLE_NAME": "life-platform",
+                "TABLE_NAME": TABLE_NAME,
                 "S3_BUCKET": BUCKET,
                 "EMAIL_SENDER": "lifeplatform@mattsusername.com",
                 "SITE_URL": "https://averagejoematt.com",
