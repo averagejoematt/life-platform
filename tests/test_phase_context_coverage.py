@@ -346,6 +346,18 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
         out = axp.build_arc_prompt("[Week 1] tone=steady\n\n[Week 2] tone=mixed", "{}", "", 2)
         assert MARKER in out
 
+    # ── Challenge generator (#1118): hoped_outcome is AI-written narrative ──
+    # The weekly generator writes each challenge's hoped_outcome (the falsifiable
+    # expected result) — the writer must know what day/phase it is, so the block
+    # rides its USER prompt; the cache_control-wrapped system prompt stays
+    # byte-stable (COST-OPT-2).
+    def test_challenge_generator_prompt(self):
+        from intelligence import challenge_generator_lambda as chg
+
+        out = chg.build_generation_prompt({})
+        assert MARKER in out
+        assert MARKER not in chg.SYSTEM_PROMPT
+
     # ── Public AI surfaces (/api/ask + board_ask) ────────────────────────────
     def test_ask_system_prompt(self):
         from web import site_api_ai_lambda as ai
@@ -404,6 +416,7 @@ NARRATIVE_BUILDER_FILES = [
     "lambdas/emails/podcast_script_v2.py",
     "lambdas/web/site_api_ai_lambda.py",
     "lambdas/intelligence/integrator_prompts.py",  # #1115 — synthesis / month-rollup / arc builders
+    "lambdas/intelligence/challenge_generator_lambda.py",  # #1118 — hoped_outcome rides the generation prompt
 ]
 
 
