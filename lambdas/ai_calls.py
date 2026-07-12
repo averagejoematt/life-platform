@@ -382,6 +382,49 @@ def call_anthropic(
 # ==============================================================================
 
 
+def _ground_legacy_output(label, output, regen_fn, *allow_sources):
+    """ADR-104 / #966: the allow-list grounding gate + regen_once for the 4
+    legacy daily-brief calls (Board of Directors, training+nutrition, journal
+    coach, TL;DR) — previously the highest-frequency narrative surface with NO
+    number gate (only the heuristic AI-3 validator, which stays in place; this
+    ADDS the deterministic allow-list check, it does not replace validation).
+
+    Reuses the exact harness the gated surfaces use (`_run_coach_v2_pipeline`
+    Step 5.5): every number in the output must appear somewhere in what the
+    model was given (`allow_sources` — the prompt + the shared system block),
+    one corrective rewrite via `regen_fn`, kept only if findings strictly
+    decrease. `facts=None` because these calls carry all their data inside the
+    prompt itself — the canonical-contradiction check is the AI-3 validator's
+    existing job on these surfaces.
+
+    Fail-soft on gate infra (same convention as the v2 pipeline's grounding
+    step): a broken gate never blocks the brief, it only stops gating.
+    The R17-16 outage sentinel passes through untouched — it contains no
+    numbers and callers already handle it.
+    """
+    if not output or not isinstance(output, str) or _is_ai_unavailable(output):
+        return output
+    try:
+        import grounded_generation as _gg  # bundled shared module (ADR-104)
+
+        _allowed = _gg.allowed_numbers(*allow_sources)
+
+        def _findings_fn(_t):
+            return _gg.grounding_findings(_t, facts=None, allowed=_allowed)
+
+        _pre = _findings_fn(output)
+        if _pre:
+            print(f"[LEGACY-GROUNDING:{label}] grounding finding(s): {[f['detail'] for f in _pre][:5]}")
+        output, _left, _corrected = _gg.regen_once(output, _findings_fn, regen_fn)
+        if _corrected:
+            print(f"[LEGACY-GROUNDING:{label}] self-corrected: {len(_pre)}→{len(_left)} finding(s)")
+        elif _pre:
+            print(f"[LEGACY-GROUNDING:{label}] rewrite not strictly better — keeping original draft ({len(_pre)} finding(s) remain)")
+    except Exception as _gg_e:
+        print(f"[LEGACY-GROUNDING:{label}] gate failed (non-blocking): {_gg_e}")
+    return output
+
+
 def call_training_nutrition_coach(
     data: dict[str, Any], profile: dict[str, Any], api_key: str = "", shared_system: Optional[str] = None
 ) -> str:
@@ -454,6 +497,15 @@ Respond in EXACTLY this JSON format, no other text:
 
     try:
         raw = call_anthropic(prompt, api_key, max_tokens=500, system=shared_system, cache_system=False)
+        # ADR-104 / #966: allow-list grounding gate on the raw JSON text before
+        # parsing — a fabricated number inside either coaching string is caught here.
+        raw = _ground_legacy_output(
+            "training_nutrition",
+            raw,
+            lambda _corr: call_anthropic(prompt + "\n\n" + _corr, api_key, max_tokens=500, system=shared_system, cache_system=False),
+            prompt,
+            shared_system,
+        )
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -519,13 +571,28 @@ Format: [reflection] || [tactical thing]
 No labels, no formatting. Natural voice. Max 80 words total."""
 
     try:
-        return call_anthropic(
+        _out = call_anthropic(
             prompt,
             api_key,
             max_tokens=250,
             system=shared_system,
             cache_system=False,
             output_type=AIOutputType.JOURNAL_COACH if _AI_VALIDATOR_AVAILABLE else None,
+        )
+        # ADR-104 / #966: allow-list grounding gate (AI-3 validator above stays).
+        return _ground_legacy_output(
+            "journal_coach",
+            _out,
+            lambda _corr: call_anthropic(
+                prompt + "\n\n" + _corr,
+                api_key,
+                max_tokens=250,
+                system=shared_system,
+                cache_system=False,
+                output_type=AIOutputType.JOURNAL_COACH if _AI_VALIDATOR_AVAILABLE else None,
+            ),
+            prompt,
+            shared_system,
         )
     except Exception as e:
         print("[WARN] Journal coach failed: " + str(e))
@@ -828,7 +895,7 @@ DO NOT start with "Matthew". Max 60 words."""
         "tsb": data.get("tsb") if data else None,
         "sleep_score": _safe_float((data.get("sleep") or {}), "sleep_score") if data else None,
     }
-    return call_anthropic(
+    _out = call_anthropic(
         prompt,
         api_key,
         max_tokens=200,
@@ -836,6 +903,25 @@ DO NOT start with "Matthew". Max 60 words."""
         cache_system=False,
         output_type=AIOutputType.BOD_COACHING if _AI_VALIDATOR_AVAILABLE else None,
         health_context=_hctx,
+    )
+    # ADR-104 / #966: the prompt demands "Reference specific numbers (at least
+    # two)" — the allow-list gate is what makes that demand safe. Every number
+    # cited must exist in the prompt/system input; one corrective rewrite, kept
+    # only if strictly better. The AI-3 validator above stays in place.
+    return _ground_legacy_output(
+        "board_of_directors",
+        _out,
+        lambda _corr: call_anthropic(
+            prompt + "\n\n" + _corr,
+            api_key,
+            max_tokens=200,
+            system=shared_system,
+            cache_system=False,
+            output_type=AIOutputType.BOD_COACHING if _AI_VALIDATOR_AVAILABLE else None,
+            health_context=_hctx,
+        ),
+        prompt,
+        shared_system,
     )
 
 
@@ -1050,6 +1136,24 @@ Respond in EXACTLY this JSON format, no other text:
             output_type=AIOutputType.GUIDANCE if _AI_VALIDATOR_AVAILABLE else None,
             health_context=_hctx,
         )
+        # ADR-104 / #966: allow-list grounding gate on the raw JSON text before
+        # parsing — the TL;DR's mandatory "at least ONE SPECIFIC NUMBER" and the
+        # guidance items' numbers must all exist in the prompt input.
+        raw = _ground_legacy_output(
+            "tldr_guidance",
+            raw,
+            lambda _corr: call_anthropic(
+                prompt + "\n\n" + _corr,
+                api_key,
+                max_tokens=450,
+                system=shared_system,
+                cache_system=False,
+                output_type=AIOutputType.GUIDANCE if _AI_VALIDATOR_AVAILABLE else None,
+                health_context=_hctx,
+            ),
+            prompt,
+            shared_system,
+        )
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
@@ -1091,7 +1195,34 @@ AI_UNAVAILABLE_SENTINEL = "[AI_UNAVAILABLE]"
 def _is_ai_unavailable(text):
     """True when a generation (or a gate's corrective regeneration) came back as
     the R17-16 outage sentinel rather than real coaching text (#952)."""
-    return bool(text) and AI_UNAVAILABLE_SENTINEL in text
+    return bool(text) and isinstance(text, str) and AI_UNAVAILABLE_SENTINEL in text
+
+
+class CoachHold:
+    """#966: sentinel returned by `_run_coach_v2_pipeline` when a draft was
+    deliberately HELD by a blocking gate (quality gate N-06/#390, presence-ack
+    #914) — as opposed to `None`, which means an infra/pipeline failure.
+
+    The distinction is load-bearing: an infra failure (orchestrator down,
+    Bedrock outage, voice spec missing) may still warrant the legacy fallback —
+    the reader loses nothing and no gate made a judgment. A deliberate hold
+    must be TERMINAL for that domain in that brief: the gate judged the draft
+    unpublishable, so silently substituting the ungated legacy narrative
+    defeats "hold, don't publish" (the issue's exact failure mode).
+
+    Truthy on purpose — a falsy sentinel would be swallowed by the caller's
+    `result or ""` coercion and rendered as an empty section indistinguishable
+    from an error. Callers must check `isinstance(x, ai_calls.CoachHold)`.
+    """
+
+    __slots__ = ("coach_id", "reason")
+
+    def __init__(self, coach_id, reason):
+        self.coach_id = coach_id
+        self.reason = reason
+
+    def __repr__(self):
+        return f"CoachHold(coach_id={self.coach_id!r}, reason={self.reason!r})"
 
 
 def _allowlist_prompt(system_prompt, few_shot_block):
@@ -1315,7 +1446,11 @@ def _run_coach_v2_pipeline(coach_id, domain_data, domain_label, data, api_key):
     """
     Generic Coach Intelligence pipeline for any coach.
 
-    Returns generated text on success, None on failure (caller falls back to legacy).
+    Returns generated text on success; None on infra/pipeline FAILURE (caller
+    may fall back to legacy); a `CoachHold` sentinel when a blocking gate
+    (quality gate N-06, presence-ack #914) deliberately HELD the draft — a
+    hold is terminal for the domain, the caller must NOT substitute the
+    ungated legacy narrative (#966).
     """
     global _comp_results_cache
 
@@ -1649,7 +1784,10 @@ Write your {domain_label} coaching section now."""
         )
         if output is None:
             print(f"[COACH-V2:{coach_id}] Held by quality gate (N-06) — no output published this cycle")
-            return None
+            # #966: a deliberate hold is terminal — signal it distinctly from an
+            # infra failure so the caller does not publish the ungated legacy
+            # narrative in the held draft's place.
+            return CoachHold(coach_id, "quality_gate")
 
         # Step 6.2 (#914): presence-acknowledgment gate — at severity loud/alarm a
         # coach section that narrates a normal week over a real logging stall is
@@ -1671,7 +1809,8 @@ Write your {domain_label} coaching section now."""
                     print(f"[COACH-V2:{coach_id}] presence-ack gate fired: {_ack_finding.get('detail')}")
                 if output is None:
                     print(f"[COACH-V2:{coach_id}] Held by presence-ack gate (#914) — no output published this cycle")
-                    return None
+                    # #966: deliberate hold — terminal for this domain (see CoachHold).
+                    return CoachHold(coach_id, "presence_ack")
         except Exception as _ack_e:
             print(f"[COACH-V2:{coach_id}] presence-ack gate failed (non-blocking): {_ack_e}")
 
