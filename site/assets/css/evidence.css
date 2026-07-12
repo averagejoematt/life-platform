@@ -142,6 +142,12 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .supp-dose { grid-column: 2; justify-self: end; text-align: right; max-width: 13ch; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink); }
 .supp-timing { grid-column: 2; justify-self: end; color: var(--ember); border: 1px solid var(--ember-line); border-radius: var(--radius-xs); padding: 1px 6px; white-space: nowrap; }
 .supp-why { margin-top: var(--sp-2); color: var(--ink-muted); font-size: var(--fs-small); line-height: var(--lh-body); }
+/* #1116 — the closed loop: hoped outcome + measured by, first-class on the card
+   face. An entry without a stated hypothesis renders nothing here (ADR-104). */
+.supp-loop { margin-top: var(--sp-2); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line); }
+.supp-loop .rd-line { margin-top: var(--sp-1); }
+.supp-loop .rd-line:first-child { margin-top: 0; }
+.supp-hope .label { color: var(--ember); }
 /* Paused supplements: dimmed + an honest badge, so a compound Matthew stopped
    taking can't read as part of the active stack (truth-audit Phase 4b). */
 .supp--paused { opacity: 0.62; }

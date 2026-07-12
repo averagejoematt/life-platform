@@ -9,7 +9,11 @@ import { preStart } from "/assets/js/coach_popover.js"; // #978 — the shared p
 
 export function renderSupplements(d) {
   const g = d.groups || {};
-  const head = figs([fig(d.total_count ?? Object.values(g).reduce((a, x) => a + (x.items || []).length, 0), "compounds"), d.as_of_date && fig(d.as_of_date, "as of")]);
+  const allItems = Object.values(g).flatMap((x) => x.items || []);
+  // #1116 — the loop station: how many entries state their hypothesis. An honest
+  // completeness count, not a claim — unannotated entries simply render nothing.
+  const withLoop = allItems.filter((s) => s.hoped_outcome || s.measured_by).length;
+  const head = figs([fig(d.total_count ?? allItems.length, "compounds"), allItems.length ? fig(`${withLoop}/${allItems.length}`, "with stated hypotheses") : null, d.as_of_date && fig(d.as_of_date, "as of")]);
   // #978 — cycle-aware framing. Before genesis this catalog is the plan going in, not a
   // progress report; say so, keyed off the same pre-start signal every door uses. Once
   // the experiment starts, preStart() returns null and the frame drops away.
@@ -51,7 +55,14 @@ export function renderSupplements(d) {
       // live registry; a non-match simply means no chip (fail-soft).
       const snps = (d.genome_snps || []).filter((x) => x && x.supp && String(s.name || "").toLowerCase().includes(String(x.supp).toLowerCase()));
       const snpChips = snps.length ? snps.map((x) => `<p class="supp-snp label" title="${esc(x.note || "")}">genome · ${esc(x.id || "")}${x.note ? ` — ${esc(String(x.note).split("—")[0].trim())}` : ""}</p>`).join("") : "";
-      return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div>${adherence}${more}${snpChips}<p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || (srcs[0] || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (srcs[0] || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`;
+      // #1116 — the closed loop, first-class on the card face: what we expect
+      // (hoped_outcome) and which instrument adjudicates it (measured_by).
+      // Honest-empty per ADR-104: an entry without a stated hypothesis renders
+      // NOTHING here — no placeholder prose, ever.
+      const loop = (s.hoped_outcome && !isBad(s.hoped_outcome)) || (s.measured_by && !isBad(s.measured_by))
+        ? `<div class="supp-loop">${s.hoped_outcome && !isBad(s.hoped_outcome) ? `<p class="rd-line supp-hope"><span class="label">hoped outcome</span> ${esc(s.hoped_outcome)}</p>` : ""}${s.measured_by && !isBad(s.measured_by) ? `<p class="rd-line supp-measure"><span class="label">measured by</span> ${esc(s.measured_by)}</p>` : ""}</div>`
+        : "";
+      return `<article class="supp${paused ? " supp--paused" : ""}"><header class="supp-top"><h3 class="supp-name">${esc(s.name)}</h3>${paused ? `<span class="supp-flag label">paused</span>` : s.timing ? `<span class="supp-timing label">${esc(s.timing)}</span>` : ""}${s.dose ? `<span class="supp-dose num">${esc(s.dose)}</span>` : ""}</header>${paused ? `<p class="supp-paused-note label">${esc(pausedNote)}</p>` : ""}${s.why ? `<p class="supp-why">${esc(s.why)}</p>` : ""}${loop}<div class="supp-ev"><span class="supp-evlabel ${c}">${l}</span><span class="supp-meter"><i class="${c}" style="width:${pct}%"></i></span><span class="supp-evpct num">${s.evPct != null ? s.evPct + "%" : ""}</span></div>${adherence}${more}${snpChips}<p class="supp-meta label">${[s.board && "src: " + esc(s.board), s.cost_monthly != null && "$" + esc(s.cost_monthly) + "/mo", (s.evidence_url || (srcs[0] || {}).url) && `<a class="supp-ev-link" href="${esc(s.evidence_url || (srcs[0] || {}).url)}" target="_blank" rel="noopener">evidence ↗</a>`].filter(Boolean).join("  ·  ")}</p></article>`;
     }).join("");
     return `<section class="rd-sec"><div class="rd-grouphead"><h2 class="rd-h">${esc(grp.name)}</h2>${grp.desc ? `<p class="rd-desc">${esc(grp.desc)}</p>` : ""}</div><div class="supp-grid">${cards}</div></section>`;
   }).join("");

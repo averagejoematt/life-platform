@@ -130,6 +130,25 @@ POPULATED_GATE_PAGES = [
         ],
     },
     {
+        # #1116 — the loop station: an annotated supplement states its hypothesis
+        # (hoped_outcome) and the instrument that adjudicates it (measured_by). The
+        # fixture carries 7 annotated entries + 1 paused UNANNOTATED entry
+        # (lions_mane), so this page renders BOTH states: loop blocks mount on the
+        # annotated cards, and the unannotated card stays honest-empty (ADR-104 —
+        # no placeholder prose). The min-counts are the completeness guard.
+        "path": "/protocols/supplements/",
+        "name": "Protocols · supplements [populated]",
+        "wait_for": "body",
+        "checks": [
+            {"selector": ".supp", "min_count": 8, "desc": "supplement cards render from the registry fixture"},
+            {
+                "selector": ".supp-loop",
+                "min_count": 7,
+                "desc": "hoped_outcome + measured_by loop blocks render on annotated entries (#1116)",
+            },
+        ],
+    },
+    {
         # #974: the cockpit's levers strip (the Protocols station in the daily
         # slice) only materializes with supplement-registry/experiment data — the
         # empty-mock pass renders its honest-hidden state, so this pass asserts
