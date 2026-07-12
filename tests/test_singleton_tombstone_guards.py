@@ -261,3 +261,176 @@ def test_elena_gather_state_clean_after_wipe(monkeypatch):
     assert state["pending_callbacks"] == []
     assert state["motifs"] == []
     assert state["stance"] is None
+
+
+# ── site_api: #1085 — the coach-route readers #946 missed ─────────────────────
+# Live symptom (2026-07-12 pre-start): /api/coach_team served the WIPED cycle's
+# ENSEMBLE#dispute argument, /api/panel_ledger the wiped bet ledger, and
+# /api/field_notes?week= the wiped weekly note — all via reads that bypassed
+# both the query-level phase filter and the singleton_visible predicate.
+
+
+_DISPUTE_WIPED = {
+    **TOMBSTONED,
+    "topic": "Caloric intake adequacy",
+    "week": "2026-W27",
+    "coach_a": "nutrition_coach",
+    "coach_b": "physical_coach",
+    "turns": [{"speaker": "nutrition_coach", "name": "Dr. Marcus Webb", "line": "thin margins", "kind": "position"}],
+}
+
+
+def test_latest_dispute_hidden_when_newest_tombstoned(monkeypatch):
+    monkeypatch.setattr(capi, "table", _FakeTable(query_items=[_DISPUTE_WIPED]))
+    assert capi._latest_dispute() is None
+
+
+def test_latest_dispute_hidden_on_phase_mismatch(monkeypatch):
+    stale = {"phase": "pilot", "topic": "zone 2 fight", "turns": []}
+    monkeypatch.setattr(capi, "table", _FakeTable(query_items=[stale]))
+    assert capi._latest_dispute() is None
+
+
+def test_latest_dispute_serves_current_cycle_thread(monkeypatch):
+    fresh = {
+        "phase": "experiment",
+        "topic": "protein timing",
+        "week": "2026-W29",
+        "coach_a": "nutrition_coach",
+        "coach_b": "training_coach",
+        "turns": [{"speaker": "nutrition_coach", "name": "Dr. Marcus Webb", "line": "front-load it", "kind": "position"}],
+        "created_at": "2026-07-20T00:00:00+00:00",
+    }
+    monkeypatch.setattr(capi, "table", _FakeTable(query_items=[fresh]))
+    got = capi._latest_dispute()
+    assert got is not None
+    assert got["topic"] == "protein timing"
+    assert got["turns"][0]["line"] == "front-load it"
+
+
+def test_latest_dispute_none_when_partition_empty(monkeypatch):
+    monkeypatch.setattr(capi, "table", _FakeTable(query_items=[]))
+    assert capi._latest_dispute() is None
+
+
+def test_latest_cycle_digest_hidden_when_tombstoned(monkeypatch):
+    wiped = {**TOMBSTONED, "sk": "CYCLE#2026-07-10", "active_disagreements": [{"topic": "wiped fight", "coaches": ["sleep_coach"]}]}
+    monkeypatch.setattr(capi, "table", _FakeTable(query_items=[wiped]))
+    assert capi._latest_cycle_digest() is None
+
+
+def test_latest_cycle_digest_passes_clean_record(monkeypatch):
+    clean = {"sk": "CYCLE#2026-07-14", "active_disagreements": [{"topic": "fresh", "coaches": ["sleep_coach"]}], "phase": "experiment"}
+    monkeypatch.setattr(capi, "table", _FakeTable(query_items=[clean]))
+    got = capi._latest_cycle_digest()
+    assert got is not None
+    assert got["active_disagreements"][0]["topic"] == "fresh"
+
+
+def test_stance_latest_hidden_when_tombstoned_or_phase_mismatched(monkeypatch):
+    monkeypatch.setattr(capi, "table", _FakeTable(item={**TOMBSTONED, "headline_read": "old cycle read"}))
+    assert capi._stance_latest("sleep_coach") is None
+    # any non-current phase (not just 'pilot') is hidden after the #1085 normalization
+    monkeypatch.setattr(capi, "table", _FakeTable(item={"phase": "cycle4", "headline_read": "old"}))
+    assert capi._stance_latest("sleep_coach") is None
+
+
+def test_stance_latest_passes_clean_record(monkeypatch):
+    clean = {"headline_read": "fresh read", "phase": "experiment"}
+    monkeypatch.setattr(capi, "table", _FakeTable(item=clean))
+    assert capi._stance_latest("sleep_coach") == clean
+
+
+def test_panel_ledger_empty_when_state_tombstoned(monkeypatch):
+    wiped = {
+        **TOMBSTONED,
+        "state_json": json.dumps({"episode_count": 3, "open_bet": "step count", "bet_ledger": [{"outcome": "won"}]}),
+    }
+    monkeypatch.setattr(capi, "table", _FakeTable(item=wiped))
+    body = json.loads(capi.handle_panel_ledger({})["body"])
+    assert body["open_bet"] is None
+    assert body["episode_count"] == 0
+    assert body["ledger"] == []
+
+
+def test_panel_ledger_serves_live_state(monkeypatch):
+    live = {"state_json": json.dumps({"episode_count": 1, "open_bet": "hrv trend", "bet_ledger": [{"outcome": "open"}]})}
+    monkeypatch.setattr(capi, "table", _FakeTable(item=live))
+    body = json.loads(capi.handle_panel_ledger({})["body"])
+    assert body["episode_count"] == 1
+    assert body["open_bet"] == "hrv trend"
+
+
+def test_field_note_single_week_hidden_when_tombstoned(monkeypatch):
+    wiped = {**TOMBSTONED, "week": "2026-W27", "ai_present": "solid sleep consistency from the wiped cycle"}
+    monkeypatch.setattr(capi, "table", _FakeTable(item=wiped))
+    body = json.loads(capi.handle_field_notes({"queryStringParameters": {"week": "2026-W27"}})["body"])
+    assert body["entry"] is None
+
+
+def test_field_note_single_week_serves_current_cycle(monkeypatch):
+    live = {"week": "2026-W29", "ai_present": "fresh note", "phase": "experiment"}
+    monkeypatch.setattr(capi, "table", _FakeTable(item=live))
+    body = json.loads(capi.handle_field_notes({"queryStringParameters": {"week": "2026-W29"}})["body"])
+    assert body["entry"]["ai_present"] == "fresh note"
+
+
+def test_recap_hidden_when_tombstoned(monkeypatch):
+    # The live wiped RECAP#latest was only saved by its day-count guard
+    # (claims day 7 > pre-start day 0) — which would expire on day 7 of the
+    # NEW cycle. The tombstone guard must hide it regardless of day math.
+    wiped = {**TOMBSTONED, "story_so_far": "week seven of the cut", "experiment_day": 7}
+    monkeypatch.setattr(capi, "table", _FakeTable(item=wiped))
+    body = json.loads(capi.handle_recap()["body"])
+    assert body["recap"] is None
+
+
+def test_recap_serves_clean_record(monkeypatch):
+    live = {"story_so_far": "fresh cycle opening", "phase": "experiment"}
+    monkeypatch.setattr(capi, "table", _FakeTable(item=live))
+    monkeypatch.setattr(capi, "_regeneration_paused", lambda _f: False)
+    body = json.loads(capi.handle_recap()["body"])
+    assert body["recap"]["story_so_far"] == "fresh cycle opening"
+
+
+# ── site-api-ai (board_ask prompt grounding): same class, separate lambda ─────
+
+
+def _ai():
+    from web import site_api_ai_lambda as ai
+
+    return ai
+
+
+def test_board_coach_memory_hidden_when_tombstoned(monkeypatch):
+    ai = _ai()
+    wiped = {**TOMBSTONED, "summary": "week 4 of the stall", "key_concerns": ["adherence"]}
+    monkeypatch.setattr(ai, "table", _FakeTable(item=wiped))
+    assert ai._coach_memory_bits("sleep_coach") == ""
+
+
+def test_board_coach_memory_serves_clean_record(monkeypatch):
+    ai = _ai()
+    monkeypatch.setattr(ai, "table", _FakeTable(item={"summary": "fresh cycle memory", "phase": "experiment"}))
+    assert "fresh cycle memory" in ai._coach_memory_bits("sleep_coach")
+
+
+def test_board_coach_stance_bits_hidden_on_any_stale_phase(monkeypatch):
+    ai = _ai()
+    monkeypatch.setattr(ai, "table", _FakeTable(item={"phase": "cycle4", "headline_read": "old read"}))
+    assert ai._coach_stance_bits("sleep_coach") == ""
+
+
+def test_board_recent_interactions_query_is_phase_filtered(monkeypatch):
+    ai = _ai()
+
+    class _RecordingTable(_FakeTable):
+        def query(self, **kw):
+            self.query_kwargs = kw
+            return {"Items": []}
+
+    t = _RecordingTable()
+    monkeypatch.setattr(ai, "table", t)
+    assert ai._coach_recent_interactions("sleep_coach") == ""
+    # #1085: the wiped cycle's INTERACTION# rows must be filtered server-side
+    assert "FilterExpression" in t.query_kwargs
