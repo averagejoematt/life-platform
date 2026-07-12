@@ -14,7 +14,10 @@ rebuilding his health, habits, and relationship with himself — using the weara
 on his body, his own data, and AI coaching.** An experiment of one (N=1), in public, with the
 down weeks shown, not hidden. The tagline is the whole ethos: **proof, not promises.** The
 anti-Blueprint: no million-dollar lab, just consumer devices, Claude, and a commitment to
-keep it honest.
+keep it honest. The goal underneath every number is life satisfaction — mood, connection,
+presence, energy, sleep — pursued through measurement and AI coaching where willpower alone
+repeatedly failed; weight is the first falsifiable instrument reading, never the experiment's
+meaning.
 
 ## The thesis: one causal loop
 
