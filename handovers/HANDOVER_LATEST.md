@@ -1,114 +1,123 @@
-# HANDOVER — The July-11 review remediated end-to-end: 18 PRs, 52 issues filed, 33 closed, reader-truth QA + one-command reset + /cockpit/ live — 2026-07-12 (genesis day)
+# HANDOVER — Backlog blitz: 17 issues + 7 epics closed, 21 PRs, DR swap-back drilled, reset drill caught real lies — 2026-07-12 (genesis evening)
 
-> Instruction: Matthew's manual review (`~/Desktop/Review July 11th.md`, 41 items) +
-> "plan to review, investigate, convert to issues, and do an efficient session to
-> remediate all of them… create a /fullreview type skill… full autonomy" (edits,
-> merges, deploys all authorized in-session).
+> Instruction: "maximize paying down as many open issues in this session as possible,
+> preferably those most complex or technically more difficult as we are using the Fable
+> model. I approve all merges and deploys."
 
 ## What ran
 
-Genesis-day session (~06:00–17:00 UTC). The full elite loop: 5 investigation lanes
-(Explore agents, live-verified) → 3 adversarial verifiers (finding-verifier) → issue-filer
-(52 issues #1075–#1126, 9 epics, `review:2026-07-11` label) → 16 worktree-implementer
-agents in 3 waves → serial merge queue (driver) → deploys + live verification. Plus two
-unplanned inline fixes CI surfaced mid-train.
+Genesis-evening session (~17:45–20:15 UTC), directly after the July-11 review remediation.
+Three waves of worktree-implementer agents (8 + 4 + 3) over the entire unblocked backlog,
+serial merge queue with per-merge doc-sync reconciliation, plus two driver lanes run in
+parallel (the #936 DR drill and the #1094 reset drill).
 
-## What shipped (18 PRs #1127–#1144, ALL merged + deployed + live-verified)
+## What shipped (21 PRs #1145–#1165, ALL merged + deployed + live-verified)
 
-**Epic R1 pre-start truth (#1075) COMPLETE:** #1127 homepage purpose reframe (thesis: life
-satisfaction, weight = instrument; "the finish line" → "the first hard checkpoint"; north-star
-doc updated) · #1132 tombstone/phase guards on 7 coach-route readers the #946 sweep missed
-(the 1,581-kcal dispute, panel ledger, field notes, cycle digest, board-ask grounding) ·
-#1133 honest-numbers guards (min-n + partial-today on steps/strain means — the "62 steps" was
-an n=1 partial-day mean; genesis clamps on /api/vitals windows) · #1131 time-travel scrub
-scoped to current cycle, genesis derived at runtime · #1128 discoveries relabeled "ongoing
-protocols — carried across cycles" · #1136 chronicle prologue curated ("Empty Journal" +
-"Body Votes First" retired — `curate_prelaunch_leadins.py --apply` RUN against prod, posts.json
-now exactly 2 prologues) · #1130 multi-year labels on VO2max/Walking HR · **#1138 the flagship:
-`build_experiment_phase_context()` mandatory in every AI narrative prompt builder** (coach,
-SoM, chronicle, board, panelcast) with a coverage test. Plus 2 data repairs driver-run:
-whoop DATE#2026-07-08 + habitify DATE#2026-07-09 re-tagged pilot (both poisoned by warm
-lambdas stamping with stale constants AFTER the 07-10 tagger pass — new incident class).
+**Wave 1 (8):** #1145 reader-truth gate folded into restart verify (#1097) · #1146 habits
+30-day genesis-clamped `days[]` + dot strip (#1107 — live: 59 habits, honestly 1 day) ·
+#1147 cockpit hero instrument strip from ring()/sigil primitives, earned-glow honest
+(#1106 — its render QA caught a real `Number(null)→0` fabricated-alert bug pre-commit) ·
+#1148 supplements `hoped_outcome`/`measured_by` (#1116 — 18/21 annotated live, **values
+await Matthew's review**, registry uploaded to S3 config/) · #1149 immersive coach bios:
+authored trait scores (`lambdas/coach_traits.py`), `_voice_subset` prompt transparency,
+live-record dossier (#1113) · #1150 /data/physical/ fluid-first + registry-derived cadence
+chips (#1119) · #1151 chronicle audio: per-article date-keyed read-aloud join — **fixed a
+live wrong-audio state** (both prologues played the same panel mp3), reset-unsafe `wk{N}`
+keys, an unpublished-draft voicing risk, and a dead IAM permission; producer re-run
+rendered `ep-2026-07-11.mp3` (#1121) · #1152 per-timeframe coach narratives: daily
+one-liner (honest attribution to the brief, not a fake coach byline), Week lens finally
+consumes `/api/state_of_matthew`, month rollup + `/api/month_rollup`, phase-context in all
+integrator prompts (#1115).
 
-**Epics R4+R5 design/IA:** #1137 six-issue design batch (glucose giant-"NO" → designed empty
-state, vitals ladder, rd-tbl alignment, coach-card specialty-first headers, ~50-literal token
-sweep + 2 genuinely-broken undefined tokens, ONE shared top-bar rule) · #1134 per-source
-freshness row (all 13 sources, honest states) · #1135 footer standardization (canonical footer
-on home/404/privacy/subscribe/confirm, apply-chrome now INSERTS) · #1139 "The Technology"
-footer column + ledger unlisted + /story/agents/ orphan wired + standing orphan-audit test ·
-**#1143 /now/ → /cockpit/ rename** — S3-first-then-CloudFront-function ordering executed
-(function updated + published LIVE), 7 single-hop redirect assertions green, PWA start_url +
-sw.js + sitemap SKIP_TOP handled; **key save: `redirects.map` had drifted from its generator
-since v5 — regeneration would have reverted ~60 live redirects; the generator now carries the
-v5 split and reproduces the live map byte-for-byte.**
+**Wave 2 (4):** #1154 challenges why-now/measured-by grammar + `hoped_outcome` in the
+generator (#1118) · #1155 build-log `why_it_mattered` layer — full 40-beat authoring pass,
+field now required by the validator (#1120) · #1157 experiment justification contract
+(why_now/priority/hoped_outcome/measurement/evidence_links; `why_now` wired to the
+promotion trigger) (#1117) · #1158 Dr. Eli Marsh live at lead tier on by-coach + detail
+route, honest "runs the program / files no stances" empty states (#1112).
 
-**Epics R2+R3 process:** #1141 one-command reset (fix_prologue + prereg-seed + dedup folded as
-post-verify hooks; publish stays attended; **new `restart_verify_semantic.py` gate — ran live,
-7/7 pass, and its first real run CAUGHT the habitify poisoned row**; `dedup_source_records.py`
-applied: 52 eightsleep UTC-rollover dupes deleted) · #1140 reader-truth QA (phase-aware Bedrock
-pass — the check that was structurally missing: visual-AI QA was explicitly forbidden to judge
-truth; now hooked post-deploy CI `--reader-truth` + nightly qa_smoke "Reader Truth" category,
-budget-tier aware; Operational stack deployed for the role/timeout) · #1129 podcast
-conversational-continuity gate (deterministic dangling-thread check post-drop, judge fail-closed,
-HOLD instead of publish-best; the 3:53 prologue hole class) · #1142 + #1144 inline CI fixes (below).
+**Wave 3 (3):** #1163 `/method/game/` — The Game, Explained, generated from the real
+engine config with a byte-match + engine-fingerprint drift tripwire (#1124) · #1162
+level-up drivers persisted at event fire (engine v1.6.1; read-time enrichment kept as the
+honest fallback; sim harness invariants re-proven) (#1125) · #1164 `/data/badges/` badge
+wall over /api/achievements + 6-badge catalog extension — live state: 0 of 40 earned,
+glow discipline intact (#1126).
 
-**Also:** `/fullreview` skill authored (`.claude/commands/fullreview.md`) — expert-panel graded
-review driver, seeded mode takes a manual-review file and applies the understand-spirit →
-root-cause → generalize → A/B-classify → regression-guard discipline. DLQ cleared (the queued
-Withings message — delete went through this time). Build beat: `2026-07-12-the-site-learned-what-day-it-is`.
+**Driver lanes:** **#936 DR swap-back drill + fix (PR #1153)** — PITR restore to isolated
+table measured **4m32s**; `iam simulate-principal-policy` proved the documented Path A
+(env-repoint-only) was broken as written (implicitDeny — roles scoped to the exact table
+ARN); 7 hardcoded env literals + 4 stack literals would have partially reverted any
+cutover; all table names now derive from `stacks/constants.py TABLE_NAME`, making the real
+cutover ONE env-var-prefixed `cdk deploy --all` (~6 min measured from CI); **measured
+Scenario-2 RTO ~15 min vs the asserted 30**; DR doc rewritten, drill table torn down.
+**#1094 reset drill (PR #1161)** — dry-run pipeline vs synthetic genesis 2026-08-02 clean;
+semantic verify 7/7; **the reader-truth gate's first full run correctly FAILED with real
+findings**: the home waveform's static "every day, including the ones that dipped" over a
+1-dot chart (fixed #1156/#1159) and the cockpit week/month scope caps (fixed #1160);
+re-run confirmed cleared; pre-reset drill contract now a REQUIRED RUNBOOK step. Plus
+inline fixes: #1165 binding-map entry for the head-coach page (redded the selfcheck),
+#1159 story.js `dayN` redeclare hotfix.
+
+**Epics closed (7):** R1 #1075, R2 #1076, R3 #1077, R4 #1078, R5 #1079, R7 #1081,
+R9 #1083. R6 #1080 stays open on #1114 (Matthew art direction); R8 #1082 on #1123.
 
 ## Verification
 
-Serial merge queue, doc-sync `--apply` reconciled per test-adding batch (test_count → 3430+).
-Deploys: site auto-deploy green (final run carries everything), `deploy_site_api.sh` ×3,
-**fleet ×2 (95 fns, 0 failed)**, CDK LifePlatformOperational, coach-panel-podcast, CloudFront
-v4-redirects function published. Live checks all green: dispute null, discoveries carried_over,
-vo2 scope multi_year, steps honest-null, 13-source sync line, "first hard checkpoint" hero,
-/now/→/cockpit/ 301 single-hop, posts.json = 2 curated prologues, semantic verify 7/7.
-`smoke_test_site.sh` 74/74. Worktrees/branches cleaned.
+Serial merge queue; doc-sync `--apply` reconciled per test-adding merge (test_count →
+3585). Deploys: site-api ×6, MCP (deploy_mcp_split.sh), chronicle-podcast (+1 producer
+invoke, 1 episode 0 errors), challenge-generator, ai-expert-analyzer,
+character-sheet-compute, CDK LifePlatformEmail (70s), supplement registry → S3 config/.
+Final `smoke_test_site.sh` **76/76**; live spot-checks: lead coach API (tier lead, stance
+source none, 9 coaches), habits days[]=1, supplements 18/21, /method/game/ 200,
+/data/badges/ 200 + 0/40 earned, phase-aware wave claim JS live. Post-genesis watch items
+all green: 17:00 UTC coach generation phase-aware ("Day 1 baseline… no intervention claims
+yet"), genesis weigh-in in /api/vitals (314 lbs, honest nulls), character v1.6.0 ran 18:30
+UTC (level 1, XP 0, honest Day-1 state). Tree clean, zero open PRs, no stashes, worktrees
+pruned.
 
-## Gotchas / new reflexes (all encoded in code or memory)
+## Gotchas / new reflexes
 
-- **Adversarial verification killed 4 confident wrong fixes** (~25% of load-bearing claims):
-  portrait "clock" = the deliberate 96px sigil-frame (art direction, not a bug — moved to #1114);
-  coach-header swap fights the sitewide eyebrow convention (shipped deliberately scoped);
-  time-travel floor + prelaunch calendar were designed; folding `restart_verify.py` into the
-  reset would red every reset (it's a post-genesis check).
-- **Warm lambdas can re-poison phase tags after a reset** — ingestion re-wrote rows with stale
-  constants AFTER the tagger pass (whoop 07-08, habitify 07-09). The semantic verify's
-  zero-pre-genesis-experiment-rows assertion is the standing guard.
-- **The QA stack was phase-blind by design** — visual-AI QA's prompt forbade truth judgments;
-  the smoke test demanded weight on a pre-weigh-in morning (fixed: Day ≤ 1 window). Reader-truth
-  QA is the structural answer.
-- **CI wiki drift gate false-drifts under a shallow clone** (#1142): `git log -1` per file in a
-  fetch-depth:2 checkout returns HEAD's date → every engine doc "drifts" the day after its
-  Verified stamp. Lint job now full-history + the checker skips loudly when shallow.
-- **The 2000-line god-module gate works** (#1144): #1122 pushed the podcast lambda to 2022
-  lines; split `panelcast_qa.py` out rather than grandfathering.
-- **`redirects.map` generator drift** — regenerating without the v5 split would have clobbered
-  ~60 live redirects. The generator is now the source of truth again (byte-for-byte).
+- **`node --check` misses `const` redeclaration inside function bodies** (V8 lazy parse) —
+  my #1156 fix shipped a `SyntaxError` that only the deploy pipeline's full module parse
+  caught (publish blocked pre-QA, fail-safe). Verify JS with a real `import()`, not
+  `--check`. → memory `reference_node_check_lazy_parse`.
+- **CloudFront caches an API 404 for 300s → the site smoke fails and auto-rolls-back even
+  though the Lambda deploy was correct** (the #1158 eli_marsh route; two consecutive
+  deploys failed on the same cached error). After deploying a NEW API route the smoke
+  checks, invalidate its viewer path immediately. → memory `reference_cloudfront_404_cache_smoke`.
+- **Env-repoint ≠ cutover** — least-privilege table-ARN scoping silently breaks any
+  "just change TABLE_NAME" recovery story; now structurally fixed (#1153) and documented.
+- **Byte-match drift guards interact across concurrent PRs** — #1164's registry addition
+  changed #1163's generated page; the guard correctly demanded a regen at merge
+  (`v4_build_game_explained.py` re-run in the rebase). Generator-owned pages: regen, don't
+  hand-resolve.
+- **Two agents ran banned `git stash` in the shared tree** (both self-recovered, stack
+  verified empty at wrap) — the ban needs to stay loud in agent briefs.
+- Budget tier was 1 all session (internal AI paused) — reader-truth full runs used the
+  sanctioned tier-0 override, honest tier restored immediately after each.
 
 ## Next picks / residual
 
-- **Matthew queue:** genesis weigh-in + the Sunday `restart_pipeline.py --apply` re-run (now
-  carries the semantic gate; prereg seed/publish per the new printed steps — publish stays
-  attended) · wk0 prologue regen + spot-listen (#1123, the gate is in) · essay `[CONFIRM]`
-  draft-marker before any HN submission (#741) · #1029 (owner-gated).
-- **Post-genesis watch:** first coach-narrative generation with the phase block (~17:00 UTC — the
-  stale "Day 1 baseline" sleep-coach OUTPUT# self-replaces; verify it cites Day 1/cycle 5
-  correctly) · first v1.6.0 character run ~17:35 UTC · first nightly qa_smoke with Reader Truth
-  (18:30 UTC — watch for Haiku false positives, rails are in `lambdas/reader_truth_qa.py`) ·
-  Monday 16:00 UTC traffic digest travel-watch section.
-- **Open backlog (review epics):** R6 coach experience #1080 (#1112–#1115: head coach in
-  by-coach, immersive bios, portrait art direction v2 — needs Matthew option rounds, per-timeframe
-  narratives) · R7 protocol/story depth #1081 (#1116–#1121) · R9 gamification #1083 (Later) ·
-  R4 residue #1106/#1107 (cockpit instrument strip, habits 30-day dot strip) · R2.3/R3.3
-  (#1094/#1097 — reset drill + reader-truth in restart verify) · #1017/#916/#936/#748 + Later epics.
-- Doc-debt: ~20 historical `docs/**` `/now/` references (harmless, historical); API.md re-verify
-  pass still owed (pre-existing).
+- **Matthew queue (everything left on Now is yours):** #1123 wk0 prologue regen + attended
+  listen (the gate is in) · #1029 re-entry hardening (owner-gated) · #741 essay `[CONFIRM]`
+  before HN · #1114 portrait art direction v2 (option rounds) — it alone holds epic #1080;
+  #1123 alone holds epic #1082. **Review queue from this session:** the 18 supplement
+  hoped_outcome/measured_by values (#1148) and the authored coach trait scores
+  (`lambdas/coach_traits.py`, #1149/#1158) are drafted awaiting your edit; by-coach now
+  lands on Marsh by default (deliberate lead-tier call — flag if unwanted).
+- **Deferred with reason:** #916 (explicitly gated on observed /authorize re-entry
+  friction — none observed yet) · #1017 (needs post-genesis real data at 390px).
+- **Watch:** first persisted-drivers level-up event (next headline level-up, engine
+  v1.6.1) · challenge generator's next Sunday 22:00 UTC run emits `hoped_outcome` ·
+  Wednesday 15:40 UTC chronicle-podcast cron on the new date-keyed feed · Monday
+  `restart_verify.py` (asserts post-genesis character) · Monday 16:00 UTC traffic digest.
+- **Backlog:** Later epics #1000/#1001 (mobile IA/perf) · standing #936→done, #916/#748 ·
+  older epics #342/#348/#717–#723 unchanged.
 
-**Build beat:** 2026-07-12-the-site-learned-what-day-it-is (see `site/story/build/beats.json`).
+**Build beat:** 2026-07-12-the-machine-audited-its-own-story (see `site/story/build/beats.json`).
 
-**Docs:** CLAUDE.md v4-site section now says /cockpit/ (#1143 sweep); RUNBOOK restart section
-rewritten to the one-command contract (#1141); COACH_STANCE.md re-verified post-#1138;
-SITE_MAP_AND_INTENT.md updated (#1139). Doc-sync literals reconciled; wiki gates green at wrap.
+**Docs:** DISASTER_RECOVERY.md (Scenario-2 rewrite + drill row + measured RTO, Verified
+2026-07-12) · RUNBOOK.md (pre-reset drill contract + drill record) · site pages carry
+their own registries (SITE_MAP/sitemap regenerated by the builders in-PR); no other
+canonical pages invalidated — engine change was version-bump-only (v1.6.1 drivers field,
+SCHEMA untouched: drivers ride the existing event item), MCP tool count unchanged.
