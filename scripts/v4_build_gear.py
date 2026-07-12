@@ -278,6 +278,15 @@ MOTION_SCRIPT = '<script src="/assets/js/motion.js" defer></script>'
 # Wire the shared one-line theme toggle (the standalone Methods Registry omits this and
 # ships a dead toggle — #904 does better with a real, self-wiring module init).
 THEME_SCRIPT = '<script type="module">import { initTheme } from "/assets/js/theme.js"; initTheme();</script>'
+# #1015 — the page runs ~9,500px tall at 390px: mount the shared mobile section-TOC
+# (sticky "on this page" jump bar; section_toc.js self-injects its stylesheet and
+# assigns shareable ids to each category head). Anchored before the first section so
+# the affiliate disclosure stays above it.
+TOC_SCRIPT = (
+    '<script type="module">import { mountSectionToc } from "/assets/js/section_toc.js"; '
+    'const w = document.querySelector(".gr-wrap"); '
+    'mountSectionToc(w, { before: w.querySelector(".rd-sec") });</script>'
+)
 
 
 # Doors nav + footer are the shared chrome partial (#1009). /gear/ is a footer-tier page
@@ -476,6 +485,7 @@ def render(entries: list[dict]) -> str:
   </main>
   {FOOTER}
   {THEME_SCRIPT}
+  {TOC_SCRIPT}
   {MOTION_SCRIPT}
 </body>
 </html>

@@ -1,6 +1,6 @@
 # Design System v5 — "Coherence"
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-05
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
 
 Extends (does **not** replace) `DESIGN_SYSTEM_V4_THE_MEASURED_LIFE.md` and
 `site/assets/css/tokens.css`. v4 gave us the *materials* (palette, type triad,
@@ -432,3 +432,19 @@ registration is deliberately scoped to the **cockpit-PWA island** — home (`/`)
 at deploy, with a hard-fail guard if the stamp misses (#1020; details in
 `docs/SITE_AUTHORING.md` §4). A PR that changes cached assets should assume the SW may serve a
 stale copy until the cache rolls (≤5 min: `sw.js` is served `max-age=300, must-revalidate`).
+
+### 10.8 The section-TOC primitive — deep pages get in-page anchors (#1015)
+
+One shared module for very deep pages (the labs readout is ~19 screens at 390px):
+`site/assets/js/section_toc.js` + `site/assets/css/section_toc.css` (self-injected by the JS, so
+generated shells need no rebuild). `mountSectionToc(scope, { content, before })` scans `content`
+for `.rd-h` headings, gives each enclosing `.rd-sec`/`.gr-cat-head` a real slug id (shareable
+deep links), and mounts a **top-sticky, collapsible "on this page" bar**: one tap opens the list,
+one tap jumps — every major section ≤ 2 taps. Rules: shown only at ≤820 (`--bp-tw`); **top-sticky
+by contract** so it can never collide with the bottom app-bar (§10.2), `z-index` kept below the
+app-bar's 60; the open list is an absolute overlay (no layout shift), height-capped; toggle and
+links meet the 44px floor (§10.4); anchor targets get `scroll-margin-top` so the stuck bar never
+covers a jumped-to heading. `scope` must be sticky-safe (no overflow/transform ancestor between it
+and the viewport — `.ev-main` and `.gr-wrap` qualify). Adopted: `/data/labs/`, `/data/character/`
+(allowlisted in `evidence.js` — shallower topics keep thumb-scroll), `/gear/` (static mount from
+`v4_build_gear.py`). Adding it to another deep page is one `mountSectionToc` call.

@@ -26,6 +26,7 @@ import { renderReading } from "/assets/js/evidence_reading.js";
 import { renderSleep, renderMind, renderVices } from "/assets/js/evidence_sleep.js";
 import { renderPulse } from "/assets/js/evidence_vitals.js";
 import { renderAutonomic, renderZone2 } from "/assets/js/evidence_autonomic.js";
+import { mountSectionToc } from "/assets/js/section_toc.js";
 
 const REG = window.__EVIDENCE_REGISTRY__ || [];
 
@@ -114,6 +115,11 @@ const WIRE = {
 };
 
 const $ = (s) => document.querySelector(s);
+
+// #1015 — the deepest readouts (~19 screens for labs, ~15 for character at 390px)
+// get the sticky mobile section-TOC (section_toc.js). Allowlisted: the other
+// topics are shallow enough to thumb-scroll, and the /data/ hub keeps its rail.
+const TOC_SLUGS = new Set(["labs", "character"]);
 
 let current = window.__START_SLUG__ || (REG[0] && REG[0].slug);
 
@@ -216,6 +222,7 @@ async function renderCenter() {
   main.querySelector("[data-blurb]").textContent = t.blurb;
   const ro = main.querySelector("[data-readout]");
   const deeper = main.querySelector("[data-deeper]");
+  { const staleToc = main.querySelector(".stoc"); if (staleToc) staleToc.remove(); } // #1015 — never carry a TOC across topics
   deeper.innerHTML = "";   // no link-outs to /legacy — everything lives inline in v4 now
   if (t.mode === "editorial") { ro.innerHTML = t.editorial || empty("—"); return; }
   if (t.mode === "interactive") { ro.innerHTML = (RENDERERS[t.slug] || renderGeneric)({}, t); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro); return; }
@@ -225,6 +232,7 @@ async function renderCenter() {
     const data = await getJSON(t.endpoint); const fn = RENDERERS[t.slug] || renderGeneric; const html = await fn(data, t);
     if (my !== renderSeq) return; // superseded by a newer topic selection
     ro.innerHTML = html && html.trim() ? html : empty("No data published for this section yet."); if (WIRE[t.slug]) WIRE[t.slug](); enhanceProvenance(ro);
+    if (TOC_SLUGS.has(t.slug)) mountSectionToc(main, { content: ro, before: ro }); // #1015 — after the race guard, never on a superseded paint
   } catch (e) { if (my === renderSeq) ro.innerHTML = empty("This readout couldn't load its data just now. The preserved view is linked below."); }
   // Only pull the viewport to the readout on MOBILE (the nav stacks above the
   // content there). On desktop the readout sits beside the sticky nav, so a smooth
