@@ -7,6 +7,10 @@ past 7 days, and emails a digest: total page views, unique + returning visitors,
 top pages, and where external traffic comes from (e.g. Reddit). This is the
 instrument for the returnability goal (docs/PLATFORM_NORTH_STAR.md).
 
+It also carries a "Travel watch" section (#741): per-page views + referrer
+domains for the WATCHED_PAGES list (currently the career essay), so a published
+artifact's travel is measurable even when it isn't in the site-wide top-15.
+
 PRIVACY (matches the no-tracking ethos):
   • Source is CloudFront access logs — standard infrastructure logging, NOT
     tracking cookies or third-party analytics.
@@ -43,6 +47,13 @@ EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "awsdev@mattsusername.com")
 EMAIL_SENDER = os.environ.get("EMAIL_SENDER", "awsdev@mattsusername.com")
 SITE_HOST = os.environ.get("SITE_HOST", "averagejoematt.com")
 DAYS = int(os.environ.get("DIGEST_DAYS", "7"))
+
+# Travel watch (#741): published artifacts whose reach we want measured every week
+# regardless of whether they crack the site-wide top-15 — per-page views plus WHERE
+# that page's readers came from (external referrer domains), so a submission (e.g.
+# Hacker News) is attributable to the artifact itself, not just the site total.
+# Comma-separated env override; the default tracks the career essay.
+WATCHED_PAGES = [p.strip() for p in os.environ.get("WATCHED_PAGES", "/journal/essays/org-chart-of-one/").split(",") if p.strip()]
 
 # Link-preview + crawler agents — real fetches, but not human visitors.
 _BOT_RE = (
@@ -122,6 +133,17 @@ def _ref_domain(ref: str) -> str:
         return ""
 
 
+def _norm_page(uri: str) -> str:
+    """Canonicalize a page URI for watched-page matching: `/a/b`, `/a/b/`, and
+    `/a/b/index.html` all identify the same permalink page."""
+    u = uri
+    if u.endswith("/index.html"):
+        u = u[: -len("index.html")]
+    if not u.endswith("/"):
+        u += "/"
+    return u
+
+
 def parse_cf_log(text: str):
     """Parse one CloudFront standard log file's text → list of page-request dicts.
     Pure function (no I/O) so it's unit-testable. Header lines (#Version/#Fields)
@@ -160,12 +182,18 @@ def aggregate(records):
     pages = Counter()
     referrers = Counter()
     visit_days = {}  # vkey -> set(date)
+    watched = {_norm_page(p): {"views": 0, "referrers": Counter()} for p in WATCHED_PAGES}
     for r in records:
         pages[r["uri"]] += 1
         d = _ref_domain(r["ref"])
         if d and d != SITE_HOST:
             referrers[d] += 1
         visit_days.setdefault(r["vkey"], set()).add(r["date"])
+        w = watched.get(_norm_page(r["uri"]))
+        if w is not None:
+            w["views"] += 1
+            if d and d != SITE_HOST:
+                w["referrers"][d] += 1
     unique = len(visit_days)
     returning = sum(1 for days in visit_days.values() if len(days) >= 2)
     return {
@@ -175,6 +203,18 @@ def aggregate(records):
         "returning_pct": round(100 * returning / unique) if unique else 0,
         "top_pages": pages.most_common(15),
         "top_referrers": referrers.most_common(10),
+        # Travel watch (#741): a 0-view week is a valid reading — always report
+        # every watched page so "no travel yet" is visible, never silent.
+        "watched_pages": [
+            {
+                "page": p,
+                "views": w["views"],
+                "referrers": w["referrers"].most_common(10),
+                # residual = direct visits + internal navigation (no external referrer)
+                "direct_or_internal": w["views"] - sum(w["referrers"].values()),
+            }
+            for p, w in watched.items()
+        ],
     }
 
 
@@ -187,6 +227,20 @@ def build_html(agg, start_date, end_date):
             f'<td style="padding:4px 0;text-align:right;font-variant-numeric:tabular-nums">{v}</td></tr>'
             for k, v in pairs
         )
+
+    def watched_block(entries):
+        if not entries:
+            return ""
+        parts = ['<h2 style="font-size:16px;margin-top:24px">Travel watch</h2>']
+        for e in entries:
+            refs = ", ".join(f"{k} ({v})" for k, v in e["referrers"]) or "no external referrers"
+            detail = f"{refs} · {e['direct_or_internal']} direct/internal" if e["views"] else "no views this week"
+            parts.append(
+                f'<p style="margin:6px 0"><span style="font-family:monospace">{e["page"]}</span> — '
+                f'<strong>{e["views"]}</strong> views<br>'
+                f'<span style="color:#6e665a;font-size:13px">{detail}</span></p>'
+            )
+        return "".join(parts)
 
     return f"""<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;color:#221e17;max-width:640px;margin:0 auto;padding:16px">
 <p style="font-family:monospace;color:#a34e13;text-transform:uppercase;letter-spacing:.1em;font-size:12px">averagejoematt · weekly traffic</p>
@@ -201,6 +255,7 @@ def build_html(agg, start_date, end_date):
 <table style="width:100%;border-collapse:collapse">{rows(agg['top_pages'], 'pages')}</table>
 <h2 style="font-size:16px;margin-top:24px">Where they came from</h2>
 <table style="width:100%;border-collapse:collapse">{rows(agg['top_referrers'], 'external referrers')}</table>
+{watched_block(agg.get('watched_pages', []))}
 <p style="color:#888;font-size:12px;margin-top:24px">From first-party CloudFront access logs — aggregate only, no cookies, no tracking, IPs hashed-then-discarded. {agg['returning_visitors']} of {agg['unique_visitors']} visitors returned on a second day.</p>
 </body></html>"""
 

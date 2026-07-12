@@ -67,7 +67,57 @@ def test_empty_logs_safe():
         "returning_pct": 0,
         "top_pages": [],
         "top_referrers": [],
+        # travel watch (#741): a watched page with zero views is still reported
+        "watched_pages": [
+            {"page": "/journal/essays/org-chart-of-one/", "views": 0, "referrers": [], "direct_or_internal": 0},
+        ],
     }
+
+
+# ── Travel watch (#741): per-page referrer attribution for watched artifacts ──
+
+ESSAY = "/journal/essays/org-chart-of-one/"
+
+SAMPLE_WATCHED = HEADER + "\n".join(
+    [
+        _row("2026-07-13", "1.1.1.1", "GET", ESSAY, "200", "https://news.ycombinator.com/item?id=1", "Mozilla/5.0 (Mac)"),
+        _row("2026-07-13", "2.2.2.2", "GET", ESSAY, "200", "https://news.ycombinator.com/", "Mozilla/5.0 (iPhone)"),
+        # index.html + no-trailing-slash variants normalize onto the same permalink
+        _row("2026-07-13", "3.3.3.3", "GET", ESSAY + "index.html", "200", "https://t.co/abc", "Mozilla/5.0 (Linux)"),
+        _row("2026-07-13", "4.4.4.4", "GET", ESSAY.rstrip("/"), "200", "-", "Mozilla/5.0 (Windows)"),
+        # internal navigation → counts as a view, not as an external referrer
+        _row("2026-07-13", "5.5.5.5", "GET", ESSAY, "200", "https://averagejoematt.com/method/build/", "Mozilla/5.0 (Mac)"),
+        # unrelated page traffic must not pollute the watched entry
+        _row("2026-07-13", "6.6.6.6", "GET", "/now/", "200", "https://news.ycombinator.com/", "Mozilla/5.0 (Mac)"),
+    ]
+)
+
+
+def test_watched_page_referrer_attribution():
+    agg = td.aggregate(td.parse_cf_log(SAMPLE_WATCHED))
+    assert len(agg["watched_pages"]) == 1
+    w = agg["watched_pages"][0]
+    assert w["page"] == ESSAY
+    assert w["views"] == 5  # 3 canonical + index.html variant + slashless variant
+    refs = dict(w["referrers"])
+    assert refs["news.ycombinator.com"] == 2  # attributed to the ESSAY only, not /now/
+    assert refs["t.co"] == 1
+    assert "averagejoematt.com" not in refs  # own-host navigation is not travel
+    assert w["direct_or_internal"] == 2  # the "-" direct hit + the internal-nav hit
+
+
+def test_watched_block_in_email_html():
+    agg = td.aggregate(td.parse_cf_log(SAMPLE_WATCHED))
+    html = td.build_html(agg, "Jul 07", "Jul 14")
+    assert "Travel watch" in html
+    assert ESSAY in html
+    assert "news.ycombinator.com (2)" in html
+
+
+def test_watched_block_zero_views_is_explicit():
+    html = td.build_html(td.aggregate([]), "Jul 07", "Jul 14")
+    assert "Travel watch" in html
+    assert "no views this week" in html
 
 
 # ── ADR-133 (#739): the digest also emits UniqueVisitors7d / PageViews7d so
