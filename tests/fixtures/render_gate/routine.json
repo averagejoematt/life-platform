@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "generated_at": "2026-07-11T18:00:00+00:00",
+    "cache_seconds": 900
+  },
+  "available": true,
+  "as_of_date": "2026-07-11",
+  "block": {
+    "phase": "Foundation",
+    "phase_started": "2026-06-16"
+  },
+  "routine": {
+    "target_date": "2026-07-11",
+    "archetype": "push",
+    "variant": "ideal",
+    "status": "active",
+    "days_out": 0,
+    "exercise_count": 6,
+    "total_sets": 18,
+    "pushed": true
+  },
+  "pre_start": false
+}

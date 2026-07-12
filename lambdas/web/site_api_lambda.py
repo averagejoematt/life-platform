@@ -124,6 +124,7 @@ from web.site_api_data import (
     handle_platform_stats,
     handle_presence,
     handle_protocols,
+    handle_routine,
     handle_scenarios,
     handle_sleep_correlations,
     handle_sleep_detail,
@@ -355,6 +356,8 @@ ROUTES = {
     "/api/genome_risks": handle_genome_risks,
     # Sprint 9: new public endpoints
     "/api/supplements": handle_supplements,
+    # #1066: the prescribed training block for the cockpit levers (counts-only projection)
+    "/api/routine": handle_routine,
     "/api/habits": handle_habits,
     "/api/vice_streaks": handle_vice_streaks,
     "/api/fulfillment_ritual": handle_fulfillment_ritual,  # #769 (ADR-124): C-floor aggregate-only publish surface
