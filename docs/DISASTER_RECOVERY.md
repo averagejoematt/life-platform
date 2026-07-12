@@ -329,7 +329,7 @@ key file paths here (repo is public) — the device-resident credential inventor
 4. **The Whoop single-use-refresh-token trap.** Whoop rotates the refresh token on every
    use, so a *leaked refresh response permanently invalidates it* — if the attacker
    redeems it once, your ingestion 401s; if you re-auth, theirs dies. Either way the fix
-   is a full browser re-auth via `deploy/setup_whoop_auth.py` (see `docs/SECRETS_ROTATION.md`
+   is a full browser re-auth via `setup/setup_whoop_auth.py` (see `docs/SECRETS_ROTATION.md`
    §Whoop). Do this deliberately — a half-finished Whoop re-auth leaves ingestion broken.
 5. **Everything else the browser/keychain held.** claude.ai / Claude Code session,
    third-party connector tokens (Notion, Dropbox, …), and any browser-saved provider
