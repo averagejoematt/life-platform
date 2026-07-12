@@ -68,6 +68,13 @@
   <div class="page-hero cockpit-hero">
     <p class="ph-kicker label">the cockpit · one life, measured live</p>
     <nav class="loop-ribbon" aria-label="Where this sits in the loop"><span class="lr-here" aria-current="page">Now</span><span class="lr-sep" aria-hidden="true">&middot;</span><a href="/data/">Data</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/coaching/">Coaching</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/protocols/">Protocols</a><span class="lr-arrow" aria-hidden="true">&rarr;</span><a href="/story/">Story</a><span class="lr-arrow" aria-hidden="true">&#8635;</span></nav>
+    <!-- #1106: the instrument strip — the first screen reads as a cockpit. Composed
+         from the EXISTING ring() primitive (charts.js) + the instrument mark
+         (sigils.js §8.5); populated by cockpit.js from the same /api/snapshot the
+         page already fetches. Earned glow only: ember strictly on the thresholds
+         the vitals page established; an absent reading is an honest "—", so the
+         pre-start / Day-1 state reads as staged instruments, never broken. -->
+    <div class="hero-instruments" data-bind="hero-instruments" hidden aria-label="Today's instruments at a glance"></div>
   </div>
 
   <main id="cockpit" class="cockpit" data-state="loading">

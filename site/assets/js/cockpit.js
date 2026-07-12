@@ -15,9 +15,9 @@
 */
 
 import { initTheme } from "/assets/js/theme.js";
-import { sigil } from "/assets/js/sigils.js";
+import { sigil, instrumentMark } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
-import { sparkline } from "/assets/js/charts.js";
+import { sparkline, ring } from "/assets/js/charts.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
@@ -92,6 +92,62 @@ function renderHub(character) {
   } else {
     honest.hidden = true;
   }
+}
+
+/* ── #1106: the hero instrument strip ─────────────────────────────────────────
+   The first screen reads as a cockpit: four small instruments composed from the
+   EXISTING ring() primitive (charts.js) with the instrument mark (sigils.js
+   §8.5) as the strip's one marginal device — no new iconography. Everything is
+   a re-read of the /api/snapshot payload the page already fetched; no extra
+   endpoint. Earned glow (DESIGN_SYSTEM_V5 §7/§8): ember ONLY on the thresholds
+   the vitals page already established (evidence_vitals._vitalsComponents —
+   recovery ≥67%, sleep ≥7h) or a green stored-readiness band; consistency is
+   the neutral discipline band, so it never glows. alert stays the same reserved
+   run-down state as /data/vitals/ (recovery <34, sleep <5.5) — a state, never a
+   direction. An absent reading renders an honest "—" at fill 0 (muted), so the
+   Day-1 / pre-start strip reads as staged instruments, never broken (#1133:
+   a null is honest, not an error). Present-tense only — hidden in time travel. */
+function renderHeroInstruments({ character = null, readiness = null, vitals = null, pre = null } = {}) {
+  const strip = bind("hero-instruments");
+  if (!strip) return;
+  // null/undefined/"" are ABSENT (→ "—"), never coerced to 0 — Number(null) is 0,
+  // and a fabricated "0% · alert" on a no-reading morning is exactly the
+  // unearned red state this strip must never show.
+  const num = (x) => (x == null || x === "" ? null : Number.isFinite(Number(x)) ? Number(x) : null);
+  const rec = num(vitals && vitals.recovery_pct);
+  const slp = num(vitals && vitals.sleep_hours);
+  const rdy = num(readiness && readiness.score);
+  const band = String((readiness && readiness.band) || "").toLowerCase();
+  const con = num(state.pillars.consistency && state.pillars.consistency.raw_score);
+  // Thin-baseline treatment (<14 days in), mirroring the vitals page's forming-
+  // baseline rings — a fresh cycle shows its state without overclaiming.
+  let thin = true;
+  if (character && character.as_of_date && character.started_date) {
+    const d = Math.round((Date.parse(character.as_of_date) - Date.parse(character.started_date)) / 864e5);
+    if (Number.isFinite(d)) thin = d < 14;
+  }
+  const comps = [
+    { value: rec != null ? Math.round(rec) + "%" : "—", label: "recovery", fill: rec != null ? rec / 100 : 0,
+      tone: rec == null ? "muted" : rec >= 67 ? "ember" : rec >= 34 ? "muted" : "alert" },
+    { value: slp != null ? (Math.round(slp * 10) / 10).toFixed(1) : "—", sub: slp != null ? "h" : "", label: "sleep",
+      fill: slp != null ? Math.min(1, slp / 8) : 0,
+      tone: slp == null ? "muted" : slp >= 7 ? "ember" : slp >= 5.5 ? "muted" : "alert" },
+    // The stored readiness band's own rule is "worded, never red" — so its ring
+    // is ember on green, muted otherwise (a red band is worded below, not glowed).
+    { value: rdy != null ? String(Math.round(rdy)) : "—", label: "readiness",
+      fill: rdy != null ? Math.max(0, Math.min(1, rdy / 100)) : 0,
+      tone: rdy != null && band === "green" ? "ember" : "muted" },
+    { value: con != null ? String(Math.round(con)) : "—", label: "consistency",
+      fill: con != null ? Math.max(0, Math.min(1, con / 100)) : 0, tone: "muted" },
+  ];
+  const note = pre
+    ? "staged — the instruments light with Day 1's data"
+    : comps.every((c) => c.value === "—") ? "instruments on — today's readings land through the morning" : "";
+  strip.innerHTML =
+    `<span class="hi-mark" aria-hidden="true">${instrumentMark({ cls: "hi-imark" })}</span>` +
+    `<div class="hi-rings">${comps.map((c) => ring({ value: c.value, sub: c.sub || "", label: c.label, fill: c.fill, tone: c.tone, thin })).join("")}</div>` +
+    (note ? `<p class="hi-note label">${escapeHTML(note)}</p>` : "");
+  strip.hidden = false;
 }
 
 // True for missing/sentinel/error values so they never render raw to a visitor
@@ -1171,6 +1227,9 @@ async function load(dateStr) {
       renderDomains();
       // Real readings from that date (renderReadiness self-hides if the date has none).
       renderReadiness(vitBody?.vitals || null);
+      // #1106: the hero strip is present-tense only — a past sheet carries no
+      // stored readiness, so the strip hides rather than half-render history.
+      { const hi = bind("hero-instruments"); if (hi) hi.hidden = true; }
       bind("boardline").hidden = true;
       const post = nearestPost(posts, dateStr);
       const xlink = post ? ` <a href="/story/chronicle/#${escapeHTML(post.date)}">Read ${escapeHTML(post.label || ("Week " + post.week))} &rarr;</a>` : "";
@@ -1211,6 +1270,8 @@ async function load(dateStr) {
     renderReadinessScore(snapV?.readiness);  // RQA-04 — stored readiness score + components
     renderReadiness(snapV?.vitals?.vitals);  // last night → today; hides itself if no readings
     renderDomains();
+    // #1106: the hero instrument strip — same snapshot payload, glance-first.
+    renderHeroInstruments({ character, readiness: snapV?.readiness, vitals: snapV?.vitals?.vitals, pre });
     const pri = priority.status === "fulfilled" ? priority.value : null;
     renderVerdict(pri);
     renderBoardline(pri);
@@ -1261,6 +1322,9 @@ async function load(dateStr) {
     // #975: same for the inputs row — the manual channels' freshness is exactly
     // the thing that must stay visible when the daily compute has nothing to say.
     renderInputs(preC);
+    // #1106: the strip still renders without a sheet — staged instruments at "—"
+    // are the designed pre-start/empty state, never a blank hero.
+    renderHeroInstruments({ pre: preC });
     $(".panel").setAttribute("aria-busy", "false");
   }
 }
