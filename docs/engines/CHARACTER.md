@@ -1,8 +1,8 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#956 math v2, ENGINE_VERSION 1.5.0, ADR-134)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#956/#965, ENGINE_VERSION 1.6.0, ADR-134 + amendment)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
-> **Sources of truth:** `lambdas/character_engine.py` (v1.5.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.4.0, deployed to `s3://…/config/matthew/character_sheet.json`)
+> **Sources of truth:** `lambdas/character_engine.py` (v1.6.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.5.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 
 ## Purpose
 
@@ -54,6 +54,19 @@ always the number the engine leveled on; nothing mutates it post-compute.
   `character_engine.derive_consistency_inputs` (:804-878) from the same 21-day record window
   the EMA histories already fetch. `buddy_engagement` was removed (B-3 precedent — no producer
   ever wrote `buddy_freshness_days`); relationships weights renormalized (.45/.35/.20).
+
+**Source wiring (#965/ADR-134 amendment, v1.6.0):** three previously-blind sources feed one
+component each — all **day-count** metrics so volume gaming buys nothing:
+- **hevy → movement `strength_sessions`** (weight .20, behavioral): distinct workout days in the
+  trailing 7 vs a 3-day target (`fetch_hevy_workout_days` handles the `DATE#…#WORKOUT#` sort-key
+  end-bound trap). A lifting week no longer reads as movement absence.
+- **reading → mind `reading_practice`** (weight .10, behavioral): distinct ADR-097 session days
+  in the trailing 7 vs a 4-day target, via GSI2 `READING_SESSION` (reading is CROSS_PHASE — no
+  phase filter).
+- **todoist → consistency `task_follow_through`** (weight .15, measured): `100 − 12.5 ×
+  overdue_count` — follow-through as overdue pressure, the one todoist signal task-volume
+  gaming can't inflate. Measured class: the record is an automatic daily pull, so absence is an
+  ingestion gap, never a behavior verdict.
 
 ## EMA smoothing (`compute_ema_level_score`, :998-1019)
 
