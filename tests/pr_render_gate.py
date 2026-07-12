@@ -126,6 +126,23 @@ POPULATED_GATE_PAGES = [
             {"selector": ".rd-card", "min_count": 20, "desc": "running + backlog pipeline cards render from the experiments fixture"},
         ],
     },
+    {
+        # #974: the cockpit's levers strip (the Protocols station in the daily
+        # slice) only materializes with supplement-registry/experiment data — the
+        # empty-mock pass renders its honest-hidden state, so this pass asserts
+        # the populated rows (the stack + the experiment under way) actually
+        # mount, and capture_page's mobile pass keeps them inside 390px.
+        "path": "/now/",
+        "name": "Cockpit · levers [populated]",
+        "wait_for": "body",
+        "checks": [
+            {
+                "selector": ".lever-row",
+                "min_count": 2,
+                "desc": "levers strip renders the stack + experiment rows from the supplements/experiments fixtures (#974)",
+            },
+        ],
+    },
 ]
 
 # ── API mocks ─────────────────────────────────────────────────────────────────
@@ -153,6 +170,7 @@ POPULATED_API_MOCKS = {
     "**/api/vitals_depth": "vitals_depth.json",
     "**/api/labs": "labs.json",
     "**/api/experiments": "experiments.json",
+    "**/api/supplements": "supplements.json",
 }
 
 

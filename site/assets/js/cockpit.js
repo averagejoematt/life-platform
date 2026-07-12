@@ -18,7 +18,7 @@ import { initTheme } from "/assets/js/theme.js";
 import { sigil } from "/assets/js/sigils.js";
 import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || sigil(c)
 import { sparkline } from "/assets/js/charts.js";
-import { domainIcon } from "/assets/js/icons.js";
+import { domainIcon, icon } from "/assets/js/icons.js";
 import { explainMount } from "/assets/js/explain.js"; // #403 one-tap explainer
 import { momentsIndex, shareMount } from "/assets/js/share.js"; // #404 moment permalinks
 import { preStart } from "/assets/js/coach_popover.js"; // #931 — the pre-start countdown state
@@ -744,6 +744,86 @@ async function renderSinceLastVisit() {
   localStorage.setItem(_LV_KEY, String(now));
 }
 
+/* ── #974: the levers — the Protocols station in the daily slice ─────────────
+   /now/ rendered Coaching (the board), Data (pillars/trends/forecast) and Story
+   (log/achievements) but never Protocols — the loop's fourth station. This strip
+   is the morning checklist: the supplement stack in protocol and the experiment
+   under way, each row a link into /protocols/. Real reads of the EXISTING
+   read-only /api/supplements + /api/experiments — nothing is invented, and the
+   strip self-hides if neither endpoint answers. Pre-genesis (#931) the same rows
+   read as STAGED for Day 1: the registry and the pre-registered design exist
+   before the data does, so naming them is honest — but a day count is never
+   faked. Training block: no routine /api/ endpoint exists yet — tracked as the
+   #974 follow-up rather than built here. */
+async function renderLevers(pre) {
+  const sec = $("[data-levers]");
+  if (!sec) return;
+  const [supp, exp] = await Promise.all([
+    getJSON(`${API}/supplements`).catch(() => null),
+    getJSON(`${API}/experiments`).catch(() => null),
+  ]);
+  const out = [];
+
+  // The stack — registry truth (what's IN protocol), never an adherence claim.
+  const groups = (supp && supp.groups) || {};
+  const nGroups = Object.keys(groups).length;
+  const nSupp = Number(supp && supp.total_count) ||
+    Object.values(groups).reduce((a, g) => a + (((g && g.items) || []).length), 0);
+  if (nSupp > 0) {
+    out.push(
+      `<li class="lever-row"><a class="lever-link" href="/protocols/supplements/">` +
+      `<span class="lever-k label">${icon("nutrition", { cls: "dom-ico" })}the stack</span>` +
+      `<span class="lever-what"><span class="num">${nSupp}</span> supplement${nSupp === 1 ? "" : "s"}` +
+      `${nGroups ? ` · ${nGroups} group${nGroups === 1 ? "" : "s"}` : ""}</span>` +
+      `<span class="lever-note label">${pre ? "staged — in protocol from Day 1" : "in protocol today"}</span>` +
+      `<span class="lever-go" aria-hidden="true">→</span></a></li>`
+    );
+  }
+
+  // The experiment under way — live runs only (library entries are the shelf).
+  // Same status vocabulary as the protocols-door renderer (evidence_discovery.js).
+  const xs = exp && Array.isArray(exp.experiments) ? exp.experiments : [];
+  const live = xs.filter((x) => x && x.origin !== "library" && !/complete|done|ended|closed|abandon/i.test(String(x.status || "")));
+  for (const x of live.slice(0, 2)) {
+    const name = isBad(x.name) ? "Experiment" : String(x.name);
+    const dur = Number(x.planned_duration_days);
+    const dayN = Number(x.days_in);
+    const counted = !pre && Number.isFinite(dayN) && dayN >= 1 && Number.isFinite(dur) && dur > 0;
+    // Pre-genesis a run has no honest day count — it starts with Day 1.
+    const note = pre
+      ? `starts ${pre.startDow} — Day 1`
+      : counted ? `day ${dayN} of ${dur}` : (x.start_date ? `since ${x.start_date}` : "");
+    const pct = counted
+      ? Math.max(2, Math.min(100, Math.round(Number(x.progress_pct) || (dayN / dur) * 100)))
+      : null;
+    out.push(
+      `<li class="lever-row"><a class="lever-link" href="/protocols/experiments/">` +
+      `<span class="lever-k label">${icon("milestone", { cls: "dom-ico" })}experiment</span>` +
+      `<span class="lever-what">${escapeHTML(name)}</span>` +
+      (pct != null ? `<span class="lever-meter" aria-hidden="true"><i style="width:${pct}%"></i></span>` : "") +
+      `${note ? `<span class="lever-note label">${escapeHTML(note)}</span>` : ""}` +
+      `<span class="lever-go" aria-hidden="true">→</span></a></li>`
+    );
+  }
+  // No run under way — said plainly, with the stocked shelf as the pointer.
+  if (!live.length && xs.length) {
+    const ready = xs.filter((x) => x && x.origin === "library" && x.status === "available").length;
+    out.push(
+      `<li class="lever-row"><a class="lever-link" href="/protocols/experiments/">` +
+      `<span class="lever-k label">${icon("milestone", { cls: "dom-ico" })}experiment</span>` +
+      `<span class="lever-what lever-none">${pre ? "runs begin with Day 1" : "none running"}</span>` +
+      `${ready ? `<span class="lever-note label">${ready} ready on the shelf</span>` : ""}` +
+      `<span class="lever-go" aria-hidden="true">→</span></a></li>`
+    );
+  }
+
+  if (!out.length) { sec.hidden = true; return; }
+  const capNote = bind("levers-note");
+  if (capNote) capNote.textContent = pre ? " · staged for Day 1" : " · in play today";
+  bind("lever-rows").innerHTML = out.join("");
+  sec.hidden = false;
+}
+
 // Reading line (Mind pillar, ADR-097): current book + read-today tick + streak.
 // Recall prompts/retention are owner-private — never fetched on the public cockpit.
 async function renderReading() {
@@ -1042,6 +1122,7 @@ async function load(dateStr) {
     renderForecast();   // fire-and-forget (#541); hides itself until the engine has a summary
     renderReading();    // fire-and-forget; hides itself if no book in hand
     renderPredict();    // fire-and-forget; hides itself if no active weekly prediction
+    renderLevers(pre);  // fire-and-forget (#974); the Protocols station — staged pre-genesis, self-hiding
 
     if (pre) {
       // #931 pre-start banner — the same calm voice as the rest of the cockpit:
@@ -1074,6 +1155,9 @@ async function load(dateStr) {
     bind("verdict").innerHTML = preC
       ? preStartLine(preC)
       : "Today's score hasn't computed yet — the numbers refresh each morning. Check back shortly.";
+    // #974: the levers still render without a sheet — the registry and the
+    // pre-registered design are real before (and independent of) today's score.
+    renderLevers(preC);
     $(".panel").setAttribute("aria-busy", "false");
   }
 }

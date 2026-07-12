@@ -482,6 +482,33 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .rl-now .rl-author { font-family: var(--font-mono); font-size: 0.7em; color: var(--ink-faint); }
 .rl-streak { margin-top: var(--sp-1); color: var(--ink-faint); }
 
+/* ── #974: the levers — the Protocols station in the daily slice ─────────────
+   What's actually being run today (the stack in protocol, the experiment under
+   way), each row one link into /protocols/. Registry truth only; pre-genesis it
+   reads as staged, never as fabricated progress. Rows are flex + wrap so 390px
+   never overflows; the whole row is the tap target (≥44px, #1010). */
+.levers { margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: var(--border-hair); }
+.lever-cap-note { color: var(--ink-faint); }
+.lever-rows { list-style: none; margin: var(--sp-1) 0 0; padding: 0; display: grid; }
+.lever-link {
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  min-height: 44px; padding: var(--sp-1) 0; text-decoration: none; color: inherit;
+}
+.lever-row + .lever-row .lever-link { border-top: var(--honest-border); }
+.lever-k { min-width: 5.5em; color: var(--ink-muted); }
+.lever-what { font-family: var(--font-serif); font-size: var(--fs-quote); color: var(--ink); }
+.lever-what .num { font-family: var(--font-mono); font-size: 0.85em; font-variant-numeric: tabular-nums; }
+.lever-none { color: var(--ink-muted); font-style: italic; }
+.lever-meter {
+  flex: 1; min-width: 64px; max-width: 160px; height: 3px; align-self: center;
+  background: var(--rule); border-radius: 3px; overflow: hidden;
+}
+.lever-meter i { display: block; height: 100%; background: var(--ember); transition: width var(--dur) var(--ease-out); }
+.lever-note { color: var(--ink-faint); }
+.lever-go { margin-left: auto; color: var(--ink-faint); }
+.lever-link:hover .lever-what { color: var(--ember); }
+.lever-link:hover .lever-go { color: var(--ember); }
+
 /* Foot + states */
 .cockpit-foot { margin-top: var(--sp-5); display: flex; gap: var(--sp-5); flex-wrap: wrap; align-items: baseline; }
 .cockpit-foot a { color: var(--ink-faint); text-decoration: none; }

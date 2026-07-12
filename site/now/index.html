@@ -171,6 +171,20 @@
         <!-- A named persona's read, made glanceable -->
         <p class="boardline" data-bind="boardline" hidden></p>
 
+        <!-- #974: the levers — the Protocols station in the daily slice. /now/
+             rendered Coaching / Data / Story but never Protocols; this strip is
+             the morning checklist: the supplement stack in protocol and the
+             experiment under way (day N of its planned duration), each row a
+             link into /protocols/. Real reads of the existing /api/supplements
+             + /api/experiments only; self-hides if neither answers. Pre-genesis
+             (#931) the same protocol renders as STAGED for Day 1 — honest,
+             never a fabricated day count. Training block: no routine endpoint
+             exists yet — follow-up tracked on #974. -->
+        <section class="levers" data-levers hidden aria-label="The levers — the protocols in play">
+          <p class="cap label">the levers<span class="lever-cap-note" data-bind="levers-note"></span></p>
+          <ul class="lever-rows" data-bind="lever-rows"></ul>
+        </section>
+
         <!-- Tonight's forecast: the circadian-compliance score — predictive, not
              retrospective. What today's light / meal / screen / sleep-timing
              behaviours set tonight's sleep up to be. Present-tense only (hidden
