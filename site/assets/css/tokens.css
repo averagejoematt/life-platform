@@ -748,8 +748,11 @@ a { color: inherit; text-underline-offset: 0.18em; }
 @media (max-width: 600px) { .vr-row { grid-template-columns: repeat(2, 1fr); } }
 /* P0.2 — now/7d/30d ladder, aligned under the ring grid. */
 .vl-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin-top: calc(-1 * var(--sp-2)); }
-.vl-cell { display: flex; justify-content: center; gap: var(--sp-3); }
-.vl-pair { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+/* #1099 — reserved slot geometry: min-width:0 lets a cell shrink inside its grid
+   track instead of overprinting the neighbour, and flex-wrap absorbs any value
+   still too wide (absent values render the honest "—", never a collapsed cell). */
+.vl-cell { display: flex; justify-content: center; gap: var(--sp-3); min-width: 0; flex-wrap: wrap; }
+.vl-pair { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
 .vl-k { color: var(--ink-faint); font-size: 0.58rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
 .vl-v { font-size: var(--fs-small); }
 .vl-v.vl-base { color: var(--ink-muted); }
@@ -1029,6 +1032,31 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .cp-link { display: inline-block; margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-label);
   color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
 .cp-link:hover { border-color: var(--ember); }
+
+/* ── Shared top-bar chrome (#1105) — ONE rule for every door's desktop top bar.
+   Stickiness, padding, translucent blur backdrop and the hairline rule were
+   previously three diverging per-sheet rules (.story-top sticky+blur, .ev-top and
+   .cockpit-top static, container-boxed, different padding). Normalized on the
+   Story treatment: sticky, full-bleed, --sp-3/--gutter padding; doors right-align
+   via space-between on every page (the cockpit's scope switcher moved to its own
+   row — cockpit.css .top-controls). Lives in @layer chrome-base so the mobile
+   app-bar (@layer chrome, below) keeps winning at ≤600 by layer order — no
+   !important (#1007). Page sheets keep only page-specific extras. */
+@layer chrome-base {
+  .story-top, .ev-top, .cockpit-top {
+    position: sticky; top: 0; z-index: var(--z-sticky);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: var(--sp-4); padding: var(--sp-3) var(--gutter);
+    background: color-mix(in oklch, var(--page) 82%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: var(--border-hair);
+  }
+  @media (max-width: 480px) {
+    .story-top, .ev-top, .cockpit-top { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); }
+  }
+}
+/* Fragment jumps + scrollIntoView clear the now-sticky bar on every page. */
+html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
 
 /* ── Mobile: the five doors become a fixed, thumb-reachable bottom app-bar
    (2026-06-14; five doors since the v5 IA). Replaces the old top-nav shrink-to-9px.
