@@ -89,6 +89,13 @@ def site_footer(with_asof: bool = False) -> str:
     home's old slim footer carried: `story.js` binds `data-bind="asof"` from the
     public-stats metadata, so the stamp rides in the base line between the brand
     and the home link (the `.sf-base` flex line spaces the three apart).
+
+    IA notes (2026-07-12): "The Technology" column (#1110) is the menu home for the
+    platform-itself content — the /method/ hub, the build log (moved here OUT of the
+    story sub-nav; URL unchanged), the curated machine pages, and /gear/ (#1111 — the
+    devices behind the data). "The ledger" (#1109) and "The agents" (#1111) are footer-
+    linked so neither is an unaccounted orphan; the ledger stays OFF the /data/ tile
+    rail by explicit registry intent (`"unlisted"` in v4_build_evidence.REGISTRY).
     """
     asof = ASOF_STAMP if with_asof else ""
     return (
@@ -96,11 +103,11 @@ def site_footer(with_asof: bool = False) -> str:
         '<div class="sf-col"><p class="sf-h label">The Story</p>'
         '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a>'
         '<a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a>'
-        '<a href="/story/about/">About</a></div>'
+        '<a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div>'
         '<div class="sf-col"><p class="sf-h label">The Data</p>'
         '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a>'
         '<a href="/data/labs/">Labs</a><a href="/data/training/">Training</a>'
-        '<a href="/data/sleep/">Sleep</a></div>'
+        '<a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div>'
         '<div class="sf-col"><p class="sf-h label">The Protocols</p>'
         '<a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a>'
         '<a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div>'
@@ -108,9 +115,13 @@ def site_footer(with_asof: bool = False) -> str:
         '<a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a>'
         '<a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a>'
         '<a href="/coaching/lab-notes/">AI lab notes</a></div>'
+        '<div class="sf-col"><p class="sf-h label">The Technology</p>'
+        '<a href="/method/">The machine</a><a href="/story/build/">Build log</a>'
+        '<a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a>'
+        '<a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div>'
         '<div class="sf-col"><p class="sf-h label">Follow &amp; context</p>'
         '<a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a>'
-        '<a href="/method/">The method</a><a href="/story/about/">About</a>'
+        '<a href="/story/about/">About</a>'
         '<a href="/privacy/">Privacy</a></div>'
         f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p></footer>'
     )

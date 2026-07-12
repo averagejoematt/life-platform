@@ -31,7 +31,10 @@ from v4_proof import chronicle_list_html, load_chronicle, load_chronicle_pending
 
 OUT = Path("site/story")
 
-# key, label, one-line description (for the per-section <meta>/<title>)
+# key, label, one-line description (for the per-section <meta>/<title>).
+# NB: this list drives which SHELLS are emitted; the visible sub-nav tab list lives in
+# assets/js/dispatches.js — the two must carry the same keys (a shell whose key the JS
+# doesn't know renders the default section).
 SECTIONS = [
     ("chronicle", "Chronicle", "The weekly chronicle, written by Elena Voss."),
     # "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20).
@@ -39,6 +42,9 @@ SECTIONS = [
     ("journal", "In my own words", "The daily journal, first-person."),
     ("timeline", "Timeline", "Level-ups and milestones — the journey so far."),
     # #380: engineering exhaust, distilled — merged + deployed work only.
+    # #1110: `unlisted: true` in dispatches.js — OUT of the story sub-nav (the footer's
+    # "The Technology" column links it); the entry stays HERE so /story/build/ keeps
+    # regenerating (URL unchanged — pinned by tests/test_build_dispatches.py).
     ("build", "Build log", "Engineering dispatches — what shipped, the gotcha, the honest miss."),
     ("about", "About", "The experiment, in context."),
 ]

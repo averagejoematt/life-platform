@@ -33,7 +33,11 @@ const SECTIONS = [
   // #380 — the engineering exhaust, distilled. Each beat is written at session
   // close from the handover (docs/content/BUILD_DISPATCH_CHECKLIST.md), commits
   // with the code, and narrates ONLY merged + deployed work — never plans.
-  { key: "build", label: "Build log", kicker: "what the machine shipped — merged work only", kind: "build", url: "/story/build/beats.json" },
+  // #1110: `unlisted` — the build log left the story sub-nav (the story is the human
+  // story; the platform content lives under the footer's "The Technology" column,
+  // which links /story/build/ directly). The section stays in SECTIONS/BYKEY so the
+  // unchanged URL still renders — only the tab bar filters it out.
+  { key: "build", label: "Build log", kicker: "what the machine shipped — merged work only", kind: "build", url: "/story/build/beats.json", unlisted: true },
   { key: "about", label: "About", kicker: "the experiment, in context", kind: "about" },
 ];
 const BYKEY = Object.fromEntries(SECTIONS.map((s) => [s.key, s]));
@@ -581,7 +585,7 @@ async function selectSection(key, preId, push = true) {
 
 function build() {
   const tabsEl = $("[data-dx-tabs]"); if (!tabsEl) return;
-  tabsEl.innerHTML = SECTIONS.map((s) => `<button class="dx-tab" data-sec="${s.key}">${s.icon ? icon(s.icon, { cls: "tab-ico" }) : ""}${esc(s.label)}</button>`).join("");
+  tabsEl.innerHTML = SECTIONS.filter((s) => !s.unlisted).map((s) => `<button class="dx-tab" data-sec="${s.key}">${s.icon ? icon(s.icon, { cls: "tab-ico" }) : ""}${esc(s.label)}</button>`).join("");
   tabsEl.querySelectorAll(".dx-tab").forEach((b) => b.addEventListener("click", () => selectSection(b.dataset.sec)));
   wireTabList(tabsEl, (key) => selectSection(key));
   const start = (window.__DISPATCH_START__ && BYKEY[window.__DISPATCH_START__]) ? window.__DISPATCH_START__ : "chronicle";
