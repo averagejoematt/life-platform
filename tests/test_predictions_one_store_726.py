@@ -123,7 +123,7 @@ class TestGetPredictionsBehavior:
 
 class TestVoidSplitRule:
     def test_semantic_key_separates_clean_from_corrupt(self):
-        sys.path.insert(0, os.path.join(_ROOT, "deploy"))
+        sys.path.insert(0, os.path.join(_ROOT, "deploy", "archive", "onetime"))
         from void_legacy_predictions_726 import split_predictions
 
         clean_pred = {"prediction_id": "pred_20260706_x", "semantic_key": "x", "status": "pending"}
