@@ -942,6 +942,36 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1074"
         }
       ]
+    },
+    {
+      "id": "2026-07-12-the-site-learned-what-day-it-is",
+      "date": "2026-07-12",
+      "title": "The site learned what day it is",
+      "shipped": "Matthew walked the whole site the day before the restart and wrote down 41 things that felt wrong — coaches quoting data from the previous attempt, a steps average built from a single partial day, discoveries listed before Day 1. Every finding was traced to its actual cause, filed, and fixed in 18 merged pull requests: every AI narrator now receives the experiment's day number before it writes a word, an AI reviewer now reads each page nightly as a first-time reader who knows what day it is, the restart collapsed from eight manual steps to one command with a truth-check gate, and the daily instrument moved to /cockpit/ — its real name.",
+      "gotcha": "Half the 'bugs' weren't bugs. The 'sixteen attempts' line one reviewer flagged as a hallucination is true biography; the time-travel slider reaching back through old cycles was a designed feature; two 'leaked' numbers traced to a single database row that a warm server had stamped with stale constants after the reset ran. An adversarial verification pass killed four confident fixes that would each have made things worse — the cheapest work of the whole session.",
+      "honest_miss": "The quality gates themselves were phase-blind: the vision QA was explicitly told to judge pixels and never truth, and the deploy smoke test demanded a body weight on a morning when none could honestly exist yet. Both are fixed, but they shipped that way — and the richer work the review asked for (immersive coach bios, badge pages, deeper protocol stories) is filed, not built.",
+      "prs": [
+        {
+          "label": "PR #1127",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1127"
+        },
+        {
+          "label": "PR #1138",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1138"
+        },
+        {
+          "label": "PR #1140",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1140"
+        },
+        {
+          "label": "PR #1141",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1141"
+        },
+        {
+          "label": "PR #1143",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1143"
+        }
+      ]
     }
   ]
 }
