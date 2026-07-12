@@ -16,6 +16,7 @@ Endpoints:
   /api/predictions      — coach prediction ledger (?status=&coach_id=&limit=)
   /api/coach_timeline   — coach thread timeline (?coach_id= param)
   /api/weekly_priority  — integrator synthesis (cross-domain weekly priority)
+  /api/month_rollup     — integrator month rollup (trailing ~4 weeks, #1115)
 """
 
 import json
@@ -1680,3 +1681,49 @@ def handle_weekly_priority(event):
     except Exception as _e:
         logger.warning(f"[/api/weekly_priority] {_e}")
         return _ok({"weekly_priority": None}, cache_seconds=60)
+
+
+def handle_month_rollup():
+    """GET /api/month_rollup — the integrator's month-altitude rollup (#1115).
+
+    Reads the precomputed EXPERT#integrator_month record (written weekly by
+    ai-expert-analyzer from the trailing ~4 weekly lab notes; honest-skipped
+    while fewer than 2 week notes exist). Honest-null pre-start, while
+    tombstoned after a reset (#946), when nothing is written yet (the designed
+    early-cycle empty state — ADR-104), and when the stored record's day count
+    outruns the live experiment day (a prior cycle's rollup is never served).
+    """
+    try:
+        _pre = pre_start_meta()
+        if _pre:
+            return _ok({"narrative": None, **_pre}, cache_seconds=300)
+        item = table.get_item(Key={"pk": f"{USER_PREFIX}ai_analysis", "sk": "EXPERT#integrator_month"}).get("Item")
+        if not singleton_visible(item):
+            return _ok({"narrative": None, "pre_start": False}, cache_seconds=300)
+        item = _decimal_to_float(item)
+        rec_days = item.get("days_in_experiment")
+        if rec_days is not None:
+            try:
+                if int(rec_days) > _current_day_n():
+                    logger.info(
+                        "[month_rollup] record claims day %s but current is %s — withholding stale rollup", rec_days, _current_day_n()
+                    )
+                    return _ok({"narrative": None, "pre_start": False}, cache_seconds=300)
+            except (TypeError, ValueError):
+                pass
+        return _ok(
+            {
+                "narrative": item.get("narrative") or None,
+                "headline": item.get("headline") or None,
+                "week_count": item.get("week_count"),
+                "window_label": item.get("window_label") or None,
+                "generated_at": item.get("generated_at", ""),
+                "coach_name": "Dr. Kai Nakamura",
+                "coach_title": "Integrative Health Director",
+                "pre_start": False,
+            },
+            cache_seconds=3600,
+        )
+    except Exception as _e:
+        logger.warning(f"[/api/month_rollup] {_e}")
+        return _ok({"narrative": None}, cache_seconds=60)

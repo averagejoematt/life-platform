@@ -323,6 +323,29 @@ class TestEveryNarrativePromptBuilderCarriesTheBlock:
         beats = panel._gather_week({"week": 1, "date": _g(6), "title": "Week 1"}, {})
         assert MARKER in beats.get("phase_block", "")
 
+    # ── Observatory integrator (#1115): weekly synthesis + month rollup + arc ──
+    # ai_expert_analyzer's three cross-domain narrative prompts (the weekly
+    # priority, the month rollup, the experiment arc) live in
+    # intelligence/integrator_prompts.py — pure builders extracted precisely so
+    # this suite can drive them offline (and the ADR-080 size gate holds).
+    def test_observatory_synthesis_prompt(self):
+        from intelligence import integrator_prompts as axp
+
+        out = axp.build_synthesis_prompt("--- SLEEP COACH ---\nSteady, honest week.", "{}", "", "")
+        assert MARKER in out
+
+    def test_observatory_month_rollup_prompt(self):
+        from intelligence import integrator_prompts as axp
+
+        out = axp.build_month_rollup_prompt("[Week 1] tone=steady\n\n[Week 2] tone=mixed", "{}", "", 2, "")
+        assert MARKER in out
+
+    def test_observatory_experiment_arc_prompt(self):
+        from intelligence import integrator_prompts as axp
+
+        out = axp.build_arc_prompt("[Week 1] tone=steady\n\n[Week 2] tone=mixed", "{}", "", 2)
+        assert MARKER in out
+
     # ── Public AI surfaces (/api/ask + board_ask) ────────────────────────────
     def test_ask_system_prompt(self):
         from web import site_api_ai_lambda as ai
@@ -380,6 +403,7 @@ NARRATIVE_BUILDER_FILES = [
     "lambdas/emails/coach_panel_podcast_lambda.py",
     "lambdas/emails/podcast_script_v2.py",
     "lambdas/web/site_api_ai_lambda.py",
+    "lambdas/intelligence/integrator_prompts.py",  # #1115 — synthesis / month-rollup / arc builders
 ]
 
 

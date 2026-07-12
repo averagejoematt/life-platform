@@ -952,6 +952,16 @@ def _presence_block():
     return presence_prompt_block(_load_engagement_signal())
 
 
+# #1115 / ADR-080: the integrator's three narrative prompt builders (weekly
+# synthesis, month rollup, experiment arc) live in the sibling module
+# integrator_prompts.py — pure builders, each carrying the mandatory #1086
+# phase-context block. Dual import path per the grounding_guard convention.
+try:
+    from intelligence.integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt
+except ImportError:  # pragma: no cover — flat-staged runtime layout
+    from integrator_prompts import build_arc_prompt, build_month_rollup_prompt, build_synthesis_prompt  # noqa: F401
+
+
 def _build_shared_system_prompt():
     """Build the cacheable system prompt shared across all 8 expert calls.
 
@@ -1435,44 +1445,7 @@ def generate_synthesis(all_coach_outputs):
     _pb = _presence_block()
     presence_block = ("\n" + _pb + "\n") if _pb else ""
 
-    prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've just read assessments from all domain coaches. Your job: synthesize, resolve contradictions, and make ONE call.
-
-Matthew's goals: {goals_json}
-{facts_block}{presence_block}
-Coach assessments:
-{coach_sections}
-
-Write in first person. You are Nakamura — direct, decisive, and on Matthew's side.
-
-HOW TO JUDGE THE WEEK (read this before you write):
-- Judge progress against where Matthew STARTED, not only against the end goal. He is early in a long experiment; "not at the goal yet" is NOT failure. Distance-to-goal is context, never the verdict.
-- Start from what actually happened. Before you name a problem, account for what he DID this week — the workouts, the walks, the logged meals, the habits checked off. Credit the real wins first. A coach who only sees what's missing isn't reading the data, he's projecting onto it.
-- Be honest about genuine problems, but calibrate the tone: direct and warm, never catastrophizing. NO clinical doom labels ("behavioral arrest", "he's avoiding himself"), no diagnosing his character from one thin week. Describe behavior and numbers, not pathology.
-- Effort and consistency are the wins worth reinforcing at this stage, even when the scale or a lab hasn't moved yet. Lagging outcomes are expected to lag — don't read a slow-moving number as a behavioral failure.
-
-Produce EXACTLY this JSON structure (no markdown, no explanation):
-{{
-  "weekly_priority": "One paragraph. Open by crediting what Matthew actually did well this week (be specific, drawn from the data). Then name the ONE thing that matters most NEXT — framed as the next step forward from where he is, not a scolding about the gap to the goal. One concrete action. If coaches disagree, make the call and say why. Decisive but encouraging — the voice of a coach who saw the real effort this week.",
-  "cross_domain_notes": {{
-    "sleep": "1-2 sentences connecting sleep to the other domains this week",
-    "nutrition": "1-2 sentences connecting nutrition to the other domains",
-    "training": "1-2 sentences connecting training to the other domains",
-    "glucose": "1-2 sentences connecting glucose to the other domains",
-    "physical": "1-2 sentences connecting physical/body comp to the other domains",
-    "mind": "1-2 sentences connecting mind/behavioral to the other domains"
-  }},
-  "disagreements": [
-    {{
-      "topic": "what the disagreement is about",
-      "coaches": ["coach_a", "coach_b"],
-      "position_a": "what coach A recommends",
-      "position_b": "what coach B recommends",
-      "nakamura_call": "your resolution — who is right and why"
-    }}
-  ]
-}}
-
-For disagreements: only flag GENUINE conflicts where two coaches would give Matthew contradictory advice. Do not invent disagreements. Empty list is fine if all coaches are aligned."""
+    prompt = build_synthesis_prompt(coach_sections, goals_json, facts_block, presence_block)
 
     api_key = _get_api_key()
 
@@ -1684,32 +1657,7 @@ def generate_experiment_arc():
         ("\nAUTHORITATIVE FACTS (cite these exact numbers; invent no others): " + "; ".join(_fact_bits) + "\n") if _fact_bits else ""
     )
 
-    prompt = f"""You are Dr. Kai Nakamura, Integrative Health Director. You've read the board's weekly lab notes across Matthew's entire experiment so far. Your job: step back and tell the ARC — not this week, but the whole trajectory.
-
-Matthew's goals: {goals_json}
-{facts_block}
-The board's read, week by week (oldest first):
-{weeks_text}
-
-Write in first person as Nakamura — direct, warm, on Matthew's side.
-
-HOW TO JUDGE THE ARC (read before writing):
-- Judge the trajectory against where Matthew STARTED, not the end goal. He is early in a long experiment; a slow-moving outcome is expected to lag and is NOT failure.
-- Tell the real story: where this began, what shifted, what held steady, where it stands now. Name the turning points honestly but never catastrophize and never diagnose his character from thin data.
-- Credit the throughline of effort and consistency. If the weeks rhymed (the same pattern recurring), say so plainly — that's the signal.
-- Only {len(weeks)} weeks exist; do not pretend to more history than the notes contain.
-- BEHAVIORAL PRESENCE lines are deterministic counts from the raw logs — they are AUTHORITATIVE and override any rosier read in that week's notes. A week whose counts are zero (or near-zero) is an ABSENCE week: narrate it AS absence — the logging stopped, and that is the week's story — never as progress or triumph. Recovery/HRV that looks good during an absence week is REST-INFLATED (no training, no logged deficit behind it) and must NOT be credited as progress or "the best of the arc". Never call a fully-dark week's missing data "a minor logging problem".
-
-Produce EXACTLY this JSON (no markdown, no preamble):
-{{
-  "arc": "2-3 short paragraphs. The trajectory of the experiment to date — the start, the turns, the throughline, where it stands now. Specific, drawn from the weekly notes. The voice of a coach who has watched the whole run.",
-  "throughline": "One sentence — the single sentence that names what this experiment has actually been about so far.",
-  "chapters": [
-    {{ "week_label": "the week's label exactly as given", "headline": "4-8 words naming what that week was, in the arc" }}
-  ]
-}}
-
-For chapters: one entry per week given, in order. The headline is the chapter title that week earns in the larger story."""
+    prompt = build_arc_prompt(weeks_text, goals_json, facts_block, len(weeks))
 
     api_key = _get_api_key()
 
@@ -1786,6 +1734,158 @@ For chapters: one entry per week given, in order. The headline is the chapter ti
         return None
 
 
+def generate_month_rollup():
+    """
+    #1115: the integrator's month rollup — Dr. Kai Nakamura reads the most recent
+    ~4 weekly lab notes and names the month's pattern, so the site's Month lens has
+    a narrative at its own altitude instead of reusing the weekly priority. Writes
+    EXPERT#integrator_month. Honest-skip when fewer than 2 week notes exist in the
+    window (early-cycle: the API serves null and the front-end renders the designed
+    empty state — ADR-104, never a fabricated rollup).
+    """
+    fn_pk = f"{USER_PREFIX}field_notes"
+    from phase_filter import with_phase_filter
+
+    try:
+        resp = table.query(
+            **with_phase_filter(
+                {
+                    "KeyConditionExpression": Key("pk").eq(fn_pk) & Key("sk").begins_with("WEEK#"),
+                    "ScanIndexForward": False,  # newest first — we want the trailing month
+                    "Limit": 5,
+                }
+            )
+        )
+        weeks = list(reversed(_decimal_to_float(resp.get("Items", []))))[-4:]
+    except Exception as e:  # noqa: BLE001
+        logger.error("Month-rollup: field_notes query failed: %s", e)
+        return None
+
+    if len(weeks) < 2:
+        logger.info("Month-rollup skipped — only %d week note(s) in the trailing window (need >=2)", len(weeks))
+        return None
+
+    blocks = []
+    window_dates = []
+    for w in weeks:
+        label = w.get("week_label") or w.get("week") or "Week"
+        tone = w.get("ai_tone", "mixed")
+        present = (w.get("ai_present") or "").strip()
+        bits = [f"[{label}] tone={tone}"]
+        pres = _week_behavioral_presence(w.get("week"))
+        if pres is not None:
+            window_dates.extend([pres["start"], pres["end"]])
+            bits.append(
+                f"BEHAVIORAL PRESENCE ({pres['start']}..{pres['end']}, deterministic counts from the raw logs — AUTHORITATIVE): "
+                f"lifting days {pres['lift_days']}, weigh-ins {pres['weigh_ins']}, "
+                f"habit-completion days {pres['habit_completion_days']}, food-log days {pres['food_log_days']}"
+                + (" — AN ABSENCE WEEK (no behavioral data at all)" if pres["absence_week"] else "")
+            )
+        if present:
+            bits.append(present[:600])
+        blocks.append("\n".join(bits))
+    weeks_text = "\n\n".join(blocks)
+    window_label = f"{min(window_dates)} to {max(window_dates)}" if window_dates else ""
+
+    try:
+        goals = load_goals_config() if _HAS_INTELLIGENCE_COMMON else {}
+    except Exception:  # noqa: BLE001
+        goals = {}
+    goals_json = json.dumps(
+        {"mission": goals.get("mission", ""), "targets": goals.get("targets", {}), "philosophy": goals.get("philosophy", "")},
+        indent=2,
+        default=str,
+    )
+    _f = _load_canonical_facts()
+    _fact_bits = []
+    if _f.get("latest_weight") is not None:
+        _fact_bits.append(f"current weight {_f['latest_weight']:g} lb")
+    if _f.get("recovery_pct") is not None:
+        _fact_bits.append(f"recovery {_f['recovery_pct']:g}%")
+    facts_block = (
+        ("\nAUTHORITATIVE FACTS (cite these exact numbers; invent no others): " + "; ".join(_fact_bits) + "\n") if _fact_bits else ""
+    )
+
+    prompt = build_month_rollup_prompt(weeks_text, goals_json, facts_block, len(weeks), window_label)
+
+    api_key = _get_api_key()
+
+    def _build_req():
+        body = json.dumps({"model": AI_MODEL, "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]})
+        return urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body.encode(),
+            headers={"Content-Type": "application/json", "x-api-key": api_key, "anthropic-version": "2023-06-01"},
+        )
+
+    from retry_utils import call_anthropic_raw
+
+    def _parse(text):
+        import re
+
+        s = (text or "").strip()
+        if s.startswith("```"):
+            s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        if s.endswith("```"):
+            s = s[:-3]
+        a, b = s.find("{"), s.rfind("}")
+        core = s[a : b + 1] if (a != -1 and b > a) else s  # noqa: E203
+        for cand in (core, re.sub(r",(\s*[}\]])", r"\1", core)):
+            try:
+                return json.loads(cand)
+            except Exception:  # noqa: BLE001
+                pass
+        m = re.search(r'"narrative"\s*:\s*"((?:[^"\\]|\\.)*)"', core, re.DOTALL)
+        if m:
+            try:
+                narrative = json.loads(f'"{m.group(1)}"')
+            except Exception:  # noqa: BLE001
+                narrative = m.group(1)
+            logger.warning("Month-rollup full-JSON parse failed — used narrative regex fallback")
+            return {"narrative": narrative, "headline": "", "_partial": True}
+        return None
+
+    parsed = None
+    last_err = None
+    for attempt in (1, 2):
+        try:
+            result = call_anthropic_raw(_build_req(), timeout=60)
+            text = "".join(b["text"] for b in result.get("content", []) if b.get("type") == "text")
+            parsed = _parse(text)
+            if parsed and parsed.get("narrative"):
+                break
+            last_err = f"no narrative parsed (attempt {attempt})"
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            logger.error("Month-rollup call failed (attempt %d/2): %s", attempt, e)
+    if not parsed or not parsed.get("narrative"):
+        logger.error("Month-rollup generation failed after retries: %s", last_err)
+        return None
+
+    try:
+        now = datetime.now(timezone.utc)
+        day_n = max(1, (now.date() - datetime.strptime(EXPERIMENT_START, "%Y-%m-%d").date()).days + 1)
+        item = {
+            "pk": CACHE_PK,
+            "sk": "EXPERT#integrator_month",
+            "expert_key": "integrator_month",
+            "narrative": parsed.get("narrative", ""),
+            "headline": parsed.get("headline", ""),
+            "week_count": len(weeks),
+            "window_label": window_label,
+            "days_in_experiment": day_n,
+            "generated_at": now.isoformat(),
+            "ttl": int((now + timedelta(days=10)).timestamp()),
+        }
+        table.put_item(Item=item)
+        logger.info("Month-rollup cached: %d weeks, %d chars", len(weeks), len(item["narrative"]))
+        parsed["week_count"] = len(weeks)
+        return parsed
+    except Exception as e:  # noqa: BLE001
+        logger.error("Month-rollup cache write failed: %s", e)
+        return None
+
+
 def lambda_handler(event, context):
     try:
         # C-1: refresh just the cross-week arc without re-running the 8 narratives
@@ -1796,6 +1896,16 @@ def lambda_handler(event, context):
                 "statusCode": 200,
                 "body": json.dumps(
                     {"experiment_arc": {"status": "ok", "weeks": arc.get("week_count")} if arc else {"status": "skipped"}},
+                    default=str,
+                ),
+            }
+        # #1115: refresh just the month rollup (manual/test repopulate).
+        if event.get("month_only"):
+            rollup = generate_month_rollup()
+            return {
+                "statusCode": 200,
+                "body": json.dumps(
+                    {"month_rollup": {"status": "ok", "weeks": rollup.get("week_count")} if rollup else {"status": "skipped"}},
                     default=str,
                 ),
             }
@@ -1839,6 +1949,19 @@ def lambda_handler(event, context):
             except Exception as e:
                 logger.error(f"Experiment-arc failed: {e}")
                 results["experiment_arc"] = {"status": "error", "error": str(e)}
+
+            # #1115: month rollup — the trailing ~4 weeks as one pattern, so the
+            # Month lens speaks at its own altitude (honest-skips when <2 week
+            # notes exist in the window).
+            try:
+                rollup = generate_month_rollup()
+                if rollup:
+                    results["month_rollup"] = {"status": "ok", "weeks": rollup.get("week_count")}
+                else:
+                    results["month_rollup"] = {"status": "skipped"}
+            except Exception as e:
+                logger.error(f"Month-rollup failed: {e}")
+                results["month_rollup"] = {"status": "error", "error": str(e)}
 
         return {
             "statusCode": 200,

@@ -112,11 +112,14 @@
         <!-- Honesty vocabulary: down/flat states, muted, never red, never hidden -->
         <p class="honest" data-bind="honest" hidden></p>
 
-        <!-- Signature 2: the machine ↔ human dialogue (the Third Wall) -->
-        <section class="dialogue" aria-label="The board's read, and Matthew's reply">
+        <!-- Signature 2: the machine ↔ human dialogue (the Third Wall).
+             #1115: the Today slot carries the DAILY line (the morning brief's
+             one-liner) — the integrator's weekly call lives on /coaching/'s
+             Week lens; the who label tracks the active time scope. -->
+        <section class="dialogue" aria-label="The machine's daily line, and Matthew's reply">
           <div class="voice machine">
-            <span class="who">The board</span>
-            <p class="what" data-bind="verdict"><span class="shimmer">Reading the week…</span></p>
+            <span class="who">Today</span>
+            <p class="what" data-bind="verdict"><span class="shimmer">Reading today…</span></p>
           </div>
           <div class="voice human" data-bind="replyWrap" hidden>
             <span class="who">Matthew</span>

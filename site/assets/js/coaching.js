@@ -15,8 +15,20 @@
 
   Pure surfacing of existing endpoints (/api/coaching-dashboard, /api/coach_team,
   /api/coach/{id}, /api/coach_analysis?domain=, /api/observatory_week?domain=,
-  /api/weekly_priority, /api/field_notes) — nothing invented; honest empty-states.
+  /api/weekly_priority, /api/state_of_matthew, /api/month_rollup,
+  /api/field_notes, /public_stats.json) — nothing invented; honest empty-states.
   Reuses dx- and coach- styles from story.css; one type system (coaches speak serif).
+
+  #1115 per-timeframe narratives — each lens speaks at its OWN altitude, and the
+  same sentence never appears under two labels:
+    Today       → the daily one-liner (public_stats.json elena_hero_line, minted
+                  by the morning brief) — NOT the integrator's weekly priority.
+    This week   → the integrator's weekly call (/api/weekly_priority) + the
+                  State of Matthew weekly model brief (/api/state_of_matthew —
+                  pre-existing artifact, previously consumed by no site JS).
+    This month  → the integrator's month rollup (/api/month_rollup, written
+                  weekly from the trailing ~4 lab notes; honest-empty early).
+    Experiment  → the cross-week arc (/api/experiment_synthesis), unchanged.
 */
 import { initTheme } from "/assets/js/theme.js";
 import { enhanceCoachNames, stampGenesis, preStart } from "/assets/js/coach_popover.js"; // + #949 pre-start gate
@@ -43,6 +55,7 @@ const OBS_DOMAINS = new Set(["sleep", "training", "nutrition", "mind", "physical
 const READ_SCOPES = [
   { id: "today", title: "Today", date: "the board's read right now" },
   { id: "week", title: "This week", date: "the week in each domain" },
+  { id: "month", title: "This month", date: "the month's pattern" }, // #1115
   { id: "experiment", title: "The experiment", date: "the arc so far" },
 ];
 
@@ -292,14 +305,20 @@ async function renderReadToday(read) {
   const pre = preStart();
   if (pre) { read.innerHTML = preStartReadHTML(pre); return; }
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the board…</span></p>`;
-  const d = await tryJSON("/api/coaching-dashboard");
-  const team = await tryJSON("/api/coach_team"); // for the tensions band + disclosure
+  // #1115: Today leads with the DAILY one-liner (public_stats.json, minted each
+  // morning by the daily brief) — never the integrator's weekly priority, which
+  // lives on the This-week lens. Same sentence, two labels = the exact defect.
+  const [d, team, stats] = await Promise.all([
+    tryJSON("/api/coaching-dashboard"),
+    tryJSON("/api/coach_team"), // for the tensions band + disclosure
+    tryJSON("/public_stats.json"),
+  ]);
   if (!d) { read.innerHTML = `<p class="dx-prose">Couldn't load the board's read just now.</p>`; return; }
-  const wp = d.weekly_priority || {};
   let h = `<p class="dx-kicker label">the board's read on you · right now</p><h2 class="dx-title">What the board is saying</h2>`;
-  if (wp.text) {
-    h += `<section class="read-priority"><p class="dx-kicker label">the one priority · ${esc(wp.coach_name || "the integrator")}</p>` +
-      `<blockquote class="rp-text">${esc(wp.text)}</blockquote></section>`;
+  const daily = stats && stats.elena_hero_line;
+  if (daily) {
+    h += `<section class="read-priority"><p class="dx-kicker label">today's line · from the morning brief</p>` +
+      `<blockquote class="rp-text">${esc(daily)}</blockquote></section>`;
   }
   if (team) h += tensionsHTML(team);
   // The stacked all-coach digest — each coach's LIVE read (position_summary), domain-labeled, deep-linking into By Coach.
@@ -330,7 +349,10 @@ async function renderReadWeek(read) {
   const pre = preStart();
   if (pre) { read.innerHTML = preStartReadHTML(pre); return; }  // #949 — no week exists to read yet
   read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the week…</span></p>`;
-  const wp = await tryJSON("/api/weekly_priority");
+  // #1115: the Week lens also carries the State of Matthew weekly model brief —
+  // a pre-existing artifact (/api/state_of_matthew, written Sundays) that no
+  // site JS consumed until now. Reuse over new generation (ADR-063 posture).
+  const [wp, som] = await Promise.all([tryJSON("/api/weekly_priority"), tryJSON("/api/state_of_matthew")]);
   let h = `<p class="dx-kicker label">the week · what each domain showed</p><h2 class="dx-title">This week</h2>`;
   if (wp && wp.weekly_priority) {
     h += `<section class="read-priority"><p class="dx-kicker label">the week's call · ${esc(wp.coach_name || "the integrator")}</p><blockquote class="rp-text">${esc(wp.weekly_priority)}</blockquote></section>`;
@@ -346,6 +368,40 @@ async function renderReadWeek(read) {
     h += `</dl></section>`;
   } else if (!(wp && wp.weekly_priority)) {
     h += `<p class="dx-prose">The week's domain read isn't in yet — it's written once a week from the integrator's synthesis.</p>`;
+  }
+  // #1115: the State of Matthew — the weekly model brief (forecast + live bets +
+  // panel consensus + calibration, narrated). Deterministic numbers, one narration
+  // pass; honest-absent until the first Sunday run of the cycle.
+  if (som && som.available && som.narrative) {
+    h += `<section class="read-som"><p class="dx-kicker label">the state of Matthew · the weekly model brief${som.date ? ` · ${esc(String(som.date).slice(0, 10))}` : ""}</p>`;
+    for (const para of String(som.narrative).split(/\n\n+/).filter(Boolean)) h += `<p class="dx-prose">${esc(para)}</p>`;
+    if (som.disclosure) h += `<p class="dx-disclosure label">${esc(som.disclosure)}</p>`;
+    h += `</section>`;
+  }
+  read.innerHTML = h;
+  enhanceCoachNames(read);
+}
+
+// #1115 — THIS MONTH: the integrator's month rollup (written weekly by the
+// analyzer from the trailing ~4 lab notes). Month altitude only — never the
+// weekly call re-labeled. Honest-empty early in a cycle: the rollup needs at
+// least 2 weeks of lab notes to exist, and pre-data it simply isn't written.
+async function renderReadMonth(read) {
+  const pre = preStart();
+  if (pre) { read.innerHTML = preStartReadHTML(pre); return; }
+  read.innerHTML = `<p class="dx-kicker label"><span class="shimmer">Reading the month…</span></p>`;
+  const mr = await tryJSON("/api/month_rollup");
+  let h = `<p class="dx-kicker label">the month · the pattern across the weeks</p><h2 class="dx-title">This month</h2>`;
+  if (mr && mr.narrative) {
+    h += `<section class="read-priority"><p class="dx-kicker label">the month's read · ${esc(mr.coach_name || "the integrator")}` +
+      `${mr.window_label ? ` · ${esc(mr.window_label)}` : ""}</p>`;
+    if (mr.headline) h += `<p class="exp-throughline">${esc(mr.headline)}</p>`;
+    for (const para of String(mr.narrative).split(/\n\n+/).filter(Boolean)) h += `<p class="dx-prose">${esc(para)}</p>`;
+    if (mr.week_count) h += `<p class="dx-disclosure label">written from the last ${esc(mr.week_count)} weekly lab notes${mr.generated_at ? ` · ${esc(String(mr.generated_at).slice(0, 10))}` : ""}</p>`;
+    h += `</section>`;
+  } else {
+    h += `<p class="dx-prose">The month's rollup isn't written yet — it needs at least two weeks of lab notes to say anything honest. ` +
+      `Early in a cycle, <strong>This week</strong> carries the story; the month's pattern appears here once the weeks accrue.</p>`;
   }
   read.innerHTML = h;
   enhanceCoachNames(read);
@@ -831,7 +887,7 @@ function renderAskBoard(read) {
 
 async function renderRead(s, id) {
   const read = $("[data-dx-read]");
-  if (s.kind === "read") { if (id === "week") return renderReadWeek(read); if (id === "experiment") return renderReadExperiment(read); return renderReadToday(read); }
+  if (s.kind === "read") { if (id === "week") return renderReadWeek(read); if (id === "month") return renderReadMonth(read); if (id === "experiment") return renderReadExperiment(read); return renderReadToday(read); }
   if (s.kind === "bycoach") return renderByCoach(read, id);
   if (s.kind === "team") return String(id) === "team" ? renderTeamRead(read) : renderTeamCoach(read, id);
   if (s.kind === "fieldnotes") return renderFieldNote(read, id);
