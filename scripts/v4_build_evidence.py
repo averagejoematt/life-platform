@@ -608,7 +608,9 @@ EDITORIAL = {
         '<p class="rd-prose">A level only moves after a sustained shift — roughly <strong>five or more days of real improvement</strong> to go up, and <strong>seven or more of decline</strong> to go down. That deliberate stickiness means a single great (or terrible) day can\'t swing it, and an "up" is earned, not noise. Expect only a handful of level events in a month. When a pillar crosses a tier line, that\'s a genuine milestone — the kind of thing the weekly chronicle writes about.</p>'
         # #913: the neglect-honesty line — the sheet decays under silence, it never coasts on it.
         "<p class=\"rd-prose\">The stickiness cuts both ways: the sheet responds honestly to neglect. When manual logging goes dark, behaviors that aren't happening score zero, XP bleeds into a visible debt, and after a few dark days the levels themselves start to <strong>atrophy</strong> — a level earned before a quiet stretch isn't a level kept through it.</p>"
-        '<p class="rd-archive">The live sheet — today\'s levels, XP, the tier ladder, and the figure drawn from the real numbers — lives at <a href="/data/character/">/data/character/</a>.</p>'
+        '<p class="rd-archive">The live sheet — today\'s levels, XP, the tier ladder, and the figure drawn from the real numbers — lives at <a href="/data/character/">/data/character/</a>. '
+        # #1124: the rulebook — every number generated from the engine's real config, drift-checked.
+        "And for the full rulebook — every weight, target, streak gate, and honest-absence rule, generated straight from the engine's config so it can't drift — read <a href=\"/method/game/\">The Game, Explained</a>.</p>"
         '<p class="correlative">It\'s a motivational lens on real data, not a medical score — every input is correlative and N=1. <span class="confidence conf-low">N=1</span></p></section>'
     ),
     "kitchen": (
