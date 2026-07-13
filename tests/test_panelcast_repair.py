@@ -192,11 +192,111 @@ def test_qa_max_consecutive_is_two_and_judge_rubrics_state_the_same_bound():
     import re
 
     assert qa._QA_MAX_CONSECUTIVE == 2
-    for rubric in (qa._INTRO_RUBRIC, qa._WEEKLY_RUBRIC):
-        m = re.search(r"more than (\d+) consecutive turns", rubric)
-        assert m, "judge rubric no longer states the consecutive-turns bound — re-align it with _QA_MAX_CONSECUTIVE"
-        # The deterministic bound must be AT LEAST as strict as what the judge is told to fail.
-        assert qa._QA_MAX_CONSECUTIVE <= int(m.group(1))
+    # #1123: the intro path is stricter — strict alternation after the ONE solo hook.
+    assert qa._QA_MAX_CONSECUTIVE_INTRO == 1
+    # Each rubric states ITS OWN bound from the matching constant, and the deterministic
+    # bound must be AT LEAST as strict as what the judge is told to fail (det <= judge).
+    for rubric, const in ((qa._WEEKLY_RUBRIC, qa._QA_MAX_CONSECUTIVE), (qa._INTRO_RUBRIC, qa._QA_MAX_CONSECUTIVE_INTRO)):
+        m = re.search(r"more than (\d+) consecutive turns?", rubric)
+        assert m, "judge rubric no longer states the consecutive-turns bound — re-align it with its constant"
+        assert const <= int(m.group(1))
+    # The intro rubric must explicitly demand strict alternation after the hook (#1123).
+    assert "strictly alternate" in qa._INTRO_RUBRIC.lower()
+
+
+# ── #1123: intro path enforces strict alternation after the ONE solo hook ─────
+
+
+def _intro_pairs_script():
+    """Elena→Elena at t0/t1 (the "And yet" non-sequitur after the hook) AND at t3/t4 —
+    both BENIGN 2-runs (no question/challenge, so no dangling thread): the weekly bound (2)
+    allows them, the intro bound (1) must flag both."""
+    return [
+        {"speaker": "elena_voss", "line": "Here's the hook that got me."},
+        {"speaker": "elena_voss", "line": "And yet, here's who is running it."},
+        {"speaker": "eli_marsh", "line": "Glad to be here."},
+        {"speaker": "elena_voss", "line": "Matt is an ordinary, technical person."},
+        {"speaker": "elena_voss", "line": "The honest version is slower and truer."},
+        {"speaker": "eli_marsh", "line": "That tracks with what I see."},
+    ]
+
+
+def test_intro_bound_flags_pairs_the_weekly_bound_allows():
+    turns = _intro_pairs_script()
+    # Weekly bound (default 2): two riffing beats in a row read fine — not a seam, not a fail.
+    assert qa.structural_seams(turns) == []
+    assert qa._craft_check(turns) == []
+    # Intro bound (1): BOTH same-speaker pairs are seams, and the craft check fails.
+    assert qa.structural_seams(turns, qa._QA_MAX_CONSECUTIVE_INTRO) == [(0, 1), (3, 4)]
+    craft = qa._craft_check(turns, qa._QA_MAX_CONSECUTIVE_INTRO)
+    assert any("in a row" in f and "max 1" in f for f in craft)
+
+
+def test_intro_bound_repairs_both_pairs_weekly_bound_spends_nothing():
+    merged = [{"speaker": "elena_voss", "line": "One clean merged Elena beat."}]
+
+    # Weekly bound: benign pairs are not seams → repair must not spend a generation.
+    def _never(*a, **k):
+        raise AssertionError("weekly bound must not treat benign 2-runs as seams")
+
+    turns, found, fixed = repair.repair_structure(
+        _intro_pairs_script(), {"elena_voss", "eli_marsh"}, _never, "m", panel._extract_json, _LOG
+    )
+    assert (found, fixed) == (0, 0)
+    # Intro bound (1): both pairs are seams and both get repaired to full alternation.
+    turns, found, fixed = repair.repair_structure(
+        _intro_pairs_script(),
+        {"elena_voss", "eli_marsh"},
+        _invoke_returning(merged),
+        "m",
+        panel._extract_json,
+        _LOG,
+        max_consecutive=qa._QA_MAX_CONSECUTIVE_INTRO,
+    )
+    assert (found, fixed) == (2, 2)
+    assert qa.structural_seams(turns, qa._QA_MAX_CONSECUTIVE_INTRO) == []
+    speakers = [t["speaker"] for t in turns]
+    assert all(a != b for a, b in zip(speakers, speakers[1:]))
+
+
+# ── #1123: cold-open boundary — name Elena in place, don't create a t0/t1 seam ─
+
+
+def test_intro_cold_open_prefixes_name_onto_model_hook_no_seam():
+    # Elena opens with a real hook but forgot to name herself → prefix ONLY a name sentence
+    # onto her OWN hook: still ONE solo turn, no new turn, no Elena+Elena t0/t1 seam.
+    ts = [
+        {"speaker": panel.ELENA, "line": "Here's the part that got me: he already knows how, and watched it slip."},
+        {"speaker": panel.INTRO_GUEST_ID, "line": "Right."},
+    ]
+    out = repair.name_the_opener([dict(t) for t in ts], panel.ELENA, panel.INTRO_COLD_OPEN)
+    assert len(out) == 2  # no new turn inserted
+    assert out[0]["line"].startswith("I'm Elena Voss")
+    assert "he already knows how" in out[0]["line"]  # the model's own hook is preserved, not doubled
+    assert out[0]["speaker"] == panel.ELENA and out[1]["speaker"] == panel.INTRO_GUEST_ID
+    assert qa.structural_seams(out, qa._QA_MAX_CONSECUTIVE_INTRO) == []
+
+
+def test_intro_cold_open_untouched_when_elena_already_named():
+    ts = [
+        {"speaker": panel.ELENA, "line": "I'm Elena Voss, and here's the hook that got me."},
+        {"speaker": panel.INTRO_GUEST_ID, "line": "Right."},
+    ]
+    out = repair.name_the_opener([dict(t) for t in ts], panel.ELENA, panel.INTRO_COLD_OPEN)
+    assert len(out) == 2 and out[0]["line"] == ts[0]["line"]
+
+
+def test_intro_cold_open_full_prepend_when_opener_is_not_elena():
+    # Model opened on the guest → fall back to the fixed solo cold-open as a NEW turn 0,
+    # which still alternates against the guest's turn.
+    ts = [
+        {"speaker": panel.INTRO_GUEST_ID, "line": "I'll start, if that's alright."},
+        {"speaker": panel.ELENA, "line": "Please."},
+    ]
+    out = repair.name_the_opener([dict(t) for t in ts], panel.ELENA, panel.INTRO_COLD_OPEN)
+    assert len(out) == 3
+    assert out[0] == {"speaker": panel.ELENA, "line": panel.INTRO_COLD_OPEN}
+    assert qa.structural_seams(out, qa._QA_MAX_CONSECUTIVE_INTRO) == []
 
 
 # ── #1171: revision loop feeds the judge's exact failure text to the writer ───

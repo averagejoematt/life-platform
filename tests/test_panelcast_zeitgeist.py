@@ -268,7 +268,7 @@ def test_run_intro_fetches_once_and_feeds_prompt_and_ground_truth(monkeypatch):
         panel, "_build_intro_script", lambda bible, zeitgeist=None: builder_zg.append(zeitgeist) or [dict(t) for t in clean_script]
     )
     monkeypatch.setattr(panel._repair, "repair_structure", lambda turns, *a, **k: (turns, [], []))
-    monkeypatch.setattr(panel, "_craft_check", lambda turns: [])
+    monkeypatch.setattr(panel, "_craft_check", lambda turns, *a, **k: [])
     monkeypatch.setattr(panel, "_qa_review", lambda turns, rubric, gt="": judged_gt.append(gt) or (True, []))
     monkeypatch.setattr(panel.s3, "put_object", lambda **k: {})
 
