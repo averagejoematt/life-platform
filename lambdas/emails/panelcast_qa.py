@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 MODEL = os.environ.get("AI_MODEL_HAIKU", "claude-haiku-4-5-20251001")
+# #1180: the CRAFT items (read-aloud Turing test, humour/human texture, arc rhythm) are
+# NARRATIVE judgment, not structure — ADR-049 puts that on the Sonnet tier, not Haiku. The
+# structure/accuracy rubrics below stay on Haiku (MODEL); _craft_judge runs on this model.
+CRAFT_MODEL = os.environ.get("AI_MODEL_SONNET", "claude-sonnet-4-6")
 
 # ── QA rigor (automates the manual review loop, 2026-06-17) ───────────────────
 # Two layers on top of the ER-03 + Compassion gates, both catching CRAFT/accuracy
@@ -184,13 +188,8 @@ _INTRO_RUBRIC = (
     "Matt's boss), or that Matt merely follows a single daily instruction / 'one next move' — Matt runs many "
     "parallel protocols (experiments, challenges, habit trials, supplements) and makes his own calls; the coaches "
     "advise, predict, and get publicly scored.\n"
-    "10. READ-ALOUD TURING TEST: read aloud, it must sound human-written. Flag any AI tell — 'in this episode', "
-    "narrating the format or naming segments, tidy three-item lists, 'not just X, it's Y' symmetry, over-explaining, "
-    "hedge throat-clearing, or a neat summary bow at the end.\n"
-    "11. HUMOUR & HUMAN TEXTURE: this must feel like a show a stranger would keep listening to, not a briefing — "
-    "at least two genuinely warm or dryly funny beats, plus human texture (an aside or callback, direct address to "
-    "the listener, a moment of small talk that earns its place, a quotable line). A script that is merely compliant "
-    "and information-dense — personality-free — fails this item."
+    # #1180: the CRAFT items (Turing test, humour/texture, arc rhythm) moved to the Sonnet
+    # _craft_judge (_INTRO_CRAFT_RUBRIC below) — this Haiku rubric is now structure/accuracy only.
 )
 
 
@@ -198,25 +197,98 @@ _WEEKLY_RUBRIC = (
     "Two speakers: ELENA VOSS (host, embedded journalist) and the GUEST COACH (an AI coach, named in the script). "
     "MATT is the third-person SUBJECT of the experiment — he is NOT in the room and does NOT speak. Elena and the "
     "coaches are ESTABLISHED show personas (never flag them as invented). Judge it as a real podcast a human would "
-    "believe is human-made and would recommend to a friend:\n"
-    "1. READ-ALOUD TURING TEST: read aloud, it must sound human-written. Flag any AI tell — 'in this episode', "
-    "narrating the format or naming segments, tidy three-item lists, 'not just X, it's Y' symmetry, over-explaining, "
-    "hedge throat-clearing, or a neat summary bow at the end.\n"
-    "2. GUEST INTRODUCTION: the guest is introduced for the audience early (who they are + what they work on), UNLESS "
+    "believe is human-made and would recommend to a friend. (#1180: the CRAFT items — Turing test, "
+    "humour/texture, arc rhythm — moved to the Sonnet _craft_judge; this Haiku rubric is structure/accuracy only.)\n"
+    "1. GUEST INTRODUCTION: the guest is introduced for the audience early (who they are + what they work on), UNLESS "
     "they were the guest in the immediately previous episode. A guest who just starts talking with no introduction FAILS.\n"
-    "3. NO DANGLING THREAD: every question Elena asks is actually answered in the next turn; no topic the SCRIPT itself "
+    "2. NO DANGLING THREAD: every question Elena asks is actually answered in the next turn; no topic the SCRIPT itself "
     "raises is then dropped; no abrupt unbridged jump; never two same-speaker turns where a reply is clearly missing; more "
     f"than {_QA_MAX_CONSECUTIVE} consecutive turns from one speaker fails this item. "
     "(Coverage is NOT required — do NOT flag a ground-truth fact that simply goes unmentioned; only flag a thread the "
     "script opens and abandons.)\n"
-    "4. REAL HOOK: turn 0 earns attention — not a flat 'welcome to the show'.\n"
-    "5. GENUINE FRICTION: at least one real disagreement or tension, not constant agreement.\n"
-    "6. GROUNDED: every specific claim, number, or event about MATT traces to the GROUND TRUTH. No invented scenes, "
+    "3. REAL HOOK: turn 0 earns attention — not a flat 'welcome to the show'.\n"
+    "4. GENUINE FRICTION: at least one real disagreement or tension, not constant agreement.\n"
+    "5. GROUNDED: every specific claim, number, or event about MATT traces to the GROUND TRUTH. No invented scenes, "
     "times of day, or sensory detail (e.g. a '5 AM protein shake'). Flag anything not in the ground truth.\n"
-    "7. NO BODY WEIGHT IN THE SCRIPT: no body-weight figure appears in the spoken lines, numeric or spelled-out "
-    "(e.g. 'nine pounds'). Body weight in the GROUND TRUTH is fine and expected — only flag it if it is SPOKEN in the script.\n"
-    "8. HUMOUR & HUMAN INTEREST: at least one genuinely warm or dryly funny human beat — not dry data recitation."
+    "6. NO BODY WEIGHT IN THE SCRIPT: no body-weight figure appears in the spoken lines, numeric or spelled-out "
+    "(e.g. 'nine pounds'). Body weight in the GROUND TRUTH is fine and expected — only flag it if it is SPOKEN in the script."
 )
+
+
+# ── #1180: the CRAFT rubrics (the taste bar) — judged on the Sonnet tier ──────
+# The Haiku judge PASSED the humour item on a flat, factually-clean wk0 candidate: the
+# taste bar was too lenient to mean anything. These three items — read-aloud Turing test,
+# humour/human texture, and the NEW arc-rhythm item — are narrative judgment (ADR-049), so
+# they move to a Sonnet judge that must QUOTE the beats it credits (a judge that has to cite
+# evidence can't wave compliance through). Shared header + one arc item, phrased per path.
+_CRAFT_ARC_ITEM = (
+    "ARC RHYTHM: the episode has the emotional rhythm of a real show, not a flat Q&A — a cold-open hook, "
+    "a warm human beat before it gets heavy, a deepening, a lighter 'laugh valve' before the heaviest beat, "
+    "and a close on tension rather than a tidy bow. FAIL a one-note arc, or more than ~3 heavy exchanges in a "
+    "row with no lighter beat to let the listener breathe."
+)
+_CRAFT_TURING_ITEM = (
+    "READ-ALOUD TURING TEST: read aloud, it must sound human-written. Flag any AI tell — 'in this episode', "
+    "narrating the format or naming segments, tidy three-item lists, 'not just X, it's Y' symmetry, over-explaining, "
+    "hedge throat-clearing, or a neat summary bow at the end."
+)
+_INTRO_CRAFT_RUBRIC = (
+    "This is EPISODE 0 (the trailer) of a narrative podcast — host ELENA VOSS and guest DR. ELI MARSH. Judge ONLY "
+    "the show-craft; structure and accuracy are judged elsewhere.\n"
+    "1. " + _CRAFT_TURING_ITEM + "\n"
+    "2. HUMOUR & HUMAN TEXTURE: this must feel like a show a stranger would keep listening to, not a briefing — at "
+    "least two genuinely warm or dryly funny beats, plus human texture (an aside or callback, direct address to the "
+    "listener, a moment of small talk that earns its place, a quotable line). A script that is merely compliant and "
+    "information-dense — personality-free — FAILS this item.\n"
+    "3. " + _CRAFT_ARC_ITEM
+)
+_WEEKLY_CRAFT_RUBRIC = (
+    "This is a WEEKLY episode of a narrative podcast — host ELENA VOSS and a guest AI coach. Judge ONLY the "
+    "show-craft; structure and accuracy are judged elsewhere.\n"
+    "1. " + _CRAFT_TURING_ITEM + "\n"
+    "2. HUMOUR & HUMAN INTEREST: at least two genuinely warm or dryly funny human beats plus real texture (an aside, "
+    "a callback, a quotable line) — a show a stranger would keep listening to, never dry data recitation. A "
+    "personality-free, information-dense script FAILS this item.\n"
+    "3. " + _CRAFT_ARC_ITEM
+)
+
+
+def _craft_judge(turns: list, rubric: str, model: str = None) -> tuple:
+    """#1180: the narrative-tier (Sonnet) TASTE judge for the craft items — read-aloud Turing
+    test, humour/human texture, arc rhythm (ADR-049: this IS narrative judgment, not
+    structure). Returns (ok, [reasons], [cited_beats]). The response schema REQUIRES quoted
+    evidence: the judge must cite the two funniest / most-human lines it credits, and if it
+    cannot find two that would make a stranger smile or feel something it FAILS the humour
+    item. A judge that must cite evidence can't wave compliance through. FAIL-CLOSED
+    (ADR-087/108): a judge/infra error returns a failure so the episode HOLDs, matching the
+    Haiku judge's posture. Reuses the bedrock_client.invoke + budget-guard path exactly."""
+    import bedrock_client
+
+    m = model or CRAFT_MODEL
+    script = "\n".join(f"{t.get('speaker')}: {t.get('line')}" for t in turns)
+    system = (
+        "You are a sharp, warm podcast producer judging ONLY the CRAFT of a two-person script — is this a show a "
+        "stranger would actually keep listening to, or a compliant, AI-flavoured briefing? Structure and accuracy are "
+        "judged elsewhere; do NOT comment on them. Judge only the rubric below.\n"
+        'Reply with STRICT JSON: {"pass": true|false, "fails": ["short reason", ...], '
+        '"cited_beats": ["<verbatim line from the script>", "..."]}. No prose, no fences. '
+        "You MUST quote, verbatim, the two funniest or most human lines you credit; each cited beat must be an exact "
+        "substring of a line in the script. If you cannot find two lines that would make a stranger smile or feel "
+        "something, FAIL the humour item and say so in fails.\n\nRUBRIC:\n" + rubric
+    )
+    try:
+        body = {"model": m, "max_tokens": 700, "system": system, "messages": [{"role": "user", "content": f"SCRIPT:\n{script}"}]}
+        resp = bedrock_client.invoke(body, model_name=m)
+        text = "".join(p.get("text", "") for p in (resp.get("content") or []) if isinstance(p, dict)).strip()
+        text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
+        verdict = json.loads(text)
+        cited = [str(c) for c in (verdict.get("cited_beats") or [])][:4]
+        if verdict.get("pass"):
+            return True, [], cited
+        return False, [str(r) for r in (verdict.get("fails") or ["failed craft rubric"])][:6], cited
+    except Exception as e:
+        logger.warning("[panel] craft judge unavailable — failing CLOSED (hold, don't publish): %s", e)
+        return False, [f"craft-judge-error (fail-closed): {e}"], []
 
 
 def _qa_gate(turns: list, rubric: str, ground_truth: str = "", max_consecutive: int = _QA_MAX_CONSECUTIVE) -> list:

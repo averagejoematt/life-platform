@@ -221,16 +221,24 @@ def revise_weekly(turns, fails, guest_name, show_name, invoke, model, extract_js
         return {}
 
 
-def ledger_entry(attempt, revision, deterministic, judge, repaired_seams=0) -> dict:
+def ledger_entry(attempt, revision, deterministic, judge, repaired_seams=0, punched=None, citations=None) -> dict:
     """One row of the per-attempt verdict ledger (#1171) — compact and transcript-free,
-    so it can ride the hold record and the escalation email verbatim."""
-    return {
+    so it can ride the hold record and the escalation email verbatim. #1180: full gate-pass
+    rows also record whether the Sonnet punch-up was applied (``punched`` true/false) and the
+    craft judge's quoted evidence (``citations``); rows that never reach the craft layer
+    (no-candidate / editor-hold / dropped-turns) omit both."""
+    entry = {
         "attempt": attempt,
         "revision": revision,
         "deterministic": [str(f)[:160] for f in (deterministic or [])][:8],
         "judge": [str(f)[:160] for f in (judge or [])][:8],
         "repaired_seams": repaired_seams,
     }
+    if punched is not None:
+        entry["punched"] = bool(punched)
+    if citations is not None:
+        entry["citations"] = [str(c)[:200] for c in citations][:4]
+    return entry
 
 
 def log_ledger(logger, path: str, week, ledger: list) -> None:

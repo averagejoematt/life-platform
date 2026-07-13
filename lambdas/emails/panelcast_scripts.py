@@ -37,7 +37,13 @@ CONVO_DIRECTIVE = (
     "Write it like two people who actually like each other talking — NOT alternating monologues. Use genuine back-and-forth: "
     "short interjections and reactions ('Mm.', 'Right.', 'Wait—', 'Exactly.', 'Honestly?'), one person occasionally finishing "
     "or gently cutting into the other's thought, a trailing-off, a little dry humor, a beat of real curiosity. Vary turn length "
-    "hard — some turns are one word, some are a paragraph. No bracketed stage directions (no '[laughs]'); put the warmth in the words."
+    "hard — some turns are one word, some are a paragraph. No bracketed stage directions (no '[laughs]'); put the warmth in the words. "
+    # #1180: give it the RHYTHM of a real episode, not a flat topic-by-topic Q&A.
+    "And give the whole thing the RHYTHM of a real episode, not a flat topic list: open cold on a hook, then let a warm human "
+    "beat breathe — a little small talk, a shared laugh, something ordinary and human — before you establish the ground; deepen "
+    "from there; drop in a laugh valve, a lighter beat, right before the heaviest turn; and close on tension, not a tidy bow. "
+    "Never stack more than about three heavy exchanges in a row without a lighter one to let the listener breathe — that swing "
+    "between light and heavy IS the show."
 )
 
 

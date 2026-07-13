@@ -274,6 +274,10 @@ def test_run_intro_is_evergreen_never_fetches_zeitgeist_or_feeds_headlines(monke
     monkeypatch.setattr(panel._repair, "repair_structure", lambda turns, *a, **k: (turns, [], []))
     monkeypatch.setattr(panel, "_craft_check", lambda turns, *a, **k: [])
     monkeypatch.setattr(panel, "_qa_review", lambda turns, rubric, gt="": judged_gt.append(gt) or (True, []))
+    # #1180: the craft layer (punch-up + Sonnet craft judge) is offline here — this test is
+    # about the zeitgeist wiring, not the taste bar.
+    monkeypatch.setattr(panel._craft, "punch_up_script", lambda turns, *a, **k: (turns, False))
+    monkeypatch.setattr(panel, "_craft_judge", lambda turns, rubric, model=None: (True, [], []))
     monkeypatch.setattr(panel.s3, "put_object", lambda **k: {})
 
     out = panel._run_intro(dry_run=True)
@@ -309,6 +313,9 @@ def _wire_weekly(monkeypatch, zeitgeist_result):
     monkeypatch.setattr(panel, "_build_weekly_script", lambda b, bb: json.loads(json.dumps(script)))
     monkeypatch.setattr(panel, "_editor_review", lambda turns, bible: {"verdict": "pass", "issues": [], "pull_quote": ""})
     monkeypatch.setattr(panel, "_qa_review", lambda turns, rubric, gt="": judged_gt.append(gt) or (True, []))
+    # #1180: keep the craft layer offline — this harness is about zeitgeist wiring.
+    monkeypatch.setattr(panel._craft, "punch_up_script", lambda turns, *a, **k: (turns, False))
+    monkeypatch.setattr(panel, "_craft_judge", lambda turns, rubric, model=None: (True, [], []))
     monkeypatch.setattr(panel, "_publish_episode_audio", lambda *a, **k: (_ for _ in ()).throw(AssertionError("published in dry run")))
     return fetches, judged_gt, builder_beats
 
