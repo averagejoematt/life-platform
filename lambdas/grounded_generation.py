@@ -23,9 +23,9 @@ Pure functions, no AWS, no HTTP — the caller supplies the regeneration callabl
 Fail modes are the caller's choice: keep-best (internal narratives) or
 fail-closed (reader-facing surfaces drop/fallback, like the podcast gate).
 
-Import paths: bundled at lambdas/ root AND shipped in the shared layer (with a
-flat copy of grounding_guard) so both bundled lambdas and layer modules
-(ai_calls' V2 coach render) can use it.
+Import paths: bundled at lambdas/ root in every function's deploy package (with a
+flat copy of grounding_guard) so every consumer (ai_calls' V2 coach render)
+can use it.
 """
 
 import json

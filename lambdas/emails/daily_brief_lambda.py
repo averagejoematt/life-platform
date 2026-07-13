@@ -731,8 +731,8 @@ def compute_tsb(strava_60d, today):
 
 
 # ==============================================================================
-# COMPONENT SCORERS — canonical implementations live in the shared layer's
-# scoring_engine; the ~470-line local copies were deleted 2026-06-12 after an
+# COMPONENT SCORERS — canonical implementations live in the bundled
+# scoring_engine module; the ~470-line local copies were deleted 2026-06-12 after an
 # AST-level check confirmed zero logic divergence. One implementation, one
 # place for the next scoring change.
 # ==============================================================================

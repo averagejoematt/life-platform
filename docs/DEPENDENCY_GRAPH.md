@@ -225,4 +225,4 @@ Partitions ranked by number of Lambda + MCP readers:
 
 ---
 
-**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Ingestion table updated to reflect SIMP-2 cohort (ADR-056) and current schedules; weather Lambda renamed; coach-quality-gate wiring documented; tool count corrected to 127.
+**Verified:** 2026-05-19 — full audit (V2 audit + follow-up). Ingestion table updated to reflect SIMP-2 cohort (ADR-056) and current schedules; weather Lambda renamed; coach-quality-gate wiring documented; tool count corrected to 64.

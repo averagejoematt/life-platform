@@ -16,8 +16,8 @@ import time  # noqa: F401 — used by some handlers
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401 — kept for handlers that convert types
 
-import digest_utils  # shared layer — compute_confidence tiering (ADR-105)
-import stats_core  # shared layer (#529): the one sanctioned stats implementation
+import digest_utils  # bundled shared module — compute_confidence tiering (ADR-105)
+import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
 

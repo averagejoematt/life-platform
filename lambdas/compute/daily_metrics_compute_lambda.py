@@ -245,7 +245,7 @@ def dedup_activities(activities):
 # ==============================================================================
 # TSB COMPUTATION
 # ==============================================================================
-# #490 (C-5/C-6): the load model lives in the shared layer's training_load —
+# #490 (C-5/C-6): the load model lives in the bundled training_load module —
 # TSS-like points (100 ≈ 1 h at threshold), walks count via a moving-time
 # fallback, and the Hevy proxy is calibrated to the same scale the form bands
 # downstream assume. The wrappers keep this module's public names stable.

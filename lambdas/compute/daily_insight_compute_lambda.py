@@ -60,7 +60,7 @@ from decimal import Decimal
 
 import boto3
 import personal_baselines  # #543: percentile bands from Matthew's own distribution (ADR-105 r4)
-import stats_core  # shared layer (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
+import stats_core  # bundled shared module (#529/#535): effective-n so drift significance isn't inflated by autocorrelation
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights

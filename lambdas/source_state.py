@@ -5,7 +5,7 @@ A single resolver for every ingest source's operational state —
 (Strava, paused at the 402 paywall) or a chronically rate-limited one (Garmin's 429
 refresh block) is legible as off-by-design and is never mistaken for silent breakage.
 
-Read by three consumers (all on the shared layer):
+Read by three consumers (all get it via the bundled lambdas/ tree):
   - ``get_freshness_status`` (MCP) — surfaces the state so the flip is visible.
   - the training-coach honesty guard (DI-1.3) — withholds an under-training verdict
     when the movement sources aren't ``live``.

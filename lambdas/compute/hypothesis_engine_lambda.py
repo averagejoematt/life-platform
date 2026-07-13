@@ -62,7 +62,7 @@ from decimal import Decimal
 
 import boto3
 import digest_utils  # shared query_range implementations (#970)
-import stats_core  # shared layer (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
+import stats_core  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 

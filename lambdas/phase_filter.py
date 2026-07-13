@@ -8,7 +8,7 @@ phase=pilot records are hidden by default. Records without a phase attribute
 Callers can pass include_pilot=True to bypass the filter for the rare
 backward-looking case (e.g., historical research, audit, baseline diff).
 
-Part of the shared Lambda layer. Adds the filter to a boto3 Query/Scan
+Bundled into every function's deploy package (#781). Adds the filter to a boto3 Query/Scan
 kwargs dict in-place-safe (returns a new dict if changes would be made,
 otherwise returns the original).
 

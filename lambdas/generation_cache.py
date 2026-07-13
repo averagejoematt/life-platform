@@ -25,7 +25,7 @@ list is deliberately CONSERVATIVE because the failure modes are asymmetric:
     fresh → the one failure this feature must never introduce.
 So when unsure, we keep the field in the hash.
 
-Part of the shared Lambda layer.
+Bundled into every function's deploy package (#781 retired the shared layer).
 """
 
 import hashlib

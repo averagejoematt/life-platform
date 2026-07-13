@@ -1333,7 +1333,7 @@ Access via `get_benchmark(view="pace"/"maintenance")`. PRIVATE.
 ### macrofactor_meals (derived meal layer — best-effort meal grouping)
 
 Recomputable projection (ADR-090) over the raw `macrofactor` food log, written by the
-deterministic `meal_grouper` (shared layer). Groups individual food entries into the
+deterministic `meal_grouper` (bundled `lambdas/` tree). Groups individual food entries into the
 meals they were eaten as. **Raw is never mutated** — `member_refs`/`sides` are pointers
 into the `macrofactor` partition; `rollup` is a cached sum, raw wins on any disagreement.
 Every record is an inference: `inferred:true` + `confidence`. Conservation holds — every

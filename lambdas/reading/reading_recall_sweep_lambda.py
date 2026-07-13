@@ -10,7 +10,7 @@ the GSI1SK comparison is date/iso-string lexical, so there's no local-time bound
 to drift. PRIVATE by construction — the snapshot lives under READING# (never served
 by the public site-api; recall is owner-only).
 
-Bundled with lambdas/ (uses reading_store via the shared layer's numeric); no AI.
+Bundled with lambdas/ (uses reading_store from the bundled lambdas/ tree); no AI.
 """
 
 from __future__ import annotations

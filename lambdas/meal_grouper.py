@@ -39,8 +39,8 @@ BASE_CAN_ANCHOR = {"oats"}
 
 # ── vocabulary ───────────────────────────────────────────────────────────────
 def _vocab_candidates():
-    """Search order for food_vocabulary.json. In the shared layer the file is
-    staged alongside this module (/opt/python/); locally it lives in repo config/."""
+    """Search order for food_vocabulary.json. In the bundled lambdas/ tree the file is
+    staged alongside this module; locally it lives in repo config/."""
     here = os.path.dirname(os.path.abspath(__file__))
     return [
         os.environ.get("FOOD_VOCAB_PATH"),

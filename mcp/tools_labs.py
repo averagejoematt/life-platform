@@ -490,7 +490,7 @@ def tool_get_freshness_status(args):
         sources: list[str] — restrict to these source keys; default = all 11
     """
 
-    # #392: derive from the canonical registry (shared layer) instead of a third
+    # #392: derive from the canonical registry (bundled lambdas/ tree) instead of a third
     # hand-rolled mirror — this one had drifted worst (food_delivery still 90d,
     # the pre-triage masking value; hevy missing entirely).
     from source_registry import DEFAULT_STALE_HOURS, mcp_sources, stale_hours_overrides

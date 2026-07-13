@@ -60,8 +60,8 @@ TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 USER_ID = os.environ.get("USER_ID", "matthew")
 
 # Whoop recovery bands (mirror mcp/recovery_authoring.BAND_THRESHOLDS — kept
-# inline because recovery_authoring lives in mcp/, not the shared layer this
-# Lambda ships on).
+# inline because recovery_authoring lives in mcp/, not the bundled lambdas/
+# tree this Lambda ships).
 GREEN_MIN = 67
 YELLOW_MIN = 34
 

@@ -50,7 +50,7 @@ from ai_context import build_experiment_phase_context, format_experiment_phase_c
 from boto3.dynamodb.conditions import Key
 from er03_gate import BANNED_CAUSAL  # reuse the platform's one causal-language list
 from grounded_generation import allowed_numbers, grounding_findings  # ADR-104 gate
-from numeric import decimals_to_float, floats_to_decimal  # shared layer float<->Decimal
+from numeric import decimals_to_float, floats_to_decimal  # bundled shared module: float<->Decimal
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:

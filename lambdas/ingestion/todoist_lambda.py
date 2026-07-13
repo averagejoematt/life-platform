@@ -44,7 +44,7 @@ try:
 except ImportError:  # pragma: no cover — layer-module fallback (local tooling)
     urlopen_with_retry = urllib.request.urlopen
 
-# Framework (shipped in the shared layer)
+# Framework (bundled in the lambdas/ tree)
 from ingestion_framework import IngestionConfig, run_ingestion
 
 SECRET_NAME = os.environ.get("SECRET_NAME", "life-platform/ingestion-keys")

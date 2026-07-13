@@ -5,7 +5,7 @@ Provides data inventory, data maturity, goals loading, and coach preamble
 generation used by all content-producing Lambdas (observatory, daily brief,
 weekly digest, chronicle, etc.).
 
-Part of the shared Lambda layer — changes require layer rebuild.
+Bundled into every function's deploy package (#781 retired the shared layer).
 
 v1.0.0 — 2026-04-07 (Intelligence Layer V2 Session 1)
 """

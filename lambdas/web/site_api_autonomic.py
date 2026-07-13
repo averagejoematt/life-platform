@@ -5,7 +5,7 @@ lambdas/web/site_api_autonomic.py — two computed-view endpoints for the data d
 Both views already existed in the PRIVATE MCP tool layer (mcp.tools_health.
 tool_get_autonomic_balance and mcp.tools_correlation.tool_get_zone2_breakdown) but
 were never served to the public site. The MCP tier is a different runtime package
-than the web tier (web/ + shared layer, no mcp/ on the path), so the computation is
+than the web tier (web/ + bundled lambdas/ modules, no mcp/ on the path), so the computation is
 PORTED here — same model, same references — rather than imported. Kept as pure
 functions (`_compute_*`) so the math is unit-testable without DynamoDB.
 
