@@ -306,14 +306,18 @@ def _synthesize_dialogue(turns: list) -> bytes:
 
 
 def _publish_episode_audio(week, wav_audio: bytes) -> dict:
-    """Compress + PUT the episode audio (#1018): the Gemini WAV (24 kHz PCM,
-    ~385 kbps — 16.6 MB per 6-min episode on cellular) is encoded to spoken-word
-    MP3 via audio_encode (lameenc-layer). Fail-open: if the encoder is missing
-    or errors, the WAV publishes exactly as before — compression never strands
-    an episode. Returns the url/bytes/duration_sec fields for the episode entry;
-    duration comes from the WAV header BEFORE encoding (the lossless source)."""
+    """Compress + PUT the episode audio (#1018): the Gemini WAV (24 kHz PCM) is encoded
+    to spoken-word MP3 via audio_encode (lameenc-layer), fail-open to the raw WAV. Before
+    encoding, the synthesized audio ident (intro jingle + fade-under + outro reprise,
+    #1179/#1082) is mixed in at the raw-PCM stage — the ONE hook covering both episode 0
+    and the weekly path. duration comes from the WAV header AFTER the mix (ident adds ~9s)."""
     import audio_encode
 
+    try:  # #1179: mix the audio ident; mix_into_wav is fully fail-open (speech-only on error)
+        from emails import panelcast_ident
+    except ImportError:
+        import panelcast_ident
+    wav_audio = panelcast_ident.mix_into_wav(wav_audio)
     duration = max(1, audio_encode.wav_duration_sec(wav_audio))
     body, ext, mime = audio_encode.compress_wav(wav_audio)
     s3.put_object(Bucket=S3_BUCKET, Key=f"{PREFIX}/wk{week}.{ext}", Body=body, ContentType=mime, CacheControl="max-age=86400, public")
