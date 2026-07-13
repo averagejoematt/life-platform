@@ -1,6 +1,6 @@
 # New-Machine Bootstrap — bare metal to operational
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (reconciled #1026 status — memory backup landed + live, datadrops leg FDA-gated; fixed the datadrops S3 prefix; added .config.json regen + Full Disk Access grant)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (reconciled #1026 status — memory backup landed + live; datadrops + ingest are manual by decision, no FDA grant, §3c; fixed the datadrops S3 prefix; added .config.json regen §3b)
 > **Sources of truth:** `docs/AWS_ACCESS.md` (auth) · `docs/QUICKSTART.md` (toolchain + deploy tree) · `docs/CONTINUITY.md` (the laptop-only state surfaces) · `ingest/README.md` (drop-folder runtime) · `requirements-dev.txt` (pinned dev deps)
 
 This is the **from-zero rebuild runbook**: a fresh Mac, nothing installed, no
@@ -170,16 +170,25 @@ cat > .config.json <<JSON
 JSON
 ```
 
-### 3c. Grant Full Disk Access to `/bin/bash` (one-time, TCC)
+### 3c. TCC posture — no Full Disk Access grant (by decision, 2026-07-13)
 
-macOS TCC blocks launchd agents from reading `~/Documents` (the launchd-TCC trap),
-which silently disables **two** things until granted: the `datadrops/` backup leg of the
-#1026 job (step 4b/5b) and the manual-drop **ingest watcher** (step 5a). Grant it once:
+macOS TCC blocks launchd agents from reading `~/Documents` (the launchd-TCC trap). The
+obvious "fix" — granting Full Disk Access to `/bin/bash` — is **rejected**: it would hand
+FDA to *every* shell script on the machine, far too broad. Instead we accept that the two
+things which read `~/Documents` are **low-churn and run manually**, while the one
+high-churn asset (Claude memory) lives in `~/.claude` and backs up automatically with no
+grant at all. So there is **nothing to grant here** — the split is:
 
-> System Settings → Privacy & Security → **Full Disk Access** → add `/bin/bash`
-> (⌘⇧G in the file picker → type `/bin/bash`). Then re-run the backup once to populate
-> the archive: `bash ~/.local/bin/claude-memory-backup.sh` and confirm the
-> `datadrops-archive/` prefix fills.
+| Asset | Cadence | How |
+|---|---|---|
+| Claude memory dir | high (every session) | **automated** daily launchd (step 5b) + `/wrap` sync — reads `~/.claude`, never TCC-blocked |
+| `datadrops/` originals | low (new genome/labs/export) | **manual** push from a Terminal (step 4b/5b) |
+| Manual-drop ingest | occasional CSV/zip | **manual** run from a Terminal (step 5a) |
+
+An interactive Terminal launched from Finder already has disk access via your login
+session, so the manual commands "just work" without any standing grant. If you later
+decide you *want* these two automated, the secure route is relocating their folders out of
+`~/Documents` (TCC only protects Documents/Desktop/Downloads/iCloud) — not an FDA grant.
 
 ---
 
@@ -215,12 +224,16 @@ aws s3 sync s3://matthew-life-platform/datadrops-archive/ \
   ~/Documents/Claude/life-platform/datadrops/ --region us-west-2
 ```
 
-**Caveat — this archive fills only after the Full Disk Access grant (step 3c).** #1026's
-datadrops leg reads `~/Documents`, which macOS TCC blocks from launchd until `/bin/bash`
-has Full Disk Access; the backup script logs a WARN and skips the leg rather than failing.
-So on a machine where 3c was never granted, `datadrops-archive/` may be empty and the
-originals (genome, physicals xlsx, Apple Health exports) live only on the old laptop. Grant
-3c and run one backup to populate it; treat an empty archive as the ungranted-TCC symptom.
+**The archive fills from a manual push, not the daily job (see §3c).** `datadrops/` is
+low-churn and backed up by running the push from a Terminal whenever you add a drop:
+
+```bash
+BACKUP_DATADROPS=1 bash ~/.local/bin/claude-memory-backup.sh   # reads ~/Documents; run from Terminal
+```
+
+If that push has never been run on the source machine, `datadrops-archive/` may be empty
+and the originals (genome, physicals xlsx, Apple Health exports) live only on the old
+laptop — treat an empty archive as "the manual push was never run," not a bug.
 
 ---
 
@@ -228,8 +241,18 @@ originals (genome, physicals xlsx, Apple Health exports) live only on the old la
 
 ### 5a. The ingest drop-folder watcher
 
-The manual-drop ingest agent is reinstalled with **one command**
-(`docs/CONTINUITY.md` §7, `ingest/README.md`):
+> **No-FDA posture (§3c):** the watcher's folders live under `~/Documents`, so the launchd
+> agent can't auto-fire without a Full Disk Access grant we deliberately don't make. Under
+> the current posture, **ingest is manual**: drop your CSV/zip, then process it from a
+> Terminal (which has disk access via your login session):
+> ```bash
+> cd ~/Documents/Claude/life-platform && bash ingest/process_all_drops.sh
+> ```
+> Installing the agent below is still fine (harmless, and it works instantly if you ever
+> do relocate the drop folders out of `~/Documents`), but don't rely on it auto-firing.
+
+The ingest agent is installed with **one command** (`docs/CONTINUITY.md` §7,
+`ingest/README.md`):
 
 ```bash
 cd ~/Documents/Claude/life-platform/ingest
@@ -266,9 +289,9 @@ bash install.sh   # copies backup.sh → ~/.local/bin, loads the launchd plist
 ```
 
 This registers `com.matthewwalker.claude-memory-backup` (daily + RunAtLoad). The **memory
-leg works immediately** (it reads `~/.claude`, never TCC-blocked). The **datadrops leg
-stays skipped with a WARN until the step-3c Full Disk Access grant** — grant it, then run
-`bash ~/.local/bin/claude-memory-backup.sh` once to populate `datadrops-archive/`.
+leg works immediately** (it reads `~/.claude`, never TCC-blocked). The daily job **skips
+the datadrops leg by design** (§3c) — back that up manually when you add a drop:
+`BACKUP_DATADROPS=1 bash ~/.local/bin/claude-memory-backup.sh` from a Terminal.
 
 ---
 
