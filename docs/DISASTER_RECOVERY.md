@@ -316,7 +316,7 @@ directories stop being a silent loss surface.
 
 Priority order = blast radius first. The rotation *mechanics* live in Scenario 5 above
 and in `docs/SECRETS_ROTATION.md`; this is the device-loss ordering. Do **not** enumerate
-key file paths here (repo is public) — the device-resident credential inventory is in
+key file paths here (defense-in-depth — this doc is exportable and the repo can flip public again) — the device-resident credential inventory is in
 `docs/AWS_ACCESS.md` and `docs/ACCOUNTS.md`.
 
 1. **AWS break-glass keys — do this first (highest blast radius).** The long-lived
@@ -434,7 +434,7 @@ finding, 2026-07-10). If the repo/org were lost, rebuild:
 | `production` environment | Required reviewer: Matthew — this is CI's deploy approval gate (`ci-cd.yml` `environment: production`) |
 | OIDC identity provider | `token.actions.githubusercontent.com` in IAM (account 205930651321); trust policies on the 4 CI roles (inventory: `AWS_ACCESS.md` §4) |
 | Actions | Enabled; workflows in `.github/workflows/` (all in-repo — nothing console-only) |
-| Repo visibility | Target: PRIVATE (⚠️ still PUBLIC as of 2026-07-10 — flip pending, owner action; `docs/coaching/` carries Tier-2 personal data and visibility is a load-bearing privacy control, see DATA_GOVERNANCE) |
+| Repo visibility | PRIVATE (flipped 2026-07-13, owner action — was public through that date; 0 forks at flip so nothing detached; `docs/coaching/` carries Tier-2 personal data and visibility is a load-bearing privacy control, see DATA_GOVERNANCE) |
 | Webhooks / branch protection | None beyond the environment gate (verify: `gh api repos/{owner}/{repo}/branches/main/protection`) |
 
 Re-derive current truth: `gh api repos/averagejoematt/life-platform` + `gh api repos/averagejoematt/life-platform/environments`.

@@ -170,8 +170,9 @@ aws s3 sync s3://matthew-life-platform/claude-memory-backup/ \
 > as the *last session that wrapped*, and anything since then is lost with the laptop.
 > This is the top gap the audit flagged; step 5b closes it going forward.
 
-Never commit this directory or its export to the repo — the repo is public and memory
-files carry personal + security-incident detail by design (`docs/CONTINUITY.md` §4).
+Never commit this directory or its export to the repo — even with the repo private (since
+2026-07-13), memory files carry personal + security-incident detail by design and stay out
+of git (`docs/CONTINUITY.md` §4; visibility can flip back).
 
 ### 4b. `datadrops/` originals
 

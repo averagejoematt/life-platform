@@ -141,8 +141,9 @@ over the committed `site/` tree. Three arms:
   non-allowlisted email addresses (the PII classes in `DATA_GOVERNANCE.md`).
 - **Literal denylist** (best-effort) — partner name / employer / role / industry
   from a **non-committed** source (`config/pii_denylist.local.json`, gitignored, or
-  env `PII_DENYLIST_JSON` as a CI secret). The repo is PUBLIC, so these literals
-  never live in git; absent → that arm self-skips, the always-on arms still gate.
+  env `PII_DENYLIST_JSON` as a CI secret). These literals never live in git (repo went
+  private 2026-07-13, but the site is public and the discipline holds regardless); absent
+  → that arm self-skips, the always-on arms still gate.
 
 The **same scanner runs fail-closed inside `sync_site_to_s3.sh` before the S3 sync**
 — this test is the CI half of the same gate. (Its first run caught a real leak: the

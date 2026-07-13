@@ -150,8 +150,9 @@ aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platfo
 Caveat: the datadrops leg needs `/bin/bash` granted Full Disk Access (macOS TCC blocks
 launchd from ~/Documents; the same block is silently failing the ingest watcher).
 
-**Never commit this directory (or its export) to the repo — the repo is public** and
-memory files contain personal detail and security-incident narrative by design.
+**Never commit this directory (or its export) to the repo** — even though the repo went
+private 2026-07-13, memory files contain personal detail and security-incident narrative
+by design and must stay out of git (visibility can flip back; the discipline is permanent).
 
 ## 5. `.claude/commands/` — the skills are human runbooks
 

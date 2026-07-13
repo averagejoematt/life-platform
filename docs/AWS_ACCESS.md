@@ -36,7 +36,7 @@ Human AWS credentials never go there — see the rule at the end of §3.
 > ✅ **LIVE as of 2026-07-12** (verified: instance ACTIVE, user `awsdev` +
 > `AdministratorAccess` permission set assigned to the account; password set).
 > The access portal URL is on the Identity Center dashboard — get it from your
-> admin (Matthew); it is deliberately not written in this public repo. §2a below
+> admin (Matthew); it is deliberately not written in the repo (private since 2026-07-13; the discipline holds regardless). §2a below
 > is retained as the rebuild procedure. If SSO is unavailable, fall back to §3.
 > Note: users created via the CLI get **no activation email** — send one via
 > Console → Identity Center → Users → *user* → Reset password.

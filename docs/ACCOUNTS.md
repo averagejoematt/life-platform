@@ -5,7 +5,9 @@
 
 Every external account/service the platform depends on, what it's for, where its
 credential lives, and how to recover access. **No secret values and no account
-emails appear here — this repo is public.** "Password manager" means Matthew's
+emails appear here** — the repo went private 2026-07-13, but this discipline stands
+regardless (secrets never belong in git; the site is public; visibility can flip back).
+"Password manager" means Matthew's
 password manager; a successor needs estate access to it first.
 
 Credential-location pointers reference `docs/SECRETS_MAP.md` (service creds in
