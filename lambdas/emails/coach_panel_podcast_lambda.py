@@ -644,14 +644,17 @@ try:
     from emails.panelcast_qa import (  # noqa: F401 — re-exported for callers/tests
         _CHALLENGE_RE,
         _INTERROGATIVE_RE,
+        _INTRO_CRAFT_RUBRIC,
         _INTRO_RUBRIC,
         _QA_MAX_ATTEMPTS,
         _QA_MAX_CONSECUTIVE,
         _QA_MAX_CONSECUTIVE_INTRO,
         _QA_MAX_WORDS_PER_TURN,
+        _WEEKLY_CRAFT_RUBRIC,
         _WEEKLY_RUBRIC,
         _continuity_check,
         _craft_check,
+        _craft_judge,
         _qa_gate,
         _qa_review,
     )
@@ -659,14 +662,17 @@ except ImportError:  # bundle stages lambdas/ at the zip root
     from panelcast_qa import (  # noqa: F401
         _CHALLENGE_RE,
         _INTERROGATIVE_RE,
+        _INTRO_CRAFT_RUBRIC,
         _INTRO_RUBRIC,
         _QA_MAX_ATTEMPTS,
         _QA_MAX_CONSECUTIVE,
         _QA_MAX_CONSECUTIVE_INTRO,
         _QA_MAX_WORDS_PER_TURN,
+        _WEEKLY_CRAFT_RUBRIC,
         _WEEKLY_RUBRIC,
         _continuity_check,
         _craft_check,
+        _craft_judge,
         _qa_gate,
         _qa_review,
     )
@@ -692,6 +698,13 @@ try:
     from emails import panelcast_scripts as _pscripts
 except ImportError:  # bundle stages lambdas/ at the zip root
     import panelcast_scripts as _pscripts
+
+# #1180 (epic #1082): the craft layer's punch-up pass (the "script doctor"). Thin wiring
+# only — the machinery lives in the module so the lambda stays under the ADR-080 size gate.
+try:
+    from emails import panelcast_craft as _craft
+except ImportError:  # bundle stages lambdas/ at the zip root
+    import panelcast_craft as _craft
 
 
 def _pscripts_deps() -> dict:
@@ -790,9 +803,19 @@ def _run_intro(dry_run: bool = False) -> dict:
                 cand, {ELENA, INTRO_GUEST_ID}, bedrock_client.invoke, INTRO_MODEL, _extract_json, logger, _line_ok, max_consecutive=mc
             )
             det = _craft_check(cand, mc)
+            # #1180: once the draft clears the deterministic checks, run ONE Sonnet punch-up
+            # pass (locks enforced in the module; a lock/craft regression falls back to the
+            # draft, punched=False). The punched script re-enters the FULL gate below.
+            punched = False
+            if not det:
+                cand, punched = _craft.punch_up_script(
+                    cand, bedrock_client.invoke, INTRO_MODEL, _extract_json, logger, _line_ok, craft_check=lambda ts: _craft_check(ts, mc)
+                )
             judge = _qa_review(cand, _INTRO_RUBRIC, bio_truth)[1]
+            _cok, _craft_fails, _cites = _craft_judge(cand, _INTRO_CRAFT_RUBRIC)
+            judge += _craft_fails  # Haiku structure/accuracy + Sonnet craft (evidence-cited)
             fails = det + judge  # same composition as _qa_gate; split only for the ledger
-            ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed))
+            ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed, punched=punched, citations=_cites))
             if turns is None or len(fails) < len(qa_fails):
                 turns, qa_fails = cand, fails
             if not fails:
@@ -1628,9 +1651,18 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
                 clean, {ELENA, guest_id}, bedrock_client.invoke, WRITER_MODEL, _extract_json, logger, line_ok=_line_ok
             )
             det = _craft_check(clean)
+            # #1180: punch-up pass on a deterministically-clean draft (locks in the module;
+            # a lock/craft regression falls back to the draft, punched=False), then re-gate.
+            punched = False
+            if not det:
+                clean, punched = _craft.punch_up_script(
+                    clean, bedrock_client.invoke, WRITER_MODEL, _extract_json, logger, _line_ok, craft_check=_craft_check
+                )
             judge = _qa_review(clean, _WEEKLY_RUBRIC, _gt)[1]
+            _cok, _craft_fails, _cites = _craft_judge(clean, _WEEKLY_CRAFT_RUBRIC)
+            judge += _craft_fails  # Haiku structure/accuracy + Sonnet craft (evidence-cited)
             fails = det + judge  # same composition as _qa_gate; split only for the ledger
-            ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed))
+            ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed, punched=punched, citations=_cites))
             last_fails, draft_turns = fails, clean
             if not fails:
                 ready = (script, clean, review)

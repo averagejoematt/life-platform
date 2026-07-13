@@ -427,6 +427,9 @@ def test_intro_repaired_script_that_still_fails_judge_holds(monkeypatch):
     monkeypatch.setattr(bedrock_client, "invoke", _invoke_returning(replacement))
     # The judge still fails the repaired script → the gate must HOLD (repair never pre-clears).
     monkeypatch.setattr(panel, "_qa_review", lambda turns, rubric, gt="": (False, ["judge: still reads as a lecture"]))
+    # #1180: craft layer offline — this test isolates the repair→judge→HOLD path.
+    monkeypatch.setattr(panel._craft, "punch_up_script", lambda turns, *a, **k: (turns, False))
+    monkeypatch.setattr(panel, "_craft_judge", lambda turns, rubric, model=None: (True, [], []))
     monkeypatch.setattr(panel._repair, "revise_intro", lambda *a, **k: [])  # revisions add nothing here
 
     held, emails = {}, []
@@ -496,6 +499,10 @@ def _weekly_harness(monkeypatch, judge):
     monkeypatch.setattr(panel, "_build_weekly_script", lambda b, bb: json.loads(json.dumps(script)))
     monkeypatch.setattr(panel, "_editor_review", lambda turns, bible: {"verdict": "pass", "issues": [], "pull_quote": ""})
     monkeypatch.setattr(panel, "_qa_review", judge)
+    # #1180: the craft layer runs after the deterministic checks clear — stub it offline so
+    # this budget/exhaustion harness stays about the Haiku judge it parametrizes.
+    monkeypatch.setattr(panel._craft, "punch_up_script", lambda turns, *a, **k: (turns, False))
+    monkeypatch.setattr(panel, "_craft_judge", lambda turns, rubric, model=None: (True, [], []))
     import bedrock_client
 
     monkeypatch.setattr(
