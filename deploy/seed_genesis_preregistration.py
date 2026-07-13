@@ -129,7 +129,7 @@ FALLBACK_PREDICTIONS = {
     },
     "physical_coach": {
         "claim_natural": (
-            "From the 300.8 lb start, body weight trends down over the first 14 days — the early move "
+            "From the plan's start weight, body weight trends down over the first 14 days — the early move "
             "is primarily water and glycogen, and the plan expects it."
         ),
         "metric": "weight_lbs",
@@ -503,6 +503,7 @@ def build_hypotheses(goals):
     Shapes satisfy hypothesis_engine_lambda.validate_hypothesis (incl. #530 test_spec)."""
     kcal = goals["targets"]["nutrition"]["daily_calories_target"]
     steps_note = goals["targets"]["training"]["daily_movement_target"]
+    sw = goals["timeline"]["start_weight_lbs"]  # ADR-104: grounded, never hardcoded (baseline moves per cycle)
     return [
         {
             "hypothesis_id": "genesis_prereg_h1",
@@ -513,7 +514,7 @@ def build_hypotheses(goals):
             "domains": ["nutrition", "weight"],
             "evidence": (
                 f"Pre-registered at genesis from the plan itself: {kcal} kcal/day target from a "
-                "300.8 lb start (config/user_goals.json); MacroFactor logs daily calories and "
+                f"{sw} lb start (config/user_goals.json); MacroFactor logs daily calories and "
                 "Withings logs daily weight, so both arms are directly measurable."
             ),
             "confirmation_criteria": ("Mean next-day weight at least 0.1 lbs lower on adherent days within 30 days, 95% CI excluding 0."),
