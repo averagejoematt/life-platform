@@ -11,9 +11,12 @@
 #   1. sync_doc_metadata --check   — literal counts match AST discovery; a sync rule
 #                                    matching nothing is itself a failure
 #   2. check_doc_links             — every relative link + anchor resolves
-#   3. check_doc_tombstones        — no live doc references a retired concept
-#   4. check_doc_index             — index coverage + status headers (+ freshness report)
-#   5. generate_adr_index --check  — the ADR index reflects every ## ADR- heading
+#   3. check_doc_tombstones        — no live doc (or lambdas/+mcp/ docstring) references
+#                                    a retired concept
+#   4. check_doc_facts             — no live doc states a stale count/budget in ANY
+#                                    phrasing (the generalized net beyond sync's regexes)
+#   5. check_doc_index             — index coverage + status headers (+ freshness report)
+#   6. generate_adr_index --check  — the ADR index reflects every ## ADR- heading
 
 name: Docs CI
 
@@ -68,6 +71,10 @@ jobs:
       - name: Tombstone gate (retired concepts)
         if: always()
         run: python3 scripts/check_doc_tombstones.py
+
+      - name: Stale-number gate (generalized fact scan)
+        if: always()
+        run: python3 scripts/check_doc_facts.py
 
       - name: Index coverage + status headers (+ freshness report)
         if: always()
