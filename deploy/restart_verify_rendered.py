@@ -175,10 +175,23 @@ def _old_genesis_tokens(old_genesis: str) -> list:
     o = _d.fromisoformat(old_genesis)
     # cycle_compare / timeline legitimately list every past genesis (ISO only).
     iso_allowed = ["/api/cycle_compare", "/api/timeline"]
-    return [
-        (f"Outgoing genesis literal ({old_genesis})", re.compile(rf"\b{re.escape(old_genesis)}\b"), iso_allowed),
+    tokens = [
         (f"Outgoing genesis prose ({o.strftime('%B')} {o.day})", re.compile(rf"\b{o.strftime('%B')}\s+{o.day}\b"), []),
         (f"Outgoing genesis prose ({o.strftime('%b')} {o.day})", re.compile(rf"\b{o.strftime('%b')}\s+{o.day}\b(?![a-zA-Z])"), []),
+    ]
+    # Future-genesis reset (#1188): when the NEW genesis is still ahead of us, the
+    # OUTGOING genesis equals today's real date — so every legitimate freshness stamp
+    # ('as of 2026-07-12', '"night_of": "2026-07-12"', ISO dates in /api/* payloads)
+    # is that literal. The ISO token is then indistinguishable from live data, so we
+    # waive it (logged) and rely on the prose forms to catch a genuine chronicle leak.
+    if old_genesis == _d.today().isoformat():
+        print(
+            f"  ⚠ outgoing genesis {old_genesis} == today (future-genesis reset) — ISO-literal token WAIVED (collides with live freshness data)"
+        )
+        return tokens
+    return [
+        (f"Outgoing genesis literal ({old_genesis})", re.compile(rf"\b{re.escape(old_genesis)}\b"), iso_allowed),
+        *tokens,
     ]
 
 

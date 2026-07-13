@@ -113,3 +113,33 @@ def test_truth_gate_failure_merges_into_verify_rc():
     # and the final nonzero exit.
     src = inspect.getsource(pipeline.main)
     assert "verify_rc = verify_rc or truth_rc" in src
+
+
+# ── #1188: future-genesis reset — outgoing genesis == today's real date ──────────
+
+
+def _labels(tokens):
+    return [t[0] for t in tokens]
+
+
+def test_old_genesis_iso_literal_waived_when_outgoing_equals_today():
+    """A future-genesis reset (outgoing genesis == today) drops the ISO-literal
+    token — it collides with every legitimate freshness stamp — but keeps the prose
+    forms that still catch a real chronicle leak."""
+    from datetime import date
+
+    today = date.today().isoformat()
+    labels = _labels(rendered._old_genesis_tokens(today))
+    assert not any("literal" in lbl for lbl in labels), labels
+    assert any("prose" in lbl for lbl in labels), labels
+
+
+def test_old_genesis_iso_literal_enforced_for_a_past_genesis():
+    """A normal (past-genesis) reset still forbids the outgoing ISO literal."""
+    labels = _labels(rendered._old_genesis_tokens("2026-06-14"))
+    assert any("literal" in lbl for lbl in labels), labels
+
+
+def test_old_genesis_tokens_empty_when_missing_or_equals_current():
+    assert rendered._old_genesis_tokens("") == []
+    assert rendered._old_genesis_tokens(rendered.EXPERIMENT_START_DATE) == []
