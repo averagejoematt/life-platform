@@ -209,10 +209,19 @@ still valid; the bot is the net under it, not a replacement for pre-merge hygien
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
    Do NOT widen the whitelist reflexively; inspect the generator diff, fix main
    manually (`git pull` → run the generator → review → push).
-2. **Push rejected** — branch protection: the `github-actions` app must be on
-   `main`'s required-pull-request **bypass list** (one-time repo setting; classic
-   protection: `bypass_pull_request_allowances.apps = ["github-actions"]`). Or a
-   concurrent human push raced it twice — the queued run reconciles next.
+2. **Push rejected** — branch protection blocks the `github-actions[bot]` push
+   (this repo is a **personal/User-owned** repo, so `enforce_admins:false` lets
+   Matthew bypass but the bot is not an admin). NB the classic-protection PR-bypass
+   list (`bypass_pull_request_allowances`) is **organization-only** — it does not
+   exist on a personal repo, so you cannot add the app there. The one-time fix
+   applied 2026-07-13 (#1173): turn OFF "Require a pull request before merging" on
+   `main` (`gh api -X DELETE repos/<owner>/<repo>/branches/main/protection/required_pull_request_reviews`)
+   — near-vacuous here anyway (0 required approvals, admins already bypass, no
+   required status checks), so its only effect was blocking the reconcile bot.
+   Alternative if the PR rule must stay: push with a Matthew-owned PAT (admin →
+   bypasses), but a PAT push **retriggers** a duplicate `push` run (the default
+   `GITHUB_TOKEN` deliberately does not). Or a concurrent human push raced it
+   twice — the queued run reconciles next.
 3. **A generator crashed** — same failure the test suite would have shown; fix the
    generator like any red test. Reproduce locally: run the generators from repo root
    on a clean main checkout; `git status` must end clean (they are idempotent).

@@ -232,7 +232,7 @@ jobs:
 
             echo "::warning::push to main rejected (attempt $attempt of 2)"
             if [ "$attempt" = "2" ]; then
-              echo "::error::reconcile commit could not be pushed to main. Either a concurrent push raced this run twice (rare — the queued run will reconcile) or branch protection is blocking the github-actions app: add it to the required-pull-request bypass list (docs/CONVENTIONS.md §4, one-time setting). Manual fallback: run the generators locally on main and push, exactly as before #1173."
+              echo "::error::reconcile commit could not be pushed to main. Either a concurrent push raced this run twice (rare — the queued run will reconcile) or branch protection is blocking the github-actions[bot] push. This is a personal repo, so the classic-protection PR-bypass list is org-only and unavailable — the fix is to keep 'Require a pull request before merging' OFF on main (docs/CONVENTIONS.md §4c). Manual fallback: run the generators locally on main and push, exactly as before #1173."
               exit 1
             fi
           done
