@@ -62,6 +62,14 @@ def _fixture_frozen():
 GOALS = json.loads((REPO_ROOT / "config" / "user_goals.json").read_text())
 FROZEN = _fixture_frozen()
 
+# Derive the reset-sensitive dates from the live genesis so a re-anchor (restart
+# pipeline) never reds main here again — the seeder builds prediction ids from
+# EXPERIMENT_START_DATE and the publisher dates the artifact genesis − 1.
+from datetime import date as _date, timedelta as _timedelta  # noqa: E402
+
+GENESIS_COMPACT = seeder.EXPERIMENT_START_DATE.replace("-", "")
+GENESIS_MINUS_1 = (_date.fromisoformat(seeder.EXPERIMENT_START_DATE) - _timedelta(days=1)).isoformat()
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1. PREDICTION# record shape — what handle_predictions + the evaluator expect
@@ -75,7 +83,7 @@ def test_prediction_records_match_api_read_shape():
     assert {r["pk"] for r in records} == api_coach_pks
 
     for rec in records:
-        assert rec["sk"].startswith("PREDICTION#pred_20260712_"), rec["sk"]
+        assert rec["sk"].startswith(f"PREDICTION#pred_{GENESIS_COMPACT}_"), rec["sk"]
         assert rec["prediction_id"] == rec["sk"].split("PREDICTION#", 1)[1]
         assert rec["created_date"] == seeder.EXPERIMENT_START_DATE
         assert rec["status"] == "pending"  # in handle_predictions' _BUCKETS
@@ -110,7 +118,7 @@ def test_eval_spec_parity_with_coach_state_updater():
     by_sk = {r["sk"]: r for r in records}
     for coach_id, block in FROZEN["coaches"].items():
         for pred in block["predictions"]:
-            sk = f"PREDICTION#pred_20260712_{seeder._slug(pred['claim_natural'])}"
+            sk = f"PREDICTION#pred_{GENESIS_COMPACT}_{seeder._slug(pred['claim_natural'])}"
             expected = _build_prediction_eval_spec(
                 pred["metric"] or None,
                 pred["direction"] if pred["metric"] else None,
@@ -171,8 +179,8 @@ def test_artifact_has_no_cycle_or_prior_attempt_language():
 def test_artifact_content_contract():
     record = publisher.build_chronicle_record(GOALS, FROZEN)
     # dated genesis − 1, pre-genesis chronicle shape
-    assert record["date"] == "2026-07-11"
-    assert record["sk"] == "DATE#2026-07-11"
+    assert record["date"] == GENESIS_MINUS_1
+    assert record["sk"] == f"DATE#{GENESIS_MINUS_1}"
     assert record["phase"] == "experiment"
     assert record["author"] == "Elena Voss"
     md = record["content_markdown"]
