@@ -165,14 +165,19 @@ def check_body(path: str, body: str) -> list[tuple[str, list[str]]]:
     return hits
 
 
-def _old_genesis_tokens(old_genesis: str) -> list:
+def _old_genesis_tokens(old_genesis: str, today: str | None = None) -> list:
     """Dynamic forbidden tokens for the OUTGOING genesis: the ISO literal plus its
-    short prose forms ('June 14' / 'Jun 14') — the forms the JS sweep rewrites."""
+    short prose forms ('June 14' / 'Jun 14') — the forms the JS sweep rewrites.
+
+    `today` (ISO) is injectable so the waiver branch is testable without wall-clock
+    coupling; it defaults to the real today at call time.
+    """
     from datetime import date as _d
 
     if not old_genesis or old_genesis == EXPERIMENT_START_DATE:
         return []
     o = _d.fromisoformat(old_genesis)
+    today = today or _d.today().isoformat()
     # cycle_compare / timeline legitimately list every past genesis (ISO only).
     iso_allowed = ["/api/cycle_compare", "/api/timeline"]
     tokens = [
@@ -184,7 +189,7 @@ def _old_genesis_tokens(old_genesis: str) -> list:
     # ('as of 2026-07-12', '"night_of": "2026-07-12"', ISO dates in /api/* payloads)
     # is that literal. The ISO token is then indistinguishable from live data, so we
     # waive it (logged) and rely on the prose forms to catch a genuine chronicle leak.
-    if old_genesis == _d.today().isoformat():
+    if old_genesis == today:
         print(
             f"  ⚠ outgoing genesis {old_genesis} == today (future-genesis reset) — ISO-literal token WAIVED (collides with live freshness data)"
         )

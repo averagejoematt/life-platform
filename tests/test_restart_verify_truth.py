@@ -125,18 +125,17 @@ def _labels(tokens):
 def test_old_genesis_iso_literal_waived_when_outgoing_equals_today():
     """A future-genesis reset (outgoing genesis == today) drops the ISO-literal
     token — it collides with every legitimate freshness stamp — but keeps the prose
-    forms that still catch a real chronicle leak."""
-    from datetime import date
-
-    today = date.today().isoformat()
-    labels = _labels(rendered._old_genesis_tokens(today))
+    forms that still catch a real chronicle leak. `today` is injected so the test is
+    deterministic regardless of the wall clock or the live EXPERIMENT_START_DATE."""
+    labels = _labels(rendered._old_genesis_tokens("2026-06-14", today="2026-06-14"))
     assert not any("literal" in lbl for lbl in labels), labels
     assert any("prose" in lbl for lbl in labels), labels
 
 
 def test_old_genesis_iso_literal_enforced_for_a_past_genesis():
-    """A normal (past-genesis) reset still forbids the outgoing ISO literal."""
-    labels = _labels(rendered._old_genesis_tokens("2026-06-14"))
+    """A normal (past-genesis) reset — outgoing genesis is in the past, not today —
+    still forbids the outgoing ISO literal."""
+    labels = _labels(rendered._old_genesis_tokens("2026-06-14", today="2026-07-20"))
     assert any("literal" in lbl for lbl in labels), labels
 
 
