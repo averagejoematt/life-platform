@@ -1,107 +1,96 @@
-# HANDOVER — The podcast no-touch pipeline + a captivating episode 0, then cycle-6 reset (genesis 2026-07-13) — 2026-07-12 (late night)
+# HANDOVER — Green main, chronicle prequels restored + cycle-6 pre-registration, repo → private — 2026-07-13
 
-> Instruction thread: "get the most issues cleared efficiently, hardest first" →
-> which turned into a deep, Matthew-in-the-loop rebuild of the podcast so episode 0
-> "doesn't sound like an AI-generated boring thing a stranger wouldn't listen to,"
-> then "get the new episode up and the reset processed so we can wrap up for today."
-> Standing: "I approve all merges and deploys."
+> Instruction thread: "what to work on" → which surfaced a **red main** and cascaded:
+> unblock main → "chronicle is missing the prequel articles" → re-seed + publish the
+> cycle-6 pre-registration (Option A: draft-for-review, approved) → "should I make my
+> git repo private?" → Matthew flipped it, "run the doc/memory cleanup." Standing:
+> "I approve all merges and deploys" (all commits pushed directly to main with approval).
 
 ## The arc of the session
 
-Started as an epic close-out continuation (already wrapped at `96e01b46`), then Matthew
-asked to clear more issues → the podcast became the whole session. The live wk0 prologue
-had the dropped-turn bug he'd reported; regenerating it under the new #1122 gate went
-**0/15** across blind re-rolls, which proved the load-bearing lesson: **prompt
-instructions cannot guarantee structural output properties** (the model wrote
-same-speaker turns even under an explicit "STRICT ALTERNATION" ban). That drove building
-a real pipeline, then three rounds of Matthew's attended listens drove the craft fixes.
+Opened on "what to work on"; CI answered — **main had been red since the cycle-6 reset**,
+two gates failing. Fixing that led straight into the reset's other loose ends (the
+tombstoned chronicle prequels, the un-published cycle-6 pre-registration), and then a
+strategic decision (repo visibility) with its own cleanup tail.
 
-## Shipped (all merged + deployed + live-verified) — PRs #1174–#1186
+## Shipped (all committed + pushed to main; live surfaces verified)
 
-**The no-touch podcast contract (epic #1082, ADR-135):**
-- **#1176** (#1170/#1171/#1172) — deterministic same-speaker **seam repair** (shares the
-  gate's own primitives so gate+repair can't disagree) + **convergent revision loop** on
-  the intro path (judge failures fed back verbatim, was blind re-rolls) + `_QA_MAX_CONSECUTIVE`
-  3→2 calibration + **bounded attempts (3×2) → one needs-human escalation email** on
-  exhaustion. `lambdas/emails/panelcast_repair.py` (new).
-- **#1177** — authorship/method grounding fix + human-passability rubric. The series
-  bible (`config/podcast_series_bible.json`, now v2 in S3) **falsely said Eli designed the
-  experiment** and framed the method as "the ONE next move" — both were baked into the
-  bible AND repeated in the judge's own rubric header, so the judge could never catch
-  them. Corrected: Matthew designed/built everything and cast Eli as head coach; Matt runs
-  many parallel protocols. New rubric item enforces it. Also ported the weekly READ-ALOUD
-  TURING TEST + humour items into the intro rubric (the intro judged structure only, so
-  the revision loop had optimized personality away).
-- **#1181** (#1178) — free BBC RSS **zeitgeist** for weekly episodes (stdlib urllib+xml,
-  tragedy-filtered, fed to judge ground truth). **Excluded from ep0** (see #1185).
-- **#1183** — **strict alternation** on the intro path after the solo hook (the "AND YET"
-  non-sequitur class); intro bound=1 threaded through shared primitives, weekly stays 2.
-- **#1185** (#1182) — extracted the two big prompt builders to
-  `lambdas/emails/panelcast_scripts.py` (lambda 1999→1856, ADR-080 headroom for craft) +
-  **evergreen ep0**: `_run_intro` no longer fetches zeitgeist (reset resurrects the
-  prologue stale, so ep0 must carry no dated content — see the reset section).
-- **#1186** (#1180) — **the craft layer** (the "boring/AI" fix): emotional-arc rhythm
-  spec in both builders + a **Sonnet punch-up "script doctor"** pass (adds humour/warmth,
-  facts+turn-count+speaker-order deterministically LOCKED, falls back to the draft on any
-  violation) + the taste judge **split to Sonnet with mandatory quoted evidence** ("cite
-  the two funniest/most-human lines or FAIL"). `lambdas/emails/panelcast_craft.py` (new).
+**Unblocked main (4 commits):**
+- **`6f843660`** — `test_genesis_preregistration` hardcoded cycle-5 dates (`pred_20260712_`
+  prefix, `2026-07-11` artifact date); the reset moved genesis to 2026-07-13. Now derives
+  `GENESIS_COMPACT`/`GENESIS_MINUS_1` from `seeder.EXPERIMENT_START_DATE` → **reset-proof**.
+- **`c1cb557a` — #1188** — `restart_verify_rendered._old_genesis_tokens` now **waives the
+  outgoing-genesis ISO-literal token when it equals today** (future-genesis/pre-start reset:
+  outgoing genesis == today's real date, so every legit `as of`/`night_of`/`/api` freshness
+  stamp tripped it — 8/40 URLs false-failed the reset). Keeps the prose forms (catch a real
+  chronicle leak). `Fixes #1188`.
+- **`54a1718c`** — killed a wall-clock flake in my OWN #1188 test: it used `date.today()`
+  as the outgoing genesis, which == `EXPERIMENT_START_DATE` on genesis day, so CI (running
+  2026-07-13) hit the current-genesis early-return and got `[]`. Made `today` injectable;
+  pinned both branches to fixed dates. (Classic now-based-fixture time bomb.)
+- **`6ad83c8b`** — hand-reconciled `test_count` 3641→3644 (`[skip-reconcile]`).
+- **`a2b45b9b`** — corrected CONVENTIONS §4c + the ci-cd reconcile error hint: the org-only
+  `bypass_pull_request_allowances` doesn't exist on a personal repo.
 
-**Adjacent:**
-- **#1184** (#1179) — synthesized audio ident. **Currently OFF** (`PANELCAST_IDENT=off`) —
-  Matthew rejected the arpeggio bed ("iPhone alarm"); superseded by the voiced-hook plan.
-- **#1174** (toward #741) — build-log cross-link to the career essay + travel-watch drift
-  guards (measurement was already live from #1072; essay lives at `/journal/essays/org-chart-of-one/`).
-- **#1175** (#1173) — CI auto-reconcile of derived artifacts on main push (kills the
-  merge-day doc-sync drift-red class). **BLOCKED:** needs the `github-actions` app added to
-  the branch-protection PR-bypass (`gh api … required_pull_request_reviews … bypass_pull_request_allowances`).
-  The permission classifier refused it without Matthew explicitly naming it; UNTIL SET,
-  main keeps accumulating doc-sync drift and I hand-reconcile each merge (I did, twice).
+**Restored the chronicle prequels** (the reset tombstoned `journal/posts.json`; the #1188
+false-fail exited the pipeline nonzero so `restart_leadin_pages` never ran):
+- Ran `restart_leadin_pages.py --apply` → Part I **"Before the Numbers"** (genesis−6 =
+  2026-07-07) re-rendered. Then re-seeded + published Part II (below). posts.json now = 2
+  posts; `/journal/posts/week-01/` + `week-02/` + `/story/chronicle/` all 200.
 
-**Episode 0 is LIVE** (`/panelcast/wk0.mp3`, 3,494,400 bytes, 5:49) — the craft-pipeline
-cut, swapped by Matthew's approval, now the standing prequel. Converged in 1 generation +
-1 revision; the Sonnet craft judge passed only on quoting real beats ("I'm having that
-engraved on something."). **#1123 + epic #1082 CLOSED.**
+**Re-seeded + published the cycle-6 pre-registration (`ecff46b9`):**
+- `seed_genesis_preregistration.py --apply` → **16 board predictions + 2 hypotheses** to
+  DDB, grounded in the corrected **314 lb / 2026-07-13** plan (Bedrock-generated, dry-run
+  reviewed + Matthew-approved before publish).
+- `publish_genesis_preregistration.py --apply` → **"The Plan, On the Record"** live as
+  Prologue · Part II (dated genesis−1 = 2026-07-12).
+- **ADR-104 bug fixed in the same commit:** `build_hypotheses` evidence + the
+  `physical_coach` fallback hardcoded the OLD 300.8 lb baseline instead of reading
+  `user_goals.json` — after `--override-weight-lbs 314` those would have put the wrong
+  baseline on the permanent record. Now derived from goals.
 
-## The cycle-6 reset (genesis 2026-07-13) — applied, committed `dc8a839c`
+**Repo → PRIVATE cleanup (`896eddba` + memory):**
+- Matthew flipped `averagejoematt/life-platform` to private (0 forks/stars → nothing
+  detached; GitHub Pages mirror now **404/unpublished** — exposure fully closed).
+- Corrected the live docs' "repo is public" claims (DISASTER_RECOVERY visibility row =
+  PRIVATE; ACCOUNTS/CONTINUITY/AWS_ACCESS/TESTING/NEW_MACHINE_BOOTSTRAP reasoning lines)
+  **while keeping every privacy discipline** (history was public through today + site
+  public + reversible). Left historical review docs/CHANGELOG untouched.
+- New memory `project_repo_visibility.md`; updated R22 + sensitive-content guidance.
+  Noted the completed `repo-private` leg on **#1029**.
 
-`python3 deploy/restart_pipeline.py --genesis 2026-07-13 --override-weight-lbs 314 --apply
---sync-site` (Matthew confirmed 314 baseline; a FUTURE genesis → site runs the pre-start
-countdown). Cycle 5→6 (SSM=6). Semantic verify **7/7 PASS** (character zeroed to L1,
-ledger rolled to LIFETIME + zeroed, 0 poisoned rows across 29 sources, pre-start window).
-Media reset resurrected the NEW ep0 (we swapped it live FIRST — that ordering is
-load-bearing). Deferred hook run by hand (553 subscribe TTLs). Regenerated files committed
-from main; site-deploy green on `dc8a839c`.
+## Verification
+- Full suite green in CI on `54a1718c` + `a2b45b9b` (`Unit Tests ✓`, 5079 passed). The two
+  earlier `failure` runs (`c1cb557a`, `6ad83c8b`) were the wall-clock flake, superseded.
+- `ecff46b9` (deploy/ ops scripts) is path-filtered out of ci-cd; tests verified locally
+  (`test_genesis_preregistration` 11 passed). `896eddba` (docs) → Docs CI ✓.
+- Live: posts.json = 2 posts; both prequel pages + chronicle hub 200; repo `visibility:
+  private`; Pages mirror 404.
 
-**The rendered-verify gate FALSE-FAILED** (8/40 URLs) — it forbids the outgoing-genesis
-literal (2026-07-12) as "leakage," but a future genesis makes that == today's real date,
-so legitimate `as of 2026-07-12` / `night_of: 2026-07-12` data tripped it. Reset is
-correct; **#1188** filed to fix the gate for pre-start resets. The false-fail skipped the
-post-verify hooks (I ran them manually).
+## Gotchas hit
+- **Now-based test fixtures are time bombs** — `date.today()` in a test collided with
+  `EXPERIMENT_START_DATE` on genesis day; green locally (07-12), red in CI (07-13). Inject
+  the date. ([[reference-golden-tests-wallclock]] class.)
+- **#1173 reconcile bot / personal repo** — the org-only PR-bypass list doesn't exist on a
+  User-owned repo; the fix Matthew applied was turning OFF "require a pull request" on main.
+- **Prereg is EXPERIMENT_SCOPED** — a future `restart_pipeline.py` wipes it; re-run
+  `seed --apply` + `publish --apply` after any reset (the reminder prints on every run).
 
-## Open / next picks
-- **#1187** (Matthew) — wire the V1 voiced show-open once he sources a **real royalty-free/CC0
-  music bed** (Pixabay Music / YouTube Audio Library). V1 = Elena voice, "One ordinary
-  life. Every number, in the open. This is The Measured Life. averagejoematt dot com."
-  Preview clips + `_voice_v1.wav` staged; ident held OFF until this lands. Voice-only was
-  "a bit bland," synth beds sounded synthetic — needs actual music.
-- **#1188** (Next) — rendered-verify false-fail on future-genesis resets.
-- **Deferred by design (next session):** attended genesis pre-registration publish
-  (`publish_genesis_preregistration.py` — permanent public AI artifact, dry-run-review
-  posture); **Monday post-genesis `restart_verify.py`**.
-- **Branch-protection bypass** for the #1173 reconcile job — Matthew must OK it or doc-sync
-  drift + hand-reconciles continue.
-- Carried from before: supplement hypotheses (#1148) + coach trait scores review; #741
-  publish (Matthew's byline); the epic-closeout queue.
+## Residual / next-picks
+- **#1173 now unblocked** — Matthew set the branch-protection; the reconcile bot can push.
+  First real proof is the next PR that shifts a doc-sync literal (this session had none to
+  exercise it).
+- **#1029** remaining hardening legs: Identity Center, ACCOUNTS estate rows, FileVault,
+  registrar. `repo-private` leg done.
+- Monday post-genesis `restart_verify.py` + the 07-13 drift sentinel (→ close #342/#717).
+- Matthew queue: **#1187** (voiced show-open needs a music bed), **#1114** portraits,
+  **#741** career artifact (build-in-public; note: private repo now — flip back if the
+  code is wanted as a portfolio piece), **#1148** + coach traits.
+- Budget tier 1 ($82/$85).
 
-## Gotchas (durable → memory)
-- **Prompt rules can't guarantee structure** — 0/15; enforce structure in code
-  (deterministic repair + full re-gate), not prompts. [[reference-prompt-structural-guarantees]]
-- **A parity check can codify a broken live state** ([[reference-iam-parity-codified-broken-state]] — same class bit the reconcile job).
-- ADR-080 god-module gate (2000 lines) forced a mid-stream extraction (#1185) — watch it
-  when adding to a big `*_lambda.py`; extract prompt builders to sibling modules.
-- Reset resurrects (never regenerates) the prologue → durable artifacts must be evergreen.
-- Fable credits ran out mid-fan-out (5 agents died); switched to Opus 4.8, salvaged the
-  ~90%-done zeitgeist work by hand rather than re-running.
+**Build beat:** `chronicle-prequels-restored` — see `site/story/build/beats.json`.
+**Docs:** CONVENTIONS.md §4c + docs visibility corrections (DISASTER_RECOVERY, ACCOUNTS,
+CONTINUITY, AWS_ACCESS, TESTING, NEW_MACHINE_BOOTSTRAP) shipped in-session; wiki checkers
+green at wrap.
 
-**Build beat:** 2026-07-12-the-podcast-that-refused-to-be-boring
-**Docs:** ADR-135 (no-touch contract, #1176); `restart_media_reset.py` docstring (evergreen ep0, #1185); reset regenerated CHANGELOG + restart reports (committed `dc8a839c`); doc-sync reconciled on main. No other canonical pages invalidated.
+Prior: `handovers/HANDOVER_2026-07-12_PodcastNoTouchAndCycle6Reset.md`.
