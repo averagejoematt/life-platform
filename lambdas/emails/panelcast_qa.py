@@ -30,6 +30,15 @@ _QA_HOOK_MAX_WORDS = 180  # turn 0 is the cold-open hook — a solo turn by desi
 # could never converge. The graders must agree: 2 is the bound, and the judge rubrics
 # below state the SAME number (test-enforced in tests/test_panelcast_repair.py).
 _QA_MAX_CONSECUTIVE = 2
+# #1123 (intro path): after the ONE solo cold-open hook (turn 0), Episode 0 must strictly
+# alternate — the series bible's episode0_arc calls the hook "ONE punchy solo turn", so a
+# second same-speaker turn is a seam, not a monologue-tolerance question. The weekly show
+# keeps the looser bound of 2 (two riffing beats in a row read fine mid-conversation); the
+# trailer does not. Threaded through the SHARED primitives (structural_seams / _craft_check
+# / repair_structure) as a param so the gate and the #1170 repair pass can never disagree
+# on the bound they enforce (the #1176 invariant). Turn 0 keeps its OTHER exemptions — the
+# longer hook word-cap below and the cold-open dangling-thread exemption.
+_QA_MAX_CONSECUTIVE_INTRO = 1
 
 # #1122: a turn that ASKS something (interrogative or an explicit challenge) must get a
 # reply from the OTHER speaker in the very next turn. The observed wk0 defect: a gate
@@ -83,26 +92,28 @@ def _continuity_check(turns: list) -> list:
     ]
 
 
-def structural_seams(turns: list) -> list:
+def structural_seams(turns: list, max_consecutive: int = _QA_MAX_CONSECUTIVE) -> list:
     """#1170: the same-speaker adjacency spans the deterministic gate flags — the repair
     pass's work list, as inclusive (start, end) index spans. A run is a seam if it is longer
-    than _QA_MAX_CONSECUTIVE (the craft floor-hog bound) or contains a dangling thread (the
-    continuity check). Built from the gate's own primitives, never a parallel detection."""
+    than `max_consecutive` (the craft floor-hog bound — weekly 2, intro 1 per #1123) or
+    contains a dangling thread (the continuity check). Built from the gate's own primitives,
+    never a parallel detection; the same `max_consecutive` is threaded into _craft_check and
+    repair_structure so the gate and the repair pass enforce the identical bound."""
     dangling = {i for i, _ in _dangling_pairs(turns)}
-    return [(s, e) for s, e in _speaker_runs(turns) if (e - s + 1) > _QA_MAX_CONSECUTIVE or any(s <= i <= e for i in dangling)]
+    return [(s, e) for s, e in _speaker_runs(turns) if (e - s + 1) > max_consecutive or any(s <= i <= e for i in dangling)]
 
 
-def _craft_check(turns: list) -> list:
+def _craft_check(turns: list, max_consecutive: int = _QA_MAX_CONSECUTIVE) -> list:
     """Deterministic, zero-cost craft gate. Returns a list of failure reasons (empty = pass).
     Catches exactly the pacing problems an LLM judge is unreliable at: monologue dumps and
-    one speaker holding the floor too long (bound: _QA_MAX_CONSECUTIVE, aligned with the
-    judge rubric per #1171). Turn 0 is the intentional solo cold-open hook (a longer
-    ceiling, not the dialogue cap)."""
+    one speaker holding the floor too long (bound: `max_consecutive` — weekly 2, intro 1 per
+    #1123 — aligned with the judge rubric per #1171). Turn 0 is the intentional solo cold-open
+    hook (a longer word ceiling, not the dialogue cap)."""
     fails = []
     for s, e in _speaker_runs(turns):
         run = e - s + 1
-        if run > _QA_MAX_CONSECUTIVE:
-            fails.append(f"{turns[e].get('speaker')} speaks {run} turns in a row (max {_QA_MAX_CONSECUTIVE}) — break it up")
+        if run > max_consecutive:
+            fails.append(f"{turns[e].get('speaker')} speaks {run} turns in a row (max {max_consecutive}) — break it up")
             break
     for i, t in enumerate(turns):
         wc = len((t.get("line") or "").split())
@@ -143,17 +154,20 @@ def _qa_review(turns: list, rubric: str, ground_truth: str = "") -> tuple:
         return False, [f"qa-judge-error (fail-closed): {e}"]
 
 
-# NB (#1171): both rubrics state the consecutive-turns bound as f"{_QA_MAX_CONSECUTIVE}"
-# so the judge is instructed to fail exactly what the deterministic check fails — a
-# calibration test asserts the constant and the rubric text agree.
+# NB (#1171/#1123): each rubric states its consecutive-turns bound from the constant —
+# the weekly rubric from _QA_MAX_CONSECUTIVE (2), the intro rubric from
+# _QA_MAX_CONSECUTIVE_INTRO (1, strict alternation after the solo hook) — so the judge is
+# instructed to fail exactly what the deterministic check fails; a calibration test asserts
+# each constant and its rubric text agree (tests/test_panelcast_repair.py).
 _INTRO_RUBRIC = (
     "The two speakers are ELENA VOSS (the host — an embedded journalist) and DR. ELI MARSH (the guest — the head "
     "coach MATT cast to lead the coaching staff; MATT himself designed and built the experiment and the platform). "
     "MATT is the third-person SUBJECT of the experiment; he is NOT "
     "in the room and does NOT speak. These three are ESTABLISHED show personas — never treat Elena or Eli as invented.\n"
-    "1. Opens on a genuine HOOK in turn 0, not a flat self-introduction.\n"
-    "2. After the opening, it's a real two-person conversation — no long stretch of one person talking; more than "
-    f"{_QA_MAX_CONSECUTIVE} consecutive turns from one speaker fails this item.\n"
+    "1. Opens on a genuine HOOK in turn 0 — ONE punchy solo turn, not a flat self-introduction.\n"
+    "2. After the opening hook the speakers STRICTLY ALTERNATE — two consecutive turns from the same speaker fails this "
+    f"item (more than {_QA_MAX_CONSECUTIVE_INTRO} consecutive turn from one speaker fails). The hook is a single solo "
+    "turn; from the second turn on it is a real two-person back-and-forth, never a stretch of one person talking.\n"
     "3. At least one point of GENUINE friction/disagreement — Eli is not just agreeing with Elena throughout.\n"
     "4. Dr. Eli Marsh (the PI) names the over-optimization / 'measuring a life instead of living it' RISK himself, in his own words.\n"
     "5. No abrupt, unbridged topic jumps.\n"
@@ -205,6 +219,7 @@ _WEEKLY_RUBRIC = (
 )
 
 
-def _qa_gate(turns: list, rubric: str, ground_truth: str = "") -> list:
-    """Combined craft (deterministic) + LLM-judge gate. Returns all failure reasons (empty = clean)."""
-    return _craft_check(turns) + _qa_review(turns, rubric, ground_truth)[1]
+def _qa_gate(turns: list, rubric: str, ground_truth: str = "", max_consecutive: int = _QA_MAX_CONSECUTIVE) -> list:
+    """Combined craft (deterministic) + LLM-judge gate. Returns all failure reasons (empty = clean).
+    `max_consecutive` threads the floor-hog bound (weekly 2, intro 1 per #1123) into _craft_check."""
+    return _craft_check(turns, max_consecutive) + _qa_review(turns, rubric, ground_truth)[1]

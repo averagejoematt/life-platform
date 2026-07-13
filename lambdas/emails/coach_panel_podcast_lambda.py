@@ -742,6 +742,7 @@ try:
         _INTRO_RUBRIC,
         _QA_MAX_ATTEMPTS,
         _QA_MAX_CONSECUTIVE,
+        _QA_MAX_CONSECUTIVE_INTRO,
         _QA_MAX_WORDS_PER_TURN,
         _WEEKLY_RUBRIC,
         _continuity_check,
@@ -756,6 +757,7 @@ except ImportError:  # bundle stages lambdas/ at the zip root
         _INTRO_RUBRIC,
         _QA_MAX_ATTEMPTS,
         _QA_MAX_CONSECUTIVE,
+        _QA_MAX_CONSECUTIVE_INTRO,
         _QA_MAX_WORDS_PER_TURN,
         _WEEKLY_RUBRIC,
         _continuity_check,
@@ -830,10 +832,8 @@ def _run_intro(dry_run: bool = False) -> dict:
             return None
         for t in ts:
             t["line"] = re.sub(r"\bMatthew\b", "Matt", t["line"])
-        first = ts[0]["line"].lower()
-        if not ("i'm elena" in first or "i am elena" in first or "elena voss" in first):
-            ts.insert(0, {"speaker": ELENA, "line": INTRO_COLD_OPEN})
-        return ts
+        # #1123: name Elena in her own hook (or fall back to the cold-open) — turn 0 stays ONE solo hook, no t0/t1 seam.
+        return _repair.name_the_opener(ts, ELENA, INTRO_COLD_OPEN)
 
     def _line_ok(line):
         # The intro path's per-line gates, applied to #1170 repair-generated lines too.
@@ -855,10 +855,11 @@ def _run_intro(dry_run: bool = False) -> dict:
             if not cand:
                 ledger.append(_repair.ledger_entry(attempt + 1, rev, ["no usable candidate (parse/too-few-turns)"], []))
                 break
+            mc = _QA_MAX_CONSECUTIVE_INTRO  # #1123: strict alternation after the solo hook (gate + repair share this bound)
             cand, _seams, _fixed = _repair.repair_structure(
-                cand, {ELENA, INTRO_GUEST_ID}, bedrock_client.invoke, INTRO_MODEL, _extract_json, logger, line_ok=_line_ok
+                cand, {ELENA, INTRO_GUEST_ID}, bedrock_client.invoke, INTRO_MODEL, _extract_json, logger, _line_ok, max_consecutive=mc
             )
-            det = _craft_check(cand)
+            det = _craft_check(cand, mc)
             judge = _qa_review(cand, _INTRO_RUBRIC, bio_truth)[1]
             fails = det + judge  # same composition as _qa_gate; split only for the ledger
             ledger.append(_repair.ledger_entry(attempt + 1, rev, det, judge, _fixed))

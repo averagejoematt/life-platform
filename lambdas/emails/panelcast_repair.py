@@ -28,9 +28,9 @@ import json
 import os
 
 try:
-    from emails.panelcast_qa import _QA_MAX_WORDS_PER_TURN, structural_seams
+    from emails.panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
 except ImportError:  # bundle stages lambdas/ at the zip root
-    from panelcast_qa import _QA_MAX_WORDS_PER_TURN, structural_seams
+    from panelcast_qa import _QA_HOOK_MAX_WORDS, _QA_MAX_CONSECUTIVE, _QA_MAX_WORDS_PER_TURN, structural_seams
 
 # #1172: the fixed attempt budget — panelcast_qa._QA_MAX_ATTEMPTS generations, each with
 # up to MAX_REVISIONS judge-feedback revisions. Exhaustion escalates; never a silent miss.
@@ -39,6 +39,34 @@ MAX_REVISIONS = int(os.environ.get("PANEL_QA_MAX_REVISIONS", "2"))
 # attempt (a healthy post-#1168 draft has 0–2 seams; more than this means re-write, and
 # the gate + revision loop already own that path).
 MAX_SEAM_REPAIRS = int(os.environ.get("PANELCAST_MAX_SEAM_REPAIRS", "4"))
+
+
+# #1123: the Episode-0 cold-open name lock. INTRO_COLD_OPEN (owned by the lambda) names
+# Elena AND states the whole hook; when the model's turn 0 already IS a hook and merely
+# failed to name her, prepending the full cold-open reads doubled and creates an Elena+Elena
+# t0/t1 seam. The cheap fix prefixes ONLY this one name sentence onto her own hook instead.
+INTRO_NAME_SENTENCE = "I'm Elena Voss, the journalist living inside this experiment."
+_ELENA_NAME_MARKERS = ("i'm elena", "i am elena", "elena voss")
+
+
+def name_the_opener(turns, host_speaker, cold_open):
+    """#1123: Episode 0's turn 0 must name the host. Cheap fix — when the host speaks first
+    with a real hook but never names herself, prefix ONLY INTRO_NAME_SENTENCE onto her OWN
+    hook so turn 0 stays a single solo hook (no host+host t0/t1 seam, no doubled hook a full
+    `cold_open` prepend would create). Fall back to prepending `cold_open` as a new turn 0
+    only when the opener is NOT the host's, or naming in place would breach the hook word cap;
+    under the strict-alternation intro bound the repair pass then merges any seam that leaves."""
+    if not turns:
+        return turns
+    line = turns[0].get("line", "")
+    if any(m in line.lower() for m in _ELENA_NAME_MARKERS):
+        return turns
+    prefixed = f"{INTRO_NAME_SENTENCE} {line}"
+    if turns[0].get("speaker") == host_speaker and len(prefixed.split()) <= _QA_HOOK_MAX_WORDS:
+        turns[0]["line"] = prefixed
+    else:
+        turns.insert(0, {"speaker": host_speaker, "line": cold_open})
+    return turns
 
 
 def _invoke_text(invoke, model: str, system: str, user: str, max_tokens: int) -> str:
@@ -106,13 +134,17 @@ def _repair_seam(turns, s, e, speakers, invoke, model, extract_json, line_ok):
     return rep if _replacement_ok(rep, before_spk, after_spk, speakers, line_ok) else None
 
 
-def repair_structure(turns, speakers, invoke, model, extract_json, logger, line_ok=None, max_repairs=MAX_SEAM_REPAIRS):
+def repair_structure(
+    turns, speakers, invoke, model, extract_json, logger, line_ok=None, max_repairs=MAX_SEAM_REPAIRS, max_consecutive=_QA_MAX_CONSECUTIVE
+):
     """#1170: deterministic seam detection + ONE targeted repair generation per seam.
     Returns (turns, seams_found, seams_repaired). A failed/invalid repair keeps the
     ORIGINAL span, and the result must still clear the full unchanged gate downstream —
     repair can only help, never bypass. Seams are spliced last-to-first so earlier
-    indices never shift; zero-cost (no model call) when the script already alternates."""
-    seams = structural_seams(turns)
+    indices never shift; zero-cost (no model call) when the script already alternates.
+    `max_consecutive` is the SAME bound the gate's _craft_check enforces (weekly 2, intro 1
+    per #1123) — passed straight into structural_seams so repair and gate never disagree."""
+    seams = structural_seams(turns, max_consecutive)
     if not seams:
         return turns, 0, 0
     if len(seams) > max_repairs:
