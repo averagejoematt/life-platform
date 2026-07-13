@@ -577,8 +577,10 @@ def _intro_guest() -> dict:
     }
 
 
-def _build_intro_script(bible: dict) -> list:
-    """Episode 0 as a two-person interview, driven by the series bible."""
+def _build_intro_script(bible: dict, zeitgeist: list | None = None) -> list:
+    """Episode 0 as a two-person interview, driven by the series bible.
+    `zeitgeist` (#1178): optional real headlines — an OPTIONAL TOPICAL COLOR
+    block in the prompt, omitted entirely when the list is empty."""
     import bedrock_client
 
     g = _intro_guest()
@@ -654,12 +656,14 @@ def _build_intro_script(bible: dict) -> list:
         'OUTPUT: ONLY a JSON array of turns [{"speaker":"elena"|"eli","line":"..."}], 20–28 turns. '
         "No preamble, no stage directions, no JSON fences."
     )
+    zg = _zeitgeist.zeitgeist_prompt_block(zeitgeist or [])
     user = (
         f"ELENA (host): {ch.get('elena', '')}\n\n"
         f"MATTHEW (the subject — NEVER a weight or body number): {ch.get('matthew', '')}\n\n"
         f"ELI (guest): {ch.get('eli', '')}\nHis philosophy: {g['philosophy']}\nHis expertise: {', '.join(g['expertise'])}\n\n"
         f"WHAT A LISTENER CAN EXPLORE (weave these in naturally, do NOT list them robotically):\n{site}\n\n"
-        "Write Episode 0 now."
+        + (f"{zg}\n\n" if zg else "")
+        + "Write Episode 0 now."
     )
     body = {"model": INTRO_MODEL, "max_tokens": 4000, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=INTRO_MODEL)
@@ -767,6 +771,13 @@ try:
 except ImportError:  # bundle stages lambdas/ at the zip root
     import panelcast_repair as _repair
 
+# #1178: free RSS zeitgeist — optional topical color, fetched ONCE per run; the
+# same list feeds the judge's ground truth (details in panelcast_zeitgeist.py).
+try:
+    from emails import panelcast_zeitgeist as _zeitgeist
+except ImportError:  # bundle stages lambdas/ at the zip root
+    import panelcast_zeitgeist as _zeitgeist
+
 
 # The weekly read-aloud bar: a real listener should believe this is a human-made podcast and
 # recommend it. Encodes Matt's acceptance test (2026-06-21) — Turing-pass transcript, guest
@@ -799,12 +810,15 @@ def _run_intro(dry_run: bool = False) -> dict:
     # this enforces "no invented numbers"). No elapsed-time/results context is fed.
     allowed = er03_gate.numbers_in(json.dumps(bible))
     _chars = bible.get("characters", {}) or {}
+    # #1178: ONE fetch per run — every attempt/revision reuses the same list so the
+    # writer prompt and the judge's ground truth stay consistent. Fail-soft: [].
+    zeitgeist = _zeitgeist.fetch_zeitgeist()
     bio_truth = (
         "MATT — the experiment's SUBJECT, the ONLY person whose biographical facts are constrained:\n"
         + _chars.get("matthew", "")
         + "\n\nESTABLISHED show personas (NOT Matt, NOT inventions — never flag their names/roles): "
         "Elena Voss (host, embedded journalist); Dr. Eli Marsh (guest, the head coach Matt cast to lead the AI coach "
-        "team — Matt himself designed and built the experiment and the platform)."
+        "team — Matt himself designed and built the experiment and the platform)." + _zeitgeist.zeitgeist_truth_block(zeitgeist)
     )
 
     def _prep(raw):
@@ -836,7 +850,7 @@ def _run_intro(dry_run: bool = False) -> dict:
     ledger = []
     turns, qa_fails = None, ["no candidate generated"]
     for attempt in range(_QA_MAX_ATTEMPTS):
-        cand = _prep(_build_intro_script(bible))
+        cand = _prep(_build_intro_script(bible, zeitgeist=zeitgeist))
         for rev in range(_repair.MAX_REVISIONS + 1):
             if not cand:
                 ledger.append(_repair.ledger_entry(attempt + 1, rev, ["no usable candidate (parse/too-few-turns)"], []))
@@ -1184,6 +1198,8 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
     # #1086: the mandatory experiment-phase block — computed here if a caller
     # hands beats without one, so no path can build this prompt phase-blind.
     _phase_block = beats.get("phase_block") or format_experiment_phase_context(build_experiment_phase_context(None, beats.get("date")))
+    # #1178: optional topical color — real headlines, at most 1-2 light quips, never load-bearing.
+    _zg = _zeitgeist.zeitgeist_prompt_block(beats.get("zeitgeist") or [])
     user = (
         f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n{_phase_block}\n\n{_chron_block}{_presence_block}"
         f"GUEST COACH {guest.get('name')} — recent read: {guest.get('summary', '')}\nThemes: {', '.join(guest.get('themes', []))}\n\n"
@@ -1196,7 +1212,8 @@ def _build_weekly_script(beats: dict, bible: dict) -> dict:
         # SS-09: rotate the entry-point lens so the show doesn't feel formulaic by ep 26.
         # Keep the bet/Split/scoreboard format — change only what the episode LEADS with.
         f"THIS WEEK'S ANGLE (keep the format, but lead with THIS lens so the show stays fresh): {_episode_angle(beats.get('week'))}\n\n"
-        "Write the JSON now."
+        + (f"{_zg}\n\n" if _zg else "")
+        + "Write the JSON now."
     )
     body = {"model": WRITER_MODEL, "max_tokens": 3500, "system": system, "messages": [{"role": "user", "content": user}]}
     resp = bedrock_client.invoke(body, model_name=WRITER_MODEL)
@@ -1685,9 +1702,12 @@ def _run_weekly(force: bool, dry_run: bool = False) -> dict:
         + " "
         + beats.get("phase_block", "")
     )
+    # #1178: ONE fetch per run — attempts/revisions reuse the same list (via beats)
+    # so writer prompt + judge ground truth stay consistent. Fail-soft: [] = no block.
+    beats["zeitgeist"] = _zeitgeist.fetch_zeitgeist()
     _gt = (beats.get("chronicle", "")[:1500] + "\n" + "\n".join(f"{c['name']}: {c['summary']}" for c in beats.get("coach_reads", [])))[
         :4000
-    ]
+    ] + _zeitgeist.zeitgeist_truth_block(beats["zeitgeist"])
 
     def _valid(ts):
         return [t for t in ts if isinstance(t, dict) and (t.get("line") or "").strip()]

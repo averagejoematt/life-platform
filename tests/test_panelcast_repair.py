@@ -317,7 +317,7 @@ def test_intro_repaired_script_that_still_fails_judge_holds(monkeypatch):
         {"speaker": "elena", "line": "And the readers see all of it."},
         {"speaker": "eli", "line": "Every line of it."},
     ]
-    monkeypatch.setattr(panel, "_build_intro_script", lambda bible: [dict(t) for t in seeded])
+    monkeypatch.setattr(panel, "_build_intro_script", lambda bible, **k: [dict(t) for t in seeded])
     # The only bedrock call left un-patched is the REPAIR generation → return a valid splice.
     replacement = [
         {"speaker": "eli_marsh", "line": "Point one about the platform."},

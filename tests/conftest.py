@@ -33,6 +33,11 @@ for _sp in ("ingestion", "compute", "coach", "emails", "web", "operational", "in
 # autoload would otherwise perform a real DynamoDB read when local creds exist.
 os.environ.setdefault("AI_VALIDATOR_AUTOLOAD", "off")
 
+# #1178: keep the unit suite hermetic — the podcast zeitgeist fetch would
+# otherwise hit live BBC RSS feeds from any test that drives _run_intro/_run_weekly.
+# Tests that exercise the fetch itself set PANELCAST_ZEITGEIST=on and mock urlopen.
+os.environ.setdefault("PANELCAST_ZEITGEIST", "off")
+
 
 # #381: make the unit suite hermetic regardless of the developer's local
 # ~/.aws profile. Several nominally-offline tests (e.g. tests/test_coaches_api.py)

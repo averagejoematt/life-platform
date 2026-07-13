@@ -268,7 +268,7 @@ def test_run_intro_holds_on_qa_fails_never_publishes(monkeypatch):
         {"speaker": ("elena" if i % 2 == 0 else "eli"), "line": "I'm Elena Voss and this is a clean, number-free line of dialogue."}
         for i in range(10)
     ]
-    monkeypatch.setattr(panel, "_build_intro_script", lambda bible: [dict(t) for t in clean_script])
+    monkeypatch.setattr(panel, "_build_intro_script", lambda bible, **k: [dict(t) for t in clean_script])
     monkeypatch.setattr(bedrock_client, "invoke", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("judge down")))
 
     held = {}

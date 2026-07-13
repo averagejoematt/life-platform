@@ -27,6 +27,12 @@ from datetime import datetime, timezone
 
 from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 
+# #1178: optional topical color — the caller fetches once per run into beats["zeitgeist"].
+try:
+    from emails.panelcast_zeitgeist import zeitgeist_prompt_block
+except ImportError:  # bundle stages lambdas/ at the zip root
+    from panelcast_zeitgeist import zeitgeist_prompt_block
+
 SHOW_MEMORY_SK = "SHOW#memory"
 MAX_CALLBACKS = 10
 MAX_GUEST_HISTORY = 12
@@ -179,7 +185,8 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
         f"FORMAT:\n{json.dumps(fmt.get('segments', []))}\nSign-off line: {fmt.get('sign_off', '')}\n\n"
         f"TONE: {bible.get('tone', '')}\n\n{_HARD_RULES} "
         "If SHOW MEMORY is provided, land at least one natural callback — you remember your own show. If an AIRED DISPUTE or OPEN "
-        "ARGUMENT is provided, that IS this week's Split segment — put the actual positions to the guest, don't soften them into agreement. "
+        "ARGUMENT is provided, that IS this week's Split segment — put the actual positions to the guest, "
+        "don't soften them into agreement. "
         'OUTPUT ONLY JSON: {"elena_turns":[{"line":"<your words>","wants_from_guest":"<what their answer must address>"}], '
         '"open_bet":"<the one new falsifiable bet>", "last_bet_result":{"outcome":"won"|"lost"|"open"|"none"}, '
         '"pull_quote":"<one shareable line>", "episode_title":"<2-5 word hook>"}. 8-11 elena_turns (the last is your sign-off). No fences.'
@@ -191,6 +198,8 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
     # #1086: the mandatory experiment-phase block — computed here if a caller
     # hands beats without one, so no path can build this prompt phase-blind.
     _phase = beats.get("phase_block") or format_experiment_phase_context(build_experiment_phase_context(None, beats.get("date")))
+    # #1178: optional topical color — real headlines, at most 1-2 light quips, never load-bearing.
+    _zg = zeitgeist_prompt_block(beats.get("zeitgeist") or [])
     elena_user = (
         f"WEEK {beats.get('week')}: {beats.get('title')}.\n\n"
         + f"{_phase}\n\n"
@@ -202,7 +211,9 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
         + f"{deps['elena_host_state']()}\n\n"
         + f"LAST WEEK'S OPEN BET (score it honestly): {beats.get('last_open_bet') or '(none)'}\n\n"
         + f"RECENT TOPICS (avoid repeating): {beats.get('recent_topics')}\n\n"
-        + f"THIS WEEK'S ANGLE: {deps['episode_angle'](beats.get('week'))}\n\nWrite the JSON now."
+        + f"THIS WEEK'S ANGLE: {deps['episode_angle'](beats.get('week'))}\n\n"
+        + (f"{_zg}\n\n" if _zg else "")
+        + "Write the JSON now."
     )
     model = deps["writer_model"]
     resp = deps["invoke"](
@@ -230,7 +241,8 @@ def build_weekly_script_v2(beats: dict, bible: dict, deps: dict) -> dict:
         f"questions with your real read). Stay in your own voice. {_HARD_RULES}"
         + (f"\n\nYour voice rules: {v_rules}" if v_rules else "")
         + (f"\n\nA sample in your voice:\n{v_example}" if v_example else "")
-        + '\n\nOUTPUT ONLY JSON: {"replies":["<reply to line 1>", "<reply to line 2>", ...]} — exactly one reply per Elena line, in order. No fences.'
+        + '\n\nOUTPUT ONLY JSON: {"replies":["<reply to line 1>", "<reply to line 2>", ...]} '
+        "— exactly one reply per Elena line, in order. No fences."
     )
     coach_user = (
         f"{_phase}\n\n"  # #1086: the guest sees the same phase clock Elena does
