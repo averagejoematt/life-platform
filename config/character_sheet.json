@@ -1,14 +1,14 @@
 {
   "_meta": {
     "version": "1.5.0",
-    "description": "Character Sheet v1.5.0 (#965 source wiring, ADR-134 amendment): hevy strength days feed movement (strength_sessions, behavioral), reading-session days feed mind (reading_practice, behavioral), the todoist overdue queue feeds consistency (task_follow_through, measured) — all day-count metrics, volume-gaming resistant. On v1.4.0's #956 math-v2 base.",
-    "last_updated": "2026-07-11",
+    "description": "Character Sheet v1.5.0 (#965 source wiring, ADR-134 amendment): hevy strength days feed movement (strength_sessions, behavioral), reading-session days feed mind (reading_practice, behavioral), the todoist overdue queue feeds consistency (task_follow_through, measured) \u2014 all day-count metrics, volume-gaming resistant. On v1.4.0's #956 math-v2 base.",
+    "last_updated": "2026-07-12",
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
-    "start_date": "2026-07-12",
-    "start_weight_lbs": 300.8,
-    "start_weight_kg": 136.441,
+    "start_date": "2026-07-13",
+    "start_weight_lbs": 314.0,
+    "start_weight_kg": 142.428,
     "baseline_source": "withings",
     "goal_weight_lbs": 185,
     "weight_phase": "loss",
@@ -169,7 +169,7 @@
       "ema_lambda": 0.93,
       "rolling_window_days": 14,
       "owner": "Social Connection",
-      "not_instrumented_note": "No relationship data source feeds this pillar yet — tracked as future work (#747).",
+      "not_instrumented_note": "No relationship data source feeds this pillar yet \u2014 tracked as future work (#747).",
       "components": {
         "social_interaction_frequency": {
           "weight": 0.45
@@ -294,31 +294,31 @@
   "tiers": [
     {
       "name": "Foundation",
-      "emoji": "🔨",
+      "emoji": "\ud83d\udd28",
       "min_level": 1,
       "max_level": 20
     },
     {
       "name": "Momentum",
-      "emoji": "🔥",
+      "emoji": "\ud83d\udd25",
       "min_level": 21,
       "max_level": 40
     },
     {
       "name": "Discipline",
-      "emoji": "⚔️",
+      "emoji": "\u2694\ufe0f",
       "min_level": 41,
       "max_level": 60
     },
     {
       "name": "Mastery",
-      "emoji": "🏆",
+      "emoji": "\ud83c\udfc6",
       "min_level": 61,
       "max_level": 80
     },
     {
       "name": "Elite",
-      "emoji": "👑",
+      "emoji": "\ud83d\udc51",
       "min_level": 81,
       "max_level": 100
     }
@@ -326,7 +326,7 @@
   "cross_pillar_effects": [
     {
       "name": "Sleep Drag",
-      "emoji": "🛏️",
+      "emoji": "\ud83d\udecf\ufe0f",
       "condition": "sleep < 35",
       "targets": {
         "movement": {
@@ -341,7 +341,7 @@
     },
     {
       "name": "Training Boost",
-      "emoji": "💪",
+      "emoji": "\ud83d\udcaa",
       "condition": "movement > 70",
       "targets": {
         "metabolic": {
@@ -352,7 +352,7 @@
     },
     {
       "name": "Focus Buff",
-      "emoji": "🧠",
+      "emoji": "\ud83e\udde0",
       "condition": "mind > 70",
       "targets": {
         "consistency": {
@@ -363,7 +363,7 @@
     },
     {
       "name": "Synergy Bonus",
-      "emoji": "⚡",
+      "emoji": "\u26a1",
       "condition": "nutrition > 70 AND movement > 70",
       "targets": {
         "metabolic": {
@@ -374,7 +374,7 @@
     },
     {
       "name": "Alignment Bonus",
-      "emoji": "🌟",
+      "emoji": "\ud83c\udf1f",
       "condition": "all_pillars >= 41",
       "targets": {
         "_all": {
@@ -385,7 +385,7 @@
     },
     {
       "name": "Vice Shield",
-      "emoji": "🛡️",
+      "emoji": "\ud83d\udee1\ufe0f",
       "condition": "any_vice_streak > 30",
       "targets": {
         "mind": {
@@ -404,19 +404,19 @@
     "_meta": "Per-pillar protocol recommendations by tier. Surfaced in Daily Brief when pillar drops or needs attention.",
     "sleep": {
       "Foundation": [
-        "Fixed wake time ±30 min every day, including weekends — circadian anchor #1",
-        "Morning sunlight within 30 min of waking (10+ min, no sunglasses) — Huberman protocol",
-        "No screens 1 hour before bed — use NSDR audio or book instead",
-        "Bedroom temperature 65–67°F — set Eight Sleep accordingly"
+        "Fixed wake time \u00b130 min every day, including weekends \u2014 circadian anchor #1",
+        "Morning sunlight within 30 min of waking (10+ min, no sunglasses) \u2014 Huberman protocol",
+        "No screens 1 hour before bed \u2014 use NSDR audio or book instead",
+        "Bedroom temperature 65\u201367\u00b0F \u2014 set Eight Sleep accordingly"
       ],
       "Momentum": [
         "NSDR protocol (10 min) at 2pm if prior night was <7 hours",
-        "No caffeine after 12pm — half-life is 5–6 hours",
+        "No caffeine after 12pm \u2014 half-life is 5\u20136 hours",
         "Evening wind-down routine: dim lights at 9pm, Eight Sleep cooling ramp"
       ],
       "Discipline": [
-        "Track sleep onset consistency — keep std dev under 30 min",
-        "Optimize deep sleep: limit alcohol (even 1 drink cuts deep sleep 20–40%)",
+        "Track sleep onset consistency \u2014 keep std dev under 30 min",
+        "Optimize deep sleep: limit alcohol (even 1 drink cuts deep sleep 20\u201340%)",
         "Consider magnesium threonate 30 min before bed for sleep architecture"
       ],
       "Mastery": [
@@ -427,134 +427,134 @@
     },
     "movement": {
       "Foundation": [
-        "Start with 3 sessions per week — consistency over intensity",
-        "Walk 30+ min daily — lowest-hanging NEAT fruit",
-        "Track all activity in Strava — data creates accountability"
+        "Start with 3 sessions per week \u2014 consistency over intensity",
+        "Walk 30+ min daily \u2014 lowest-hanging NEAT fruit",
+        "Track all activity in Strava \u2014 data creates accountability"
       ],
       "Momentum": [
-        "Build toward 150 min/week Zone 2 — the longevity threshold (Attia)",
-        "Add 1 strength session per week — sarcopenia prevention starts now",
-        "Progressive overload: increase volume or load 5–10% per week"
+        "Build toward 150 min/week Zone 2 \u2014 the longevity threshold (Attia)",
+        "Add 1 strength session per week \u2014 sarcopenia prevention starts now",
+        "Progressive overload: increase volume or load 5\u201310% per week"
       ],
       "Discipline": [
-        "Polarize training: 80% Zone 2, 20% high intensity — avoid the middle",
-        "Monitor TSB (Training Stress Balance) — stay between -10 and +15",
+        "Polarize training: 80% Zone 2, 20% high intensity \u2014 avoid the middle",
+        "Monitor TSB (Training Stress Balance) \u2014 stay between -10 and +15",
         "Add rucking: loaded walking builds Zone 2 + functional strength simultaneously"
       ],
       "Mastery": [
         "Periodize in 4-week mesocycles with planned deload weeks",
         "Track pace-at-HR over time as cardiovascular efficiency signal",
-        "Diversify movement patterns — aim for 4+ activity types per month"
+        "Diversify movement patterns \u2014 aim for 4+ activity types per month"
       ]
     },
     "nutrition": {
       "Foundation": [
-        "Log everything in MacroFactor — even imperfect days. Data > perfection",
-        "Hit protein target (190g) — the non-negotiable macro during weight loss",
-        "Eat within designated window — structure prevents drift"
+        "Log everything in MacroFactor \u2014 even imperfect days. Data > perfection",
+        "Hit protein target (190g) \u2014 the non-negotiable macro during weight loss",
+        "Eat within designated window \u2014 structure prevents drift"
       ],
       "Momentum": [
-        "Distribute protein across 4+ meals (30g+ each) — MPS threshold matters (Norton)",
-        "Stay within ±10% of calorie target — consistency beats precision",
-        "Plan meals ahead — decision fatigue is the enemy of adherence"
+        "Distribute protein across 4+ meals (30g+ each) \u2014 MPS threshold matters (Norton)",
+        "Stay within \u00b110% of calorie target \u2014 consistency beats precision",
+        "Plan meals ahead \u2014 decision fatigue is the enemy of adherence"
       ],
       "Discipline": [
         "Front-load protein: aim for 50g+ by noon to protect lean mass",
-        "Track weekend vs weekday adherence — close the gap",
-        "Use MacroFactor's adaptive algorithm — trust the math on expenditure"
+        "Track weekend vs weekday adherence \u2014 close the gap",
+        "Use MacroFactor's adaptive algorithm \u2014 trust the math on expenditure"
       ],
       "Mastery": [
-        "Optimize micronutrient density — leverage The Weekly Plate for variety",
+        "Optimize micronutrient density \u2014 leverage The Weekly Plate for variety",
         "Meal-specific glucose responses: identify your personal spike triggers (CGM)",
         "Strategic refeeds during extended deficit phases to preserve metabolic rate"
       ]
     },
     "metabolic": {
       "Foundation": [
-        "Get baseline blood work (Function Health) — you can't manage what you don't measure",
-        "Track fasting glucose via CGM — morning reading is your metabolic canary",
-        "Monitor blood pressure weekly — silent risk factor"
+        "Get baseline blood work (Function Health) \u2014 you can't manage what you don't measure",
+        "Track fasting glucose via CGM \u2014 morning reading is your metabolic canary",
+        "Monitor blood pressure weekly \u2014 silent risk factor"
       ],
       "Momentum": [
-        "Target time-in-range >85% (70–140 mg/dL) on CGM",
-        "Walk 10 min after meals — blunts glucose spikes 20–30% (Huberman)",
-        "Track ApoB trajectory across blood draws — the causal agent in ASCVD (Attia)"
+        "Target time-in-range >85% (70\u2013140 mg/dL) on CGM",
+        "Walk 10 min after meals \u2014 blunts glucose spikes 20\u201330% (Huberman)",
+        "Track ApoB trajectory across blood draws \u2014 the causal agent in ASCVD (Attia)"
       ],
       "Discipline": [
-        "Push toward time-in-range >90% — tighten the glucose variability band",
+        "Push toward time-in-range >90% \u2014 tighten the glucose variability band",
         "Monitor waist circumference trend alongside scale weight (DEXA validation)",
-        "Optimize sleep to improve insulin sensitivity — they're tightly coupled (Patrick)"
+        "Optimize sleep to improve insulin sensitivity \u2014 they're tightly coupled (Patrick)"
       ],
       "Mastery": [
-        "Target ApoB <60 mg/dL — 20th percentile, optimal ASCVD risk reduction",
-        "Build personal postprandial glucose database — rank foods by your response",
+        "Target ApoB <60 mg/dL \u2014 20th percentile, optimal ASCVD risk reduction",
+        "Build personal postprandial glucose database \u2014 rank foods by your response",
         "Quarterly blood work to validate lifestyle interventions are moving biomarkers"
       ]
     },
     "mind": {
       "Foundation": [
-        "Complete all T0 (non-negotiable) habits every day — the foundation is the routine",
-        "Journal at least 3x per week — process, don't accumulate",
+        "Complete all T0 (non-negotiable) habits every day \u2014 the foundation is the routine",
+        "Journal at least 3x per week \u2014 process, don't accumulate",
         "One deliberate stress-management practice daily (NSDR, breathwork, or walk)"
       ],
       "Momentum": [
-        "Extend vice streaks — each day compounds the neuroplasticity (Huberman)",
+        "Extend vice streaks \u2014 each day compounds the neuroplasticity (Huberman)",
         "State of Mind logging: capture valence data for pattern detection",
-        "Physiological sigh (double inhale + long exhale) for acute stress — 1 min protocol"
+        "Physiological sigh (double inhale + long exhale) for acute stress \u2014 1 min protocol"
       ],
       "Discipline": [
-        "Journal every day — even 2 sentences. Consistency > depth",
-        "Review habit tier performance weekly — adjust T2 habits, protect T0",
-        "Identify avoidance patterns in journal entries — name the defense mechanism (Conti)"
+        "Journal every day \u2014 even 2 sentences. Consistency > depth",
+        "Review habit tier performance weekly \u2014 adjust T2 habits, protect T0",
+        "Identify avoidance patterns in journal entries \u2014 name the defense mechanism (Conti)"
       ],
       "Mastery": [
-        "Connect journal themes to objective data — what does the gap between feeling and metrics reveal?",
-        "Reduce T0 habit list only if current set is 95%+ for 30 days — earned simplification",
+        "Connect journal themes to objective data \u2014 what does the gap between feeling and metrics reveal?",
+        "Reduce T0 habit list only if current set is 95%+ for 30 days \u2014 earned simplification",
         "Explore cognitive-behavioral patterns: intellectualization, displacement, isolation of affect"
       ]
     },
     "relationships": {
       "Foundation": [
         "Log at least 1 meaningful social interaction per week via journal or contact tool",
-        "Reach out to Tom or a friend proactively once per week — don't wait to be contacted",
-        "Notice social mentions in journal — are you writing about people or just metrics?"
+        "Reach out to Tom or a friend proactively once per week \u2014 don't wait to be contacted",
+        "Notice social mentions in journal \u2014 are you writing about people or just metrics?"
       ],
       "Momentum": [
         "Aim for 3+ meaningful social interactions per week (Murthy)",
-        "Diversify social connections — don't rely on one person for all social needs",
+        "Diversify social connections \u2014 don't rely on one person for all social needs",
         "Use Partner accountability to strengthen partnership engagement"
       ],
       "Discipline": [
-        "Schedule social time like training — it's not less important, just less urgent",
-        "Track contact frequency — are you maintaining breadth or narrowing?",
+        "Schedule social time like training \u2014 it's not less important, just less urgent",
+        "Track contact frequency \u2014 are you maintaining breadth or narrowing?",
         "Quality over quantity: one deep conversation > five surface interactions"
       ],
       "Mastery": [
-        "Invest in 2–3 relationships that provide mutual growth and accountability",
-        "Social connection affects every other pillar — treat it as infrastructure, not luxury",
+        "Invest in 2\u20133 relationships that provide mutual growth and accountability",
+        "Social connection affects every other pillar \u2014 treat it as infrastructure, not luxury",
         "Reflect on relationship patterns in journal: giving vs. taking, vulnerability vs. guardedness"
       ]
     },
     "consistency": {
       "Foundation": [
-        "Focus on data completeness — log everything, even bad days. Gaps are worse than bad data",
-        "Minimize weekend-weekday variance — the gap reveals your real routine",
+        "Focus on data completeness \u2014 log everything, even bad days. Gaps are worse than bad data",
+        "Minimize weekend-weekday variance \u2014 the gap reveals your real routine",
         "One priority per week: don't try to fix all pillars at once"
       ],
       "Momentum": [
-        "Build minimum viable days — even your worst day should hit basic thresholds",
+        "Build minimum viable days \u2014 even your worst day should hit basic thresholds",
         "Cross-pillar awareness: notice which pillar you sacrifice first under pressure",
-        "Reduce variance before increasing averages — stability enables growth"
+        "Reduce variance before increasing averages \u2014 stability enables growth"
       ],
       "Discipline": [
-        "Aim for 'no pillar below 30' on any given day — protect the floor",
+        "Aim for 'no pillar below 30' on any given day \u2014 protect the floor",
         "Use travel and disruption as consistency tests, not excuses",
         "Review weekly: which pillar was most volatile? That's your leverage point"
       ],
       "Mastery": [
-        "Keep every pillar scoring 41+ to hold the Alignment Bonus — a current-state synergy, held day by day, never a rank you bank",
-        "Consistency at this level is identity, not discipline — you've become the person",
-        "Mentor others: Tom, Partner, future open-source users — teaching deepens mastery"
+        "Keep every pillar scoring 41+ to hold the Alignment Bonus \u2014 a current-state synergy, held day by day, never a rank you bank",
+        "Consistency at this level is identity, not discipline \u2014 you've become the person",
+        "Mentor others: Tom, Partner, future open-source users \u2014 teaching deepens mastery"
       ]
     }
   }

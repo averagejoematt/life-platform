@@ -1,30 +1,30 @@
-phase-tag report — mode=DRY-RUN — genesis=2026-07-12
-generated 2026-07-12T18:58:58.936626+00:00
-scanned 22286 items across 92 partitions
+phase-tag report — mode=APPLY — genesis=2026-07-13
+generated 2026-07-13T01:27:48.844711+00:00
+scanned 22290 items across 92 partitions
 
 partition (source)                      total    pilot    exper    no-date ok-correct  to-update  applied  errors
 -----------------------------------------------------------------------------------------------------------------
 adaptive_mode                             134      134        0          0        134          0        0       0
-ai_analysis                                10        1        9          0          1          9        0       0
-anomalies                                 109      109        0          0        107          2        0       0
-apple_health                             4007     4004        2          1       4005          1        0       0
+ai_analysis                                10       10        0          0          1          9        9       0
+anomalies                                 108      108        0          0        106          2        2       0
+apple_health                             4007     4006        0          1       4004          2        2       0
 calibration                                14        0        0         14          0          0        0       0
 centenarian_progress                       13       13        0          0         13          0        0       0
 challenges                                 26       26        0          0         26          0        0       0
 character_sheet                           105      105        0          0        105          0        0       0
-chronicle                                  14       14        0          0         12          2        0       0
+chronicle                                  14       14        0          0         12          2        2       0
 chronicling                                16        0        0         16          0          0        0       0
 circadian                                 117      117        0          0        117          0        0       0
 coach_gen_cache                             8        0        0          8          0          0        0       0
 composite_scores                            1        0        0          1          0          0        0       0
 computed_insights                         126      126        0          0        126          0        0       0
-computed_metrics                          129      129        0          0        129          0        0       0
-day_grade                                1080     1080        0          0       1078          2        0       0
+computed_metrics                          130      130        0          0        129          1        1       0
+day_grade                                1081     1081        0          0       1078          3        3       0
 decisions                                   3        3        0          0          3          0        0       0
 dexa                                        2        0        0          2          0          0        0       0
 discovery_annotations                       4        4        0          0          4          0        0       0
 dropbox_tracker                            47        0        0         47          0          0        0       0
-eightsleep                                951      950        1          0        951          0        0       0
+eightsleep                                951      951        0          0        950          1        1       0
 email_log#anomaly_detector                 90        0        0         90          0          0        0       0
 email_log#daily_brief                      76        0        0         76          0          0        0       0
 email_log#monday_compass                   11        0        0         11          0          0        0       0
@@ -32,100 +32,122 @@ email_log#nutrition_review                  3        0        0          3      
 email_log#wednesday_chronicle               9        0        0          9          0          0        0       0
 email_log#weekly_digest                    11        0        0         11          0          0        0       0
 email_log#weekly_plate                      5        0        0          5          0          0        0       0
-engagement_state                           14       12        2          0         14          0        0       0
+engagement_state                           14       14        0          0         12          2        2       0
 experiments                                 5        5        0          0          5          0        0       0
 field_notes                                 9        0        0          9          0          0        0       0
 food_delivery                            1718     1717        0          1       1717          0        0       0
-forecast                                   51       32       19          0         51          0        0       0
+forecast                                   51       36       15          0         47          4        4       0
 garmin                                   1461     1461        0          0       1461          0        0       0
 genome                                    111        0        0        111          0          0        0       0
 google_calendar                            10        0        0         10          0          0        0       0
-habit_scores                              130      130        0          0        128          2        0       0
-habitify                                  139      138        1          0        139          0        0       0
+habit_scores                              131      131        0          0        128          3        3       0
+habitify                                  139      139        0          0        138          1        1       0
 health_check                              106        0        0        106          0          0        0       0
 hevy                                      904      904        0          0        904          0        0       0
 hevy_id_map                                26        0        0         26          0          0        0       0
-hypotheses                                 36       36        0          0         34          2        0       0
+hypotheses                                 36       36        0          0         34          2        2       0
 ingest_liveness                            33        0        0         33          0          0        0       0
-insights                                  892      892        0          0        878         14        0       0
-journal_analysis                           69        0        0         69          0          2        0       0
+insights                                  892      892        0          0        878         14       14       0
+journal_analysis                           69        0        0         69          0          2        2       0
 labs                                        9        0        0          9          0          0        0       0
 ledger                                      6        0        0          6          0          0        0       0
 macrofactor                               124      124        0          0        124          0        0       0
-macrofactor_meals                         780      780        0          0          0        780        0       0
+macrofactor_meals                         780      780        0          0          0        780      780       0
 macrofactor_workouts                      431      431        0          0        431          0        0       0
 measurements                                1        1        0          0          1          0        0       0
 notion                                     62       62        0          0         62          0        0       0
 nutrition_review                            7        7        0          0          7          0        0       0
 panelcast                                   2        0        0          2          0          0        0       0
 personal_baselines                          1        0        0          1          0          0        0       0
-platform_memory                            27       26        0          1         26          0        0       0
+platform_memory                            28       27        0          1         26          1        1       0
 protocols                                   9        3        0          6          3          0        0       0
 routine_index                              35        0        0         35          0          0        0       0
-scenarios                                   9        8        1          0          9          0        0       0
+scenarios                                   9        9        0          0          8          1        1       0
 sick_days                                   8        8        0          0          8          0        0       0
 sleep_unified                             146        0        0        146          0          0        0       0
-state_of_matthew                            1        1        0          0          1          0        0       0
+state_of_matthew                            2        2        0          0          1          1        1       0
 strava                                   1202     1202        0          0       1202          0        0       0
 subscribers                                 3        0        0          3          0          0        0       0
 supplements                                34        0        0         34          0          0        0       0
 todoist                                   403      403        0          0        403          0        0       0
 training_notes#CACHE                        1        0        0          1          0          0        0       0
-training_notes#EXERCISE#0222DB42            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#056a1c53-c77        1        1        0          0          0          1        0       0
-training_notes#EXERCISE#062AB91A            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#07B38369            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#128A2381            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#243710DE            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#3303376C            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#422B08F1            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#50C613D0            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#651F844C            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#9930DF71            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#BE640BA0            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#D57C2EC7            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#D8F7F851            4        4        0          0          0          4        0       0
-training_notes#EXERCISE#E53CCBE5            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#F1E57334            1        1        0          0          0          1        0       0
-training_notes#EXERCISE#ee0911e8-c01        1        1        0          0          0          1        0       0
+training_notes#EXERCISE#0222DB42            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#056a1c53-c77        1        1        0          0          0          1        1       0
+training_notes#EXERCISE#062AB91A            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#07B38369            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#128A2381            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#243710DE            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#3303376C            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#422B08F1            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#50C613D0            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#651F844C            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#9930DF71            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#BE640BA0            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#D57C2EC7            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#D8F7F851            4        4        0          0          0          4        4       0
+training_notes#EXERCISE#E53CCBE5            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#F1E57334            1        1        0          0          0          1        1       0
+training_notes#EXERCISE#ee0911e8-c01        1        1        0          0          0          1        1       0
 training_notes#USAGE                        1        0        0          1          0          0        0       0
 training_reference                          5        0        0          5          0          0        0       0
-weather                                   137      136        1          0        137          0        0       0
+weather                                   137      137        0          0        136          1        1       0
 weekly_correlations                        14       14        0          0         14          0        0       0
 weight_episodes                            29        0        0         29          0          0        0       0
 what_changed                                2        1        0          1          1          0        0       0
-whoop                                    4743     4742        1          0       4743          0        0       0
-withings                                 1199     1198        1          0       1199          0        0       0
+whoop                                    4743     4743        0          0       4742          1        1       0
+withings                                 1199     1199        0          0       1198          1        1       0
 -----------------------------------------------------------------------------------------------------------------
-TOTAL                                   22286    21309       38        939      20513        836        0       0
+TOTAL                                   22290    21336       15        939      20499        854      854       0
 
 === samples of items that would be updated (up to 5 per partition) ===
 
 [ai_analysis]
-  sk=EXPERT#explorer  before=None  after='experiment'
-  sk=EXPERT#glucose  before=None  after='experiment'
-  sk=EXPERT#integrator  before=None  after='experiment'
-  sk=EXPERT#labs  before=None  after='experiment'
-  sk=EXPERT#mind  before=None  after='experiment'
+  sk=EXPERT#explorer  before=None  after='pilot'
+  sk=EXPERT#glucose  before=None  after='pilot'
+  sk=EXPERT#integrator  before=None  after='pilot'
+  sk=EXPERT#labs  before=None  after='pilot'
+  sk=EXPERT#mind  before=None  after='pilot'
 
 [anomalies]
   sk=DATE#2026-07-10  before=None  after='pilot'
   sk=DATE#2026-07-11  before=None  after='pilot'
 
 [apple_health]
-  sk=DATATYPE_LIVENESS  before=None  after='experiment'
+  sk=DATATYPE_LIVENESS  before=None  after='pilot'
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
 
 [chronicle]
   sk=DATE#2026-02-28  before='experiment'  after='pilot'
   sk=DATE#2026-07-11  before='experiment'  after='pilot'
 
+[computed_metrics]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+
 [day_grade]
   sk=DATE#2026-07-10  before=None  after='pilot'
   sk=DATE#2026-07-11  before=None  after='pilot'
+  sk=DATE#2026-07-12  before=None  after='pilot'
+
+[eightsleep]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+
+[engagement_state]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+  sk=STATE#current  before='experiment'  after='pilot'
+
+[forecast]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+  sk=FORECAST#2026-07-12#recovery_pct#h7  before='experiment'  after='pilot'
+  sk=FORECAST#2026-07-12#sleep_hours#h7  before='experiment'  after='pilot'
+  sk=FORECAST#2026-07-12#weight_lbs#h7  before='experiment'  after='pilot'
 
 [habit_scores]
   sk=DATE#2026-07-10  before=None  after='pilot'
   sk=DATE#2026-07-11  before=None  after='pilot'
+  sk=DATE#2026-07-12  before=None  after='pilot'
+
+[habitify]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
 
 [hypotheses]
   sk=HYPOTHESIS#2026-07-11T15:54:13.351022+00:00  before='experiment'  after='pilot'
@@ -148,6 +170,15 @@ TOTAL                                   22286    21309       38        939      
   sk=DATE#2025-11-24#MEAL#03  before=None  after='pilot'
   sk=DATE#2025-11-24#MEAL#04  before=None  after='pilot'
   sk=DATE#2025-11-24#MEAL#05  before=None  after='pilot'
+
+[platform_memory]
+  sk=MEMORY#hypothesis_monitoring#2026-07-12  before='experiment'  after='pilot'
+
+[scenarios]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+
+[state_of_matthew]
+  sk=DATE#2026-07-12  before={'week_num': Decimal('1'), 'stage': 'Foundation', 'pre_start': False, 'as_of': '2026-07-12', 'days_in': Decimal('1'), 'days_until_start': Decimal('0'), 'start_date': '2026-07-12'}  after='pilot'
 
 [training_notes#EXERCISE#0222DB42]
   sk=DATE#2026-06-23#WORKOUT#4cde7836-9bb2-4d4a-9caf-b3cae6d4c44b  before=None  after='pilot'
@@ -202,3 +233,12 @@ TOTAL                                   22286    21309       38        939      
 
 [training_notes#EXERCISE#ee0911e8-c017-42db-b271-633d99e13507]
   sk=DATE#2026-06-20#WORKOUT#dc3e3b10-dfc6-47be-a5a7-c79dc0b8175f  before=None  after='pilot'
+
+[weather]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+
+[whoop]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'
+
+[withings]
+  sk=DATE#2026-07-12  before='experiment'  after='pilot'

@@ -1,7 +1,7 @@
-docs update report — mode=DRY-RUN — genesis=2026-07-12
+docs update report — mode=APPLY — genesis=2026-07-13
 
 unchanged  docs/DECISIONS.md
-unchanged  docs/CHANGELOG.md
+updated    docs/CHANGELOG.md
 unchanged  docs/SCHEMA.md
 unchanged  docs/ARCHITECTURE.md
 unchanged  docs/RUNBOOK.md

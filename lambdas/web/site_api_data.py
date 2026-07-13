@@ -3832,6 +3832,7 @@ CYCLE_GENESES = {
     3: "2026-06-08",  # baseline 311.62
     4: "2026-06-14",  # current run — Sunday-anchored routine (baseline 306.87)
     5: "2026-07-12",  # appended by restart_pipeline --close-cycle
+    6: "2026-07-13",  # appended by restart_pipeline --close-cycle
 }
 
 

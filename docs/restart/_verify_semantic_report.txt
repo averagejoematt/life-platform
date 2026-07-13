@@ -1,4 +1,4 @@
-verify_semantic report — genesis=2026-07-12 today=2026-07-12
+verify_semantic report — genesis=2026-07-13 today=2026-07-12
 
 [PASS] snapshot pre_start
 [PASS] journey pre_start

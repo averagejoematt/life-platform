@@ -20,12 +20,12 @@ import { portrait } from "/assets/js/portraits.js"; // §8.7 — portrait(c) || 
 // client literal as its boot fallback (the API payload is the runtime truth).
 // The reset sweep (deploy/restart_site_copy_sync.py rewrite_js_files) follows
 // the quoted ISO form here — keep it a plain quoted literal.
-export const GENESIS_ISO = "2026-07-12";
+export const GENESIS_ISO = "2026-07-13";
 const GENESIS = new Date(`${GENESIS_ISO}T00:00:00`);
 export function genesisCount() {
   const dayN = Math.floor((Date.now() - GENESIS.getTime()) / 86400000) + 1;
   const weekN = Math.floor((Math.max(1, dayN) - 1) / 7) + 1;
-  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since July 12 2026` };
+  return { dayN, weekN, base: `Day ${dayN} · Week ${weekN}, since July 13 2026` };
 }
 
 // Pre-start countdown (#931). A reset can stage a FUTURE genesis (constants + this

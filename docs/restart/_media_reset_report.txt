@@ -1,34 +1,46 @@
-media reset report — mode=DRY-RUN — genesis=2026-07-12
-generated=2026-07-12T18:59:04.919064+00:00
+media reset report — mode=APPLY — genesis=2026-07-13
+generated=2026-07-13T01:31:31.316610+00:00
 
-would-archive: generated/panelcast/wk0.draft.transcript.txt
-would-archive: generated/panelcast/wk0.mp3
-would-archive: generated/panelcast/wk0.transcript.json
-would-archive: generated/panelcast/wk0.transcript.txt
-would-archive: generated/panelcast/wk0.wav
+archived: generated/panelcast/hook-v1-drone.wav
+archived: generated/panelcast/hook-v1-voice.wav
+archived: generated/panelcast/hook-v1.wav
+archived: generated/panelcast/hook-v2.wav
+archived: generated/panelcast/hook-v3-drone.wav
+archived: generated/panelcast/hook-v3-voice.wav
+archived: generated/panelcast/hook-v3.wav
+archived: generated/panelcast/ident-preview.wav
+archived: generated/panelcast/wk0-candidate.mp3
+archived: generated/panelcast/wk0-candidate.transcript.json
+archived: generated/panelcast/wk0-candidate.transcript.txt
+archived: generated/panelcast/wk0.draft.transcript.txt
+archived: generated/panelcast/wk0.mp3
+archived: generated/panelcast/wk0.transcript.json
+archived: generated/panelcast/wk0.transcript.txt
+archived: generated/panelcast/wk0.wav
 already-tombstoned: generated/panelcast/wk1.transcript.txt
 already-tombstoned: generated/panelcast/wk1.wav
 already-tombstoned: generated/panelcast/wk2.transcript.txt
 already-tombstoned: generated/panelcast/wk2.wav
 already-tombstoned: generated/panelcast/wk4.transcript.txt
 already-tombstoned: generated/panelcast/wk4.wav
-would-rewrite: generated/panelcast/episodes.json
-would-rewrite: generated/panelcast/feed.xml
+rewritten: generated/panelcast/episodes.json
+rewritten: generated/panelcast/feed.xml
 already-tombstoned: generated/podcast/debrief/2026-07-07.mp3
 already-tombstoned: generated/podcast/debrief/2026-07-08.mp3
 already-tombstoned: generated/podcast/debrief/2026-07-09.mp3
-would-archive: generated/podcast/debrief/2026-07-10.mp3
-would-rewrite: generated/podcast/debrief/episodes.json
-would-rewrite: generated/podcast/debrief/feed.xml
+archived: generated/podcast/debrief/2026-07-10.mp3
+archived: generated/podcast/debrief/2026-07-11.mp3
+rewritten: generated/podcast/debrief/episodes.json
+rewritten: generated/podcast/debrief/feed.xml
 
 PREQUEL RESURRECTION:
-  would-restore: generated/panelcast/archive/pilot/wk0.draft.transcript.txt → generated/panelcast/wk0.draft.transcript.txt (5669 bytes)
-  would-restore: generated/panelcast/archive/pilot/wk0.mp3 → generated/panelcast/wk0.mp3 (3465600 bytes)
-  would-restore: generated/panelcast/archive/pilot/wk0.transcript.json → generated/panelcast/wk0.transcript.json (7458 bytes)
-  would-restore: generated/panelcast/archive/pilot/wk0.transcript.txt → generated/panelcast/wk0.transcript.txt (5976 bytes)
-  would-restore: generated/panelcast/archive/pilot/wk0.wav → generated/panelcast/wk0.wav (16631610 bytes)
-  episode: wk0 "Prologue — Elena previews the experiment" dated 2026-07-10 (346s, 3465600 bytes)
-  would-write: generated/panelcast/episodes.json (1 episode(s))
-  would-write: generated/panelcast/feed.xml (1 episode(s))
+  restored: generated/panelcast/archive/pilot/wk0.draft.transcript.txt → generated/panelcast/wk0.draft.transcript.txt
+  restored: generated/panelcast/archive/pilot/wk0.mp3 → generated/panelcast/wk0.mp3
+  restored: generated/panelcast/archive/pilot/wk0.transcript.json → generated/panelcast/wk0.transcript.json
+  restored: generated/panelcast/archive/pilot/wk0.transcript.txt → generated/panelcast/wk0.transcript.txt
+  restored: generated/panelcast/archive/pilot/wk0.wav → generated/panelcast/wk0.wav
+  episode: wk0 "Prologue — Elena previews the experiment" dated 2026-07-11 (346s, 3465600 bytes)
+  wrote: generated/panelcast/episodes.json (1 episode(s))
+  wrote: generated/panelcast/feed.xml (1 episode(s))
 
-archived=6 skipped=9 manual=0
+archived=18 skipped=9 manual=0

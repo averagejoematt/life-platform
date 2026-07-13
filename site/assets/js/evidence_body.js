@@ -73,7 +73,7 @@ export function renderLabs(d) { const L = d.labs || d; const bm = L.biomarkers |
 
 // ── /data/physical/ — two tiers: the weight cockpit (daily) + the composition arc
 // (episodic). "Weight is the metronome; composition is the arc." `d` = physical_overview.
-export const PHYS_GENESIS = "2026-07-12";
+export const PHYS_GENESIS = "2026-07-13";
 
 // Staleness honesty (truth audit 2026-07-10): present-tense weight copy over a dead
 // scale reads false. Mirrors the withings threshold in source_registry (7 days).

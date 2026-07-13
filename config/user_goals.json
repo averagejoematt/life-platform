@@ -1,13 +1,13 @@
 {
   "version": "1.2",
-  "last_updated": "2026-07-10",
+  "last_updated": "2026-07-12",
   "updated_by": "matthew_genesis_reweigh_jun08",
   "mission": "12-month aggressive body recomposition for longevity, mental health, and athletic performance. This is not Matthew's first transformation \u2014 he went from 305 to 190 lbs in 8 months approximately a year ago. He knows how to do this. The challenge is sustaining it.",
   "timeline": {
-    "start_date": "2026-07-12",
-    "end_date": "2027-07-11",
-    "start_weight_lbs": 300.8,
-    "start_weight_kg": 136.441,
+    "start_date": "2026-07-13",
+    "end_date": "2027-07-12",
+    "start_weight_lbs": 314.0,
+    "start_weight_kg": 142.428,
     "current_weight_lbs": 297.24,
     "baseline_source": "withings",
     "baseline_measurement_utc": null,
