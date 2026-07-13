@@ -14,6 +14,9 @@ SCOPE:
   Scans the LIVE docs surface: docs/*.md (top level), docs/design/, docs/coaching/,
   docs/content/, docs/design-review/, docs/engines/, plus README.md, CLAUDE.md,
   .claude/commands/*.md, deploy/README.md.
+  ALSO scans SOURCE docstrings/comments: lambdas/**/*.py + mcp/**/*.py (#781 taught
+  us the shared-layer retirement reached tests + 2 docs but left 35+ stale "part of
+  the shared layer" claims in code — the docs-only scan never opened lambdas/).
   EXEMPT (history may mention history): CHANGELOG, DECISIONS, INCIDENT_LOG, BACKLOG,
   MCP_TOOL_AUDIT, and docs/{archive,specs,reviews,audits,v2-audits,rca,restart,
   briefs,site-reviews}/, handovers/, docs/_lint/ itself.
@@ -63,10 +66,16 @@ def _rules() -> list[tuple[re.Pattern, str]]:
     return rules
 
 
+# Source trees scanned for stale retired-concept claims in docstrings/comments.
+SOURCE_DIRS = ("lambdas", "mcp")
+
+
 def _scan_files(include_exempt: bool) -> list[Path]:
     candidates: list[Path] = [ROOT / "README.md", ROOT / "CLAUDE.md", ROOT / "deploy" / "README.md"]
     candidates += sorted((ROOT / ".claude" / "commands").glob("*.md"))
     candidates += sorted((ROOT / "docs").rglob("*.md"))
+    for d in SOURCE_DIRS:
+        candidates += sorted((ROOT / d).rglob("*.py"))
     out = []
     for p in candidates:
         if not p.exists():
@@ -90,7 +99,14 @@ def main():
         rel = doc.relative_to(ROOT)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
             # A line that itself explains the retirement is allowed to name the corpse.
-            if re.search(r"retired|removed|superseded|no longer|banned|do (?:NOT|not)|never hand-roll|tombstone|was deleted", line, re.I):
+            # Includes the "NOT/no/without the shared layer" and "X it replaces"
+            # framings that source docstrings use to say a concept is gone (#781).
+            if re.search(
+                r"retired|removed|superseded|no longer|banned|do (?:NOT|not)|never hand-roll|tombstone|was deleted"
+                r"|replaces?|replaced|no shared layer|without the shared layer|not the (?:retired )?shared layer",
+                line,
+                re.I,
+            ):
                 continue
             for rx, hint in rules:
                 if rx.search(line):

@@ -25,10 +25,10 @@ import boto3
 
 # #422: shared causality conventions (note parse + cross-page merge), bundled (#781).
 import habit_causality  # noqa: E402
-import stats_core  # shared layer (#529): the one sanctioned stats implementation (ADR-105)
+import stats_core  # bundled shared module (#529): the one sanctioned stats implementation (ADR-105)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
-from source_registry import (  # #392: canonical source classification (shared layer)
+from source_registry import (  # #392: canonical source classification (bundled lambdas/ tree)
     DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
     engagement_channels,
     manual_capture_sources,
@@ -3916,7 +3916,7 @@ def handle_cycle_compare() -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 # The inference receipt (2026-06-13) — radical cost transparency.
 # Every Claude call already lands in two metric streams: AWS/Bedrock emits
-# token counts per ModelId, and the shared layer emits per-Lambda tokens to
+# token counts per ModelId, and the bundled modules emit per-Lambda tokens to
 # LifePlatform/AI. This endpoint reads both, prices them with the same table
 # the cost governor enforces, and publishes the meter.
 # ══════════════════════════════════════════════════════════════════════════════
@@ -3977,7 +3977,7 @@ def handle_inference_receipt() -> dict:
             if row["month"]["input_tokens"] or row["month"]["output_tokens"]:
                 models.append(row)
 
-        # Per-feature (the shared layer dimensions by Lambda function)
+        # Per-feature (the bundled modules dimension by Lambda function)
         features = []
         fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
         for m in fn_metrics.get("Metrics", []):

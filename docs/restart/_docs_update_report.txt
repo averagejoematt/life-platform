@@ -1,9 +1,0 @@
-docs update report — mode=APPLY — genesis=2026-07-13
-
-unchanged  docs/DECISIONS.md
-updated    docs/CHANGELOG.md
-unchanged  docs/SCHEMA.md
-unchanged  docs/ARCHITECTURE.md
-unchanged  docs/RUNBOOK.md
-unchanged  docs/BACKLOG.md
-unchanged  docs/MCP_TOOL_CATALOG.md

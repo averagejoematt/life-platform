@@ -74,6 +74,14 @@ qa-screenshots/
 # Stale committed QA report snapshot (regenerated, unreferenced — untracked 2026-06-08)
 deploy/qa_report/
 
+# Experiment-restart pipeline run-reports + scratch grep dumps (regenerated on EVERY
+# reset run — the scripts write here by design, RUNBOOK §restart). Tracking them was
+# pure churn: a dry-run dirtied 9 of them. Keep the DIRECTORY and the hand-written
+# RESET_*/RESTART_*/README docs + leadin_backups/; ignore the generated _*.txt outputs.
+# (untracked 2026-07-13; same rationale as deploy/qa_report/ above)
+docs/restart/_*.txt
+docs/restart/_*.log
+
 # Local scratch / superseded harnesses (PDF builder venv, pre-v4 page captures)
 show_and_tell/
 captures/

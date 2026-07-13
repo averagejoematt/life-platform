@@ -37,7 +37,7 @@ except ImportError:
     logger = logging.getLogger("coherence-sentinel")
     logger.setLevel(logging.INFO)
 
-import coherence_invariants as ci  # shared layer module (pure cores)
+import coherence_invariants as ci  # bundled shared module (pure cores)
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE = os.environ.get("TABLE_NAME", "life-platform")

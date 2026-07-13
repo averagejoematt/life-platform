@@ -17,7 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-**Total tests:** 1,217 passing (as of 2026-05-19) + 41 skipped + 10 xfailed + 15 deselected.
+**Total tests:** 3646 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 
 ---
 

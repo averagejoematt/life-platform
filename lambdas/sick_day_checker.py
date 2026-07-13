@@ -1,5 +1,5 @@
 """
-Sick Day Checker — shared Lambda Layer utility.
+Sick Day Checker — bundled shared utility (lambdas/ tree).
 
 Provides a lightweight DDB check so all Lambdas can test whether a given
 date has been flagged as a sick/rest day without duplicating query logic.

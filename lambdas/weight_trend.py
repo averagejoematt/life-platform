@@ -15,7 +15,7 @@ Early-cut water weight makes a raw rate wildly fast, so the rate is flagged
 
 from datetime import datetime, timedelta, timezone
 
-import stats_core  # shared layer (#529): block-bootstrap CI for the projection slope
+import stats_core  # bundled shared module (#529): block-bootstrap CI for the projection slope
 
 
 def _ols_slope(xs, ys):

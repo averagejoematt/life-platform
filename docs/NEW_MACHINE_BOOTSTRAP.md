@@ -1,6 +1,6 @@
 # New-Machine Bootstrap — bare metal to operational
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (reconciled #1026 status — memory backup landed + live, datadrops leg FDA-gated; fixed the datadrops S3 prefix; added .config.json regen + Full Disk Access grant)
 > **Sources of truth:** `docs/AWS_ACCESS.md` (auth) · `docs/QUICKSTART.md` (toolchain + deploy tree) · `docs/CONTINUITY.md` (the laptop-only state surfaces) · `ingest/README.md` (drop-folder runtime) · `requirements-dev.txt` (pinned dev deps)
 
 This is the **from-zero rebuild runbook**: a fresh Mac, nothing installed, no
@@ -38,6 +38,12 @@ GitHub Issues. Two things are laptop-only and are the whole reason this runbook 
 A third, softer asset: **`datadrops/`** (gitignored) holds the original source drops
 (genome, physicals xlsx, Apple Health exports, backfill CSVs). Its S3 archive is what
 **#1026** provisions — see step 4 for its current status.
+
+A fourth, **regenerable** asset: **`.config.json`** (repo root, gitignored) — the local
+MCP bridge config `mcp_bridge.py` reads (Claude Desktop → the `life-platform-mcp` Lambda).
+It holds `api_key` + `function_name` + `region`. It is NOT a single point of loss: the
+`api_key` is just a copy of the `life-platform/mcp-api-key` secret, so a new machine
+recreates it from Secrets Manager (step 3b below). Never commit it.
 
 ---
 
@@ -149,6 +155,32 @@ so a new machine inherits them the moment AWS auth works. Nothing to copy. OAuth
 that rotate (Whoop/Garmin) may need a browser re-auth — that is a *data-source* task, not
 a bootstrap task: see `docs/RUNBOOK_REENTRY.md`.
 
+### 3b. Recreate `.config.json` (local MCP bridge)
+
+`mcp_bridge.py` (Claude Desktop → the MCP Lambda) reads a gitignored `.config.json` at the
+repo root. Its `api_key` is the `life-platform/mcp-api-key` secret, so regenerate it from
+Secrets Manager rather than restoring a copy:
+
+```bash
+cd ~/Documents/Claude/life-platform
+KEY=$(aws secretsmanager get-secret-value --secret-id life-platform/mcp-api-key \
+  --region us-west-2 --query SecretString --output text)
+cat > .config.json <<JSON
+{"api_key": "$KEY", "function_name": "life-platform-mcp", "region": "us-west-2"}
+JSON
+```
+
+### 3c. Grant Full Disk Access to `/bin/bash` (one-time, TCC)
+
+macOS TCC blocks launchd agents from reading `~/Documents` (the launchd-TCC trap),
+which silently disables **two** things until granted: the `datadrops/` backup leg of the
+#1026 job (step 4b/5b) and the manual-drop **ingest watcher** (step 5a). Grant it once:
+
+> System Settings → Privacy & Security → **Full Disk Access** → add `/bin/bash`
+> (⌘⇧G in the file picker → type `/bin/bash`). Then re-run the backup once to populate
+> the archive: `bash ~/.local/bin/claude-memory-backup.sh` and confirm the
+> `datadrops-archive/` prefix fills.
+
 ---
 
 ## Step 4 — Restore the laptop-only state from S3
@@ -164,11 +196,11 @@ aws s3 sync s3://matthew-life-platform/claude-memory-backup/ \
   --region us-west-2
 ```
 
-> **RPO caveat — read this.** The scheduled backup job is issue **#1026**, which has **not
-> landed yet**. Until it does, the S3 backup is refreshed only as a manual **`/wrap`-step
-> habit** at session close (`docs/CONTINUITY.md` §4) — so the restored memory is as fresh
-> as the *last session that wrapped*, and anything since then is lost with the laptop.
-> This is the top gap the audit flagged; step 5b closes it going forward.
+> **Freshness.** The scheduled backup job (**#1026**) has **landed and runs daily** via
+> launchd (`com.matthewwalker.claude-memory-backup`, step 5b) — the memory leg reads
+> `~/.claude`, which TCC never blocks, so it works today. The `/wrap`-step manual sync
+> (`docs/CONTINUITY.md` §4) stays as belt-and-suspenders. So the restored memory is at
+> worst one day stale, not one session stale.
 
 Never commit this directory or its export to the repo — even with the repo private (since
 2026-07-13), memory files carry personal + security-incident detail by design and stay out
@@ -177,15 +209,18 @@ of git (`docs/CONTINUITY.md` §4; visibility can flip back).
 ### 4b. `datadrops/` originals
 
 ```bash
-# Only if the #1026 initial sync has already populated the archive prefix:
-aws s3 sync s3://matthew-life-platform/uploads/datadrops-archive/ \
+# datadrops lands under the TOP-LEVEL, delete-protected datadrops-archive/ prefix
+# (NOT uploads/ — that expires in 30 days). Restore into the repo's datadrops/:
+aws s3 sync s3://matthew-life-platform/datadrops-archive/ \
   ~/Documents/Claude/life-platform/datadrops/ --region us-west-2
 ```
 
-The `uploads/datadrops-archive/` prefix is provisioned by **#1026**. If #1026 has not run
-its one-time sync, this archive may not exist yet — the original drops (genome, physicals
-xlsx, Apple Health exports) may then live only on the lost laptop. That unverified-archive
-gap is tracked in #1026; treat a missing archive as a known limitation, not a mistake here.
+**Caveat — this archive fills only after the Full Disk Access grant (step 3c).** #1026's
+datadrops leg reads `~/Documents`, which macOS TCC blocks from launchd until `/bin/bash`
+has Full Disk Access; the backup script logs a WARN and skips the leg rather than failing.
+So on a machine where 3c was never granted, `datadrops-archive/` may be empty and the
+originals (genome, physicals xlsx, Apple Health exports) live only on the old laptop. Grant
+3c and run one backup to populate it; treat an empty archive as the ungranted-TCC symptom.
 
 ---
 
@@ -222,18 +257,18 @@ is in use.
 
 ### 5b. The scheduled backup job (#1026)
 
-Install the daily backup agent that snapshots the step-4 state into versioned, private S3
-so the RPO caveat above stops applying:
+**#1026 has landed** (commit `48f635e3`); its installer + plist live in `backup/`. Install
+the daily agent that snapshots the step-4 state into versioned, private S3:
 
 ```bash
-# Once #1026 has landed, install its plist the same way as ingest:
-bash ingest/install.sh   # (or the dedicated installer #1026 ships — follow its README)
+cd ~/Documents/Claude/life-platform/backup
+bash install.sh   # copies backup.sh → ~/.local/bin, loads the launchd plist
 ```
 
-**Status:** #1026 is **open, not merged**. Until it lands there is no scheduled job to
-install — keep running the manual memory sync from step 4a (and the `/wrap`-step habit) as
-the interim belt-and-suspenders. When #1026 merges, `docs/CONTINUITY.md` §4/§7–8 get
-updated to say the memory backup is *scheduled* and this step becomes a one-command install.
+This registers `com.matthewwalker.claude-memory-backup` (daily + RunAtLoad). The **memory
+leg works immediately** (it reads `~/.claude`, never TCC-blocked). The **datadrops leg
+stays skipped with a WARN until the step-3c Full Disk Access grant** — grant it, then run
+`bash ~/.local/bin/claude-memory-backup.sh` once to populate `datadrops-archive/`.
 
 ---
 

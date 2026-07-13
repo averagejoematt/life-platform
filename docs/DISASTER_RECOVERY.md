@@ -1,6 +1,6 @@
 # Disaster Recovery
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (reconciled #1026 backup status — memory leg live ≤24h, datadrops leg FDA-gated)
 
 **Last updated:** 2026-07-12 (Scenario 2 swap-back drilled + Path A made executable, #936)
 
@@ -19,7 +19,7 @@
 | S3 bucket corruption (specific path) | 5 min (versioned restore) | Versioning enabled — every put |
 | S3 bucket deletion (catastrophic) | ⚠️ NOT RECOVERABLE — cross-region replication not enabled (ADR-057 W-03 deferred) | — |
 | Account compromise | Hours (rotate all secrets + audit CloudTrail) | Depends on compromise window |
-| Stolen / lost laptop | Hours (rotate device-resident creds + rebuild on a new machine) | Pushed git = last push; Claude memory + `datadrops/` ≤24h behind once #1026 lands (manual/unbounded until then) — see Scenario 8 |
+| Stolen / lost laptop | Hours (rotate device-resident creds + rebuild on a new machine) | Pushed git = last push; Claude memory ≤24h behind (#1026 daily backup is live); `datadrops/` unbounded until the Full Disk Access grant — see Scenario 8 |
 | us-west-2 region outage | Hours-days (no DR region — ADR-057 W-03 deferred) | — |
 | Anthropic API outage | Auto-degrade — see below | — |
 
@@ -305,7 +305,7 @@ Grounded in what actually lives *only* on the laptop:
 |---|---|---|
 | Git-tracked code + docs | GitHub `origin` | Last push (near-zero if you push per session) |
 | Un-pushed commits / working-tree edits / `git stash` entries | **nothing** | Total loss beyond `origin`; today's orphaned commits + stashes are being rescued under #1025 |
-| Claude memory dir (`MEMORY.md` + topic files) | **manual today → S3 daily once #1026 lands** | ≤24h target (post-#1026); manual/unbounded until then |
+| Claude memory dir (`MEMORY.md` + topic files) | **S3 daily via launchd (#1026 live)** + `/wrap` manual sync | ≤24h (reads `~/.claude`, never TCC-blocked) |
 | `datadrops/` originals (raw source drops) | same as memory (#1026) | ≤24h target (post-#1026); manual/unbounded until then |
 | On-device break-glass AWS keys | Secrets/IAM (not a data-loss risk — a *compromise* risk) | n/a — see rotation checklist |
 
@@ -364,8 +364,9 @@ key file paths here (defense-in-depth — this doc is exportable and the repo ca
 **Truly lost (the gap the RPO quantifies):**
 - Un-pushed git commits, working-tree edits, and `git stash` entries beyond what's on
   `origin` (today's are being rescued under #1025).
-- Claude memory + `datadrops/` changes since the last backup — bounded to ≤24h once #1026
-  lands, otherwise back to the last manual copy.
+- Claude memory changes since the last backup — bounded to ≤24h (the #1026 daily launchd
+  backup is live). `datadrops/` changes are unbounded until the Full Disk Access grant
+  (its backup leg is TCC-blocked until then; see `docs/NEW_MACHINE_BOOTSTRAP.md` §3c).
 - Any purely-local scratch that was never committed or uploaded.
 
 **Cross-refs:** epic #1024 · git-WIP rescue #1025 · launchd backup that sets the RPO

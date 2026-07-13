@@ -338,8 +338,16 @@ AI powered down.** Four layers, each with a named owner-mechanism:
    ci-cd.yml's Lint job for code pushes:
    - `scripts/check_doc_links.py` — every relative link/anchor resolves;
    - `scripts/check_doc_tombstones.py` + `docs/_lint/tombstones.txt` — no live page
-     references a retired concept. **Retiring something = adding its tombstone rule in
-     the same PR** (that's the generalized #781 lesson);
+     **or `lambdas/`+`mcp/` docstring** references a retired concept. **Retiring
+     something = adding its tombstone rule in the same PR** (that's the generalized #781
+     lesson — the source scan was added 2026-07-13 because #781 retired the layer yet
+     left 35+ stale "part of the ... layer" claims in code the docs-only scan never opened);
+   - `scripts/check_doc_facts.py` — the **generalized stale-number net**: it knows the
+     ground-truth counts (imported from `sync_doc_metadata`'s discoverers) and fails on a
+     stale count/budget stated in ANY phrasing, not just the exact ones the sync RULES
+     target. This is what catches the un-ruled-phrasing class (`**Tools:** 127` drifting
+     while the ruled header said 64). Precision-first: a false-positive gate gets disabled,
+     so it is deliberately narrow (forward-only, glue-guarded, ledgers exempt);
    - `scripts/check_doc_index.py` — every page is indexed from the wiki home, carries
      the status header, the >90d advisory freshness report, and a **blocking 180d ceiling**
      (a canonical page unverified that long fails CI).

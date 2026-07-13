@@ -939,6 +939,12 @@ def _apply_auto_discovered(facts: dict) -> dict:
     if tool_module_count is not None:
         facts["tool_module_count"] = tool_module_count
 
+    test_count = _count_test_functions()
+    if test_count is not None:
+        if facts.get("test_count") != test_count:
+            print(f"  [auto] test_count: {facts.get('test_count')} → {test_count} (def test_ across tests/*.py)")
+        facts["test_count"] = test_count
+
     adr_count = _count_adrs()
     if adr_count is not None:
         if facts.get("adr_count") != adr_count:
@@ -1006,6 +1012,7 @@ PLATFORM_FACTS = {
     "alarm_count": 67,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK)
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 9,
+    "test_count": 3644,  # fallback: `def test_` count across tests/*.py (_count_test_functions)
     "iam_roles": 43,
     "adr_max": "132",  # fallback: auto-discovered from docs/DECISIONS.md (#817, _auto_discover_adr_max)
     "restart_page_count": 33,  # fallback: len(PAGES) in deploy/restart_verify_rendered.py (#973, _auto_discover_restart_url_counts)
@@ -1310,6 +1317,23 @@ RULES = [
         ".claude/README.md",
         r"\d+ tools that let Claude query",
         "{tool_count} tools that let Claude query",
+    ),
+    # ── ARCHITECTURE.md MCP server stat line ─────────────────────────────────
+    # This inline "**Tools:** N … **Modules:** M" phrasing had NO rule and so
+    # drifted to a stale 127/26 while the file header (ruled) correctly said 64
+    # — a same-file self-contradiction that passed CI. Now ruled.
+    (
+        "docs/ARCHITECTURE.md",
+        r"\*\*Tools:\*\* \d+ \| \*\*Memory:\*\* 768 MB \| \*\*Runtime:\*\* python3\.12 \| \*\*Modules:\*\* \d+",
+        "**Tools:** {tool_count} | **Memory:** 768 MB | **Runtime:** python3.12 | **Modules:** {module_count}",
+    ),
+    # ── TESTING.md suite size ────────────────────────────────────────────────
+    # Was a hand-typed "1,217 passing (as of 2026-05-19)" — 2.9× stale. The tool
+    # already computes the count for /api/platform_stats; now it also writes here.
+    (
+        "docs/TESTING.md",
+        r"\*\*Total tests:\*\* [\d,]+ `def test_` functions",
+        "**Total tests:** {test_count} `def test_` functions",
     ),
 ]
 

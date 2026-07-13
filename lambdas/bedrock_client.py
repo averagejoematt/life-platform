@@ -19,7 +19,7 @@ Key facts:
   • Prompt caching is GA on Bedrock for supported Claude models via the
     same cache_control blocks used on the direct API — no beta header.
 
-This module is part of the shared Lambda layer.
+This module is bundled into every function's deploy package (#781 retired the shared Lambda layer).
 """
 
 import json

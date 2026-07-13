@@ -1,3 +1,0 @@
-2026-05-24T16:48:42.562947+00:00  watchdog starting. genesis=2026-05-25 max_minutes=1 poll=180s
-2026-05-24T16:48:42.712586+00:00    no reading yet for 2026-05-25, sleeping 180s
-2026-05-24T16:51:42.718445+00:00  watchdog deadline reached without finding a reading for 2026-05-25. Exit.

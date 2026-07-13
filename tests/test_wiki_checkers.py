@@ -6,6 +6,8 @@ checker must exit 0 against the current tree. If one reds here, the wiki contrac
 the rule), don't skip the test.
 """
 
+import importlib.util
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -15,6 +17,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def _run(script, *args):
     return subprocess.run([sys.executable, str(ROOT / script), *args], capture_output=True, text=True)
+
+
+def _load(script):
+    spec = importlib.util.spec_from_file_location("_mod", ROOT / script)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
 
 
 def test_doc_links_resolve():
@@ -35,3 +44,28 @@ def test_wiki_index_coverage_and_headers():
 def test_adr_index_current():
     r = _run("scripts/generate_adr_index.py", "--check")
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_doc_facts_clean():
+    r = _run("scripts/check_doc_facts.py")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_doc_facts_gate_is_not_vacuous():
+    """The scanner must actually flag a stale value — a gate that passes on anything
+    is worse than none (the lesson from the shared-layer scan that matched nothing)."""
+    facts = _load("scripts/check_doc_facts.py")
+    # exact fact: any deviation is drift; the true value is not.
+    assert facts._off(127, 64, 0.0, approx=False) is True
+    assert facts._off(64, 64, 0.0, approx=False) is False
+    # soft fact honors the ~approx marker (allows an honest "~3,600" vs 3,644)…
+    assert facts._off(3600, 3644, 0.18, approx=True) is False
+    # …but still catches the 2.9x-stale class (1,217 vs 3,644).
+    assert facts._off(1217, 3644, 0.18, approx=True) is True
+    # the "python3 tests/" glue class must NOT match a test-count pattern.
+    joined = [p for _, pats, _ in facts.FACT_SPECS for p in pats if "tests?" in p]
+    assert joined, "expected test_count patterns to exist"
+    assert not any(re.search(p, "run python3 tests/visual_qa.py now") for p in joined)
+    # a real "N MCP tools" claim IS caught.
+    tool_pats = [p for key, pats, _ in facts.FACT_SPECS if key == "tool_count" for p in pats]
+    assert any(re.search(p, "the server exposes 143 MCP tools") for p in tool_pats)

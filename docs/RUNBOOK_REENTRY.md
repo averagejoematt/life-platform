@@ -144,7 +144,7 @@ If WR-50 (Re-Entry Day Template) is live, this auto-loads as a challenge in Habi
 - `get_habits view=dashboard` — today reflects reality (even if low — that's fine)
 - `get_journal_entries start_date=<re-entry date>` — re-entry entry present and enriched
 - `get_labs view=results` — new draw visible if applicable
-- All ~125 MCP tools respond < 30s. Spot-check 10 representative tools.
+- All ~64 MCP tools respond < 30s. Spot-check 10 representative tools.
 
 ---
 

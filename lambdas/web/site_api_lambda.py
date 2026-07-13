@@ -51,7 +51,7 @@ from decimal import Decimal  # noqa: F401 — kept for backward-compat with hand
 import boto3  # noqa: F401 — kept for handlers that create clients
 from boto3.dynamodb.conditions import Key
 
-# shared layer
+# bundled shared module
 from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
 
 from web.site_api_agents import handle_agent_activity

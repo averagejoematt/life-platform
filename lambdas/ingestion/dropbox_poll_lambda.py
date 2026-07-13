@@ -121,7 +121,7 @@ def refresh_access_token(app_key, app_secret, refresh_token):
         },
     )
 
-    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
     from http_retry import urlopen_with_retry
 
     try:
@@ -153,7 +153,7 @@ def list_folder(access_token, folder_path="/life-platform"):
         },
     )
 
-    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
     from http_retry import urlopen_with_retry
 
     try:
@@ -203,7 +203,7 @@ def download_file(access_token, path):
     )
     req.data = b""  # Force POST without urllib adding form content-type
 
-    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
     from http_retry import urlopen_with_retry
 
     with urlopen_with_retry(req, timeout=60) as resp:
@@ -228,7 +228,7 @@ def move_file(access_token, from_path, to_path):
             "Content-Type": "application/json",
         },
     )
-    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
     from http_retry import urlopen_with_retry
 
     try:
@@ -252,7 +252,7 @@ def delete_file(access_token, path):
             "Content-Type": "application/json",
         },
     )
-    # L-04 (2026-06-06): retry on transient 429/5xx via shared layer module.
+    # L-04 (2026-06-06): retry on transient 429/5xx via bundled retry_utils module.
     from http_retry import urlopen_with_retry
 
     try:

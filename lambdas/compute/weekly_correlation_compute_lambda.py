@@ -31,7 +31,7 @@ from decimal import Decimal
 
 import boto3
 import digest_utils  # shared query_range implementations (#970)
-import stats_core  # shared layer (#529): the one sanctioned stats implementation
+import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
 # OBS-1: Structured logger
 try:

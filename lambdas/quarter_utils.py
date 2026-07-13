@@ -8,7 +8,7 @@ cadence predictable (four fixed dates a year) instead of drifting with the
 genesis date.
 
 Pure functions, no AWS — bundled as a plain sibling module (like er03_gate.py),
-not added to the shared layer, since only the memoir batch imports it today.
+not broken out as a widely-imported shared module, since only the memoir batch imports it today.
 """
 
 from datetime import date, datetime, timezone

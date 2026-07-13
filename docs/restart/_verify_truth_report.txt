@@ -1,3 +1,0 @@
-verify_truth report — SKIP at 1d pre-start
-
-    budget tier 1 pauses feature 'reader_truth_qa' (internal QA pauses first, ADR-125)

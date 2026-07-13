@@ -35,7 +35,7 @@ Fail-open: if SSM is unreadable (transient error, missing grant, param absent)
 we return tier 0 — a monitoring blip must never take AI down. The AWS Budgets
 notifications are the backstop for that rare window.
 
-This module is part of the shared Lambda layer.
+This module is bundled into every function's deploy package (#781 retired the shared Lambda layer).
 """
 
 import json

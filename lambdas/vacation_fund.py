@@ -3,7 +3,7 @@ vacation_fund.py — shared compute for the "vacation fund" tracker.
 
 Game: every mile of workout distance since EXPERIMENT_START_DATE earns $1
 (configurable) toward a shared vacation fund. This module is the single source
-of the miles->USD math, imported by three Lambdas via the shared layer:
+of the miles->USD math, imported by three Lambdas from the bundled lambdas/ tree:
   - MCP tool        (mcp/tools_vacation.py)
   - site-api        (lambdas/web/site_api_lambda.py  →  /api/vacation_fund)
   - daily brief     (lambdas/emails/daily_brief_lambda.py)
@@ -21,7 +21,7 @@ Sources (additive, per the user's choice — see plan / ADR):
 Hevy/MacroFactor MAY overlap Strava (same ride logged twice). That's accepted by
 design; the per-source breakdown surfaces it and `manual_adjustment_usd` corrects it.
 
-No mcp.* imports — this module lives in the shared layer (lambdas/*.py) and uses
+No mcp.* imports — this module lives in the bundled lambdas/*.py tree and uses
 boto3 directly. Read-only: queries DDB + reads S3 config; never writes.
 """
 
