@@ -253,10 +253,14 @@ def test_weekly_v2_elena_prompt_carries_block(monkeypatch):
     assert "OPTIONAL TOPICAL COLOR" in user and HEADLINES[0] in user
 
 
-# ── run wiring: ONE fetch per run; the same list reaches prompt AND judge ─────
+# ── run wiring: Episode 0 is EVERGREEN — the intro path never touches the zeitgeist ──
 
 
-def test_run_intro_fetches_once_and_feeds_prompt_and_ground_truth(monkeypatch):
+def test_run_intro_is_evergreen_never_fetches_zeitgeist_or_feeds_headlines(monkeypatch):
+    # #1182: ep0 carries no dated content so the reset can resurrect it without staleness.
+    # The intro path must NOT fetch the zeitgeist, must pass an EMPTY list to the builder,
+    # and must NOT append the topical ground-truth block. (Weeklies keep topical color —
+    # asserted in test_run_weekly_* above.)
     fetches, builder_zg, judged_gt = [], [], []
     monkeypatch.setattr(panel._zeitgeist, "fetch_zeitgeist", lambda *a, **k: fetches.append(1) or list(HEADLINES))
     monkeypatch.setattr(panel, "_load_bible", lambda: {"characters": {"matthew": "an ordinary, technical, curious person"}})
@@ -274,10 +278,10 @@ def test_run_intro_fetches_once_and_feeds_prompt_and_ground_truth(monkeypatch):
 
     out = panel._run_intro(dry_run=True)
     assert json.loads(out["body"])["qa_pass"] is True
-    assert fetches == [1]  # ONE fetch per run — attempts/revisions reuse the list
-    assert builder_zg == [list(HEADLINES)]  # the writer saw exactly the fetched list
-    assert "TOPICAL HEADLINES provided to the writer" in judged_gt[0] and HEADLINES[0] in judged_gt[0]
-    # And Matt's bio truth is still there — the headlines extend it, never replace it.
+    assert fetches == []  # EVERGREEN — the intro path never fetches the zeitgeist
+    assert builder_zg == [[]]  # the writer always receives an empty list on the intro path
+    assert "TOPICAL HEADLINES" not in judged_gt[0] and HEADLINES[0] not in judged_gt[0]
+    # Matt's bio truth is still the ground truth — only the topical block is gone.
     assert "an ordinary, technical, curious person" in judged_gt[0]
 
 

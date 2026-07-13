@@ -18,6 +18,11 @@ back over the tombstoned live keys and episodes.json/feed.xml rewritten with
 the prequel episode dated genesis − days_before. An entry with skip_reason is
 skipped (audio can't be edited, so a vet-failing episode stays archived).
 
+Episode 0 is EVERGREEN by design (#1182): the intro/prologue carries NO dated
+content (no zeitgeist headlines — see coach_panel_podcast_lambda._run_intro),
+so resurrecting it from archive here can never surface stale news. Only the
+weekly episodes carry topical color, and those are regenerated, not resurrected.
+
 If the bucket policy blocks a needed PutObject/CopyObject, the failure is
 collected and printed as a MANUAL RUNBOOK step at the end instead of failing
 the pipeline (exit stays 0 for access-denied; any other error exits 1).
