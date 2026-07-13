@@ -1,6 +1,6 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11 (post-#956/#965, ENGINE_VERSION 1.6.0, ADR-134 + amendment)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#956/#965, ENGINE_VERSION 1.6.0, ADR-134 + amendment)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
 > **Sources of truth:** `lambdas/character_engine.py` (v1.6.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.5.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 

@@ -50,6 +50,7 @@ ALLOWLIST_FILES = {
     # what NOT to mention — necessary, never served to readers.
     "lambdas/emails/wednesday_chronicle_lambda.py",
     "lambdas/emails/coach_panel_podcast_lambda.py",
+    "lambdas/emails/panelcast_scripts.py",  # the intro/weekly builders' safety guardrail (extracted from the lambda, #1185)
 }
 
 # File extensions to scan (text only).
