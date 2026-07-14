@@ -21,11 +21,11 @@ ruff==0.14.14
 black==25.9.0
 
 # Type checking (advisory — see tests/test_mypy_clean_modules.py + mypy.ini)
-mypy==2.1.0
+mypy==2.3.0
 
 # AWS SDK (for tests that call boto3 directly)
-boto3==1.43.41
-botocore==1.43.41
+boto3==1.43.47
+botocore==1.43.47
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
