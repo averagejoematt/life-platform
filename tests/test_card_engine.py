@@ -28,6 +28,33 @@ def _png_size(img):
     return len(buf.getvalue()), img.size
 
 
+def test_brand_card_fonts_render_basic_latin():
+    """Regression guard for the tofu bug: every off-site card font MUST map basic-Latin
+    (A-Z / a-z / 0-9). The original Bebas Neue / Space Mono TTFs shipped as subsets with
+    NO basic-Latin glyphs, so every card rendered as .notdef boxes from HP-13 until this
+    fix — unnoticed because visual QA never inspects the generated PNGs. Detect a missing
+    glyph with PIL only (no fontTools dep): a real letter's raster must differ from a
+    guaranteed-unmapped private-use codepoint's raster; identical means both fell back to
+    the same .notdef box."""
+    from PIL import Image, ImageDraw, ImageFont
+
+    fonts_dir = os.path.join(_REPO, "lambdas", "fonts")
+    unmapped = chr(0xE000)  # private-use area — absent from any real Latin subset
+
+    def _raster(f, ch):
+        im = Image.new("L", (72, 72), 0)
+        ImageDraw.Draw(im).text((6, 6), ch, fill=255, font=f)
+        return im.tobytes()
+
+    for fname in (ce.FONT_DISPLAY, ce.FONT_MONO, ce.FONT_MONO_BOLD):
+        path = os.path.join(fonts_dir, fname)
+        assert os.path.exists(path), f"card font not bundled: {fname} (build_bundle stages lambdas/fonts/)"
+        f = ImageFont.truetype(path, 48)  # not ce.font() — that masks a missing file with load_default()
+        notdef = _raster(f, unmapped)
+        for ch in "AZmz09":
+            assert _raster(f, ch) != notdef, f"{fname}: {ch!r} renders as .notdef — font lacks basic-Latin (the tofu bug)"
+
+
 def test_every_registered_card_type_renders_from_a_fixture():
     fixtures = {
         "character": {

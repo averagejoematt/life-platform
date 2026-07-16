@@ -20,8 +20,10 @@ _AUTHOR = (150, 140, 125)  # muted ink
 
 _W, _H = 600, 900  # 2:3 cover ratio
 _FONTS_DIR = os.path.join(os.path.dirname(__file__), "..", "fonts")
-_DISPLAY = os.path.join(_FONTS_DIR, "bebas-neue-400.ttf")
-_MONO = os.path.join(_FONTS_DIR, "space-mono-400.ttf")
+# v5 brand fonts (the retired Bebas/Space Mono subsets had no basic-Latin glyphs —
+# they rendered placeholders as tofu; Fraunces + IBM Plex Mono are the live-site faces).
+_DISPLAY = os.path.join(_FONTS_DIR, "fraunces-400.ttf")
+_MONO = os.path.join(_FONTS_DIR, "ibm-plex-mono-400.ttf")
 
 
 def _font(path: str, size: int):
