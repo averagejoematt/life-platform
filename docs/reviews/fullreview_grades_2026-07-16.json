@@ -1,0 +1,194 @@
+{
+  "date": "2026-07-16",
+  "run_id": "wf_acd72834-8d9",
+  "method": "17-lens panel, one grader agent per lens + adversarial finding-verifier per lens (lean-REFUTED). Read-only contract. Ground truth: Day 4 of cycle 6 (genesis 2026-07-13), live build 1b57516, main b6408f39, budget tier 1 ($82/$85), repo PRIVATE since 2026-07-13.",
+  "lenses": {
+    "cto": {
+      "area": "Architecture & ops",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every resilience/ops claim in ARCHITECTURE.md reproduces against live CDK + AWS state; liveness sensors are capability-verified (not just IAM-parity-verified) after deploy; no alarm sits in ALARM unexplained beyond ~72h; the ADR-103 ledger rows match live subsystem state \u2014 all inside the solo-operator $85/mo envelope with no added standing machinery.",
+        "C": "The core pipeline (ingest\u2192DLQ\u2192digest, S3/DDB protection, per-lambda roles) works, but one or more monitoring paths are silently dead, the canonical architecture doc materially misdescribes live behavior (crons, stack ownership, quotas), and stale alarms/ledger rows accumulate with no reconcile loop.",
+        "F": "Async paths without DLQ/alarm coverage, shared over-privileged IAM roles, S3/DDB unprotected against operator error, or documentation wrong enough that an incident responder acting on it would make things worse."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 0
+    },
+    "principal": {
+      "area": "Code health",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "Full offline suite green and fast with creds blanked; every stated quality gate (coverage floor, mypy tier set, deploy-critical lane, format gates) matches measured reality within a small tolerance; no unreferenced code shipping in the every-bundle shared modules; exactly one canonical implementation per platform invariant (float\u2192Decimal, Pacific-date, ISO parse); golden tests pinned against the known wall-clock defect class.",
+        "C": "Suite green but the gates are partly decorative \u2014 coverage floor drifted far below actual so backsliding is possible, gate comments/config contradict enforcement status, hundreds of dead lines ship in every Lambda bundle, and invariant helpers are forked with divergent edge-case semantics.",
+        "F": "Red main tolerated or gates disabled to get green; tests mirror implementation so defects cannot fail them; no coverage or type gate at all; wall-clock time bombs in fixtures with no encoded lesson."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "ai-quality": {
+      "area": "AI content integrity",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every reader-facing AI narrative passes a deterministic grounding gate with the audience-correct fail mode (fail-closed public, keep-best internal), every prompt carries the phase/day truth, a reset leaves zero wiped-cycle narrative reachable on any live endpoint, and live spot-checks find no number, date, or verdict a Day-4 reader couldn't trace to real data.",
+        "C": "The grounding harness exists and covers the flagship surfaces, but coverage is convention rather than structure \u2014 at least one live surface serves stale, ungated, or mischaracterized AI content and no test or gate would catch it.",
+        "F": "Models receive raw data and ship unchecked numbers or claims to readers, or a reset/budget state silently narrates wiped or fabricated history as current with no tombstone semantics at all."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 1
+    },
+    "cpo": {
+      "area": "Product & narrative arc",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every door's first screen states its loop role; every live engagement hook (predict-the-week, ask-the-board, chronicle/podcast cadence) is demonstrably alive-or-honestly-absent on ANY day of a cycle including Day 4 of a fresh reset; a shared bare URL lands on the page; each of the 4 audiences finds its surface within one click of Home; the early-cycle state reads as a deliberate season premiere (day counter, pre-registration, prequels, cycle-vs-cycle context).",
+        "C": "Doors render and the loop is taught, but one or more engagement hooks silently serve stale or dead-cycle content, shared links 404, or the fresh-cycle state depends on the reader's forgiveness to not read as broken \u2014 returnability exists on paper but not on the calendar.",
+        "F": "The early-cycle site reads as broken or dishonest: blank doors, no day counter or pre-registration, hooks dead or fabricating (gains hidden, dead weeks presented as live, chronicle inventing content beyond the logged data)."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "designer": {
+      "area": "Design system",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "Every live surface draws color/type/spacing from tokens.css; the 11px type floor holds when MEASURED (including SVG text under render scale) at 390 and 1280; single-ember discipline and the breakpoint set are enforced by a gate that sweeps all sheets; Day-N-sparse states are visibly designed and honest.",
+        "C": "The kit and tokens exist and most pages use them, but flagship charts ship sub-floor text, several off-palette raw-hex accents render live, and the token gate covers only a minority of sheets so drift accumulates unpoliced.",
+        "F": "No token discipline: decorative glow, red-for-down direction encoding, emoji marks, per-page ad-hoc type and colors; empty states are blank, broken, or dressed up to hide sparseness."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 1
+    },
+    "dataviz": {
+      "area": "Charts & instruments",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "Every visual encoding is proportional and honest at any n (lengths/areas never anchored to arbitrary floors), every statistical claim carries visible-and-reachable n/CI on touch and keyboard, low-n charts refuse or degrade with explicit copy, and the live site renders zero contradictory encodings on any surface.",
+        "C": "Charts render and mostly caption honestly, but multiple encodings exaggerate (truncated-baseline bar lengths, area fills over min-max axes), some correlations ship without visible n, or the hover/tap readouts are dead on a class of charts.",
+        "F": "Truncated axes or area lies presented as trends, correlations framed causally or shipped with no n at all, fabricated confidence bands, or n=4 data drawn as a confident trend line with no caveat."
+      },
+      "findings_confirmed": 3,
+      "findings_refuted": 4
+    },
+    "qs": {
+      "area": "Scientific credibility",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every public claim is correlative and carries a real, resolvable citation; every protocol lever states the data it targets and the hypothesis that spawned it; every pre-registered bet is either graded or explicitly voided ON THE RECORD across resets; thresholds derive from personal variance or are labelled population constants; every 'how it holds up' surface is either live or honestly retired.",
+        "C": "The methodology pages state the right posture (correlative-only, pre-registration, calibration) but spot-checks find fabricated-looking citations, pre-registered bets that silently vanish at reset, or dead credibility surfaces a skeptic can trip on.",
+        "F": "Causal claims stated as fact, invented or search-URL citations presented as studies, calibration numbers that misrepresent the actual record, or magic-number thresholds presented as personalized."
+      },
+      "findings_confirmed": 6,
+      "findings_refuted": 1
+    },
+    "narrative": {
+      "area": "Voice & immersion",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Every live narrative surface tells one coherent cycle-6 story \u2014 reset seams are invisible to a binge reader, restored prequels are internally reconciled, each coach is distinguishable blind (and the voice-fidelity scoreboard has evidence), and no page contradicts another page's account of the same week.",
+        "C": "Page-by-page prose is competent but cross-surface continuity breaks survive a reset \u2014 stale prior-cycle narratives render on live doors, restored posts contradict each other on plan facts, or coach attributions add no voice \u2014 so an attentive reader catches the machinery mis-telling the story.",
+        "F": "Personas are interchangeable or the narrator voice is absent, wiped-cycle narratives dominate live pages as if current, or narrative copy contradicts the platform's own data (hype over honesty, unearned glow)."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 2
+    },
+    "security": {
+      "area": "Exposure \u2014 privacy absolutes on the live surface, repo secret/PII hygiene, auth surfaces (MCP OAuth, site-api write rate-limits), S3 bucket policy, IAM posture",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "Live public JSON exposes zero chronological age / birth year / genome identifiers / vice-substance names (verified by curl+grep, not docs); sensitive S3 prefixes (raw/config/uploads/dashboard) return 403/404 publicly; no live secret or PII in tracked repo files or recent history; the MCP OAuth consent+PKCE gate and DDB-backed per-IP rate limits are provably enforced with no spoofable trust boundary; every Lambda has its own least-privilege role with Resource:* only on actions that cannot be resource-scoped.",
+        "C": "Privacy absolutes hold on the sampled live endpoints but one enforcement boundary is bypassable (e.g. spoofable client-IP so rate limits don't actually bind) or a known-inversion residual is unmitigated, OR an over-broad IAM wildcard / publicly readable sensitive prefix exists without a compensating control.",
+        "F": "Any live public endpoint returns chronological age, a genome identifier, or a named vice/substance; a live credential is committed to the repo; /token or /authorize mints a bearer without consent; or raw health data is publicly fetchable."
+      },
+      "findings_confirmed": 1,
+      "findings_refuted": 1
+    },
+    "a11y": {
+      "area": "Accessibility",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "WCAG AA holds on every live page in BOTH themes (verified by an automated token-contrast check, not hand-written comments); every interactive widget is keyboard-operable with visible focus; data charts are named to AT; reduced-motion is honored; tap targets meet the 44px floor site-wide with a gating audit.",
+        "C": "Landmarks/headings/skip links are mostly right and most widgets are keyboard-reachable, but multiple AA contrast failures exist in at least one theme, some custom widgets (charts, tabs, popovers) are mouse-only or unnamed to screen readers, and there is no regression guard so fixes decay.",
+        "F": "Div-soup interactive UI (no focus styles, no keyboard path), data charts silent to screen readers, contrast failures on body text, no skip links, animation ignores prefers-reduced-motion."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 1
+    },
+    "reader": {
+      "area": "First-contact comprehension (cold Reddit reader, live site, desktop 1280 + mobile 390)",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "A stranger from Reddit gets what/who/why in one screen on every door, every platform term is glossed inline where it first appears, every visible number is self-consistent and date-scoped, and a 4-day-old experiment reads as deliberately young rather than empty or broken.",
+        "C": "The pages render and the premise is findable, but unexplained jargon, contradictory or stale numbers, or broken-looking text force the reader to do reconciliation work before they can trust the site.",
+        "F": "A first-time reader cannot tell what the site is or whether it is alive \u2014 blank regions, raw template bindings, dead data, or a story surface that looks abandoned."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "observability": {
+      "area": "Telemetry & alerting",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Every alarm state is honest (red = a real, actionable condition; nothing permanently red or structurally unclearable), every watchdog's producer is verified actually emitting (not just designed to), and the remediation/drift loop demonstrably closes or explicitly hands off every signal it sees \u2014 all within the $85 ceiling, urgent-vs-digest split intact, solo operator paged for what matters and only that.",
+        "C": "The alarm inventory is well-designed on paper but one or more watchdog producers are dead (IAM/emission failures swallowed as warnings), red alarms sit unactioned for a week-plus, or the self-healing loop completes triage only intermittently while reporting green \u2014 governance expressed but not achieved.",
+        "F": "Alarms missing or routed to nowhere (no live SNS subscription), DLQ pileup or a dead ingestion source discoverable only by manual audit, budget hard-stop silent, log groups unbounded \u2014 the operator learns about failures from the website being wrong."
+      },
+      "findings_confirmed": 6,
+      "findings_refuted": 0
+    },
+    "cost": {
+      "area": "Cost engineering",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "The ADR-063/133 ceiling is enforced at the bedrock_client chokepoint with the ADR-125 audience-ordered ladder, the projection math has no double-count or de-escalation traps, every public and operator-facing cost number (ceiling, monthly total, tier labels) matches the live governor state per ADR-104, and per-feature AI cost is visible on a live public receipt.",
+        "C": "A hard stop exists somewhere but the tier labels, public cost numbers, and the actual degradation ladder disagree with each other; or the projection has a known over/under-count failure mode; or the operator cannot attribute AI spend per feature.",
+        "F": "No near-real-time enforcement (AWS Budgets alone with its 24-48h Bedrock lag), reader traffic can spend unbounded through the public AI endpoints, or the public cost claims are fabricated rather than derived from metering."
+      },
+      "findings_confirmed": 6,
+      "findings_refuted": 0
+    },
+    "data-architect": {
+      "area": "Data modeling",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Live DynamoDB items, docs/SCHEMA.md, and the phase-taxonomy registry are mutually consistent under spot-sampling; exactly the 2 sanctioned GSIs (ADR-097) exist; the reset machinery is provably total AND idempotent (a double reset preserves each record's original cycle provenance); raw-S3 layouts match their source_registry raw_layout facets including filename scheme.",
+        "C": "The schema doc is mostly accurate and GSI count holds, but the reset/provenance machinery drifts from its stated contract in live data (wrong cycle stamps, claimed write-time stamping absent), or new pk families can silently escape the taxonomy's totality guarantee.",
+        "F": "Undocumented GSIs or partitions in live; float writes crashing or silently failing DDB persistence; tombstoned records from a prior cycle leaking into current-cycle reads; or archive records destroyed/overwritten with no way to reconstruct provenance."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 0
+    },
+    "integrations": {
+      "area": "Ingestion health",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every source's declared cadence/threshold matches its live EventBridge rule with a written derivation (the #471 Todoist standard); the public board and the operator checker tell the same cross-reset-honest story (real last_update + 'dark N days'); a dead OAuth token pages within ~one cadence via alarms that are green because they work, not because they can't fire; dead sources are disclosed everywhere they surface \u2014 all with no machinery beyond the one canonical registry.",
+        "C": "Cadences and thresholds are mostly honest, but at least one public surface omits or misstates staleness (e.g. a real lapse rendered as 'no data' with no duration), or a dead source appears live on a reader-facing surface, or token death is only noticed by a daily human glance rather than an alarm.",
+        "F": "Registry facets contradict the live rules (thresholds impossible for the cadence), staleness is silently hidden or fabricated on the public board, dead sources are presented as flowing, and there is no alarm path for a dead token."
+      },
+      "findings_confirmed": 2,
+      "findings_refuted": 1
+    },
+    "devex": {
+      "area": "Build & ship ergonomics (AI-agent development)",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "Every load-bearing claim an agent reads in its first 5 minutes (CLAUDE.md, CONVENTIONS, the /deploy skill) is either machine-synced or provably current; all deploy paths verifiably stage through one bundle; the fast deploy-critical lane runs green offline in seconds; incident classes are encoded in gates/agents rather than relying on agent memory; drift gates cover process/ownership/date facts, not just counts.",
+        "C": "The one-bundle rule and CI gates exist and mostly work, but agent-facing docs carry multiple contradictions an agent must resolve by reading source (stale ship paths, wrong stack owners, dead command signatures), the doc-sync gates cover only what they were hand-taught, and a fresh agent's first deploy requires tribal knowledge from memory topics to avoid a known incident class.",
+        "F": "Deploy paths diverge (some functions ship partial bundles), CLAUDE.md commands fail or silently do the wrong thing, CI pins drift from local tooling so local-green \u2260 CI-green, and the handover/memory system has rotted into an unindexed pile \u2014 a fresh agent's first change is more likely to regress production than to land."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 1
+    },
+    "growth": {
+      "area": "Community & commercialization",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every shareable page emits a current, data-driven OG card; the subscribe flow is double-opt-in, canary-tested, AND its conversion (attempts \u2192 confirms \u2192 list size) is visible in the weekly traffic digest; subscribers get a fixed cadence that matches the promise copy on /subscribe/; engagement hooks (predict, board-ask, votes) work on Day 1 of a fresh cycle and are discoverable from the pages newcomers land on; commercial option value (list, RSS, gear, podcast) is real and measured with zero dishonest monetization.",
+        "C": "Capture and email machinery works end-to-end but the funnel is unmeasured (signups can silently die in pending state), share surfaces ship a generic or stale card, and engagement hooks exist in code but are not reachable or not functional on Day 1 of a cycle.",
+        "F": "The funnel is broken or dishonest: subscribe silently fails or is single-opt-in spam, share cards present wrong/stale numbers as current, engagement endpoints 500, or monetization (undisclosed affiliates, paywalled 'proof') contradicts the proof-not-promises posture."
+      },
+      "findings_confirmed": 3,
+      "findings_refuted": 4
+    }
+  }
+}
