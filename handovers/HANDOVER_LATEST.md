@@ -1,100 +1,92 @@
-# HANDOVER — Documentation accuracy pass + generalized drift guardrails + local-file sunset — 2026-07-13
+# HANDOVER — OG share cards un-tofu'd + the career-artifact essay card (#741) — 2026-07-16
 
-> Instruction thread: Matthew relayed a ChatGPT repo assessment — "documentation volume
-> beginning to exceed documentation truth" — with 4 concrete drift examples (README 64
-> vs ARCHITECTURE 127 MCP tools; repo desc $75 vs current $85/$100; bedrock_client.py
-> still says "shared layer" though retired; TESTING 1,217 vs ~3,000 tests) and the meta-
-> point: *the repo is better at expressing drift governance than achieving it.* Ask:
-> "right-size all documentation, ensure accuracy, and build guardrails from drift."
-> Plus two riders: (2) sunset local-only laptop files in favor of git; (3) a 5th finding
-> about public infra-identifier disclosure. Mid-session Matthew noted the **repo is now
-> PRIVATE** (was public) and "a lot more merges/deploys since," so I re-verified ground
-> truth before touching anything.
+> Instruction thread: session opened "read memory and handover, what should we work on."
+> Recommended #741 (publish the career artifact + measure travel) — the one `Now` story
+> with shippable mechanics. On inspection its mechanics were ALREADY done (essay live,
+> `/method/build/` cross-link live, traffic-digest "Travel watch" #1072 deployed), so the
+> one real gap was the essay's share card. Building it surfaced a months-old production
+> bug — every OG card renders tofu — which became the actual work. Matthew then said
+> "can you do the deploy," which unblocked the lambda deploy (his hard boundary, explicit
+> in-session words unblock).
 
-## What shipped — PR #1189 (OPEN, 4 commits, awaiting Matthew's merge)
+## What shipped — PR #1193 (OPEN, 1 commit; branch `feat/essay-og-card`)
 
-Branch `docs/accuracy-and-drift-guardrails`. Full offline suite **5106 passed / 0 fail**;
-all six doc gates green; both new gates proven to catch planted drift.
+`fix(cards): repair tofu OG share cards + add the essay card (#741)`. Offline card/OG
+suite **20 passed** (with `scripts` on path, as CI runs it); black + flake8 clean.
 
-**Phase 1 — Accuracy (commit aba73513).** Every confirmed drift fixed against ground truth:
-- `ARCHITECTURE.md:227` `**Tools:** 127`→64 (self-contradicted line 5's ruled 64 — the
-  phrasing had no sync rule); `Modules: 26`→34. `DEPENDENCY_GRAPH.md:228` 127→64.
-- `TESTING.md` `1,217`→3,646 (now marked sync-managed). Published essay (`.md` + live HTML
-  `site/journal/essays/org-chart-of-one/`): `8 CDK stacks`→9, `~140 API tools`→~64, `$75`→$85.
-- **35 shared-layer docstrings** across `lambdas/`+`mcp/` reworded to "bundled per-function"
-  (via an auditable one-shot migration script; files that correctly say "NOT the shared
-  layer" left alone). `SCHEMA.md`/`PHASE_TAXONOMY.md` `(shared layer)` parentheticals.
-- GitHub repo description `$75`→$85 (via `gh repo edit`). **`BACKLOG.md` $75 left intact by
-  design** — loudly-frozen historical archive; the ceiling really was $75 then.
+**The bug.** Every OG/social share card the platform generates has rendered as `.notdef`
+"tofu" boxes since the HP-13 origin commit (`e1adce8d`) — including the one live on the
+site. Root cause: the bundled `bebas-neue-400.ttf` / `space-mono-*.ttf` are subsets with
+**no basic-Latin glyphs** — `A`–`Z` are absent from the cmap entirely (first cmap entries
+jump `space` → `Amacron`), so `card_engine` drew boxes for all card text. Invisible for
+months because visual QA inspects live *pages*, never the generated PNGs, and cards only
+surface on external shares.
 
-**Phase 2 — Generalized guardrails (commit 8952ec01) — the structural deliverable:**
-- **`scripts/check_doc_facts.py` (NEW)** — generalized stale-number gate. Imports
-  `sync_doc_metadata`'s discoverers (one source of truth) and fails on a stale count/budget
-  in ANY phrasing, not just pre-registered regexes. Precision-first: forward-only patterns,
-  a letter/digit glue-guard (kills `python3 tests/`==「3 tests」), `lambda_count`
-  deliberately UNPOLICED (subset counts irreducibly ambiguous), ledger + historical-line +
-  `<!-- drift-ok -->` exemptions. **First run found a real stale "~125 MCP tools" in
-  RUNBOOK_REENTRY** (fixed).
-- **`check_doc_tombstones.py` now scans `lambdas/`+`mcp/`** with one broad
-  `shared (?:Lambda )?layer` rule replacing 3 narrow ones that missed the dominant "part of
-  the shared Lambda layer" phrasing entirely. Exempt-line regex broadened. Proven
-  non-vacuous by a new test.
-- **`sync_doc_metadata.py`**: `test_count` wired into discovery + 2 new RULES (ARCHITECTURE
-  `**Tools:**/Modules:`, TESTING.md). Both gates wired into docs-ci.yml + ci-cd.yml;
-  documented in `CONVENTIONS.md` §8; `test_wiki_checkers.py` +2 tests.
+**The fix (one PR):**
+- Repointed the shared `card_engine` (ADR-114) **and** `reading/cover_placeholder.py` at
+  the v5 brand type triad the live site actually serves — **Fraunces** (display) + **IBM
+  Plex Mono** 400/500 (mono) — converted `woff2→ttf` from `site/assets/fonts/v4/`. Deleted
+  the 3 broken TTFs, added 3 good ones. One change fixes **all** cards (12 daily + character
+  + chronicle + coach + moment) AND rebrands them from the retired Bebas/Space Mono look to
+  v5.
+- Added `build_essay_org_chart` → `og-org-chart.png` (editorial card: amber kicker, wrapped
+  Fraunces title, mono lede) and repointed the essay's `og:image` / `twitter:image` /
+  JSON-LD `image` at it.
+- **Regression guard** (`tests/test_card_engine.py::test_brand_card_fonts_render_basic_latin`):
+  PIL-only (no fontTools dep) — a real letter's raster must differ from an unmapped
+  private-use codepoint (`U+E000`); identical ⇒ both fell back to the same `.notdef` box.
+  Verified it catches the old broken font and passes the new ones.
 
-**Phase 3 — Right-size (commit 8bdc46da).** Untracked `docs/restart/_*.txt`/`_*.log` — 22
-generated run-reports (~1 MB, incl. 450 KB grep dumps) regenerated every reset run.
-Gitignored like `deploy/qa_report/`. Deferred (cosmetic, gate-exempt): archiving the 7
-`REVIEW_BUNDLE_*` snapshots.
+## Deployed + verified LIVE
+- `deploy/deploy_lambda.sh og-image-generator lambdas/web/og_image_lambda.py` (full-tree
+  bundle staged `lambdas/fonts/` automatically, #781) → invoked → `Generated 13/13 OG images`.
+- Live CDN confirmed: `og-home.png` went **10 KB (tofu) → 33 KB (real glyphs)**; every card
+  renders real text; **`og-org-chart.png` is live and on-brand** (visually reviewed).
+- Deployed from the branch (code-only, green, tested) — a small deviation from deploy-from-main,
+  accepted to fix prod now without the merge-triggered rollback risk below. Transient
+  branch/main drift closes on merge (nothing auto-deploys this lambda from main pre-merge).
 
-**Phase 4 — Local-file sunset (commit 0eb9d0bc).** Local-state audit: almost everything
-laptop-only already has a git/S3 home. `.config.json` (only uncovered credential) is
-regenerable from `life-platform/mcp-api-key` → documented `NEW_MACHINE_BOOTSTRAP` §3b;
-Full Disk Access grant (unblocks #1026 datadrops leg + ingest watcher) → §3c. Reconciled
-stale "#1026 not landed" across DR docs (it LANDED, commit 48f635e3; memory leg live daily)
-and fixed a wrong datadrops S3 restore path (`uploads/…` 30-day-expires → top-level
-`datadrops-archive/`).
+## Merge intentionally HELD (the load-bearing gotcha)
+Merging #1193 now would trigger `site-deploy.yml`, whose `visual-qa` job uploads
+screenshots with `if: always()` + **no `continue-on-error`** (lines 187–193), and the
+auto-rollback fires on `needs.visual-qa.result == 'failure'` (line 208). GitHub's
+**artifact-storage quota is currently exhausted** (account-wide, recalculates ~6–12h) — the
+same condition that red-X'd this PR's render gate even though its logic printed `✅ GATE
+PASSED`. So a merge → QA passes its real checks but fails the artifact UPLOAD → job failure
+→ **spurious auto-rollback of a healthy site + false-alarm email**. Held until the quota
+clears. Safe to wait: the live essay still points at `og-home.png` (now fixed), so nothing
+looks broken; the merge only swaps in the bespoke card, which already exists in S3.
 
 ## Gotchas hit
-- **The whole point, live:** `sync --check` passed GREEN while ARCHITECTURE contained both
-  64 (ruled) and 127 (un-ruled) — the cleanest proof that per-phrasing regexes miss.
-- **Fact-scanner precision is everything:** first pass = 34 hits, ~32 false positives
-  (`python3 tests/`, subset Lambda counts, "24h", reverse-pattern number grabs). Tightened
-  to forward-only + glue-guard + dropped lambda_count → 2 hits, both real (1 stale claim, 1
-  budget FP fixed by requiring ceiling-word adjacency). A false-positive gate gets disabled.
-- **Vacuous-scan trap:** planted "part of the shared Lambda layer" did NOT fire until I
-  added the broad rule — the dominant phrasing matched NONE of the 3 narrow rules. Always
-  prove a new gate catches a planted violation.
-- Adding the 2 new tests bumped `def test_` 3644→3646, re-drifting the sync literal — had
-  to `--apply` again (correct: the number is now auto-managed).
-- My Phase-1 comment rewords touched compute lambdas → `check_doc_index --strict` engine-doc
-  drift; bumped HYPOTHESIS/READINESS/SCORING Verified dates (comment-only, formulas unchanged).
-- Interactive-shell for-loop reported spurious exit-2 on the DECISIONS-parsing gates;
-  direct runs + pytest confirm exit 0. Not a real failure.
+- **Artifact-storage quota red-X's healthy jobs.** A passed gate whose post-run
+  `upload-artifact` step fails on quota still marks the whole JOB red. It will red *other*
+  CI jobs too (any `upload-artifact` step) until it clears — those reds are noise, not code.
+- **The repo's "full" legacy fonts were ALSO broken.** `site/legacy/assets/fonts/*.woff2`
+  are subset to near-nothing too. Only the `site/assets/fonts/v4/*.woff2` (hashed names) are
+  real full fonts — and the v5 site had already moved OFF Bebas/Space Mono to Fraunces / IBM
+  Plex Mono / Instrument Sans (`tokens.css`), so the card lambda was doubly stale.
+- **Two OG lambdas exist; only one is live.** `og-image-generator` (operational stack,
+  handler `web.og_image_lambda.lambda_handler`) is the live card producer. `life-platform-og-image`
+  (web_stack) does not exist live — don't deploy to it.
+- **zsh doesn't word-split unquoted `$VARS`** — passing a `$FILES` list to black/flake8 as
+  one arg failed; list files explicitly.
 
-## 5th finding (infra disclosure) — no action, mooted
-Repo went private 2026-07-13. Disclosure sweep found **zero credential VALUES** in-repo
-(R22 redaction verified clean). Aggregate recon surface (account ID, bucket, dist IDs) is
-load-bearing in CI/CDK and defensibly accept-as-documented-risk. Only residual (auth on
-public Function URLs) already covered by R22 hardening.
-
-**Build beat:** none — PR #1189 is open, merge + any deploy await Matthew ("I run deploys/merges").
-**Docs:** updated in-PR (ARCHITECTURE, TESTING, DEPENDENCY_GRAPH, SCHEMA, PHASE_TAXONOMY,
-RUNBOOK_REENTRY, CONVENTIONS §8, NEW_MACHINE_BOOTSTRAP, DISASTER_RECOVERY, engines/{HYPOTHESIS,
-READINESS,SCORING}, content essay); all Verified dates bumped; wiki checkers green at the
-branch HEAD. No separate wrap-commit doc changes needed.
+**Build beat:** none — PR #1193 is open; the lambda is deployed+live but the code is NOT
+merged to `main`, so it fails the merged-AND-deployed eligibility bar (#736).
+**Docs:** none on `main` this wrap — the card-font fix lives in open PR #1193; no canonical
+current doc names the retired fonts (only `docs/archive/` + `docs/briefs/`, exempt), so no
+tombstone. Any doc impact ships with the PR.
 
 ## Next picks / residual queue
-- **Merge PR #1189** (Matthew) — 4 doc commits, no deploy needed (docs + gates + gitignore;
-  site essay HTML change auto-deploys via site-deploy.yml on merge). Then the new gates go
-  live on every push.
-- Deferred in-PR (optional follow-up): archive the 7 `REVIEW_BUNDLE_*` snapshots (~20k lines,
-  gate-exempt dir) + delete near-empty reviews/ stubs.
-- Matthew's laptop actions (documented, not automatable): grant `/bin/bash` Full Disk Access
-  (unblocks datadrops backup + ingest watcher); remove dead `may25-pivot.plist`.
-- Standing from prior session: #1187 podcast music, #1114 portraits, #741 essay, #1148 +
-  coach traits; `/fullreview` 17-lens relaunch after weekly reset (~07-18).
+- **Merge PR #1193** after the artifact quota resets (~6–12h) — swaps the essay's `og:image`
+  to the bespoke card; on merge, site-deploy runs clean. Then a build beat becomes eligible.
+- After that, **#741's only remaining scope is the external publish** (blog + CFP/HN) —
+  Matthew's action, permission-gated.
+- **Follow-up (filed as a clause, not an issue yet):** `build_builders` in `og_image_lambda.py`
+  hardcodes stale figures — `116 MCP TOOLS / 59 LAMBDAS / $13` vs real ~64 / ~94 / $85. The
+  #1189 `check_doc_facts` gate scans docs, not in-lambda card literals, so it's unpoliced.
+- **Also open, awaiting Matthew's merge:** PR #1190 (no-FDA TCC posture docs, `docs/option-c-no-fda`).
+- Standing from prior sessions: #1187 podcast music, #1114 portraits v2, #1148 coach traits;
+  `/fullreview` 17-lens relaunch after weekly reset (~07-18).
 
-Full narrative of new gate machinery + ground-truth counts: memory
-`project_doc_drift_guardrails_2026_07_13`. Prior session: `HANDOVER_2026-07-13_GreenMainPrereg.md`.
+Prior session: `handovers/HANDOVER_2026-07-13_DocAccuracyDriftGuardrails.md`.
