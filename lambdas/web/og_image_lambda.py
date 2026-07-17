@@ -238,6 +238,29 @@ def build_experiments(stats):
     return img
 
 
+def build_essay_org_chart(stats):
+    """#741 — the flagship career-artifact share card. The essay
+    (/journal/essays/org-chart-of-one/) is the piece Matthew publishes externally, and
+    its *measured travel* is the story's success metric — so it earns a bespoke card
+    instead of the generic home card. Static editorial (like the chronicle card): a
+    kicker, the wrapped title, and one honest lede — no fabricated metrics. Rendered
+    through the same primitives so it stays byte-consistent with the card family."""
+    img, draw = _base_image()
+    _draw_header(draw, "Essay")
+
+    draw.text((48, 92), "THE OPERATING SYSTEM, IN PUBLIC", fill=card_engine.AMBER, font=_font(FONT_MONO, 13))
+    y = card_engine.draw_title(draw, "The Org Chart of One Human and N Agents", 126, size=64, width=22, max_lines=3)
+
+    lede = "How a one-person production platform is actually run: sessions as mortal"
+    lede2 = "employees, deterministic gates holding the keys, the failure log as credibility."
+    y = max(y + 20, 430)
+    draw.text((48, y), lede, fill=MUTED, font=_font(FONT_MONO, 15))
+    draw.text((48, y + 26), lede2, fill=MUTED, font=_font(FONT_MONO, 15))
+
+    card_engine.draw_footer(draw, left_text="an essay", right_text="averagejoematt.com/journal/essays")
+    return img
+
+
 def build_builders(stats):
     img, draw = _base_image()
     _draw_header(draw, "For Builders")
@@ -264,6 +287,7 @@ PAGES = [
     ("og-weekly", build_weekly),
     ("og-experiments", build_experiments),
     ("og-builders", build_builders),
+    ("og-org-chart", build_essay_org_chart),  # #741 — the career-artifact essay card
 ]
 
 

@@ -40,9 +40,14 @@ GREEN = (34, 197, 94)  # #22c55e
 BORDER = (14, 26, 18)  # subtle line
 AMBER = (240, 180, 41)  # #f0b429 — the "honest miss" accent (#405/#551)
 
-FONT_DISPLAY = "bebas-neue-400.ttf"
-FONT_MONO = "space-mono-400.ttf"
-FONT_MONO_BOLD = "space-mono-700.ttf"
+# v5 brand type triad (tokens.css): Fraunces = display/human voice, IBM Plex Mono =
+# machine & data. Retired the original Bebas Neue / Space Mono TTFs — those subsets
+# shipped with NO basic-Latin glyphs (A–Z unmapped in the cmap), so every off-site
+# card rendered as tofu boxes since HP-13. These woff2→ttf conversions of the exact
+# fonts the live site serves fix the render AND align the cards with the v5 site.
+FONT_DISPLAY = "fraunces-400.ttf"
+FONT_MONO = "ibm-plex-mono-400.ttf"
+FONT_MONO_BOLD = "ibm-plex-mono-500.ttf"
 
 W, H = 1200, 630
 MARGIN = 48  # safe left/right margin
