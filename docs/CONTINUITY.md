@@ -1,6 +1,6 @@
 # CONTINUITY — if the AI is gone
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (datadrops backup is a manual push, no FDA grant — §3c posture)
 > **Sources of truth:** handovers/, .claude/commands/, mcp memory tool code, this repo's git history
 
 This page maps every piece of operational state that lives **outside `docs/`** — where
@@ -144,11 +144,12 @@ aws s3 sync ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platfo
 ```
 
 **Automated since 2026-07-11 (#1026):** the daily launchd agent
-`com.matthewwalker.claude-memory-backup` (`backup/install.sh`) runs this sync plus a
-`datadrops/` → `s3://…/datadrops-archive/` sweep — RPO is now ~1 day instead of
-"whenever the last wrap ran". The wrap-step sync stays as belt-and-suspenders.
-Caveat: the datadrops leg needs `/bin/bash` granted Full Disk Access (macOS TCC blocks
-launchd from ~/Documents; the same block is silently failing the ingest watcher).
+`com.matthewwalker.claude-memory-backup` (`backup/install.sh`) runs this memory sync —
+RPO is now ~1 day instead of "whenever the last wrap ran". The wrap-step sync stays as
+belt-and-suspenders. The `datadrops/` → `datadrops-archive/` leg is a **manual push**
+(`BACKUP_DATADROPS=1 …`) by decision — reading `~/Documents` would need a Full Disk Access
+grant on bash we deliberately don't make; datadrops is low-churn historical originals, so a
+manual push when you add one is enough (`docs/NEW_MACHINE_BOOTSTRAP.md` §3c).
 
 **Never commit this directory (or its export) to the repo** — even though the repo went
 private 2026-07-13, memory files contain personal detail and security-incident narrative
