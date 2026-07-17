@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
 
-Last updated: 2026-07-16 (v8.6.0 — 64 tools, 34-module MCP package, 20 data sources, 94 Lambdas, 21 secrets, 67 alarms, 9 CDK stacks deployed).
+Last updated: 2026-07-17 (v8.6.0 — 64 tools, 34-module MCP package, 20 data sources, 94 Lambdas, 21 secrets, 67 alarms, 9 CDK stacks deployed).
 
 > **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **121 ADRs** (ADR-001 → ADR-135 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
