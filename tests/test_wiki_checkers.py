@@ -48,6 +48,39 @@ def test_adr_index_current():
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+def test_adr_index_parses_h3_records_and_folds_amendments():
+    """#1321: h3-headed records (the ADR-046..057 class) are real records; a
+    `### ADR-NNN Amendment (...)` heading folds into its parent record — never a
+    distinct index row (it would duplicate the parent's number)."""
+    gen = _load("scripts/generate_adr_index.py")
+    doc = (
+        "## ADR-001 — First\n**Status:** Active\n**Date:** 2026-01-01\nbody\n"
+        "### ADR-002 — H3 record\n**Status:** Active\n**Date:** 2026-01-02\nbody\n"
+        "### ADR-002 Amendment (2026-01-03): a tweak\namendment body\n"
+        "## ADR-003: Third\n**Status:** Accepted\n**Date:** 2026-01-04\nbody\n"
+    )
+    recs = gen._records(doc)
+    assert [r["num"] for r in recs] == ["001", "002", "003"]
+    assert recs[1]["title"] == "H3 record"
+    # the amendment stays inside the parent's body: the parent keeps its own date,
+    # and no fourth row appears.
+    assert recs[1]["date"] == "2026-01-02"
+
+
+def test_adr_index_record_parse_agrees_with_permissive_scan():
+    """#1321 regression guard: on the live corpus the record parse must see every
+    distinct ADR number a permissive any-level heading scan finds (the pre-fix
+    `##`-only parse missed the 12 h3-headed records ADR-046..057 while --check
+    certified the index current)."""
+    gen = _load("scripts/generate_adr_index.py")
+    src = (ROOT / "docs" / "DECISIONS.md").read_text(encoding="utf-8")
+    nums = [r["num"] for r in gen._records(src)]
+    for n in range(46, 58):
+        assert f"{n:03d}" in nums, f"ADR-{n:03d} (h3-headed) missing from the parsed records (#1321)"
+    assert len(nums) == len(set(nums)), "duplicate ADR record rows"
+    assert set(nums) == set(gen._ANY_ADR_HEADING_RE.findall(src)), "record parse disagrees with the permissive heading scan (#1321)"
+
+
 def test_doc_facts_clean():
     r = _run("scripts/check_doc_facts.py")
     assert r.returncode == 0, r.stdout + r.stderr
