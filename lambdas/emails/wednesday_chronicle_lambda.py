@@ -1135,10 +1135,20 @@ def installment_grounding_findings(elena_prompt, user_message, text):
     gate path. Returns grounded_generation findings ([] = grounded).
 
     #1220: also verifies weekday↔date pairs in the narrative against the real
-    calendar (deterministic, zero AI cost) — the class the number gate never saw."""
+    calendar (deterministic, zero AI cost) — the class the number gate never saw.
+
+    #1242: symmetrically date-grounds the installment — a full calendar date Elena
+    cites that was NOT in her prompt or data packet is a fabricated_date finding
+    (the number gate is blind to it: '2026-07-08' tokenizes to benign 2026/7/8).
+    The allow-list is built the same way as the number allow-list, from exactly what
+    she was given. Regen-once-then-fail-open, so a false positive costs one rewrite."""
     import grounded_generation as _gg
 
-    findings = _gg.grounding_findings(text, allowed=_gg.allowed_numbers(elena_prompt, user_message))
+    findings = _gg.grounding_findings(
+        text,
+        allowed=_gg.allowed_numbers(elena_prompt, user_message),
+        allowed_dates=_gg.allowed_dates(elena_prompt, user_message),
+    )
     year, month = _covered_year_month(user_message)
     if year is not None:
         findings += _gg.weekday_date_findings(text, year, month_hint=month)
