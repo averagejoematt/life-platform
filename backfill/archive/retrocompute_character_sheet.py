@@ -41,7 +41,7 @@ from collections import defaultdict
 # Add parent dir so we can import character_engine
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 from character_engine import (
-    compute_character_sheet, store_character_sheet, fetch_character_sheet,
+    compute_character_sheet, store_character_sheet,
     _to_decimal, _from_decimal, ENGINE_VERSION
 )
 
