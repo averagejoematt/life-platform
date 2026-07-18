@@ -22,6 +22,14 @@ from email.utils import format_datetime
 from pathlib import Path
 from urllib.request import urlopen
 
+# Reuse the ONE word-boundary truncation helper (#1224) so the RSS excerpt cut lands on
+# a word boundary with an ellipsis instead of a raw fixed-length mid-word slice (#1261).
+# text_utils lives in lambdas/ (bundled into every function's package, #781); scripts run
+# from the repo root, so put lambdas/ on sys.path — the same pattern the other lambdas-
+# importing scripts use (e.g. scripts/publish_board_answer.py).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lambdas"))
+from text_utils import truncate_at_word  # noqa: E402
+
 # /journal/posts.json is the live genesis-anchored chronicle feed (served from
 # generated/journal/posts.json on S3).  The old /chronicle/posts.json was a
 # dead season-1 snapshot frozen at the pre-reset experiment; don't use it.
@@ -97,8 +105,8 @@ def main() -> int:
         post_url = p.get("url") or f"/journal/posts/week-{str(p.get('week', '')).zfill(2)}/"
         link = f"{BASE}{post_url}"
         excerpt = " ".join((p.get("excerpt") or "").split())
-        if len(excerpt) > 360:
-            excerpt = excerpt[:357].rstrip() + "…"
+        # Word-boundary truncation (#1224 helper) — never a mid-word slice (#1261).
+        excerpt = truncate_at_word(excerpt, 360)
         items.append(
             "    <item>\n"
             f"      <title>{esc(p['title'])}</title>\n"
