@@ -550,7 +550,7 @@ body { overflow-x: hidden; }
 .cr-calls { list-style: none; padding: 0; margin: var(--sp-3) 0 0; }
 .cr-calls li { margin-top: var(--sp-2); color: var(--ink); }
 .cr-calls .label { display: inline-block; min-width: 5.5em; text-transform: uppercase; }
-.cr-confirmed .label { color: #22c55e; }
+.cr-confirmed .label { color: #22c55e; } /* hex-ok: pre-existing confirmed-call green, out of #1211 scope (sky/green-hold) — its own tokenization is a separate finding */
 .cr-refuted .label { color: var(--ember); }
 .cr-caveat { display: block; margin-top: var(--sp-3); color: var(--ink-faint); }
 .cr-tuning { margin-top: var(--sp-3); }
@@ -636,7 +636,9 @@ body { overflow-x: hidden; }
 .team-huddle .label, .cr-rate, .tf-list li, .th-name, .cj-date { font-family: var(--font-mono); }
 
 /* ── The lead / Principal Investigator card — head of the team (2026-06-13) ──── */
-.team-lead { margin: var(--sp-4) 0; padding: var(--sp-4); border: 1px solid var(--ember-line); border-left: 3px solid #0ea5e9; background: var(--surface-raised); border-radius: var(--radius-sm); }
+/* #1211 — the lead-tier marker rides the one ember accent (DESIGN_SYSTEM_V5 §4:
+   the head coach IS the elevated one). Was raw sky #0ea5e9, off-palette. */
+.team-lead { margin: var(--sp-4) 0; padding: var(--sp-4); border: 1px solid var(--ember-line); border-left: 3px solid var(--ember); background: var(--surface-raised); border-radius: var(--radius-sm); }
 .team-lead .label { font-family: var(--font-mono); }
 .tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-1); }
 .tl-name { font-family: var(--font-serif); font-size: var(--fs-h3); font-weight: 600; color: var(--ink); }
@@ -646,21 +648,22 @@ body { overflow-x: hidden; }
 .tl-focus { margin-top: var(--sp-3); font-family: var(--font-mono); color: var(--ink-dim); }
 
 /* ── #1112 — the head coach at lead tier on the roster + detail surfaces ──────
-   Same sky accent as the .team-lead card above: the cast hierarchy, visually. */
-.dx-item--lead { border-left: 3px solid #0ea5e9; background: color-mix(in oklch, #0ea5e9 6%, var(--surface)); }
-.dx-item--lead.is-active { border-left-color: #0ea5e9; background: color-mix(in oklch, #0ea5e9 12%, var(--surface)); }
-.dx-item-lead { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: #0ea5e9; }
-.coach-head--lead { padding: var(--sp-3); border: 1px solid var(--ember-line); border-left: 3px solid #0ea5e9; background: var(--surface-raised); border-radius: var(--radius-sm); }
-.coach-head-tier { margin: var(--sp-1) 0 0; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: #0ea5e9; }
+   Same ember accent as the .team-lead card above: the cast hierarchy, visually
+   (#1211 — was raw sky #0ea5e9; ember is the one sanctioned "elevated" accent). */
+.dx-item--lead { border-left: 3px solid var(--ember); background: color-mix(in oklch, var(--ember) 6%, var(--surface)); }
+.dx-item--lead.is-active { border-left-color: var(--ember); background: color-mix(in oklch, var(--ember) 12%, var(--surface)); }
+.dx-item-lead { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: var(--ember); }
+.coach-head--lead { padding: var(--sp-3); border: 1px solid var(--ember-line); border-left: 3px solid var(--ember); background: var(--surface-raised); border-radius: var(--radius-sm); }
+.coach-head-tier { margin: var(--sp-1) 0 0; font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: .08em; text-transform: uppercase; color: var(--ember); }
 
 /* ── The Panel ledger — running bet scoreboard (2026-06-14) ──────────────────── */
 .panel-ledger { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--ember-line); }
 .pl-list { list-style: none; padding: 0; margin: var(--sp-2) 0 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .pl-list li { font-family: var(--font-serif); color: var(--ink); line-height: var(--lh-relaxed); }
 .pl-tag { font-family: var(--font-mono); font-size: var(--fs-label); padding: 1px 6px; border-radius: var(--radius-sm); margin-right: var(--sp-2); white-space: nowrap; }
-.pl-won .pl-tag { background: rgba(34,197,94,.15); color: #16a34a; }
-.pl-lost .pl-tag { background: rgba(239,68,68,.15); color: #dc2626; }
-.pl-open .pl-tag { background: rgba(234,179,8,.15); color: #b45309; }
+.pl-won .pl-tag { background: rgba(34,197,94,.15); color: #16a34a; } /* hex-ok: pre-existing bet-ledger status colour, out of #1211 scope (sky/green-hold) — its own tokenization is a separate finding */
+.pl-lost .pl-tag { background: rgba(239,68,68,.15); color: #dc2626; } /* hex-ok: pre-existing bet-ledger status colour, out of #1211 scope */
+.pl-open .pl-tag { background: rgba(234,179,8,.15); color: #b45309; } /* hex-ok: pre-existing bet-ledger status colour, out of #1211 scope */
 
 /* Episode transcript reader — speaker-attributed turns + an in-page "chapters"
    contents (the host's questions). Reads like a script; calm, library-grade. */
@@ -877,8 +880,8 @@ body { overflow-x: hidden; }
 .sc-call-st { text-transform: uppercase; letter-spacing: 0.04em; }
 .sc-call-claim { margin: 0; font-family: var(--font-serif); color: var(--ink); }
 .sc-call-why { color: var(--ink-faint); margin: 4px 0 0; }
-.sc-confirmed { border-left-color: #5a8f6b; }
-.sc-confirmed .sc-call-st { color: #5a8f6b; }
+.sc-confirmed { border-left-color: #5a8f6b; } /* hex-ok: pre-existing confirmed-call green, out of #1211 scope (sky/green-hold) — its own tokenization is a separate finding */
+.sc-confirmed .sc-call-st { color: #5a8f6b; } /* hex-ok: pre-existing confirmed-call green, out of #1211 scope */
 .sc-refuted { border-left-color: var(--ember); }
 .sc-refuted .sc-call-st { color: var(--ember); }
 .sc-call-m { font-family: var(--font-mono); color: var(--ink-faint); }
