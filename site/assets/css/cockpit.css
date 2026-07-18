@@ -543,7 +543,7 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .carry-tag {
   display: inline-block; margin-left: 0.35em; padding: 0 0.4em;
   border: 1px solid var(--rule); border-radius: 3px;
-  font-size: 0.82em; color: var(--ink-faint); white-space: nowrap;
+  font-size: 0.82em; /* fs-ok: inline carry marker, deliberately smaller than the lever caption it rides */ color: var(--ink-faint); white-space: nowrap;
 }
 .lever-go { margin-left: auto; color: var(--ink-faint); }
 .lever-link:hover .lever-what { color: var(--ember); }
