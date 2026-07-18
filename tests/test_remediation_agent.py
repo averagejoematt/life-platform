@@ -306,6 +306,115 @@ def test_triage_incomplete_non_dict_is_flagged():
     assert agent.triage_incomplete(None) is True
 
 
+# ── #1204: alarm-aging escalation (deterministic, LLM-independent) ───────────
+
+
+def _metric_alarm(name, age_hours, now):
+    from datetime import timedelta
+
+    return {
+        "AlarmName": name,
+        "StateReason": "Threshold Crossed",
+        "MetricName": "M",
+        "Namespace": "NS",
+        "StateUpdatedTimestamp": now - timedelta(hours=age_hours),
+    }
+
+
+def test_aged_alarm_over_72h_becomes_named_needs_human_line(monkeypatch):
+    # Synthetic describe-alarms: grading-stalled stuck 10 days (the real incident) +
+    # a fresh 3h blip. Drive the REAL gather_signals → aged_alarm_escalations path.
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 7, 16, 20, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(
+        agent._cw,
+        "describe_alarms",
+        lambda **kw: {"MetricAlarms": [_metric_alarm("grading-stalled", 240, now), _metric_alarm("fresh-blip", 3, now)]},
+    )
+    monkeypatch.setattr(agent, "_coherence_findings", lambda: None)
+    monkeypatch.setattr(agent.drift_report, "read_latest", lambda *a, **k: None)
+    monkeypatch.setattr(agent.drift_report, "as_signal", lambda x: None)
+    monkeypatch.setattr(agent._sqs, "get_queue_attributes", lambda **kw: (_ for _ in ()).throw(RuntimeError("no dlq")))
+    monkeypatch.setattr(agent.subprocess, "run", lambda *a, **k: _Stub(returncode=1, stdout="[]"))
+
+    signals = agent.gather_signals(None)
+    esc = dict(agent.aged_alarm_escalations(signals, now=now))
+
+    # > 72h escalates with a NAMED line carrying its age; < 72h does NOT.
+    assert "grading-stalled" in esc
+    assert "fresh-blip" not in esc
+    issue = esc["grading-stalled"]["issue"]
+    assert "grading-stalled" in issue  # named
+    assert "10.0d" in issue and "240h" in issue  # carries age in days + hours
+
+
+def test_acked_aged_alarm_is_not_re_escalated():
+    # An already-acked alarm (a prior run's conclusion carried forward) is the
+    # acknowledgement — it must NOT re-escalate until the ack expires.
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    signals = {
+        "alarms": [{"name": "grading-stalled", "updated": (now - timedelta(hours=240)).isoformat(), "acked": {"bucket": "needs_human"}}]
+    }
+    assert agent.aged_alarm_escalations(signals, now=now) == []
+
+
+def test_aged_alarm_unparseable_timestamp_never_false_fires():
+    from datetime import datetime, timezone
+
+    now = datetime(2026, 7, 16, tzinfo=timezone.utc)
+    assert agent.aged_alarm_escalations({"alarms": [{"name": "x", "updated": ""}]}, now=now) == []
+    assert agent.aged_alarm_escalations({"alarms": [{"name": "x", "updated": "not-a-date"}]}, now=now) == []
+
+
+def test_main_surfaces_aged_alarm_into_needs_human(monkeypatch, tmp_path):
+    # End-to-end non-vacuous proof: the agent transcript classifies grading-stalled
+    # as STALE (never naming it in needs_human) yet the deterministic backstop lands
+    # it in needs_human anyway. Without the #1204 wiring this assertion fails.
+    import json as _json
+    from datetime import datetime, timedelta, timezone
+
+    old = (datetime.now(timezone.utc) - timedelta(hours=240)).isoformat()
+    monkeypatch.setenv("REMEDIATION_REPORT_PATH", str(tmp_path / "r.json"))
+    monkeypatch.setattr(agent, "gate", lambda: "shadow")
+    monkeypatch.setattr(
+        agent,
+        "gather_signals",
+        lambda ev: {
+            "alarms": [{"name": "grading-stalled", "updated": old}],
+            "ci_failures": [],
+            "dlq": {},
+            "coherence": None,
+            "drift": None,
+            "urgent": None,
+        },
+    )
+    monkeypatch.setattr(agent, "load_ack_ledger", lambda: {})
+    monkeypatch.setattr(agent, "build_prompt", lambda mode, signals: "prompt")
+    transcript = (
+        "Triaged grading-stalled → stale.\n"
+        '```json\n{"auto_fixed": [], "prs": [], "needs_human": [], '
+        '"stale": [{"summary": "grading-stalled looked cleared"}], "untriaged": []}\n```'
+    )
+
+    async def _fake(prompt):
+        return transcript
+
+    monkeypatch.setattr(agent, "run_agent", _fake)
+    monkeypatch.setattr(agent, "update_ack_ledger", lambda *a, **k: {})
+    monkeypatch.setattr(agent, "audit_log", lambda *a, **k: None)
+    monkeypatch.setattr(agent, "email_report", lambda *a, **k: None)
+
+    code = agent.main()
+    report = _json.load(open(tmp_path / "r.json"))
+    nh_text = _json.dumps(report["needs_human"])
+    assert "grading-stalled" in nh_text
+    assert "240h" in nh_text or "10.0d" in nh_text
+    assert code == 0
+
+
 def _run_main_with_transcript(monkeypatch, tmp_path, transcript):
     """Drive agent.main() end-to-end with a canned agent transcript, stubbing the
     boto3/SES/gh side-effects, and return main()'s exit code. Exercises the real

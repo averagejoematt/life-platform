@@ -31,6 +31,13 @@ classify it C (needs-human) with your best evidence so far and move on. Never
 let one signal consume the run: an unfinished report on every signal beats a
 perfect diagnosis of one.
 
+## Alarm aging (#1204)
+Any alarm stuck in ALARM past 72h is a load-bearing sensor the digest silently
+absorbed — classify it **C (needs-human)** naming the alarm and its age, unless you
+can confirm a clean fix. The harness also appends a deterministic aging line for any
+such alarm you don't reach, so don't burn turns re-deriving it — but do classify it
+if you have the budget.
+
 ## Bucket actions
 - **A — AUTO-FIX-SAFE**: only if the diff matches a taxonomy *template*, touches
   only the named allowlisted file(s), is ≤ ~40 lines, and you're confident.

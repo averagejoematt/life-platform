@@ -251,6 +251,74 @@ def earn_or_shadow_check(mode, now=None):
     }
 
 
+# ── Alarm-aging escalation (#1204) ──────────────────────────────────────────
+# A digest-routed CloudWatch alarm can sit in ALARM indefinitely with the daily
+# digest as its only consumer — grading-stalled sat in ALARM ~10 days and the LLM
+# triage produced no fix, no issue, no acted-on needs-human item, so the solo
+# operator's attention silently absorbed a dead load-bearing sensor. This is a
+# DETERMINISTIC backstop, independent of the LLM turn/token budget: any alarm that
+# has been in ALARM past the escalation window becomes a NAMED needs-human line
+# carrying its age, until it clears or is acked. The remediation role is read-only
+# — this only SURFACES the aged alarm into the report; it does not act on it (no
+# deploy, no IAM, no alarm mutation — #1229 owns the digest-consumer alarms).
+
+ALARM_AGE_ESCALATION_HOURS = 72
+
+
+def _alarm_age_hours(alarm, now):
+    """Hours the alarm has been in its current (ALARM) state, from the
+    StateUpdatedTimestamp captured in gather_signals (`updated`). None if it can't
+    be parsed — an unparseable stamp must never manufacture a false escalation."""
+    ts = alarm.get("updated")
+    if not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return (now - dt).total_seconds() / 3600.0
+
+
+def _fmt_age(hours):
+    days = hours / 24.0
+    if days >= 1:
+        return f"{days:.1f}d ({hours:.0f}h)"
+    return f"{hours:.0f}h"
+
+
+def aged_alarm_escalations(signals, now=None):
+    """Return `(alarm_name, needs_human_item)` tuples for every alarm that has been
+    in ALARM longer than ALARM_AGE_ESCALATION_HOURS and is not already acked. Pure
+    and deterministic (no LLM, no I/O) so it always fires even when the agent's turn
+    budget burns out mid-triage. An already-acked alarm (annotate_acked ran a prior
+    conclusion forward) is skipped — that IS the acknowledgement — and it re-escalates
+    only once the ack expires and the alarm is still stuck."""
+    now_dt = now or datetime.now(timezone.utc)
+    out = []
+    for a in signals.get("alarms", []) or []:
+        if a.get("acked"):
+            continue
+        age = _alarm_age_hours(a, now_dt)
+        if age is None or age <= ALARM_AGE_ESCALATION_HOURS:
+            continue
+        name = a.get("name", "?")
+        out.append(
+            (
+                name,
+                {
+                    "issue": f"Alarm '{name}' has been in ALARM for {_fmt_age(age)} "
+                    f"(> {ALARM_AGE_ESCALATION_HOURS}h aging threshold) — an aged, unresolved sensor whose only "
+                    "consumer is the daily alert digest (#1204).",
+                    "action": f"Investigate and resolve '{name}', or ack it if the state is expected. "
+                    "This aging escalation repeats each run until the alarm clears or is acknowledged.",
+                },
+            )
+        )
+    return out
+
+
 # ── Signal gathering (deterministic, no LLM) ────────────────────────────────
 
 
@@ -564,6 +632,16 @@ def main():
     earn_item = earn_or_shadow_check(mode)
     if earn_item:
         report.setdefault("needs_human", []).append(earn_item)
+    # #1204: deterministic alarm-aging backstop — surface any alarm stuck in ALARM
+    # past the escalation window as a NAMED needs-human line, whether or not the LLM
+    # triage reached it, so a burned turn budget can never silently absorb a dead
+    # load-bearing sensor. Dedup by name against what the agent already reported.
+    existing_nh = report.get("needs_human", []) or []
+    existing_text = " ".join(str(i.get("issue", "")) + " " + str(i.get("action", "")) for i in existing_nh if isinstance(i, dict))
+    for name, item in aged_alarm_escalations(signals):
+        if name not in existing_text:
+            report.setdefault("needs_human", []).append(item)
+            existing_text += " " + name
     # Keep the file consistent with what we report/audit (the merge gate reads it).
     try:
         with open(report_path, "w") as f:
