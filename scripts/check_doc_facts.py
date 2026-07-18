@@ -352,6 +352,80 @@ def _cron_hits(files, cdk_map: dict) -> list[str]:
     return hits
 
 
+# ── #1260: reader-facing "N data sources" scan (lambdas/web/og_*.py) ──────────
+# The OG card lambda draws share-preview PNGs quoted on 72 pages — the platform's most
+# distributed surface. og_image_lambda.py hardcoded "One man. 25 data sources." while the
+# canonical registry (lambdas/source_registry.py, SOURCE_REGISTRY) has 16 top-level sources
+# — an uncomputed, inflated count exactly in the ADR-104 honest-numbers / stale-count drift
+# class this gate was built to kill, but the doc scan above scopes docs/* only and never
+# reaches lambda-emitted strings. This rule policies the reader-facing "N data sources"
+# phrasing in any lambdas/web/og_*.py against the LIVE registry length (the same source the
+# fixed card derives from), so the card and the gate can never disagree.
+#
+# GROUND TRUTH is the registry itself, AST-counted (not the hand-maintained PLATFORM_FACTS
+# data_sources literal, which counts a different — public-catalogue — surface): the card
+# derives `len(SOURCE_REGISTRY)` at runtime, so the gate must police against exactly that.
+#
+# PRECISION: skip full-line `#` comments and HISTORICAL-framed lines (as the ceiling scan
+# does). The correct card writes an f-string `{n} data sources` — no numeric literal — so a
+# fixed card is clean; only a hardcoded digit next to "data sources" trips.
+OG_DIR = ROOT / "lambdas" / "web"
+SOURCE_REGISTRY_PATH = ROOT / "lambdas" / "source_registry.py"
+OG_SOURCE_COUNT = re.compile(r"(?<![\w.])(\d+)\s+data sources?\b")
+
+
+def _registry_source_count() -> int | None:
+    """Top-level key count of SOURCE_REGISTRY in lambdas/source_registry.py, AST-parsed.
+
+    Read as TEXT + AST (never imported) so the gate stays import-free and can't drag in a
+    lambda's runtime deps. This is the ONE source of truth for the reader-facing card count.
+    """
+    import ast
+
+    if not SOURCE_REGISTRY_PATH.exists():
+        return None
+    try:
+        tree = ast.parse(SOURCE_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for tgt in node.targets:
+                if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
+                    return len(node.value.keys)
+    return None
+
+
+def _scan_og_files() -> list[Path]:
+    return sorted(OG_DIR.glob("og_*.py")) if OG_DIR.exists() else []
+
+
+def _og_source_hits(files, truth: int) -> list[str]:
+    """Reader-facing "N data sources" literals in og_*.py that disagree with the registry.
+
+    Skips full-line `#` comments and HISTORICAL-framed lines. Exposed so the regression test
+    can plant a stale "25 data sources" string in a scratch file and prove the rule bites (the
+    #1189 non-vacuous-scan lesson)."""
+    hits = []
+    for src in files:
+        try:
+            rel = src.relative_to(ROOT)
+        except ValueError:
+            rel = src  # scratch file outside the repo (the non-vacuous test)
+        for lineno, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#") or HISTORICAL.search(line):
+                continue
+            for mo in OG_SOURCE_COUNT.finditer(line):
+                claim = _to_int(mo.group(1))
+                if claim is not None and claim != truth:
+                    hits.append(
+                        f"{rel}:{lineno}: og card claims {claim} data sources, truth is {truth} "
+                        f"(len(SOURCE_REGISTRY)); derive it, don't hardcode (#1260)\n"
+                        f"      | {line.strip()[:120]}"
+                    )
+    return hits
+
+
 def _scan_files() -> list[Path]:
     cands = [ROOT / "README.md", ROOT / "CLAUDE.md"]
     cands += sorted((ROOT / ".claude" / "commands").glob("*.md"))
@@ -433,6 +507,13 @@ def main():
     # cron table is the highest-stakes operational claim — it drifted 2 months stale).
     hits += _cron_hits(_scan_files(), _cdk_cron_map())
 
+    # #1260: no og card hardcodes a "N data sources" count that disagrees with the registry.
+    registry_n = _registry_source_count()
+    if registry_n is None:
+        print("error: could not discover SOURCE_REGISTRY count for the og-card scan", file=sys.stderr)
+        sys.exit(2)
+    hits += _og_source_hits(_scan_og_files(), registry_n)
+
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []
     for h in hits:
@@ -451,7 +532,8 @@ def main():
         sys.exit(1)
     print(
         f"✅ doc + source facts OK — no live doc/source states a stale count/budget "
-        f"({len(_scan_files())} docs + {len(_scan_source_files())} source files scanned)."
+        f"({len(_scan_files())} docs + {len(_scan_source_files())} source files + "
+        f"{len(_scan_og_files())} og cards scanned)."
     )
 
 
