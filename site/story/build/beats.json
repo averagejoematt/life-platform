@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-07-12T20:00:00Z",
+ "updated_at": "2026-07-18",
  "beats": [
   {
    "id": "2026-07-06-dating-the-past-so-it-stops-pretending-to-be-now",
@@ -1119,6 +1119,29 @@
     {
      "label": "PR #1193",
      "url": "https://github.com/averagejoematt/life-platform/pull/1193"
+    }
+   ]
+  },
+  {
+   "id": "2026-07-18-honest-numbers-on-the-cost-receipt",
+   "date": "2026-07-18",
+   "title": "The public cost page was quoting a budget ceiling we retired two amendments ago",
+   "shipped": "A batch of eight fixes from the platform's first full review shipped and went live. The headline one: the public 'inference receipt' — the page that shows exactly what the AI costs — had a hard-coded $75 monthly ceiling baked into it, but the real ceiling is $85 and floats to $100 when reader traffic surges (which it currently is). The page now reads the live number straight from the budget governor, so it can never drift again. The same batch also fixed shared links that 404'd: typing or pasting a bare address like the site's /data or /cockpit page (many link tools strip the trailing slash) used to land on a dead page; now it redirects cleanly to the real one. Plus a cost-alert email that named the wrong features as paused, a chronicle draft that called July 13th a Sunday (it was a Monday), and a monitoring permission that was missing so a health metric never reported.",
+   "why_it_mattered": "The whole premise of this project is that the numbers are real — so a flagship 'here's what it costs' page showing a figure that's $25 stale is exactly the kind of quiet lie the platform exists to not tell. Deriving it from the one source of truth means the honesty is structural, not a thing someone has to remember to update. The routing fix matters for a different reason: it's the difference between a shared link working and a stranger's first impression being a broken page.",
+   "gotcha": "The routing fix had a tail: the new rule adds a trailing slash to any bare address, which is exactly the point — but it also means a genuinely non-existent page now gets one redirect before its 404, and the site's own smoke test asserted a direct 404. So a correct fix turned a health check red. The right fix wasn't to weaken the redirect but to teach the test to check the final destination, not the first hop.",
+   "honest_miss": "Two follow-ups are deliberately left undone. A monitoring alarm that had been firing because a permission was missing now has the permission — but it's still red, honestly this time: no prediction has been graded in 8 days because the current experiment cycle is only days old and nothing is due yet. And two historical-data cleanups (re-stamping some old archived records, regenerating one held draft) weren't run — healing past data by hand is riskier than the code fix that stops it recurring, so those wait for a careful pass.",
+   "prs": [
+    {
+     "label": "PR #1273",
+     "url": "https://github.com/averagejoematt/life-platform/pull/1273"
+    },
+    {
+     "label": "PR #1276",
+     "url": "https://github.com/averagejoematt/life-platform/pull/1276"
+    },
+    {
+     "label": "PR #1270",
+     "url": "https://github.com/averagejoematt/life-platform/pull/1270"
     }
    ]
   }

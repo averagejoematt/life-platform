@@ -31,16 +31,38 @@ offline suite green, `Fixes #N`, verified by me against the diff before merge.
 | #1277 | #1235 | CLAUDE.md experiment-anchor line 2026-07-12/cycle5 → 2026-07-13/cycle6 (+ bonus SCHEMA.md stale date) + 2 AST discoverers in `sync_doc_metadata.py` (self-heals every reset) + `currently`-bound anchor gate in `check_doc_facts.py` | none (docs + CI-gate) |
 | **#1275 (HELD, OPEN)** | #1222 | light-mode `--alert` override `#9E4732` (5.4:1 on --page / 5.8:1 on --surface, clears WCAG AA) + contrast regression test | **HELD: `site/**`-only → merging AUTO-DEPLOYS via `site-deploy.yml`** |
 
-## Why #1275 is held (the one open decision for Matthew)
+## Deploys — ALL DONE + verified live (Matthew granted deploy authority mid-session)
 
-#1275 touches **only `site/assets/css/tokens.css`** + a test. A push to `main` touching
-`site/**` auto-deploys via `.github/workflows/site-deploy.yml` (#750, no approval gate —
-"the merge IS the deploy"). Since **"deploys stay mine"** is a hard boundary, I did NOT
-merge it — merging it would trigger a production site deploy. It's fully verified and ready.
-**Matthew's call:** merge #1275 yourself (auto-deploys the CSS a11y fix, gated by
-smoke+visual-QA+auto-rollback), or tell me to. All other PRs were lambdas/-only or doc/CI
-(they trigger ci-cd *validation* on main, whose Deploy job sits behind the manual approval
-gate — safe for me to merge).
+After the merges, Matthew said "yes merge, you handle all deploys." Merged **#1275** and
+deployed everything:
+
+| Deploy | Covers | Verified live |
+|--------|--------|---------------|
+| `#1275` merge → `site-deploy.yml` | light-mode `--alert` a11y CSS | run SUCCESS |
+| `deploy_fleet.sh` (95 fns, 0 failed) | #1273 bedrock_client, #1272 grounded_generation+wednesday-chronicle, #1270 cost-governor, #1265 Elena, #1268 qa_smoke, + site-api code | fleet report 95/0/0 |
+| CloudFront invalidate `/api/*` | site-api route freshness | `inference_receipt` ceiling=**100** surge=true no-$75 ✓; `state_of_matthew` available=**false** ✓ |
+| `cdk deploy LifePlatformCompute LifePlatformServe` | **#1263** both `cloudwatch:PutMetricData` grants (CoachPredictionEvaluatorRole + SiteApiAiLambdaRole) | both IAM policy UPDATE_COMPLETE |
+| CloudFront `publish-function v4-redirects` | **#1209/#1276** bare-door 301 | `/data`·`/cockpit`·`/story` → 301→200, no `/site/*` hop ✓; `/now/`→`/cockpit/` preserved ✓ |
+| follow-up `60aef367` | smoke 404 check hit `/nonexistent-page-xyz` (now 301'd by #1209) → assert trailing-slash form | `smoke_test_site.sh` **82 passed / 0 failed** |
+
+**#1263 outcome (honest):** the grant makes `coach-prediction-evaluator` emit
+`DaysSinceLastDecided` again (I invoked it: 200, no AccessDenied — grant works). The
+`grading-stalled` alarm was breaching on **missing datapoints** (no grant → no metric); it
+now reflects the **true** value (8 days, genuine cycle-6 post-reset maturation — the 1 open
+prediction isn't due yet). So #1263 restored honest telemetry (epic #1195's point); the
+alarm clears when a cycle-6 prediction actually matures/decides, **not** from any deploy.
+The R8-ST6 ci-cd "Plan" red also clears now the IAM is deployed (next main run's `cdk diff`
+is IAM-clean).
+
+## The 2 remaining items are NOT deploys — data/editorial, left by deliberate judgment
+- **#1266 DDB cycle re-stamp** — re-derive true `cycle=N` on already-corrupted archive rows
+  (e.g. `INSIGHT#2026-02-23`). The code (#1266 `if_not_exists`) stops future corruption; this
+  heals history and mutates archive records — no tested one-shot script in hand, so I did not
+  improvise a live-history mutation. Low urgency (archive navigability).
+- **#1265 Elena held-draft regen** — regenerate the held `DATE#2026-07-14` draft (phantom
+  "Sunday walks"). The λ is now deployed with the weekday guard (#1220) + `singleton_visible`
+  (#1265), so a regen would be clean — but it's a `status=draft` chronicle Matthew approves
+  editorially + costs AI budget, so it's his creative gate, not a deploy.
 
 ## Verification / gotchas
 - **Main is code-green.** Batch 1 ci-cd run (79b18fd5): **Lint + Unit Tests + Deploy-critical
@@ -60,20 +82,19 @@ gate — safe for me to merge).
   issue BEFORE launching; batch only disjoint-file issues; the check_doc_facts.py cluster
   (#1232/#1205) was deliberately DEFERRED because they'd collide with #1230/#1235 on that file.
 
-**Build beat:** none — 7 PRs merged to main but the user-facing fixes are NOT yet deployed
-(#1273 site-api ceiling, #1272 chronicle λ, #1276 CloudFront publish, #1270 cost-governor,
-#1275 held); the beat gate requires merged-AND-live. Eligible once Matthew deploys.
+**Build beat:** `2026-07-18-honest-numbers-on-the-cost-receipt` — the public inference receipt
+now shows the true ceiling (all 8 fixes merged AND deployed this session; beat distills #1273).
 **Docs:** none needed beyond the in-PR doc edits (#1271 deploy.md + tombstones, #1277
 CLAUDE.md/SCHEMA.md anchor + sync_doc_metadata discoverers) which shipped inside their PRs;
 all six doc gates green at the wrap commit; `sync_doc_metadata` literals auto-reconciled.
 
 ## Residual queue / next picks
-- **Matthew's deploys (merged, awaiting live):** #1273 `deploy_site_api.sh` + fleet;
-  #1272 email-λ fleet; #1270 `deploy_lambda.sh cost-governor`; #1276 CloudFront function
-  publish + invalidate; **#1275 merge decision** (site auto-deploy).
-- **Also still pending from the PRIOR session** (unchanged): #1262/#1267/#1268
-  `deploy_site_api.sh`, #1263 `cdk deploy LifePlatformCompute LifePlatformServe` (clears the
-  R8-ST6 Plan red + the grading-stalled alarm), #1265 email fleet, 2 live-DDB backfills.
+- **All this-session deploys are DONE + verified (see the deploy table above).** The prior
+  session's undeployed items were ALSO deployed here — the fleet + site-api cover
+  #1262/#1267/#1268, and `cdk deploy` landed #1263. Nothing merged is now unlive except the
+  2 data/editorial items.
+- **Left for Matthew (NOT deploys):** #1266 DDB cycle re-stamp (history healing, needs a
+  careful/tested backfill), #1265 Elena held-draft regen (editorial + AI-budget, his gate).
 - **Next milestone: 30 stories remain open.** The `check_doc_facts.py` cluster (#1232
   monthly_cost ~$60, #1205 ARCHITECTURE.md six false claims) must be **SERIALIZED** — they
   + #1230/#1235 all edit that one file. Other good disjoint picks: #1211/#1212 (tokens/css
