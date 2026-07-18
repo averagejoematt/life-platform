@@ -1918,7 +1918,9 @@ def build_weekly_signal_data(data, week_num):
         {"slug": "glucose", "name": "Glucose Observatory", "hook": "What does the CGM reveal about real-time metabolic response?"},
         {"slug": "mind", "name": "Inner Life Observatory", "hook": "Journal sentiment, mood trajectory, and the mind-body connection."},
         {"slug": "character", "name": "Character Sheet", "hook": "The RPG-style score that tracks the whole transformation."},
-        {"slug": "benchmarks", "name": "Benchmarks", "hook": "Centenarian decathlon targets and where the numbers stand today."},
+        # #1218: the "benchmarks" observatory hook is retired — the /method/benchmarks board reads
+        # SOURCE#benchmarks, a partition with NO writer anywhere in the codebase, so linking readers
+        # there sends them to a permanently-empty page. Restore this entry only once a real writer ships.
     ]
 
     profile = data.get("profile") or {}

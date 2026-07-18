@@ -278,7 +278,7 @@ export function renderPredictions(d) {
 // Benchmarks — where the numbers sit vs age-band + centenarian-decathlon targets.
 export function renderBenchmarks(d) {
   const trends = (d && d.trends) || (Array.isArray(d) ? d : []);
-  if (!trends.length) return empty("No benchmark readouts yet — these place your current numbers against age-band and centenarian-decathlon targets, and they re-populate from the current genesis as each metric accrues enough post-reset readings to be worth showing. An empty board is the experiment starting fresh, not a gap in the data. Direction, not destiny.");
+  if (!trends.length) return empty("No benchmark readouts here — this board would place current numbers against age-band and centenarian-decathlon targets, but that reference data isn't wired to a live source yet, so the board stays empty rather than inventing numbers. It's a cross-cycle reference view, not a per-genesis readout — nothing auto-populates it. Direction, not destiny.");
   const rows = trends.slice(0, 40).map((t) => {
     const name = t.metric || t.name || t.label || t.sk || "—";
     const cur = t.current ?? t.value ?? t.current_value;

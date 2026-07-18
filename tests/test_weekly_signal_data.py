@@ -70,11 +70,13 @@ def test_board_rotation_deterministic():
 
 
 def test_observatory_rotation():
-    """Test observatory rotation cycles through 7 pages."""
+    """Observatory rotation cycles through its 6 pages (#1218 retired the 7th,
+    "benchmarks", whose /method/benchmarks board reads a writer-less partition)."""
     from wednesday_chronicle_lambda import build_weekly_signal_data
 
     slugs = set()
     for w in range(1, 8):
         r = build_weekly_signal_data({}, week_num=w)
         slugs.add(r["featured_observatory"]["slug"])
-    assert len(slugs) == 7
+    assert len(slugs) == 6
+    assert "benchmarks" not in slugs, "#1218: the writer-less benchmarks board must not be featured in the chronicle rotation"
