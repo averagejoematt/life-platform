@@ -5,7 +5,7 @@
   change.
 */
 import { lineChart, dualWeight, nDots } from "/assets/js/charts.js";
-import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note, warmup } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 
 export async function renderResults(d) { const j = d.journey || d; const wp = await tryJSON("/api/weight_progress"); const chart = sec("Weight trajectory", lineChart((wp && wp.weight_progress) || [], { valueKey: "weight_lbs", goal: j.goal_weight_lbs, unit: " lb", label: "Weight · recent readings", emptyMsg: "Weight trajectory fills as weigh-ins accrue." })); const lost = j.lost_lbs != null ? Number(j.lost_lbs) : null; const wdir = lost == null ? "" : (lost < -0.05 ? "up" : (Math.abs(lost) <= 0.05 ? "even" : "down")); const _wCap = (!j.last_weighin_date || String(j.last_weighin_date).slice(0, 10) === todayPT()) ? "today" : `latest · ${fmtShort(j.last_weighin_date)}`; return dataFigure(j) + chart + figs([lost != null && fig(dualWeight(Math.abs(lost), "lb"), wdir), j.current_weight_lbs != null && fig(dualWeight(j.current_weight_lbs, "lb"), _wCap), j.progress_pct != null && fig(fmt(j.progress_pct) + "%", "to goal"), (j.projected_goal_date_earliest && j.projected_goal_date_latest) ? fig(`${fmtShort(j.projected_goal_date_earliest)}–${fmtShort(j.projected_goal_date_latest)}`, "projected goal (80% range)", null, "ewma_forecast") : (j.projected_goal_date && fig(j.projected_goal_date, "projected goal", null, "ewma_forecast"))]) + `<p class="rd-archive">The headline outcome is weight, but the real results live in the mechanisms — see Experiments for what's confirmed, Bloodwork for what changed inside, and the Story for the arc.</p>` + note("Correlative projection — a range, not a promise."); }
@@ -212,7 +212,21 @@ export async function renderCorrelations(d) {
   const c = d && d.correlations;
   const obj = (c && !Array.isArray(c)) ? c : {};
   const pairs = obj.pairs || [];
-  if (!pairs.length) return betsLine + empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
+  if (!pairs.length) {
+    // #1371: the zero-state is an ARMED instrument — the engine's real gates +
+    // measured progress (payload `gates`, same objects the compute enforces),
+    // rendered as the warming-up grammar. Copy derives from the numbers; the
+    // authored "~2 weeks" promise is gone.
+    const g = d && d.gates;
+    if (g && g.min_n) {
+      const interp = g.interp_n || {};
+      const thresholds = interp.moderate && interp.strong ? ` Strength labels are earned by sample size: n≥${fmt(interp.moderate)} before a pair may read "moderate", n≥${fmt(interp.strong)} for "strong".` : "";
+      return betsLine +
+        warmup(g.current_n, g.min_n, "days of data toward the first correlation matrix") +
+        empty(`No correlations yet — the honest state, not a broken pipeline. The weekly matrix computes its first pairs once ${fmt(g.min_n)} overlapping days of this cycle's data exist.${thresholds} The marks above fill as real days accrue.`);
+    }
+    return betsLine + empty("No correlations yet — and that's the honest state, not a broken pipeline. The experiment is freshly anchored to its current genesis, and the weekly matrix only computes once there are ~2+ weeks of overlapping daily data. An empty matrix means the sample is still too small to claim a pattern; it fills in as the days accrue.");
+  }
   const sig = pairs.filter((p) => p.fdr_significant).length;
   // Pairs with fewer than 5 overlapping days can't claim anything — collapse them
   // into one honest line instead of tabling a wall of r=0.00 / n=2 rows.

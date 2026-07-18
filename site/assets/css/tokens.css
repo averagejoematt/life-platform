@@ -834,6 +834,18 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .vg-off { opacity: 0.55; border-style: dashed; }
 .vg-off .vg-word { color: var(--ink-faint); }
 a.vg-lit:hover { background: var(--ember-wash); }
+/* #1371 — "warming up": hollow marks filling toward an instrument's real arming
+   threshold (the earned-glyph vocabulary applied to a not-yet-armed instrument).
+   Hollow = days still needed, lit ember = days accrued. Never red, never a spinner —
+   an instrument arming, not a failure state. */
+.warmup { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin: var(--sp-3) 0; }
+.wu-marks { display: inline-flex; gap: 5px; align-items: center; }
+.wu-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--ink-faint); background: transparent; flex: 0 0 auto; }
+.wu-dot.lit { background: var(--ember); border-color: var(--ember); }
+.wu-label { color: var(--ink-muted); }
+/* Compound selector: .rd-badge's border shorthand (evidence.css, loads later)
+   would re-solidify a bare .wu-carried — 0,2,0 wins regardless of order. */
+.wu-carried, .rd-badge.wu-carried { border-style: dashed; opacity: 0.85; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }

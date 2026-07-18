@@ -31,6 +31,7 @@ from decimal import Decimal
 
 import boto3
 import digest_utils  # shared query_range implementations (#970)
+import experiment_gates  # #1371: the ONE registry of arming thresholds
 import stats_core  # bundled shared module (#529): the one sanctioned stats implementation
 
 # OBS-1: Structured logger
@@ -97,10 +98,10 @@ from digest_utils import safe_float  # shared bundled helpers (#970)
 
 def pearson_r(xs, ys):
     """Pearson r for paired lists via stats_core; keeps this lambda's contract:
-    (r rounded to 4, n) with min n=10."""
+    (r rounded to 4, n) with min n from the experiment_gates registry (#1371)."""
     xs2, ys2 = stats_core.clean_pairs(xs, ys)
     n = len(xs2)
-    r = stats_core.pearson_r(xs2, ys2, min_n=10)
+    r = stats_core.pearson_r(xs2, ys2, min_n=experiment_gates.CORRELATION_MIN_N)
     return (round(r, 4) if r is not None else None), n
 
 
@@ -149,11 +150,9 @@ def apply_benjamini_hochberg(results: dict, alpha: float = 0.05) -> dict:
 
 # Minimum sample sizes for each interpretation label (Henning, R9).
 # Pearson r on small n is extremely noisy — a r=0.7 on n=12 must not be called 'strong'.
-_INTERP_N_REQUIRED = {
-    "strong": 50,  # |r| >= 0.6 AND n >= 50
-    "moderate": 30,  # |r| >= 0.4 AND n >= 30
-    "weak": 10,  # |r| >= 0.2 AND n >= 10
-}
+# #1371: defined in the experiment_gates registry (the site serves the same values
+# in zero-states, so the rendered trigger can never drift from this enforcement).
+_INTERP_N_REQUIRED = experiment_gates.CORRELATION_INTERP_N
 
 
 def interpret_r(r, n=None):
@@ -1027,11 +1026,15 @@ def lambda_handler(event, context):
     series = assemble_daily_series(start_date, end_date)
     logger.info("Assembled %d days of data", len(series))
 
-    if len(series) < 10:
-        logger.warning("Insufficient data (%d days) — need at least 10 for meaningful correlations", len(series))
+    if len(series) < experiment_gates.CORRELATION_MIN_N:
+        logger.warning(
+            "Insufficient data (%d days) — need at least %d for meaningful correlations",
+            len(series),
+            experiment_gates.CORRELATION_MIN_N,
+        )
         return {
             "statusCode": 200,
-            "body": f"Insufficient data: {len(series)} days (need ≥10)",
+            "body": f"Insufficient data: {len(series)} days (need ≥{experiment_gates.CORRELATION_MIN_N})",
             "week": week_key,
             "days_available": len(series),
         }
