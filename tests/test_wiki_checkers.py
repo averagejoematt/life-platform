@@ -121,3 +121,64 @@ def test_experiment_anchor_clean_on_current_tree():
     truth = facts._ground_truth()
     hits = facts._anchor_hits(facts._scan_files(), truth["experiment_genesis"], truth["experiment_cycle"])
     assert hits == [], "stale experiment anchor still in a live doc:\n" + "\n".join(hits)
+
+
+def test_cdk_cron_map_discovers_from_source():
+    """#1205: the cron gate's ground truth is LIVE-discovered from cdk/stacks/*.py, not a
+    pinned literal — re-derive two schedules (one per stack file) straight from source and
+    assert the map agrees, proving the fact the gate polices tracks the CDK."""
+    facts = _load("scripts/check_doc_facts.py")
+    cmap = facts._cdk_cron_map()
+    assert cmap, "CDK cron map is empty — discovery broke"
+    compute = (ROOT / "cdk" / "stacks" / "compute_stack.py").read_text(encoding="utf-8")
+    m = re.search(r'function_name="character-sheet-compute".*?schedule="(cron\([^"]*\))"', compute, re.S)
+    assert m, "could not locate character-sheet-compute schedule in compute_stack.py"
+    assert cmap.get("character-sheet-compute") == m.group(1)
+    email = (ROOT / "cdk" / "stacks" / "email_stack.py").read_text(encoding="utf-8")
+    mb = re.search(r'function_name="daily-brief".*?schedule="(cron\([^"]*\))"', email, re.S)
+    assert mb, "could not locate daily-brief schedule in email_stack.py"
+    assert cmap.get("daily-brief") == mb.group(1)
+
+
+def test_cron_gate_is_not_vacuous():
+    """#1205 (per the #1189 vacuous-scan lesson): the cron scan must FLAG a doc cron that
+    disagrees with the CDK, PASS the matching value, and EXEMPT the shapes that legitimately
+    differ (history, hyphen-suffixed rule names, ambiguous multi-cron lines)."""
+    facts = _load("scripts/check_doc_facts.py")
+    d = Path(tempfile.mkdtemp())
+    cdk = {"character-sheet-compute": "cron(30 16 * * ? *)", "wednesday-chronicle": "cron(0 15 ? * WED *)"}
+
+    # the EXACT #1205 defect: a stale cron quoted next to the function name — must be caught.
+    bad = d / "stale.md"
+    bad.write_text("| Character Sheet Compute | `character-sheet-compute` | `cron(35 17 * * ? *)` | 10:35 AM |\n")
+    hits = facts._cron_hits([bad], cdk)
+    assert hits, "cron scan is VACUOUS — it did not flag the planted stale cron"
+    assert "character-sheet-compute" in hits[0] and "cron(30 16 * * ? *)" in hits[0]
+
+    # the correct (current) cron — must pass.
+    good = d / "ok.md"
+    good.write_text("| Character Sheet Compute | `character-sheet-compute` | `cron(30 16 * * ? *)` | 09:30 AM |\n")
+    assert facts._cron_hits([good], cdk) == []
+
+    # hyphen-aware: `wednesday-chronicle` must NOT match inside `wednesday-chronicle-schedule`,
+    # so a line naming only the suffixed rule form is skipped (no false positive).
+    suffixed = d / "suffixed.md"
+    suffixed.write_text("`wednesday-chronicle-schedule` ENABLED (`cron(59 59 ? * WED *)`)\n")
+    assert facts._cron_hits([suffixed], cdk) == []
+
+    # a HISTORICAL-framed line stating an old cron — must NOT be flagged.
+    hist = d / "hist.md"
+    hist.write_text("`character-sheet-compute` was `cron(35 17 * * ? *)` before Phase 3.1\n")
+    assert facts._cron_hits([hist], cdk) == []
+
+    # an ambiguous line with two crons — skipped (the table shape is one cron per row).
+    ambig = d / "ambig.md"
+    ambig.write_text("`character-sheet-compute` `cron(35 17 * * ? *)` and `cron(30 16 * * ? *)`\n")
+    assert facts._cron_hits([ambig], cdk) == []
+
+
+def test_cron_gate_clean_on_current_tree():
+    """After the fix, no live doc quotes a cron that disagrees with the CDK schedule."""
+    facts = _load("scripts/check_doc_facts.py")
+    hits = facts._cron_hits(facts._scan_files(), facts._cdk_cron_map())
+    assert hits == [], "a live doc quotes a cron that disagrees with the CDK schedule:\n" + "\n".join(hits)
