@@ -231,7 +231,8 @@
       "Bash(python3 -c \"import json;d=json.load\\(open\\('/private/tmp/claude-501/-Users-matthewwalker-Documents-Claude-life-platform/091739c8-969e-4d4a-b3db-24cccbf67df3/scratchpad/drift_latest.json'\\)\\);print\\(json.dumps\\(d,indent=2\\)[:3000]\\)\")",
       "Bash(python3 deploy/verify_oidc_iam.py)",
       "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE AWS_DEFAULT_REGION=us-west-2 timeout 300 python3 -m pytest tests/ -q -x --timeout=300)",
-      "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE AWS_DEFAULT_REGION=us-west-2 python3 -m pytest tests/ -q -x --timeout=300)"
+      "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE AWS_DEFAULT_REGION=us-west-2 python3 -m pytest tests/ -q -x --timeout=300)",
+      "Bash(python3 -m pytest tests/test_fullreview_doc_drift_guards.py -q)"
     ]
   },
   "enableAllProjectMcpServers": true,
