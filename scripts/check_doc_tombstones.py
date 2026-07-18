@@ -13,7 +13,9 @@ THE PROBLEM THIS SOLVES:
 SCOPE:
   Scans the LIVE docs surface: docs/*.md (top level), docs/design/, docs/coaching/,
   docs/content/, docs/design-review/, docs/engines/, plus README.md, CLAUDE.md,
-  .claude/commands/*.md, deploy/README.md.
+  .claude/commands/*.md, deploy/*.md (#1322 — the deploy directory's own runbooks
+  steered operators onto the retired boot-broken manual MCP zip; MANIFEST.md and
+  V2_ROLLBACK.md are exempt as dated/deprecated records).
   ALSO scans SOURCE docstrings/comments: lambdas/**/*.py + mcp/**/*.py (#781 taught
   us the shared-layer retirement reached tests + 2 docs but left 35+ stale "part of
   the shared layer" claims in code — the docs-only scan never opened lambdas/).
@@ -39,7 +41,19 @@ EXEMPT_FILES = {
     "docs/INCIDENT_LOG.md",
     "docs/BACKLOG.md",
     "docs/MCP_TOOL_AUDIT.md",
+    "deploy/MANIFEST.md",  # deprecated inventory (superseded) — history may mention history
+    "deploy/V2_ROLLBACK.md",  # dated completed-operation record (2026-05-31)
 }
+
+# A line that itself explains the retirement is allowed to name the corpse.
+# Includes the "NOT/no/without the shared layer" and "X it replaces" framings
+# that source docstrings use to say a concept is gone (#781). Module-level so
+# tests can prove a planted stale line is NOT exempted (#1322 non-vacuity).
+RETIREMENT_LINE_RE = re.compile(
+    r"retired|removed|superseded|no longer|banned|do (?:NOT|not)|never hand-roll|tombstone|was deleted"
+    r"|replaces?|replaced|no shared layer|without the shared layer|not the (?:retired )?shared layer",
+    re.I,
+)
 EXEMPT_DIRS = (
     "docs/archive/",
     "docs/specs/",
@@ -71,7 +85,8 @@ SOURCE_DIRS = ("lambdas", "mcp")
 
 
 def _scan_files(include_exempt: bool) -> list[Path]:
-    candidates: list[Path] = [ROOT / "README.md", ROOT / "CLAUDE.md", ROOT / "deploy" / "README.md"]
+    candidates: list[Path] = [ROOT / "README.md", ROOT / "CLAUDE.md"]
+    candidates += sorted((ROOT / "deploy").glob("*.md"))  # #1322: the whole live deploy-doc surface, not just README
     candidates += sorted((ROOT / ".claude" / "commands").glob("*.md"))
     candidates += sorted((ROOT / "docs").rglob("*.md"))
     for d in SOURCE_DIRS:
@@ -98,15 +113,7 @@ def main():
     for doc in _scan_files(include_exempt):
         rel = doc.relative_to(ROOT)
         for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
-            # A line that itself explains the retirement is allowed to name the corpse.
-            # Includes the "NOT/no/without the shared layer" and "X it replaces"
-            # framings that source docstrings use to say a concept is gone (#781).
-            if re.search(
-                r"retired|removed|superseded|no longer|banned|do (?:NOT|not)|never hand-roll|tombstone|was deleted"
-                r"|replaces?|replaced|no shared layer|without the shared layer|not the (?:retired )?shared layer",
-                line,
-                re.I,
-            ):
+            if RETIREMENT_LINE_RE.search(line):
                 continue
             for rx, hint in rules:
                 if rx.search(line):

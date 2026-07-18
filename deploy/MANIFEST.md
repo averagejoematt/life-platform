@@ -1,3 +1,5 @@
+> **Status:** superseded · superseded by docs/ARCHITECTURE.md + ci/lambda_map.json (#1322 header)
+
 **DEPRECATED** -- This manifest is outdated. See docs/ARCHITECTURE.md for current Lambda inventory.
 
 # Deploy Manifest — Life Platform

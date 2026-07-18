@@ -14,7 +14,14 @@ Four assertions over the engineering wiki (docs/README.md is the home page):
    lists canonical pages whose Verified date is older than FRESHNESS_DAYS, as
    the re-verification worklist.
 
-4. SOURCE-NEWER-THAN-VERIFY (#973 — advisory; blocking under --strict) — for each
+4. DEPLOY-SURFACE DOCS (#1322 — blocking) — every live deploy/*.md carries the
+   standard status header, and canonical ones respect the same freshness ceiling
+   as docs/ (advisory at FRESHNESS_DAYS, BLOCKING at FRESHNESS_HARD_DAYS).
+   deploy/README.md sat "Last updated: 2026-05-24" with no header while steering
+   operators onto the retired boot-broken manual MCP zip — a deploy-surface doc
+   must not be able to sit unverified for months again.
+
+5. SOURCE-NEWER-THAN-VERIFY (#973 — advisory; blocking under --strict) — for each
    engine doc (docs/engines/*.md), the git last-commit date of every declared
    `Sources of truth` file is compared against the doc's Verified date. Calendar
    freshness alone (gate 3) misses the real staleness signal: a doc verified
@@ -150,6 +157,44 @@ def check_engine_source_freshness(git_date_fn=_git_last_commit_date):
     return flagged, notes
 
 
+def check_deploy_docs(deploy_dir=None, today=None):
+    """Gate 4 (#1322): the deploy directory's own docs are header-stamped and fresh.
+
+    Every top-level deploy/*.md must carry the standard status header; canonical
+    pages must carry a **Verified:** date and respect the freshness ceiling
+    (BLOCKING past FRESHNESS_HARD_DAYS). Non-canonical statuses (superseded,
+    archive, …) are honest about their age and are freshness-exempt, matching
+    gate 3's semantics. deploy/archive/ is not scanned (top-level glob only).
+
+    Returns (problems, stale) mirroring gates 2+3 so main() can merge them.
+    """
+    deploy_dir = Path(deploy_dir) if deploy_dir else ROOT / "deploy"
+    today = today or date.today()
+    problems, stale = [], []
+    for p in sorted(deploy_dir.glob("*.md")):
+        rel = f"deploy/{p.name}"
+        src = p.read_text(encoding="utf-8")
+        m = _STATUS_RE.search(src[:600])
+        if not m:
+            problems.append(f"missing status header (> **Status:** …): {rel}")
+            continue
+        if m.group(1) not in VALID_STATUSES:
+            problems.append(f"unrecognized status {m.group(1)!r}: {rel}")
+            continue
+        if m.group(1) != "canonical":
+            continue
+        v = _VERIFIED_RE.search(src[:600])
+        if not v:
+            problems.append(f"canonical deploy doc missing '**Verified:** YYYY-MM-DD': {rel}")
+            continue
+        d = date.fromisoformat(v.group(1))
+        if today - d > timedelta(days=FRESHNESS_DAYS):
+            stale.append((str(today - d).split(",")[0], rel, v.group(1)))
+        if today - d > timedelta(days=FRESHNESS_HARD_DAYS):
+            problems.append(f"deploy-surface doc unverified > {FRESHNESS_HARD_DAYS}d (re-verify + bump the header): {rel} ({v.group(1)})")
+    return problems, stale
+
+
 def main():
     fresh_only = "--fresh" in sys.argv
     strict = "--strict" in sys.argv
@@ -188,7 +233,13 @@ def main():
                     f"canonical page unverified > {FRESHNESS_HARD_DAYS}d (re-verify + bump the header): docs/{rel} ({v.group(1)})"
                 )
 
-    # 4. source-newer-than-verify (#973) — advisory unless --strict
+    # 4. deploy-surface docs (#1322) — headers required, canonical freshness BLOCKING
+    dep_problems, dep_stale = check_deploy_docs(today=today)
+    if not fresh_only:
+        problems += dep_problems
+    stale += dep_stale
+
+    # 5. source-newer-than-verify (#973) — advisory unless --strict
     flagged, notes = check_engine_source_freshness()
     if flagged and strict and not fresh_only:
         for doc_rel, source_rel, committed, verified in flagged:
