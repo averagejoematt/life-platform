@@ -533,6 +533,14 @@ def build_sub_scripts(
         ("restart_character_rebuild", ["python3", "deploy/restart_character_rebuild.py", "--apply"]),
         ("restart_site_copy_sync", ["python3", "deploy/restart_site_copy_sync.py", "--apply", "--old-genesis", old_genesis]),
         ("restart_docs_update", ["python3", "deploy/restart_docs_update.py", "--apply"]),
+        # 2026-07-18: sync the generated doc literals that restart_docs_update does NOT own —
+        # the genesis/cycle references in docs/SCHEMA.md + CLAUDE.md (and the maintained
+        # PLATFORM_FACTS-derived counts in site_api_common.py). Without this a reset that moved
+        # the genesis left those literals stale, reddening the doc-facts unit gate on the very
+        # commit of the reset artifacts (a manual `sync_doc_metadata.py --apply` was required —
+        # exactly the "one command, zero manual steps" gap the cycle-7 reset surfaced). Dry-run:
+        # run_step strips --apply → no-flag check, which exits 0 even with stale literals.
+        ("sync_doc_metadata", ["python3", "deploy/sync_doc_metadata.py", "--apply"]),
     ]
     sub_scripts.insert(3, ("restart_leadin_pages", ["python3", "deploy/restart_leadin_pages.py", "--apply"]))
     sub_scripts.insert(3, ("restart_media_reset", ["python3", "deploy/restart_media_reset.py", "--apply"]))

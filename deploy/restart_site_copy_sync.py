@@ -67,8 +67,13 @@ ORPHAN_S3_FILES = [
     # DDB records were already phase=pilot+tombstoned. Clear them too so a feed
     # only carries current-cycle posts (empty → honest "Nothing published yet").
     "site/chronicle/posts.json",  # /chronicle/posts.json — Story chronicle feed
-    "generated/journal/posts.json",  # /journal/posts.json — Story journal feed
-    "site/journal/posts.json",  # sibling journal index (same vintage)
+    # NB (2026-07-18): generated/journal/posts.json + its sibling site/journal/posts.json
+    # were REMOVED from this list. restart_leadin_pages.py now OWNS /journal/posts.json —
+    # it runs EARLIER in the sub-script order and rebuilds the manifest from the resurrected
+    # prelaunch lead-ins (writing an empty {"posts": []} manifest when there are none). Listing
+    # it here re-tombstoned that fresh manifest right after leadin_pages wrote it, so every
+    # reset served a `"tombstone": true` marker at /journal/posts.json and the render gate
+    # failed on it (cycle-7 reset, 2026-07-18). See test_reset_orphan_list_excludes_owned_keys.
 ]
 
 # Lambdas to invoke after sync to regenerate the JSON files they own.

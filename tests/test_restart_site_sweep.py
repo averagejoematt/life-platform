@@ -124,3 +124,28 @@ def test_same_genesis_is_noop(tmp_path, monkeypatch):
     _fixture_tree(tmp_path, monkeypatch)
     assert scs.rewrite_js_files(apply=False, old_genesis=scs.EXPERIMENT_START_DATE) == []
     assert scs.rewrite_genesis_prose(apply=False, old_genesis=scs.EXPERIMENT_START_DATE) == []
+
+
+# ── Ownership invariant (2026-07-18): the orphan-tombstone list must not name a
+# key that restart_leadin_pages OWNS. leadin_pages runs EARLIER in the pipeline and
+# rebuilds generated/journal/posts.json (the /journal/posts.json manifest); listing it
+# in ORPHAN_S3_FILES re-tombstoned that fresh manifest, so every reset served a
+# `"tombstone": true` marker at /journal/posts.json and the render gate failed on it
+# (cycle-7 reset). Guard: no owned manifest key may appear in the orphan list.
+_lp_spec = importlib.util.spec_from_file_location("restart_leadin_pages", REPO_ROOT / "deploy" / "restart_leadin_pages.py")
+lp = importlib.util.module_from_spec(_lp_spec)
+sys.modules["restart_leadin_pages"] = lp
+_lp_spec.loader.exec_module(lp)
+
+
+def test_reset_orphan_list_excludes_owned_keys():
+    # restart_leadin_pages OWNS MANIFEST_KEY — it must never be tombstoned as an "orphan".
+    assert lp.MANIFEST_KEY not in scs.ORPHAN_S3_FILES, (
+        f"{lp.MANIFEST_KEY!r} is written every reset by restart_leadin_pages but is also in "
+        f"restart_site_copy_sync.ORPHAN_S3_FILES — site_copy_sync runs AFTER leadin_pages and "
+        f"re-tombstones the fresh manifest (the cycle-7 /journal/posts.json tombstone leak)."
+    )
+    # The sibling site/ index shares the manifest's vintage; it must go too, or the same
+    # double-write recurs on whichever key CloudFront resolves /journal/posts.json to.
+    sibling = lp.MANIFEST_KEY.replace("generated/", "site/", 1)
+    assert sibling not in scs.ORPHAN_S3_FILES, f"{sibling!r} must also be excluded from ORPHAN_S3_FILES (same manifest, sibling key)."
