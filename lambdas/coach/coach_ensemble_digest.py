@@ -203,9 +203,16 @@ def _get_item(pk, sk):
 
 
 def _put_item(item):
-    """Write an item to DynamoDB with float-to-Decimal conversion."""
+    """Write an item to DynamoDB with float-to-Decimal conversion.
+
+    ENSEMBLE#*/COACH#* rows are EXPERIMENT_SCOPED intelligence — stamp write-time
+    provenance (phase + cycle, #1233). experiment_stamp() is fail-soft and cached;
+    the item's own keys win, so it never clobbers or breaks the write.
+    """
+    from phase_taxonomy import experiment_stamp
+
     try:
-        table.put_item(Item=floats_to_decimal(item))
+        table.put_item(Item=floats_to_decimal({**experiment_stamp(), **item}))
         return True
     except Exception as e:
         logger.error("put_item failed for %s/%s: %s", item.get("pk"), item.get("sk"), e)

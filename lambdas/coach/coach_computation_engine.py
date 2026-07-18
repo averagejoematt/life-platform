@@ -662,7 +662,11 @@ def _write_results(today_str, package):
         item["flag_count"] = Decimal(str(len(package.get("seasonality_flags", []))))
         item["prediction_eval_count"] = Decimal(str(len(package.get("prediction_evaluations", []))))
 
-        table.put_item(Item=item)
+        # Write-time provenance (#1233): COACH#computation is EXPERIMENT_SCOPED,
+        # tagger-blind — stamp phase + cycle (fail-soft, cached, never clobbers).
+        from phase_taxonomy import experiment_stamp
+
+        table.put_item(Item={**experiment_stamp(), **item})
         logger.info("Wrote computation results for %s", today_str)
     except Exception as e:
         logger.error("Failed to write computation results: %s", e)
@@ -772,10 +776,18 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
         "metrics_context": {"up": up_count, "down": down_count, "flat": flat_count, "total": total},
     }
 
+    # Write-time provenance (#1233): NARRATIVE#arc is EXPERIMENT_SCOPED and
+    # tagger-blind, but its `phase` attribute is the narrative-arc STATE (not the
+    # taxonomy phase) — stamp cycle ONLY (include_phase=False) so the arc semantic
+    # is preserved. Fail-soft, cached; the item's own keys win.
+    from phase_taxonomy import experiment_stamp
+
+    _arc_stamp = experiment_stamp(include_phase=False)
     try:
         table.put_item(
             Item=floats_to_decimal(
                 {
+                    **_arc_stamp,
                     "pk": "NARRATIVE#arc",
                     "sk": "STATE#current",
                     "phase": new_phase,
@@ -790,6 +802,7 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
         table.put_item(
             Item=floats_to_decimal(
                 {
+                    **_arc_stamp,
                     "pk": "NARRATIVE#arc",
                     "sk": f"HISTORY#{today_str}",
                     "transition": transition,
