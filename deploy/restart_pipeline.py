@@ -239,6 +239,40 @@ def update_ddb_profile(target_date: str, weight_lbs: float, apply: bool):
     )
 
 
+def seed_grading_liveness_marker(target_date: str, apply: bool):
+    """#1196: seed the coach-prediction grading-liveness watermark to genesis.
+
+    coach_prediction_evaluator.emit_grading_liveness() reads the singleton marker
+    (pk=EVALUATOR#coach_prediction, sk=STATE#last_decided) and emits
+    DaysSinceLastDecided = days between today and the marker's date (or the 999
+    "never" sentinel when the marker is absent). monitoring_stack.GradingStalled
+    alarms at >= 14.
+
+    The EVALUATOR# partition is SYSTEM_STATE (phase_taxonomy.py) — the restart
+    tooling deliberately never touches it — so across a cycle reset the marker
+    otherwise carries the OUTGOING cycle's last-decided date (or, on a first-ever
+    cycle, is absent → the 999 sentinel). Either way it fires a false
+    grading-stalled ALARM for the first ~14 days of every new cycle, before any
+    fresh prediction in the new cycle has had a window to mature and grade.
+
+    Re-stamping date=genesis at reset restarts the grading clock at 0 on Day 1,
+    so the alarm only fires if 14 real days elapse in the NEW cycle with nothing
+    graded — the intended liveness semantic. Idempotent: put_item overwrites.
+    """
+    if not apply:
+        return
+    ddb = boto3.resource("dynamodb", region_name=REGION)
+    t = ddb.Table(TABLE)
+    t.put_item(
+        Item={
+            "pk": "EVALUATOR#coach_prediction",
+            "sk": "STATE#last_decided",
+            "date": target_date,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
 def bust_lambda_warm_cache(apply: bool):
     """Toggle an env var on site-api-style Lambdas to force a cold start.
     Required because they cache the DDB profile in-memory for the warm
@@ -461,6 +495,14 @@ def main():
     update_configs(target, wt["weight_lbs"], wt["weight_kg"], wt.get("measurement_utc"), args.apply)
     update_ddb_profile(target, wt["weight_lbs"], args.apply)
     print(f"    ({'wrote' if args.apply else 'would write'} configs + DDB profile)")
+
+    # Step 2c (#1196): re-stamp the grading-liveness watermark to genesis so the
+    # GradingStalled alarm's DaysSinceLastDecided gauge restarts at 0 on Day 1
+    # instead of inheriting the outgoing cycle's stale date (or the 999 sentinel)
+    # and firing a false 14-day ALARM every new cycle. EVALUATOR# is SYSTEM_STATE,
+    # untouched by the wipe, so this seed is the only thing that resets its clock.
+    seed_grading_liveness_marker(target, args.apply)
+    print(f"    ({'seeded' if args.apply else 'would seed'} EVALUATOR#coach_prediction/STATE#last_decided = {target})")
 
     # Step 2b (--close-cycle, default ON): register the new cycle's genesis in
     # CYCLE_GENESES (drives /api/cycle_compare + /api/timeline). Must happen
