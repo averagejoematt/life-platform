@@ -109,14 +109,19 @@ PLATFORM_STATS = {
     "cdk_stacks": 8,
     "alarms": 69,
     "adrs": 121,
-    "monthly_cost": "~$60",  # real steady-state (~$29 AI + CloudWatch/Secrets/CE); the old
-    # "$19" was stale and read as less than AI-alone MTD ($24) on the inference page — a visible
-    # contradiction. ~$60 total keeps AI < total and matches the actual run-rate (still « $75 cap).
+    "monthly_cost": "~$80",  # GROUND-TRUTH run-rate, pinned (#1232). Source = the budget
+    # governor's own numbers: June 2026 actual $79.80 (Cost Explorer), July projects $82.22
+    # (SSM /life-platform/budget-breakdown "projected"; governor emits it as the
+    # LifePlatform/Budget ProjectedMonthlySpend metric). Two consecutive months at ~$80, so
+    # "~$80" is the honest trailing run-rate. The prior "~$60" understated it ~25% and its
+    # comment cited the RETIRED "$75 cap" — the effective ceiling is $85, floating to $100 in
+    # surge (ADR-133). This is a hand-maintained judgment field (never rewritten by
+    # sync_doc_metadata); tests/test_platform_stats_cost.py is the offline drift guard.
     "review_count": 19,
     "review_grade": "A",
     "active_secrets": 21,
     "site_pages": 77,
-    "test_count": 3820,
+    "test_count": 3822,
     "board_technical": 12,
     "board_product": 8,
     "start_weight": EXPERIMENT_BASELINE_WEIGHT_LBS,
