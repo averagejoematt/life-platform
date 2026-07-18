@@ -17,15 +17,21 @@ import os
 import sys
 from datetime import date, timedelta
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "lambdas"))
 
 import coach_computation_engine as eng  # noqa: E402
 import coach_narrative_orchestrator as orch  # noqa: E402
 import elena_state_updater as elena  # noqa: E402
+import phase_taxonomy  # noqa: E402
 from ai_expert_analyzer_lambda import _load_engagement_signal  # noqa: E402
 from constants import EXPERIMENT_START_DATE  # noqa: E402
 from phase_filter import singleton_visible  # noqa: E402
-from web import site_api_coach as capi  # noqa: E402
+from web import (
+    site_api_coach as capi,  # noqa: E402
+    site_api_data as capi_data,  # noqa: E402
+)
 
 GENESIS = date.fromisoformat(EXPERIMENT_START_DATE)
 PRE_GENESIS = (GENESIS - timedelta(days=9)).isoformat()
@@ -434,3 +440,78 @@ def test_board_recent_interactions_query_is_phase_filtered(monkeypatch):
     assert ai._coach_recent_interactions("sleep_coach") == ""
     # #1085: the wiped cycle's INTERACTION# rows must be filtered server-side
     assert "FilterExpression" in t.query_kwargs
+
+
+# ── site_api_data: #1197 — the latest-DATE# QUERY readers #946/#1085 missed ────
+# handle_state_of_matthew / handle_forecast / handle_scenarios take the newest
+# DATE# record via ScanIndexForward=False + Limit=1 and (before #1197) set
+# available=True with no tombstone/phase guard — their _INTERNAL strip removed
+# the `phase` attr instead of FILTERING on it. So a wiped cycle-N record served
+# as current for the ~1-day..1-week window until the next writer run overwrote
+# it (LIVE symptom: /api/state_of_matthew served the tombstoned cycle-5
+# "Week 1, Day 1" brief on /coaching/ on Day 4 of cycle 6). Each partition is
+# EXPERIMENT_SCOPED in phase_taxonomy, so the fix is the same singleton_visible
+# predicate the coach get_item readers already apply.
+
+# (handler, SOURCE# partition it reads latest-DATE# from) — enumerate every
+# public latest-DATE# reader in site_api_data so a newly-added one without a
+# guard fails this family.
+_LATEST_DATE_READERS = [
+    (capi_data.handle_forecast, "forecast"),
+    (capi_data.handle_scenarios, "scenarios"),
+    (capi_data.handle_state_of_matthew, "state_of_matthew"),
+]
+
+_SOM_NARRATIVE = {
+    "narrative": "# State of Matthew — Week 1, Day 1\n\nThe cut begins…",
+    "date": "2026-07-12",
+    "sections_available": {"forecast": True},
+}
+
+
+def _handler_body(handler):
+    return json.loads(handler()["body"])
+
+
+@pytest.mark.parametrize("source", [s for _h, s in _LATEST_DATE_READERS])
+def test_latest_date_readers_cover_experiment_scoped_partitions(source):
+    # Ties the guard set to the taxonomy: each partition guarded here must be
+    # EXPERIMENT_SCOPED (if it were reclassified, the guard rationale changes).
+    assert phase_taxonomy.SOURCE_CLASS[source] == phase_taxonomy.EXPERIMENT_SCOPED
+
+
+@pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
+def test_latest_date_reader_hidden_when_tombstoned(monkeypatch, handler, source):
+    wiped = {**TOMBSTONED, "date": PRE_GENESIS, **_SOM_NARRATIVE}
+    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[wiped]))
+    body = _handler_body(handler)
+    assert body.get("available") is False
+    # the wiped payload must not leak — no tombstoned narrative served as current
+    assert "narrative" not in body
+    assert body.get("tombstone") is not True
+
+
+@pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
+def test_latest_date_reader_hidden_on_non_current_phase(monkeypatch, handler, source):
+    # any non-current phase (not just 'pilot'), no tombstone attr — the latent
+    # sibling shape (a surviving cycle-4 record that the wipe never tombstoned).
+    stale = {"phase": "cycle4", "date": PRE_GENESIS, **_SOM_NARRATIVE}
+    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[stale]))
+    body = _handler_body(handler)
+    assert body.get("available") is False
+    assert "narrative" not in body
+
+
+@pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
+def test_latest_date_reader_serves_current_cycle_record(monkeypatch, handler, source):
+    fresh = {"phase": "experiment", "date": POST_GENESIS, **_SOM_NARRATIVE}
+    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[fresh]))
+    body = _handler_body(handler)
+    assert body.get("available") is True
+
+
+@pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
+def test_latest_date_reader_available_false_when_partition_empty(monkeypatch, handler, source):
+    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[]))
+    body = _handler_body(handler)
+    assert body.get("available") is False
