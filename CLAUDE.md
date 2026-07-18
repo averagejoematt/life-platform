@@ -142,7 +142,7 @@ Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~0
 
 ## Experiment Restart Pipeline (ADR-058/059/077)
 
-Experiment is anchored by `EXPERIMENT_START_DATE` in `lambdas/constants.py` (currently **2026-07-18**, cycle 7 — a future genesis is sanctioned: the site runs a pre-start countdown until Day 1, #931/#939). Re-anchoring is one idempotent command:
+Experiment is anchored by `EXPERIMENT_START_DATE` in `lambdas/constants.py` (currently **2026-07-19**, cycle 8 — a future genesis is sanctioned: the site runs a pre-start countdown until Day 1, #931/#939). Re-anchoring is one idempotent command:
 
 ```bash
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --apply

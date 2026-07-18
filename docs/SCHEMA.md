@@ -2563,7 +2563,7 @@ Every DDB item under `USER#matthew#SOURCE#*` carries an optional `phase` attribu
 
 | Value         | Meaning                                                          |
 |---------------|------------------------------------------------------------------|
-| `experiment`  | Record dated on or after EXPERIMENT_START_DATE (currently 2026-07-18). |
+| `experiment`  | Record dated on or after EXPERIMENT_START_DATE (currently 2026-07-19). |
 | `pilot`       | Record dated before EXPERIMENT_START_DATE.                       |
 | (unset)       | Cross-phase identity record: profile, config, subscribers, genome, field_notes, baseline_snapshot, re_entry. |
 

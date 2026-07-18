@@ -2,11 +2,11 @@
   "_meta": {
     "version": "1.5.0",
     "description": "Character Sheet v1.5.0 (#965 source wiring, ADR-134 amendment): hevy strength days feed movement (strength_sessions, behavioral), reading-session days feed mind (reading_practice, behavioral), the todoist overdue queue feeds consistency (task_follow_through, measured) \u2014 all day-count metrics, volume-gaming resistant. On v1.4.0's #956 math-v2 base.",
-    "last_updated": "2026-07-17",
+    "last_updated": "2026-07-18",
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
-    "start_date": "2026-07-18",
+    "start_date": "2026-07-19",
     "start_weight_lbs": 315.65,
     "start_weight_kg": 143.177,
     "baseline_source": "withings",
