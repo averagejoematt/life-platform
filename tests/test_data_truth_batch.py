@@ -298,7 +298,7 @@ def test_device_agreement_never_silent_null():
 
 
 def _sleep_detail_with(monkeypatch, eight_items, whoop_items):
-    from web import site_api_data as sad
+    from web import site_api_vitals as sad  # #1240: handle_sleep_detail moved to site_api_vitals
 
     def _fake_query(source, start, end, **kw):
         return {"eightsleep": eight_items, "whoop": whoop_items}.get(source, [])

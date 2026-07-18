@@ -23,9 +23,11 @@ Endpoints:
 import hashlib  # used by handle_achievements stable-event-key hash
 import json
 import os
+import re as _re  # #1240: genetic-biomarker strip regexes (handle_labs)
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
+import boto3  # #1240: S3/DDB clients used by handle_labs / handle_glucose / handle_genome_risks
 import weight_trend  # shared weekly-rate + projection (layer module)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
@@ -41,6 +43,7 @@ from web.site_api_common import (
     _clamp_today,
     _decimal_to_float,
     _error,
+    _experiment_date,
     _get_profile,
     _latest_item,
     _latest_item_asof,
@@ -1788,3 +1791,929 @@ def handle_snapshot() -> dict:
         "headers": {**CORS_HEADERS, "Cache-Control": "public, max-age=60"},
         "body": json.dumps(payload, default=str),
     }
+
+
+# ════════════════════════════════════════════════════════════════════════
+# #1240: vitals-adjacent domain handlers — moved verbatim from site_api_data.py
+# (glucose / sleep / circadian / phenoage / labs / genome). Behavior-identical;
+# the router (site_api_lambda.py) now imports these from here.
+# ════════════════════════════════════════════════════════════════════════
+
+
+def handle_genome_risks() -> dict:
+    """
+    GET /api/genome_risks
+    Returns genome SNPs grouped by category with risk levels.
+    No raw genotypes exposed. Cache: 86400s (24h).
+    """
+    pk = f"{USER_PREFIX}genome"
+    resp = table.query(KeyConditionExpression=Key("pk").eq(pk))
+    items = _decimal_to_float(resp.get("Items", []))
+
+    if not items:
+        # No genome uploaded yet — shaped-empty 200 so the page shows "not yet published".
+        return _ok(
+            {"genome": {"total_snps": 0, "risk_summary": {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}, "categories": {}}},
+            cache_seconds=3600,
+        )
+
+    categories = {}
+    risk_summary = {"unfavorable": 0, "mixed": 0, "neutral": 0, "favorable": 0}
+
+    for snp in items:
+        cat = snp.get("category", "other")
+        risk = snp.get("risk_level", "neutral")
+        risk_summary[risk] = risk_summary.get(risk, 0) + 1
+
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(
+            {
+                "gene": snp.get("gene", ""),
+                "rsid": snp.get("rsid", snp.get("sk", "").replace("SNP#", "")),
+                "risk_level": risk,
+                "summary": snp.get("summary", ""),
+                "implications": snp.get("implications", ""),
+                "interventions": snp.get("interventions", []),
+                "evidence": snp.get("evidence_strength", "moderate"),
+            }
+        )
+
+    for cat in categories:
+        categories[cat].sort(key=lambda x: {"unfavorable": 0, "mixed": 1, "neutral": 2, "favorable": 3}.get(x["risk_level"], 2))
+
+    return _ok(
+        {
+            "genome": {
+                "total_snps": len(items),
+                "risk_summary": risk_summary,
+                "categories": categories,
+            }
+        },
+        cache_seconds=86400,
+    )
+
+
+def handle_glucose() -> dict:
+    """
+    GET /api/glucose
+    Returns: 30-day CGM stats — time-in-range, variability, daily trend.
+    Source: apple_health DynamoDB records.
+    Cache: 3600s (1h).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = _experiment_date(30)
+
+    records = _query_source("apple_health", d30, today)
+    cgm_days = [r for r in records if r.get("blood_glucose_avg") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START]
+    cgm_days.sort(key=lambda x: x.get("sk", ""))
+
+    if not cgm_days:
+        return _ok({"glucose": None, "glucose_trend": []}, cache_seconds=3600)
+
+    latest = cgm_days[-1]
+
+    # 30-day averages
+    avg_vals = [float(r["blood_glucose_avg"]) for r in cgm_days if r.get("blood_glucose_avg")]
+    tir_vals = [float(r["blood_glucose_time_in_range_pct"]) for r in cgm_days if r.get("blood_glucose_time_in_range_pct")]
+    opt_vals = [float(r["blood_glucose_time_in_optimal_pct"]) for r in cgm_days if r.get("blood_glucose_time_in_optimal_pct")]
+    std_vals = [float(r["blood_glucose_std_dev"]) for r in cgm_days if r.get("blood_glucose_std_dev")]
+
+    def avg(lst):
+        return round(sum(lst) / len(lst), 1) if lst else None
+
+    # Daily trend array for chart
+    trend = [
+        {
+            "date": r.get("sk", "").replace("DATE#", ""),
+            "avg": round(float(r["blood_glucose_avg"]), 1) if r.get("blood_glucose_avg") else None,
+            "tir": round(float(r["blood_glucose_time_in_range_pct"]), 1) if r.get("blood_glucose_time_in_range_pct") else None,
+            "std": round(float(r["blood_glucose_std_dev"]), 1) if r.get("blood_glucose_std_dev") else None,
+        }
+        for r in cgm_days
+    ]
+
+    tir_today = float(latest.get("blood_glucose_time_in_range_pct", 0))
+    tir_status = "excellent" if tir_today >= 90 else ("good" if tir_today >= 70 else "needs_attention")
+    std_today = float(latest.get("blood_glucose_std_dev", 99))
+    variability_status = "low" if std_today < 15 else ("moderate" if std_today < 25 else "high")
+
+    # Best/worst day by TIR (or avg glucose if all 100% TIR)
+    best_day = None
+    worst_day = None
+    if len(cgm_days) >= 2:
+        sorted_by_tir = sorted(
+            cgm_days, key=lambda r: (float(r.get("blood_glucose_time_in_range_pct", 0)), -float(r.get("blood_glucose_std_dev", 99)))
+        )
+        worst_r = sorted_by_tir[0]
+        best_r = sorted_by_tir[-1]
+        worst_day = {
+            "date": worst_r.get("sk", "").replace("DATE#", ""),
+            "avg": round(float(worst_r.get("blood_glucose_avg", 0)), 1),
+            "tir": round(float(worst_r.get("blood_glucose_time_in_range_pct", 0)), 1),
+        }
+        best_day = {
+            "date": best_r.get("sk", "").replace("DATE#", ""),
+            "avg": round(float(best_r.get("blood_glucose_avg", 0)), 1),
+            "tir": round(float(best_r.get("blood_glucose_time_in_range_pct", 0)), 1),
+        }
+
+    return _ok(
+        {
+            "glucose": {
+                "avg_mg_dl": round(float(latest.get("blood_glucose_avg", 0)), 1) if latest.get("blood_glucose_avg") else None,
+                "std_dev": round(float(latest.get("blood_glucose_std_dev", 0)), 1) if latest.get("blood_glucose_std_dev") else None,
+                "time_in_range_pct": round(tir_today, 1),
+                "time_in_optimal_pct": (
+                    round(float(latest.get("blood_glucose_time_in_optimal_pct", 0)), 1)
+                    if latest.get("blood_glucose_time_in_optimal_pct")
+                    else None
+                ),
+                "time_above_140_pct": (
+                    round(float(latest.get("blood_glucose_time_above_140_pct", 0)), 1)
+                    if latest.get("blood_glucose_time_above_140_pct")
+                    else None
+                ),
+                "cgm_source": latest.get("cgm_source", "unknown"),
+                "tir_status": tir_status,
+                "variability_status": variability_status,
+                "30d_avg_mg_dl": avg(avg_vals),
+                "30d_avg_tir": avg(tir_vals),
+                "30d_avg_optimal": avg(opt_vals),
+                "30d_avg_std": avg(std_vals),
+                "days_tracked": len(cgm_days),
+                "as_of_date": latest.get("sk", "").replace("DATE#", ""),
+                "best_day": best_day,
+                "worst_day": worst_day,
+            },
+            "glucose_trend": trend,
+        },
+        cache_seconds=3600,
+    )
+
+
+def _sane_sleep_score(raw, hours, whoop_quality):
+    """Gate an implausible nightly sleep score. A score <40 next to >=6h slept AND/OR a healthy
+    Whoop quality (>=70) is a scoring/attribution glitch (the live '12' next to 8.2h + 84%
+    quality), not a real terrible night — fall back to Whoop quality so one bad number doesn't
+    make the whole sleep page look broken. Returns a rounded score or None."""
+    if raw is None:
+        return None
+    try:
+        raw = round(float(raw), 0)
+    except (TypeError, ValueError):
+        return None
+    hrs = float(hours) if hours else 0
+    wq = float(whoop_quality) if whoop_quality else 0
+    if raw < 40 and (hrs >= 6 or wq >= 70):
+        return round(wq, 0) if wq else None
+    return raw
+
+
+# ── Cross-source correlation board (sleep §8, Phase 2) ───────────────────────
+# Self-policing: every card carries n + overlap_weeks + a confidence tag. The Pearson
+# coefficient is computed ONLY at >=14 overlapping days (>=2 weeks); below that it's
+# direction-only ("watching — too early"). Sleep-vs-weight (C1) is hard-WITHHELD through
+# the water-weight phase. Powered by the same raw sources the platform tools read; the
+# Pearson + day-lag logic is replicated compactly here (site-api can't import mcp/).
+_CORR_MIN_COEF_DAYS = 14  # >=2 weeks of overlap before any coefficient
+
+_CORR_MIN_DIR_DAYS = 4  # below this, not even a direction
+
+
+def _shift_date(d, lag):
+    try:
+        return (datetime.strptime(d, "%Y-%m-%d") + timedelta(days=lag)).strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+
+def _corr_card(cid, label, predictor, outcome, pred_series, outc_series, lag=0, withhold=False, note=""):
+    """Build one self-policing correlation card from two {date: value} maps."""
+    xs, ys = [], []
+    for d, x in (pred_series or {}).items():
+        d2 = _shift_date(d, lag)
+        if d2 and d2 in (outc_series or {}) and x is not None and outc_series[d2] is not None:
+            xs.append(float(x))
+            ys.append(float(outc_series[d2]))
+    n = len(xs)
+    card = {
+        "id": cid,
+        "label": label,
+        "predictor": predictor,
+        "outcome": outcome,
+        "n": n,
+        "overlap_weeks": round(n / 7, 1),
+        "lag_days": lag,
+        "direction": "insufficient",
+        "coefficient": None,
+        "withheld": bool(withhold),
+        "confidence": "watching — too early",
+        "noise": False,
+        "note": note,
+    }
+    if n >= _CORR_MIN_DIR_DAYS:
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+        card["direction"] = "moves together" if cov > 0 else ("moves opposite" if cov < 0 else "flat")
+        card["noise"] = n < 7  # thin pairs are likely noise
+    if withhold:
+        card["confidence"] = "withheld — water-weight phase"
+        card["coefficient"] = None
+    elif n >= _CORR_MIN_COEF_DAYS:
+        mx, my = sum(xs) / n, sum(ys) / n
+        cov = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+        sx = sum((a - mx) ** 2 for a in xs) ** 0.5
+        sy = sum((b - my) ** 2 for b in ys) ** 0.5
+        card["coefficient"] = round(cov / (sx * sy), 2) if sx > 0 and sy > 0 else None
+        card["confidence"] = "low confidence" if n < 30 else "moderate"
+    return card
+
+
+def _whoop_daily(d30, today):
+    """Whoop daily metrics keyed by date: recovery, strain, deep hours, sleep hours."""
+    out = {}
+    for w in _query_source("whoop", d30, today):
+        if "#WORKOUT#" in w.get("sk", ""):
+            continue
+        dt = w.get("sk", "").replace("DATE#", "")[:10]
+        if not dt:
+            continue
+        out[dt] = {
+            "recovery": _f(w.get("recovery_score")),
+            "strain": _f(w.get("strain")),
+            "deep": _f(w.get("slow_wave_sleep_hours")),
+            "hours": _f(w.get("sleep_duration_hours")),
+            "hrv": _f(w.get("hrv")),
+        }
+    return out
+
+
+def _f(v):
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def handle_sleep_correlations() -> dict:
+    """
+    GET /api/sleep_correlations
+    The self-policing cross-source signal board. Each card: n + overlap-weeks + confidence;
+    direction-only under 2 weeks (no coefficient); Pearson only at >=2 weeks. Sleep-vs-weight
+    withheld through the water-weight phase. Cache: 3600s.
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = _experiment_date(30)
+    wd = _whoop_daily(d30, today)
+    recovery = {d: v["recovery"] for d, v in wd.items() if v["recovery"] is not None}
+    strain = {d: v["strain"] for d, v in wd.items() if v["strain"] is not None}
+
+    cards = []
+    # A1 (LEAD) — last night's recovery → today's training capacity (same-day; the only
+    # arrow that changes tomorrow morning). Outcome proxy: the day's Whoop strain.
+    cards.append(
+        _corr_card(
+            "A1",
+            "Last night's recovery → today's training capacity",
+            "sleep recovery",
+            "day strain",
+            recovery,
+            strain,
+            lag=0,
+            note="The only arrow that changes tomorrow morning — high recovery should let the day carry more strain.",
+        )
+    )
+    # A2 — day strain → next-night deep sleep (day-lagged: "did I earn it?").
+    deep = {d: v["deep"] for d, v in wd.items() if v["deep"] is not None}
+    cards.append(
+        _corr_card(
+            "A2",
+            "Day strain → next-night deep sleep",
+            "day strain",
+            "deep sleep",
+            strain,
+            deep,
+            lag=1,
+            note="Did I earn it? — yesterday's training load against tonight's deep sleep.",
+        )
+    )
+    # Eight Sleep nightly sleep-score series (feeds the A4 last-meal card).
+    # NB: the former "A3 — bed temp → deep sleep" card was retired (ADR-118,
+    # #489) — the Eight Sleep temperature pipeline is dead (dead /v2/intervals
+    # endpoint, no bed_temp_f for 4+ months), so the card only ever rendered empty.
+    eight = {}
+    for e in _query_source("eightsleep", d30, today):
+        dt = e.get("sk", "").replace("DATE#", "")[:10]
+        if dt:
+            eight[dt] = {"score": _f(e.get("sleep_score"))}
+    sleep_score = {d: v["score"] for d, v in eight.items() if v["score"] is not None}
+    # A4 — last meal time → sleep score. MacroFactor food_log latest time per day.
+    last_meal = {}
+    for m in _query_source("macrofactor", d30, today):
+        dt = m.get("date") or m.get("sk", "").replace("DATE#", "")[:10]
+        times = []
+        for ent in m.get("food_log") or []:
+            try:
+                p = str(ent.get("time")).split(":")
+                times.append(int(p[0]) * 60 + int(p[1]))
+            except (ValueError, IndexError, AttributeError):
+                pass
+        if times and dt:
+            last_meal[dt] = max(times)
+    cards.append(
+        _corr_card(
+            "A4",
+            "Last meal time → sleep score",
+            "last meal",
+            "sleep score",
+            last_meal,
+            sleep_score,
+            lag=0,
+            note="Eating late can blunt the night — last-meal minutes against how the night scored.",
+        )
+    )
+    # B1 — decision fatigue (Todoist completed-task load) → sleep score. No app tracks this.
+    todoist = {}
+    for t in _query_source("todoist", d30, today):
+        dt = t.get("date") or t.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(t.get("completed_count") or t.get("tasks_completed") or t.get("completed") or t.get("completed_today"))
+        if v is not None and dt:
+            todoist[dt] = v
+    cards.append(
+        _corr_card(
+            "B1",
+            "Decision load (Todoist) → sleep score",
+            "Todoist load",
+            "sleep score",
+            todoist,
+            sleep_score,
+            lag=0,
+            note="A heavy decision day against how the night scored — the cross-source signal no sleep app has.",
+        )
+    )
+    # B2 — mood/journal → sleep (bidirectional). State-of-Mind valence as the mood proxy;
+    # empty (n=0 → watching) when mood/journal logging is stale.
+    mood = {}
+    # SoM daily valence lands on the apple_health partition as som_avg_valence
+    # (there is no separate state_of_mind partition).
+    for sm in _query_source("apple_health", d30, today):
+        dt = sm.get("date") or sm.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(sm.get("som_avg_valence"))
+        if v is not None and dt:
+            mood[dt] = v
+    cards.append(
+        _corr_card(
+            "B2",
+            "Mood → sleep score",
+            "mood / valence",
+            "sleep score",
+            mood,
+            sleep_score,
+            lag=0,
+            note="Mood and sleep move together both ways — gated on active mood/journal logging; empty until entries accrue.",
+        )
+    )
+    # B3 — day-of-week best duration. Not a Pearson pair; n=1/day at week one = noise.
+    durations = {d: v["hours"] for d, v in wd.items() if v["hours"] is not None}
+    dow = {}
+    for d, h in durations.items():
+        try:
+            dow.setdefault(datetime.strptime(d, "%Y-%m-%d").weekday(), []).append(h)
+        except ValueError:
+            pass
+    _wk = round(len(durations) / 7, 1)
+    b3 = {
+        "id": "B3",
+        "label": "Day-of-week → best sleep duration",
+        "predictor": "day of week",
+        "outcome": "sleep duration",
+        "n": len(durations),
+        "overlap_weeks": _wk,
+        "lag_days": 0,
+        "coefficient": None,
+        "withheld": False,
+        "direction": "fills in ~4 weeks",
+        "confidence": "watching — needs ~4 weeks",
+        "noise": True,
+        "note": "Which weekday sleeps best needs ~4 weeks — one Tuesday is not a pattern.",
+    }
+    if _wk >= 4 and dow:
+        _best = max(dow, key=lambda k: sum(dow[k]) / len(dow[k]))
+        _names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        b3.update(
+            {
+                "direction": f"best on {_names[_best]} ({round(sum(dow[_best]) / len(dow[_best]), 1)}h avg)",
+                "confidence": "low confidence",
+                "noise": False,
+            }
+        )
+    cards.append(b3)
+    # C1 (shown LAST, labelled loudest) — sleep vs weight. HIGHEST false-positive risk in a
+    # water-weight cut; the coefficient is HARD-WITHHELD until well past the early water phase
+    # AND explicit sign-off (the STOP-AND-ASK gate). Direction is still shown honestly.
+    weight = {}
+    for w in _query_source("withings", d30, today):
+        dt = w.get("date") or w.get("sk", "").replace("DATE#", "")[:10]
+        v = _f(w.get("weight_lbs"))
+        if v is not None and dt:
+            weight[dt] = v
+    cards.append(
+        _corr_card(
+            "C1",
+            "Sleep → weight",
+            "sleep score",
+            "weight",
+            sleep_score,
+            weight,
+            lag=0,
+            withhold=True,
+            note="Highest false-positive risk in a water-weight cut — the coefficient stays withheld until well past the early water phase.",
+        )
+    )
+
+    return _ok({"cards": cards, "min_coef_days": _CORR_MIN_COEF_DAYS, "as_of": today}, cache_seconds=3600)
+
+
+def handle_sleep_detail() -> dict:
+    """
+    GET /api/sleep_detail
+    Returns: 30-day sleep stats from Eight Sleep + Whoop cross-referenced.
+    Shows sleep score, efficiency, quality, and daily trend.
+    Cache: 3600s (1h).
+    """
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    d30 = _experiment_date(30)
+
+    eight_days = _query_source("eightsleep", d30, today)
+    whoop_days = _query_source("whoop", d30, today)
+
+    # Index whoop by date for cross-referencing
+    whoop_by_date = {r.get("sk", "").replace("DATE#", ""): r for r in whoop_days if r.get("sk")}
+
+    eight_days.sort(key=lambda x: x.get("sk", ""))
+    # Filter to experiment window — EXPERIMENT_QUERY_START fetches 1 day early for sleep lookback,
+    # but we only display data from EXPERIMENT_START onwards
+    eight_with_data = [
+        r for r in eight_days if r.get("sleep_score") is not None and r.get("sk", "").replace("DATE#", "") >= EXPERIMENT_START
+    ]
+
+    if not eight_with_data:
+        return _ok({"sleep_detail": None, "sleep_trend": []}, cache_seconds=3600)
+
+    latest = eight_with_data[-1]
+    latest_date = latest.get("sk", "").replace("DATE#", "")
+    whoop_latest = whoop_by_date.get(latest_date, {})
+    # #495/M-9: if the latest Eight Sleep night has no matching Whoop recovery,
+    # borrow the most recent night that has one — but ONLY the recovery block
+    # (recovery/HRV/RHR), and SAY SO via recovery_night_of. The old code swapped
+    # the whole Whoop record, so night-A hours/stages + night-B recovery rendered
+    # under one dated header with no per-field date.
+    whoop_recovery_rec = whoop_latest
+    recovery_night_of = None
+    if not whoop_latest.get("recovery_score"):
+        for r in reversed(eight_with_data):
+            _rd = r.get("sk", "").replace("DATE#", "")
+            _wm = whoop_by_date.get(_rd, {})
+            if _wm.get("recovery_score"):
+                whoop_recovery_rec = _wm
+                if _rd != latest_date:
+                    recovery_night_of = _rd
+                break
+
+    # 30-day averages (actual field names: sleep_efficiency_pct, sleep_duration_hours)
+    score_vals = [float(r["sleep_score"]) for r in eight_with_data if r.get("sleep_score")]
+    eff_vals = [float(r["sleep_efficiency_pct"]) for r in eight_with_data if r.get("sleep_efficiency_pct")]
+    # Bed-temperature surfaces retired (ADR-118, #489) — the Eight Sleep temp
+    # pipeline is dead (dead /v2/intervals endpoint, no bed_temp_f for 4+ months).
+
+    def avg(lst):
+        return round(sum(lst) / len(lst), 1) if lst else None
+
+    # Daily trend — filter to experiment start (EXPERIMENT_QUERY_START is 1 day early for sleep lookback)
+    trend = []
+    for r in eight_with_data:
+        date = r.get("sk", "").replace("DATE#", "")
+        if date < EXPERIMENT_START:
+            continue  # Don't include pre-experiment days in trend output
+        w = whoop_by_date.get(date, {})
+        trend.append(
+            {
+                "date": date,
+                "sleep_score": _sane_sleep_score(r.get("sleep_score"), w.get("sleep_duration_hours"), w.get("sleep_quality_score")),
+                "efficiency": round(float(r["sleep_efficiency_pct"]), 1) if r.get("sleep_efficiency_pct") else None,
+                "hours": round(float(w["sleep_duration_hours"]), 1) if w.get("sleep_duration_hours") else None,
+                "whoop_quality": round(float(w["sleep_quality_score"]), 0) if w.get("sleep_quality_score") else None,
+                "deep_sleep_hours": round(float(w["slow_wave_sleep_hours"]), 2) if w.get("slow_wave_sleep_hours") else None,
+                "rem_sleep_hours": round(float(w["rem_sleep_hours"]), 2) if w.get("rem_sleep_hours") else None,
+                "deep_pct": round(float(r["deep_pct"]), 1) if r.get("deep_pct") else None,
+                "rem_pct": round(float(r["rem_pct"]), 1) if r.get("rem_pct") else None,
+                "light_pct": round(float(r["light_pct"]), 1) if r.get("light_pct") else None,
+                "recovery_score": round(float(w["recovery_score"]), 0) if w.get("recovery_score") else None,
+                "hrv": round(float(w["hrv"]), 1) if w.get("hrv") else None,
+                "rhr": round(float(w["resting_heart_rate"]), 0) if w.get("resting_heart_rate") else None,
+                "sleep_start": w.get("sleep_start"),
+            }
+        )
+
+    # Use the gated latest trend score so a glitch score (the '12') doesn't drive the headline.
+    score_today = float(trend[-1]["sleep_score"]) if trend and trend[-1].get("sleep_score") else float(latest.get("sleep_score", 0) or 0)
+    score_status = "excellent" if score_today >= 85 else ("good" if score_today >= 70 else "needs_attention")
+
+    # Compute bed time / wake time averages and social jet lag from Whoop sleep_start/end
+    bed_times_weekday = []
+    bed_times_weekend = []
+    wake_times = []
+    for w in whoop_days:
+        ss = w.get("sleep_start")
+        se = w.get("sleep_end")
+        if not ss or "#WORKOUT#" in w.get("sk", ""):
+            continue
+        try:
+            start_dt = datetime.fromisoformat(ss.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(se.replace("Z", "+00:00"))
+            start_pt = start_dt.astimezone(PT)
+            end_pt = end_dt.astimezone(PT)
+            # Normalize bed hour: treat times after 6 PM as evening (18-30), before 6 AM as late night (24-30)
+            bed_hour = start_pt.hour + start_pt.minute / 60
+            if bed_hour < 6:
+                bed_hour += 24  # 1 AM → 25, so avg with 11 PM (23) works correctly
+            wake_hour = end_pt.hour + end_pt.minute / 60
+            wake_times.append(wake_hour)
+            if start_pt.weekday() in (4, 5):  # Fri/Sat night = weekend sleep
+                bed_times_weekend.append(bed_hour)
+            else:
+                bed_times_weekday.append(bed_hour)
+        except Exception:
+            continue
+
+    def _fmt_hour(h):
+        """Convert decimal hour to HH:MM AM/PM."""
+        h = h % 24
+        hr = int(h)
+        mn = int((h - hr) * 60)
+        ampm = "AM" if hr < 12 else "PM"
+        hr12 = hr % 12 or 12
+        return f"{hr12}:{mn:02d} {ampm}"
+
+    all_bed = bed_times_weekday + bed_times_weekend
+    avg_bed = round(sum(all_bed) / len(all_bed), 2) if all_bed else None
+    avg_bed_wd = round(sum(bed_times_weekday) / len(bed_times_weekday), 2) if bed_times_weekday else None
+    avg_bed_we = round(sum(bed_times_weekend) / len(bed_times_weekend), 2) if bed_times_weekend else None
+    avg_wake = round(sum(wake_times) / len(wake_times), 2) if wake_times else None
+    social_jet_lag_hrs = round(abs((avg_bed_wd or 0) - (avg_bed_we or 0)), 1) if avg_bed_wd is not None and avg_bed_we is not None else None
+
+    return _ok(
+        {
+            "sleep_detail": {
+                "sleep_score": round(score_today, 0),
+                "sleep_efficiency": round(float(latest.get("sleep_efficiency_pct", 0)), 1) if latest.get("sleep_efficiency_pct") else None,
+                "total_sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
+                "whoop_quality": (
+                    round(float(whoop_latest.get("sleep_quality_score", 0)), 0) if whoop_latest.get("sleep_quality_score") else None
+                ),
+                "whoop_hours": (
+                    round(float(whoop_latest.get("sleep_duration_hours", 0)), 1) if whoop_latest.get("sleep_duration_hours") else None
+                ),
+                "deep_sleep_hours": (
+                    round(float(whoop_latest.get("slow_wave_sleep_hours", 0)), 2) if whoop_latest.get("slow_wave_sleep_hours") else None
+                ),
+                "rem_sleep_hours": round(float(whoop_latest.get("rem_sleep_hours", 0)), 2) if whoop_latest.get("rem_sleep_hours") else None,
+                "recovery_score": (
+                    round(float(whoop_recovery_rec.get("recovery_score", 0)), 0) if whoop_recovery_rec.get("recovery_score") else None
+                ),
+                # #495/M-9: when the recovery/HRV/RHR trio above comes from a different
+                # night than the Eight Sleep record, this carries that night's date (else null).
+                "recovery_night_of": recovery_night_of,
+                "hrv": round(float(whoop_recovery_rec.get("hrv", 0)), 1) if whoop_recovery_rec.get("hrv") else None,
+                "rhr": (
+                    round(float(whoop_recovery_rec.get("resting_heart_rate", 0)), 0)
+                    if whoop_recovery_rec.get("resting_heart_rate")
+                    else None
+                ),
+                "score_status": score_status,
+                "deep_pct": round(float(latest.get("deep_pct", 0)), 1) if latest.get("deep_pct") else None,
+                "rem_pct": round(float(latest.get("rem_pct", 0)), 1) if latest.get("rem_pct") else None,
+                "light_pct": round(float(latest.get("light_pct", 0)), 1) if latest.get("light_pct") else None,
+                "30d_avg_recovery": (
+                    avg(
+                        [
+                            float(whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score", 0))
+                            for r in eight_with_data
+                            if whoop_by_date.get(r.get("sk", "").replace("DATE#", ""), {}).get("recovery_score")
+                        ]
+                    )
+                    if whoop_by_date
+                    else None
+                ),
+                "30d_avg_score": avg(score_vals),
+                "30d_avg_efficiency": avg(eff_vals),
+                "days_tracked": len(eight_with_data),
+                "as_of_date": latest_date,
+                "avg_bedtime": _fmt_hour(avg_bed) if avg_bed is not None else None,
+                "avg_bedtime_weekday": _fmt_hour(avg_bed_wd) if avg_bed_wd is not None else None,
+                "avg_bedtime_weekend": _fmt_hour(avg_bed_we) if avg_bed_we is not None else None,
+                "avg_waketime": _fmt_hour(avg_wake) if avg_wake is not None else None,
+                "social_jet_lag_hrs": social_jet_lag_hrs,
+            },
+            "sleep_trend": trend,
+        },
+        cache_seconds=3600,
+    )
+
+
+def handle_circadian() -> dict:
+    """
+    GET /api/circadian
+    Today's circadian-compliance score — computed daily by
+    circadian_compliance_lambda and stored at SOURCE#circadian | DATE#<today>,
+    but (until now) never surfaced. A *predictive* 0–100 behavioral score across
+    four anchors (wake light, meal timing, screen wind-down, sleep consistency):
+    it estimates what tonight's sleep will look like based on today's behaviors.
+    Cache: 900s — recomputed once daily; refreshing faster gains nothing.
+    """
+    item = _latest_item("circadian")
+    if not item:
+        return _ok({"available": False}, cache_seconds=900)
+
+    comps = item.get("components", {}) or {}
+    components = {
+        name: {
+            "score": c.get("score"),
+            "max": c.get("max"),
+            "note": c.get("note"),
+            # Staleness honesty (truth audit 2026-07-10): False = the lambda had no
+            # real signal for this anchor — render "unknown", never a scored default.
+            # Legacy records predate the flag; absent means measured (old behavior).
+            "measured": c.get("measured", True),
+        }
+        for name, c in comps.items()
+    }
+    return _ok(
+        {
+            "available": True,
+            "date": item.get("date"),
+            # Temporal frame (additive): this is a forward-looking forecast of how
+            # tonight's sleep will turn out given today's behaviours — not a measurement.
+            "frame": "tonight",
+            "score": item.get("score"),
+            "category": item.get("category"),
+            "prescription": item.get("prescription"),
+            "weakest_component": item.get("weakest_component"),
+            "measured_count": item.get("measured_count"),
+            "components": components,
+        },
+        cache_seconds=900,
+    )
+
+
+# ── PhenoAge (Levine et al. 2018) — transparent biological age (P1.5) ──────────────
+# Replaces the DEXA black-box "biological age" with a published formula over 9 standard blood
+# markers + chronological age. PRIVACY (owner decision, Option A): chronological age is used
+# ONLY to compute — it is NEVER returned, and neither is the chrono−pheno gap, so the page
+# can't be used to back out the owner's real age. (Residual: the 9 markers are public on the
+# labs page, so a determined reader applying this formula could approximate age from a precise
+# phenotypic number — flagged for review.) Population-level, correlative, NOT the DNAm clock.
+_PHENOAGE_COEF = {  # (coefficient, reference value in formula units) — ref = healthy midpoint
+    "albumin_gL": (-0.0336, 45.0),
+    "creatinine_umolL": (0.0095, 80.0),
+    "glucose_mmolL": (0.1953, 5.0),
+    "lncrp": (0.0954, None),  # ln(CRP mg/dL); handled separately
+    "lymphocyte_pct": (-0.0120, 32.0),
+    "mcv_fL": (0.0268, 90.0),
+    "rdw_pct": (0.3306, 13.0),
+    "alp_UL": (0.00188, 65.0),
+    "wbc_1000": (0.0554, 6.0),
+}
+
+_PHENOAGE_LABELS = {
+    "albumin_gL": "Albumin",
+    "creatinine_umolL": "Creatinine",
+    "glucose_mmolL": "Glucose",
+    "lncrp": "hs-CRP",
+    "lymphocyte_pct": "Lymphocyte %",
+    "mcv_fL": "MCV",
+    "rdw_pct": "RDW",
+    "alp_UL": "Alkaline phosphatase",
+    "wbc_1000": "WBC",
+}
+
+
+def _compute_phenoage(vals: dict, age_years: float):
+    """Levine Phenotypic Age from the 9 converted markers (formula units) + chronological age.
+    Returns the exact phenotypic age in years, or None on bad inputs. Age is an INPUT only."""
+    import math
+
+    try:
+        g = 0.0076927
+        xb = (
+            -19.9067
+            - 0.0336 * vals["albumin_gL"]
+            + 0.0095 * vals["creatinine_umolL"]
+            + 0.1953 * vals["glucose_mmolL"]
+            + 0.0954 * math.log(max(0.01, vals["crp_mgdL"]))
+            - 0.0120 * vals["lymphocyte_pct"]
+            + 0.0268 * vals["mcv_fL"]
+            + 0.3306 * vals["rdw_pct"]
+            + 0.00188 * vals["alp_UL"]
+            + 0.0554 * vals["wbc_1000"]
+            + 0.0804 * age_years
+        )
+        mort = 1.0 - math.exp(-math.exp(xb) * (math.exp(120.0 * g) - 1.0) / g)
+        if mort <= 0 or mort >= 1:
+            return None
+        pheno = 141.50225 + math.log(-0.00553 * math.log(1.0 - mort)) / 0.090165
+        return pheno
+    except (ValueError, KeyError, ZeroDivisionError, OverflowError):
+        return None
+
+
+def handle_phenoage() -> dict:
+    """GET /api/phenoage — transparent Levine Phenotypic Age. Option A privacy: returns the
+    phenotypic age + the 9 driver markers ONLY; never chronological age or the gap."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=f"dashboard/{USER_ID}/clinical.json")
+        data = json.loads(resp["Body"].read())
+        labs = data.get("labs", {})
+        markers = labs.get("biomarkers", []) or []
+        by = {}
+        for m in markers:
+            nm = str(m.get("name", "")).strip().lower()
+            if nm and nm not in by:
+                by[nm] = m
+
+        def _num(name):
+            m = by.get(name)
+            if not m:
+                return None
+            try:
+                return float(str(m.get("value")).replace("<", "").replace(">", "").strip())
+            except (TypeError, ValueError):
+                return None
+
+        raw = {
+            "albumin": _num("albumin"),
+            "creatinine": _num("creatinine"),
+            "glucose": _num("glucose"),
+            "crp": _num("crp hs"),
+            "mcv": _num("mcv"),
+            "rdw": _num("rdw"),
+            "alp": _num("alkaline phosphatase"),
+            "wbc": _num("wbc"),
+            "abs_lymph": _num("absolute lymphocytes"),
+        }
+        # Lymphocyte % derived from absolute lymphocytes ÷ WBC (2a — exact, labeled).
+        lymph_pct = None
+        lymph_derived = False
+        if raw["abs_lymph"] is not None and raw["wbc"]:
+            lymph_pct = round(raw["abs_lymph"] / (raw["wbc"] * 1000.0) * 100.0, 1)
+            lymph_derived = True
+
+        required = {
+            "Albumin": raw["albumin"],
+            "Creatinine": raw["creatinine"],
+            "Glucose": raw["glucose"],
+            "hs-CRP": raw["crp"],
+            "Lymphocyte %": lymph_pct,
+            "MCV": raw["mcv"],
+            "RDW": raw["rdw"],
+            "Alkaline phosphatase": raw["alp"],
+            "WBC": raw["wbc"],
+        }
+        missing = [k for k, v in required.items() if v is None]
+        # Chronological age (compute-only; never returned). From profile DOB.
+        prof = _get_profile() or {}
+        dob = prof.get("date_of_birth")
+        age_years = None
+        if dob:
+            try:
+                d = datetime.strptime(str(dob)[:10], "%Y-%m-%d")
+                age_years = (datetime.now(timezone.utc).replace(tzinfo=None) - d).days / 365.25
+            except (ValueError, TypeError):
+                age_years = None
+
+        if missing or age_years is None:
+            return _ok(
+                {
+                    "phenoage": None,
+                    "missing": missing or (["chronological age (profile)"] if age_years is None else []),
+                    "as_of": labs.get("latest_draw_date"),
+                    "lymphocyte_derived": lymph_derived,
+                },
+                cache_seconds=3600,
+            )
+
+        # Convert to formula units.
+        vals = {
+            "albumin_gL": raw["albumin"] * 10.0,  # g/dL → g/L
+            "creatinine_umolL": raw["creatinine"] * 88.42,  # mg/dL → µmol/L
+            "glucose_mmolL": raw["glucose"] / 18.0182,  # mg/dL → mmol/L
+            "crp_mgdL": raw["crp"] / 10.0,  # mg/L → mg/dL
+            "lymphocyte_pct": lymph_pct,
+            "mcv_fL": raw["mcv"],
+            "rdw_pct": raw["rdw"],
+            "alp_UL": raw["alp"],
+            "wbc_1000": raw["wbc"],
+        }
+        pheno = _compute_phenoage(vals, age_years)
+        if pheno is None:
+            return _ok({"phenoage": None, "missing": ["computation failed"], "as_of": labs.get("latest_draw_date")}, cache_seconds=3600)
+
+        # Per-marker driver direction (younger/older) vs healthy reference — transparent, but
+        # NOT the raw contribution (keeps the published surface from adding inversion precision).
+        import math
+
+        drivers = []
+        for key, (coef, ref) in _PHENOAGE_COEF.items():
+            if key == "lncrp":
+                val_f = math.log(max(0.01, vals["crp_mgdL"]))
+                ref_f = math.log(0.1)
+                disp_val, disp_unit = raw["crp"], "mg/L"
+            else:
+                val_f = vals[key]
+                ref_f = ref
+                disp_val, disp_unit = {
+                    "albumin_gL": (raw["albumin"], "g/dL"),
+                    "creatinine_umolL": (raw["creatinine"], "mg/dL"),
+                    "glucose_mmolL": (raw["glucose"], "mg/dL"),
+                    "lymphocyte_pct": (lymph_pct, "%"),
+                    "mcv_fL": (raw["mcv"], "fL"),
+                    "rdw_pct": (raw["rdw"], "%"),
+                    "alp_UL": (raw["alp"], "U/L"),
+                    "wbc_1000": (raw["wbc"], "K/µL"),
+                }[key]
+            push = coef * (val_f - ref_f)  # >0 raises pheno (older), <0 lowers (younger)
+            direction = "older" if push > 0.02 else ("younger" if push < -0.02 else "neutral")
+            drivers.append(
+                {
+                    "name": _PHENOAGE_LABELS[key],
+                    "value": disp_val,
+                    "unit": disp_unit,
+                    "direction": direction,
+                    "derived": (key == "lymphocyte_pct" and lymph_derived),
+                }
+            )
+
+        # Round to the nearest year for display; chronological age and the gap are NOT returned.
+        return _ok(
+            {
+                "phenoage": round(pheno),
+                "as_of": labs.get("latest_draw_date"),
+                "drivers": drivers,
+                "lymphocyte_derived": lymph_derived,
+                "missing": [],
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[phenoage] failed: {e}")
+        return _error(503, "Phenotypic age temporarily unavailable.")
+
+
+# Privacy absolute (PRE-13 pending): named genes / genotypes must NEVER reach the
+# public labs payload. Matched case-insensitively against category + name/notes/range/value.
+_GENETIC_CATEGORY_RE = _re.compile(r"pharmacogenomic|genetic|genomic", _re.IGNORECASE)
+
+_GENETIC_TEXT_RE = _re.compile(r"genotype|\bgene\b|\brs\d+\b|variant|allele|\bsnp\b", _re.IGNORECASE)
+
+
+def _strip_genetic_biomarkers(labs: dict) -> dict:
+    """Drop any biomarker that is genetic (pharmacogenomics category, or genotype/gene/rsID/variant
+    language in its fields) and recompute served counts so the page header stays consistent."""
+    kept = []
+    for b in labs.get("biomarkers") or []:
+        if _GENETIC_CATEGORY_RE.search(str(b.get("category") or "")):
+            continue
+        text = " ".join(str(b.get(k) or "") for k in ("name", "notes", "range", "value"))
+        if _GENETIC_TEXT_RE.search(text):
+            continue
+        kept.append(b)
+    sanitized = dict(labs)
+    sanitized["biomarkers"] = kept
+    # Same flag semantics as the front-end (evidence_body.js): truthy and not the string "null".
+    sanitized["flagged_count"] = sum(1 for b in kept if b.get("flag") and str(b.get("flag")).lower() != "null")
+    for count_key in ("biomarker_count", "total_biomarkers"):
+        if count_key in sanitized:
+            sanitized[count_key] = len(kept)
+    return sanitized
+
+
+def handle_labs() -> dict:
+    """GET /api/labs — Returns lab biomarkers from clinical.json in S3 (genetic entries stripped)."""
+    try:
+        S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
+        s3 = boto3.client("s3", region_name=S3_REGION)
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=f"dashboard/{USER_ID}/clinical.json")
+        data = json.loads(resp["Body"].read())
+        labs = data.get("labs", {})
+        if not labs or not labs.get("biomarkers"):
+            return _error(404, "No lab data available.")
+        labs = _strip_genetic_biomarkers(labs)
+        if not labs.get("biomarkers"):
+            return _error(404, "No lab data available.")
+        return _ok({"labs": labs}, cache_seconds=3600)
+    except Exception as e:
+        logger.warning(f"[labs] Failed to load clinical.json: {e}")
+        return _error(503, "Lab data temporarily unavailable.")

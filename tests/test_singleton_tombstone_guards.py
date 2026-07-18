@@ -30,7 +30,7 @@ from constants import EXPERIMENT_START_DATE  # noqa: E402
 from phase_filter import singleton_visible  # noqa: E402
 from web import (
     site_api_coach as capi,  # noqa: E402
-    site_api_data as capi_data,  # noqa: E402
+    site_api_intelligence as capi_intel,  # noqa: E402  # #1240: forecast/scenarios/state_of_matthew moved here from site_api_data
 )
 
 GENESIS = date.fromisoformat(EXPERIMENT_START_DATE)
@@ -457,9 +457,9 @@ def test_board_recent_interactions_query_is_phase_filtered(monkeypatch):
 # public latest-DATE# reader in site_api_data so a newly-added one without a
 # guard fails this family.
 _LATEST_DATE_READERS = [
-    (capi_data.handle_forecast, "forecast"),
-    (capi_data.handle_scenarios, "scenarios"),
-    (capi_data.handle_state_of_matthew, "state_of_matthew"),
+    (capi_intel.handle_forecast, "forecast"),
+    (capi_intel.handle_scenarios, "scenarios"),
+    (capi_intel.handle_state_of_matthew, "state_of_matthew"),
 ]
 
 _SOM_NARRATIVE = {
@@ -483,7 +483,7 @@ def test_latest_date_readers_cover_experiment_scoped_partitions(source):
 @pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
 def test_latest_date_reader_hidden_when_tombstoned(monkeypatch, handler, source):
     wiped = {**TOMBSTONED, "date": PRE_GENESIS, **_SOM_NARRATIVE}
-    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[wiped]))
+    monkeypatch.setattr(capi_intel, "table", _FakeTable(query_items=[wiped]))
     body = _handler_body(handler)
     assert body.get("available") is False
     # the wiped payload must not leak — no tombstoned narrative served as current
@@ -496,7 +496,7 @@ def test_latest_date_reader_hidden_on_non_current_phase(monkeypatch, handler, so
     # any non-current phase (not just 'pilot'), no tombstone attr — the latent
     # sibling shape (a surviving cycle-4 record that the wipe never tombstoned).
     stale = {"phase": "cycle4", "date": PRE_GENESIS, **_SOM_NARRATIVE}
-    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[stale]))
+    monkeypatch.setattr(capi_intel, "table", _FakeTable(query_items=[stale]))
     body = _handler_body(handler)
     assert body.get("available") is False
     assert "narrative" not in body
@@ -505,13 +505,13 @@ def test_latest_date_reader_hidden_on_non_current_phase(monkeypatch, handler, so
 @pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
 def test_latest_date_reader_serves_current_cycle_record(monkeypatch, handler, source):
     fresh = {"phase": "experiment", "date": POST_GENESIS, **_SOM_NARRATIVE}
-    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[fresh]))
+    monkeypatch.setattr(capi_intel, "table", _FakeTable(query_items=[fresh]))
     body = _handler_body(handler)
     assert body.get("available") is True
 
 
 @pytest.mark.parametrize("handler,source", _LATEST_DATE_READERS)
 def test_latest_date_reader_available_false_when_partition_empty(monkeypatch, handler, source):
-    monkeypatch.setattr(capi_data, "table", _FakeTable(query_items=[]))
+    monkeypatch.setattr(capi_intel, "table", _FakeTable(query_items=[]))
     body = _handler_body(handler)
     assert body.get("available") is False

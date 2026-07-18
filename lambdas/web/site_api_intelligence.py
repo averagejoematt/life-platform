@@ -24,8 +24,9 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3  # noqa: F401 — handlers may instantiate clients
+import stats_core  # #1240: sanctioned stats implementation (ADR-105) — handle_correlations
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
 
 from web.site_api_common import (
     DDB_REGION,
@@ -1636,3 +1637,595 @@ def handle_intelligence_summary() -> dict:
         logger.warning(f"intel summary: experiments failed: {e}")
 
     return _ok(summary, cache_seconds=1800)
+
+
+# ════════════════════════════════════════════════════════════════════════
+# #1240: intelligence-adjacent domain handlers — moved verbatim from site_api_data.py
+# (correlations / forecast / scenarios / state_of_matthew / inference_receipt /
+# wrong / pillar_coupling). Behavior-identical; the router imports these from here.
+# ════════════════════════════════════════════════════════════════════════
+
+_COUPLING_PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"]
+
+_COUPLING_WINDOW = 60  # trailing character-sheet records to read
+
+_COUPLING_MIN_N = 6  # a pair needs this many co-present real days or it's honestly omitted
+
+
+def _coupling_real_score(pd: dict):
+    """The pillar's raw_score for a day IF that day carried real signal, else None.
+
+    ADR-104/105: a held/zero-coverage day is NOT a real low — counting a floored or
+    carried-forward score would manufacture spurious (anti-)correlation, especially
+    across a manual-logging gap. We correlate only days with genuine data.
+    """
+    if not isinstance(pd, dict):
+        return None
+    v = pd.get("raw_score")
+    if v is None:
+        return None
+    if pd.get("coverage_hold"):
+        return None
+    cov = pd.get("data_coverage")
+    if cov is not None and float(cov) <= 0:
+        return None
+    return float(v)
+
+
+def handle_pillar_coupling() -> dict:
+    """GET /api/pillar_coupling — #590: how the seven pillars have actually co-moved.
+
+    Deterministic pairwise Pearson of each pillar's daily raw_score over a trailing
+    window (real-signal days only, per _coupling_real_score). Every edge carries its
+    own n; pairs below the n floor or with no variance are omitted, never faked — the
+    constellation draws thin/absent data honestly faint. No AI, no forecast: this is a
+    descriptive statistic over the last ~60 days, labeled by its actual date range.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}character_sheet") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=_COUPLING_WINDOW,
+    )
+    recs = _decimal_to_float(resp.get("Items", []))
+    recs.sort(key=lambda r: str(r.get("sk", "")))  # chronological
+    if len(recs) < _COUPLING_MIN_N:
+        return _ok(
+            {
+                "edges": [],
+                "pillars": [],
+                "window_start": None,
+                "window_end": None,
+                "window_days": 0,
+                "min_n": _COUPLING_MIN_N,
+                "honest_null": True,
+            },
+            cache_seconds=3600,
+        )
+
+    series = {p: [_coupling_real_score(r.get(f"pillar_{p}")) for r in recs] for p in _COUPLING_PILLARS}
+    present = [p for p in _COUPLING_PILLARS if any(v is not None for v in series[p])]
+
+    edges = []
+    for i in range(len(present)):
+        for j in range(i + 1, len(present)):
+            a, b = present[i], present[j]
+            r = stats_core.pearson_r(series[a], series[b], min_n=_COUPLING_MIN_N)
+            if r is None:  # thin or flat → no honest edge to draw
+                continue
+            n = sum(1 for x, y in zip(series[a], series[b]) if x is not None and y is not None)
+            p_val = stats_core.pearson_p_value(r, n)
+            edges.append(
+                {
+                    "a": a,
+                    "b": b,
+                    "r": round(r, 2),
+                    "n": n,
+                    "p": round(p_val, 3) if p_val is not None else None,
+                    "significant": bool(p_val is not None and p_val < 0.05),
+                }
+            )
+    edges.sort(key=lambda e: -abs(e["r"]))
+    return _ok(
+        {
+            "edges": edges,
+            "pillars": present,
+            "window_start": str(recs[0].get("sk", "")).replace("DATE#", "")[:10],
+            "window_end": str(recs[-1].get("sk", "")).replace("DATE#", "")[:10],
+            "window_days": len(recs),
+            "min_n": _COUPLING_MIN_N,
+            "honest_null": not edges,
+        },
+        cache_seconds=3600,
+    )
+
+
+def _corr_p_value(p: dict):
+    """Serve the stored p-value faithfully, or None when absent.
+
+    The compute lambda rounds p to 4 decimals, so a highly-significant pair
+    stores p=0.0 — and the old `float(... or 1)` coerced that 0.0 to 1.0,
+    rendering the flagship FDR-significant pair as "p 1.000". Zero is a
+    value, not a missing value.
+    """
+    raw = p.get("p_value", p.get("p"))
+    if raw is None:
+        return None
+    return round(float(raw), 4)
+
+
+def _corr_strength(r_val: float, stored: str) -> str:
+    """Deterministic strength label from |r| (Cohen-style bands).
+
+    The stored `interpretation` has disagreed with the number it sits next
+    to (r=0.843 labeled "weak"); the served label must match the served r.
+    Falls back to the stored label only for degenerate r=0 rows so
+    "insufficient_data" survives.
+    """
+    a = abs(r_val)
+    if a >= 0.7:
+        return "strong"
+    if a >= 0.4:
+        return "moderate"
+    if a > 0:
+        return "weak"
+    return stored or "weak"
+
+
+def handle_correlations(event: dict = None) -> dict:
+    """
+    GET /api/correlations
+    Returns the most recent weekly correlation matrix (23 pairs)
+    for the public Correlation Explorer.
+
+    HP-06: When ?featured=true is passed, returns a flat array of
+    the top N significant correlations (default 3) for the homepage
+    dynamic discoveries section. Response shape changes to:
+      {"correlations": [{...}, ...], "week": "...", "count": N}
+    so the homepage JS can iterate directly.
+
+    Cache: 3600s.
+    """
+    # HP-06: Parse query params
+    params = {}
+    if event:
+        params = event.get("queryStringParameters") or {}
+    featured = (params.get("featured") or "").lower() == "true"
+    limit = None
+    if params.get("limit"):
+        try:
+            limit = max(1, min(20, int(params["limit"])))
+        except (ValueError, TypeError):
+            pass
+
+    pk = f"{USER_PREFIX}weekly_correlations"
+    resp = table.query(
+        **with_phase_filter(
+            {  # ADR-058: hide pilot weekly correlations
+                "KeyConditionExpression": Key("pk").eq(pk),
+                "ScanIndexForward": False,
+                "Limit": 1,
+            }
+        )
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    if not items:
+        # Genesis week / weekly-correlation compute hasn't run — shaped-empty 200
+        # so the site shows an honest "fills as data accrues" state, not a 503.
+        return _ok({"correlations": [], "week": None, "start_date": None, "end_date": None, "count": 0}, cache_seconds=300)
+
+    record = items[0]
+    week = record.get("sk", "").replace("WEEK#", "")
+    start_date = record.get("start_date", "")
+    end_date = record.get("end_date", "")
+
+    # The compute lambda stores correlations as a dict (label → data).
+    # Convert to list for the public API. Also supports legacy "pairs" list format.
+    raw_corrs = record.get("correlations", {})
+    if isinstance(raw_corrs, list):
+        # Legacy format: already a list
+        pairs = raw_corrs
+    elif isinstance(raw_corrs, dict):
+        # Current format: dict keyed by label. Convert to list.
+        pairs = []
+        for label, data in raw_corrs.items():
+            entry = dict(data)
+            entry["label"] = label
+            pairs.append(entry)
+    else:
+        pairs = []
+
+    # Human-readable labels and source names for each metric
+    _METRIC_META = {
+        "hrv": {"label": "Heart Rate Variability", "source": "Whoop"},
+        "recovery_score": {"label": "Recovery Score", "source": "Whoop"},
+        "sleep_duration": {"label": "Sleep Duration", "source": "Whoop"},
+        "sleep_score": {"label": "Sleep Score", "source": "Whoop"},
+        "resting_hr": {"label": "Resting Heart Rate", "source": "Whoop"},
+        "strain": {"label": "Strain", "source": "Whoop"},
+        "tsb": {"label": "Training Stress Balance", "source": "Computed"},
+        "training_kj": {"label": "Training Load (kJ)", "source": "Strava"},
+        "training_mins": {"label": "Training Minutes", "source": "Strava"},
+        "protein_g": {"label": "Protein (g)", "source": "MacroFactor"},
+        "calories": {"label": "Calories", "source": "MacroFactor"},
+        "carbs_g": {"label": "Carbs (g)", "source": "MacroFactor"},
+        "fat_g": {"label": "Fat (g)", "source": "MacroFactor"},
+        "steps": {"label": "Steps", "source": "Apple Health"},
+        "habit_pct": {"label": "Habit Completion %", "source": "Habitify"},
+        "day_grade": {"label": "Day Grade", "source": "Computed"},
+        "readiness": {"label": "Readiness Score", "source": "Computed"},
+        "tier0_streak": {"label": "Tier 0 Streak", "source": "Computed"},
+    }
+
+    public_pairs = []
+    for p in pairs:
+        metric_a = p.get("metric_a", p.get("field_a", ""))
+        metric_b = p.get("metric_b", p.get("field_b", ""))
+        meta_a = _METRIC_META.get(metric_a, {})
+        meta_b = _METRIC_META.get(metric_b, {})
+        r_val = float(p.get("pearson_r", p.get("r", 0)) or 0)
+        public_pairs.append(
+            {
+                "source_a": meta_a.get("source", p.get("source_a", "")),
+                "field_a": metric_a,
+                "label_a": meta_a.get("label", p.get("label_a", metric_a)),
+                "source_b": meta_b.get("source", p.get("source_b", "")),
+                "field_b": metric_b,
+                "label_b": meta_b.get("label", p.get("label_b", metric_b)),
+                "r": round(r_val, 3),
+                "p": _corr_p_value(p),
+                "n": int(p.get("n_days", p.get("n", 0)) or 0),
+                "strength": _corr_strength(r_val, p.get("interpretation", p.get("strength", ""))),
+                "fdr_significant": p.get("fdr_significant", False),
+                "correlation_type": p.get("correlation_type", "cross_sectional"),
+                "lag_days": int(p.get("lag_days", 0) or 0),
+                "description": p.get("description", ""),
+                "direction": p.get("direction", ""),
+                # DISC-1: counterintuitive flag from compute lambda
+                "counterintuitive": p.get("counterintuitive", False),
+                "expected_direction": p.get("expected_direction", ""),
+                # HP-06: metric labels for homepage cards
+                "metric_a": meta_a.get("label", p.get("label_a", metric_a)),
+                "metric_b": meta_b.get("label", p.get("label_b", metric_b)),
+            }
+        )
+
+    # Sort all by absolute r descending
+    public_pairs.sort(key=lambda x: -abs(x["r"]))
+
+    # HP-06: Featured mode — return flat array of top significant correlations
+    if featured:
+        # Filter to significant only (p < 0.05 or FDR-significant).
+        # p may be None (absent) — and p=0.0 is maximally significant, not missing.
+        significant = [p for p in public_pairs if p.get("fdr_significant") or (p.get("p") is not None and p["p"] < 0.05)]
+        # Fall back to strongest by |r| if no significant ones found
+        if not significant:
+            significant = public_pairs
+        # Apply limit (default 3)
+        top = significant[: limit or 3]
+        # Auto-generate description if missing
+        for p in top:
+            if not p.get("description"):
+                direction = "positive" if p["r"] > 0 else "inverse"
+                p["description"] = f"{direction.title()} correlation between " f"{p['metric_a']} and {p['metric_b']} " f"(r={p['r']:.2f})"
+        return _ok(
+            {
+                "correlations": top,
+                "week": week,
+                "count": len(top),
+            },
+            cache_seconds=3600,
+        )
+
+    # Standard mode — return full object for explorer page
+    return _ok(
+        {
+            "correlations": {
+                "week": week,
+                "start_date": start_date,
+                "end_date": end_date,
+                "pairs": public_pairs,
+                "count": len(public_pairs),
+                "methodology": "Pearson r over 90-day rolling window. Benjamini-Hochberg FDR correction. n-gated strength labels.",
+            }
+        },
+        cache_seconds=3600,
+    )
+
+
+def handle_forecast() -> dict:
+    """
+    GET /api/forecast
+    The forecast engine's daily summary (#541) — deterministic EWMA expectations
+    for recovery / sleep / weight with 80% intervals, today's graded resolutions
+    (expected vs actual), and the running interval-coverage stat. SOURCE#forecast
+    holds frozen FORECAST# rows plus one DATE#<today> summary; we serve the
+    latest summary with internal keys stripped. The anti-causal framing ships in
+    the payload so every consumer renders it: these are expectations from
+    observed patterns, not causal claims. Cache: 900s — recomputed once daily.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}forecast") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    # #1197: the latest DATE# record may be a wiped cycle-N record (tombstone=true /
+    # non-current phase) that survived a reset until the next daily writer run — mirror
+    # the singleton_visible guard the coach get_item readers already apply (#946/#1085).
+    if not items or not singleton_visible(items[0]):
+        return _ok({"available": False}, cache_seconds=900)
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
+    data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
+    data["available"] = True
+    data["framing"] = "what the model expects from observed patterns — correlative, not causal"
+    # PRE-START (#948, throughline): before genesis these are the model's physiology
+    # warm-up expectations, while Home simultaneously promises "no finish-line math
+    # until Day 1" — flag the window so the cockpit can frame the panel instead of
+    # reading as a contradiction. Inert (pre_start=False) once genesis <= today.
+    _pre = pre_start_meta()
+    data["pre_start"] = bool(_pre)
+    if _pre:
+        data.update(_pre)
+    return _ok(data, cache_seconds=900)
+
+
+def handle_scenarios() -> dict:
+    """
+    GET /api/scenarios
+    The scenario explorer's nightly precompute (#550) — for each curated lever
+    ("slept 7.5h+", "20+ zone-2 minutes", …), the distribution of what FOLLOWED
+    similar days (next-day recovery/sleep/HRV/mood/energy) with block-bootstrap
+    CIs and honest n / n_eff labels; thin cells are pre-hidden by the compute's
+    effective-n gate. Anti-causal framing ships in the payload. Read-only;
+    cache 3600s — recomputed nightly.
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}scenarios") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    # #1197: same latest-DATE# tombstone/phase guard as handle_forecast.
+    if not items or not singleton_visible(items[0]):
+        return _ok({"available": False}, cache_seconds=3600)
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
+    data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
+    data["available"] = True
+    return _ok(data, cache_seconds=3600)
+
+
+def handle_state_of_matthew() -> dict:
+    """
+    GET /api/state_of_matthew
+    The weekly "State of Matthew" model brief (#552) — the deterministic
+    assembly of the forecast engine (#541), the hypothesis engine's live
+    pre-registered bets (#530/ADR-105), the coaching panel's current
+    consensus/disputes, and the calibration scoreboard (#538) into one
+    narrated read-back, computed weekly by state-of-matthew-lambda. Each of
+    the four sections is independently present-or-absent per
+    `sections_available` — a source with genuinely nothing yet (e.g. n=0
+    calibration post-reset) is omitted rather than zero-filled. The one
+    Haiku call that wrote `narrative` never computed a number; every figure
+    traces back to the section it's quoted from. Read-only; cache 3600s —
+    recomputed once a week (Sundays).
+    """
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}state_of_matthew") & Key("sk").begins_with("DATE#"),
+        ScanIndexForward=False,
+        Limit=1,
+    )
+    items = _decimal_to_float(resp.get("Items", []))
+    # #1197 (LIVE leak): before this guard, the wiped cycle-5 "Week 1, Day 1" brief
+    # (tombstone=true, phase=pilot) served as current on /coaching/ for the ~1-week
+    # window until the next Sunday state-of-matthew run overwrote it. singleton_visible
+    # gives the honest empty state coaching.js already renders ("honest-absent until the
+    # first Sunday run of the cycle").
+    if not items or not singleton_visible(items[0]):
+        return _ok({"available": False}, cache_seconds=3600)
+    _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
+    data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
+    data["available"] = True
+    return _ok(data, cache_seconds=3600)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The inference receipt (2026-06-13) — radical cost transparency.
+# Every Claude call already lands in two metric streams: AWS/Bedrock emits
+# token counts per ModelId, and the bundled modules emit per-Lambda tokens to
+# LifePlatform/AI. This endpoint reads both, prices them with the same table
+# the cost governor enforces, and publishes the meter.
+# ══════════════════════════════════════════════════════════════════════════════
+_BEDROCK_PRICES = {  # USD per 1M tokens — keep in sync with cost_governor_lambda._PRICES
+    "fable": {"in": 10.00, "out": 50.00},
+    "sonnet": {"in": 3.00, "out": 15.00},
+    "haiku": {"in": 1.00, "out": 5.00},
+    "opus": {"in": 5.00, "out": 25.00},
+}
+
+
+def _price_for_model(model_id: str) -> dict:
+    m = (model_id or "").lower()
+    for k, p in _BEDROCK_PRICES.items():
+        if k in m:
+            return p
+    return _BEDROCK_PRICES["sonnet"]
+
+
+# #1230: the ADR-133 base ceiling (amendment 2026-07-08, $75→$85). The live ceiling is
+# derived from the governor's /life-platform/budget-breakdown param (#822) — it floats to
+# $100 in reader-traffic surge mode. This constant is ONLY the fail-closed fallback when
+# that read fails; never the retired $75.
+_ADR133_BASE_CEILING_USD = 85.0
+
+
+def handle_inference_receipt() -> dict:
+    """GET /api/inference_receipt — today's AI calls + month-to-date, priced."""
+    try:
+        cw = boto3.client("cloudwatch", region_name="us-west-2")
+        ssm = boto3.client("ssm", region_name="us-west-2")
+        now = datetime.now(timezone.utc)
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        def _sum(namespace, metric, dim_name, dim_value, start):
+            r = cw.get_metric_statistics(
+                Namespace=namespace,
+                MetricName=metric,
+                Dimensions=[{"Name": dim_name, "Value": dim_value}],
+                StartTime=start,
+                EndTime=now,
+                Period=86400,
+                Statistics=["Sum"],
+            )
+            return sum(p["Sum"] for p in r.get("Datapoints", []))
+
+        # Per-model (AWS/Bedrock emits these for every invoke)
+        models = []
+        seen = cw.list_metrics(Namespace="AWS/Bedrock", MetricName="InputTokenCount")
+        for m in seen.get("Metrics", []):
+            mid = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "ModelId"), None)
+            if not mid:
+                continue
+            price = _price_for_model(mid)
+            row = {"model": mid.split("/")[-1]}
+            for label, start in (("today", day_start), ("month", month_start)):
+                tin = _sum("AWS/Bedrock", "InputTokenCount", "ModelId", mid, start)
+                tout = _sum("AWS/Bedrock", "OutputTokenCount", "ModelId", mid, start)
+                row[label] = {
+                    "input_tokens": int(tin),
+                    "output_tokens": int(tout),
+                    "est_cost_usd": round((tin * price["in"] + tout * price["out"]) / 1_000_000, 4),
+                }
+            if row["month"]["input_tokens"] or row["month"]["output_tokens"]:
+                models.append(row)
+
+        # Per-feature (the bundled modules dimension by Lambda function)
+        features = []
+        fn_metrics = cw.list_metrics(Namespace="LifePlatform/AI", MetricName="AnthropicInputTokens")
+        for m in fn_metrics.get("Metrics", []):
+            fn = next((d["Value"] for d in m["Dimensions"] if d["Name"] == "LambdaFunction"), None)
+            if not fn:
+                continue
+            tin = _sum("LifePlatform/AI", "AnthropicInputTokens", "LambdaFunction", fn, month_start)
+            tout = _sum("LifePlatform/AI", "AnthropicOutputTokens", "LambdaFunction", fn, month_start)
+            if tin or tout:
+                features.append({"lambda": fn, "month_input_tokens": int(tin), "month_output_tokens": int(tout)})
+        features.sort(key=lambda f: -(f["month_input_tokens"] + f["month_output_tokens"]))
+
+        try:
+            tier = int(ssm.get_parameter(Name="/life-platform/budget-tier")["Parameter"]["Value"])
+        except Exception:
+            tier = None
+
+        # #1230: derive the ceiling from the governor's breakdown param (#822 / ADR-133)
+        # rather than a hardcoded literal — the base is $85 and floats to $100 in surge
+        # mode, so a hardcoded number is guaranteed to be a lie. Fail closed to the $85
+        # base (never the retired $75) if the breakdown read fails.
+        ceiling_usd = _ADR133_BASE_CEILING_USD
+        surge_active = False
+        try:
+            breakdown = json.loads(ssm.get_parameter(Name="/life-platform/budget-breakdown")["Parameter"]["Value"])
+            ceiling_usd = float(breakdown["ceiling"])
+            surge_active = bool(breakdown.get("surge_active", False))
+        except Exception:
+            pass
+
+        month_total = round(sum(r["month"]["est_cost_usd"] for r in models), 2)
+        surge_clause = " — reader-traffic surge mode" if surge_active else ""
+        note = (
+            "Every Claude call routes through one audited chokepoint (ADR-062). "
+            "Costs are estimated from token metrics x list prices — the same math "
+            f"the budget governor enforces. The ${_ADR133_BASE_CEILING_USD:.0f} base ceiling "
+            f"(${ceiling_usd:.0f} in effect{surge_clause}) covers the WHOLE platform, not just AI."
+        )
+        return _ok(
+            {
+                "as_of": now.isoformat(timespec="seconds"),
+                "budget_ceiling_usd": ceiling_usd,
+                "budget_surge_active": surge_active,
+                "budget_tier": tier,
+                "ai_month_to_date_usd": month_total,
+                "models": models,
+                "features": features,
+                "note": note,
+            },
+            cache_seconds=900,
+        )
+    except Exception as e:
+        logger.warning(f"[inference_receipt] failed: {e}")
+        return _error(503, "Inference receipt temporarily unavailable.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# The Wrong Page (2026-06-13) — the AI's misses, in public.
+# Three streams of being wrong, all already recorded:
+#   1. The post-generation validator: coach claims contradicted by the data
+#      (USER#matthew / SOURCE#intelligence_quality#date — errors[] + flags[])
+#   2. The prediction evaluator: per-coach LEARNING# verdicts
+#      (confirmed / refuted / inconclusive / expired)
+#   3. Refuted hypotheses from the weekly engine
+# Nothing here is curated. An empty refuted column after a reset is honest,
+# not flattering — the ledger fills as calls resolve.
+# ══════════════════════════════════════════════════════════════════════════════
+_WRONG_COACHES = ("sleep", "nutrition", "training", "glucose", "mind", "physical", "labs", "explorer")
+
+
+def handle_wrong() -> dict:
+    """GET /api/wrong — the public ledger of AI misses."""
+    try:
+        # 1. Validator catches (last 120 days)
+        start = (datetime.now(timezone.utc) - timedelta(days=120)).strftime("%Y-%m-%d")
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq("USER#matthew")
+            & Key("sk").between(f"SOURCE#intelligence_quality#{start}", "SOURCE#intelligence_quality#~"),
+        )
+        items = _decimal_to_float(resp.get("Items", []))
+        checks_run = int(sum(i.get("checks_run", 0) or 0 for i in items))
+        catches, numeric_caught = [], 0
+        for i in items:
+            for field, sev in (("errors", "error"), ("flags", "flag")):
+                v = i.get(field)
+                if isinstance(v, list):
+                    for e in v:
+                        what = (e.get("detail") or e.get("check") or str(e)) if isinstance(e, dict) else str(e)
+                        catches.append({"date": i.get("date"), "coach": i.get("coach_id"), "severity": sev, "what": str(what)[:240]})
+                elif isinstance(v, (int, float)) and v:
+                    numeric_caught += int(v)  # older records store counts, not detail
+        catches.sort(key=lambda c: c.get("date") or "", reverse=True)
+
+        # 2. Prediction verdicts per coach
+        ledger, recent_misses = [], []
+        for c in _WRONG_COACHES:
+            r = table.query(
+                KeyConditionExpression=Key("pk").eq(f"COACH#{c}_coach") & Key("sk").begins_with("LEARNING#"),
+            )
+            recs = _decimal_to_float(r.get("Items", []))
+            live = [x for x in recs if not x.get("tombstone")]
+            counts = {}
+            for x in live:
+                counts[x.get("status", "unknown")] = counts.get(x.get("status", "unknown"), 0) + 1
+            if live:
+                ledger.append({"coach": c, **{k: counts.get(k, 0) for k in ("confirmed", "refuted", "inconclusive", "expired")}})
+            for x in live:
+                if x.get("status") == "refuted":
+                    recent_misses.append(
+                        {"date": x.get("date"), "coach": c, "what": str(x.get("condition") or x.get("reason") or "")[:240]}
+                    )
+        recent_misses.sort(key=lambda m: m.get("date") or "", reverse=True)
+
+        return _ok(
+            {
+                "validator": {"claims_checked": checks_run, "caught": len(catches) + numeric_caught, "recent": catches[:25]},
+                "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                "note": (
+                    "Uncurated. The validator audits every coach claim against the data it cites; "
+                    "the evaluator scores every dated prediction. A thin refuted column right after "
+                    "a reset means the slate is young, not that the model is right — inconclusive "
+                    "and expired are claims that could not be proven either."
+                ),
+            },
+            cache_seconds=3600,
+        )
+    except Exception as e:
+        logger.warning(f"[wrong] failed: {e}")
+        return _error(503, "The wrong page is temporarily unavailable.")

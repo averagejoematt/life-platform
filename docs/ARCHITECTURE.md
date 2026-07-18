@@ -251,10 +251,10 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 | `lambdas/web/site_api_lambda.py` | 1,216 | `lambda_handler` entry point + `ROUTES`/`_SIMPLE_ROUTES` dispatch + 5 inline coach handlers |
 | `lambdas/web/site_api_common.py` | 320 | Shared helpers: `_ok`, `_error`, `_query_source`, `_latest_item`, `_decimal_to_float`, `_load_s3_json`, CORS, request-id state |
 | `lambdas/web/site_api_observatory.py` | 1,591 | 14 `/api/*_overview` + meal/strength/journal handlers |
-| `lambdas/web/site_api_intelligence.py` | 1,057 | `/api/status` + `/api/pulse` |
+| `lambdas/web/site_api_intelligence.py` | ~2,230 | `/api/status` + `/api/pulse` + (#1240) the intelligence-adjacent domain handlers: correlations, forecast, scenarios, state_of_matthew, inference_receipt, wrong, pillar_coupling |
 | `lambdas/web/site_api_social.py` | 1,168 | 15 subscriber/experiment/challenge/nudge handlers + token-HMAC machinery |
-| `lambdas/web/site_api_vitals.py` | 1,086 | 10 homepage/dashboard handlers (vitals, journey, character, achievements, snapshot) |
-| `lambdas/web/site_api_data.py` | 1,619 | 19 domain-data handlers (glucose, sleep, habits, correlations, ledger, discoveries, etc.) |
+| `lambdas/web/site_api_vitals.py` | ~2,720 | homepage/dashboard handlers (vitals, journey, character, achievements, snapshot) + (#1240) the vitals-adjacent domain handlers: glucose, sleep_detail, sleep_correlations, circadian, phenoage, labs, genome_risks |
+| `lambdas/web/site_api_data.py` | ~2,740 | domain-data grab-bag after the #1240 split: habits, experiments, ledger/discoveries, pipeline freshness, cycle_compare/survival, protocols/domains (docstring lists the routed set; guarded by `tests/test_site_api_data_split.py`) |
 
 All 7 modules ship together via the standard `Code.from_asset("../lambdas")` zip. `/api/ask` + `/api/board_ask` are served by the separate `life-platform-site-api-ai` Lambda (ADR-036).
 
