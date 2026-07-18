@@ -383,3 +383,95 @@ def test_divergence_subcheck_clean_when_values_match():
 def test_no_vitals_quote_is_not_flagged():
     assert rtq.check_vitals_freshness([{"path": "/coaching/", "prose": "Sleep looks steady this week. as of Jul 13"}]) == []
     assert rtq.check_vitals_freshness([{"path": "/coaching/", "prose": "Sleep looks steady this week."}]) == []
+
+
+# ── #1224: word-boundary truncation helper + the mid-word reader-truth guard ───
+
+import text_utils  # noqa: E402  (lambdas/ on sys.path via conftest)
+
+# A source longer than the 300-char excerpt budget, ending on real prose. The
+# generator's `content_markdown[:300]` cut lands inside "data" → "…before any dat",
+# the exact defect the issue reproduces on /journal/posts.json.
+_STORY_SOURCE = (
+    "The honest part of this week is that the plan was never really tested. I spent it "
+    "writing the whole plan down, in public, before any data had a chance to argue back, "
+    "which is a different kind of discipline than sticking to a hard cut across four days "
+    "in a row while the deficit quietly did its slow, unglamorous, entirely predictable work."
+)
+# The /coaching/ position_summary defect: `content[:200]` cut lands inside "allocated".
+_COACH_SOURCE = (
+    "The real pressure point is the deficit: he is holding roughly 1,500 calories allocated "
+    "to protein while training hard across four days, and that is a tension worth naming out loud."
+)
+
+
+def _midword_slice(source, word):
+    """A fixed-length-style slice of `source` that stops partway through `word`."""
+    cut = source.index(word) + len(word) - 1  # drop the last letter of the word
+    return source[:cut]
+
+
+def test_truncate_at_word_no_ellipsis_when_shorter_than_limit():
+    # Nothing was cut → no ellipsis appended (preserve intent).
+    assert text_utils.truncate_at_word("short and sweet", 200) == "short and sweet"
+    assert text_utils.truncate_at_word("  padded  ", 200) == "padded"
+
+
+def test_truncate_at_word_empty_and_none():
+    assert text_utils.truncate_at_word("", 200) == ""
+    assert text_utils.truncate_at_word(None, 200) == ""
+
+
+def test_truncate_at_word_cuts_on_word_boundary_with_ellipsis():
+    assert len(_STORY_SOURCE) > 300  # guard the fixture stays longer than the budget
+    out = text_utils.truncate_at_word(_STORY_SOURCE, 300)
+    assert out.endswith("…"), "a truncated excerpt must be signalled with an ellipsis"
+    assert len(out) <= 301, "cut budget (300) + one ellipsis char"
+    body = out[:-1].rstrip()  # the kept text, sans ellipsis
+    assert _STORY_SOURCE.startswith(body), "truncation is a whole-word prefix of the source"
+    assert body.split()[-1] in _STORY_SOURCE.split(), "last kept token is a complete source word"
+    assert not body.endswith("dat"), "must not stop mid-word inside 'data'"
+
+
+def test_truncate_at_word_idempotent_on_already_truncated():
+    once = text_utils.truncate_at_word(_STORY_SOURCE, 300)
+    assert text_utils.truncate_at_word(once, 300) == once
+
+
+def test_truncate_at_word_single_long_token_hard_cut_still_ellipsised():
+    out = text_utils.truncate_at_word("a" * 500, 200)
+    assert out.endswith("…") and len(out) == 201
+
+
+def test_midword_guard_is_non_vacuous_flags_current_defect_and_clears_after_fix():
+    """The regression guard MUST fire on the shipped-today mid-word cut and go
+    silent once the word-boundary helper is applied — proving it is not vacuous."""
+    # BEFORE: the current generator behaviour — a slice ending '…before any dat'.
+    pre_fix = _midword_slice(_STORY_SOURCE, "data")
+    assert pre_fix.endswith("dat") and _STORY_SOURCE.startswith(pre_fix + "a")
+    before = rtq.check_midword_truncation([{"path": "/story/", "field": "excerpt", "value": pre_fix, "source": _STORY_SOURCE}])
+    assert before, "guard must flag the current mid-word excerpt (non-vacuous)"
+    assert before[0]["category"] == "audience_violation"
+
+    # AFTER: the same source through the fix helper — guard is clean.
+    post_fix = text_utils.truncate_at_word(_STORY_SOURCE, len(pre_fix))
+    after = rtq.check_midword_truncation([{"path": "/story/", "field": "excerpt", "value": post_fix, "source": _STORY_SOURCE}])
+    assert after == [], "guard must clear once the excerpt is cut on a word boundary"
+
+
+def test_midword_guard_flags_coaching_card_fragment():
+    pre_fix = _midword_slice(_COACH_SOURCE, "allocated")  # stops inside "allocated"
+    assert pre_fix[-1].islower() and _COACH_SOURCE.startswith(pre_fix + "d")
+    findings = rtq.check_midword_truncation(
+        [{"path": "/coaching/", "field": "position_summary", "value": pre_fix, "source": _COACH_SOURCE}]
+    )
+    assert findings and findings[0]["severity"] == "med"
+
+
+def test_midword_guard_ignores_full_and_sentence_terminated_values():
+    # value == whole source (not truncated) → clean.
+    whole = "A complete, untruncated coach read."
+    assert rtq.check_midword_truncation([{"value": whole, "source": whole}]) == []
+    # truncated but ends on sentence punctuation → clean.
+    src = "First sentence ends here. And then a much longer continuation that got dropped."
+    assert rtq.check_midword_truncation([{"value": "First sentence ends here.", "source": src}]) == []

@@ -409,3 +409,60 @@ def check_vitals_freshness(surfaces, vitals_by_date=None, divergence_pct=VITALS_
                         }
                     )
     return findings
+
+
+# ── #1224: reader-facing excerpts/summaries hard-cut mid-word ──────────────────
+# A second DETERMINISTIC reader-truth rule (no Bedrock). The /story/ chronicle
+# excerpt and the /coaching/ "EACH COACH'S READ" cards were built by a fixed-length
+# `text[:N]` slice, so they ended on a bare mid-word fragment ("…before any dat",
+# "…1,500 calories alloc") with no ellipsis — to a cold reader on the door aimed at
+# friends/family that reads as a rendering bug. Rule: a reader-facing excerpt/summary
+# field must not end in a lowercase letter (the issue's regex) while its underlying
+# SOURCE text continues past the cut. A field ending in an ellipsis (the
+# `truncate_at_word` fix), terminal punctuation, or equal to its full source is clean.
+
+# Ends in a lowercase letter — the mid-word-fragment tell from the issue.
+_MIDWORD_END = re.compile(r"[a-z]$")
+
+
+def check_midword_truncation(surfaces):
+    """Deterministic reader-truth rule (#1224): flag reader-facing excerpt/summary
+    fields that were hard-cut mid-word.
+
+    Args:
+        surfaces: [{"name"/"path", optional "field", "value", "source"}], where
+            `value` is the rendered excerpt/summary and `source` the full text it was
+            derived from. A finding fires only when `value` is shorter than `source`
+            (an actual truncation) AND ends on a bare lowercase letter with no
+            ellipsis / terminal punctuation.
+
+    Returns normalized findings [{"page","category","severity","note"}] in the same
+    shape as the LLM/vitals paths (category "audience_violation"). Never raises.
+    """
+    findings = []
+    for s in surfaces or []:
+        value = (s.get("value") or "").rstrip()
+        source = (s.get("source") or "").strip()
+        if not value:
+            continue
+        # Not actually truncated (field carries the whole source) → clean.
+        if len(value) >= len(source):
+            continue
+        # Cleanly terminated — the fix appends "…"; a real sentence end is also fine.
+        if value.endswith("…") or value.endswith("...") or value[-1] in ".!?—":
+            continue
+        if _MIDWORD_END.search(value):
+            page = s.get("path") or s.get("name") or "?"
+            field = s.get("field") or "excerpt"
+            findings.append(
+                {
+                    "page": page,
+                    "category": "audience_violation",
+                    "severity": "med",
+                    "note": (
+                        f"{field} ends mid-word ('…{value[-24:]}') while the source text continues (#1224) — "
+                        "reads as a rendering bug on the door aimed at friends/family"
+                    ),
+                }
+            )
+    return findings

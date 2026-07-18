@@ -34,6 +34,7 @@ import privacy_guard  # deterministic real-name + vice gate (layer module)
 from ai_context import build_experiment_phase_context, format_experiment_phase_context  # #1086: mandatory phase block
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import singleton_visible  # ADR-058 / #946 (query paths get the phase filter via digest_utils, #970)
+from text_utils import truncate_at_word  # #1224: word-boundary excerpt truncation (no mid-word cut)
 
 # OBS-1: Structured logger (wired below after optional imports)
 _logger_std = logging.getLogger()
@@ -1850,7 +1851,7 @@ def publish_to_journal(title, stats_line, body_html, week_num, date_str, all_ins
                 "date": idate,
                 "stats_line": display_stats_line(inst.get("stats_line", ""), idate),  # #949 — prologue-framed dek pre-genesis
                 "url": _u,
-                "excerpt": (inst.get("content_markdown") or "")[:300].strip(),
+                "excerpt": truncate_at_word(inst.get("content_markdown") or "", 300),  # #1224: word boundary, no mid-word cut
                 "word_count": inst.get("word_count", 0),
                 "has_board_interview": inst.get("has_board_interview", False),
                 "image_url": _im.get("image_url", ""),
@@ -2709,7 +2710,7 @@ def lambda_handler(event: dict, context) -> dict:
                 "date": date_str,
                 "stats_line": stats_line,
                 "word_count": len(raw_installment.split()),
-                "content_markdown": raw_installment[:300],
+                "content_markdown": truncate_at_word(raw_installment, 300),  # #1224: excerpt-source preview, word boundary
                 "has_board_interview": has_board,
             },
         )

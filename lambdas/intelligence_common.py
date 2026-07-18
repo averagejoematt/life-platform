@@ -21,6 +21,7 @@ import boto3
 import calibration_core  # #538: the shared prediction-calibration scorer (Brier + reliability)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058
+from text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 logger = logging.getLogger(__name__)
 
@@ -1690,7 +1691,7 @@ Rules:
     except Exception as e:
         logger.warning("Thread extraction failed for %s: %s — using defaults", coach_id, e)
         return {
-            "position_summary": narrative[:200] if narrative else "",
+            "position_summary": truncate_at_word(narrative, 200),  # #1224: word boundary, no mid-word cut
             "predictions": [],
             "surprises": [],
             "emotional_investment": "observing",
