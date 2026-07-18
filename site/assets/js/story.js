@@ -122,6 +122,10 @@ function drawConstellation(pillars, coupling, activeEffects) {
   // ── EDGES = measured co-movement ──
   const edges = Array.isArray(coupling && coupling.edges) ? coupling.edges : [];
   const coupledPillars = new Set();
+  // #1215 — the edge evidence (r, n, significance) rides the site's ONE shared readout
+  // (motion.js data-cpts: hover + tap + keyboard) instead of a hover-only native <title>
+  // that touch and keyboard can never reach. One focus point per edge, at its midpoint.
+  const edgeCpts = [];
   // Which edges are lit RIGHT NOW by an active designed effect (source→target).
   const effectPairs = new Set();
   for (const e of activeEffects || []) {
@@ -147,10 +151,13 @@ function drawConstellation(pillars, coupling, activeEffects) {
     line.style.setProperty("--emag", mag.toFixed(3));
     if (sign === "neg") line.setAttribute("stroke-dasharray", "5 4"); // trade-off reads dashed
     const rel = e.r >= 0 ? "move together" : "trade off";
-    const t = document.createElementNS(SVGNS, "title");
-    t.textContent = `${NODES[e.a].label} ↔ ${NODES[e.b].label}: r=${e.r > 0 ? "+" : ""}${e.r} over ${e.n} days` +
+    const label = `${na.label} ↔ ${nb.label}: r=${e.r > 0 ? "+" : ""}${e.r} over ${e.n} days` +
       `${e.significant ? "" : " (not significant)"} — they ${rel}`;
-    line.appendChild(t);
+    // Focus point at the edge midpoint, normalized to the 360×360 viewBox — which is the
+    // svg's rendered box (CSS aspect-ratio:1), so it maps 1:1 to the shared readout's
+    // getBoundingClientRect() nearest-point (data-cpts-hit="xy"). No native <title> — it
+    // would double-announce the same text over the readout tip on hover.
+    edgeCpts.push({ x: (na.x + nb.x) / 2 / 360, y: (na.y + nb.y) / 2 / 360, l: label, v: e.r });
     edgeG.appendChild(line);
   }
 
@@ -201,6 +208,17 @@ function drawConstellation(pillars, coupling, activeEffects) {
       nodeG.appendChild(g);
     }
   }
+
+  // #1215 — publish the edge readout points on the svg itself, the exact contract the
+  // radar / pillar-ring charts use (charts.js: data-cpts + data-cpts-hit="xy"). motion.js
+  // renders its shared focus dot + tip and wires hover + tap + keyboard exploration; the
+  // tip is an HTML span appended to the .constellation figure (svg.parentElement), so it
+  // renders (unlike a span inside the svg namespace). This svg is static in index.html, so
+  // motion.js's childList observer never saw an attribute-set — re-attach it once so the
+  // readout gets wired (moving an existing node fires the observer's addedNodes).
+  svg.setAttribute("data-cpts", JSON.stringify(edgeCpts));
+  svg.setAttribute("data-cpts-hit", "xy");
+  if (edgeCpts.length && svg.parentNode) svg.parentNode.insertBefore(svg, svg.nextSibling);
 
   // #1017 — size the type + tap targets for the current rendered width, and keep them
   // floored across rotations/resizes (one rAF-debounced listener, vars-only — no redraw).

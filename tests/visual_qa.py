@@ -354,6 +354,33 @@ def _check_svg_charts(page, selectors):
     )
 
 
+def _constellation_edge_cpts(page):
+    """#1215 regression guard. The home constellation's edge evidence (r, n, significance)
+    must ride the site's ONE shared data-cpts readout (hover + tap + keyboard), not a
+    hover-only native <title> that touch and keyboard can never reach.
+
+    Assert the constellation svg CARRIES a data-cpts attribute (present even at zero edges)
+    whose point count >= the number of served edge <line>s. Non-vacuous: the PRE-FIX svg has
+    no data-cpts attribute at all, so this fails regardless of how many edges the live
+    coupling data currently has (it fails even at 0 edges) — see test_constellation_edge_cpts.
+    """
+    return page.evaluate(
+        """() => {
+        const svg = document.querySelector('.constellation svg');
+        if (!svg) return { skip: 'no constellation svg on this page' };
+        const edges = svg.querySelectorAll('[data-edges] line').length;
+        const raw = svg.getAttribute('data-cpts');
+        if (raw === null)
+            return { ok: false, edges, reason: 'svg carries no data-cpts attribute — edge evidence is still hover-only <title>' };
+        let pts;
+        try { pts = JSON.parse(raw); } catch (e) { return { ok: false, edges, reason: 'data-cpts is not valid JSON' }; }
+        const n = Array.isArray(pts) ? pts.length : -1;
+        if (n < edges) return { ok: false, edges, n, reason: `data-cpts has ${n} point(s) < ${edges} served edge line(s)` };
+        return { ok: true, edges, n };
+    }"""
+    )
+
+
 def _check_sections_for_blank(page):
     """Visible sections >100px tall with <5 chars of text and no chart (excludes closed <details>)."""
     return page.evaluate(
@@ -697,6 +724,13 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
                 warnings.append(f"No chart SVG matched {page_def['charts']} (may be an honest sparse-data state)")
             elif visible and all(c["drawn"] == 0 for c in visible):
                 issues.append(f"Chart SVG present but no drawn geometry: {page_def['charts']}")
+
+        # ── #1215: the home constellation's edge evidence must ride the shared data-cpts
+        #    readout (hover + tap + keyboard), not a hover-only native <title>. GATING. ──
+        if path == "/":
+            ec = _constellation_edge_cpts(page)
+            if ec and not ec.get("ok") and not ec.get("skip"):
+                issues.append(f"Constellation edge readout gap (#1215): {ec.get('reason')}")
 
         # ── interaction (cockpit pillar disclosure) ──
         if page_def.get("interact"):
