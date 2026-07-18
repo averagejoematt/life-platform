@@ -137,6 +137,46 @@ else
 fi
 echo ""
 
+# ── Bare door URLs → live door, no /site/* hop (#1209) ─────────────────────────
+# A slash-stripped shared link (Reddit comments + many autolinkers drop trailing
+# slashes) for a bare door must land on the door, not a dead page. Before the fix
+# the S3 website origin 302'd /data → /site/data/ (the internal prefix) → 404; the
+# v4-redirects edge fn now 301s the bare extensionless path to <path>/. Assert
+# `curl -L` terminates in 200 at the door's trailing-slash URL, never hopping
+# through /site/*. Same publish-window caveat as the cockpit block: while the
+# updated function is pending, WARN + skip instead of failing into a rollback.
+check_bare_door() {
+  local label="$1"
+  local door="$2"   # e.g. /data
+  local status effective
+  status=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE$door")
+  effective=$(curl -sL -o /dev/null -w "%{url_effective}" --max-time 15 "$BASE$door")
+  if [[ "$status" == "200" && "$effective" == "$BASE$door/" ]]; then
+    echo "  ✅ $label"
+    PASS=$((PASS + 1))
+  else
+    echo "  ❌ $label — expected 200 at $BASE$door/ (no /site/* hop), got $status at $effective"
+    FAIL=$((FAIL + 1))
+  fi
+}
+echo "── Bare door URLs (expect 200 on the door, no /site/* hop) ─"
+DATA_BARE_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" --max-time 15 "$BASE/data")
+DATA_BARE_EFF=$(curl -sL -o /dev/null -w "%{url_effective}" --max-time 15 "$BASE/data")
+if [[ "$DATA_BARE_STATUS" == "200" && "$DATA_BARE_EFF" == "$BASE/data/" ]]; then
+  check_bare_door "/data → /data/"           "/data"
+  check_bare_door "/cockpit → /cockpit/"     "/cockpit"
+  check_bare_door "/coaching → /coaching/"   "/coaching"
+  check_bare_door "/protocols → /protocols/" "/protocols"
+  check_bare_door "/story → /story/"         "/story"
+  check_bare_door "/method → /method/"       "/method"
+else
+  echo "  ⚠ /data resolved to $DATA_BARE_STATUS at $DATA_BARE_EFF — the updated"
+  echo "    v4-redirects function is not yet published for #1209. Bare-door"
+  echo "    assertions SKIPPED. PUBLISH deploy/generated/v4_redirects_function.js"
+  echo "    (viewer-request on E3S424OXQZ8NBE), invalidate, then re-run this smoke."
+fi
+echo ""
+
 # ── Static assets (non-hashed fallbacks + feeds) ───────────────────────────────
 echo "── Static assets ─────────────────────────────────────────"
 check_status "tokens.css"           "$BASE/assets/css/tokens.css"
