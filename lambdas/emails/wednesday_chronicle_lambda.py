@@ -2142,7 +2142,9 @@ def _elena_notebook_block(current_week):
         parts = []
 
         stance = table.get_item(Key={"pk": pk, "sk": "STANCE#latest"}).get("Item") or {}
-        if stance.get("headline_stance") and not stance.get("grounding_flag"):
+        # #1200: a reset tombstones PERSONA#elena singletons — never carry a wiped
+        # cycle's stance into the current draft (the phantom-citation failure #946 names).
+        if stance.get("headline_stance") and not stance.get("grounding_flag") and singleton_visible(stance):
             parts.append("YOUR EDITORIAL STANCE (it evolves only with receipts — never claim a change you can't back):")
             parts.append(f"  {stance['headline_stance']}")
             for p in (stance.get("positions") or [])[:5]:
@@ -2151,7 +2153,8 @@ def _elena_notebook_block(current_week):
                 parts.append(f"  How my read changed after last week: {stance['how_my_stance_changed']}")
 
         resp = table.query(KeyConditionExpression=_Key("pk").eq(pk) & _Key("sk").begins_with("THREAD#"), ScanIndexForward=False, Limit=60)
-        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open"][:8]
+        # #1200: drop tombstoned/non-current-phase threads so cycle-N threads don't leak into cycle-N+1 drafts.
+        open_threads = [t for t in resp.get("Items", []) if t.get("status") == "open" and singleton_visible(t)][:8]
         if open_threads:
             parts.append("OPEN STORY THREADS (advance, resolve, or complicate — a thread stuck 3+ weeks must move or close):")
             for t in open_threads:
@@ -2161,7 +2164,8 @@ def _elena_notebook_block(current_week):
                 parts.append(f"  - [opened wk {opened}, age {max(0, current_week - opened)} wk]{stale} {t.get('slug')}: {t.get('summary')}")
 
         resp = table.query(KeyConditionExpression=_Key("pk").eq(pk) & _Key("sk").begins_with("CALLBACK#"), ScanIndexForward=False, Limit=60)
-        pending = [c for c in resp.get("Items", []) if c.get("status") == "pending"]
+        # #1200: a wiped cycle's promises must not be "paid off" in the new cycle's draft.
+        pending = [c for c in resp.get("Items", []) if c.get("status") == "pending" and singleton_visible(c)]
         due = sorted(
             (c for c in pending if int(c.get("due_by_week") or 10**6) <= current_week), key=lambda c: int(c.get("due_by_week") or 0)
         )
@@ -2180,6 +2184,8 @@ def _elena_notebook_block(current_week):
                 parts.append(f"  - [due wk {c.get('due_by_week')}] {c.get('promise')}")
 
         motif_state = table.get_item(Key={"pk": pk, "sk": "MOTIF#state"}).get("Item") or {}
+        if not singleton_visible(motif_state):  # #1200: don't carry a wiped cycle's running motifs
+            motif_state = {}
         motifs = [m.get("phrase") if isinstance(m, dict) else str(m) for m in (motif_state.get("motifs") or [])[:6]]
         motifs = [m for m in motifs if m]
         if motifs:
@@ -2233,7 +2239,8 @@ def _due_callback_promises(week_num, limit=5):
             ScanIndexForward=False,
             Limit=60,
         )
-        pending = [c for c in resp.get("Items", []) if c.get("status") == "pending"]
+        # #1200: honor restart tombstones — a wiped cycle's promises aren't owed in the new cycle.
+        pending = [c for c in resp.get("Items", []) if c.get("status") == "pending" and singleton_visible(c)]
         due = [c for c in pending if int(c.get("due_by_week") or 10**6) <= week_num]
         return [c["promise"] for c in due[:limit] if c.get("promise")]
     except Exception as e:
