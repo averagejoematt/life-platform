@@ -16,10 +16,16 @@ ADR-133 amendment 2026-07-08, $100 in surge mode). The tier bands are fixed
 FRACTIONS of the ceiling (≈73%/87%/97%, the original $75 calibration in
 _TIER_THRESHOLDS, scaled by _tier_for):
   0 Normal    < 73% of ceiling  ($62.33 at the $85 base)
-  1 Caution   73–87%            → pause heaviest coach AI (narrative/ensemble/chronicle)
-  2 Restrict  87–97%            → + pause public website AI (/api/ask, /api/board_ask)
-  3 Hard stop ≥ 97% of ceiling  ($82.73 at the $85 base) → + pause ALL Bedrock;
-                                  daily brief goes data-only
+  1 Caution   73–87%            → pause internal/dev AI (ensemble, chronicle editor,
+                                  coherence-semantic)
+  2 Restrict  87–97%            → + pause reader narratives (coach commentary,
+                                  State of Matthew, chronicle)
+  3 Hard stop ≥ 97% of ceiling  ($82.73 at the $85 base) → + pause the ask endpoints
+                                  (/api/ask, /api/board_ask) and daily-brief AI;
+                                  brief goes data-only
+(Bands are the audience-ordered ADR-125 ladder — the authority is
+budget_guard._FEATURE_CUTOFF, which these labels must mirror; tests/
+test_budget_guard_ladder.py pins them in lockstep.)
 
 Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
 Also persists the projection breakdown (mtd/projected/ai+non-ai daily burn) to
@@ -435,11 +441,15 @@ def _write_breakdown(
         logger.warning(f"Breakdown SSM write failed (non-fatal, display-only): {e}")
 
 
+# Tier-change alert copy. These MUST mirror budget_guard._FEATURE_CUTOFF's
+# audience bands (ADR-125): a label that names the wrong pause misinforms the
+# on-call about what actually degraded. tests/test_budget_guard_ladder.py derives
+# the expected band per tier from _FEATURE_CUTOFF and asserts each label matches.
 _TIER_LABELS = {
     0: "Normal — all AI features active",
-    1: "Caution — heavy coach AI paused (narrative/ensemble/chronicle)",
-    2: "Restrict — + public website AI paused (/api/ask, /api/board_ask)",
-    3: "Hard stop — ALL Bedrock paused; daily brief is data-only",
+    1: "Caution — internal/dev AI paused (ensemble, chronicle editor, coherence-semantic)",
+    2: "Restrict — + reader narratives paused (coach commentary, State of Matthew, chronicle)",
+    3: "Hard stop — + ask endpoints (/api/ask, /api/board_ask) and daily-brief AI paused; brief is data-only",
 }
 
 
