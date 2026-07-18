@@ -1310,7 +1310,14 @@ def handle_calibration(event):
         hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows)
         hypotheses = calibration_core.score_pairs(hyp_pairs)
 
-        platform = calibration_core.score_pairs(platform_pairs + hyp_pairs)
+        # Interval forecasts (#1246): forecast_resolution rows live in the SAME CALIB#
+        # ledger but carry `covered` (did the 80% interval hold?), not an `outcome`
+        # word — a genuinely graded binary the scoreboard was silently dropping, so
+        # /api/calibration read platform n=0 while /api/forecast graded the same rows.
+        forecast_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows)
+        interval_forecasts = calibration_core.score_pairs(forecast_pairs)
+
+        platform = calibration_core.score_pairs(platform_pairs + hyp_pairs + forecast_pairs)
 
         # Rank coaches by Brier (best first); the never-graded fall to the bottom.
         per_coach.sort(key=lambda c: (c["n"] == 0, c["brier"] if c["brier"] is not None else 1.0))
@@ -1320,6 +1327,7 @@ def handle_calibration(event):
                 "platform": platform,
                 "coaches": per_coach,
                 "hypotheses": hypotheses,
+                "interval_forecasts": interval_forecasts,
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
@@ -1332,7 +1340,7 @@ def handle_calibration(event):
         )
     except Exception as e:
         logger.error(f"[calibration] {e}")
-        return _ok({"platform": {}, "coaches": [], "hypotheses": {}}, cache_seconds=60)
+        return _ok({"platform": {}, "coaches": [], "hypotheses": {}, "interval_forecasts": {}}, cache_seconds=60)
 
 
 def handle_voice_fidelity(event):

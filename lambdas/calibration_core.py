@@ -80,13 +80,47 @@ def pairs_from_prediction_records(records):
 
 
 def pairs_from_calibration_rows(rows):
-    """(confidence, outcome) pairs from hypothesis CALIB# rows (word confidence)."""
+    """(confidence, outcome) pairs from hypothesis CALIB# rows (word confidence).
+
+    The CALIB# ledger is shared: the forecast engine writes forecast_resolution
+    rows into the same partition, and those carry `covered` (see
+    pairs_from_forecast_resolution_rows), not an `outcome` word. Skip them here so
+    each row type is scored by exactly one extractor and never double-counted.
+    """
     pairs = []
     for r in rows or []:
+        if r.get("record_type") == "forecast_resolution":
+            continue
         y = outcome_to_binary(r.get("outcome"))
         if y is None:
             continue
         pairs.append((normalize_confidence(r.get("stated_confidence")), y))
+    return pairs
+
+
+def pairs_from_forecast_resolution_rows(rows):
+    """(confidence, outcome) pairs from forecast_resolution CALIB# rows (#1246).
+
+    Interval forecasts don't carry an `outcome` word — they carry `covered`: did
+    the stated-confidence prediction interval (e.g. the 80% interval) contain the
+    actual value? That is the genuinely graded, scoreable binary for interval
+    calibration — covered True → 1, covered False → 0 — and the calibration
+    scoreboard was silently dropping all of them because they lack `outcome`
+    (`pairs_from_calibration_rows` skipped them), so the platform showed n=0 while
+    /api/forecast reported real coverage over the same rows.
+
+    The stated confidence is the interval's nominal coverage (`confidence`, e.g.
+    0.80 — a well-calibrated 80% interval covers ~80% of the time). Rows still
+    awaiting resolution (no `covered`) are skipped — nothing is fabricated.
+    """
+    pairs = []
+    for r in rows or []:
+        if r.get("record_type") != "forecast_resolution":
+            continue
+        covered = r.get("covered")
+        if covered is None:
+            continue
+        pairs.append((normalize_confidence(r.get("confidence")), 1 if covered else 0))
     return pairs
 
 
