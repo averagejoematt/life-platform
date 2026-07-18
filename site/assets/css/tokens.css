@@ -277,6 +277,9 @@
     --ink-muted: #6E665A;   /* oklch(.49 .015 82) */
     --ink-faint: #6F6757;   /* oklch(.48 .015 84) · 4.9:1 on --page (WCAG AA) */
     --ember:     #A34E13;   /* AA-compliant on paper — 5.0:1 on #F4EFE4 (small ember text: nav, footer headers, labels) */
+    --alert:     #9E4732;   /* light-mode oxblood — 5.4:1 on #F4EFE4 / 5.8:1 on #FBF8F1 (WCAG AA — dark-root
+                              #CB634C measured only 3.37:1 on --page, failing AA for the .vr-alert .vr-v
+                              ring-center value; #579 fixed dark only, #1222 adds the light override) */
     --rule:        rgba(34, 30, 23, 0.13);
     --rule-strong: rgba(34, 30, 23, 0.22);
     --tick:        rgba(34, 30, 23, 0.30);
@@ -294,6 +297,7 @@
   --ink-muted: #6E665A;
   --ink-faint: #6F6757;   /* 4.9:1 on --page (WCAG AA) */
   --ember:     #A34E13;
+  --alert:     #9E4732;   /* light-mode oxblood — 5.4:1 on #F4EFE4 / 5.8:1 on #FBF8F1 (WCAG AA — see #1222) */
   --rule:        rgba(34, 30, 23, 0.13);
   --rule-strong: rgba(34, 30, 23, 0.22);
   --tick:        rgba(34, 30, 23, 0.30);
