@@ -42,10 +42,25 @@ function syncThemeColor() {
   if (page) meta.setAttribute("content", page);
 }
 
+/* Expose the toggle's current state to assistive tech (#1250). Screen-reader
+ * users need name/role/value on the control: aria-pressed=true means dark is
+ * active, and the accessible name tells them what the click will do next.
+ * Runs on every apply — boot (initTheme) and each toggle — so the announced
+ * state never drifts from documentElement.dataset.theme. */
+function syncToggleState(root = document) {
+  const dark = activeTheme() !== "light";
+  const label = dark ? "Switch to light theme" : "Switch to dark theme";
+  root.querySelectorAll(".theme-toggle").forEach((btn) => {
+    btn.setAttribute("aria-pressed", dark ? "true" : "false");
+    btn.setAttribute("aria-label", label);
+  });
+}
+
 function setTheme(next) {
   const apply = () => {
     document.documentElement.dataset.theme = next;
     syncThemeColor();
+    syncToggleState();
   };
   if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
     document.startViewTransition(apply);
@@ -67,6 +82,7 @@ export function toggleTheme() {
  * so re-initialising after a re-render never double-binds. */
 export function initTheme(root = document) {
   syncThemeColor();
+  syncToggleState(root);
   root.querySelectorAll(".theme-toggle").forEach((btn) => {
     if (btn.dataset.themeWired) return;
     btn.dataset.themeWired = "1";
