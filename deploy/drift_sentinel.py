@@ -133,6 +133,18 @@ def check_cfn_drift(per_stack_timeout=180):
                 saw_error = True
 
     status = "drift" if saw_drift else ("degraded" if saw_error else "clean")
+    # #1227: a DEAD capability must not report as a soft "degraded". If every stack
+    # errored AND every error is an AccessDenied, the cfn_drift check is dead-on-arrival
+    # (a missing IAM action, not a transient) — escalate to a first-class "error" so it
+    # surfaces as needs-human instead of being buried in "degraded" behind continue-on-
+    # error. The IAM-parity lesson: verify the capability, don't report a dead one soft.
+    if (
+        out
+        and all(v.get("status") == "error" for v in out.values())
+        and all("AccessDenied" in (v.get("detail") or "") for v in out.values())
+    ):
+        status = "error"
+        return {"status": status, "stacks": out, "dead_capability": "all stacks AccessDenied (missing IAM action)"}
     return {"status": status, "stacks": out}
 
 

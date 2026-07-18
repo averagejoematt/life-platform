@@ -285,3 +285,51 @@ def test_oidc_iam_drift_surfaces_mismatch_lines(monkeypatch):
     res = ds.check_oidc_iam()
     assert res["status"] == "drift"
     assert any("deploy-role" in m for m in res["mismatches"])
+
+
+# ── #1227 — a dead cfn_drift capability must escalate, not report soft ────────
+class _FakeCfn:
+    """A CloudFormation client whose detect_stack_drift raises a chosen error —
+    stands in for the live AccessDenied the sentinel hit on all 9 stacks (2026-07-13)."""
+
+    def __init__(self, exc):
+        self._exc = exc
+
+    def detect_stack_drift(self, StackName):  # noqa: N803 — boto3 kwarg casing
+        raise self._exc
+
+
+def test_cfn_drift_all_access_denied_escalates_to_error(monkeypatch):
+    # Every stack's detect_stack_drift fails with AccessDenied (the missing
+    # cloudformation:DetectStackResourceDrift action fans out per-resource) — the
+    # capability is DEAD, so the whole check must report "error", not "degraded".
+    monkeypatch.setattr(
+        ds,
+        "_client",
+        lambda *a, **k: _FakeCfn(Exception("AccessDenied: not authorized to perform: cloudformation:DetectStackResourceDrift")),
+    )
+    res = ds.check_cfn_drift(per_stack_timeout=1)
+    assert res["status"] == "error", f"all-AccessDenied must escalate to error, got {res['status']}"
+    assert res.get("dead_capability"), "the dead-capability signal must be set for a first-class needs-human surface"
+    # non-vacuous: the PRE-#1227 code returned 'degraded' here (saw_error → degraded).
+
+
+def test_cfn_drift_partial_or_transient_error_stays_degraded(monkeypatch):
+    # A NON-AccessDenied error (e.g. a transient throttle/timeout) is fail-soft, not a
+    # dead capability — it must stay "degraded" so we don't cry needs-human on a blip.
+    monkeypatch.setattr(ds, "_client", lambda *a, **k: _FakeCfn(Exception("Throttling: rate exceeded")))
+    res = ds.check_cfn_drift(per_stack_timeout=1)
+    assert res["status"] == "degraded", f"a transient (non-AccessDenied) error must stay degraded, got {res['status']}"
+    assert not res.get("dead_capability")
+
+
+def test_remediation_role_grants_detect_stack_resource_drift():
+    # #1227: the drift op fans out to per-resource detection; without this action the
+    # sentinel's flagship check is dead-on-arrival. Guard the grant so it can't regress.
+    with open(os.path.join(_ROOT, "infra", "iam", "github-actions-remediation-role.permissions.json")) as f:
+        doc = json.load(f)
+    actions = set()
+    for stmt in doc.get("Statement", []):
+        act = stmt.get("Action", [])
+        actions.update(act if isinstance(act, list) else [act])
+    assert "cloudformation:DetectStackResourceDrift" in actions, "remediation role must grant DetectStackResourceDrift (#1227)"

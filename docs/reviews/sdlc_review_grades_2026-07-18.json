@@ -1,0 +1,139 @@
+{
+  "date": "2026-07-18",
+  "run_id": "wf_5bc1c2d8-af1",
+  "method": "12-lens SDLC panel (one grader per lens + finding-verifier batches, lean-REFUTED). Read-only contract. Ground truth: Day 1 of cycle 7 (genesis 2026-07-18), main 1c641b6a, budget tier 1 ($47.67 MTD/$85), repo PRIVATE since 2026-07-13. First /sdlc-review run \u2014 baseline file.",
+  "lenses": {
+    "Ideation & discovery": {
+      "area": "Ideation & discovery",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "The idea\u2192work path is a written contract (ADR-099) that practice either follows or formally amends; backlog drained and ranked against the north star; every override recorded in the issue; no shadow queues \u2014 an acquirer could reconstruct why every open item exists and why every closed item closed, from the issues alone.",
+        "C": "Issues exist but score lines are unexplained ceremony, milestones drift weeks stale, owner-gated and machine-actionable work are indistinguishable, and a meaningful share of known work lives only in prose docs/handovers that GitHub can't see.",
+        "F": "The pre-ADR-099 failure mode: a hand-maintained backlog doc ~27% wrong about its own state, closure decoupled from shipping, ideas and defects untracked or duplicated across reviews with no idempotency."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "Planning & design practice": {
+      "area": "Planning & design practice",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every architectural/governance decision is traceable in a navigable, self-checking ledger whose gates cannot pass while wrong; superseded decisions are marked at the superseded record; substantial builds are preceded by a durable design artifact in a WRITTEN-DOWN form (spec, epic-with-hypothesis, audit doc, or ADR-in-PR); a session close structurally asks whether a decision was made.",
+        "C": "Decisions get recorded but the ledger drifts silently \u2014 stale 'Active' statuses, index rows missing, governance changes landing only in workflow files and session notes; design happens inside ephemeral session context with rationale recoverable only by archaeology through handovers.",
+        "F": "No decision records or a diary masquerading as one; architecture choices live nowhere durable; the index/specs actively mislead an auditor about what was decided and what is still true."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 0
+    },
+    "AI-engineering practice": {
+      "area": "AI-engineering practice",
+      "grade": "A-",
+      "rubric_anchors": {
+        "A": "Every standing prompt/ritual is legible, drift-gated, and demonstrably consumed: status block replaced per wrap, memory index AND bodies stay true, verification of subagent output is structural, model routing is recorded and drives sessions, each token-heavy ritual carries a written keep/retire posture (ADR-103 style).",
+        "C": "Rituals exist but rot ungated: memory and command files silently drift from live truth, verification is by convention (\"remember ~50% are false positives\"), labels are decorative, handovers are written but nothing reads them back, review rituals accumulate without a recorded posture.",
+        "F": "Opaque prompt sprawl: stacking session diaries in CLAUDE.md, no memory index, subagent findings flow unverified into the backlog, no written rationale for any deviation from textbook practice \u2014 an acquirer would conclude the org is un-auditable."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "Version control & integration": {
+      "area": "Version control & integration",
+      "grade": "B-",
+      "rubric_anchors": {
+        "A": "Main's CI verdict answers 'is main green?' truthfully without operator archaeology; every written integration posture (branch protection, hooks, templates) matches live state byte-for-byte; each recurring incident class is either tooled-enforced or a written chosen-posture entry; derived-artifact churn costs zero human merge-sequencing; an acquirer replaying the git/CI history finds every deviation deliberate.",
+        "C": "Strong written reflexes and partial automation (a reconcile bot, guarded deploy scripts), but the CI signal requires operator memory to interpret, some controls are dead-but-present (stale hook, bypassed template), and server-side guarantees are absent with docs that half-describe them.",
+        "F": "No reproducible integration discipline: force-pushes and red merges with no record, incident classes recur with no ledger, derived artifacts drift silently, and the commit history cannot be trusted as an account of what shipped."
+      },
+      "findings_confirmed": 6,
+      "findings_refuted": 1
+    },
+    "Build & deploy engineering": {
+      "area": "Build & deploy engineering",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every path to prod funnels through one structurally-enforced staging mechanism verified both repo-side and against the live fleet; every recorded deploy-incident class has a coded detector or gate (not lore); every entry-point surface (README, Makefile, command docs) agrees with the live scripts so a fresh operator or acquirer's auditor cannot be steered onto a broken procedure; standing CI signals are trustworthy \u2014 red means act.",
+        "C": "The primary deploy path is sound and documented, but secondary entry points contradict the flagship invariant, detectors exist as scripts nobody invokes, several incident classes survive only as lore a future operator must remember, and a standing-red CI job trains signal-ignoring.",
+        "F": "Multiple ad-hoc zip paths with no shared staging, deploy procedure is tribal knowledge only, no rollback artifacts, prod reachable without gates, no incident ledger at all."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 2
+    },
+    "Testing & quality economics": {
+      "area": "Testing & quality economics",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Every gate has a named defect-class it owns and a red means something: main green-rate >90%, any flake class that reds main twice gets a structural fix (not a memory note), performance/concurrency posture is written down AND validated against live traffic, AI outputs gated by falsifiable deterministic checks. Feedback latency measured and budgeted.",
+        "C": "Gate count is high and coverage honest, but signal is decaying: reds on main are routinely explained away from tribal memory, sizing assumptions run unmonitored in prod, suite cost grows monotonically with no review, and the operator needs a decode ring to know if main is actually green.",
+        "F": "Green CI that doesn't exercise the shipped artifact; coverage theater (floor set above measured or gamed); no AI-output evals despite AI-generated public content; production degradation (throttles/errors) with no detection path at all."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "Release & environments": {
+      "area": "Release & environments",
+      "grade": "C+",
+      "rubric_anchors": {
+        "A": "Every control claim in the release docs is reproducible against live GitHub/AWS config; every topology deviation (no staging, single account/region, gate-less deploys) is a written ADR naming its compensating controls; both revert nets (site + Lambda) are exercised with tuned precision (no healthy-deploy reverts from harness noise); drills recur at a cadence that pays ADR-103 rent.",
+        "C": "The detect-and-revert machinery genuinely works and has fired, but at least one load-bearing documented control is false against live state, the topology is an accident of history rather than a written posture, or a rollback path has never been proven end-to-end.",
+        "F": "No revert path ever exercised; bad deploys reach readers undetected; prod-only topology with no compensating controls; docs actively misrepresent multiple live controls with no honest incident record."
+      },
+      "findings_confirmed": 3,
+      "findings_refuted": 2
+    },
+    "Operations & oversight": {
+      "area": "Operations & oversight",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "Every ALARM explained or firing correctly; autonomous loops measurably earn rent or are demoted by written ADR with numeric earn-back criteria; every incident-class event (including CI/rollback events) lands in ONE in-repo system of record within a session; paging posture is written and matched to proven failure modes; an acquirer's ops audit finds no prod-impacting trap whose only mitigation is tribal memory.",
+        "C": "Alarm estate mostly clean but incident knowledge scattered across repo log and out-of-repo memory; agents run green-while-yielding-nothing without anyone measuring; known prod-impacting traps mitigated only by 'remember not to merge during X'.",
+        "F": "Alarms sit in ALARM for weeks unexplained; self-healing agent mutates prod unaudited; no incident record; a week away means silent data loss with no detection path."
+      },
+      "findings_confirmed": 5,
+      "findings_refuted": 0
+    },
+    "Security & supply chain": {
+      "area": "Security & supply chain",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Every security control is a written, chosen posture AND its closure loop demonstrably operates: scanners cover every deployed artifact (including layers), fired alerts reach a tracked queue and get actioned within their own SLA, IAM grants and their consumers cannot drift apart silently, and the supply chain of the AI org itself (Actions, deps) is pinned and patched hands-free.",
+        "C": "Controls exist and are documented but coverage claims drift from reality: scanners miss deployed artifacts, alerts fire into an ignored channel, policy SLAs are breached without a decision, and capability-vs-grant drift recurs despite being a documented incident class.",
+        "F": "No SCA/SAST at all, long-lived cloud keys in CI, unpinned mutable actions, secrets committed or unrotated indefinitely, no written security posture \u2014 an acquirer audit fails on the first pass."
+      },
+      "findings_confirmed": 7,
+      "findings_refuted": 0
+    },
+    "Cost engineering": {
+      "area": "Cost engineering",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Both halves of cost engineering live: the enforcing governor keeps tier 0 the norm (or degraded residence is a written, ADR'd posture); per-feature cost is answerable in one working command; the canonical cost doc matches live AWS within one verification cycle; every metered platform (AWS AND GitHub Actions) has a tracked line; a cost-per-reader trend exists for the unit-economics slide.",
+        "C": "Hard ceiling enforced and spend under it, but attribution tooling/doc drift means totals are the only trustworthy number; degraded tiers are chronic without a written posture; new cost surfaces appear untracked.",
+        "F": "No enforced ceiling or attribution; spend surprises discovered on the monthly bill; retired machinery still billing; cost claims in docs are fiction."
+      },
+      "findings_confirmed": 4,
+      "findings_refuted": 1
+    },
+    "Knowledge & continuity": {
+      "area": "Knowledge & continuity",
+      "grade": "B+",
+      "rubric_anchors": {
+        "A": "One canonical home per fact, enforced by gates that catch phrasing VARIANTS (hyphens, synonyms); a stale-fact fix eradicates every copy corpus-wide and lands a rule in the generalized gate; the Day-1/successor docs are verified within a stated cadence and a competent successor hits no undocumented wall; laptop-only institutional memory is backed up automatically and restore-tested.",
+        "C": "Boundary rule written down but routinely violated \u2014 the same fact restated in 2-4 canonical docs with copies drifting independently; gates only match exact phrasings; successor path exists on paper but the first wall (credentials/estate) is unaddressed; memory backup is a manual habit.",
+        "F": "No canonical home; CLAUDE.md a stacking diary; contradictory numbers across docs with no gate; institutional memory exists only on one laptop; a successor cannot even find AWS access procedure."
+      },
+      "findings_confirmed": 6,
+      "findings_refuted": 0
+    },
+    "Commercialization readiness": {
+      "area": "Commercialization readiness",
+      "grade": "B",
+      "rubric_anchors": {
+        "A": "Every deviation from textbook practice is a chosen, written posture with a re-open trigger; the canonical compliance doc (DATA_GOVERNANCE.md) is current and gate-covered; every PII class held \u2014 including third parties' \u2014 has an owner-signed retention rule AND an exercised deletion path; multi-tenancy/blast-radius numbers in ADRs match a fresh measurement; license/IP inventory exists for all shipped binaries and AI-generated content.",
+        "C": "Postures mostly written but the compliance doc a lawyer would read is stale in load-bearing places; third-party PII handling is ad hoc (retention decided in code comments, no per-subject deletion); blast-radius estimates unrefreshed since the deferral ADR; no license inventory.",
+        "F": "Deviations are accidents nobody wrote down; no deletion/export capability at all; PII reachable from public surfaces; no LICENSE; hardcoded identity with no deferral rationale \u2014 an acquirer walks after the first day of DD."
+      },
+      "findings_confirmed": 6,
+      "findings_refuted": 0
+    }
+  }
+}
