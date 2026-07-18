@@ -107,7 +107,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 |---|---|
 | `specs/` | Dated feature specs (shipped — historical record; includes the 2026-06-21 page-redesign series) |
 | `archive/` | Superseded designs, plans, and launch artifacts (incl. the v4 design quartet, V2 audit) |
-| `reviews/` | Dated board/consultancy reviews (see [R21](reviews/R21_BACKLOG.md), the 2026-07-06 definitive review) |
+| `reviews/` | Dated board/consultancy reviews (see [R21](reviews/R21_BACKLOG.md), the 2026-07-06 definitive review; [FRONTIER_REVIEW_2026-07-18](reviews/FRONTIER_REVIEW_2026-07-18.md), the quantified-life strategy review → label `review:frontier-2026-07-18`) |
 | `design/` | Current design assets + the portrait runbook |
 | `design-review/` | The paste-ready design-review prompt kit (current tooling) |
 | `coaching/` | Coaching program docs (PRIVATE-flagged content — never surface publicly) |
