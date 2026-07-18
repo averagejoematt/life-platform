@@ -27,3 +27,5 @@ WAF rule	WAF was removed 2026-06
 grep -c '"name":' mcp/registry\.py	banned counting method — over-counts nested schema fields; use the AST discoverer
 hevy-webhook FunctionURL is (live|active|standing)	removed 2026-07-06 (#756)
 test_layer_version_consistency	test retired with the layer (#781) — the invariant is test_i2_shared_layer_retired
+since #393.*CI deploys the site	the #393 approval-gated ci-cd.yml site path is retired (#750, 2026-07-09) — site pushes deploy via .github/workflows/site-deploy.yml with NO production-approval gate; see CONVENTIONS §2
+LifePlatformOperational.*site-api	site-api/site-api-ai moved Operational → LifePlatformServe (cdk/stacks/serve_stack.py, #793 cdk refactor 2026-07-08); see .claude/commands/deploy.md Mode 3 site-api special case
