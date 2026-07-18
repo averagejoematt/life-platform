@@ -22,15 +22,15 @@ black==25.9.0
 
 # Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
 # see tests/test_mypy_clean_modules.py + mypy.ini)
-mypy==2.1.0
+mypy==2.3.0
 
 # AWS SDK (for tests that call boto3 directly)
-boto3==1.43.41
-botocore==1.43.41
+boto3==1.43.51
+botocore==1.43.51
 
 # CDK (synth + diff) — pinned exactly, MUST equal cdk/requirements.txt's pins
 # (#814, R22-MOD-01: a floor-only `>=` let an untested aws-cdk-lib release
 # reach CI unpinned). Bump both files together as a deliberate PR, plus the
 # `npm install -g aws-cdk@X.Y.Z` CLI pin in ci-cd.yml.
 aws-cdk-lib==2.261.0
-constructs==10.6.0
+constructs==10.7.0
