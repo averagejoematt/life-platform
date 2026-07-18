@@ -1,92 +1,70 @@
-# HANDOVER — Later-milestone drain: 17 /fullreview issues shipped + deployed + verified — 2026-07-18
+# HANDOVER — /sdlc-review born + first run: 12-lens lifecycle audit, 60 confirmed findings, 40 issues filed — 2026-07-18
 
-> Instruction thread: "drain the LATER milestone — close as many OPEN issues as possible,
-> PROPERLY" (a real fix + a non-vacuous regression guard proven to FAIL on the pre-fix code,
-> merged AND deployed + verified live where it has a runtime surface). Matthew granted full
-> authority up front: **"i approve all merges and deploys this session"** (IAM grants still
-> user-NAMED).
+> Instruction thread: Matthew asked (via /plan) for a comprehensive review of the entire
+> technical approach — AWS, Claude, skills, git, ideation→production→oversight — as
+> (1) a durable "much better prompt", (2) the review actually run, (3) GitHub issues filed.
+> Grading posture: commercialization-defensible showcase · AI-engineering pedagogy ·
+> solo-operator maintainable — "not an AI slop piece". Plan approved; filing authorized by
+> the request itself; NO merges/deploys authorized — the PR is open, not merged.
 
-## Outcome — 17 issues CLOSED, all merged + deployed + verified
-All from the /fullreview 2026-07-16 Later backlog. Two `worktree-implementer` fan-out waves
-(5 + 4 disjoint-file agents) plus a hand-authored doc bundle and two small direct fixes.
-Every fix carries a guard proven to fail on the pre-fix tree (stash/pre-fix run captured each time).
+## Shipped this session
 
-**Wave 1 (code fan-out):**
-- **#1246** calibration scoreboard surfaced 23 graded `forecast_resolution` rows (they carry
-  `covered`, not `outcome`) — `/api/calibration` platform n **0→23** live (82.6%, verified).
-- **#1250** theme toggle exposes `aria-pressed` + accessible name (site, live).
-- **#1242** fabricated-date grounding: generalized the chronicle's date allow-list into shared
-  `grounded_generation` (`allowed_dates`/`fabricated_dates`) AND **wired it live** into the
-  chronicle installment gate (`installment_grounding_findings`) — a real new protection, not
-  latent capability (agent's first cut was capability-only; I sent it back to wire the surface).
-- **#1261** RSS excerpt → `#1224`'s word-boundary helper (357-slice killed). NB residual: the
-  live chronicle item still shows a 300-char mid-sentence excerpt — that's a STALE/separately-
-  generated `posts.json` excerpt (predates #1224's line-1864 helper), not the 357-slice; a tiny
-  follow-up if desired.
-- **#1239** deleted 8 verified-dead functions (intelligence_common ×6, character_engine ×2) from
-  every bundle; AST guard.
+1. **`.claude/commands/sdlc-review.md`** — the new ritual: companion to /fullreview that
+   audits the LIFECYCLE (fullreview grades artifacts; this grades the machinery + operator
+   practice). 12 lenses (ideation, planning/ADR practice, AI-engineering org, VCS, deploy
+   engineering, testing economics, release topology, ops/oversight, security-as-process,
+   cost, knowledge/continuity, commercialization DD), three-outcome-axes calibration,
+   A/B fix taxonomy, kill-on-sight list incl. "enterprise cosplay" and "documented posture
+   restated as finding".
+2. **The first run** (Workflow `wf_5bc1c2d8-af1`): 24 agents (12 graders pipelined into 12
+   finding-verifier batches), ~2.1M subagent tokens, 66 findings → **60 CONFIRMED / 6 REFUTED**.
+   Report: `docs/reviews/SDLC_REVIEW_2026-07-18.md` (+ `sdlc_review_grades_2026-07-18.json`,
+   the baseline comparability file; next run diffs against it).
+3. **Grades:** A- ideation · A- AI-practice · B+ planning · B+ deploy · B+ ops · B+ knowledge ·
+   B- vcs · B testing · B security · B cost · B commercial · **C+ release** (not the topology —
+   its compensating controls: the documented approval gate is DEAD, rollback unproven, reverts unlogged).
+4. **Headline P1s (9 Now stories):** production approval gate doesn't exist live while 4 docs
+   claim it (auto-merge safety case rests on it, #1319) · main CI normalized-red 19/100 green
+   (#1327) · site-api throttled readers 627×/30d at an unalarmed, daily-saturating cap of 5
+   (#1328) · ai-keys 132d vs 90d SLA, staleness alert firing daily unactioned (#1329) ·
+   ai_spend_attribution.py crashes on default invocation (#1335) · ADR index silently omits 12
+   ADRs, self-certifying --check (#1321) · deploy/README teaches a boot-broken MCP zip (#1322) ·
+   subscriber-email retention decided by a fictional persona's code comment, undeletable,
+   ungoverned (#1350) · release-topology ADR (#1338, PM override to Now).
+5. **Filed:** 4 epics **#1355–#1358** (dead controls · alert→action loop · contract truth ·
+   acquirer paperwork) + **36 stories #1319–#1354** (9 Now / 21 Next / 6 Later), all labeled
+   `review:sdlc-2026-07-18`, each with score line + acceptance criteria + regression guard.
+   New label **`gate:owner`** created and stamped on the 7 human-only stories. Map:
+   `docs/reviews/SDLC_BACKLOG_MANIFEST_2026-07-18.json`. Zero duplicates (extends-comments on
+   #342/#717/#1195). Six pre-seed hypotheses: 4 confirmed, "no SCA" FALSE as stated
+   (pip-audit exists; real gaps narrower), "topology wrong" REFUTED (it's defensible — but
+   undocumented, which IS the confirmed finding).
 
-**Wave 2 (code/site fan-out):**
-- **#1254** cost-governor cadence "hourly"→"every 8h" (docstrings, budget_guard, /method/cost
-  editorial + 28 regenerated shells) — live.
-- **#1260** OG home card "25 data sources"→`len(SOURCE_REGISTRY)` (self-correcting) + check_doc_facts
-  og-scan; og-image-generator deployed.
-- **#1249** waveform day-bars reach the 44px tap floor via a touch-only `::after` expander;
-  promoted the visual-QA tap-target audit **advisory→gating** (both-axes rule) — passed the live
-  gating visual-QA.
-- **#1247** experiment library deduped 71→67 (4 near-dup pairs, both copies) — `/api/experiments`
-  **67** live (needed a root-`config/` S3 re-sync + CDN invalidation; site-deploy only syncs `site/`).
+## ⚠️ Concurrent-session incident (read before merging anything)
 
-**Doc bundle (#1309, hand-authored — closes 6):** #1258 (deploy quickstart `<source-file>`),
-#1245 (SITE_MAP panelcast viewer path), #1241 (mypy ENFORCED not advisory), #1253 (remediation
-Mon/Wed/Fri not daily), #1256 (raw_layout `filename` facets — the leaf form varies; framework
-`YYYY-MM-DD.json`, HAE-webhook `DD.json`, todoist/garmin flipped mid-tree), #1238 (ADR-103 ledger:
-MCP prune EXECUTED, Panel LIVE). One `tests/test_fullreview_doc_drift_guards.py`, all 6 fail pre-fix.
+A second session (Opus, draining deferred issues #1227/#1240/#1251-52-44) worked the SHARED
+tree while this session ran. Its commit `bcb2e651` ("fix(drift): … #1227", branch
+`fix-1227-drift-sentinel`, pushed, **no PR open yet** as of 11:45 PT) did a broad `git add`
+that **swept this session's in-progress files into the IAM PR branch**: `.claude/commands/
+sdlc-review.md`, the SDLC report, the grades JSON (+ its own new `frontier-plan.md`).
+Handling: copied my final delta out, restored the shared tree to exactly their HEAD, moved to
+worktree `.claude/worktrees/sdlc-review-2026-07-18`, branched off origin/main. **Resolution:** the swept
+branch merged first as #1359; this branch rebased onto the new main and the add/add conflict
+on `SDLC_REVIEW_2026-07-18.md` was resolved toward this branch's newer, disposition-complete
+copy — main now carries the canonical versions. This is a live
+instance of the [[feedback_concurrent_session_worktree]] class — memory updated with the tell
+(your own files suddenly showing tracked/modified in `git status`).
 
-**Direct small fixes (#1314 — closes 2):** #1248 (Elena PERSONA#* comment falsely claimed she was
-"carried into EP0" — she's EXPERIMENT_SCOPED/wiped; reconciled with a classify() guard), #1259
-(memory orphan gate added to `/wrap`; indexed 4 orphaned topic files while validating).
+## Left open
 
-## Deploys done (all verified live)
-site-api ×1 (#1246, calibration n=23) · wednesday-chronicle (#1242) · og-image-generator (#1260) ·
-4 site auto-deploys (#1250/#1249/#1254/#1247 — **each passed the gating visual-QA**, incl. #1249's
-new tap-target gate) · root `config/experiment_library.json` S3 overwrite + `/api/experiments` CDN
-invalidation (#1247 → 67 live) · CI auto-fleet-deployed the shared-module changes (#1239 dead-code,
-#1242 grounded_generation). Site `version.json` == HEAD after the last site merge.
+- **PR #1360 (docs-only: command + report + grades + manifest + this wrap) MERGED with
+  Matthew's explicit in-session approval ("yes approve to merge").**
+- The 40 filed issues are the implementation backlog — 9 Now stories are the next
+  /uplevel / fan-out targets; 7 carry `gate:owner` (Matthew: rotate ai-keys #1329, IAM grant
+  #1330, owner toggles in #1336, decisions in #1333/#1345/#1350/#1352).
+- Story 19 note from the filer: #1337 relates to #1195 (noted in body, kept standalone).
 
-## Merge mechanics / gotchas
-- **Only the doc bundle (#1309) hit the wiki-drift gate** (it touches `docs/`); the code PRs adding
-  test files drift `test_count` but that's fixed post-merge by the reconcile bot. Merged #1309 LAST,
-  after main settled, rebasing onto the final reconcile commit + `sync_doc_metadata --apply` (3900) —
-  the repeated rebase-conflict on the test_count literal is the [[reference_docsync_literal_cross_pr_drift]]
-  class; ending with the doc PR stops the churn.
-- **#1247 `/api/experiments` reads the ROOT `config/` S3 object**, which `sync_site_to_s3.sh` (site/
-  only) does NOT update — count stayed 71 until I `aws s3 cp config/experiment_library.json` +
-  invalidated `/api/experiments`. Same class as [[project_reset_purges_site_config]].
-- **#1249 gating-audit risk:** the tap-target audit runs only in the 390px mobile pass (where the
-  touch-only `::after` is active) and now fails only when sub-floor in BOTH axes — verified the live
-  gating visual-QA passed before merging the other site PRs through the same gate.
-- Reused the proven playbook: disjoint-file batches, `worktree remove --force` + `branch -D` after
-  each merge, spot-checked every diff against its issue before merging.
+**Build beat:** none — internal SDLC review + backlog session; nothing reader-facing shipped.
 
-## Left OPEN on Later (8) — for Matthew / next session
-- **FLAG (do not attempt — infra/audio/gated):** #1257 (delete 2 hand-created EventBridge rules —
-  live AWS mutation + CDK), #1255 (chronicle bypasses `allow('chronicle')` — needs a user-NAMED IAM
-  grant + CDK deploy, R8-ST6 Plan-red-by-design), #1243 (Prologue Part II read-aloud narrates the
-  superseded genesis — podcast AUDIO re-narration), #748 (fulfillment story — data/time-gated).
-- **DEFER (code-actionable, careful/solo):** cockpit/home trio #1251 (conflicting HRV scope labels)
-  + #1252 (pre-genesis "as of" dates) + #1244 (footer-buried cycle-compare) — shared cockpit files +
-  timing judgment, best as one coordinated site-ux slice (testable NOW while cycle-7 is pre-start);
-  #1240 (split `site_api_data.py` 4,184 lines/37 handlers — big refactor, own session).
-
-## Operational note (Matthew's domain)
-The ingestion **DLQ holds 1 message** — a Withings token-refresh 503 ("invalid refresh_token", the
-known [[reference_withings_transient_refresh]] transient) from 15:05 UTC. It reds the **post-deploy
-integration check (I1/I2/I5)** on every lambda deploy (cosmetic — smoke passes, no auto-rollback), but
-does NOT indicate a code break. Drain via `life-platform-dlq-consumer` or let it age out / self-recover.
-
-**Build beat:** `2026-07-18-later-drain-17` (distilled below — merged + deployed + verified).
-**Docs:** #1309 already updated CLAUDE.md/DECISIONS.md/RUNBOOK.md/SITE_MAP/mypy.ini/SCHEMA-verified;
-this wrap updates the CLAUDE.md status block only — no other pages invalidated (fixes were self-documenting).
-
-Prior session: `handovers/HANDOVER_2026-07-18_NextSlice3.md`.
+Budget tier 1. Full findings narrative: `docs/reviews/SDLC_REVIEW_2026-07-18.md`. Prior
+session: `handovers/HANDOVER_2026-07-18_LaterDrain.md`.

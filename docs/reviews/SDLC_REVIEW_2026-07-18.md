@@ -763,7 +763,11 @@ Examined with reproduction: multi-tenancy blast radius (grep counts: 82 USER#mat
 
 ## Disposition
 
-Filed per ADR-099 via the issue-filer agent (see `docs/reviews/BACKLOG_MANIFEST_2026-07.json`
-additions and the `review:sdlc-2026-07-18` label). Owner-gated actions (rotate ai-keys, GitHub
-owner toggles, ACCOUNTS.md estate rows) are marked in their stories; parked/won't-do items live
-here and in #423, never as stories. Implementation is deliberately NOT this session's job.
+Filed per ADR-099 via the issue-filer agent — **4 epics (#1355 dead controls · #1356
+alert→action loop · #1357 contract truth · #1358 acquirer paperwork) + 36 stories
+(#1319–#1354)**, all under the `review:sdlc-2026-07-18` label; the item→issue map is
+`docs/reviews/SDLC_BACKLOG_MANIFEST_2026-07-18.json`. Milestones: 9 Now / 21 Next / 6 Later.
+Seven stories carry the new `gate:owner` label (human-only acts: rotate ai-keys, IAM grants,
+GitHub owner toggles, retention/paging/license decisions, the rollback drill). Parked/won't-do
+items live here and in #423, never as stories. Implementation is deliberately NOT this
+session's job — the backlog feeds /uplevel and worktree-implementer sessions.
