@@ -45,10 +45,10 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Any, Optional
 
 import boto3
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 try:
     from http_retry import urlopen_with_retry
@@ -213,17 +213,6 @@ def fetch_events_page(since_iso: str, page: int = 1, page_size: int = 10) -> dic
 # ── Normalization ────────────────────────────────────────────────────────────
 
 
-def _to_decimal(v: Any) -> Any:
-    """Recursively convert floats to Decimal for DDB."""
-    if isinstance(v, float):
-        return Decimal(str(v))
-    if isinstance(v, dict):
-        return {k: _to_decimal(x) for k, x in v.items()}
-    if isinstance(v, list):
-        return [_to_decimal(x) for x in v]
-    return v
-
-
 def _lbs_to_kg(lbs: float) -> float:
     return round(lbs * 0.45359237, 3)
 
@@ -274,7 +263,7 @@ def normalize_workout(raw: dict) -> dict:
     """Convert raw Hevy workout response → normalized record.
 
     Returns a dict ready for DynamoDB write (still in float; caller should
-    pass through `_to_decimal` before put_item).
+    pass through `floats_to_decimal` before put_item).
 
     The exact field names in Hevy's response may differ slightly from this
     mapping — verify against a real fetch. Unknown fields are dropped on
@@ -496,7 +485,7 @@ def write_normalized(record: dict) -> None:
         # Fallback: tag as experiment (untagged passes the filter too, but
         # explicit is better for audit clarity)
         record["phase"] = "experiment"
-    _table.put_item(Item=_to_decimal(record))
+    _table.put_item(Item=floats_to_decimal(record))
     stale = delete_workout_records(record["source_workout_id"], keep_sk=record["sk"])
     if stale:
         logger.info(

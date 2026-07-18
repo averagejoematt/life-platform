@@ -64,6 +64,7 @@ import boto3
 import digest_utils  # shared query_range implementations (#970)
 import stats_core  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 # OBS-1: Structured logger — JSON output for CloudWatch Logs Insights
@@ -255,16 +256,6 @@ def store_hypothesis(hypothesis: dict):
         **{k: v for k, v in hypothesis.items() if v is not None},
     }
 
-    # Convert floats to Decimal for DynamoDB
-    def to_decimal(obj):
-        if isinstance(obj, float):
-            return Decimal(str(obj))
-        if isinstance(obj, dict):
-            return {k: to_decimal(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [to_decimal(v) for v in obj]
-        return obj
-
     # V2 P2.6 (2026-05-19): tag with run_id + computed_at for double-write detection
     try:
         from compute_metadata import tag_record
@@ -272,7 +263,7 @@ def store_hypothesis(hypothesis: dict):
         item = tag_record(item, source_id="hypotheses")
     except ImportError:
         pass
-    table.put_item(Item=to_decimal(item))
+    table.put_item(Item=floats_to_decimal(item))
     logger.info(f"Stored hypothesis: {hypothesis.get('hypothesis_id', sk)}")
 
 
@@ -736,22 +727,13 @@ def write_calibration_row(hyp, stats, outcome):
         item = build_calibration_item(hyp, stats, outcome, datetime.now(timezone.utc).isoformat())
         item = {k: v for k, v in item.items() if v is not None}
 
-        def to_decimal(obj):
-            if isinstance(obj, float):
-                return Decimal(str(obj))
-            if isinstance(obj, dict):
-                return {k: to_decimal(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [to_decimal(v) for v in obj]
-            return obj
-
         try:
             from compute_metadata import tag_record
 
             item = tag_record(item, source_id="calibration")
         except ImportError:
             pass
-        table.put_item(Item=to_decimal(item))
+        table.put_item(Item=floats_to_decimal(item))
         logger.info(f"[#530] Calibration row written: {item['sk']} outcome={outcome}")
     except Exception as e:
         logger.warning(f"write_calibration_row failed (non-fatal): {e}")

@@ -4,6 +4,8 @@ import os
 import sys
 from decimal import Decimal
 
+from boto3.dynamodb.types import TypeSerializer
+
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "lambdas"))
 
@@ -40,6 +42,58 @@ def test_int_unchanged():
 
 def test_string_unchanged():
     assert n.floats_to_decimal("hello") == "hello"
+
+
+# ── #1207: NaN/Inf → None guard (adopted from character_engine) ───────────────
+
+
+def test_nan_inf_map_to_none():
+    """NaN and +/-Inf must map to None — a non-finite float can never be written
+    (boto3's TypeSerializer rejects Decimal('NaN')/Decimal('Infinity')). Before
+    #1207 the canonical helper passed them through as Decimal('nan'), so this
+    assertion fails against the pre-fix implementation."""
+    out = n.floats_to_decimal({"x": float("nan"), "y": float("inf"), "z": float("-inf"), "ok": 1.5})
+    assert out["x"] is None
+    assert out["y"] is None
+    assert out["z"] is None
+    assert out["ok"] == Decimal("1.5")
+
+
+def test_nan_inf_result_is_boto3_serializable():
+    """The converted structure must survive boto3's TypeSerializer — the exact
+    DDB write path that raised 'Infinity and NaN not supported' on the forks."""
+    out = n.floats_to_decimal({"nan": float("nan"), "inf": float("inf"), "vals": [1.0, float("nan"), 2.5]})
+    # Must NOT raise; None serializes to {"NULL": True}, finite Decimals to {"N": ...}.
+    TypeSerializer().serialize(out)
+
+
+def test_nan_inf_scalar_and_nested():
+    """The guard applies at every recursion depth and for bare scalars."""
+    assert n.floats_to_decimal(float("nan")) is None
+    nested = n.floats_to_decimal({"a": {"b": [float("inf")]}})
+    assert nested["a"]["b"][0] is None
+
+
+# ── #1207: precision param subsumes the round(4)/round(6) local variants ───────
+
+
+def test_precision_param_rounds():
+    """precision rounds floats before conversion (character_engine round(4),
+    coach round(6)); default None preserves the full str(float) repr."""
+    assert n.floats_to_decimal(1.23456789, precision=4) == Decimal("1.2346")
+    assert n.floats_to_decimal({"a": 1.23456789}, precision=6)["a"] == Decimal("1.234568")
+    # Default (None) keeps existing-caller behavior byte-for-byte.
+    assert n.floats_to_decimal(1.23456789) == Decimal(str(1.23456789))
+
+
+def test_precision_still_guards_nan():
+    """The NaN/Inf guard fires regardless of the precision argument."""
+    assert n.floats_to_decimal(float("nan"), precision=4) is None
+    assert n.floats_to_decimal(float("inf"), precision=6) is None
+
+
+def test_precision_preserves_bool():
+    assert n.floats_to_decimal(True, precision=4) is True
 
 
 def test_decimals_to_float():

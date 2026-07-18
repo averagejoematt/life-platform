@@ -61,9 +61,9 @@ import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 # Truth audit 2026-07-10 (EIGHTSLEEP UTC double-stamp): platform data is keyed by the
 # PACIFIC calendar day, but the framework derived "today" in UTC — after 5 PM PT the
@@ -325,17 +325,6 @@ class IngestionConfig:
 # ══════════════════════════════════════════════════════════════════════════════
 # SHARED UTILITIES
 # ══════════════════════════════════════════════════════════════════════════════
-
-
-def _floats_to_decimal(obj):
-    """Recursively convert floats to Decimal for DynamoDB."""
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: _floats_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_floats_to_decimal(i) for i in obj]
-    return obj
 
 
 def _init_logger(source_name):
@@ -683,7 +672,7 @@ def run_ingestion(config, authenticate_fn, fetch_day_fn, transform_fn, event, co
                 pk = f"USER#{config.user_id}#SOURCE#{source}"
                 sk = f"DATE#{date_str}{sk_suffix}"
 
-                db_item = _floats_to_decimal(
+                db_item = floats_to_decimal(
                     {
                         "pk": pk,
                         "sk": sk,

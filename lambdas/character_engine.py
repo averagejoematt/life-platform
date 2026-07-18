@@ -28,10 +28,10 @@ import logging
 import math
 import time
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 from typing import Any, Optional
 
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS, EXPERIMENT_START_DATE  # ADR-058
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 logger = logging.getLogger(__name__)
 
@@ -1942,7 +1942,7 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
     scripts) silently leak as live data post-launch.
     """
     item = {"pk": user_prefix + "character_sheet", "sk": "DATE#" + record["date"]}
-    item.update(_to_decimal(record))
+    item.update(floats_to_decimal(record, precision=4))
     if record.get("date", "") < EXPERIMENT_START_DATE:
         item["phase"] = "pilot"
     try:
@@ -1998,19 +1998,6 @@ def fetch_character_sheet_range(
     except Exception as e:
         logger.error("[character_engine] Range query failed: %s", e)
         return []
-
-
-def _to_decimal(obj):
-    """Recursively convert floats to Decimal for DynamoDB writes (NaN/Inf -> None)."""
-    if isinstance(obj, float):
-        if math.isnan(obj) or math.isinf(obj):
-            return None
-        return Decimal(str(round(obj, 4)))
-    if isinstance(obj, dict):
-        return {k: _to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_to_decimal(i) for i in obj]
-    return obj
 
 
 def _from_decimal(obj):

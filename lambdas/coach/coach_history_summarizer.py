@@ -40,7 +40,6 @@ import re
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from decimal import Decimal
 
 import boto3
 from phase_filter import with_phase_filter  # ADR-058
@@ -159,19 +158,10 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
-
-
-def _float_to_decimal(obj):
-    """Recursively convert floats to Decimal for DynamoDB writes."""
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: _float_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_float_to_decimal(v) for v in obj]
-    return obj
-
+from numeric import (
+    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
+    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
+)
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from retry_utils import _emit_token_metrics  # noqa: E402,F401
@@ -292,7 +282,7 @@ def _get_item(pk, sk):
 def _put_item(item):
     """Write an item to DynamoDB with float-to-Decimal conversion."""
     try:
-        table.put_item(Item=_float_to_decimal(item))
+        table.put_item(Item=floats_to_decimal(item))
         return True
     except Exception as e:
         logger.error("put_item failed for %s/%s: %s", item.get("pk"), item.get("sk"), e)
