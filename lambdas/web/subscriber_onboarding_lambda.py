@@ -3,7 +3,8 @@ Subscriber Onboarding Lambda — Day 2 Bridge Email
 Sends curated Chronicle installments to new subscribers who confirmed
 1-6 days ago and whose next Wednesday is 3+ days away.
 
-Schedule: EventBridge cron(0 16 * * ? *) — 9 AM PT daily
+Schedule: EventBridge cron(5 17 * * ? *) — 10:05 AM PT daily (CDK SubscriberOnboarding,
+staggered from the daily brief; the old cron(0 16) hand-created rule was an orphan, #1257).
 """
 
 import json
