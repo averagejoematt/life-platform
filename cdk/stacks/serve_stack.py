@@ -41,6 +41,15 @@ from stacks.constants import TABLE_NAME  # CONF-01 / #936: one source for the ta
 from stacks.lambda_helpers import create_platform_lambda
 from stacks.secrets_helpers import site_api_origin_secret_value
 
+# #1328: every Lambda this stack defines gets a Throttles alarm — a throttle on
+# the public serving path is a synchronous 429 to a real reader, never an
+# unobserved event. tests/test_serve_throttles_alarms.py asserts this tuple
+# covers every create_platform_lambda(function_name=...) in this file.
+THROTTLE_ALARMED_FUNCTIONS = (
+    ("life-platform-site-api", "SiteApiThrottles"),
+    ("life-platform-site-api-ai", "SiteApiAiThrottles"),
+)
+
 REGION = "us-west-2"
 ACCT = "205930651321"
 LIFE_PLATFORM_TABLE = TABLE_NAME
@@ -113,7 +122,13 @@ class ServeStack(Stack):
 
         # ADR-036 fix: cap data Lambda concurrency to isolate from AI traffic spikes
         # 2026-06-17: account concurrency quota raised to 100 (AWS case 177921309700709) — enabled.
-        site_api_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 5)
+        # #1328 (2026-07-18): 5 → 20. The cap of 5 BOUND daily — ConcurrentExecutions
+        # Max hit 5.0 every day 07-10..07-17 and readers ate 627 synchronous 429s
+        # over 30d (peak 110/day) while monitoring showed green. 20 = 4× the
+        # measured saturation point, still leaves 78 unreserved of the 100 account
+        # limit (site-api-ai holds 2). Sized against measured traffic, not load
+        # testing — see docs/RESERVED_CONCURRENCY.md.
+        site_api_fn.node.default_child.add_property_override("ReservedConcurrentExecutions", 20)
 
         # ── Site API AI Lambda — /api/ask + /api/board_ask (split from site-api for blast radius isolation)
         # Separate Lambda for AI endpoints: sequential Haiku calls can take 3-20s.
@@ -251,6 +266,50 @@ class ServeStack(Stack):
             treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
         )
         _site_api_spike_alarm.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        # ── #1328: Throttles alarms — one per serve-stack Lambda ──
+        # A throttle on a Function-URL origin is a synchronous 429 to a real reader.
+        # 627 throttles/30d ran unobserved (zero Throttles alarms existed anywhere)
+        # while the reserved-concurrency cap of 5 bound daily. Threshold 5/15min:
+        # a lone cold-start collision stays quiet, a binding cap does not.
+        # tests/test_serve_throttles_alarms.py asserts one alarm per function here.
+        # Deliberately unrolled (no loop): the #795/#934 alarm-count/name AST
+        # discoverers resolve one Alarm() per call site with a literal name.
+        _site_api_throttles = cloudwatch.Alarm(
+            self,
+            "SiteApiThrottles",
+            alarm_name="site-api-throttles",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Throttles",
+                dimensions_map={"FunctionName": "life-platform-site-api"},
+                period=Duration.minutes(15),
+                statistic="Sum",
+            ),
+            threshold=5,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _site_api_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
+
+        _site_api_ai_throttles = cloudwatch.Alarm(
+            self,
+            "SiteApiAiThrottles",
+            alarm_name="site-api-ai-throttles",
+            metric=cloudwatch.Metric(
+                namespace="AWS/Lambda",
+                metric_name="Throttles",
+                dimensions_map={"FunctionName": "life-platform-site-api-ai"},
+                period=Duration.minutes(15),
+                statistic="Sum",
+            ),
+            threshold=5,
+            evaluation_periods=1,
+            comparison_operator=GTE,
+            treat_missing_data=cloudwatch.TreatMissingData.NOT_BREACHING,
+        )
+        _site_api_ai_throttles.add_alarm_action(cw_actions.SnsAction(local_digest_topic))
 
         # NOTE (2026-06-08): the "life-platform-site-api" CloudWatch Dashboard was
         # removed from CDK after it was deleted out-of-band — CFN tried to UPDATE a

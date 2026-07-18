@@ -60,6 +60,10 @@ def _ground_truth() -> dict:
         # max(CYCLE_GENESES) in lambdas/web/site_api_data.py, surfaced through the sync tool.
         "experiment_genesis": facts.get("experiment_genesis"),
         "experiment_cycle": facts.get("experiment_cycle"),
+        # #1328: the Lambda account concurrency quota — maintained in PLATFORM_FACTS,
+        # refreshed via `aws lambda get-account-settings`. The doc claim "limit: 10 …
+        # awaiting approval" outlived the actual raise to 100 by two months.
+        "account_concurrency_limit": facts.get("account_concurrency_limit"),
     }
 
 
@@ -108,6 +112,18 @@ FACT_SPECS = [
             r"\btest suite of\s+" + NG + r"([\d,]+)\b",
         ],
         0.18,
+    ),
+    # account_concurrency_limit — exact (#1328). "Account concurrency limit: 100",
+    # "account concurrency limit of 100", "concurrency quota ... to 100" is NOT
+    # matched (raise-request phrasing is historical narrative). The colon/of forms
+    # are the current-state claims that rotted ("limit: 10 … awaiting approval").
+    (
+        "account_concurrency_limit",
+        [
+            r"[Aa]ccount concurrency limit(?::| of| is)\s*" + NG + r"(\d+)\b",
+            r"[Cc]oncurrency limit(?::| of| is)\s*" + NG + r"(\d+)\b",
+        ],
+        0.0,
     ),
 ]
 
