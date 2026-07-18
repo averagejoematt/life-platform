@@ -1815,3 +1815,47 @@ def tool_log_field_note_response(args):
             f"   You responded in {word_count} words."
         ),
     }
+
+
+# ── #1405: the private evening-intake ledger (Matthew-private, never public) ──
+
+
+def tool_log_evening_intake(args):
+    """One-tap alternative to the nudge email's signed link: log the evening's
+    intake count (0-4; 4 means 4+) to the Matthew-private partition.
+    PK: USER#matthew#SOURCE#private_intake, SK: DATE#YYYY-MM-DD.
+    """
+    from intake_response import PRIVATE_INTAKE_PK
+
+    try:
+        count = int(args.get("count"))
+    except (TypeError, ValueError):
+        raise ValueError("count is required (integer 0-4; 4 = four or more)")
+    if not (0 <= count <= 4):
+        raise ValueError("count must be between 0 and 4 (4 = four or more)")
+    date_str = (args.get("date") or datetime.now(timezone.utc).strftime("%Y-%m-%d")).strip()
+    datetime.strptime(date_str, "%Y-%m-%d")  # validate; raises on junk
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    table.update_item(
+        Key={"pk": PRIVATE_INTAKE_PK, "sk": f"DATE#{date_str}"},
+        UpdateExpression="SET intake_count = :v, intake_count_logged_at = :ts, #src = :src",
+        ExpressionAttributeNames={"#src": "source"},
+        ExpressionAttributeValues={":v": Decimal(count), ":ts": now_iso, ":src": "mcp"},
+    )
+    logger.info(f"log_evening_intake: date={date_str} count={count}")
+    return {"logged": True, "date": date_str, "count": count, "private": True}
+
+
+def tool_get_intake_response(args):
+    """The private intake→next-morning dose-response read (#1405): lagged pairs
+    vs HRV / recovery / REM with Pyper-Peterman effective n, p on n_eff, and a
+    zero-vs-nonzero block-bootstrap CI; dose bins (0/1/2+) once 15 nonzero
+    evenings exist. ADR-105 throughout — below the floors it reports arming
+    progress, never an early verdict.
+    """
+    from intake_response import compute_intake_response
+
+    window_days = int(args.get("window_days") or 180)
+    window_days = max(30, min(730, window_days))
+    return compute_intake_response(table, window_days=window_days)

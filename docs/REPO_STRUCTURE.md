@@ -10,7 +10,7 @@ The canonical top-level layout. Read this before adding a new file so things lan
 | Dir | Purpose |
 |---|---|
 | `lambdas/` | All Lambda source, by stack: `ingestion/ compute/ email/ web/ operational/ intelligence/` + shared modules at the root (`ai_calls.py`, `bedrock_client.py`, `constants.py`, …) — bundled into every function (#781). |
-| `mcp/` | MCP server — 64 tools across `tools_*.py` domain modules, wired in `registry.py`. |
+| `mcp/` | MCP server — 66 tools across `tools_*.py` domain modules, wired in `registry.py`. |
 | `cdk/` | Infrastructure-as-code — 9 CDK stacks (`stacks/*.py`), entry `app.py`. **The only way infra changes.** |
 | `deploy/` | Build/deploy scripts — `build_bundle.py`, `deploy_lambda.sh`, `deploy_fleet.sh`, `deploy_site_api.sh`, `sync_site_to_s3.sh`, `restart_pipeline.py`, `sync_doc_metadata.py`, smoke tests, `lib/`. |
 | `scripts/` | Operational helpers — `v4_build_*.py` site generators, `generate_adr_index.py`, `content_policy_scan.py`, migration tooling. |

@@ -37,8 +37,10 @@ from mcp.tools_lifestyle import (
     tool_get_experiment_results,
     tool_get_field_notes,
     tool_get_insights,
+    tool_get_intake_response,
     tool_get_social_connection_trend,
     tool_list_experiments,
+    tool_log_evening_intake,
     tool_log_field_note_response,
     tool_save_insight,
     tool_update_insight_outcome,
@@ -555,6 +557,45 @@ TOOLS = {
                     "source": {"type": "string", "description": "Origin of the insight: 'chat' (default) or 'email'."},
                 },
                 "required": ["text"],
+            },
+        },
+    },
+    "log_evening_intake": {
+        "fn": tool_log_evening_intake,
+        "schema": {
+            "name": "log_evening_intake",
+            "description": (
+                "PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) "
+                "to the Matthew-private intake ledger. One tap, no free text. "
+                "Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date)."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "count": {"type": "integer", "description": "Evening count, 0-4 (4 = four or more)."},
+                    "date": {"type": "string", "description": "YYYY-MM-DD (default: today UTC)."},
+                },
+                "required": ["count"],
+            },
+        },
+    },
+    "get_intake_response": {
+        "fn": tool_get_intake_response,
+        "schema": {
+            "name": "get_intake_response",
+            "description": (
+                "PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs "
+                "vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on "
+                "n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 "
+                "nonzero evenings exist. Reports arming progress below the floors (ADR-105). "
+                "Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "window_days": {"type": "integer", "description": "Trailing window in days (30-730, default 180)."},
+                },
+                "required": [],
             },
         },
     },

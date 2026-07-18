@@ -1979,11 +1979,16 @@ def build_html(
     explorer_coach_v2_text=None,
     vacation_fund=None,
     budget_headroom_line=None,
+    intake_line=None,
 ):
     """Build the full daily brief HTML email.
 
     triggered_rewards and protocol_recs are pre-computed by lambda_handler
     (extracted from _evaluate_rewards_brief / _get_protocol_recs_brief in output_writers.py).
+
+    intake_line (#1405): the pre-formatted private intake-ledger line from
+    intake_response.brief_line() — n + CI per ADR-105, or arming progress. The
+    brief is Matthew-private; this line must never reach a public surface.
     """
 
     date_str = data["date"]
@@ -2026,5 +2031,8 @@ def build_html(
         training_coach_v2_text,
         weekly_habit_review,
     )
+    # #1405: private intake-ledger line — quiet, above the footer, never scolding.
+    if intake_line:
+        html += '<div style="padding:4px 24px 12px;"><p style="font-size:12px;color:#475569;margin:0;">🌙 ' + intake_line + "</p></div>"
     html += _brief_footer(compute_age_msg, compute_stale, data, date_str, budget_headroom_line=budget_headroom_line)
     return html

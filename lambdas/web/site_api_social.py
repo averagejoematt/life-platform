@@ -1366,9 +1366,16 @@ def _handle_ritual_log(event: dict) -> dict:
             }
 
     now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    # #1405: private-class metrics land in their own Matthew-private partition —
+    # never the evening_ritual record the public wellbeing aggregate reads. The
+    # write path is shared (same signed link, same rate limit); only the
+    # destination differs, so the public read surface structurally can't see it.
+    from ritual_link import PRIVATE_INTAKE_SOURCE, PRIVATE_RITUAL_METRICS
+
+    dest_source = PRIVATE_INTAKE_SOURCE if metric in PRIVATE_RITUAL_METRICS else "evening_ritual"
     try:
         table.update_item(
-            Key={"pk": f"{USER_PREFIX}evening_ritual", "sk": f"DATE#{date_str}"},
+            Key={"pk": f"{USER_PREFIX}{dest_source}", "sk": f"DATE#{date_str}"},
             UpdateExpression="SET #m = :v, #ts = :ts, #src = :src",
             ExpressionAttributeNames={
                 "#m": metric,
