@@ -52,7 +52,7 @@ _SSM_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
 # brief its headroom line, never AI enforcement.
 _SSM_BREAKDOWN_PARAM = os.environ.get("BUDGET_BREAKDOWN_PARAM", "/life-platform/budget-breakdown")
 _REGION = os.environ.get("AWS_REGION", "us-west-2")
-_CACHE_TTL_S = 300  # 5 min — matches the governor's hourly cadence well enough
+_CACHE_TTL_S = 300  # 5 min — comfortably shorter than the governor's every-8h cadence
 # A breakdown older than this is not worth showing (the governor runs every 8h,
 # so ~6 consecutive missed runs) — stale burn rates mislead more than no line.
 _BREAKDOWN_MAX_AGE_S = 48 * 3600

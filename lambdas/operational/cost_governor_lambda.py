@@ -27,7 +27,8 @@ _TIER_THRESHOLDS, scaled by _tier_for):
 budget_guard._FEATURE_CUTOFF, which these labels must mirror; tests/
 test_budget_guard_ladder.py pins them in lockstep.)
 
-Runs hourly. Sets SSM /life-platform/budget-tier (default 0). Alerts on change.
+Runs every 8h (cron(0 0/8 * * ? *)). Sets SSM /life-platform/budget-tier
+(default 0). Alerts on change.
 Also persists the projection breakdown (mtd/projected/ai+non-ai daily burn) to
 SSM /life-platform/budget-breakdown every enforcement run so the daily brief can
 render a one-line headroom readout (#822 — a dev sprint alone can trip the tier).
@@ -49,7 +50,7 @@ budget-breakdown JSON so the daily brief's headroom line can say so.
 
 IAM: ce:GetCostAndUsage, cloudwatch:GetMetricData, cloudwatch:PutMetricData,
      ssm:GetParameter, ssm:PutParameter, sns:Publish.
-Schedule: hourly (EventBridge).
+Schedule: every 8h (EventBridge — cron(0 0/8 * * ? *)).
 """
 
 import calendar
