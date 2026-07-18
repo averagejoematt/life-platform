@@ -19,9 +19,17 @@ secret. The site-api endpoint additionally windows how old `date` may be (see
 
 import hmac
 
-RITUAL_METRICS = ("connection", "mood_valence")
+RITUAL_METRICS = ("connection", "mood_valence", "intake_count")
 RITUAL_VALUE_MIN = 0
 RITUAL_VALUE_MAX = 4
+
+# #1405: metrics that persist to the Matthew-PRIVATE intake partition instead of
+# the public-aggregated evening_ritual record. The oblique id is deliberate — the
+# intake class is named only in private surfaces (nudge email, MCP, daily brief);
+# no public payload, site file, or generated artifact may carry it
+# (tests/test_intake_privacy_contract.py enforces both directions).
+PRIVATE_RITUAL_METRICS = frozenset({"intake_count"})
+PRIVATE_INTAKE_SOURCE = "private_intake"  # DDB: USER#matthew#SOURCE#private_intake / DATE#YYYY-MM-DD
 
 
 def sign_ritual_token(secret: str, date_str: str, metric: str, value: int) -> str:

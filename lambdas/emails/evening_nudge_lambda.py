@@ -55,8 +55,16 @@ _ritual_secret_cache: str | None = None
 RITUAL_LABELS = {
     "connection": ["Not at all", "A little", "Some", "A lot", "Deeply"],
     "mood_valence": ["Rough", "Low", "Okay", "Good", "Great"],
+    # #1405: one-tap evening intake count (4 = "4+"). This email is Matthew-private,
+    # so the title names it plainly; everywhere else the metric stays oblique
+    # (intake_count) and the count lands in the private_intake partition only.
+    "intake_count": ["0", "1", "2", "3", "4+"],
 }
-RITUAL_METRIC_TITLES = {"connection": "Felt connected today?", "mood_valence": "Mood today?"}
+RITUAL_METRIC_TITLES = {
+    "connection": "Felt connected today?",
+    "mood_valence": "Mood today?",
+    "intake_count": "Drinks this evening?",
+}
 
 
 from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
@@ -126,20 +134,30 @@ def _check_how_we_feel(date_str: str) -> tuple[bool, str]:
 
 def _check_evening_ritual(date_str: str) -> tuple[list[str], str]:
     """Returns (missing_metrics, detail). missing_metrics is a subset of
-    ["connection", "mood_valence"] — only the metrics not yet logged today,
-    so a partially-completed ritual only re-prompts for what's left."""
+    ["connection", "mood_valence", "intake_count"] — only the metrics not yet
+    logged today, so a partially-completed ritual only re-prompts for what's left.
+
+    #1405: intake_count lives in its own Matthew-private partition (never the
+    public-aggregated evening_ritual record), so it gets its own fetch.
+    """
+    from ritual_link import PRIVATE_INTAKE_SOURCE
+
     item = _fetch_date("evening_ritual", date_str)
     connection = item.get("connection") if item else None
     mood_valence = item.get("mood_valence") if item else None
+    intake_item = _fetch_date(PRIVATE_INTAKE_SOURCE, date_str)
+    intake = intake_item.get("intake_count") if intake_item else None
     missing_metrics = []
     if connection is None:
         missing_metrics.append("connection")
     if mood_valence is None:
         missing_metrics.append("mood_valence")
+    if intake is None:
+        missing_metrics.append("intake_count")
     if not missing_metrics:
-        return [], f"Connection {int(connection)}/4 · Mood {int(mood_valence)}/4"
-    if len(missing_metrics) == 1:
-        return missing_metrics, "Partially logged — one tap left"
+        return [], f"Connection {int(connection)}/4 · Mood {int(mood_valence)}/4 · Intake {int(intake)}"
+    if len(missing_metrics) < 3:
+        return missing_metrics, f"Partially logged — {len(missing_metrics)} tap{'s' if len(missing_metrics) != 1 else ''} left"
     return missing_metrics, "Not logged yet"
 
 

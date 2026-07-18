@@ -1898,6 +1898,16 @@ def lambda_handler(event, context):
     except Exception as _bh_err:
         logger.warning("budget headroom line failed (non-fatal): " + str(_bh_err))
 
+    # #1405: the private intake-ledger line (n + CI per ADR-105, or arming
+    # progress). Fail-soft — the brief must send even if the read breaks.
+    _intake_line = None
+    try:
+        import intake_response
+
+        _intake_line = intake_response.brief_line(intake_response.compute_intake_response(table))
+    except Exception as _ir_err:
+        logger.warning("intake-response line failed (non-fatal): " + str(_ir_err))
+
     try:
         html = html_builder.build_html(
             data,
@@ -1933,6 +1943,7 @@ def lambda_handler(event, context):
             explorer_coach_v2_text=explorer_coach_v2_text,
             vacation_fund=_vacation_fund,
             budget_headroom_line=_budget_headroom_line,
+            intake_line=_intake_line,
         )
     except Exception as e:
         logger.error("build_html crashed, sending minimal brief: " + str(e))

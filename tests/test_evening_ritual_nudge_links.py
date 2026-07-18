@@ -27,7 +27,7 @@ from ritual_link import verify_ritual_token  # noqa: E402
 SECRET = "test-nudge-ritual-secret"
 
 
-def _set_ritual_record(monkeypatch, connection=None, mood_valence=None):
+def _set_ritual_record(monkeypatch, connection=None, mood_valence=None, intake_count=None):
     rec = {}
     if connection is not None:
         rec["connection"] = connection
@@ -35,6 +35,9 @@ def _set_ritual_record(monkeypatch, connection=None, mood_valence=None):
         rec["mood_valence"] = mood_valence
     today = nudge.pacific_today()
     store_items = [{"pk": nudge.USER_PREFIX + "evening_ritual", "sk": "DATE#" + today, **rec}] if rec else []
+    if intake_count is not None:
+        # #1405: the intake count lives in its own Matthew-private partition.
+        store_items.append({"pk": nudge.USER_PREFIX + "private_intake", "sk": "DATE#" + today, "intake_count": intake_count})
     # query() always answers empty here — only get_item (keyed by pk/sk) is used.
     ft = FakeDdbTable(rows=[], store_items=store_items)
     monkeypatch.setattr(nudge, "table", ft)
@@ -47,23 +50,24 @@ def _set_ritual_record(monkeypatch, connection=None, mood_valence=None):
 def test_not_logged_at_all(monkeypatch):
     today = _set_ritual_record(monkeypatch)
     missing, detail = nudge._check_evening_ritual(today)
-    assert set(missing) == {"connection", "mood_valence"}
+    assert set(missing) == {"connection", "mood_valence", "intake_count"}
     assert "not logged" in detail.lower()
 
 
 def test_partially_logged_only_flags_the_missing_metric(monkeypatch):
-    today = _set_ritual_record(monkeypatch, connection=3)
+    today = _set_ritual_record(monkeypatch, connection=3, intake_count=0)
     missing, detail = nudge._check_evening_ritual(today)
     assert missing == ["mood_valence"]
-    assert "one tap left" in detail.lower()
+    assert "1 tap left" in detail.lower()
 
 
 def test_fully_logged_reports_both_values(monkeypatch):
-    today = _set_ritual_record(monkeypatch, connection=3, mood_valence=1)
+    today = _set_ritual_record(monkeypatch, connection=3, mood_valence=1, intake_count=2)
     missing, detail = nudge._check_evening_ritual(today)
     assert missing == []
     assert "3/4" in detail
     assert "1/4" in detail
+    assert "Intake 2" in detail
 
 
 # ── link minting agrees with the site-api verifier ──────────────────────────

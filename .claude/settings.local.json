@@ -233,7 +233,12 @@
       "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE AWS_DEFAULT_REGION=us-west-2 timeout 300 python3 -m pytest tests/ -q -x --timeout=300)",
       "Bash(AWS_ACCESS_KEY_ID=FAKE AWS_SECRET_ACCESS_KEY=FAKE AWS_DEFAULT_REGION=us-west-2 python3 -m pytest tests/ -q -x --timeout=300)",
       "Bash(python3 -m pytest tests/test_fullreview_doc_drift_guards.py -q)",
-      "Skill(deep-research)"
+      "Skill(deep-research)",
+      "Bash(python3 -c \"import json; b=json.load\\(open\\('/tmp/wrongout.json'\\)\\); body=json.loads\\(b['body']\\); v=body['validator']; print\\('direct invoke:', v['caught'], v.get\\('caught_detailed'\\), v.get\\('caught_undetailed'\\)\\)\")",
+      "Bash(unzip -l /tmp/siteapi.zip)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('platform:', {k:d['platform'].get\\(k\\) for k in \\('mcp_tools','data_sources','lambdas'\\)}\\); print\\('vitals:', {k:d['vitals'].get\\(k\\) for k in \\('recovery_pct','recovery_status','sleep_hours'\\)}\\)\")",
+      "Bash(python3 scripts/check_main_green.py)",
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\)['platform']; print\\({k:p[k] for k in \\('mcp_tools','data_sources','lambdas'\\)}\\)\")"
     ]
   },
   "enableAllProjectMcpServers": true,
