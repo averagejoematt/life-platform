@@ -92,3 +92,58 @@ class TestScorePairs:
         recs = [{"confidence": 0.9, "status": ("confirmed" if i % 2 else "refuted")} for i in range(8)]
         s = cc.score_pairs(cc.pairs_from_prediction_records(recs))
         assert s["calibration"] == "over-confident"
+
+
+class TestHonestBadgeSemantics:
+    """#1370 (ADR-104/105): brier_skill <= 0 can NEVER render the flattering states.
+
+    The live bug this pins: /api/calibration's platform block carried
+    brier_skill = -0.0047 (worse than the base-rate climatology) yet rendered
+    "Well Calibrated" / "authoritative" / 90 — reliability alone was buying the
+    flattering badge. Calibrated (reliability) and skilled (beats base rate) are
+    different claims; a skill <= 0 surface must read "not_yet_skillful".
+    """
+
+    # 12 forecasts, all stated at 90%, 11 confirmed / 1 refuted. Base rate 11/12 —
+    # the climatology forecast narrowly beats the forecaster: brier ≈ 0.0767 vs
+    # base ≈ 0.0764 → skill ≈ -0.0037, the −0.0047-style live shape. Pre-fix this
+    # scored brier ≤ 0.15, n ≥ 12, |gap| ≤ 0.15 → "well-calibrated"/"authoritative"/90.
+    NEG_SKILL_PAIRS = [(0.9, 1)] * 11 + [(0.9, 0)]
+
+    def test_negative_skill_never_well_calibrated(self):
+        s = cc.score_pairs(self.NEG_SKILL_PAIRS)
+        assert s["brier_skill"] is not None and s["brier_skill"] <= 0  # fixture is the bug shape
+        assert s["calibration"] != "well-calibrated"
+        assert s["calibration"] == "not_yet_skillful"
+
+    def test_negative_skill_never_authoritative(self):
+        s = cc.score_pairs(self.NEG_SKILL_PAIRS)
+        assert s["brier"] <= 0.15 and s["n"] >= 12  # would have been authoritative pre-fix
+        assert s["label"] != "authoritative"
+        assert s["label"] == "not_yet_skillful"
+        assert s["score"] < 70  # never the reliable/authoritative rungs either
+
+    def test_skilled_flag_exposed(self):
+        # The payload carries the calibrated-vs-skilled distinction explicitly so
+        # every surface can copy it honestly (issue AC-3).
+        s = cc.score_pairs(self.NEG_SKILL_PAIRS)
+        assert s["skilled"] is False
+
+    def test_positive_skill_keeps_well_calibrated(self):
+        # A genuinely discriminating forecaster keeps the earned verdict.
+        pairs = [(0.9, 1), (0.85, 1), (0.9, 1), (0.15, 0), (0.1, 0), (0.2, 0)]
+        s = cc.score_pairs(pairs)
+        assert s["brier_skill"] > 0
+        assert s["skilled"] is True
+        assert s["calibration"] == "well-calibrated"
+
+    def test_undefined_skill_is_not_punished(self):
+        # All-identical outcomes → skill is None (undefined vs a degenerate base
+        # rate). That is "unknown", not "unskilled" — the coarse label falls back
+        # to the Brier ladder rather than the not-yet-skillful state.
+        pairs = [(0.9, 1)] * 12
+        s = cc.score_pairs(pairs)
+        assert s["brier_skill"] is None
+        assert s["skilled"] is None
+        assert s["label"] == "authoritative"
+        assert s["calibration"] != "not_yet_skillful"

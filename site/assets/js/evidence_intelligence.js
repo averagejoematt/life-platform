@@ -234,7 +234,11 @@ export function renderCalibration(d) {
     p.brier != null && fig(fmt(p.brier), "platform Brier", null, "brier_score"),
     p.brier_skill != null && fig(fmt(p.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
     p.accuracy_pct != null && fig(fmt(p.accuracy_pct) + "%", "hit rate", null, "calibration_score_pairs"),
-    p.calibration && p.calibration !== "insufficient_data" && fig(ttl(cal), "calibration", null, "calibration_verdict"),
+    // #1370 honest badge: calibrated (reliability) ≠ skilled (beats base rate). A
+    // skill ≤ 0 surface reads the dignified state with its n, never "Well Calibrated".
+    p.calibration === "not_yet_skillful"
+      ? fig("Not Yet Skillful", `n=${p.n}, skill ≤ base rate`, null, "brier_skill_score")
+      : p.calibration && p.calibration !== "insufficient_data" && fig(ttl(cal), "calibration (reliability)", null, "calibration_verdict"),
   ]);
   const bins = p.reliability_bins || [];
   const relRows = bins

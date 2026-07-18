@@ -1331,8 +1331,11 @@ def handle_calibration(event):
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
-                    "always-say-50% baseline, lower is better. A well-calibrated forecaster's stated confidence "
-                    "matches how often it turns out right."
+                    "always-say-50% baseline, lower is better. Calibrated and skilled are different claims: "
+                    "calibrated means stated confidence matches how often calls turn out right (reliability); "
+                    "skilled means beating the base rate (Brier skill > 0). A surface can be reliable without "
+                    "being skillful — when skill is at or below zero it reads Not Yet Skillful, never Well "
+                    "Calibrated."
                 ),
                 "as_of": datetime.now(PT).strftime("%Y-%m-%d"),
             },

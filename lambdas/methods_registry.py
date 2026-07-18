@@ -335,8 +335,11 @@ REGISTRY = {
         "Every resolved prediction for the coach/surface being scored, to date.",
         "Needs at least 1 resolved pair to report accuracy_pct; the calibration verdict "
         "(over/under-confident) needs ≥ 5. Below those thresholds the relevant field is None "
-        "rather than a guess dressed as a number.",
-        "7d28e82fff91",
+        "rather than a guess dressed as a number. Also reports `skilled` (Brier skill > 0?) — "
+        "calibrated (reliability: stated confidence tracks observed rates) and skilled (beats "
+        "the base rate) are different claims, and the summary carries both so no surface can "
+        "conflate them (#1370).",
+        "96a2d825721f",
         used_by="/api/calibration, /api/coach_team's per-coach calibration line.",
     ),
     "calibration_verdict": _entry(
@@ -345,28 +348,36 @@ REGISTRY = {
         calibration_core.score_pairs,
         "Calibration",
         "Weighted mean gap = Σ(bin_n · (bin_mean_confidence - bin_observed_rate)) / Σ(bin_n); "
-        "gap > 0.15 → over-confident, gap < -0.15 → under-confident, else well-calibrated",
+        "gap > 0.15 → over-confident, gap < -0.15 → under-confident; otherwise well-calibrated "
+        "only when Brier skill > 0 — a skill ≤ 0 surface reads not-yet-skillful instead (#1370)",
         "Same reliability bins as reliability_bins for that surface.",
         "Requires n ≥ 5 resolved predictions AND at least one non-empty bin, else "
         "'insufficient_data'. The ±0.15 threshold is a fixed editorial choice (not derived "
         "from this platform's own variance) — a documented exception to the ADR-105 'thresholds "
         "from personal variance' rule, tracked as a candidate for future recalibration once "
-        "more predictions resolve.",
-        "7d28e82fff91",
+        "more predictions resolve. 'Well-calibrated' asserts reliability AND skill: a forecaster "
+        "whose stated confidence tracks observed rates but whose Brier skill is ≤ 0 (worse than "
+        "always guessing the base rate) reads 'not_yet_skillful' — reliability alone never earns "
+        "the flattering verdict (ADR-104/105, #1370). An undefined skill (degenerate base rate) "
+        "is treated as unknown, not as unskilled.",
+        "96a2d825721f",
         min_n=5,
     ),
     "credibility_label": _entry(
         "credibility_label",
-        "Coarse credibility label (nascent / developing / reliable / authoritative)",
+        "Coarse credibility label (nascent / not-yet-skillful / developing / reliable / authoritative)",
         calibration_core.score_pairs,
         "Calibration",
-        "n < 3 → nascent. Brier ≤ 0.15 AND n ≥ 12 → authoritative. Brier ≤ 0.20 → reliable. " "Else → developing",
+        "n < 3 → nascent. Brier skill ≤ 0 → not-yet-skillful. Brier ≤ 0.15 AND n ≥ 12 → "
+        "authoritative. Brier ≤ 0.20 → reliable. Else → developing",
         "Same pair set as the Brier score for that surface.",
         "A coarse, backward-compatible label kept for surfaces that pre-date the Brier-based "
         "scorer — always shown alongside the underlying Brier score and n, never as a "
         "substitute for them. The 0.15/0.20 cut points are fixed, not personal-variance-"
-        "derived.",
-        "7d28e82fff91",
+        "derived. A negative Brier skill (worse than the base rate) can never render the "
+        "reliable/authoritative rungs, however good the raw Brier looks against an extreme "
+        "base rate — it reads not-yet-skillful (#1370).",
+        "96a2d825721f",
         used_by="Coach cards that need a single at-a-glance credibility word.",
     ),
 }
