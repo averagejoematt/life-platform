@@ -815,12 +815,19 @@ def _auto_discover_version() -> str | None:
 
 
 def _count_adrs() -> int | None:
-    """Count `## ADR-` headings in docs/DECISIONS.md."""
+    """Count ADR record headings in docs/DECISIONS.md.
+
+    #1328 follow-up to #1321: matches BOTH `## ADR-` and `### ADR-` record
+    headings (amendments fold into parents), the SAME semantics as
+    scripts/generate_adr_index.py::_HEADING_RE. The old `## `-only count (121)
+    fought the regenerated index header (133 real records) — sync --apply and
+    generate_adr_index --apply ping-ponged the "N ADRs total" line forever.
+    """
     decisions = DOCS / "DECISIONS.md"
     if not decisions.exists():
         return None
     try:
-        return len(re.findall(r"^## ADR-", decisions.read_text(encoding="utf-8"), re.MULTILINE)) or None
+        return len(re.findall(r"^###? ADR-\d{3}(?!\s*Amendment)", decisions.read_text(encoding="utf-8"), re.MULTILINE)) or None
     except Exception:
         return None
 
@@ -1084,7 +1091,8 @@ PLATFORM_FACTS = {
     "tool_module_count": 25,  # fallback: mcp/tools_*.py domain modules only
     "adr_count": 120,  # fallback: ## ADR- headings in docs/DECISIONS.md (record count; max number may differ — see adr_max)
     "secret_count": 21,  # live-verified 2026-07-10 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
-    "alarm_count": 69,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms)
+    "account_concurrency_limit": 100,  # live-verified 2026-07-18 via `aws lambda get-account-settings` (#1328; raised from 10 by AWS case 177921309700709 — update after any quota change)
+    "alarm_count": 71,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms)
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 9,
     "test_count": 3644,  # fallback: `def test_` count across tests/*.py (_count_test_functions)
