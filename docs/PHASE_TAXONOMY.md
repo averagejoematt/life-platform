@@ -26,7 +26,7 @@ restart tools and the read paths derive from it. See ADR-077 for the decision re
 
 - Current cycle integer lives at SSM `/life-platform/experiment-cycle` (seed **2**, matching the `CYCLE#2#reentry` marker).
 - At restart, the wipe stamps `cycle=<closing run>` on every experiment_scoped record it archives, then increments the counter for the new run.
-- Going forward, experiment_scoped writers stamp `phase=experiment` + `cycle=<current>` at write time, so records self-describe even on partitions the tagger can't reach (COACH#, ENSEMBLE#, bare `USER#matthew`, NARRATIVE#arc).
+- The tagger-blind intelligence output writers stamp their own provenance at write time via `phase_taxonomy.experiment_stamp()` (#1233), so records self-describe without relying solely on the reset-time wipe: COACH#* (OUTPUT#/TRACE#/VOICE#/COMMITMENT#/STANCE#/…), ENSEMBLE#* and COACH#computation RESULTS# carry `phase=experiment` + `cycle=<current>`; **NARRATIVE#arc carries `cycle=<current>` only** — its `phase` attribute is the narrative-arc STATE, not the taxonomy phase, so it's left intact. Other experiment_scoped writers (e.g. daily INSIGHT#, bare `USER#matthew` coach_thread rows) still lean on the wipe/tagger for provenance. The stamp is read-safe: `phase=experiment` matches the `with_phase_filter` current-phase clause, so a stamped row stays visible exactly as an unstamped one did.
 
 ## Decisions where the panel diverged or corrected the prior behavior (ADR-077)
 

@@ -34,14 +34,65 @@ Cycle stamping
 --------------
 On restart, the wipe stamps `cycle=<closing run number>` (read from SSM
 /life-platform/experiment-cycle) onto every EXPERIMENT_SCOPED record it archives,
-alongside `phase=pilot` + `tombstone=true`. Going forward, experiment_scoped
-writers stamp `cycle=<current>` + `phase=experiment` at write time so records are
-self-describing even on partitions the tagger cannot reach.
+alongside `phase=pilot` + `tombstone=true`.
+
+At write time, the intelligence output writers on the tagger-blind partitions
+stamp their own provenance via `experiment_stamp()` (#1233):
+  - COACH#* (OUTPUT#/TRACE#/VOICE#/COMMITMENT#/STANCE#/… via coach_state_updater +
+    coach_history_summarizer), ENSEMBLE#* and COACH#computation RESULTS# (via
+    coach_ensemble_digest + coach_computation_engine) carry `phase=<current>` +
+    `cycle=<current>`.
+  - NARRATIVE#arc (coach_computation_engine) carries `cycle=<current>` ONLY — that
+    partition's `phase` attribute is the narrative-arc STATE, not the taxonomy
+    phase, so it is left intact.
+Other experiment_scoped writers (e.g. daily INSIGHT# rows) still rely on the
+wipe/tagger for provenance. The stamp is read-safe: the current phase value matches
+the `with_phase_filter` current-phase clause, so a freshly stamped row stays visible
+exactly as an unstamped one did.
 
 v1.0.0 — 2026-06-07 (ADR-077; supersedes the ad-hoc lists in the restart tools)
+v1.1.0 — 2026-07-18 (#1233; add experiment_stamp() for write-time provenance)
 """
 
 from __future__ import annotations
+
+
+def experiment_stamp(ssm_client=None, include_phase: bool = True) -> dict:
+    """Write-time provenance stamp for EXPERIMENT_SCOPED intelligence writes (#1233).
+
+    Returns ``{"phase": <current>, "cycle": <n>}`` (phase from
+    constants.EXPERIMENT_PHASE_CURRENT) so records on the tagger-blind
+    COACH#/ENSEMBLE#/NARRATIVE# partitions describe their own reset generation at
+    write time, instead of provenance resting entirely on the reset-time wipe.
+
+    Pass ``include_phase=False`` for the NARRATIVE#arc partition, whose `phase`
+    attribute already means the narrative-arc STATE (e.g. "building"), NOT the
+    taxonomy phase — those records take the cycle stamp only so the arc semantic is
+    preserved.
+
+    The cycle is read from SSM /life-platform/experiment-cycle via
+    ``coach_checkin.read_cycle()`` — cached once per warm container (the cycle only
+    changes on a reset), so this adds no per-put_item SSM call after the first read.
+
+    Fail-soft, by contract: if the cycle can't be read (missing param/grant, no AWS,
+    import failure) the stamp carries ``phase`` only (or nothing when include_phase
+    is False), and this NEVER raises. A provenance stamp must never break a write.
+    """
+    stamp: dict = {}
+    if include_phase:
+        from constants import EXPERIMENT_PHASE_CURRENT
+
+        stamp["phase"] = EXPERIMENT_PHASE_CURRENT
+    try:
+        from coach_checkin import read_cycle  # cached, fail-soft SSM read (CHECKIN# precedent)
+
+        cycle = read_cycle(ssm_client)
+        if cycle is not None:
+            stamp["cycle"] = int(cycle)
+    except Exception:  # noqa: BLE001 — fail-soft: provenance never breaks a write
+        pass
+    return stamp
+
 
 CROSS_PHASE = "cross_phase"
 RAW_TIMESERIES = "raw_timeseries"
