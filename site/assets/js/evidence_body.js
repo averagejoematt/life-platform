@@ -5,7 +5,7 @@
 import { lineChart, barChart, dualWeight, stackedBar, dualLineChart, sparkline, targetSpine, heatStrip, stackedDayColumns, landmarkBars, weightTrendChart, projectionCone, ciWhisker } from "/assets/js/charts.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fmtShort, todayPT, dayBefore, fig, figs, sec, empty, note, evClass, kvtable } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
-import { preStart } from "/assets/js/coach_popover.js"; // #978 — the shared pre-start / Day-N cycle signal
+import { preStart, GENESIS_ISO } from "/assets/js/coach_popover.js"; // #978 pre-start signal · #1252 genesis for carry-forward markers
 
 export function renderSupplements(d) {
   const g = d.groups || {};
@@ -13,7 +13,13 @@ export function renderSupplements(d) {
   // #1116 — the loop station: how many entries state their hypothesis. An honest
   // completeness count, not a claim — unannotated entries simply render nothing.
   const withLoop = allItems.filter((s) => s.hoped_outcome || s.measured_by).length;
-  const head = figs([fig(d.total_count ?? allItems.length, "compounds"), allItems.length ? fig(`${withLoop}/${allItems.length}`, "with stated hypotheses") : null, d.as_of_date && fig(d.as_of_date, "as of")]);
+  // #1252: an "as of" date earlier than the current cycle's genesis is a deliberately
+  // carried-forward stack (cross_phase, ADR-077), not a staleness bug — co-render a
+  // "carried from prep" marker so a pre-genesis date reads as intentional. Genesis is
+  // the shared client literal (re-anchors on reset), never a new hardcoded date.
+  const asof = String(d.as_of_date || "").slice(0, 10);
+  const asofCarried = /^\d{4}-\d{2}-\d{2}$/.test(asof) && /^\d{4}-\d{2}-\d{2}$/.test(GENESIS_ISO) && asof < GENESIS_ISO;
+  const head = figs([fig(d.total_count ?? allItems.length, "compounds"), allItems.length ? fig(`${withLoop}/${allItems.length}`, "with stated hypotheses") : null, d.as_of_date && fig(d.as_of_date, "as of", asofCarried ? "carried from prep" : null)]);
   // #978 — cycle-aware framing. Before genesis this catalog is the plan going in, not a
   // progress report; say so, keyed off the same pre-start signal every door uses. Once
   // the experiment starts, preStart() returns null and the frame drops away.
