@@ -68,8 +68,10 @@ def test_dedup_hook_passes_the_source_through():
     assert cmd[cmd.index("--source") + 1] == "eightsleep"
 
 
-def test_build_sub_scripts_unchanged_by_1092():
-    # The pre-existing sub-script sequence is untouched — hooks are additive.
+def test_build_sub_scripts_sequence():
+    # The sub-script sequence, pinned. sync_doc_metadata (2026-07-18) MUST be last so the
+    # reset converges the genesis/cycle doc literals (SCHEMA.md, CLAUDE.md, site_api_common)
+    # itself — leaving it out reds the doc-facts gate on the commit of the reset artifacts.
     names = [n for n, _ in pipeline.build_sub_scripts(False, [], "2026-06-14", 4)]
     assert names == [
         "restart_phase_tag",
@@ -81,7 +83,10 @@ def test_build_sub_scripts_unchanged_by_1092():
         "restart_character_rebuild",
         "restart_site_copy_sync",
         "restart_docs_update",
+        "sync_doc_metadata",
     ]
+    # The doc-literal sync must run AFTER restart_docs_update (docs first, then literal reconcile).
+    assert names.index("sync_doc_metadata") > names.index("restart_docs_update")
 
 
 # ── clear_predict_week_subject: the #1198 reset step ─────────────────────────

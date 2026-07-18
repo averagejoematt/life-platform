@@ -425,9 +425,15 @@ def run(apply: bool = False, no_invalidate: bool = False) -> int:
     s3 = boto3.client("s3", region_name=REGION)
 
     installments = fetch_visible_installments(table)
+    # NB (2026-07-18): do NOT early-return on an empty set. restart_leadin_pages is the
+    # SOLE owner of MANIFEST_KEY (restart_site_copy_sync no longer tombstones it — that
+    # double-write clobbered this manifest and served a "tombstone": true marker at
+    # /journal/posts.json). With zero installments we fall through and write an HONEST
+    # empty {"posts": []} manifest so the story hub renders "Nothing published yet" instead
+    # of leaking a prior-cycle manifest or a stale tombstone. The per-installment page
+    # loop and posts_manifest loop below are both no-ops when installments is empty.
     if not installments:
-        print("No visible (phase=experiment, non-tombstoned) chronicle installments found — nothing to publish.")
-        return 0
+        print("No visible (phase=experiment, non-tombstoned) chronicle installments — writing an empty manifest.")
 
     all_dates = sorted(x.get("date", "") for x in installments if x.get("date", ""))
     genesis = EXPERIMENT_START_DATE

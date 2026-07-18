@@ -275,10 +275,10 @@ export async function renderHabits(d) {
     list = sec(`Habits I'm tracking (${habits.length})`, body + `<p class="rd-meta label">Time-of-day and do/avoid/maintain are <em>auto-derived</em> from the habit's name (heuristic, not fact). The friction tag is the opposite — read straight from the real adherence rate: kept ~always is automatic, kept rarely is high-friction. Descriptive, not a grade.${_stripNote}</p>`);
   }
   // §2 — 90-day adherence heatmap (P0.3). GitHub-style calendar, ember-saturation = the day's
-  // Tier-0 %, cut-start (Jul 13) ringed. Replaces the old green/amber/red 7-day grid (rainbow +
+  // Tier-0 %, cut-start (Jul 18) ringed. Replaces the old green/amber/red 7-day grid (rainbow +
   // red, both off-brand) with the ONE-ember heat scale. Reuses heatStrip (compact mode).
   const grid = _histAll.length
-    ? sec("90-day adherence heatmap", heatStrip(_histAll, { valueKey: "tier0_pct", unit: "%", max: 100, compact: true, cutDate: "2026-07-13", label: "Daily Tier-0 adherence", caption: "Each square is a day · ember intensity = the non-negotiables held · the ringed square is the cut starting Jul 13 · 90-day history predates the cut." }))
+    ? sec("90-day adherence heatmap", heatStrip(_histAll, { valueKey: "tier0_pct", unit: "%", max: 100, compact: true, cutDate: "2026-07-18", label: "Daily Tier-0 adherence", caption: "Each square is a day · ember intensity = the non-negotiables held · the ringed square is the cut starting Jul 18 · 90-day history predates the cut." }))
     : "";
   // Adherence trend (the long-run consistency story the 7-cell grid only hinted at).
   const trend = (d.history || []).length ? sec("Adherence trend", lineChart(d.history, { valueKey: "tier0_pct", unit: "%", label: "Daily Tier-0 adherence", spine: true, emptyMsg: "The adherence curve fills as days accrue." })) : "";
