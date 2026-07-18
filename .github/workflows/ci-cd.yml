@@ -1293,10 +1293,13 @@ jobs:
             -v --tb=short -m integration 2>&1
           echo "I8 complete"
 
-      - name: I9 — Ingestion DLQ empty (no silent Lambda failures)
-        # Non-zero DLQ means a Lambda is silently failing. Hard failure so it’s caught immediately.
+      - name: I9 — DLQ has no deploy-caused messages (transient-aware, #1327)
+        # Messages younger than 1h plausibly belong to THIS deploy → hard fail.
+        # Older messages are pre-existing transients (owned by the dlq-depth alarm
+        # + remediation agent) → loud warning, never a red: one documented-transient
+        # Withings message redded 38 consecutive main runs 2026-07-12..07-18.
         run: |
-          python3 -m pytest tests/test_integration_aws.py::test_i9_dlq_empty \
+          python3 -m pytest tests/test_integration_aws.py::test_i9_dlq_no_deploy_caused_messages \
             -v --tb=short -m integration 2>&1
           echo "I9 complete"
 
