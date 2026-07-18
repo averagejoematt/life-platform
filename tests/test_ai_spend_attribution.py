@@ -11,7 +11,7 @@ Run:  python3 -m pytest tests/test_ai_spend_attribution.py -v
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -89,6 +89,57 @@ def test_window_default_is_month_to_date():
     start, end, label = asa._window(_Args())
     assert start.day == 1
     assert "month-to-date" in label
+
+
+# ── GetMetricData period (#1335) ─────────────────────────────────────────────
+#
+# CloudWatch rejects any Period that isn't a multiple of 60. Now-anchored windows
+# (MTD, --days, a partial --month clipped to `now`) almost never are, so the raw
+# `int(total_seconds())` formula crashed every default invocation.
+
+# Arbitrary now-anchored instants with odd seconds/microseconds — none of these
+# produce a window length that is already a multiple of 60.
+_ARBITRARY_NOWS = [
+    datetime(2026, 7, 18, 17, 23, 41, 123456, tzinfo=timezone.utc),
+    datetime(2026, 2, 1, 0, 0, 7, tzinfo=timezone.utc),
+    datetime(2026, 12, 31, 23, 59, 59, 999999, tzinfo=timezone.utc),
+]
+
+
+@pytest.mark.parametrize("now", _ARBITRARY_NOWS)
+def test_metric_period_multiple_of_60_for_mtd_window(now):
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    period = asa._metric_period(start, now)
+    assert period % 60 == 0
+    # one-bucket contract: the period must cover the whole window
+    assert period >= (now - start).total_seconds()
+
+
+@pytest.mark.parametrize("now", _ARBITRARY_NOWS)
+@pytest.mark.parametrize("offset_s", [1, 41, 3599, 86399])
+def test_metric_period_multiple_of_60_for_arbitrary_trailing_windows(now, offset_s):
+    start = now - timedelta(days=9, seconds=offset_s)
+    period = asa._metric_period(start, now)
+    assert period % 60 == 0
+    assert period >= (now - start).total_seconds()
+
+
+def test_metric_period_exact_multiple_unchanged():
+    # A completed --month window (whole days) is already a multiple of 60 — keep it.
+    start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 1, tzinfo=timezone.utc)
+    assert asa._metric_period(start, end) == 30 * 86400
+
+
+def test_metric_period_rounds_up_never_down():
+    start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    assert asa._metric_period(start, start + timedelta(seconds=61)) == 120
+
+
+def test_metric_period_floor_60_for_degenerate_windows():
+    start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    assert asa._metric_period(start, start) == 60
+    assert asa._metric_period(start, start + timedelta(seconds=5)) == 60
 
 
 # ── stubbed CloudWatch end-to-end ────────────────────────────────────────────
