@@ -52,6 +52,8 @@ import boto3
 # CloudFront header / env var can't break subscriptions. Always importable: every
 # deploy path ships the full-tree bundle (#781), so web/site_api_common.py is
 # guaranteed present alongside this module.
+from client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
+
 from web.site_api_common import SITE_API_ORIGIN_SECRET
 
 try:
@@ -501,16 +503,10 @@ def lambda_handler(event, context):
             if not _hmac.compare_digest(incoming, SITE_API_ORIGIN_SECRET):
                 return _json_response(403, {"error": "Forbidden"})
 
-        # Behind CloudFront, requestContext.http.sourceIp is the edge IP — varies
-        # per request and would defeat IP-based rate-limiting. CloudFront forwards
-        # the real client IP in x-forwarded-for; take the first entry (the client).
-        headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-        xff = (headers.get("x-forwarded-for") or "").split(",")[0].strip()
-        source_ip = (
-            xff
-            or event.get("requestContext", {}).get("http", {}).get("sourceIp", "")
-            or event.get("requestContext", {}).get("identity", {}).get("sourceIp", "")
-        )
+        # #1221: key the per-IP subscribe rate limit off the CloudFront edge-appended
+        # (last) X-Forwarded-For hop, not the client-controllable leftmost entry — via
+        # the ONE shared helper so this can never drift from the site-api handlers.
+        source_ip = extract_client_ip(event)
 
         if action == "confirm":
             token = params.get("token", "")
