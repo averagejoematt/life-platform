@@ -342,6 +342,34 @@ def gather_chronicle_data():
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+def build_calendar_facts(start, end, genesis=None):
+    """Deterministic date→weekday map for the covered window + genesis (#1220).
+
+    Every weekday is computed from `datetime`, so it is always correct — never a
+    hardcoded map. Returns a CALENDAR grounding block (empty string on bad dates).
+    """
+    try:
+        d0 = datetime.strptime(start, "%Y-%m-%d")
+        d1 = datetime.strptime(end, "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return ""
+    days = {}
+    cur = d0
+    while cur <= d1:
+        days[cur.strftime("%Y-%m-%d")] = cur
+        cur += timedelta(days=1)
+    if genesis:
+        try:
+            days.setdefault(genesis, datetime.strptime(genesis, "%Y-%m-%d"))
+        except (ValueError, TypeError):
+            genesis = None
+    lines = ["=== CALENDAR (deterministic weekdays — cite these EXACT day-of-week labels; never guess a day of week) ==="]
+    for ds in sorted(days):
+        tag = " (experiment genesis)" if genesis and ds == genesis else ""
+        lines.append(f"- {ds} was a {days[ds].strftime('%A')}{tag}")
+    return "\n".join(lines)
+
+
 def build_data_packet(data):
     """Transform raw data into a narrative-ready packet for Elena."""
     profile = data["profile"]
@@ -377,6 +405,16 @@ def build_data_packet(data):
     prologue = [p for p in data.get("prev_installments", []) if _inst_date(p) and _inst_date(p) < journey_start]
     packet.append(f"Week number: {week_num}")
     packet.append(f"Journey start (experiment genesis): {journey_start}")
+
+    # --- Deterministic weekday calendar (#1220) ---
+    # A weekday paired with a date is a mechanically checkable fact; the grounding
+    # gate never verified it, so the cycle-6 draft called 2026-07-13 a "Sunday"
+    # (it was a Monday — stale cycle-5 genesis leak). Feed Elena the CORRECT
+    # day-of-week for every date in the covered window + the genesis, computed
+    # from datetime so it is always right, not a hardcoded map.
+    cal_facts = build_calendar_facts(dates.get("start"), dates.get("end"), genesis=journey_start)
+    if cal_facts:
+        packet.append(cal_facts)
     if prologue:
         packet.append(
             f"TIMELINE — CRITICAL: {len(prologue)} earlier installment(s) are PRE-GENESIS PROLOGUE "
@@ -1093,10 +1131,30 @@ def installment_grounding_findings(elena_prompt, user_message, text):
     somewhere in what Elena was given (her prompt + the data packet / user message).
     This is the exact findings function the live regen-once loop applies; extracted
     (#812) so the golden-surface eval harness replays fixtures through the ACTUAL
-    gate path. Returns grounded_generation findings ([] = grounded)."""
+    gate path. Returns grounded_generation findings ([] = grounded).
+
+    #1220: also verifies weekday↔date pairs in the narrative against the real
+    calendar (deterministic, zero AI cost) — the class the number gate never saw."""
     import grounded_generation as _gg
 
-    return _gg.grounding_findings(text, allowed=_gg.allowed_numbers(elena_prompt, user_message))
+    findings = _gg.grounding_findings(text, allowed=_gg.allowed_numbers(elena_prompt, user_message))
+    year, month = _covered_year_month(user_message)
+    if year is not None:
+        findings += _gg.weekday_date_findings(text, year, month_hint=month)
+    return findings
+
+
+def _covered_year_month(user_message):
+    """Reference (year, month) for the weekday check — the week-ending date in the
+    data packet ('Week ending: YYYY-MM-DD'), else the latest YYYY-MM-DD present."""
+    m = re.search(r"Week ending:\s*(\d{4})-(\d{2})-(\d{2})", user_message or "")
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    dates = re.findall(r"\b(\d{4})-(\d{2})-\d{2}\b", user_message or "")
+    if dates:
+        y, mo = max(dates)
+        return int(y), int(mo)
+    return None, None
 
 
 def _published_installments(data):
