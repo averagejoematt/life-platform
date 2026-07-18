@@ -1241,6 +1241,33 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1416"
         }
       ]
+    },
+    {
+      "id": "2026-07-18-truth-spine-attempts",
+      "date": "2026-07-18",
+      "title": "The site stopped contradicting itself — and the restarts became the story",
+      "shipped": "Two same-morning surfaces disagreed about the same body: one page said recovery 96%, another said 0.0% and colored it red — because four different code paths each derived 'current vitals' their own way. Now ONE canonical resolver feeds every public surface (pulse, snapshot, the stats file the homepage reads), a contract test fails CI if two pages ever disagree again, and the platform counts on the site derive from the code registries instead of three hand-typed numbers that had drifted years apart in spirit. Same honesty pass elsewhere: a forecaster scoring worse than the base rate can no longer wear a 'Well Calibrated' badge (it now reads 'Not Yet Skillful'), and the wrong-page's header count finally matches the rows it renders. Then the biggest one: /story/attempts/ — the serial restarter's ledger. Every one of the 7 attempts on one day-axis chart, cause of death and all, with the cockpit masthead now reading 'Attempt #8 — previous best: 13 days' the day before cycle 8 arms. And the ops layer got quieter and truer: the public API's concurrency cap had been silently throttling readers with 429s for 21 of 30 days (cap 5, hit daily) — raised to 20 with real Throttles alarms; and the CI badge means something again, because one stale queue message had redded 38 consecutive runs until the check learned to date messages instead of counting them.",
+      "gotcha": "A manual deploy got silently overwritten two minutes later by the still-running CI of an OLDER merge — the runs for the newer commits had been auto-cancelled as 'superseded', but the old one kept going and shipped its stale tree. Live behavior reverted to pre-fix while every deploy log said success. The fix to trust: read the deployed artifact's hash, never the deploy script's checkmark.",
+      "honest_miss": "The new attempts chart shipped with a comment claiming its tiny SVG text was 'floored at 11px effective' — it wasn't; the floor mechanism was never wired, and on a phone the labels rendered at 5px. A browser-measuring QA pass caught the false claim (twice — fixing the floor then exposed label clipping the floor had been hiding). The sanction comment now has to be true, not just well-phrased.",
+      "prs": [
+        {
+          "label": "PR #1421",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1421"
+        },
+        {
+          "label": "PR #1424",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1424"
+        },
+        {
+          "label": "PR #1422",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1422"
+        },
+        {
+          "label": "PR #1423",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1423"
+        }
+      ],
+      "why_it_mattered": "Honesty is the platform's entire moat, and it was failing at the two most visible points: the numbers (two pages, two answers) and the narrative (seven restarts read as shameful emptiness on every day-1). Structural truth — one resolver, derived counts, contract tests — makes the site agree with itself by construction, and the attempts ledger turns the most embarrassing fact into the frame that makes day 2 worth reading."
     }
   ]
 }

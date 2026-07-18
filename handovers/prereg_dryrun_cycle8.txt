@@ -1,0 +1,105 @@
+Installment: "The Plan, On the Record" · 2026-07-18 · 1495 words · sk DATE#2026-07-18
+Stats line: 315.65 lbs at the start · 185 lbs the target · 16 board predictions filed | Prologue — the plan before Day 1
+Frozen predictions referenced: 16 (frozen 2026-07-18T22:02:16.279383+00:00)
+
+--- body markdown ---
+
+Tomorrow morning — July 19, 2026 — a scale in a quiet bathroom records the first number of a twelve-month experiment. Today, while that number is still a blank, we are doing the thing that separates a documented experiment from a highlight reel: writing the whole plan down, in public, before any data exists to flatter it.
+
+This page is a commitment device. Every target below comes from the plan file the platform itself runs on, and every prediction below has already been logged as a formal, dated record the grading engine will score without asking anyone's permission. Nothing here can be quietly revised later. That is the point.
+
+---
+
+**The destination.** 315.65 pounds on the morning of Day 1. 185 pounds twelve months later. The waypoints are already written: 275 by month 2 · 250 by month 4 · 225 by month 7 · 200 by month 10 · 185 by month 12. Body composition is the real target under the weight — a DEXA-verified descent that protects lean mass the entire way down, with a hard floor of 155 pounds of lean mass below which the deficit gives way, no argument.
+
+**The fuel.** 1,500 calories a day as the working baseline — an aggressive, deliberate deficit — with a protein floor of 170 grams and a fiber minimum of 25 grams, eaten inside an 11:30am-7:30pm window. Hungry-day flexibility is written into the plan; starvation theater is not.
+
+**The work.** The opening months are the Foundation phase: 5 strength days a week, roughly three miles of walking every day, and 150 minutes of zone-2 cardio a week. Sleep is a training input, not an afterthought: lights out near 9:00 PM, up at 4:30 AM, chasing 7.5 hours.
+
+**The ramp discipline.** Week one is deliberately light — reduced volume, no sets to failure, and no personal records before day 21. Cardio holds at a conversational effort, zone 2 judged by feel, for the first two weeks. A body carrying three hundred pounds earns intensity by surviving consistency first; the plan protects the joints so the habit can compound.
+
+---
+
+That is the plan. Now the part most projects skip: the board goes on the record. Eight specialists have each filed opening predictions about what the first weeks of data will show — dated today, frozen, and wired straight into the platform's grading engine. Each carries its author's honest confidence and the window over which a deterministic evaluator — code, not the coach — will mark it right or wrong.
+
+> **Dr. Sarah Chen, on training:** “During the first 14 days, daily walking will consistently meet the 3-mile minimum on all 5 post-work weekdays per week, as logged by GPS or step count, because the ramp discipline explicitly schedules walking after work daily and caps intensity to avoid overreach in week 1.” *(high confidence · graded over 14 days)*
+
+
+
+> **Dr. Sarah Chen, on training:** “Zone 2 cardio minutes logged per week will be below the 150-minute/week target during the first 2 weeks, because the plan explicitly restricts zone 2 to RPE-guided effort only (no heart-rate-locked sessions) for the first 2 weeks, making it likely that actual accumulated zone 2 time falls short of the 150-minute target while the athlete calibrates perceived exertion.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Marcus Webb, on nutrition:** “Daily calorie log entries will show adherence to the 1500 kcal/day target on at least 5 out of every 7 days during the first 14 days, as the structured 11:30am-7:30pm eating window mechanically constrains intake opportunity.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Marcus Webb, on nutrition:** “Logged daily protein intake will meet or exceed the 170 g floor on at least 4 out of the first 7 days, as hitting 170 g within a 1500 kcal budget requires deliberate high-protein food selection that typically takes several days to calibrate from a cold start.” *(moderate confidence · graded over 7 days)*
+
+
+
+> **Dr. Victor Reyes, on body composition:** “Body weight will trend downward from the 315.65 lb start weight over the first 14 days, driven by the 1500 kcal/day deficit combined with daily ~3-mile walking and 5 gym days/week of Foundation-phase strength training.” *(high confidence · graded over 14 days)*
+
+
+
+> **Dr. Victor Reyes, on body composition:** “Daily protein intake logs will meet or exceed the 170 g protein floor on at least 10 of the first 14 days, as the 1500 kcal/day plan is explicitly structured around that minimum protein target within the 11:30am–7:30pm eating window.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Lisa Park, on sleep:** “During the first 7 days (Days 1–7), nightly time-in-bed will consistently reach the 7.5-hour target window defined by the 9:00 PM bedtime and 4:30 AM wake time, meaning the wearable will log at least 7.5 hours in bed on each of the 7 nights.” *(moderate confidence · graded over 7 days)*
+
+
+
+> **Dr. Lisa Park, on sleep:** “Over the first 14 days (Days 1–14), sleep consistency — defined as both the 9:00 PM bedtime and 4:30 AM wake time being hit within a 30-minute window on each logged night — will trend upward as the fixed schedule reinforces circadian anchoring, with more compliant nights in week 2 than in week 1.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Amara Patel, on metabolic health:** “Within the first 14 days, daily post-meal glucose excursions will show a consistent downward trend, driven by the 8-hour eating window (11:30am–7:30pm) combined with the 1500 kcal/day intake and daily post-work walking (~3 miles), resulting in measurably lower peak readings by day 14 compared to day 1.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Amara Patel, on metabolic health:** “Within the first 14 days, fasting glucose readings logged each morning (taken before the 11:30am eating window opens, after the overnight fast beginning at 7:30pm — a minimum 16-hour fast) will trend downward across the 14-day window, consistent with the caloric deficit of 1500 kcal/day and the enforced nightly fasting period.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. James Okafor, on biomarkers:** “Resting heart rate (RHR) will trend downward over the first 14 days, consistent with the plan's daily walking (~3 miles) and 150 min/week Zone 2 target combined with the 7.5-hour sleep protocol beginning Day 1, moving toward the stated long-term biomarker target of 55 bpm.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. James Okafor, on biomarkers:** “HRV will trend upward over the first 14 days, driven by the ramp-discipline rules (reduced volume in Week 1, no failure sets, Zone 2 by RPE only for the first 2 weeks) limiting autonomic stress while the 9:00 PM–4:30 AM sleep window provides consistent 7.5-hour recovery, moving toward the stated biomarker target of 50 ms.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Nathan Reeves, on behavior:** “Adherence to the 11:30am–7:30pm eating window will be maintained on at least 6 out of 7 days during the first 14 days, as the structured ramp discipline (reduced volume, no failure sets in week 1) lowers psychological overwhelm and makes behavioral compliance easier to sustain early.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Nathan Reeves, on behavior:** “The 9:00 PM bedtime target will be logged as met on at least 5 out of 7 nights in the first 7 days, as the fixed 4:30 AM wake time creates a concrete external anchor that reinforces consistent sleep-onset behavior from Day 1.” *(moderate confidence · graded over 7 days)*
+
+
+
+> **Dr. Henning Brandt, on the N=1 statistics:** “Within the first 14 days, daily calorie log entries will show at least 12 out of 14 days recorded (≥85% adherence rate), establishing a sufficient N=1 data density baseline for statistical tracking of the 1500 kcal/day target.” *(moderate confidence · graded over 14 days)*
+
+
+
+> **Dr. Henning Brandt, on the N=1 statistics:** “Across the first 14 days, the within-subject variance in daily step count will be high (coefficient of variation >15%) as the roughly 6,000–7,000 step daily walking target self-calibrates during the ramp discipline week-1 reduced-volume phase, reflecting expected early-experiment noise in a single-subject time series.” *(moderate confidence · graded over 14 days)*
+
+
+
+---
+
+Some of these calls will be wrong. That is not a flaw in the exercise — it is the exercise. A prediction you only publish after it comes true is a press release; these were filed before the first data point existed, and the scorecard will say so either way.
+
+So here is the standing invitation: come back and grade us. The live ledger — every call, its status, and each coach's hit rate — is public at <a href="/method/predictions/">the predictions board</a>, and it updates as each window closes. Check it at the two-week mark. Check it again at four. The numbers on that page, not this essay, are the record.
+
+The first weigh-in is tomorrow. From here on, the data does the talking.
+
+*Elena Voss, the day before Day 1*
+
+DRY RUN — nothing written. Re-run with --apply to write the DDB record, then render pages + manifest via restart_leadin_pages.run().
+
+REMINDER: the chronicle partition is EXPERIMENT_SCOPED — a restart_pipeline.py
+re-run tombstones this installment. Re-run
+  python3 deploy/seed_genesis_preregistration.py --apply
+  python3 deploy/publish_genesis_preregistration.py --apply
+after the pipeline to re-land the pre-registration unchanged (claims stay frozen).
