@@ -468,7 +468,11 @@ def _validate_bearer(event):
 # refresh tokens without re-entering it. The static Desktop bearer path is untouched.
 _AUTHORIZE_PASSCODE_DOMAIN = b"life-platform-authorize-v1"
 _APPROVAL_COOKIE_NAME = "lp_approval"
-_APPROVAL_COOKIE_TTL_SECS = 30 * 24 * 3600  # 30 days between passcode prompts per browser
+_APPROVAL_COOKIE_TTL_SECS = 90 * 24 * 3600  # #916: 90 days between passcode prompts per browser
+# (raised 30→90d to cut re-entry friction). This is the *passcode-bypass* window on an
+# already-approved browser, NOT live API access — that stays the separate 24h `lps_`
+# session bearer, deliberately left short for a tight revocation window. The cookie is
+# HMAC-bound to the API key (forging needs the key) and fail-closed with no key.
 _APPROVAL_COOKIE_DOMAIN = "lp-authorize-cookie-v1"
 
 

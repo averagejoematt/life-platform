@@ -324,3 +324,27 @@ def test_malformed_authorization_header_rejected():
     with patch("mcp.handler.get_api_key", return_value="secret"):
         assert h._validate_bearer({"headers": {}}) is False
         assert h._validate_bearer({"headers": {"authorization": "Basic xyz"}}) is False
+
+
+# ── #916 — the remembered-browser cookie TTL tune (30→90d) ──────────────────────
+def test_approval_cookie_ttl_is_tuned_and_matches_issued_cookie():
+    """#916 cut passcode re-entry friction by lengthening the remembered-browser
+    cookie window. Guard BOTH that the tune landed AND that the issued cookie's exp
+    actually reflects the constant (a future edit that changes one but not the other
+    regresses the friction fix). Non-vacuous: the pre-#916 30-day value fails the
+    >=90d assertion. Note this is the passcode-BYPASS window, not live API access —
+    the 24h session bearer (asserted elsewhere) is untouched, so revocation stays tight."""
+    import time
+
+    ninety_days = 90 * 24 * 3600
+    assert h._APPROVAL_COOKIE_TTL_SECS >= ninety_days, "#916: remembered-browser cookie must be >= 90 days"
+
+    with patch("mcp.handler.get_api_key", return_value="secret"):
+        cookie = h._issue_approval_cookie()
+        # "lp_approval=<exp>.<sig>; Max-Age=<ttl>; ..." — exp must be ~TTL out AND Max-Age must equal the constant.
+        assert f"Max-Age={h._APPROVAL_COOKIE_TTL_SECS}" in cookie, "issued cookie Max-Age must equal the constant"
+        exp = int(cookie.split("lp_approval=")[1].split(".")[0])
+        remaining = exp - int(time.time())
+        assert (
+            h._APPROVAL_COOKIE_TTL_SECS - 60 <= remaining <= h._APPROVAL_COOKIE_TTL_SECS
+        ), f"issued cookie exp ({remaining}s out) must reflect the tuned TTL ({h._APPROVAL_COOKIE_TTL_SECS}s)"
