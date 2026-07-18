@@ -168,6 +168,8 @@
   --fs-bm-cap:       8px;    /* .bm-cap — body-map front/back caption */
   --fs-emblem-level: 8px;    /* .emblem-level — tier emblem "LEVEL" caption */
   --fs-arch-at:      13px;   /* .arch-svg .at — architecture-diagram box title */
+  --fs-att-sm:       11px;   /* .att-svg ticks/labels/marks — attempts overlay (#1375) */
+  --fs-att-death:    13px;   /* .att-svg .att-death — attempts overlay collapse mark (#1375) */
   --fs-arch-as:      9.5px;  /* .arch-svg .as — architecture-diagram box subtitle */
 
   --lh-tight:    1.05;

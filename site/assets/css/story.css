@@ -915,3 +915,30 @@ body { overflow-x: hidden; }
 .ms-mark.ms-you .label { color: var(--ember); }
 .mirror-read { font-family: var(--font-serif); font-size: var(--fs-quote); line-height: 1.5; color: var(--ink); }
 .mirror-note { margin-top: var(--sp-2); color: var(--ink-faint); }
+
+/* ── /story/attempts/ — the serial restarter's ledger (#1375) ─────────────────
+   Down ≠ red: a dead attempt is ink, not alarm. Ember is reserved for the LIVE
+   attempt — the one thing on this page that's still earning. */
+.att-figs { display: flex; gap: var(--sp-6); flex-wrap: wrap; margin-top: var(--sp-6); }
+.att-fig { display: flex; flex-direction: column; gap: var(--sp-1); }
+.att-fig .att-fig-n { font-size: var(--fs-data-xl); line-height: 1; font-variant-numeric: tabular-nums; }
+.att-h { font-family: var(--font-serif); font-size: var(--fs-h3); margin-top: var(--sp-7); }
+.att-fig-wrap { margin: var(--sp-4) 0 0; overflow-x: auto; }
+.att-svg { width: 100%; height: auto; display: block; min-width: 640px; } /* #1375: below 640px the wrap scrolls (overflow-x) instead of compressing — floored glyphs would otherwise outgrow the geometry and clip */
+.att-svg .att-grid { stroke: var(--rule); stroke-width: 1; }
+.att-svg .att-tick, .att-svg .att-label { font-family: var(--font-mono); font-size: var(--fs-att-sm); fill: var(--ink-faint); } /* floored >=11px effective by svgtype.js (#1210/#1375) */
+.att-svg .att-label { fill: var(--ink-muted); }
+.att-svg .att-bar { stroke: var(--ink-muted); stroke-width: 6; stroke-linecap: round; }
+.att-svg .att-bar.is-live { stroke: var(--ember); }
+.att-svg .att-death { font-family: var(--font-mono); font-size: var(--fs-att-death); fill: var(--ink); } /* floored >=12px effective by svgtype.js (#1210/#1375) */
+.att-svg .att-censor, .att-svg .att-live-mark { font-family: var(--font-mono); font-size: var(--fs-att-sm); fill: var(--ink-faint); } /* floored >=11px effective by svgtype.js (#1210/#1375) */
+.att-svg .att-live-mark { fill: var(--ember); }
+.att-log { list-style: none; margin-top: var(--sp-4); padding: 0; }
+.att-card.is-live { border-left: 2px solid var(--ember); }
+.att-head { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; }
+.att-head .att-no { font-size: var(--fs-h3); font-variant-numeric: tabular-nums; }
+.att-fate { margin-top: var(--sp-2); font-family: var(--font-serif); font-size: var(--fs-body); }
+.att-stats { margin-top: var(--sp-1); color: var(--ink-muted); }
+.att-strip { margin-top: var(--sp-2); font-family: var(--font-mono); font-size: var(--fs-small); letter-spacing: 0.08em; color: var(--ink-faint); overflow-wrap: anywhere; }
+.att-note { margin-top: var(--sp-6); color: var(--ink-faint); }
+.att-foot { margin-top: var(--sp-3); color: var(--ink-muted); }

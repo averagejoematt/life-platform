@@ -162,6 +162,15 @@ PAGES = [
         "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}],
     },
     {
+        "path": "/story/attempts/",
+        "name": "Story · the attempts (#1375)",
+        "checks": [
+            {"selector": "[data-att-figs]", "not_empty": True, "desc": "attempt headline figures"},
+            {"selector": "[data-att-log]", "not_empty": True, "desc": "expedition log cards"},
+            {"selector": ".att-svg", "not_empty": False, "desc": "same-day-axis overlay SVG"},
+        ],
+    },
+    {
         "path": "/story/agents/",
         "name": "Story · the agents",
         "checks": [{"selector": "[data-roster], .agent-card, [data-feed]", "not_empty": True, "desc": "agent roster + feed"}],

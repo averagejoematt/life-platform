@@ -36,6 +36,8 @@ export const SVG_TYPE_FLOORS = [
   { sel: ".emblem-level", cssVar: "--fs-emblem-level", base: 8, floor: 11 }, // tier-emblem "LEVEL" (sigils.js tierEmblem)
   { sel: ".arch-svg .at", cssVar: "--fs-arch-at", base: 13, floor: 11 }, // architecture diagram box title (/method/build editorial)
   { sel: ".arch-svg .as", cssVar: "--fs-arch-as", base: 9.5, floor: 11 }, // architecture diagram box subtitle
+  { sel: ".att-svg .att-tick, .att-svg .att-label, .att-svg .att-censor, .att-svg .att-live-mark", cssVar: "--fs-att-sm", base: 11, floor: 11 }, // attempts overlay ticks/labels (#1375)
+  { sel: ".att-svg .att-death", cssVar: "--fs-att-death", base: 13, floor: 12 }, // attempts overlay death mark (#1375)
 ];
 
 // The live user→screen horizontal scale of an svg: getScreenCTM().a is exact
