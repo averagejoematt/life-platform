@@ -273,6 +273,33 @@ def seed_grading_liveness_marker(target_date: str, apply: bool):
     )
 
 
+def clear_predict_week_subject(apply: bool):
+    """#1198: retire the outgoing cycle's predict-the-week subject at reset.
+
+    site/config/current_challenge.json is a MANUAL, per-week S3 artifact (no
+    lambda writes it) that drives the cockpit's predict-the-week widget. It is
+    NOT phase-tagged DynamoDB data, so the intelligence wipe never touches it —
+    across a cycle reset the outgoing cycle's frozen week (e.g. 2026-W27) stays
+    live and the widget keeps soliciting predictions on a window that closed
+    before the new genesis. Deleting the object returns the feature to its
+    documented fail-closed 'no active challenge' state: both _predict_subject and
+    handle_current_challenge treat a missing key as None (widget self-hides,
+    banner doesn't render), until Matthew re-seeds a fresh weekly subject.
+
+    Belt-and-suspenders with the site-api _predict_subject week-mismatch guard
+    (#1198): the guard alone hides a stale subject, but clearing the artifact also
+    stops the challenge banner and keeps the S3 state honest. Idempotent — S3
+    delete is a no-op when the key is already absent.
+    """
+    if not apply:
+        return
+    s3 = boto3.client("s3", region_name=REGION)
+    try:
+        s3.delete_object(Bucket="matthew-life-platform", Key="site/config/current_challenge.json")
+    except Exception:
+        pass  # already absent / transient — the fail-closed 'no subject' state is the goal
+
+
 def bust_lambda_warm_cache(apply: bool):
     """Toggle an env var on site-api-style Lambdas to force a cold start.
     Required because they cache the DDB profile in-memory for the warm
@@ -503,6 +530,15 @@ def main():
     # untouched by the wipe, so this seed is the only thing that resets its clock.
     seed_grading_liveness_marker(target, args.apply)
     print(f"    ({'seeded' if args.apply else 'would seed'} EVALUATOR#coach_prediction/STATE#last_decided = {target})")
+
+    # Step 2d (#1198): retire the predict-the-week subject. current_challenge.json
+    # is a manual, per-week S3 artifact that no lambda and no wipe touches — left
+    # alone, the cockpit's predict-the-week widget keeps soliciting bets on the
+    # OUTGOING cycle's frozen week (votes that can never be revealed). Clearing it
+    # returns the feature to its fail-closed 'no active challenge' state until a
+    # fresh weekly subject is seeded.
+    clear_predict_week_subject(args.apply)
+    print(f"    ({'cleared' if args.apply else 'would clear'} site/config/current_challenge.json — predict-the-week fail-closed)")
 
     # Step 2b (--close-cycle, default ON): register the new cycle's genesis in
     # CYCLE_GENESES (drives /api/cycle_compare + /api/timeline). Must happen

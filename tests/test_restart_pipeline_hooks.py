@@ -84,6 +84,35 @@ def test_build_sub_scripts_unchanged_by_1092():
     ]
 
 
+# ── clear_predict_week_subject: the #1198 reset step ─────────────────────────
+
+
+class _FakeS3:
+    def __init__(self):
+        self.deletes = []
+
+    def delete_object(self, Bucket=None, Key=None, **_kw):
+        self.deletes.append((Bucket, Key))
+
+
+def test_clear_predict_week_subject_dry_run_touches_no_s3(monkeypatch):
+    # Dry-run previews only — it must never reach S3 (the whole pipeline is
+    # dry-run-provable before an --apply).
+    fake = _FakeS3()
+    monkeypatch.setattr(pipeline.boto3, "client", lambda *a, **k: fake)
+    pipeline.clear_predict_week_subject(apply=False)
+    assert fake.deletes == []
+
+
+def test_clear_predict_week_subject_apply_deletes_the_artifact(monkeypatch):
+    # #1198: --apply retires the manual per-week predict-the-week subject so the
+    # new cycle can't inherit the outgoing cycle's frozen open week.
+    fake = _FakeS3()
+    monkeypatch.setattr(pipeline.boto3, "client", lambda *a, **k: fake)
+    pipeline.clear_predict_week_subject(apply=True)
+    assert fake.deletes == [("matthew-life-platform", "site/config/current_challenge.json")]
+
+
 # ── dedup_source_records: the generalized eightsleep pass ─────────────────────
 
 # The verified instance (truth-audit finding 21): one physical night written under
