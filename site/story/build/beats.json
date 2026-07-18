@@ -1175,6 +1175,37 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1284"
         }
       ]
+    },
+    {
+      "id": "2026-07-18-later-drain-17",
+      "date": "2026-07-18",
+      "title": "The scoreboard that grades our forecasts was showing zero",
+      "shipped": "Seventeen backlog fixes went live in one sitting, and the one that stung most was the calibration page. It reads the platform's own graded predictions and reports how well-calibrated they are — and it was showing n=0, no data, while the forecast engine had already graded 23 interval forecasts at 82.6% coverage sitting right next to it. The two lived in the same ledger; the scoreboard just dropped every row that graded itself by whether the interval held (\"covered\") instead of by a yes/no \"outcome\" word. Now the page reports all 23. In the same batch: the home share-card stopped boasting \"25 data sources\" when there are 16 (it now counts the registry itself, so it can't drift again), the experiment library shed four copy-paste near-duplicates (71 → 67 distinct pre-registered designs), the RSS feed stopped cutting descriptions mid-word, the cost-governor cadence doc stopped saying \"hourly\" when it runs every 8 hours, and the mobile waveform's day-bars finally reach a real 44px tap target.",
+      "why_it_mattered": "This site's entire claim is proof over promises, and the calibration page is where that claim is most literal — it publicly grades how often the predictions came true. A grading page that shows \"no data\" while 23 graded forecasts sit one endpoint away doesn't just look empty; it undercounts the very honesty record it exists to display. Every fix in the batch carried a regression test written to fail against the old code first, so the specific defect can't quietly return — that's the point, not any reaction to it.",
+      "gotcha": "The experiment-library dedupe deployed, the page showed the new count — and the public /api/experiments endpoint kept insisting there were 71. The site's auto-deploy publishes the site/ folder, but that API reads a catalog from a different root config/ object it never touches. The count was correct in two places and stale in the one a machine would actually query. The fix was to push that root object by hand and clear the cached response; the lesson is that \"the page looks right\" and \"the API is right\" are two separate deploys.",
+      "honest_miss": "The RSS feed still shows one chronicle excerpt cut mid-sentence — that copy was truncated and stored before the fix, so it stays wrong until the chronicle regenerates; only new posts get the clean cut. And the new fabricated-date check is wired into the weekly chronicle's grounding gate but not yet into the other narrative surfaces, so a made-up date is caught in one place, not everywhere.",
+      "prs": [
+        {
+          "label": "PR #1305",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1305"
+        },
+        {
+          "label": "PR #1312",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1312"
+        },
+        {
+          "label": "PR #1311",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1311"
+        },
+        {
+          "label": "PR #1313",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1313"
+        },
+        {
+          "label": "PR #1309",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1309"
+        }
+      ]
     }
   ]
 }
