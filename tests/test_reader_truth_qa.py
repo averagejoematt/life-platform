@@ -310,3 +310,76 @@ def test_qa_smoke_no_surfaces_skips_softly(monkeypatch):
     checks = qa_smoke_lambda.check_reader_truth()
     assert not any(c.passed is False for c in checks)
     assert any("skipped this run" in c.message for c in checks)
+
+
+# ── deterministic vitals-freshness rule (#1226 regression guard) ──────────────
+#
+# Fixtures mirror the real "EACH COACH'S READ" digest card prose from the issue.
+# The NON-VACUOUS proof lives in the pair below: the exact dateless card the bug
+# reproduces on MUST flag, and the same card once the fix adds the as-of kicker
+# MUST NOT — so the guard would have failed before the fix and passes after it.
+
+# Reyes' card, verbatim shape from the issue evidence.
+_DATELESS_CARD = "Day 1 baselines: recovery score 44%, HRV 34 ms, resting heart rate 62 bpm... 315.6 lbs"
+# Chen's card, the "dip" phrasing.
+_DATELESS_DIP = "The recovery dip (60% → 44%) is the story of the week."
+# Same card once /api/coaching-dashboard supplies analysis_generated_at and
+# coaching.js stamps the coachAsOf() kicker into the rendered prose.
+_DATED_CARD = _DATELESS_CARD + " as of Jul 13"
+
+
+def test_vitals_quote_extraction_reads_the_windowed_values():
+    q = rtq.quoted_vitals(_DATELESS_CARD)
+    assert q["recovery"] == [44] and q["hrv"] == [34] and q["rhr"] == [62]  # not the 315 lbs
+    assert rtq.quoted_vitals(_DATELESS_DIP)["recovery"] == [60, 44]  # both dip endpoints
+
+
+def test_dateless_coach_vitals_quote_is_flagged():
+    """The bug: the digest card quotes vitals with no as-of date."""
+    findings = rtq.check_vitals_freshness([{"path": "/coaching/", "prose": _DATELESS_CARD}])
+    assert len(findings) == 1
+    assert findings[0]["category"] == "temporal_contradiction" and findings[0]["severity"] == "high"
+    assert "no as-of date" in findings[0]["note"]
+
+
+def test_dated_coach_vitals_quote_is_clean():
+    """The fix: the same card with the as-of kicker no longer flags."""
+    assert rtq.check_vitals_freshness([{"path": "/coaching/", "prose": _DATED_CARD}]) == []
+
+
+def test_guard_is_non_vacuous_dateless_fails_dated_passes():
+    """One assertion proving the guard discriminates: flip the ONLY difference
+    (the as-of stamp) and the verdict flips — a vacuous rule could not do this."""
+    dateless = rtq.check_vitals_freshness([{"path": "/coaching/", "prose": _DATELESS_CARD}])
+    dated = rtq.check_vitals_freshness([{"path": "/coaching/", "prose": _DATED_CARD}])
+    assert len(dateless) == 1 and dated == []
+
+
+def test_all_coachasof_kicker_forms_satisfy_the_rule():
+    # Every string coachAsOf() can emit must count as an as-of stamp.
+    for kicker in ("as of Jul 13", "as of Jul 13 — next refresh pending", "refresh paused (budget guard)"):
+        assert rtq.check_vitals_freshness([{"path": "/coaching/", "prose": _DATELESS_CARD + " " + kicker}]) == []
+
+
+def test_divergence_subcheck_flags_stale_dated_value():
+    # A dated read whose quoted recovery is far from that date's true vitals.
+    findings = rtq.check_vitals_freshness(
+        [{"path": "/coaching/", "prose": _DATELESS_CARD, "as_of": "2026-07-13"}],
+        vitals_by_date={"2026-07-13": {"recovery": 96.0, "hrv": 62.0, "rhr": 57.0}},
+    )
+    assert findings, "44% recovery vs a true 96% on the as-of date must flag"
+    assert all(f["severity"] == "med" for f in findings)
+    assert any("recovery" in f["note"] for f in findings)
+
+
+def test_divergence_subcheck_clean_when_values_match():
+    findings = rtq.check_vitals_freshness(
+        [{"path": "/coaching/", "prose": "recovery score 95%, resting heart rate 58 bpm as of Jul 13", "as_of": "2026-07-13"}],
+        vitals_by_date={"2026-07-13": {"recovery": 96.0, "rhr": 57.0}},
+    )
+    assert findings == []
+
+
+def test_no_vitals_quote_is_not_flagged():
+    assert rtq.check_vitals_freshness([{"path": "/coaching/", "prose": "Sleep looks steady this week. as of Jul 13"}]) == []
+    assert rtq.check_vitals_freshness([{"path": "/coaching/", "prose": "Sleep looks steady this week."}]) == []

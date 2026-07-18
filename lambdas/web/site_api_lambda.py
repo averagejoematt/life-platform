@@ -811,6 +811,10 @@ def lambda_handler(event, context):
                 coach_entry["emotional_investment"] = "neutral"
                 coach_entry["prediction_count"] = 0
                 coach_entry["data_phase"] = "established"
+                # #1226 (recurrence of #787): stamp each digest read with its OWN
+                # as-of date so the "EACH COACH'S READ" cards can't present a stale
+                # Day-1 vitals quote tense-free next to a cockpit showing fresh values.
+                coach_entry["analysis_generated_at"] = ""
 
                 # Latest output for position_summary
                 try:
@@ -832,6 +836,16 @@ def lambda_handler(event, context):
                             or _cd_out_item.get("content", "")[:200]
                         )
                         coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
+                        # #1226: as-of date for the digest card kicker. Prefer the
+                        # OUTPUT# record's ISO timestamp (matches the observatory
+                        # renderer + the #787 by-coach surface, coachAsOf); fall back
+                        # to the date embedded in the sk (OUTPUT#{YYYY-MM-DD}#{type}).
+                        _cd_asof = _cd_out_item.get("created_at") or _cd_out_item.get("generated_at") or ""
+                        if not _cd_asof:
+                            _cd_sk_parts = _cd_out_item.get("sk", "").split("#")
+                            if len(_cd_sk_parts) >= 2 and _cd_sk_parts[1]:
+                                _cd_asof = _cd_sk_parts[1]
+                        coach_entry["analysis_generated_at"] = _cd_asof
                         # Count predictions
                         preds = _cd_out_item.get("predictions", [])
                         if isinstance(preds, list):

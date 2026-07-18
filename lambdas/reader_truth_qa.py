@@ -289,3 +289,123 @@ def html_to_text(html):
         return re.sub(r"\n{3,}", "\n\n", p.text())
     except Exception:
         return re.sub(r"<[^>]+>", " ", html or "")  # crude fallback, never raises
+
+
+# ── deterministic vitals-freshness rule (#1226 / recurrence of #787) ─────────────
+#
+# The LLM rubric above judges prose narratively; this rule is DETERMINISTIC (no
+# Bedrock) so it gates the same way every run and is unit-testable offline. It
+# encodes the #1226 defect directly: the "EACH COACH'S READ" digest cards quoted
+# Day-1 vitals ("recovery dip 60% → 44%", "resting heart rate 62 bpm") with no
+# as-of date, one click from a cockpit showing recovery 96% / RHR 57. #787's fix
+# added an as-of stamp only to the by-coach surface; this rule guards the digest
+# surface it missed. Rule: any coach narrative quoting recovery/HRV/RHR must
+# carry an as-of date; a DATED quote diverging > divergence_pct from that date's
+# true vitals is a stale-as-current read.
+
+# Divergence threshold — a recovery of 44 vs a true 96 is ~54% off, well over this.
+VITALS_DIVERGENCE_PCT = 20.0
+
+# (metric, window regex from the metric word, value regex inside that window).
+# Windowed so "resting heart rate 62 bpm ... 315.6 lbs" only reads the 62, and a
+# "60% → 44%" dip yields BOTH endpoints for the divergence check.
+_VITALS_WINDOWS = (
+    ("recovery", re.compile(r"recovery[^.]{0,40}", re.I), re.compile(r"(\d{1,3})\s*%")),
+    ("hrv", re.compile(r"\bhrv\b[^.]{0,30}", re.I), re.compile(r"(\d{1,3})\s*ms", re.I)),
+    ("rhr", re.compile(r"(?:resting heart rate|\brhr\b)[^.]{0,30}", re.I), re.compile(r"(\d{1,3})\s*bpm", re.I)),
+)
+
+# Any of these markers anywhere in a surface's prose counts as an as-of stamp —
+# matches every string coachAsOf() can emit ("as of Jul 13", "… refresh paused",
+# "… next refresh pending") plus the ISO/"read on" forms.
+_AS_OF_MARKER = re.compile(r"\b(?:as of|as-of|read on|refresh paused|next refresh pending)\b", re.I)
+
+
+def quoted_vitals(prose):
+    """{metric: [int, ...]} for every recovery %/HRV ms/RHR bpm quoted in `prose`."""
+    text = prose or ""
+    out = {}
+    for metric, win_re, num_re in _VITALS_WINDOWS:
+        vals = []
+        for w in win_re.finditer(text):
+            for n in num_re.findall(w.group(0)):
+                try:
+                    vals.append(int(n))
+                except (TypeError, ValueError):
+                    pass
+        if vals:
+            out[metric] = vals
+    return out
+
+
+def _has_as_of(prose):
+    return bool(_AS_OF_MARKER.search(prose or ""))
+
+
+def _diverges(quoted, actual, pct):
+    """True if `quoted` is more than `pct`% away from `actual`."""
+    try:
+        actual = float(actual)
+    except (TypeError, ValueError):
+        return False
+    if actual == 0:
+        return quoted != 0
+    return abs(quoted - actual) / abs(actual) * 100.0 > pct
+
+
+def check_vitals_freshness(surfaces, vitals_by_date=None, divergence_pct=VITALS_DIVERGENCE_PCT):
+    """Deterministic reader-truth rule (#1226): flag coach narratives that quote
+    recovery/HRV/RHR without an as-of date, and dated quotes that diverge from the
+    known vitals of their as-of date.
+
+    Args:
+        surfaces: [{"name", "path", "prose", optional "as_of": "YYYY-MM-DD"}, ...].
+        vitals_by_date: {"YYYY-MM-DD": {"recovery": float, "hrv": float, "rhr": float}}
+            — optional; enables the divergence sub-check for surfaces carrying an
+            explicit ISO `as_of`.
+        divergence_pct: percentage tolerance before a dated quote is flagged.
+
+    Returns normalized findings [{"page", "category", "severity", "note"}] in the
+    same shape as the LLM path (category "temporal_contradiction"). Never raises.
+    """
+    vitals_by_date = vitals_by_date or {}
+    findings = []
+    for s in surfaces or []:
+        prose = s.get("prose") or ""
+        quoted = quoted_vitals(prose)
+        if not quoted:
+            continue
+        page = s.get("path") or s.get("name") or "?"
+        metrics = ", ".join(sorted(quoted))
+        if not (s.get("as_of") or _has_as_of(prose)):
+            findings.append(
+                {
+                    "page": page,
+                    "category": "temporal_contradiction",
+                    "severity": "high",
+                    "note": (
+                        f"coach narrative quotes {metrics} with no as-of date (#1226/#787) — "
+                        "a reader can't tell these from the current cockpit vitals"
+                    ),
+                }
+            )
+            continue
+        # Dated — check quoted values against that date's true vitals when known.
+        truth = vitals_by_date.get(s.get("as_of")) if s.get("as_of") else None
+        if not truth:
+            continue
+        for metric, vals in quoted.items():
+            actual = truth.get(metric)
+            if actual in (None, ""):
+                continue
+            for v in vals:
+                if _diverges(v, actual, divergence_pct):
+                    findings.append(
+                        {
+                            "page": page,
+                            "category": "temporal_contradiction",
+                            "severity": "med",
+                            "note": f"quoted {metric} {v} diverges >{divergence_pct:.0f}% from the {s['as_of']} value {actual}",
+                        }
+                    )
+    return findings
