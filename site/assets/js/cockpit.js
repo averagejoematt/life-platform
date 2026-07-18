@@ -239,7 +239,11 @@ function renderVerdict(stats) {
   // TL;DR is written by the brief's intelligence engine, and a persona byline
   // it didn't earn would be a fabricated attribution (ADR-104).
   const stamp = writtenStamp(stats && stats._meta && stats._meta.generated_at);
-  const who = `<p class="vd-who label">the daily line · from the morning brief${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`;
+  // #1251: the daily line is the morning brief's read of YESTERDAY's data (it's
+  // minted before today has any). That scope was only ever explained by the
+  // dismiss-once intro card — stamp it PERMANENTLY in the attribution so it can't
+  // read as conflicting with the last-night panel's own-scope numbers directly below.
+  const who = `<p class="vd-who label">the daily line · yesterday's read · from the morning brief${stamp ? ` · <span class="vd-stamp">${escapeHTML(stamp)}</span>` : ""}</p>`;
   v.innerHTML = who + beats.map((b, i) =>
     `<span class="vd-beat" style="--vd-delay:${(i * 0.45).toFixed(2)}s">${i === 0 ? `<span class="mark">&rsaquo;</span> ` : ""}${escapeHTML(b)}</span>`
   ).join(" ");
@@ -850,6 +854,24 @@ async function renderSinceLastVisit() {
   localStorage.setItem(_LV_KEY, String(now));
 }
 
+// >>> CARRY_MARK_START (#1252) — a lever's "as of / last prescribed" date that
+// predates the current cycle's genesis is a deliberately CARRIED-FORWARD cross_phase
+// lever (ADR-077), not stale data. Co-render a small "carried from prep" marker so
+// the pre-genesis date reads as intentional, not a staleness bug. Pure + marker-
+// bracketed so the guard exercises the shipped logic under node. Genesis is the
+// runtime value the scrubber already resolved (API-first), else the client
+// GENESIS_ISO fallback — never a new hardcoded date (both re-anchor on reset).
+function _isPreGenesis(dateStr, genesisISO) {
+  const s = String(dateStr || "").slice(0, 10);
+  const g = String(genesisISO || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || !/^\d{4}-\d{2}-\d{2}$/.test(g)) return false;
+  return s < g; // ISO YYYY-MM-DD sorts lexically = chronologically
+}
+function carryMark(dateStr, genesisISO) {
+  return _isPreGenesis(dateStr, genesisISO) ? ` <span class="carry-tag">carried from prep</span>` : "";
+}
+// <<< CARRY_MARK_END
+
 /* ── #974: the levers — the Protocols station in the daily slice ─────────────
    /cockpit/ rendered Coaching (the board), Data (pillars/trends/forecast) and Story
    (log/achievements) but never Protocols — the loop's fourth station. This strip
@@ -944,12 +966,14 @@ async function renderLevers(pre) {
       : "";
     const dOut = Number(r.days_out);
     const when = String(r.target_date || "");
+    // #1252: a "last prescribed" date before genesis is a carried-forward lever, not stale.
+    const carry = carryMark(when, scrubState.genesis || GENESIS_ISO);
     const note = pre
       ? "staged — prescribed for Day 1"
       : !Number.isFinite(dOut) ? ""
         : dOut === 0 ? "on the sheet today"
           : dOut > 0 ? (when ? `up next · ${escapeHTML(when)}` : "up next")
-            : (when ? `last prescribed ${escapeHTML(when)}` : "");
+            : (when ? `last prescribed ${escapeHTML(when)}${carry}` : "");
     out.push(
       `<li class="lever-row"><a class="lever-link" href="/protocols/">` +
       `<span class="lever-k label">${icon("training", { cls: "dom-ico" })}training</span>` +

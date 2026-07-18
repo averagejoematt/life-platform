@@ -865,6 +865,48 @@ load();
   if ((rib && !rib.hidden) || !wrap.querySelector("[data-home-unlocked]").hidden) wrap.hidden = false;
 })();
 
+// >>> CYCLE_BEAT_START (#1244) — the season-premiere beat's self-hiding decision +
+// derived copy, PURE and marker-bracketed so the guard runs the shipped logic under
+// node. Visible ONLY inside a fresh cycle: window_days in [1,21] with >=1 prior start
+// to compare against. Returns null (→ the wrap stays hidden) past day 21, pre-start,
+// or with no prior cycle. Cycle/day/prior-count all derive from the API payload —
+// never hardcoded (cycles re-anchor on every reset).
+function cycleBeat(d) {
+  if (!d || d.pre_start) return null;
+  const wd = Number(d.window_days);
+  const cur = Number(d.current_cycle);
+  const cycles = Array.isArray(d.cycles) ? d.cycles : [];
+  const priors = cycles.filter((c) => c && Number(c.cycle) < cur).length;
+  if (!Number.isFinite(wd) || wd < 1 || wd > 21) return null; // outside the fresh-cycle window
+  if (!Number.isFinite(cur) || priors < 1) return null; // nothing to compare against yet
+  return {
+    kicker: "the reset log · a new start",
+    h: `Start ${cur}, day ${wd} — how it compares to the ${priors} start${priors === 1 ? "" : "s"} before it.`,
+    note: (typeof d.note === "string" && d.note) ? d.note : "Each start measured over its own matched window — correlative, N=1.",
+  };
+}
+// <<< CYCLE_BEAT_END
+
+// #1244 — mount the season-premiere beat. Same self-hiding contract as homePulse:
+// fetch the already-live endpoint, unhide only when cycleBeat() has something to say.
+(async function homeCycleBeat() {
+  const wrap = document.querySelector("[data-home-cycle-wrap]");
+  if (!wrap) return;
+  if (preStart()) return; // pre-start the countdown owns the page; no cross-cycle read yet
+  let d = null;
+  try {
+    const r = await fetch("/api/cycle_compare", { headers: { accept: "application/json" } });
+    d = r.ok ? await r.json() : null;
+  } catch (e) { return; } // honest silence
+  const beat = cycleBeat(d);
+  if (!beat) return;
+  const set = (sel, text) => { const el = wrap.querySelector(sel); if (el) el.textContent = text; };
+  set("[data-home-cycle-kicker]", beat.kicker);
+  set("[data-home-cycle-h]", beat.h);
+  set("[data-home-cycle-note]", beat.note);
+  wrap.hidden = false;
+})();
+
 mountAsk(document.querySelector("[data-home-ask]"), {
   chips: ["Is my sleep actually improving?", "What moves the glucose most?", "Is the weight loss on track?"],
   note: "AI-generated from the published data — correlative, never medical advice. Rate-limited (5/hour); may pause under the budget guard.",
