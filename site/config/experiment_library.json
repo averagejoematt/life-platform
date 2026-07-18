@@ -1958,32 +1958,6 @@
       "completed_runs": []
     },
     {
-      "id": "sauna-2x-week-6wk",
-      "name": "Sauna 2x/Week for 6 Weeks",
-      "description": "Regular sauna use to test cardiovascular and recovery benefits",
-      "pillar": "movement",
-      "evidence_tier": "strong",
-      "evidence_summary": "4-7 sauna sessions/week associated with 40% reduction in all-cause mortality",
-      "evidence_citation": "Laukkanen et al., JAMA Internal Medicine, 2015",
-      "suggested_duration_days": 42,
-      "difficulty": "moderate",
-      "experiment_type": "measurable",
-      "hypothesis_template": "Regular sauna use (2x/week, 20 min at 174°F) will improve HRV by >5% and reduce resting heart rate",
-      "protocol_template": "20 minutes at 174°F (79°C), 2x per week. Hydrate before and after. No cold plunge after (isolate variable).",
-      "metrics_measurable": [
-        "hrv",
-        "resting_heart_rate",
-        "recovery_score",
-        "sleep_quality"
-      ],
-      "tags": [
-        "heat",
-        "cardiovascular",
-        "recovery"
-      ],
-      "status": "backlog"
-    },
-    {
       "id": "cold-plunge-3x-week",
       "name": "Cold Plunge 2 min, 3x/Week",
       "description": "Deliberate cold exposure for dopamine and mood",
@@ -2080,32 +2054,6 @@
         "TRF",
         "fasting",
         "metabolic"
-      ],
-      "status": "backlog"
-    },
-    {
-      "id": "eliminate-alcohol-30d",
-      "name": "Eliminate Alcohol 30 Days",
-      "description": "Complete alcohol elimination to measure sleep and recovery impact",
-      "pillar": "discipline",
-      "evidence_tier": "strong",
-      "evidence_summary": "Even moderate alcohol disrupts REM sleep, suppresses HRV, impairs recovery for 3+ days per drink",
-      "evidence_citation": "Attia, Outlive; Huberman Lab; Walker, Why We Sleep",
-      "suggested_duration_days": 30,
-      "difficulty": "moderate",
-      "experiment_type": "measurable",
-      "hypothesis_template": "30 days zero alcohol will improve REM % by >10% and HRV by >5ms",
-      "protocol_template": "Zero alcohol for 30 days. No exceptions. Track REM %, HRV, recovery score, sleep efficiency via Whoop.",
-      "metrics_measurable": [
-        "rem_pct",
-        "hrv",
-        "recovery_score",
-        "sleep_efficiency"
-      ],
-      "tags": [
-        "alcohol",
-        "sleep",
-        "recovery"
       ],
       "status": "backlog"
     },
@@ -2211,41 +2159,6 @@
         "mental_health",
         "anxiety",
         "writing"
-      ],
-      "related_protocols": [
-        "mind"
-      ],
-      "status": "backlog",
-      "votes": 0,
-      "promoted_date": null,
-      "completed_runs": []
-    },
-    {
-      "id": "gratitude-journal",
-      "name": "Three Good Things",
-      "description": "Write three good things that happened each day before bed",
-      "pillar": "mental",
-      "evidence_tier": "strong",
-      "evidence_summary": "Seligman's Three Good Things exercise: significant reduction in depression symptoms for 6 months after just 1 week.",
-      "evidence_citation": "Seligman et al., American Psychologist 2005",
-      "suggested_duration_days": 21,
-      "duration_tier": "21-day trial",
-      "difficulty": "easy",
-      "metrics_measurable": [
-        "mood_score"
-      ],
-      "metrics_behavioral": [
-        "compliance"
-      ],
-      "experiment_type": "behavioral",
-      "hypothesis_template": "Nightly gratitude journaling for {duration} days will improve average mood scores vs baseline.",
-      "protocol_template": "Each night before bed: write 3 specific good things that happened today and why they happened. Be specific (not 'nice weather' but 'the walk at Green Lake where I saw the heron').",
-      "why_it_matters": "Redirects attention from negativity bias to positive events. One of the most studied positive psychology interventions.",
-      "tags": [
-        "gratitude",
-        "journaling",
-        "mood",
-        "positive_psychology"
       ],
       "related_protocols": [
         "mind"
@@ -2392,44 +2305,6 @@
         "cognitive"
       ],
       "related_protocols": [
-        "supplements"
-      ],
-      "status": "backlog",
-      "votes": 0,
-      "promoted_date": null,
-      "completed_runs": []
-    },
-    {
-      "id": "magnesium-sleep",
-      "name": "Magnesium Glycinate for Sleep",
-      "description": "400mg magnesium glycinate 1 hour before bed",
-      "pillar": "supplements",
-      "evidence_tier": "moderate",
-      "evidence_summary": "Magnesium deficiency is common; supplementation improves sleep quality in deficient individuals. Glycinate form has calming effect.",
-      "evidence_citation": "Abbasi et al., Journal of Research in Medical Sciences 2012",
-      "suggested_duration_days": 30,
-      "duration_tier": "30-day trial",
-      "difficulty": "easy",
-      "metrics_measurable": [
-        "sleep_score",
-        "deep_sleep_pct",
-        "sleep_latency"
-      ],
-      "metrics_behavioral": [
-        "compliance"
-      ],
-      "experiment_type": "supplement",
-      "hypothesis_template": "400mg magnesium glycinate before bed for {duration} days will improve deep sleep % and reduce sleep onset latency.",
-      "protocol_template": "400mg magnesium glycinate (e.g. Doctor's Best) 1 hour before target bedtime. Take consistently. Track sleep metrics via Whoop.",
-      "why_it_matters": "Magnesium is involved in 300+ enzymatic reactions. Most Americans are deficient. Sleep is where you notice it first.",
-      "tags": [
-        "magnesium",
-        "sleep",
-        "supplement",
-        "recovery"
-      ],
-      "related_protocols": [
-        "sleep-hygiene",
         "supplements"
       ],
       "status": "backlog",
