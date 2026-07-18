@@ -7,16 +7,22 @@ Deploy a Lambda function, the site, or the fleet (one full-tree bundle, #781).
 Parse `$ARGUMENTS` to determine what to deploy. Support these modes:
 
 ### Mode 1: `site`
-**Primary path (since #393): merge to `main` — CI deploys the site.** A push to `main`
-touching `site/` runs the gated CI pipeline (`.github/workflows/ci-cd.yml`): lint → test →
-plan → **manual `production` approval** → site deploy (`deploy_site.sh`) → visual/AI-QA +
-accuracy gates. CI deploys the merged `main` tree only, so a stale local checkout can never
-clobber live, and the reader-facing QA gate fires on every site change. Prefer this.
+**The canonical site-deploy rule lives in `docs/CONVENTIONS.md` §2 — read that; this is a
+pointer, not a restatement.** In short (#750, 2026-07-09): a push to `main` touching
+`site/**` deploys the merged `main` tree automatically via
+`.github/workflows/site-deploy.yml` — OIDC deploy role → `bash deploy/deploy_site.sh`
+(wraps `sync_site_to_s3.sh` + the explicit fonts sync), then the `smoke_test_site.sh` +
+visual/AI-QA gates, with `bash deploy/rollback_site.sh HEAD~1` auto-rollback on a red.
 
-**Local fallback (documented, not the default):** `bash deploy/deploy_site.sh` — run this
-only for an out-of-band hotfix or when CI is unavailable. It syncs `site/` to S3 with
-content-hashed assets and invalidates CloudFront; the clobber guard blocks a sync from a
-checkout behind `origin/main` (override `ALLOW_STALE_SITE=1` for an intentional rollback).
+**This is a SEPARATE workflow from `ci-cd.yml` and deliberately has NO `production`
+approval gate** — do NOT wait for an approval that never comes, and watch
+`site-deploy.yml` (not `ci-cd.yml`'s deploy job) for the QA/rollback verdict. "Merged but
+not deployed" was the drift class this kills, so the merge IS the deploy. Prefer this.
+
+**Attended fallback (documented, not the default):** `bash deploy/sync_site_to_s3.sh` —
+content-hashed assets + self-invalidation, for an out-of-band hotfix or when CI is
+unavailable; its clobber guard blocks a sync from a checkout behind `origin/main`
+(override `ALLOW_STALE_SITE=1` for an intentional rollback).
 
 ### Mode 2: `layer` / `fleet`
 The shared layer is RETIRED (#781): shared modules ship inside every function's
@@ -56,9 +62,10 @@ bash deploy/deploy_site_api.sh        # full bundle + invoke-verify a real route
 (#781: the script ships the same full-tree bundle as CDK — web/ siblings,
 reading/, methods_registry, and every shared module included. The old
 single-file / partial-zip import breaks are structurally dead. #794 ownership:
-CDK — LifePlatformOperational — owns the function's infra (role, env, alarms);
-this script is the sanctioned fast code path. `tests/test_deploy_bundle_paths.py`
-enforces both channels stay on `deploy/build_bundle.py`.)
+CDK — `LifePlatformServe` (`cdk/stacks/serve_stack.py`, split from Operational by
+#793, 2026-07-08) — owns the function's infra (role, env, alarms); this script is
+the sanctioned fast code path. `tests/test_deploy_bundle_paths.py` enforces both
+channels stay on `deploy/build_bundle.py`.)
 
 ## Function Name → Source File Mapping
 
