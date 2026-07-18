@@ -482,12 +482,35 @@ function renderQuiet(p, pre) {
 // every day "up" (green) — a down day was structurally impossible, which silently broke
 // the page's own "down weeks shown, not hidden" promise. Relative tiers make the shape
 // of the week honest: the lower days read as holding/down, the best days as up.
+// >>> WAVE_PURE_START — pure render logic, extracted verbatim by tests/test_wave_render_guard.py.
+// When the window's spread is below the meaningfulSpread threshold, NEITHER channel may
+// dramatize rank-within-window: heights render near-equal (#1214) and the tier is muted
+// ink, never the positive 'up' fallback (#1213). Keep these markers — the guard extracts
+// this block and runs it under node, so it must stay self-contained (only tierOfRel deps).
+const WAVE_FLAT_HEIGHT = 66; // calm near-equal mid-height used when the spread is not meaningful
 function tierOfRel(pos) {
   if (pos == null) return "none";
   if (pos >= 0.62) return "up";
   if (pos >= 0.3) return "mid";
   return "down";
 }
+// Tier for a single bar. #1213 — below-threshold spread must NOT fall back to the positive
+// 'up' (ember) tier; it paints 'mid' (muted ink) so a monotonic decline never reads as strength.
+function barTier(score, pos, meaningfulSpread) {
+  if (score == null) return "none";
+  if (!meaningfulSpread) return "mid";
+  return tierOfRel(pos);
+}
+// Height for a single bar. #1214 — the min-max (14%..100%) amplitude only applies when the
+// spread is meaningful; below threshold every scored bar renders near-equal so a ~2.8% score
+// decline can no longer render as an ~86% visual collapse. No-data days stay the low stub.
+function barHeight(score, lo, span, meaningfulSpread) {
+  if (!score) return 6;
+  if (!meaningfulSpread) return WAVE_FLAT_HEIGHT;
+  const pos = (score - lo) / span;
+  return 14 + pos * 86;
+}
+// <<< WAVE_PURE_END
 function renderWave(days) {
   const wrap = bind("wave");
   if (!wrap || !Array.isArray(days) || !days.length) {
@@ -510,8 +533,8 @@ function renderWave(days) {
     const pos = d.score ? (d.score - lo) / span : null;
     const linkable = !!d.date && d.score != null;
     const bar = document.createElement(linkable ? "a" : "span");
-    bar.className = `bar ${d.score == null ? "none" : meaningfulSpread ? tierOfRel(pos) : "up"}`;
-    const h = d.score ? 14 + (pos || 0) * 86 : 6;
+    bar.className = `bar ${barTier(d.score, pos, meaningfulSpread)}`;
+    const h = barHeight(d.score, lo, span, meaningfulSpread);
     bar.style.height = `${h}%`;
     bar.title = `${d.date || ""}: ${d.score ?? "no data"}`; // a11y / no-JS fallback
     cpts.push({
