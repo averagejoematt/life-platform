@@ -86,6 +86,19 @@ def _cw():
     return boto3.client("cloudwatch", region_name=REGION)
 
 
+def _metric_period(start: datetime, end: datetime) -> int:
+    """GetMetricData Period covering the whole window in ONE bucket.
+
+    CloudWatch requires Period to be a multiple of 60, and arbitrary now-anchored
+    windows (month-to-date, --days) almost never land on one — so round the window
+    length UP to the next minute (up, never down: a shorter period would split the
+    window into more than one bucket and break the one-bucket-sum contract).
+    Floor of 60 for degenerate/empty windows. (#1335)
+    """
+    seconds = max(int((end - start).total_seconds()), 60)
+    return -(-seconds // 60) * 60  # ceil-divide by 60, back to seconds
+
+
 def _window(args) -> tuple[datetime, datetime, str]:
     """Resolve the query window → (start, end, human label). Times are UTC."""
     now = datetime.now(timezone.utc)
@@ -122,7 +135,7 @@ def _fetch(cw, features: list[str], start: datetime, end: datetime) -> dict[str,
     One query id per (feature, metric); GetMetricData allows 500/call so we page
     in chunks. Sum stat over one wide period bucket = window total.
     """
-    period = max(int((end - start).total_seconds()), 60)
+    period = _metric_period(start, end)
     # id → (feature, metric_key)
     id_map: dict[str, tuple[str, str]] = {}
     queries = []
@@ -193,7 +206,7 @@ def _guess_model(tok: dict) -> str:
 def _authoritative_by_model(cw, start: datetime, end: datetime) -> dict[str, dict]:
     """Per-MODEL Bedrock token totals from AWS/Bedrock (the source cost_governor
     trusts) → {model_key: {in, out, cost}}. Reconciliation footer only."""
-    period = max(int((end - start).total_seconds()), 60)
+    period = _metric_period(start, end)
     # discover ModelIds
     model_ids: set[str] = set()
     paginator = cw.get_paginator("list_metrics")
