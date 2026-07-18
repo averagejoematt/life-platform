@@ -55,6 +55,11 @@ def _ground_truth() -> dict:
         "alarm_count": facts.get("alarm_count"),
         "data_sources": facts.get("data_sources"),
         "test_count": facts.get("test_count") or m._count_test_functions(),
+        # #1235: the experiment anchor — genesis date (str) + cycle number (int). Same
+        # single-source discovery: EXPERIMENT_START_DATE in lambdas/constants.py and
+        # max(CYCLE_GENESES) in lambdas/web/site_api_data.py, surfaced through the sync tool.
+        "experiment_genesis": facts.get("experiment_genesis"),
+        "experiment_cycle": facts.get("experiment_cycle"),
     }
 
 
@@ -215,6 +220,54 @@ def _source_hits(files) -> list[str]:
     return hits
 
 
+# ── #1235: experiment genesis + cycle anchor scan (docs) ──────────────────────
+# The current experiment anchor is stated in prose as the "currently <genesis>, cycle N"
+# frame (CLAUDE.md restart section) and "EXPERIMENT_START_DATE (currently <genesis>)"
+# (SCHEMA.md phase taxonomy). Both drift the instant a reset re-anchors the experiment —
+# exactly this defect: CLAUDE.md said cycle 5 / 2026-07-12 three days into cycle 6 /
+# 2026-07-13, with no gate targeting the line. Ground truth: EXPERIMENT_START_DATE
+# (lambdas/constants.py) + max(CYCLE_GENESES) (lambdas/web/site_api_data.py), both surfaced
+# through sync_doc_metadata's discoverers (the ONE source, same as every fact above).
+#
+# PRECISION: the date/cycle are bound to the word "currently" (the current-anchor frame),
+# NEVER a bare "genesis <date>" or "cycle N" — those legitimately name synthetic drill dates
+# ("synthetic genesis 2026-08-02" in a RUNBOOK dry-run record) and historical cycles ("the
+# tombstoned cycle-5 brief"). HISTORICAL-framed lines are exempt as everywhere else.
+GENESIS_ANCHOR = re.compile(r"currently[ *]{1,4}(\d{4}-\d{2}-\d{2})", re.I)
+CYCLE_ANCHOR = re.compile(r"currently[ *]{1,4}\d{4}-\d{2}-\d{2}[ *]*,?\s*cycle\s+(\d+)", re.I)
+
+
+def _anchor_hits(files, genesis: str, cycle: int) -> list[str]:
+    """Live doc lines stating a stale experiment genesis/cycle as the CURRENT anchor.
+
+    Scans each doc Path for the "currently <genesis>[, cycle N]" frame and flags any date
+    != `genesis` or cycle != `cycle`. Skips HISTORICAL-framed lines. Exposed so the
+    regression test can plant a stale anchor in a scratch file and prove the rule bites
+    (the #1189 non-vacuous-scan lesson).
+    """
+    hits = []
+    for doc in files:
+        try:
+            rel = doc.relative_to(ROOT)
+        except ValueError:
+            rel = doc  # scratch file outside the repo (the non-vacuous test)
+        for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            if HISTORICAL.search(line):
+                continue
+            for mo in GENESIS_ANCHOR.finditer(line):
+                if mo.group(1) != genesis:
+                    hits.append(
+                        f"{rel}:{lineno}: experiment genesis claims {mo.group(1)}, truth is {genesis} (#1235)\n"
+                        f"      | {line.strip()[:120]}"
+                    )
+            for mo in CYCLE_ANCHOR.finditer(line):
+                if _to_int(mo.group(1)) != cycle:
+                    hits.append(
+                        f"{rel}:{lineno}: experiment cycle claims {mo.group(1)}, truth is {cycle} (#1235)\n" f"      | {line.strip()[:120]}"
+                    )
+    return hits
+
+
 def _scan_files() -> list[Path]:
     cands = [ROOT / "README.md", ROOT / "CLAUDE.md"]
     cands += sorted((ROOT / ".claude" / "commands").glob("*.md"))
@@ -288,6 +341,9 @@ def main():
 
     # #1230: same ground truth, now over the SOURCE tree — no hardcoded ceiling in code.
     hits += _source_hits(_scan_source_files())
+
+    # #1235: no live doc states a stale experiment genesis/cycle as the current anchor.
+    hits += _anchor_hits(_scan_files(), truth["experiment_genesis"], truth["experiment_cycle"])
 
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []

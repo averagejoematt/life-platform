@@ -10,6 +10,7 @@ import importlib.util
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -69,3 +70,54 @@ def test_doc_facts_gate_is_not_vacuous():
     # a real "N MCP tools" claim IS caught.
     tool_pats = [p for key, pats, _ in facts.FACT_SPECS if key == "tool_count" for p in pats]
     assert any(re.search(p, "the server exposes 143 MCP tools") for p in tool_pats)
+
+
+def test_experiment_anchor_ground_truth_is_discovered():
+    """#1235: genesis + cycle resolve from the real source (constants.py / CYCLE_GENESES),
+    not a stale literal — proves the fact the anchor gate polices is live."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = facts._ground_truth()
+    constants = (ROOT / "lambdas" / "constants.py").read_text(encoding="utf-8")
+    m = re.search(r'EXPERIMENT_START_DATE\s*=\s*"(\d{4}-\d{2}-\d{2})"', constants)
+    assert m, "EXPERIMENT_START_DATE literal not found in lambdas/constants.py"
+    assert truth["experiment_genesis"] == m.group(1)
+    assert isinstance(truth["experiment_cycle"], int) and truth["experiment_cycle"] >= 6
+
+
+def test_experiment_anchor_gate_is_not_vacuous():
+    """#1235 (per the #1189 vacuous-scan lesson): the anchor scan must FLAG a stale
+    'currently <genesis>, cycle N' claim, PASS the true value, and EXEMPT the phrasings
+    that legitimately name other dates/cycles (history, synthetic drill records)."""
+    facts = _load("scripts/check_doc_facts.py")
+    d = Path(tempfile.mkdtemp())
+
+    # the EXACT #1235 defect shape (a full reset stale) — must be caught, both facts.
+    bad = d / "stale.md"
+    bad.write_text("anchored `constants.py` (currently **2026-07-12**, cycle 5 — a future genesis)\n")
+    hits = facts._anchor_hits([bad], "2026-07-13", 6)
+    assert hits, "anchor scan is VACUOUS — it did not flag the planted stale genesis/cycle"
+    joined = "\n".join(hits)
+    assert "2026-07-12" in joined and "claims 5" in joined
+
+    # the current (true) anchor — must pass.
+    good = d / "ok.md"
+    good.write_text("anchored (currently **2026-07-13**, cycle 6 — a future genesis)\n")
+    assert facts._anchor_hits([good], "2026-07-13", 6) == []
+
+    # a HISTORICAL-framed line naming an old cycle/genesis — must NOT be flagged.
+    hist = d / "hist.md"
+    hist.write_text("the tombstoned cycle-5 brief was leaked; earlier genesis was 2026-07-12\n")
+    assert facts._anchor_hits([hist], "2026-07-13", 6) == []
+
+    # a synthetic drill record (bare 'genesis <date>', not the 'currently' anchor) — exempt.
+    drill = d / "drill.md"
+    drill.write_text("Drill record 2026-07-12 (genesis day, synthetic genesis 2026-08-02): dry-run\n")
+    assert facts._anchor_hits([drill], "2026-07-13", 6) == []
+
+
+def test_experiment_anchor_clean_on_current_tree():
+    """After the fix, no live doc states a stale experiment genesis/cycle as current."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = facts._ground_truth()
+    hits = facts._anchor_hits(facts._scan_files(), truth["experiment_genesis"], truth["experiment_cycle"])
+    assert hits == [], "stale experiment anchor still in a live doc:\n" + "\n".join(hits)

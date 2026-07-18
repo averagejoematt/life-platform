@@ -682,6 +682,63 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
     return pages, endpoints
 
 
+def _auto_discover_experiment_genesis() -> str | None:
+    """The current experiment anchor date, e.g. "2026-07-13" (#1235).
+
+    AST-reads the module-level `EXPERIMENT_START_DATE = "YYYY-MM-DD"` literal in
+    lambdas/constants.py — the single source of truth the whole fleet ships (ADR-058,
+    #781). This is the value that must appear in the CLAUDE.md restart-section
+    "(currently <genesis>, cycle N)" anchor and SCHEMA.md's phase-taxonomy note; both
+    drifted a full reset behind (cycle 5 / 2026-07-12) after the cycle-6 re-anchor.
+    AST (not import) so no lambdas.constants import or sys.path side effects run at
+    discovery time — consistent with the other discoverers. Returns None (manual
+    fallback) if the literal is missing, non-string, or not an ISO date.
+    """
+    path = ROOT / "lambdas" / "constants.py"
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except Exception:
+        return None
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "EXPERIMENT_START_DATE":
+                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                        val = node.value.value
+                        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", val):
+                            return val
+    return None
+
+
+def _auto_discover_experiment_cycle() -> int | None:
+    """The current experiment cycle number, e.g. 6 (#1235).
+
+    The live cycle lives in SSM (/life-platform/experiment-cycle); its committed
+    offline mirror is the highest key of the CYCLE_GENESES dict in
+    lambdas/web/site_api_data.py, which restart_pipeline --close-cycle appends to on
+    every reset (and which drives /api/cycle_compare). AST-reads that dict's max
+    integer key. Returns None (manual fallback) if the dict is missing, empty, or has
+    a non-integer key.
+    """
+    path = ROOT / "lambdas" / "web" / "site_api_data.py"
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except Exception:
+        return None
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "CYCLE_GENESES":
+                    keys = [k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, int)]
+                    if keys and len(keys) == len(node.value.keys):
+                        return max(keys)
+    return None
+
+
 _WEEKLY_CRON_RE = re.compile(r"cron\((\d{1,2}) (\d{1,2}) \? \* (SUN|MON|TUE|WED|THU|FRI|SAT) \*\)")
 
 
@@ -985,6 +1042,24 @@ def _apply_auto_discovered(facts: dict) -> dict:
             )
         facts["hypothesis_cadence"] = hypothesis_cadence
 
+    experiment_genesis = _auto_discover_experiment_genesis()
+    if experiment_genesis is not None:
+        if facts.get("experiment_genesis") != experiment_genesis:
+            print(
+                f"  [auto] experiment_genesis: {facts.get('experiment_genesis')} → {experiment_genesis} "
+                "(EXPERIMENT_START_DATE in lambdas/constants.py, #1235)"
+            )
+        facts["experiment_genesis"] = experiment_genesis
+
+    experiment_cycle = _auto_discover_experiment_cycle()
+    if experiment_cycle is not None:
+        if facts.get("experiment_cycle") != experiment_cycle:
+            print(
+                f"  [auto] experiment_cycle: {facts.get('experiment_cycle')} → {experiment_cycle} "
+                "(max key of CYCLE_GENESES in lambdas/web/site_api_data.py, #1235)"
+            )
+        facts["experiment_cycle"] = experiment_cycle
+
     # Recompute derived facts
     facts["secrets_cost"] = f"${facts['secret_count'] * 0.40:.2f}"
     facts["secrets_cost_note"] = (
@@ -1019,6 +1094,8 @@ PLATFORM_FACTS = {
     "restart_endpoint_count": 7,  # fallback: len(JSON_ENDPOINTS) in deploy/restart_verify_rendered.py (#973)
     "restart_url_count": 40,  # derived: restart_page_count + restart_endpoint_count (always recomputed)
     "hypothesis_cadence": "Sun 19:00 UTC",  # fallback: hypothesis-engine schedule cron in cdk/stacks/compute_stack.py (#973)
+    "experiment_genesis": "2026-07-13",  # fallback: EXPERIMENT_START_DATE in lambdas/constants.py (#1235)
+    "experiment_cycle": 6,  # fallback: max key of CYCLE_GENESES in lambdas/web/site_api_data.py (#1235)
     # Secret state
     "api_keys_status": "PERMANENTLY DELETED 2026-03-14",
     # Cost
@@ -1168,6 +1245,20 @@ RULES = [
         "CLAUDE.md",
         r"verifies the \d+-URL v4 surface \(\d+ pages \+ \d+ JSON endpoints",
         "verifies the {restart_url_count}-URL v4 surface ({restart_page_count} pages + {restart_endpoint_count} JSON endpoints",
+    ),
+    # #1235: the experiment anchor line — "(currently **<genesis>**, cycle N —". Drifted a
+    # full reset behind (cycle 5 / 2026-07-12) three days after the cycle-6 re-anchor because
+    # nothing synced it; restart_pipeline runs this sync, so it now self-heals every reset.
+    (
+        "CLAUDE.md",
+        r"\(currently \*\*\d{4}-\d{2}-\d{2}\*\*, cycle \d+ —",
+        "(currently **{experiment_genesis}**, cycle {experiment_cycle} —",
+    ),
+    # #1235: SCHEMA.md phase-taxonomy note quoting the same anchor as a parenthetical.
+    (
+        "docs/SCHEMA.md",
+        r"Record dated on or after EXPERIMENT_START_DATE \(currently \d{4}-\d{2}-\d{2}\)",
+        "Record dated on or after EXPERIMENT_START_DATE (currently {experiment_genesis})",
     ),
     (
         "docs/RUNBOOK.md",
