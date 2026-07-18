@@ -1206,6 +1206,41 @@
           "url": "https://github.com/averagejoematt/life-platform/pull/1309"
         }
       ]
+    },
+    {
+      "id": "2026-07-18-later-finish-cycle8",
+      "date": "2026-07-18",
+      "title": "The archive got its memory back — then we reset the whole experiment for Sunday",
+      "shipped": "The backlog's tail got drained and the archive got healed in one sitting. The cockpit now says plainly that its daily line is yesterday's read (it sat one inch above a live panel showing a different HRV number with no scope label), carried-forward protocol dates say \"carried from prep\" instead of looking stale, and the home page grew a season-premiere beat comparing the new start to every start before it — self-hiding after day 21. Under the hood, the biggest file in the repo (4,184 lines, 37 API handlers) was split along domain seams with route-for-route parity proven, and 8,427 archived records got their true cycle stamps back: every past reset had been re-stamping the whole archive with the newest cycle number, so a record from April claimed it was from July. Then, healed archive in hand, the experiment reset one more time — cycle 8, genesis Sunday July 19.",
+      "why_it_mattered": "Two kinds of honesty were on the line. Reader-facing: two true numbers that look contradictory without a scope label read as a bug, and a pre-genesis date without a \"carried\" marker reads as neglect — both are trust leaks on the highest-traffic page. Archive-facing: the whole point of stamping archived records by reset generation is answering \"which run did this belong to?\", and the stamps were all lies. The heal used each record's own content date against the authoritative cycle ledger, and the wipe was fixed so future resets can never overwrite a stamp again — cycle 8's reset ran over the healed archive and left it intact, which was the point of doing them in that order.",
+      "gotcha": "The first dry-run of the archive heal would have made everything worse: it inferred each record's era from its tombstone timestamp — which is the timestamp of the reset that buried it, the exact corruption being healed. 8,000+ rows would have been re-stamped toward the reset dates with authoritative-looking wrongness. The dry-run caught it before a single write. Separately, a one-line CSS class that passed the browser-level visual QA still turned the main branch red an hour later: a unit-level design-token guard rejects raw font sizes, and no amount of pixel-perfect rendering satisfies it.",
+      "honest_miss": "The 198 pilot-era records from before cycle 1 were left unstamped on purpose — they predate the numbering and forcing them into it would be its own small lie. 2,243 undateable singleton records also keep their wrong stamps; they rebuild themselves on the next compute. And the coach portrait redesign got as far as a rendered option round (four ways to stop the frame reading as a clock) but no decision — only Matthew approves portrait art, and that pick is deliberately still open.",
+      "prs": [
+        {
+          "label": "PR #1317",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1317"
+        },
+        {
+          "label": "PR #1318",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1318"
+        },
+        {
+          "label": "PR #1316",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1316"
+        },
+        {
+          "label": "PR #1359",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1359"
+        },
+        {
+          "label": "PR #1361",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1361"
+        },
+        {
+          "label": "PR #1416",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1416"
+        }
+      ]
     }
   ]
 }
