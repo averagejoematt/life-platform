@@ -618,6 +618,112 @@ def update_configs(target_date: str, weight_lbs: float, weight_kg: float, measur
         CHAR_SHEET.write_text(json.dumps(cs, indent=2) + "\n")
 
 
+# ── #1219: --keep-chronicle plan-figure cross-check (WARN-only, read-only) ────
+# A kept chronicle installment is re-dated forward as a pre-genesis lead-in, but its
+# PROSE is frozen from whenever it was written. If it quotes plan figures (start weight,
+# calorie target, protein floor) those go STALE against the current cycle's constants —
+# e.g. the "Before the Numbers" prologue quotes 302 lb / 1,800 kcal / 190 g, which read
+# as a live contradiction the moment they sit beside the current 315.65 lb / 1,500 kcal /
+# 170 g plan a reader also sees (#1219). We WARN before restoring (never abort — the honest
+# fix is a dated editor's note per ADR-104, not a silent rewrite) so the operator annotates
+# the artifact first. The extract + cross-check core is pure/offline (unit-tested); only the
+# thin DDB-fetch wrapper touches AWS (read-only, consistent with the census preflight).
+
+# Start-weight is context-gated (a bare "185 pounds" GOAL must not be read as the start);
+# tried in order, first hit wins.
+_KEEP_WEIGHT_PATTERNS = [
+    r"start(?:ed|ing)?\s+(?:weight\s+)?(?:at\s+|was\s+|of\s+)?(\d{2,3}(?:\.\d+)?)",
+    r"(\d{2,3}(?:\.\d+)?)\s*(?:pounds|lbs?)\s+on\s+the\s+morning\s+of\s+day\s*1",
+    r"weigh(?:ed|s|ing)?(?:\s+in)?(?:\s+at)?\s+(\d{2,3}(?:\.\d+)?)\s*(?:pounds|lbs?)",
+]
+_KEEP_CALORIE_PATTERN = r"(\d{1,2},?\d{3})\s*[-\s]*(?:kcal|calorie|calories)"
+_KEEP_PROTEIN_PATTERN = r"(\d{2,3})\s*(?:g|grams?)\s*(?:of\s+)?protein|protein\s+(?:floor|minimum|min)\s+of\s+(\d{2,3})\s*(?:g|grams?)"
+
+
+def extract_plan_figures(text: str) -> dict:
+    """Pull the plan numbers a chronicle installment quotes: start weight (lbs), daily
+    calorie target, protein floor (g). Any figure not found is None. Deterministic +
+    offline — the unit-testable core of the #1219 keep-chronicle guard."""
+    t = re.sub(r"\s+", " ", text or "")
+    figs = {"start_weight_lbs": None, "daily_calories": None, "protein_floor_g": None}
+    for pat in _KEEP_WEIGHT_PATTERNS:
+        m = re.search(pat, t, re.IGNORECASE)
+        if m:
+            figs["start_weight_lbs"] = float(m.group(1))
+            break
+    m = re.search(_KEEP_CALORIE_PATTERN, t, re.IGNORECASE)
+    if m:
+        figs["daily_calories"] = int(m.group(1).replace(",", ""))
+    m = re.search(_KEEP_PROTEIN_PATTERN, t, re.IGNORECASE)
+    if m:
+        figs["protein_floor_g"] = int(next(g for g in m.groups() if g))
+    return figs
+
+
+def load_canonical_plan_figures() -> dict:
+    """The current cycle's AUTHORITATIVE plan numbers: start weight from lambdas/constants.py
+    (the generated genesis anchor), calorie target + protein floor from config/user_goals.json
+    (the source constants.py is generated from). Pure/offline — reads committed files only."""
+    import constants as _constants  # lambdas/ is on sys.path (line 96)
+
+    goals = json.loads(USER_GOALS.read_text())
+    nutrition = goals.get("targets", {}).get("nutrition", {})
+    return {
+        "start_weight_lbs": float(_constants.EXPERIMENT_BASELINE_WEIGHT_LBS),
+        "daily_calories": _int_or_none(nutrition.get("daily_calories_target")),
+        "protein_floor_g": _int_or_none(nutrition.get("daily_protein_min_g")),
+    }
+
+
+def _int_or_none(v):
+    return int(v) if v is not None else None
+
+
+def cross_check_plan_figures(found: dict, canonical: dict, weight_tol_lbs: float = 2.0) -> list[str]:
+    """Compare figures extracted from a kept installment to the canonical plan. Returns a
+    list of human-readable mismatch warnings (empty ⇒ consistent, or nothing quoted). Start
+    weight carries a tolerance (cycle baselines re-anchor + round); the calorie target and
+    protein floor must match exactly. A figure absent on either side is not flagged."""
+    warnings: list[str] = []
+    fw, cw = found.get("start_weight_lbs"), canonical.get("start_weight_lbs")
+    if fw is not None and cw is not None and abs(fw - cw) > weight_tol_lbs:
+        warnings.append(f"start weight {fw:g} lb in prose vs {cw:g} lb in the current plan (Δ{abs(fw - cw):.1f} lb)")
+    fc, cc = found.get("daily_calories"), canonical.get("daily_calories")
+    if fc is not None and cc is not None and fc != cc:
+        warnings.append(f"calorie target {fc} kcal in prose vs {cc} kcal in the current plan")
+    fp, cp = found.get("protein_floor_g"), canonical.get("protein_floor_g")
+    if fp is not None and cp is not None and fp != cp:
+        warnings.append(f"protein floor {fp} g in prose vs {cp} g in the current plan")
+    return warnings
+
+
+def warn_on_stale_kept_chronicles(keep_sks: list[str], table=None) -> list[str]:
+    """For each --keep-chronicle sk, fetch its DDB content and WARN if the plan figures it
+    quotes diverge from the current cycle's constants (#1219). Read-only, never aborts.
+    Returns the flat list of sk-prefixed warning strings (also printed for the operator)."""
+    if not keep_sks:
+        return []
+    canonical = load_canonical_plan_figures()
+    if table is None:
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    all_warnings: list[str] = []
+    for sk in keep_sks:
+        item = table.get_item(Key={"pk": f"USER#{USER}#SOURCE#chronicle", "sk": sk}).get("Item", {})
+        text = item.get("content_markdown") or item.get("content_html") or ""
+        warns = cross_check_plan_figures(extract_plan_figures(text), canonical)
+        if warns:
+            print(f"    ⚠ {sk}: kept installment quotes plan figures that diverge from the current plan —")
+            for w in warns:
+                print(f"        · {w}")
+            print(
+                "      → this reads as a live contradiction once restored; annotate with a dated editor's note (ADR-104) before shipping."
+            )
+            all_warnings.extend(f"{sk}: {w}" for w in warns)
+        else:
+            print(f"    ✓ {sk}: plan figures consistent with the current cycle (or none quoted).")
+    return all_warnings
+
+
 def build_sub_scripts(
     skip_chronicle: bool, keep_chronicle: list[str], old_genesis: str, closing_cycle: int | None = None
 ) -> list[tuple[str, list[str]]]:
@@ -899,6 +1005,17 @@ def main():
             print("\n[5] (dry-run) skipping CDK deploy")
     else:
         print("\n[4-5] CDK deploy skipped (--skip-deploy)")
+
+    # #1219: cross-check each --keep-chronicle installment's quoted plan figures against
+    # the current cycle's constants BEFORE restoring it. WARN-only + read-only — runs in
+    # both dry-run and apply so the operator sees a stale-artifact contradiction (and can
+    # add a dated editor's note) before the reset re-dates it into the live prologue.
+    if args.keep_chronicle:
+        print("\n[keep-chronicle] #1219 plan-figure cross-check (WARN-only, read-only):")
+        try:
+            warn_on_stale_kept_chronicles(args.keep_chronicle)
+        except Exception as e:  # a read/parse hiccup must never block a reset
+            print(f"    (warn: kept-chronicle plan-figure cross-check skipped — {e})")
 
     # Step 6-11: all the restart sub-scripts (ordering built + unit-tested in
     # build_sub_scripts).

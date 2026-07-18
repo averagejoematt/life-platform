@@ -74,6 +74,22 @@ REPAIRS = {
         "byline": "By Elena Voss | Seattle, WA",
         # Replaces "Prologue | February 2026 | Seattle, WA" (month+year = date-bound).
         "stats_line": "Prologue | Before Day 1 | Seattle, WA",
+        # #1219: a dated editor's note reconciling Part I's PRE-PLAN numbers with the
+        # frozen plan in Part II ("The Plan, On the Record"). "Before the Numbers" was
+        # drafted early — it quotes ~302 lb / 1,800 kcal / 190 g, the working figures at
+        # the time; the plan Matthew committed to is 315.65 lb / 1,500 kcal / 170 g. Rather
+        # than silently rewrite a dated artifact (ADR-104), we annotate it: honesty-preserving,
+        # reusing the chronicle's Margaret-Calloway editor's-note device (a signed blockquote,
+        # cf. lambdas/margaret_editor_pass.splice_editors_note). DATE-AGNOSTIC on purpose —
+        # the reset re-dates this record every cycle, so the note anchors to "Day 1" and to
+        # Part II's TITLE, never a calendar date (no month/year → passes _FORBIDDEN_AFTER_VET).
+        "editors_note": (
+            "Filed in the days before Day 1, while the plan was still taking shape. The starting "
+            "weight, calorie target, and protein figure quoted below were Matthew's working numbers "
+            "at the time — the figures that actually govern the experiment are the ones he put on "
+            "the record days later, in “The Plan, On the Record.” This dispatch is preserved "
+            "as written: an honest snapshot from before the plan was frozen."
+        ),
         # (name, exact-old, new) — each must occur EXACTLY ONCE in the extracted body.
         "vet_edits": [
             (
@@ -215,12 +231,34 @@ def html_body_to_markdown(body_html: str) -> str:
     return "\n\n".join(out)
 
 
+def render_editors_note(note: str) -> tuple[str, str]:
+    """(html, markdown) for a Margaret-Calloway editor's note, or ('', '') when empty.
+
+    Reuses the chronicle's existing device (lambdas/margaret_editor_pass.splice_editors_note):
+    a signed blockquote. The HTML form is a <blockquote> so restart_leadin_pages renders it
+    with the same ember-rule prose styling every chronicle blockquote gets; the markdown form
+    is the identical '> **Editor's note — Margaret Calloway:** …' the live weekly path emits."""
+    note = (note or "").strip()
+    if not note:
+        return "", ""
+    note_html = f'<blockquote class="editors-note"><strong>Editor\'s note — Margaret Calloway:</strong> {note}</blockquote>\n'
+    note_md = f"> **Editor's note — Margaret Calloway:** {note}\n\n"
+    return note_html, note_md
+
+
 def build_content_fields(repair: dict, vetted_body_html: str) -> tuple[str, str, int]:
     """(content_html, content_markdown, word_count) in the DATE#2026-02-22 shape:
-    html = <h1> + byline <p> + <hr> + prose; markdown = # h1 + *byline* + --- + prose."""
-    content_html = f"<h1>{repair['h1']}</h1>\n" f'<p class="byline"><em>{repair["byline"]}</em></p>\n' f"<hr>\n{vetted_body_html}"
+    html = <h1> + byline <p> + <hr> + [editor's note] + prose; markdown = # h1 + *byline*
+    + --- + [editor's note] + prose. The optional editor's note (#1219) sits at the TOP of
+    the body — a binge reader meets the reconciliation before the pre-plan numbers, and it
+    survives the leadin-pages header strip (which removes only the h1/byline/hr chrome)."""
+    note_html, note_md = render_editors_note(repair.get("editors_note", ""))
+    content_html = (
+        f"<h1>{repair['h1']}</h1>\n" f'<p class="byline"><em>{repair["byline"]}</em></p>\n' f"<hr>\n{note_html}{vetted_body_html}"
+    )
     body_md = html_body_to_markdown(vetted_body_html)
-    content_markdown = f"# {repair['h1']}\n\n*{repair['byline']}*\n\n---\n\n{body_md}"
+    content_markdown = f"# {repair['h1']}\n\n*{repair['byline']}*\n\n---\n\n{note_md}{body_md}"
+    # word_count is the ARTICLE body only (read-time estimate), editor's-note chrome excluded.
     word_count = len(body_md.split())
     return content_html, content_markdown, word_count
 
