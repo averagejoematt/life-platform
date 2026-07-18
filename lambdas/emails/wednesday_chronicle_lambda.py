@@ -2438,20 +2438,18 @@ def lambda_handler(event: dict, context) -> dict:
             "body": json.dumps({"status": "recap_written", "as_of": recap["as_of"], "beats": len(recap.get("recent_beats", []))}),
         }
 
-    # Budget guardrail: at Tier ≥ 1 skip this week's chronicle entirely (weekly,
-    # non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
+    # Budget guardrail: skip this week's chronicle when the budget guard pauses it
+    # (weekly, non-essential, subscriber-facing) — no Bedrock spend, clean no-op.
     try:
-        from budget_guard import current_tier
+        from budget_guard import allow
 
         # Chronicle is weekly flagship content (~$1/wk of Bedrock) and the Friday Panel
-        # podcast's ONLY input — so it must survive tier 1 and only pause at tier >= 2,
-        # in lockstep with the Panel lambda's SKIP_TIER=2. We read the tier directly
-        # (it equals budget_guard's "chronicle" cutoff, now 2) so this fix ships as a
-        # one-function deploy with no layer rebuild. WAS: allow("chronicle"), whose
-        # cutoff of 1 paused this at the mildest budget state and silently starved the
-        # podcast for weeks (2026-06-19). Revert to allow("chronicle") at the next layer bump.
-        if current_tier() >= 2:
-            logger.info("Budget tier >= 2 — Wednesday chronicle paused this week (no Bedrock spend)")
+        # podcast's ONLY input — so it must survive tier 1 and only pause at tier 2,
+        # in lockstep with the Panel lambda's SKIP_TIER=2. The cutoff lives in exactly
+        # one place — budget_guard._FEATURE_CUTOFF["chronicle"] (==2) — and allow()
+        # reads it, so the tier band can be rebanded there without editing this lambda.
+        if not allow("chronicle"):
+            logger.info("Budget guard paused 'chronicle' — Wednesday chronicle skipped this week (no Bedrock spend)")
             _set_chronicle_pending(
                 None,
                 "budget_tier",
