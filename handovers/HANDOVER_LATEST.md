@@ -1,69 +1,83 @@
-# HANDOVER — Now-milestone remediation slice: 8 /fullreview issues shipped via worktree fan-out — 2026-07-18
+# HANDOVER — Next-milestone remediation slice 1: 7 /fullreview issues merged (1 held) via two worktree fan-outs — 2026-07-18
 
-> Instruction thread: continuing from the /fullreview baseline (prior session seeded 68
-> issues #1194–#1261). Matthew: "you do all the merges please, i approve" → later "yes do
-> all this then wrap and give me good to clear." Drove the entire implementable `Now`
-> milestone to merged-on-main via isolated worktree agents, then this wrap. Deploys +
-> two live-DDB backfills remain Matthew's (flagged below).
+> Instruction thread: continuing the /fullreview remediation backlog after the prior session
+> drove the entire implementable `Now` milestone to main. Driver: "Keep paying down the
+> /fullreview remediation backlog — move to the `Next` milestone… Pick a slice of 2–4…
+> fan out `worktree-implementer` agents… you do all the merges (squash + delete-branch)…
+> Deploys stay mine." Ran two disjoint-file batches of 4 agents each, verified every diff,
+> merged 7, HELD 1 (site auto-deploy).
 
-## What shipped — 8 PRs MERGED to main (the entire implementable Now milestone)
+## What shipped — 7 PRs MERGED to main, 1 PR HELD
 
-All via `worktree-implementer` agents in **isolated worktrees** (no shared-tree collision,
-the lesson from 2026-07-17). Each: issue's Path-to-A + a **non-vacuous** regression guard,
-black/ruff clean, full offline suite green, `Fixes #N`, verified by me against the diff.
+All via `worktree-implementer` agents in **isolated worktrees**. Each: issue's Path-to-A +
+a **non-vacuous** regression guard (proven to fail without the fix), black/ruff clean, full
+offline suite green, `Fixes #N`, verified by me against the diff before merge.
+
+**Batch 1 (disjoint files → all 4 merged):**
 
 | PR | Issue | Fix | Deploy (Matthew) |
 |----|-------|-----|------------------|
-| #1262 | #1197 | `singleton_visible` guard on 3 unguarded `site_api_data.py` latest-`DATE#` readers (state_of_matthew was leaking the tombstoned cycle-5 brief live on /coaching/) | `deploy_site_api.sh` |
-| #1263 | #1196 | `cloudwatch:PutMetricData` grant on `compute_coach_prediction_evaluator` + **4th instance** `site_api_ai` (caught by the new AST lockstep gate) + restart marker seed | `cdk deploy LifePlatformCompute` **+ LifePlatformServe** |
-| #1264 | #1201 | remediation agent reds the run on truncated triage (was silent "success") | none (workflow runs from main) |
-| #1265 | #1200 | `singleton_visible` on Elena's persistent-memory reads (cycle-5 threads leaked into cycle-6 drafts) | email-λ fleet / `deploy_lambda.sh` |
-| #1266 | #1202 | phase tagger uses `if_not_exists` so prior archives keep their `cycle=N` stamp | none (reset script) |
-| #1267 | #1203 | freshness reads pass `include_pilot=True` (DDB Limit-before-Filter blinded dark pre-genesis sources) | `deploy_site_api.sh` |
-| #1268 | #1198 | predict-the-week fails closed on a stale `week_id` + reset lifecycle clear + nightly qa guard | `deploy_site_api.sh` + qa_smoke via fleet |
-| #1269 | #1199 | `void_open_bets_at_reset()` writes cross-phase `CALIB#` void rows for open bets at reset | none (reset script) |
+| #1270 | #1231 | tier-change alert `_TIER_LABELS` rewritten to the ADR-125 ladder (was pre-ADR-125: falsely said tier-2 pauses /api/ask) | `deploy_lambda.sh cost-governor` |
+| #1271 | #1236 | /deploy skill Mode 1 → CONVENTIONS §2 pointer (#750 no-approval pipeline) + site-api owner Operational→Serve (#793) + 2 tombstones | none (docs/skill) |
+| #1272 | #1220 | chronicle weekday↔date grounding: deterministic `weekday_date_findings()` in `grounded_generation.py` + calendar-facts block into Elena's packet + live-gate wiring | email-λ fleet / `deploy_lambda.sh wednesday-chronicle` |
+| #1273 | #1230 | inference-receipt `budget_ceiling_usd` derived from `/life-platform/budget-breakdown` (was hardcoded 75; real $85/$100), fail-closed to $85; bedrock_client tier-3 msg drops the $75 literal; new source-literal ceiling gate in `check_doc_facts.py` | `deploy_site_api.sh` + fleet (bedrock_client shared module) |
 
-**Verification:** every PR's regression guard proven non-vacuous (fails without the fix);
-suites 16/612/19/244/24 (slice 1) + 25/63/251 (slice 2) passed; I verified each diff
-before merge (the ~50%-false-positive reflex — these also passed the /fullreview verifier).
-All 8 issues auto-CLOSED via `Fixes #N`.
+**Batch 2 (disjoint files → 3 merged, 1 held):**
 
-## Merge mechanics / gotchas
-- **Merge order for conflict-avoidance:** slice 1 (#1196/#1197/#1200/#1201/#1202) had disjoint
-  files → merged together. Slice 2: #1203/#1198 disjoint → merged; **#1199 HELD** until #1198
-  merged (both touch `restart_pipeline.py`) then released off updated main — every merge stayed
-  CLEAN, zero conflicts. #1196/#1198/#1199 each added a localized reset step (2c/2d/2e) that
-  composes with the others.
-- **`test_count` drift** reconciled after each merge batch — the repo's auto-reconcile bot
-  (`chore(reconcile) … [skip-reconcile]`) regenerates the literals within ~1 min; I aligned
-  local main to it (`reset --hard origin/main`) rather than double-committing.
-- **The ci-cd "Plan deployments" red is EXPECTED, not a break:** it's the **R8-ST6 IAM-review
-  gate** (`gh api …/annotations` → "CDK diff detected IAM/policy changes — review and approve
-  manually before deploying"), firing because #1263 added an IAM grant. Lint + all tests PASS.
-  It clears when Matthew runs the CDK deploy. NOT a resource-destruction match (verified via
-  the emitted annotation, not the script echo).
-- Worktrees left by the agents were removed (`git worktree remove --force` + `prune` + branch -D);
-  only the main worktree remains.
+| PR | Issue | Fix | Deploy (Matthew) |
+|----|-------|-----|------------------|
+| #1274 | #1206 | coverage floor `--cov-fail-under` 25→40 + `scripts/coverage_gap_warn.py` self-reminding >10pt gap `::warning::` (fail-open) | none (CI-only; **live on main now** — confirmed Unit Tests green under 40) |
+| #1276 | #1209 | bare door URLs (`/data` etc.) 301-normalize to trailing-slash in the `v4-redirects` edge fn (generator `v4_cutover.sh` + regenerated artifact) + smoke-test guard | **publish `deploy/generated/v4_redirects_function.js`** as the v4-redirects CloudFront function (viewer-request, `E3S424OXQZ8NBE`) + invalidate — manual, no CDK |
+| #1277 | #1235 | CLAUDE.md experiment-anchor line 2026-07-12/cycle5 → 2026-07-13/cycle6 (+ bonus SCHEMA.md stale date) + 2 AST discoverers in `sync_doc_metadata.py` (self-heals every reset) + `currently`-bound anchor gate in `check_doc_facts.py` | none (docs + CI-gate) |
+| **#1275 (HELD, OPEN)** | #1222 | light-mode `--alert` override `#9E4732` (5.4:1 on --page / 5.8:1 on --surface, clears WCAG AA) + contrast regression test | **HELD: `site/**`-only → merging AUTO-DEPLOYS via `site-deploy.yml`** |
 
-**Build beat:** none — all 8 PRs are merged to main but the user-facing fixes (site-api
-tombstone/freshness guards, IAM grant, Elena email λs) are NOT yet deployed; the beat gate
-requires merged-AND-live. Beat becomes eligible once Matthew deploys (see checklist below).
-**Docs:** none needed — the 8 fixes touch code + tests only (no ADR, schema, deploy-path,
-MCP-tool, or engine-doc change); `sync_doc_metadata` literals auto-reconciled + all six doc
-gates green at the wrap commit. `docs/reviews/FULLREVIEW_2026-07-16.md` (prior session) is the
-source-of-truth scorecard; no wiki page invalidated.
+## Why #1275 is held (the one open decision for Matthew)
+
+#1275 touches **only `site/assets/css/tokens.css`** + a test. A push to `main` touching
+`site/**` auto-deploys via `.github/workflows/site-deploy.yml` (#750, no approval gate —
+"the merge IS the deploy"). Since **"deploys stay mine"** is a hard boundary, I did NOT
+merge it — merging it would trigger a production site deploy. It's fully verified and ready.
+**Matthew's call:** merge #1275 yourself (auto-deploys the CSS a11y fix, gated by
+smoke+visual-QA+auto-rollback), or tell me to. All other PRs were lambdas/-only or doc/CI
+(they trigger ci-cd *validation* on main, whose Deploy job sits behind the manual approval
+gate — safe for me to merge).
+
+## Verification / gotchas
+- **Main is code-green.** Batch 1 ci-cd run (79b18fd5): **Lint + Unit Tests + Deploy-critical
+  tests all PASS.** The only red is **"Plan deployments"** — confirmed via the emitted
+  annotation ("CDK diff detected IAM/policy changes — R8-ST6 gate") to be the **same expected
+  R8-ST6 gate from the prior session's #1263 IAM grant, still undeployed** — NOT a new break.
+  It reds Plan on every main run until Matthew runs the CDK deploy. See
+  memory `reference_r8st6_iam_review_gate`.
+- **Floor-40 is safe:** the first main run under `--cov-fail-under=40` (65c96155) had
+  **Unit Tests = success** (measured ~45.6% > 40). Confirmed before wrap.
+- **`test_count` drift** after each merge auto-reconciled by the repo bot
+  (`chore(reconcile) … [skip-reconcile]`); aligned local via `reset --hard origin/main`,
+  no double-commit. #1235/#1206/#1209 each added new test files; bot regenerated the literal.
+- **Merge cleanliness:** every batch was file-disjoint, so all 7 merges were CLEAN, zero
+  conflicts. All agent worktrees removed (`git worktree remove --force` + `prune`).
+- **Fan-out playbook reused** (from `project_fullreview_panel`): triage file-footprint per
+  issue BEFORE launching; batch only disjoint-file issues; the check_doc_facts.py cluster
+  (#1232/#1205) was deliberately DEFERRED because they'd collide with #1230/#1235 on that file.
+
+**Build beat:** none — 7 PRs merged to main but the user-facing fixes are NOT yet deployed
+(#1273 site-api ceiling, #1272 chronicle λ, #1276 CloudFront publish, #1270 cost-governor,
+#1275 held); the beat gate requires merged-AND-live. Eligible once Matthew deploys.
+**Docs:** none needed beyond the in-PR doc edits (#1271 deploy.md + tombstones, #1277
+CLAUDE.md/SCHEMA.md anchor + sync_doc_metadata discoverers) which shipped inside their PRs;
+all six doc gates green at the wrap commit; `sync_doc_metadata` literals auto-reconciled.
 
 ## Residual queue / next picks
-- **Matthew's deploys (the ONLY thing between merged + live):**
-  1. `bash deploy/deploy_site_api.sh` — lands #1262 (tombstone guard) + #1267 (freshness) + #1268 (predict-week fail-closed). Verify: `curl /api/state_of_matthew` → `available:false`; `/api/source_freshness` shows MacroFactor's real `days_dark`.
-  2. `cd cdk && npx cdk deploy LifePlatformCompute LifePlatformServe` — lands #1263's two IAM grants; clears the R8-ST6 gate + the 10-day `grading-stalled` alarm.
-  3. email-λ fleet (`deploy_fleet.sh` or `cdk deploy --all`) — lands #1265 (Elena) + #1268's qa_smoke guard.
-- **Two live-DDB backfills (Matthew — the code stops future recurrence, doesn't heal history):**
-  - #1266: re-derive true `cycle=N` on already-corrupted archive rows (e.g. `INSIGHT#2026-02-23`).
-  - #1265: regenerate the held `DATE#2026-07-14` Elena draft (phantom "Sunday walks" baked in).
-- **Backlog:** `Now` milestone now = only #1029 (owner-gated re-entry checklist) + #741 (external
-  publish — Matthew's action). Next slice from `gh issue list --label type:story --milestone Next`.
-- **Minor maintainability note (#1199):** `VOID_COACH_IDS` is hardcoded to mirror
-  `coach_prediction_evaluator.COACH_IDS`; a future 9th coach must be added to both.
+- **Matthew's deploys (merged, awaiting live):** #1273 `deploy_site_api.sh` + fleet;
+  #1272 email-λ fleet; #1270 `deploy_lambda.sh cost-governor`; #1276 CloudFront function
+  publish + invalidate; **#1275 merge decision** (site auto-deploy).
+- **Also still pending from the PRIOR session** (unchanged): #1262/#1267/#1268
+  `deploy_site_api.sh`, #1263 `cdk deploy LifePlatformCompute LifePlatformServe` (clears the
+  R8-ST6 Plan red + the grading-stalled alarm), #1265 email fleet, 2 live-DDB backfills.
+- **Next milestone: 30 stories remain open.** The `check_doc_facts.py` cluster (#1232
+  monthly_cost ~$60, #1205 ARCHITECTURE.md six false claims) must be **SERIALIZED** — they
+  + #1230/#1235 all edit that one file. Other good disjoint picks: #1211/#1212 (tokens/css
+  gate), #1214/#1213 (home waveform), #1226 (coaching digest undated vitals), #1204/#1229
+  (alarm aging / alert-digest unwatched).
 
-Prior session: `handovers/HANDOVER_2026-07-17_FullreviewBaselineHonestGate.md`.
+Prior session: `handovers/HANDOVER_2026-07-18_NowMilestoneFanout.md`.
