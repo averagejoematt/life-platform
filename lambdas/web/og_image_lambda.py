@@ -16,6 +16,13 @@ import time
 
 import boto3
 
+# #1260: the home card's "N data sources" line is DERIVED from the canonical registry,
+# never hardcoded. The old literal "25" was an uncomputed, inflated claim (registry has
+# 16 top-level sources) on the platform's most-distributed surface — og-home.png ships on
+# 72 pages' share previews. Reading the registry length makes the number self-correcting:
+# it can never drift from the source of truth (source_registry.SOURCE_REGISTRY).
+from source_registry import SOURCE_REGISTRY
+
 # #595 (ADR-114): the shared card engine is the single place brand cards are drawn.
 # The daily page cards delegate their chrome to it so every off-site card — daily,
 # moment (og_moments), character (#420), chronicle (#405) — shares one template.
@@ -75,8 +82,9 @@ def build_home(stats):
     # Title
     draw.text((48, 100), "AVERAGEJOEMATT", fill=TEXT, font=_font(FONT_DISPLAY, 72))
 
-    # Subtitle
-    draw.text((48, 180), "One man. 25 data sources. Total transparency.", fill=MUTED, font=_font(FONT_MONO, 14))
+    # Subtitle — source count derived from the registry (#1260), never hardcoded.
+    n_sources = len(SOURCE_REGISTRY)
+    draw.text((48, 180), f"One man. {n_sources} data sources. Total transparency.", fill=MUTED, font=_font(FONT_MONO, 14))
 
     # Metrics row
     lost = journey.get("lost_lbs")

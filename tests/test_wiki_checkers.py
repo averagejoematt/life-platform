@@ -6,6 +6,7 @@ checker must exit 0 against the current tree. If one reds here, the wiki contrac
 the rule), don't skip the test.
 """
 
+import ast
 import importlib.util
 import re
 import subprocess
@@ -182,3 +183,61 @@ def test_cron_gate_clean_on_current_tree():
     facts = _load("scripts/check_doc_facts.py")
     hits = facts._cron_hits(facts._scan_files(), facts._cdk_cron_map())
     assert hits == [], "a live doc quotes a cron that disagrees with the CDK schedule:\n" + "\n".join(hits)
+
+
+def test_og_source_count_ground_truth_is_the_registry():
+    """#1260: the reader-facing card count resolves from lambdas/source_registry.py's
+    SOURCE_REGISTRY (AST-counted), not a hand-maintained literal — proves the fact the og
+    scan polices is live and self-correcting."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = facts._registry_source_count()
+    src = (ROOT / "lambdas" / "source_registry.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    counted = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for tgt in node.targets:
+                if isinstance(tgt, ast.Name) and tgt.id == "SOURCE_REGISTRY" and isinstance(node.value, ast.Dict):
+                    counted = len(node.value.keys)
+    assert counted is not None and counted >= 1
+    assert truth == counted, f"registry discoverer ({truth}) disagrees with an independent AST count ({counted})"
+
+
+def test_og_source_count_gate_is_not_vacuous():
+    """#1260 (per the #1189 vacuous-scan lesson): the og scan must FLAG the exact pre-fix
+    '25 data sources' literal, PASS the fixed f-string form (no numeric literal), and EXEMPT
+    the shapes that legitimately differ (full-line comments, history)."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = facts._registry_source_count()
+    d = Path(tempfile.mkdtemp())
+
+    # the EXACT #1260 defect: a hardcoded stale count in a reader-facing draw.text — caught.
+    bad = d / "og_image_lambda.py"
+    bad.write_text('    draw.text((48, 180), "One man. 25 data sources. Total transparency.", fill=MUTED)\n')
+    hits = facts._og_source_hits([bad], truth)
+    assert hits, "og-source scan is VACUOUS — it did not flag the planted stale '25 data sources'"
+    assert "claims 25 data sources" in hits[0] and f"truth is {truth}" in hits[0]
+
+    # the fixed card: an f-string interpolates the count, so no numeric literal is present — clean.
+    good = d / "og_good.py"
+    good.write_text('    draw.text((48, 180), f"One man. {n_sources} data sources. Total transparency.")\n')
+    assert facts._og_source_hits([good], truth) == []
+
+    # a value that happens to EQUAL the registry truth — not a drift, so not flagged.
+    okval = d / "og_okval.py"
+    okval.write_text(f'    draw.text((0, 0), "One man. {truth} data sources.")\n')
+    assert facts._og_source_hits([okval], truth) == []
+
+    # a full-line comment / HISTORICAL-framed line naming the old count — exempt.
+    hist = d / "og_hist.py"
+    hist.write_text('# the card used to say "25 data sources" — was 25, now derived from the registry\n')
+    assert facts._og_source_hits([hist], truth) == []
+
+
+def test_og_source_count_clean_on_current_tree():
+    """After the fix, no og_*.py card hardcodes a data-source count that disagrees with the
+    registry (the evidence pointer no longer reproduces)."""
+    facts = _load("scripts/check_doc_facts.py")
+    truth = facts._registry_source_count()
+    hits = facts._og_source_hits(facts._scan_og_files(), truth)
+    assert hits == [], "an og card still hardcodes a stale data-source count:\n" + "\n".join(hits)
