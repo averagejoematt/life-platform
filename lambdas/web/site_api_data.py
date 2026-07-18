@@ -27,7 +27,7 @@ import boto3
 import habit_causality  # noqa: E402
 import stats_core  # bundled shared module (#529): the one sanctioned stats implementation (ADR-105)
 from boto3.dynamodb.conditions import Key
-from phase_filter import with_phase_filter  # ADR-058
+from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
 from source_registry import (  # #392: canonical source classification (bundled lambdas/ tree)
     DEFAULT_STALE_HOURS as _FRESHNESS_DEFAULT_STALE_HOURS,
     engagement_channels,
@@ -2918,7 +2918,10 @@ def handle_forecast() -> dict:
         Limit=1,
     )
     items = _decimal_to_float(resp.get("Items", []))
-    if not items:
+    # #1197: the latest DATE# record may be a wiped cycle-N record (tombstone=true /
+    # non-current phase) that survived a reset until the next daily writer run — mirror
+    # the singleton_visible guard the coach get_item readers already apply (#946/#1085).
+    if not items or not singleton_visible(items[0]):
         return _ok({"available": False}, cache_seconds=900)
     _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
@@ -2951,7 +2954,8 @@ def handle_scenarios() -> dict:
         Limit=1,
     )
     items = _decimal_to_float(resp.get("Items", []))
-    if not items:
+    # #1197: same latest-DATE# tombstone/phase guard as handle_forecast.
+    if not items or not singleton_visible(items[0]):
         return _ok({"available": False}, cache_seconds=3600)
     _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
@@ -2980,7 +2984,12 @@ def handle_state_of_matthew() -> dict:
         Limit=1,
     )
     items = _decimal_to_float(resp.get("Items", []))
-    if not items:
+    # #1197 (LIVE leak): before this guard, the wiped cycle-5 "Week 1, Day 1" brief
+    # (tombstone=true, phase=pilot) served as current on /coaching/ for the ~1-week
+    # window until the next Sunday state-of-matthew run overwrote it. singleton_visible
+    # gives the honest empty state coaching.js already renders ("honest-absent until the
+    # first Sunday run of the cycle").
+    if not items or not singleton_visible(items[0]):
         return _ok({"available": False}, cache_seconds=3600)
     _INTERNAL = {"pk", "sk", "run_id", "computed_at", "phase", "cycle", "record_type"}
     data = {k: v for k, v in items[0].items() if k not in _INTERNAL}
