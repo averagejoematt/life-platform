@@ -1,105 +1,69 @@
-# HANDOVER — /fullreview baseline (17 lenses → 68 issues) + the honest-negative gate fix — 2026-07-17
+# HANDOVER — Now-milestone remediation slice: 8 /fullreview issues shipped via worktree fan-out — 2026-07-18
 
-> Instruction thread: Matthew asked "what's the best skill for a full deep review — we
-> started one last week but stopped when Fable ran out of credits; now they're reset, do
-> it again." That is the `/fullreview` relaunch the 2026-07-12 session banked a kit for.
-> After the scorecard: "move all of these into git issues so everything on the list gets
-> remediated," then "wrap before we fix." Mid-wrap, a live incident surfaced (Matthew's
-> #1193 merge auto-rolled-back) and he said "fix it in this session so I can return to
-> the other."
+> Instruction thread: continuing from the /fullreview baseline (prior session seeded 68
+> issues #1194–#1261). Matthew: "you do all the merges please, i approve" → later "yes do
+> all this then wrap and give me good to clear." Drove the entire implementable `Now`
+> milestone to merged-on-main via isolated worktree agents, then this wrap. Deploys +
+> two live-DDB backfills remain Matthew's (flagged below).
 
-## What shipped
+## What shipped — 8 PRs MERGED to main (the entire implementable Now milestone)
 
-### 1. The first-ever /fullreview scorecard (merged: `07b80001`)
-- Relaunched the saved 17-lens panel script (`fullreview-panel-wf_0d2d1b5b-c13.js`) after
-  refreshing its baked-in ground truth per the relaunch checklist: cycle 5→6, Day 1→4,
-  genesis 2026-07-13, build `1b57516`, **repo PRIVATE**, current do-not-refile issue list,
-  PR #1193 live-vs-main note. Tree switched to `main` first. The banked security lens could
-  not be reused (Workflow resume is same-session-only) — it re-ran fresh.
-- Run `wf_acd72834-8d9`: 34 agents (17 graders + 17 adversarial verifiers), 0 errors,
-  ~3.2M subagent tokens, 71 min. **89 raw findings → 72 CONFIRMED / 17 REFUTED (81%
-  survival** vs the historical ~50% — the refreshed ground truth paid for itself).
-- **Grades: nothing below B.** A-: principal, designer, dataviz, security, a11y, devex.
-  B+: cto, ai-quality, cpo, qs, reader, cost, data-architect, integrations, growth.
-  B: narrative, observability.
-- Deliverables: `docs/reviews/FULLREVIEW_2026-07-16.md` (scorecard, per-lens findings +
-  evidence + regression guards + ledger-to-A) and `docs/reviews/fullreview_grades_2026-07-16.json`
-  (durable rubric anchors — the next run re-applies them instead of redefining the bar).
+All via `worktree-implementer` agents in **isolated worktrees** (no shared-tree collision,
+the lesson from 2026-07-17). Each: issue's Path-to-A + a **non-vacuous** regression guard,
+black/ruff clean, full offline suite green, `Fixes #N`, verified by me against the diff.
 
-### 2. All 72 confirmed findings filed as 68 GitHub issues (#1194–#1261)
-- issue-filer agent, ADR-099 contract. 6 findings merged into 5 multi-lens issues; 0 skips;
-  label `review:2026-07-16`; milestones **10 Now / 34 Next / 24 Later** (independently
-  verified). Every body carries evidence, path-to-A, regression guard, scorecard link.
-- **Epic #1194 — Reset-read integrity** (the systemic class): #1197 state_of_matthew serves
-  the tombstoned cycle-5 brief on /coaching/ (+ same-pattern forecast/scenarios readers),
-  #1198 predict-the-week frozen at cycle-5 W27, #1199 calibration ledger loses pre-registered
-  bets on reset, #1200 Elena memory reads ignore tombstones, #1202 cycle-stamp overwrite
-  corrupts the archive, #1203 source_freshness blind to pre-genesis staleness (MacroFactor
-  dark since 06-24, invisible).
-- **Epic #1195 — Telemetry that lies**: #1196 coach-prediction-evaluator missing
-  `cloudwatch:PutMetricData` (dead #727 liveness heartbeat, 10-day stuck alarm — third
-  occurrence of this IAM class), #1201 remediation-agent runs "success" with everything
-  untriaged, plus alarm-aging/#1227/#1229/#1253. Two stories joined existing epic #342.
+| PR | Issue | Fix | Deploy (Matthew) |
+|----|-------|-----|------------------|
+| #1262 | #1197 | `singleton_visible` guard on 3 unguarded `site_api_data.py` latest-`DATE#` readers (state_of_matthew was leaking the tombstoned cycle-5 brief live on /coaching/) | `deploy_site_api.sh` |
+| #1263 | #1196 | `cloudwatch:PutMetricData` grant on `compute_coach_prediction_evaluator` + **4th instance** `site_api_ai` (caught by the new AST lockstep gate) + restart marker seed | `cdk deploy LifePlatformCompute` **+ LifePlatformServe** |
+| #1264 | #1201 | remediation agent reds the run on truncated triage (was silent "success") | none (workflow runs from main) |
+| #1265 | #1200 | `singleton_visible` on Elena's persistent-memory reads (cycle-5 threads leaked into cycle-6 drafts) | email-λ fleet / `deploy_lambda.sh` |
+| #1266 | #1202 | phase tagger uses `if_not_exists` so prior archives keep their `cycle=N` stamp | none (reset script) |
+| #1267 | #1203 | freshness reads pass `include_pilot=True` (DDB Limit-before-Filter blinded dark pre-genesis sources) | `deploy_site_api.sh` |
+| #1268 | #1198 | predict-the-week fails closed on a stale `week_id` + reset lifecycle clear + nightly qa guard | `deploy_site_api.sh` + qa_smoke via fleet |
+| #1269 | #1199 | `void_open_bets_at_reset()` writes cross-phase `CALIB#` void rows for open bets at reset | none (reset script) |
 
-### 3. fix(qa): signed progress_pct (merged: `09d4a0db`) — the mid-wrap incident
-- Matthew merged #1193 + #1190 during the wrap. #1193's site deploy passed smoke but the
-  **accuracy gate flagged `journey.progress_pct = -1.2` "impossible — pct out of [0,100]"
-  → HIGH → visual-QA failure → auto-rollback of a healthy deploy.** The value is honest:
-  316 lb vs the 314 cycle-6 baseline on Day 5 (ADR-104 down-weeks-shown).
-- Fix: `tests/accuracy_audit.py::impossible_values` now validates `progress_pct` in
-  **[-100, 100]** (all other `_pct` stay [0,100]) + 5 regression tests
-  (`tests/test_accuracy_audit_ranges.py`). Front-end verified safe for signed values
-  (bars clamp visually, text binds render "-1.2%" verbatim).
-- Re-deploy dispatched (`workflow_dispatch`, run 29622123327 on `09d4a0db`) — brings
-  #1193's essay `og:image` swap live. Verification status at wrap: see the status block.
+**Verification:** every PR's regression guard proven non-vacuous (fails without the fix);
+suites 16/612/19/244/24 (slice 1) + 25/63/251 (slice 2) passed; I verified each diff
+before merge (the ~50%-false-positive reflex — these also passed the /fullreview verifier).
+All 8 issues auto-CLOSED via `Fixes #N`.
 
-## Verified
-- Scorecard artifacts committed + pushed; 68 issues live-verified (count, milestones, epics).
-- Gate fix: 5/5 new tests pass; `impossible_values` returns `[]` against LIVE public_stats;
-  black clean (flake8 hits in `accuracy_audit.py` are pre-existing — CI's flake8 scope is
-  `lambdas/ mcp/` only, tests/ is black-gated).
+## Merge mechanics / gotchas
+- **Merge order for conflict-avoidance:** slice 1 (#1196/#1197/#1200/#1201/#1202) had disjoint
+  files → merged together. Slice 2: #1203/#1198 disjoint → merged; **#1199 HELD** until #1198
+  merged (both touch `restart_pipeline.py`) then released off updated main — every merge stayed
+  CLEAN, zero conflicts. #1196/#1198/#1199 each added a localized reset step (2c/2d/2e) that
+  composes with the others.
+- **`test_count` drift** reconciled after each merge batch — the repo's auto-reconcile bot
+  (`chore(reconcile) … [skip-reconcile]`) regenerates the literals within ~1 min; I aligned
+  local main to it (`reset --hard origin/main`) rather than double-committing.
+- **The ci-cd "Plan deployments" red is EXPECTED, not a break:** it's the **R8-ST6 IAM-review
+  gate** (`gh api …/annotations` → "CDK diff detected IAM/policy changes — review and approve
+  manually before deploying"), firing because #1263 added an IAM grant. Lint + all tests PASS.
+  It clears when Matthew runs the CDK deploy. NOT a resource-destruction match (verified via
+  the emitted annotation, not the script echo).
+- Worktrees left by the agents were removed (`git worktree remove --force` + `prune` + branch -D);
+  only the main worktree remains.
 
-## Gotchas hit
-- **The accuracy gate can red on honesty.** A blanket `[0,100]` pct rule treats a
-  legitimate early-cycle regression as impossible → spurious rollback. Range rules must
-  encode each metric's real domain, not the "nice" one.
-- **Concurrent-session tree collision, detected via reflog.** Mid-wrap, foreign entries
-  (`pull --ff-only`, `checkout fix/clamp-progress-pct`) + 4 uncommitted lambda edits
-  revealed Matthew's other session fixing the same incident the opposite way
-  (producer-side clamp to 0). Froze mutations, surfaced it; Matthew chose this session.
-  Recovery: other session's diff banked to scratchpad (`other-session-producer-clamp.patch`),
-  its branch force-reset to pristine `d1611ad3`, its working-tree edits reverted. **The
-  tell that saved a silent stomp: `git push` reported "Everything up-to-date" while
-  ls-remote showed the old sha — the commit had landed on the other session's branch.**
-- **A commit sweeps the whole index.** My gate-fix commit on the foreign branch silently
-  included the staged wrap rename — split back out when re-landing on main.
-- **`gh workflow run` can resolve the ref before a just-pushed commit propagates** — the
-  first dispatch ran on the pre-fix sha (cancelled); always verify the run's `headSha`.
-- **Workflow resume is same-session-only** (known from the kit, confirmed): the banked
-  security lens was unrecoverable; a fresh relaunch re-runs everything.
-- **529 Overloaded kills background agents mid-batch**; SendMessage resume preserves full
-  context. Reconcile-before-refile (`gh issue list --label review:2026-07-16`) made the
-  resume idempotent — worth repeating for any bulk-filing agent.
+**Build beat:** none — all 8 PRs are merged to main but the user-facing fixes (site-api
+tombstone/freshness guards, IAM grant, Elena email λs) are NOT yet deployed; the beat gate
+requires merged-AND-live. Beat becomes eligible once Matthew deploys (see checklist below).
+**Docs:** none needed — the 8 fixes touch code + tests only (no ADR, schema, deploy-path,
+MCP-tool, or engine-doc change); `sync_doc_metadata` literals auto-reconciled + all six doc
+gates green at the wrap commit. `docs/reviews/FULLREVIEW_2026-07-16.md` (prior session) is the
+source-of-truth scorecard; no wiki page invalidated.
 
-**Build beat:** fullreview-2026-07-16 (the report-card story; #1193's un-tofu'd cards + the
-honest-negative gate fix fold in as clauses).
-**Docs:** `docs/reviews/FULLREVIEW_2026-07-16.md` + `fullreview_grades_2026-07-16.json`
-(new, indexed); no engine/schema/deploy-path docs invalidated — the session's only engine
-change is `tests/accuracy_audit.py`, self-documenting + covered by its new test file; no
-tombstones (nothing retired).
+## Residual queue / next picks
+- **Matthew's deploys (the ONLY thing between merged + live):**
+  1. `bash deploy/deploy_site_api.sh` — lands #1262 (tombstone guard) + #1267 (freshness) + #1268 (predict-week fail-closed). Verify: `curl /api/state_of_matthew` → `available:false`; `/api/source_freshness` shows MacroFactor's real `days_dark`.
+  2. `cd cdk && npx cdk deploy LifePlatformCompute LifePlatformServe` — lands #1263's two IAM grants; clears the R8-ST6 gate + the 10-day `grading-stalled` alarm.
+  3. email-λ fleet (`deploy_fleet.sh` or `cdk deploy --all`) — lands #1265 (Elena) + #1268's qa_smoke guard.
+- **Two live-DDB backfills (Matthew — the code stops future recurrence, doesn't heal history):**
+  - #1266: re-derive true `cycle=N` on already-corrupted archive rows (e.g. `INSIGHT#2026-02-23`).
+  - #1265: regenerate the held `DATE#2026-07-14` Elena draft (phantom "Sunday walks" baked in).
+- **Backlog:** `Now` milestone now = only #1029 (owner-gated re-entry checklist) + #741 (external
+  publish — Matthew's action). Next slice from `gh issue list --label type:story --milestone Next`.
+- **Minor maintainability note (#1199):** `VOID_COACH_IDS` is hardcoded to mirror
+  `coach_prediction_evaluator.COACH_IDS`; a future 9th coach must be added to both.
 
-## Next picks / residual queue
-- **Remediation of the review backlog** — seed sessions from
-  `gh issue list --label type:story --milestone Now --state open`. Suggested first slice:
-  #1197 (shared tombstone-guard fixes three surfaces) + #1196 (IAM one-liner + the
-  role-policy lockstep test). Epics #1194/#1195 hold the task lists. Good fan-out
-  candidates for worktree-implementer.
-- **Confirm run 29622123327 went green** and `og-org-chart.png` is the essay's live
-  `og:image` (if the wrap closed before it finished).
-- **#741 remaining = external publish** (Matthew). **#1190 merged** (no-FDA docs) — done.
-- Matthew's other session: its clamp approach was superseded; patch banked in this
-  session's scratchpad if wanted. Its branch `fix/clamp-progress-pct` is pristine at
-  `d1611ad3` (safe to delete).
-- Standing: #1187 podcast music, #1114 portraits v2, #1148 coach traits.
-
-Prior session: `handovers/HANDOVER_2026-07-16_OGCardTofuEssayCard.md`.
+Prior session: `handovers/HANDOVER_2026-07-17_FullreviewBaselineHonestGate.md`.
