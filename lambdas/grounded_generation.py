@@ -257,11 +257,95 @@ def authoritative_facts_block(facts: dict) -> str:
     )
 
 
+# ── band↔adjective grounding (#1208) ─────────────────────────────────────────
+# A number can be digit-grounded yet its VERDICT semantically false: the live
+# mind-expert analysis called 44% Whoop recovery "Strong biometric recovery" —
+# 44% is Whoop's YELLOW band. The ADR-104 number gate (above) checks digits only,
+# never the adjective attached to them. This deterministic, zero-AI check maps a
+# metric's canonical value to its documented band and flags a top-band superlative
+# ("strong", "excellent", …) sitting next to a sub-band value. Thresholds are the
+# source's documented band (ADR-105: personal_baselines has no absolute recovery
+# band, so Whoop's published cutoffs are the authority).
+#
+# Whoop recovery bands (documented): red <34, yellow 34–66, green 67+. A top-band
+# superlative is honest ONLY for green.
+_RECOVERY_GREEN_FLOOR = 67.0
+
+# Superlatives that assert a HIGH / top-band reading. Scoped tight to claims of
+# strength — honest yellow-band words ("moderate", "steady", "middling", "fair")
+# are deliberately absent so they never flag.
+_HIGH_BAND_ADJECTIVES = (
+    "strong",
+    "excellent",
+    "great",
+    "solid",
+    "robust",
+    "outstanding",
+    "superb",
+    "stellar",
+    "elite",
+    "peak",
+    "roaring",
+    "exceptional",
+    "impressive",
+    "terrific",
+    "fantastic",
+)
+_HIGH_BAND_RE = re.compile(r"\b(" + "|".join(_HIGH_BAND_ADJECTIVES) + r")\b", re.IGNORECASE)
+# Recovery mentions — the noun the adjective must be attached to.
+_RECOVERY_KW_RE = re.compile(r"\brecover(?:y|ed|ing)\b", re.IGNORECASE)
+
+
+def band_adjective_findings(text: str, facts: dict = None, proximity: int = 40) -> list:
+    """Deterministic band↔adjective check. Returns [{type: "band_contradiction", ...}].
+
+    For each metric with a documented band and a sub-band canonical value, flag a
+    top-band superlative sitting within `proximity` characters of the metric's noun
+    (so "strong … recovery" is caught, an unrelated "strong squat" far away is not).
+    A superlative that is genuinely consistent (attached to a GREEN-band value) does
+    not flag. Empty list = no band mischaracterization.
+    """
+    text = text or ""
+    facts = facts or {}
+    findings = []
+
+    rec = facts.get("recovery_pct")
+    try:
+        rec = float(rec) if rec is not None else None
+    except (TypeError, ValueError):
+        rec = None
+    if rec is not None and rec < _RECOVERY_GREEN_FLOOR:
+        band = "red" if rec < 34 else "yellow"
+        for km in _RECOVERY_KW_RE.finditer(text):
+            lo = max(0, km.start() - proximity)
+            hi = km.end() + proximity
+            window = text[lo:hi]
+            am = _HIGH_BAND_RE.search(window)
+            if am:
+                findings.append(
+                    {
+                        "type": "band_contradiction",
+                        "metric": "Whoop recovery",
+                        "band": band,
+                        "value": rec,
+                        "adjective": am.group(1),
+                        "detail": (
+                            f'the narrative calls recovery "{am.group(1)}", but the authoritative '
+                            f"Whoop recovery is {rec:g}% — the {band} band, not a strong reading"
+                        ),
+                    }
+                )
+                break  # one finding per metric is sufficient signal
+    return findings
+
+
 def grounding_findings(text: str, facts: dict = None, allowed: set = None) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
     - "contradiction": a stated RHR/recovery/HRV hard-contradicts canonical facts
       (grounding_guard's per-metric tolerances + grounded-anywhere logic).
+    - "band_contradiction": a top-band superlative ("strong recovery") attached to
+      a sub-band canonical value (44% = Whoop yellow) — #1208, band_adjective_findings.
     - "fabricated_number": a number appears in the output but nowhere in the
       input allow-list (and isn't benign) — the trend/range fabrication class.
     """
@@ -269,6 +353,8 @@ def grounding_findings(text: str, facts: dict = None, allowed: set = None) -> li
     if facts and _hard_contradictions is not None:
         for c in _hard_contradictions(text, facts):
             findings.append({"type": "contradiction", **c})
+    if facts:
+        findings.extend(band_adjective_findings(text, facts))
     if allowed is not None:
         for x in fabricated_numbers(text, allowed):
             findings.append(
@@ -287,6 +373,11 @@ def correction_prompt(findings: list) -> str:
     for i, f in enumerate(findings, 1):
         if f.get("type") == "contradiction" and f.get("canonical") is not None:
             lines.append(f"{i}. {f['detail']}. Use {f['canonical']:g}, or omit the metric — never invent one.")
+        elif f.get("type") == "band_contradiction":
+            lines.append(
+                f"{i}. {f['detail']}. Use an accurate band word for a {f['band']} reading "
+                f"(e.g. 'moderate' or 'low'), never a superlative."
+            )
         elif f.get("type") == "weekday_mismatch":
             lines.append(f"{i}. {f['detail']}. Use {f['actual_weekday']} for that date, or drop the day-of-week — never guess a weekday.")
         else:

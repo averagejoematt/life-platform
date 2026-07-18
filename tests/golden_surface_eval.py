@@ -79,6 +79,7 @@ SURFACES = ("board_ask", "chronicle", "memoir", "state_of_matthew", "field_notes
 # finding type (grounded_generation / adapters) → check label (fixture vocabulary)
 CHECK_BY_TYPE = {
     "contradiction": "grounding_contradiction",
+    "band_contradiction": "band_contradiction",  # #1208 — verdict-vs-band mischaracterization
     "fabricated_number": "evidence_ceiling",
     "causal_language": "causal_language",
 }

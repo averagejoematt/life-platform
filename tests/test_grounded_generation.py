@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(LAMBDAS_DIR))
 from grounded_generation import (  # noqa: E402
     allowed_numbers,
     authoritative_facts_block,
+    band_adjective_findings,
     correction_prompt,
     fabricated_numbers,
     grounding_findings,
@@ -150,3 +151,60 @@ def test_correction_prompt_names_canonical_value():
     findings = grounding_findings("Resting heart rate of 53.", facts=FACTS)
     corr = correction_prompt(findings)
     assert "64" in corr and "never invent" in corr
+
+
+# ── band↔adjective (#1208): number-true but verdict-false ─────────────────────
+# The live incident: "Strong biometric recovery—44% on Whoop" — 44% is Whoop's
+# YELLOW band, so "Strong" is semantically false though 44 is digit-grounded.
+_LIVE_INCIDENT = "Strong biometric recovery—44% on Whoop, 34 ms HRV, resting heart rate holding at 62"
+
+
+def test_band_adjective_flags_superlative_on_yellow_recovery():
+    # NON-VACUOUS: this exact draft drew ZERO findings before the fix (number gate
+    # only). It must now yield a band_contradiction.
+    findings = band_adjective_findings(_LIVE_INCIDENT, {"recovery_pct": 44})
+    assert len(findings) == 1
+    f = findings[0]
+    assert f["type"] == "band_contradiction" and f["band"] == "yellow" and f["adjective"].lower() == "strong"
+
+
+def test_band_adjective_flows_through_grounding_findings():
+    # The live surface (ai_expert_analyzer) calls grounding_findings(text, facts, allowed).
+    findings = grounding_findings(_LIVE_INCIDENT, facts={"recovery_pct": 44}, allowed=allowed_numbers(_LIVE_INCIDENT))
+    assert any(f["type"] == "band_contradiction" for f in findings)
+
+
+def test_band_adjective_no_flag_on_honest_yellow_adjective():
+    # TRUE NEGATIVE: an honest band word for 44% must NOT flag.
+    assert band_adjective_findings("Moderate recovery — 44% on Whoop today.", {"recovery_pct": 44}) == []
+
+
+def test_band_adjective_no_flag_when_superlative_matches_green():
+    # TRUE NEGATIVE: "strong" is genuinely consistent with a green-band value.
+    assert band_adjective_findings("Strong recovery — 72% on Whoop today.", {"recovery_pct": 72}) == []
+
+
+def test_band_adjective_no_flag_on_unrelated_superlative():
+    # TRUE NEGATIVE: a superlative describing something else, far from any recovery
+    # mention, must not be attributed to recovery.
+    text = (
+        "Recovery sat at 44% this morning, well into the yellow zone for him. "
+        "Much later that afternoon he hit a strong set of heavy back squats in the gym."
+    )
+    assert band_adjective_findings(text, {"recovery_pct": 44}) == []
+
+
+def test_band_adjective_flags_red_band():
+    findings = band_adjective_findings("An excellent recovery at 20%.", {"recovery_pct": 20})
+    assert len(findings) == 1 and findings[0]["band"] == "red"
+
+
+def test_band_adjective_correction_prompt_says_use_band_word():
+    findings = grounding_findings(_LIVE_INCIDENT, facts={"recovery_pct": 44})
+    corr = correction_prompt([f for f in findings if f["type"] == "band_contradiction"])
+    assert "yellow" in corr and "superlative" in corr
+
+
+def test_band_adjective_noop_without_facts():
+    assert band_adjective_findings(_LIVE_INCIDENT, None) == []
+    assert band_adjective_findings(_LIVE_INCIDENT, {}) == []
