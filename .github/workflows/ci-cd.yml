@@ -592,11 +592,13 @@ jobs:
 
       - name: Test coverage gate (regression floor, ADR-080)
         # ENFORCED regression floor. The codebase is integration-tested (handlers
-        # run live; the ~3000 offline tests are mostly structural/contract), so the
-        # offline line-coverage baseline is ~28% (#419 ratchet, up from a stale ~9%
-        # comment/8% flag that had drifted apart while hundreds of tests were added
-        # without anyone moving the floor) — this floor (25%) prevents BACKSLIDING,
-        # it is not a quality bar. Ratchet up over time (ADR-080).
+        # run live; the ~3000 offline tests are mostly structural/contract), so
+        # measured offline line coverage is ~45.6% (45.58% on green main run
+        # 29270686464, 2026-07-13). This floor (40%) prevents BACKSLIDING with ~5pt
+        # headroom under measured so normal fluctuation doesn't red main — it is not
+        # a quality bar. Ratcheted 25→40 by #1206 (lineage: #419 ratchet 9%→25%);
+        # keep ratcheting up over time (ADR-080/ADR-107). The gap-warning step below
+        # emits a ::warning:: reminder when this floor drifts >10pts under measured.
         # Scope: lambdas/ + mcp/ only (skip tests/, cdk/).
         run: |
           echo "::group::Coverage report + gate"
@@ -605,9 +607,18 @@ jobs:
               --cov=lambdas --cov=mcp \
               --cov-report=term-missing:skip-covered \
               --cov-report=xml:coverage.xml \
-              --cov-fail-under=25 \
+              --cov-fail-under=40 \
               -q 2>&1 | tail -100
           echo "::endgroup::"
+
+      - name: Coverage floor drift warning (self-reminding ratchet, #1206)
+        # Advisory, fail-open. Parses coverage.xml's line-rate and emits a GitHub
+        # ::warning:: annotation when the enforced floor (40) lags measured line
+        # coverage by >10 points, so the ratchet reminds a human to bump it. Reuses
+        # the coverage.xml produced above — no new standing machinery. Never fails
+        # the build (the script exits 0 on any parse blip; keep `if: always()`).
+        if: always()
+        run: python3 scripts/coverage_gap_warn.py --coverage-xml coverage.xml --floor 40 --gap-threshold 10
 
       - name: Upload coverage artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
