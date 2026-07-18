@@ -86,9 +86,15 @@ DEFAULT_STALE_HOURS = 48
 #   metrics        what the source measures — public catalogue text.
 #   posture        value-per-source verdict from the 2026-07 data-source health
 #                  review: 'load-bearing' | 'portfolio' | 'paused' | 'archive'.
-#   raw_layout     the ACTUAL raw-S3 shape: {prefix, scheme[, note]} where scheme is
-#                  'date-tree' ({prefix}/{YYYY}/{MM}/{DD}.json), 'flat-uuid'
+#   raw_layout     the ACTUAL raw-S3 shape: {prefix, scheme, filename[, note]} where
+#                  scheme is 'date-tree' ({prefix}/{YYYY}/{MM}/{filename}), 'flat-uuid'
 #                  ({prefix}/{id}.json), or 'timestamped'; None = no raw archive.
+#                  filename names the ACTUAL leaf form — do NOT assume {DD}.json. Every
+#                  current date-tree write is 'YYYY-MM-DD.json'; the SIMP-2 framework
+#                  migration flipped the legacy 'DD.json' form to the full date mid-2026
+#                  IN-PLACE within the same date tree (#1256), so pre-2026 objects on the
+#                  flipped sources (todoist, garmin) still carry 'DD.json'. Read this
+#                  facet — never construct a key from the prefix alone.
 #   provider_reconcile
 #                  True = OPT-IN source-of-truth reconciliation (DI-2/TR-07): a
 #                  daily job diffs the PROVIDER API against stored records and
@@ -149,7 +155,7 @@ SOURCE_REGISTRY = {
         "method": "OAuth API pull, hourly",
         "metrics": "Recovery, sleep, HRV, resting HR, strain",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/whoop", "scheme": "date-tree"},
+        "raw_layout": {"prefix": "raw/matthew/whoop", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
         # TR-07 (#415): opt-in provider-diff reconciliation. Whoop runs hourly with
         # no rate-limit breaker, so a daily trailing-window diff (sleeps + workouts)
         # against the API is cheap and catches the late-workout / dropped-day silent
@@ -173,7 +179,7 @@ SOURCE_REGISTRY = {
         "method": "OAuth API pull, hourly",
         "metrics": "Weight, body composition",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/withings/measurements", "scheme": "date-tree"},
+        "raw_layout": {"prefix": "raw/matthew/withings/measurements", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
         # #914: weigh-ins are a manual engagement channel — he has to step on the
         # scale. Sporadic (~weekly is healthy), so a lenient ~10d before "quiet".
         "engagement_channel": {"label": "measurement", "stale_days": 10},
@@ -192,7 +198,7 @@ SOURCE_REGISTRY = {
         "method": "OAuth API pull, hourly",
         "metrics": "Activities, walks, heart rate",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/strava/activities", "scheme": "date-tree"},
+        "raw_layout": {"prefix": "raw/matthew/strava/activities", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
         # DI-2: the original source-of-truth reconciler (the Jun-2026 evening-walk
         # fix). strava_lambda._reconcile, wired in ingestion_stack. TR-07 generalized
         # this facet so whoop opts in the same way.
@@ -211,7 +217,7 @@ SOURCE_REGISTRY = {
         "method": "API pull, hourly",
         "metrics": "Sleep stages, HR/HRV, restlessness",  # bed temp retired — ADR-118, #489
         "posture": "portfolio",
-        "raw_layout": {"prefix": "raw/matthew/eightsleep", "scheme": "date-tree"},
+        "raw_layout": {"prefix": "raw/matthew/eightsleep", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
     },
     "apple_health": {
         "label": "Apple Health",
@@ -303,7 +309,12 @@ SOURCE_REGISTRY = {
         "method": "API pull, 1x daily (14:00 UTC)",
         "metrics": "Tasks completed",
         "posture": "portfolio",
-        "raw_layout": {"prefix": "raw/todoist", "scheme": "date-tree", "note": "legacy layout — no user segment (X-9)"},
+        "raw_layout": {
+            "prefix": "raw/todoist",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            "note": "legacy — no user segment (X-9); filename flipped DD→YYYY-MM-DD at SIMP-2, pre-2026 objects are DD.json (#1256)",
+        },
     },
     "habitify": {
         "label": "Habitify",
@@ -318,7 +329,7 @@ SOURCE_REGISTRY = {
         "method": "API pull, hourly",
         "metrics": "Daily habit completions",
         "posture": "load-bearing",
-        "raw_layout": {"prefix": "raw/matthew/habitify", "scheme": "date-tree"},
+        "raw_layout": {"prefix": "raw/matthew/habitify", "scheme": "date-tree", "filename": "YYYY-MM-DD.json"},
         # #914: the pull writes a record EVERY day (behavioral: False above is the
         # PIPE's classification) — presence must count only days he actually
         # completed a habit, or a total zero-completion stall reads as gap_days=0.
@@ -414,7 +425,12 @@ SOURCE_REGISTRY = {
         "method": "OAuth API pull, 4x daily — paused (ADR-074)",
         "metrics": "Stress, body battery, steps",
         "posture": "paused",
-        "raw_layout": {"prefix": "raw/matthew/garmin", "scheme": "date-tree"},
+        "raw_layout": {
+            "prefix": "raw/matthew/garmin",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            "note": "filename flipped DD.json→YYYY-MM-DD.json mid-tree at SIMP-2 (2026); pre-2026 objects are DD.json (#1256)",
+        },
         # TR-07 (#415): NO provider_reconcile facet — deliberate. Garmin is paused
         # (ADR-074, datacenter-IP 429 block) and even when live is capped at 4x/day
         # under the OAuth rate limit + best_effort. A reconciler would spend that
@@ -451,7 +467,12 @@ SOURCE_REGISTRY = {
         "posture": "portfolio",
         # #476/X-7: raw archive added — date-tree with a per-page suffix
         # (raw/matthew/notion/YYYY/MM/DD-<page_id>.json), since a day holds many entries.
-        "raw_layout": {"prefix": "raw/matthew/notion", "scheme": "date-tree", "note": "per-page: DD-<page_id>.json"},
+        "raw_layout": {
+            "prefix": "raw/matthew/notion",
+            "scheme": "date-tree",
+            "filename": "DD-<page_id>.json",
+            "note": "per-page filename, not a plain date",
+        },
         # #914: journaling is inherently intermittent — lenient tolerance. (Presence's
         # 4d "quiet" mark is narrative-only and deliberately tighter than the 14d
         # evening-nudge threshold above — different surface, different kindness.)
@@ -476,7 +497,12 @@ SOURCE_REGISTRY = {
         "method": "Open-Meteo API pull, 2x daily",
         "metrics": "Temperature, precipitation, daylight",
         "posture": "portfolio",
-        "raw_layout": {"prefix": "raw/weather", "scheme": "date-tree", "note": "legacy layout — no user segment (X-9)"},
+        "raw_layout": {
+            "prefix": "raw/weather",
+            "scheme": "date-tree",
+            "filename": "YYYY-MM-DD.json",
+            "note": "legacy layout — no user segment (X-9)",
+        },
     },
     # ── #498: registry-resident for facets only — freshness: False keeps every
     #    existing freshness surface (checker / public board / MCP view) unchanged. ──
