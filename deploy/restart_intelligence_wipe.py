@@ -20,7 +20,8 @@ The tombstone update sets:
     phase            = "pilot"
     hidden           = True             (chronicle only)
 
-Idempotent: items already tombstoned (with the same reason) are skipped.
+Idempotent: items already tombstoned by ANY reset are skipped, so a prior archive's
+`cycle` stamp / generation identity survives every later reset (#1202, ADR-077).
 Dry-run default. --apply to commit. Report → docs/restart/_intelligence_wipe_report.txt.
 
 Date-agnostic: re-run after changing genesis to expand the wipe surface.
@@ -262,8 +263,21 @@ def should_tombstone(item: dict, mode: str) -> bool:
 
 
 def is_already_tombstoned(item: dict) -> bool:
-    """Idempotency check: True if the item already has our tombstone (current reason)."""
-    return bool(item.get("tombstone")) and item.get("tombstoned_reason") == TOMBSTONE_REASON
+    """Idempotency check: True if the item already carries a tombstone from ANY reset.
+
+    #1202: this used to require ``tombstoned_reason == TOMBSTONE_REASON`` (the CURRENT
+    genesis), so a record archived by an EARLIER reset failed the check and was
+    re-tombstoned — overwriting its ``cycle`` stamp, ``tombstoned_at`` and reason with
+    the latest closing run's values. That converged the whole archive onto the newest
+    cycle (a Feb pilot insight claimed cycle=5), defeating ADR-077's "archive navigable
+    by reset generation" guarantee. The ``tombstone`` attribute is only ever written by
+    THIS wipe, so any ``tombstone=true`` row belongs to some prior (or current) reset
+    generation and must be left untouched — its original generation identity is the
+    thing worth preserving. Newly-in-scope records (never tombstoned) still tombstone
+    normally, so re-running after a genesis change to expand the wipe surface is
+    unaffected.
+    """
+    return bool(item.get("tombstone"))
 
 
 def build_update(extra_attrs: dict, now_iso: str, cycle: int):
@@ -272,13 +286,22 @@ def build_update(extra_attrs: dict, now_iso: str, cycle: int):
     ADR-077: stamps `cycle=<closing run>` so the archive is navigable by reset
     generation — `phase=pilot` says "hidden from the current run", `cycle` says
     "belonged to run N".
+
+    #1202 defence-in-depth: the generation-identity attributes (`cycle`,
+    `tombstoned_at`, `tombstoned_reason`) are written with ``if_not_exists`` so a LATER
+    reset can never overwrite the reset generation an archive was first stamped with,
+    even if a future change lets an already-tombstoned row reach this function. The
+    live guard is ``is_already_tombstoned`` (which now skips any tombstoned row); this
+    keeps the write itself correct regardless. ``tombstone`` and ``phase=pilot`` stay
+    unconditional SET — they are the "hide it" flags and setting them on an
+    already-hidden row is inert.
     """
     sets = [
         "tombstone = :tomb",
-        "tombstoned_at = :ts",
-        "tombstoned_reason = :reason",
+        "tombstoned_at = if_not_exists(tombstoned_at, :ts)",
+        "tombstoned_reason = if_not_exists(tombstoned_reason, :reason)",
         "#p = :phase",
-        "#cyc = :cycle",
+        "#cyc = if_not_exists(#cyc, :cycle)",
     ]
     values = {
         ":tomb": True,
