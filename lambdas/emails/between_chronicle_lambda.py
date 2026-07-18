@@ -74,6 +74,7 @@ ses = boto3.client("sesv2", region_name=REGION)
 
 
 from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
+from phase_filter import singleton_visible  # ADR-058 / #946 / #1200: honor restart tombstones on PERSONA reads
 
 
 def _scrub(text: str) -> str:
@@ -155,8 +156,11 @@ def gather_digest() -> dict:
     # stance (PERSONA#elena STANCE#latest, receipts-gated) frames it. Garnish,
     # never content: it doesn't count toward has_real_content.
     try:
-        st = _d2f(table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {})
-        if st.get("headline_stance") and not st.get("grounding_flag"):
+        _st_raw = table.get_item(Key={"pk": "PERSONA#elena", "sk": "STANCE#latest"}).get("Item") or {}
+        st = _d2f(_st_raw)
+        # #1200: a reset tombstones PERSONA#elena STANCE#latest — never sign a new-cycle
+        # email with a wiped cycle's stance. singleton_visible reads the raw item (tombstone/phase).
+        if st.get("headline_stance") and not st.get("grounding_flag") and singleton_visible(_st_raw):
             digest["elena_note"] = str(st["headline_stance"])[:320]
     except Exception as e:
         logger.warning("elena stance read skipped: %s", e)
