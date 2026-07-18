@@ -191,14 +191,20 @@ def impossible_values(ps):
             findings.append({"check": "impossible_value", "severity": "high", "field": f"training.{k}", "value": v, "note": "must be >= 0"})
     for blk_name in ("journey", "vitals"):
         for k, v in (ps.get(blk_name, {}) or {}).items():
-            if k.endswith("_pct") and isinstance(v, (int, float)) and not (0 <= v <= 100):
+            if not (k.endswith("_pct") and isinstance(v, (int, float))):
+                continue
+            # progress_pct is signed: weight above the cycle baseline is honest negative
+            # progress (ADR-104 down-weeks-shown), bounded at -100 (the full goal distance
+            # regained). All other _pct fields stay strictly [0,100].
+            lo = -100 if k == "progress_pct" else 0
+            if not (lo <= v <= 100):
                 findings.append(
                     {
                         "check": "impossible_value",
                         "severity": "high",
                         "field": f"{blk_name}.{k}",
                         "value": v,
-                        "note": "pct out of [0,100]",
+                        "note": f"pct out of [{lo},100]",
                     }
                 )
     return findings
