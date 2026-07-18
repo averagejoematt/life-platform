@@ -32,6 +32,7 @@ from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
+from client_ip import extract_client_ip  # #1221 — the ONE edge-observed client-IP helper
 from phase_filter import with_phase_filter  # ADR-058
 
 from web.site_api_common import (
@@ -65,27 +66,6 @@ except Exception:  # pragma: no cover — import guard
 # touched by the handlers in this file, so they move with the cluster.
 _token_secret_cache = None
 _nudge_rate_store: dict = {}  # ACCT-2: ip_hash+category -> list of timestamps (fallback only)
-
-
-def _extract_client_ip(event: dict) -> str:
-    """Return the original client IP behind CloudFront.
-
-    requestContext.http.sourceIp is the CloudFront edge IP — varies per
-    request, useless for IP-based rate-limiting. CloudFront forwards the
-    real client in x-forwarded-for; take the first entry. Falls back to
-    sourceIp (and "unknown") only if the header is missing.
-
-    Matches the pattern in email_subscriber_lambda.py:lambda_handler;
-    same bug, same shape. (Task #108 — burned in 2026-05-29.)
-    """
-    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-    xff = (headers.get("x-forwarded-for") or "").split(",")[0].strip()
-    return (
-        xff
-        or event.get("requestContext", {}).get("http", {}).get("sourceIp")
-        or event.get("requestContext", {}).get("identity", {}).get("sourceIp")
-        or "unknown"
-    )
 
 
 _nudge_counts: dict = {}  # ACCT-2: category -> approximate count
@@ -294,7 +274,7 @@ def _handle_nudge(event: dict) -> dict:
     """
     import time as _time
 
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -353,7 +333,7 @@ def _handle_submit_finding(event: dict) -> dict:
     """
     import time as _time
 
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
 
     # Rate limit: FINDING_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
@@ -611,7 +591,7 @@ def _handle_experiment_vote(event: dict) -> dict:
     Rate limit: 1 vote per IP per experiment per 24 hours via DynamoDB TTL.
     library_id must exist in the experiment library (anti-pollution, 2026-06-12).
     """
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -689,7 +669,7 @@ def _handle_experiment_follow(event: dict) -> dict:
     Stores interest so we can notify when experiment completes.
     Rate limit: 10 follows per IP per hour.
     """
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -898,7 +878,7 @@ def _handle_challenge_vote(event: dict) -> dict:
     Body: {"catalog_id": "cold-shower-finish"}
     Rate limit: 1 vote per IP per challenge per 24 hours via DynamoDB TTL.
     """
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -977,7 +957,7 @@ def _handle_challenge_follow(event: dict) -> dict:
     Body: {"email": "user@example.com", "catalog_id": "cold-shower-finish"}
     Rate limit: 10 follows per IP per hour.
     """
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -1209,7 +1189,7 @@ def _handle_challenge_checkin(event: dict) -> dict:
 
     # Rate limit: 1 check-in per IP per challenge per day (#358).
     if _RATE_LIMITER_READY:
-        ip = _extract_client_ip(event)
+        ip = extract_client_ip(event)
         ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
         allowed, _rem, _retry = _ddb_rate_check(
             table, endpoint=f"challenge_checkin:{challenge_id}", ip_hash=ip_hash, limit=1, window_seconds=86400, fail_open=True
@@ -1372,7 +1352,7 @@ def _handle_ritual_log(event: dict) -> dict:
     # Rate limit: RITUAL_LOG_RATE_LIMIT per IP per hour — DynamoDB-backed (survives
     # cold starts; in-memory fallback only). Public GET, so it needs the same
     # DDB-backed protection as every other write endpoint in this module.
-    ip = _extract_client_ip(event)
+    ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
     if _RATE_LIMITER_READY:
         allowed, _rem, _retry = _ddb_rate_check(
@@ -1426,7 +1406,7 @@ def _handle_experiment_suggest(event: dict) -> dict:
     """
     # Rate limit: 3 per IP per hour (#358).
     if _RATE_LIMITER_READY:
-        ip = _extract_client_ip(event)
+        ip = extract_client_ip(event)
         ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
         allowed, _rem, _retry = _ddb_rate_check(
             table, endpoint="experiment_suggest", ip_hash=ip_hash, limit=3, window_seconds=3600, fail_open=True
@@ -1545,7 +1525,7 @@ def _handle_predict_week(event: dict) -> dict:
     One prediction per IP per week per metric (DynamoDB dedup row, 8-day TTL).
     Validated against the live current_challenge's predict_metrics (fail-closed).
     """
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
@@ -1644,7 +1624,7 @@ def _handle_board_question(event: dict) -> dict:
     """
     import time as _time  # noqa: F401 (parity with submit_finding; fallback path)
 
-    source_ip = _extract_client_ip(event)
+    source_ip = extract_client_ip(event)
     ip_hash = hashlib.sha256(source_ip.encode()).hexdigest()[:16]
 
     if _RATE_LIMITER_READY:
