@@ -27,8 +27,8 @@ reference_local_render_qa memory):
 Mobile coverage (#1012): capture_page runs a mobile pass at 390×844 (+ the app-bar
 chrome check at 360×800) on every gate page, so the pre-merge gate now renders mobile
 in addition to 1440×900 desktop — and asserts the Epic-A failure classes there
-(stuck reveals #1002, app-bar overflow #1003, missing viewport meta #1004; tap-target
-audit #1010 is advisory). A PR that reintroduces one of those classes fails the gate
+(stuck reveals #1002, app-bar overflow #1003, missing viewport meta #1004; the 44px
+tap-target floor #1010/#1249 now gates). A PR that reintroduces one of those classes fails the gate
 before merge instead of surfacing on the live site.
 
 Realistic-data pass (#1039): the empty-mock pass is structurally blind to DATA-DRIVEN

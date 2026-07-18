@@ -1182,6 +1182,21 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
      stays put but the thumb target grows. Not an inline-flex 44px block (that reads as
      a broken gap in prose) and not an overlay (that would swallow taps on adjacent text). */
   .supp-ev-link, [data-crumb] a, .dx-crumb a { padding-block: 12px; }
+  /* Waveform day-bars (#1249) — each scored bar is an anchor into that day's cockpit,
+     but flex:1 / min-width:2px shrinks them toward ~2px wide (and low-score bars to
+     ~13px tall) as the cycle fills. Same vertical-only ::after grammar as the app-bar
+     toggle: a transparent overlay lifts the TOUCH height to the 44px floor while the
+     thin visible bar is unchanged. Anchored to the bar's bottom so it grows UP into the
+     empty waveform above (never spills below into the legend) and its width stays the
+     bar's — a dense ~90-day strip can't hold 90 × 44px-wide targets, and motion.js's
+     nearest-hit readout already mediates horizontal selection. Out-of-flow + transparent
+     ⇒ no visual change, no layout shift. Only the navigable a.bar anchors, not the
+     non-scored .bar spans. */
+  .wave a.bar { position: relative; }
+  .wave a.bar::after {
+    content: ""; position: absolute; left: 0; bottom: 0;
+    width: 100%; height: max(100%, 44px);
+  }
 }
 
 /* Build stamp — muted deploy fingerprint (git SHA), shown on machine-facing footers. */

@@ -11,7 +11,7 @@ read-only engine:
   5. Mobile pass at 390px (+ chrome at 360px): horizontal overflow, plus the Epic-A
      failure classes as regression tests (#1013) — app-bar row ≤ viewport (#1003),
      no reveal stuck at opacity:0 after scroll (#1002), viewport meta present (#1004),
-     and a tap-target advisory audit (#1010, non-gating).
+     and the tap-target floor audit (#1010/#1249, gating: effective hit area ≥ 44px).
   6. Captures full-page + per-chart element screenshots.
   7. Optional --ai-qa: hands the screenshots to Claude (Bedrock) for semantic
      "does this actually render correctly" judgement — robust to daily data changes
@@ -446,8 +446,8 @@ def _mobile_overflow(page):
 # ── Mobile failure-class assertions (#1013) ───────────────────────────────────
 # These pin the EXACT classes the 2026-07-11 mobile review found live and Epic A
 # fixed (#1002 stuck reveals, #1003 app-bar overflow, #1004 missing viewport meta),
-# so they become regression tests, not lore. (a)-(c) gate; (d) tap-targets is
-# advisory output only (the 44px floor is Epic B #1010, not yet enforced).
+# so they become regression tests, not lore. (a)-(d) all gate now — (d) the 44px
+# tap-target floor (Epic B #1010) was promoted advisory → gating by #1249.
 
 # Mirrors the reveal selector in site/assets/js/motion.js — an element matching this
 # that stays opacity:0 after a scroll-through is the #1002 tall-section reveal bug.
@@ -457,9 +457,14 @@ MOBILE_REVEAL_SEL = (
     ".team-focus, .team-tension, .team-huddle, .supp, .cap-card, .vr-row, .figs, .ml-ladder"
 )
 
-# Advisory only: the cockpit's headline controls + the site-wide chrome the review
-# measured under the 44px floor (#1010). Reported, never gated (yet).
-TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs a, .ev-link, .cta-quiet"
+# GATING (#1010/#1249): the cockpit's headline controls + site-wide chrome the review
+# measured under the 44px floor, plus the home waveform day-bar anchors (.wave a.bar,
+# #1249). The audit gates on the EFFECTIVE hit area (own box unioned with any generated
+# ::after/::before overlay — the documented #1010 grammar) and only fails a target that
+# is below the floor in BOTH axes, so a wide inline text link or a control expanded to
+# 44px in one axis by the ::after grammar passes; a target tiny in both axes (the pre-fix
+# 2px×13px day-bar) fails. This finishes #1013 as designed (advisory → gating).
+TAP_TARGET_SEL = ".doors .theme-toggle, .tt-scrubber, .intro-close, .breadcrumbs a, .ev-link, .cta-quiet, .wave a.bar"
 
 
 def _app_bar_overflow(page):
@@ -517,15 +522,34 @@ def _viewport_meta_ok(page):
 
 
 def _tap_target_audit(page, sel):
-    """Advisory (#1010): interactive controls whose effective hit area is < 44px."""
+    """#1010/#1249 tap-target floor (GATING): interactive controls whose EFFECTIVE hit
+    area is below the 44px floor in BOTH axes. The effective box is the element's own
+    rect unioned with any generated ::before/::after overlay — the documented #1010
+    grammar (a transparent, centered/anchored pseudo-element) enlarges the clickable
+    region without a visual change, and getBoundingClientRect alone can't see it. A
+    target below the floor in only ONE axis is an accepted affordance (a wide inline text
+    link; a control lifted to 44px in one axis by the ::after grammar, e.g. the app-bar
+    toggle or the #1249 waveform day-bars); a target tiny in BOTH axes is genuinely
+    un-tappable and fails the sweep."""
     return page.evaluate(
         """(sel) => {
         const out = [];
         document.querySelectorAll(sel).forEach(el => {
             const r = el.getBoundingClientRect();
             if (r.width === 0 && r.height === 0) return;        // not rendered
-            if (r.width < 44 || r.height < 44) {
-                out.push(`${(el.className||el.tagName).toString().slice(0,28)} ${Math.round(r.width)}x${Math.round(r.height)}`);
+            let w = r.width, h = r.height;
+            // Fold in the #1010 hit-expander pseudo-elements: a generated ::after/::before
+            // (content !== 'none') carries the real touch area. Chromium resolves its
+            // width/height to used px, so max() over own+pseudo is the effective hit box.
+            for (const pe of ['::before', '::after']) {
+                const ps = getComputedStyle(el, pe);
+                if (!ps || ps.content === 'none' || ps.content === 'normal') continue;
+                const pw = parseFloat(ps.width), ph = parseFloat(ps.height);
+                if (!isNaN(pw)) w = Math.max(w, pw);
+                if (!isNaN(ph)) h = Math.max(h, ph);
+            }
+            if (w < 44 && h < 44) {
+                out.push(`${(el.className||el.tagName).toString().slice(0,28)} ${Math.round(w)}x${Math.round(h)} eff`);
             }
         });
         return out;
@@ -806,10 +830,13 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         # (c) #1004 — the page must carry a width=device-width viewport meta.
         if not _viewport_meta_ok(page):
             issues.append("Missing width=device-width viewport meta (#1004 class)")
-        # (d) #1010 — tap-target floor, ADVISORY only (not gated yet).
+        # (d) #1010/#1249 — tap-target floor, GATING: any known-good control whose
+        #     effective hit area is below 44px in BOTH axes fails the sweep (advisory →
+        #     gating, finishing #1013; #1249 added .wave a.bar after the day-bars got the
+        #     vertical ::after expander).
         small = _tap_target_audit(page, TAP_TARGET_SEL)
         if small:
-            warnings.append(f"Tap targets < 44px @390px (advisory #1010): {', '.join(small[:5])}")
+            issues.append(f"Tap targets < 44px in both axes @390px (#1010/#1249): {', '.join(small[:5])}")
         if save_screenshots:
             mob = os.path.join(screenshot_dir, f"{slug}-mobile.png")
             page.screenshot(path=mob, full_page=True)
