@@ -119,11 +119,20 @@ var R = {
 function handler(event) {
   var req = event.request;
   var uri = req.uri;
-  if (uri.length > 1 && uri.charAt(uri.length-1) !== '/' && uri.indexOf('.') === -1) uri += '/';
-  var dst = R[uri];
+  var norm = uri;
+  if (uri.length > 1 && uri.charAt(uri.length-1) !== '/' && uri.indexOf('.') === -1) norm = uri + '/';
+  var dst = R[norm];
   if (dst) {
     return { statusCode: 301, statusDescription: 'Moved Permanently',
              headers: { 'location': { value: dst } } };
+  }
+  // #1209: no redirect-map match, but a bare extensionless path — 301 to the
+  // trailing-slash form so the S3 website origin serves <path>/index.html
+  // instead of 302-ing to the internal /site/<path>/ prefix (which 404s). Bare
+  // door URLs (/data, /cockpit, …) reach a live door instead of a dead page.
+  if (norm !== uri) {
+    return { statusCode: 301, statusDescription: 'Moved Permanently',
+             headers: { 'location': { value: norm } } };
   }
   return req;
 }
