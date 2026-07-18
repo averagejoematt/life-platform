@@ -250,9 +250,17 @@ def handle_journey() -> dict:
             last_weighin_date = _lw["as_of"]
     except Exception:
         pass
-    lost_lbs = round(start_weight - current_weight, 1)
-    remaining = round(current_weight - goal_weight, 1)
-    progress_pct = round(lost_lbs / (start_weight - goal_weight) * 100, 1) if start_weight != goal_weight else 0
+    # #1225 display policy: the reader sees weights rounded to ONE decimal, and every
+    # delta is derived from those SAME displayed values — so displayed_now − displayed_start
+    # == displayed_delta exactly. The old code rounded the displayed weight to an int (316)
+    # while computing lost_lbs off the raw 315.6, so the hero stat row failed mental
+    # arithmetic ("316 at last weigh-in · start 314 · 1.6 up" — 316 − 314 = 2 ≠ 1.6).
+    current_weight_disp = round(current_weight, 1)
+    start_weight_disp = round(start_weight, 1)
+    goal_weight_disp = round(goal_weight, 1)
+    lost_lbs = round(start_weight_disp - current_weight_disp, 1)
+    remaining = round(current_weight_disp - goal_weight_disp, 1)
+    progress_pct = round(lost_lbs / (start_weight_disp - goal_weight_disp) * 100, 1) if start_weight_disp != goal_weight_disp else 0
 
     # Recent rate + projection via the ONE shared computation (weight_trend) — the same
     # call the daily brief / public_stats uses, so the rate is identical everywhere.
@@ -270,12 +278,15 @@ def handle_journey() -> dict:
     _day_n = max((datetime.now(PT).date() - date.fromisoformat(EXPERIMENT_START)).days + 1, 0)
 
     journey = {
-        "start_weight_lbs": start_weight,
-        "goal_weight_lbs": goal_weight,
-        "current_weight_lbs": round(current_weight),
+        "start_weight_lbs": start_weight_disp,
+        "goal_weight_lbs": goal_weight_disp,
+        "current_weight_lbs": current_weight_disp,
         "lost_lbs": lost_lbs,
         "remaining_lbs": remaining,
         "progress_pct": progress_pct,
+        # #1225: the weigh-in count so the front-end can gate any "in N days" TREND copy
+        # on >= 2 weigh-ins (a single Day-1 reading is not a multi-day trend — ADR-105).
+        "weighin_count": len(weight_series),
         "weekly_rate_lbs": weekly_rate,
         # #535: every claim carries its uncertainty. The rate is an interval and
         # the goal date is a range (earliest..latest), not a false-precision point.

@@ -668,6 +668,78 @@ def check_predict_week_freshness():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 10 — Hero weight arithmetic reconciliation (#1225)
+# ---------------------------------------------------------------------------
+# The home hero's first data claim must survive mental arithmetic: the displayed
+# "now" weight minus the displayed "start" weight has to equal the displayed
+# delta, on the SAME rounded values a reader sees. A prior bug rounded the shown
+# weight to an int (316) while computing the delta off the raw 315.6, so the stat
+# row read "316 at last weigh-in · start 314 · 1.6 up" and 316 − 314 = 2 ≠ 1.6.
+# It also enforces the trend-honesty contract: an "in N days" trend claim (rendered
+# by story.js) is only emitted with >= 2 weigh-ins, so /api/journey must carry a
+# weighin_count and a single weigh-in must span 0 days (no multi-day trend off one
+# reading — ADR-105). Pure assessor so it's unit-testable offline.
+
+WEIGHT_RECONCILE_TOL = 0.05
+
+
+def assess_hero_weight(journey):
+    """Validate the /api/journey weight row reconciles + is trend-honest.
+
+    Returns (ok: bool, message: str). Pure — no network, no clock. A pre-start
+    payload (weight fields nulled by design, #931) is a clean pass.
+    """
+    if not isinstance(journey, dict):
+        return False, "journey payload is not an object"
+    if journey.get("pre_start") or journey.get("current_weight_lbs") is None:
+        return True, "pre-start / no weigh-in — no weight claim to reconcile"
+
+    now = journey.get("current_weight_lbs")
+    start = journey.get("start_weight_lbs")
+    lost = journey.get("lost_lbs")
+    if start is None or lost is None:
+        return False, f"weight row incomplete — current={now}, start={start}, lost={lost}"
+
+    # (a) Arithmetic: DISPLAYED now − DISPLAYED start must equal the DISPLAYED delta.
+    #     lost_lbs is start − now, so (now − start) must equal −lost_lbs.
+    residual = float(now) - float(start) + float(lost)
+    if abs(residual) > WEIGHT_RECONCILE_TOL:
+        return False, (
+            f"stat row fails arithmetic: now {now} − start {start} = {round(float(now) - float(start), 2)} "
+            f"but the delta shows {lost} (residual {round(residual, 2)}) — a numerate reader can't reconcile it (#1225)"
+        )
+
+    # (b) Trend honesty: "up/down X in N days" needs >= 2 weigh-ins. The payload must
+    #     carry the count, and a single weigh-in must span 0 days (story.js gates the
+    #     elapsed-days copy on exactly this).
+    n = journey.get("weighin_count")
+    if n is None:
+        return False, "journey payload is missing weighin_count — story.js can't gate the 'in N days' trend claim (#1225)"
+    span = journey.get("weighin_span_days") or 0
+    if int(n) < 2 and float(span) > 0:
+        return False, (
+            f"single weigh-in (count={n}) but weighin_span_days={span} > 0 — that would let story.js claim an "
+            f"N-day trend off one reading (#1225)"
+        )
+    return True, f"stat row reconciles (now {now} − start {start} → {lost} delta) · {n} weigh-in(s), span {span}d"
+
+
+def check_hero_weight_arithmetic():
+    check = Check("hero_weight:arithmetic", "Reader Truth")
+    url = SITE_BASE_URL + "/api/journey"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "life-platform-qa-smoke"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode("utf-8", "replace"))
+    except Exception as e:
+        # Fail-soft: a fetch/parse blip must never red the nightly.
+        return [check.warn(f"/api/journey fetch failed (fail-soft): {str(e)[:120]}")]
+    journey = data.get("journey", data) if isinstance(data, dict) else {}
+    ok, msg = assess_hero_weight(journey)
+    return [check.ok(msg) if ok else check.fail(msg)]
+
+
+# ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
@@ -754,6 +826,7 @@ def lambda_handler(event, context):
         all_checks += check_mcp_tool_calls()
         all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
+        all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")

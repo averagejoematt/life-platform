@@ -282,23 +282,53 @@ function renderNumbers(journey, pre) {
       }
     }
   }
-  if (journey.progress_pct != null) bind("progress").textContent = `${journey.progress_pct}%`;
+  if (journey.progress_pct != null) {
+    // #1225 — "-1.2% to goal" reads as a negative DISTANCE to the goal. It's a signed
+    // progress figure (negative = moved the wrong way so far), so relabel the caption
+    // "progress" and use a real minus sign. The HTML caption is fixed "to goal"; we
+    // override it here (same pattern the lost/current tiles use for their captions).
+    const pEl = bind("progress");
+    const pct = Number(journey.progress_pct);
+    pEl.textContent = pct < 0 ? `−${Math.abs(pct)}%` : `${pct}%`;
+    const pFig = pEl.closest(".figure");
+    const pCap = pFig && pFig.querySelector(".figure-cap");
+    if (pCap) pCap.textContent = "progress";
+  }
   // P2.1 — pair the live weight delta with the genesis timeframe up in the hero, so the claim
   // meets its proof on the opening screen (down-beat waveform leads just below).
   if (journey.lost_lbs != null) {
     const lost = Number(journey.lost_lbs);
-    const { dayN } = genesisCount();
     const hp = bind("hero-proof");
     if (hp) {
-      const dir = lost > 0.05 ? `down ${Math.round(Math.abs(lost) * 10) / 10} lb` : lost < -0.05 ? `up ${Math.round(Math.abs(lost) * 10) / 10} lb` : "even";
+      const mag = Math.round(Math.abs(lost) * 10) / 10;
+      const dir = lost > 0.05 ? `down ${mag} lb` : lost < -0.05 ? `up ${mag} lb` : "even";
+      // #1225 — "in N days" is a TREND claim; it needs >= 2 weigh-ins spanning that
+      // stretch. Off a single Day-1 weigh-in "up 1.6 lb in 4 days" invents a 4-day arc
+      // that never happened (the delta elapsed in ~0 experiment days). With one reading
+      // we say "since the start" and name the lone weigh-in instead (ADR-105).
+      const nWeighins = Number(journey.weighin_count) || 0;
+      const span = Number(journey.weighin_span_days) || 0;
+      const { dayN } = genesisCount();
       // Honest as-of: the day counter ticks live while the weight only moves at weigh-ins —
       // during a quiet stretch the pairing reads false without the anchor date.
-      let asof = "";
+      let lwLabel = "";
       if (journey.last_weighin_date) {
         const lw = new Date(`${journey.last_weighin_date}T12:00:00`);
-        if ((Date.now() - lw.getTime()) / 86400000 > 1.5) asof = ` (last weigh-in ${lw.toLocaleDateString("en-US", { month: "short", day: "numeric" })})`;
+        if (!isNaN(lw.getTime())) lwLabel = lw.toLocaleDateString("en-US", { month: "short", day: "numeric" });
       }
-      hp.textContent = `${dir} in ${dayN} days${asof} — the shape of it, every day, just below.`;
+      if (nWeighins >= 2 && span >= 1) {
+        // A real multi-weigh-in trend — keep the elapsed-days framing, anchored when stale.
+        let asof = "";
+        if (lwLabel && journey.last_weighin_date) {
+          const lw = new Date(`${journey.last_weighin_date}T12:00:00`);
+          if ((Date.now() - lw.getTime()) / 86400000 > 1.5) asof = ` (last weigh-in ${lwLabel})`;
+        }
+        hp.textContent = `${dir} in ${dayN} days${asof} — the shape of it, every day, just below.`;
+      } else {
+        // A single weigh-in: no N-day trend. State it honestly.
+        const one = lwLabel ? ` — one weigh-in so far, ${lwLabel}` : " so far";
+        hp.textContent = `${dir} since the start${one}. The shape of it, every day, just below.`;
+      }
       hp.hidden = false;
     }
   }
