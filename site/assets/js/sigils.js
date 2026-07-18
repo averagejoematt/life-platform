@@ -7,6 +7,13 @@
   §13), the one sanctioned persona-identity exception to the single-ember rule.
   Static SVG: always visible, reduced-motion-safe, light/dark via currentColor.
 */
+// The SVG legibility floor (#1210): the tier emblem's "LEVEL" caption is sized in
+// viewBox units — import the shared floor-scaler for its side effect so it floors
+// to >=11px effective wherever the emblem renders (character sheet, cockpit).
+// Absolute path so deploy/hash_site_assets.py rewrites this edge to the hashed
+// svgtype filename (a relative "./" import would pin the unhashed URL — skew risk).
+import "/assets/js/svgtype.js";
+
 const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 // FNV-1a (32-bit) — a stable string hash. Deterministic across browsers/runs.
@@ -138,7 +145,8 @@ export function tierEmblem(tier, level, { cls = "" } = {}) {
   const S = `fill="none" stroke="currentColor" pathLength="1" vector-effect="non-scaling-stroke"`;
   const num = (y) => (lvl == null ? "" :
     `<text x="55" y="${y}" text-anchor="middle" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="34" font-weight="500" fill="currentColor">${lvl}</text>` +
-    `<text x="55" y="${y + 18}" text-anchor="middle" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="8" fill="currentColor" opacity="0.6" letter-spacing="2.4">LEVEL</text>`);
+    // font-size comes from --fs-emblem-level (floored >=11px effective by svgtype.js, #1210), not an inline attr.
+    `<text class="emblem-level" x="55" y="${y + 18}" text-anchor="middle" font-family="IBM Plex Mono,ui-monospace,monospace" fill="currentColor" opacity="0.6" letter-spacing="2.4">LEVEL</text>`);
   let body;
   if (t === "momentum") {
     body =

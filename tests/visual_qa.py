@@ -507,6 +507,58 @@ def _tap_target_audit(page, sel):
     )
 
 
+# ── SVG-text legibility floor (#1210) ─────────────────────────────────────────
+# Inline-SVG <text> is sized in viewBox units, so its ON-SCREEN size scales with
+# the svg's rendered width: a 10px radar label in a 320-unit viewBox drawn 280px
+# wide lands at ~8.8px, below the 11px smallest-shipping register (DESIGN_SYSTEM_V5
+# §10.5). #1017 fixed this for the home constellation; #1210 generalized it
+# (site/assets/js/svgtype.js floors the registered labels to max(base, 11/scale)).
+# This audit is the arbiter that retired the comment-level `fs-ok: SVG viewBox
+# units` sanction: it measures the RENDERED result — computed font-size × the live
+# getScreenCTM scale — for EVERY svg <text>, at both widths, so no future
+# viewBox-unit label can ship sub-floor behind a comment again.
+SVG_TEXT_FLOOR_PX = 11.0
+
+_SVG_TEXT_AUDIT_JS = """(floor) => {
+    const out = [];
+    document.querySelectorAll('svg text').forEach(t => {
+        const txt = (t.textContent || '').trim();
+        if (!txt) return;                                  // empty <text> — nothing to read
+        let box; try { box = t.getBoundingClientRect(); } catch (e) { return; }
+        if (!box || box.width < 1 || box.height < 1) return; // not laid out / off the tree
+        const cs = getComputedStyle(t);
+        if (cs.display === 'none' || cs.visibility === 'hidden') return;
+        const fs = parseFloat(cs.fontSize) || 0;           // user-unit font-size (px)
+        let scale = 1;
+        // hypot(a,b) is the uniform scale magnitude — correct even for a rotated
+        // axis label (a -90deg text has ctm.a≈0, which would falsely read as 1x).
+        try { const m = t.getScreenCTM(); if (m) { const s = Math.hypot(m.a, m.b); if (s > 0) scale = s; } } catch (e) {}
+        const eff = fs * scale;                            // effective ON-SCREEN px
+        if (eff < floor - 0.05) {
+            out.push({
+                cls: (t.getAttribute('class') || '(none)'),
+                txt: txt.slice(0, 24),
+                fs: Math.round(fs * 100) / 100,
+                scale: Math.round(scale * 1000) / 1000,
+                eff: Math.round(eff * 100) / 100,
+            });
+        }
+    });
+    return out;
+}"""
+
+
+def _svg_text_floor_findings(page, width):
+    """Set `width`, let svgtype.js re-floor (rAF-debounced on resize), then return
+    every svg <text> whose effective on-screen size is below the 11px floor."""
+    page.set_viewport_size({"width": width, "height": 900 if width >= 1000 else 844})
+    page.wait_for_timeout(300)  # let the resize handler's rAF re-floor + layout settle
+    try:
+        return page.evaluate(_SVG_TEXT_AUDIT_JS, SVG_TEXT_FLOOR_PX) or []
+    except Exception:
+        return []
+
+
 def _write_step_summary(path, passed, failed, warns, results):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
@@ -734,6 +786,18 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         bar360 = _app_bar_overflow(page)
         if bar360 is not None and bar360 > 2:
             issues.append(f"App-bar row exceeds viewport by {bar360}px @360px (#1003 class)")
+
+        # ── SVG-text legibility floor (#1210): every inline-SVG <text> must render
+        #    >=11px effective at BOTH 1280 and 390. viewBox-unit text scales with the
+        #    svg's rendered width, so a label legible on desktop can fall sub-floor at
+        #    another width (and vice-versa) — measure at both. svgtype.js floors the
+        #    registered labels; this is the guard that it held. ──
+        for _floor_w in (1280, 390):
+            for f in _svg_text_floor_findings(page, _floor_w):
+                issues.append(
+                    f"SVG text below 11px floor @{_floor_w}px (#1210): .{f['cls']} '{f['txt']}' = "
+                    f"{f['fs']}px x scale {f['scale']} = {f['eff']}px effective"
+                )
 
         # ── failed HTTP calls (broken /api/ calls fail; other resources warn) ──
         # A 429 is throttle noise, not a broken endpoint: the sweep's parallel

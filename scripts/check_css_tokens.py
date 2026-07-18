@@ -12,9 +12,15 @@ known tokens.
 
 1. RAW FONT-SIZES — every `font-size` must come from a token (`var(--fs-*)` etc.),
    be `inherit`, or carry an explicit inline `/* fs-ok: <reason> */` sanction on the
-   same line (SVG viewBox coordinates, drop caps, geometry-fitted instrument text,
-   deliberate relative em de-emphasis). Unsanctioned literals bypass the type triad
-   and a future type-scale change silently misses them.
+   same line (drop caps, geometry-fitted instrument text, deliberate relative em
+   de-emphasis). Unsanctioned literals bypass the type triad and a future type-scale
+   change silently misses them. (#1210) 'SVG viewBox units' ALONE is no longer a
+   valid reason — that bare sanction is exactly what let inline-SVG <text> ship at
+   7–9px effective (viewBox-unit text scales with rendered width). A viewBox-unit
+   font-size must EITHER drop the literal for the shared floor-scaler
+   (`font-size: var(--fs-*)`, floored >=11px effective per-svg by svgtype.js) OR keep
+   a literal that documents why its minimum rendered scale stays >=11px effective;
+   tests/visual_qa.py's getScreenCTM sweep is the arbiter.
 
 2. UNDEFINED TOKENS — every `var(--x)` reference must resolve: defined in
    tokens.css, defined in the sheet itself, or set at runtime (JS setProperty /
@@ -112,19 +118,50 @@ def raw_hex_findings(text: str) -> list:
     return hits
 
 
+# (#1210) 'SVG viewBox units' alone is no longer a valid fs-ok reason — that bare
+# sanction is exactly what let /data/vitals + /data/character ship 7–9px labels
+# (viewBox-unit text scales with rendered width). A viewBox-unit font-size must now
+# EITHER drop the literal for the shared floor-scaler (`font-size: var(--fs-*)`, set
+# per-svg to >=11px effective by site/assets/js/svgtype.js — no literal, so it never
+# reaches this check) OR keep a literal that DOCUMENTS why its minimum rendered scale
+# stays >=11px effective. tests/visual_qa.py's getScreenCTM sweep is the arbiter that
+# the floor actually holds; this static gate just closes the hand-wave loophole.
+_FLOOR_JUSTIFY = ("floor", "effective", "11px")
+
+
+def _viewbox_sanction_without_floor(line: str) -> bool:
+    """True if an fs-ok reason invokes 'viewBox' but documents no >=11px floor —
+    the retired sanction class (#1210). Such a line no longer sanctions a literal."""
+    m = re.search(r"fs-ok:\s*(.*)", line)
+    if not m:
+        return False
+    reason = m.group(1).split("*/")[0].lower()
+    if "viewbox" not in reason:
+        return False
+    return not any(k in reason for k in _FLOOR_JUSTIFY)
+
+
 def font_size_findings(name: str, text: str) -> list:
     """Raw / literal-fallback font-sizes in `text`. A line carrying `fs-ok:` is a
     sanctioned exception; per-line comments are stripped first. Returns finding strings."""
     findings = []
     for i, line in enumerate(text.splitlines(), 1):
-        sanctioned = "fs-ok:" in line
+        sanctioned = "fs-ok:" in line and not _viewbox_sanction_without_floor(line)
         code = re.sub(r"/\*.*?(\*/|$)", " ", line)  # per-line comment strip
         m = FONT_SIZE.search(code)
         if m and not sanctioned:
             val = m.group(1).strip()
             literal = re.search(r"(?<![\w-])\d*\.?\d+\s*(px|rem|em|%|vw|vh)", val)
+            retired = _viewbox_sanction_without_floor(line)
             if literal and not val.startswith("var("):
-                findings.append(f"{name}:{i}: raw font-size `{val}` — use a --fs-* token or sanction with /* fs-ok: reason */")
+                if retired:
+                    findings.append(
+                        f"{name}:{i}: retired sanction — 'SVG viewBox units' alone no longer sanctions raw font-size `{val}` (#1210). "
+                        "Use the shared floor-scaler (font-size: var(--fs-*), floored >=11px effective by svgtype.js) or document why "
+                        "the minimum rendered scale keeps it >=11px effective (mention 'floor'/'effective'/'11px')."
+                    )
+                else:
+                    findings.append(f"{name}:{i}: raw font-size `{val}` — use a --fs-* token or sanction with /* fs-ok: reason */")
             elif literal and val.startswith("var("):
                 findings.append(f"{name}:{i}: font-size var() with a literal fallback `{val}` — resolve the token instead")
     return findings

@@ -157,6 +157,19 @@
   --fs-label:    0.6875rem;                              /* Plex Mono uppercase, tracked */
   --fs-quote:    clamp(1.15rem, 1rem + 0.7vw, 1.45rem);  /* Fraunces italic, human reply */
 
+  /* SVG-text floor tokens (#1210). These are viewBox-UNIT defaults for inline-SVG
+     <text>; svgtype.js overrides each per-svg at runtime to max(base, 11px/scale)
+     so the label renders >=11px effective at every width (the #1017 technique,
+     generalized). The default = the designed desktop-true size; do NOT retune it
+     without matching the `base` in svgtype.js SVG_TYPE_FLOORS. tests/visual_qa.py
+     asserts the floor actually holds. */
+  --fs-aq:           8px;    /* .aq-lab / .aq-ax — autonomic 2x2 labels + axes */
+  --fs-radar-lbl:    10px;   /* .radar-lbl — pillar radar spoke labels */
+  --fs-bm-cap:       8px;    /* .bm-cap — body-map front/back caption */
+  --fs-emblem-level: 8px;    /* .emblem-level — tier emblem "LEVEL" caption */
+  --fs-arch-at:      13px;   /* .arch-svg .at — architecture-diagram box title */
+  --fs-arch-as:      9.5px;  /* .arch-svg .as — architecture-diagram box subtitle */
+
   --lh-tight:    1.05;
   --lh-snug:     1.25;
   --lh-body:     1.6;
@@ -484,7 +497,9 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .bodymap svg { width: 100%; height: clamp(180px, 26vw, 240px); }
 .bm-head { fill: var(--ink-faint); opacity: 0.28; }
 .bm-m { fill: var(--ember); fill-opacity: var(--o, 0.1); stroke: var(--rule); stroke-width: 0.5; }
-.bm-cap { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; text-anchor: middle; letter-spacing: 0.12em; text-transform: uppercase; }
+.bm-cap { fill: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-bm-cap); text-anchor: middle; letter-spacing: 0.12em; text-transform: uppercase; } /* floored >=11px effective by svgtype.js (#1210) */
+/* Tier-emblem "LEVEL" caption (sigils.js tierEmblem) — viewBox-unit text, floored >=11px effective by svgtype.js (#1210). */
+.emblem-level { font-size: var(--fs-emblem-level); }
 
 /* Per-muscle volume landmark bars (training §5, P1.3) — MEV–MAV band shaded, MRV tick;
    ember in the optimal band, muted ink under/over (never red). Reuses the .suf-row grid. */
@@ -734,8 +749,8 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .aq-wrap { max-width: 340px; margin: var(--sp-3) auto 0; }
 .aq-chart svg { width: 100%; height: auto; }
 .aq-div { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 2 4; }
-.aq-lab { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.08em; }
-.aq-ax { fill: var(--ink-faint); font-family: var(--font-mono); font-size: 8px; }
+.aq-lab { fill: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-aq); letter-spacing: 0.08em; } /* floored >=11px effective by svgtype.js (#1210) */
+.aq-ax { fill: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-aq); } /* floored >=11px effective by svgtype.js (#1210) */
 .aq-dot { fill: var(--ink-muted); opacity: 0.6; }
 .aq-dot.aq-today { fill: var(--ember); opacity: 1; }
 /* P2.2 — small-multiples grid */
