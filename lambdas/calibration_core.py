@@ -128,9 +128,18 @@ def score_pairs(pairs, n_bins=10):
     """Score a set of (confidence, outcome) pairs into a calibration summary.
 
     Returns a dict — all rounding applied here so every surface renders identically:
-      n, confirmed, refuted, accuracy_pct, brier, brier_skill, reliability_bins,
-      calibration (a plain-language verdict), label, score.
+      n, confirmed, refuted, accuracy_pct, brier, brier_skill, skilled,
+      reliability_bins, calibration (a plain-language verdict), label, score.
     `brier`/`brier_skill`/`accuracy_pct` are None when there's nothing resolved.
+
+    Honest-badge gate (#1370, ADR-104/105): *calibrated* (reliability — stated
+    confidence tracks observed rates) and *skilled* (Brier skill > 0 — beats the
+    base-rate climatology) are DIFFERENT claims. A skill <= 0 forecaster did worse
+    than always guessing the observed base rate, so no amount of reliability may
+    dress it up as "well-calibrated" or "authoritative" — those surfaces read the
+    dignified state "not_yet_skillful" instead. `skilled` (True/False/None) carries
+    the distinction explicitly; None means skill is undefined (degenerate base
+    rate / n < 2), which is "unknown", never punished as "unskilled".
     """
     scored = [(p, y) for p, y in pairs if y in (0, 1)]
     n = len(scored)
@@ -141,8 +150,15 @@ def score_pairs(pairs, n_bins=10):
     bins = stats_core.reliability_bins(scored, n_bins=n_bins)
     accuracy_pct = round(100.0 * confirmed / n, 1) if n else None
 
+    # The calibrated-vs-skilled distinction (#1370): True = beats the base rate,
+    # False = worse than it, None = undefined (can't be scored against a degenerate
+    # base rate) — and None is never treated as False below.
+    skilled = None if skill is None else bool(skill > 0)
+
     # Calibration verdict: over/under-confident from the mean gap between stated
     # confidence and observed rate across bins (weighted by bin n). Needs >= 5 resolved.
+    # "well-calibrated" additionally requires skill > 0 (#1370) — reliability without
+    # skill reads "not_yet_skillful" (n and skill are always shown alongside).
     calibration = "insufficient_data"
     if n >= 5 and bins:
         total = sum(b["n"] for b in bins)
@@ -151,13 +167,19 @@ def score_pairs(pairs, n_bins=10):
             calibration = "over-confident"
         elif gap < -0.15:
             calibration = "under-confident"
+        elif skilled is False:
+            calibration = "not_yet_skillful"
         else:
             calibration = "well-calibrated"
 
     # Coarse credibility label/score (kept compatible with the prior compute_credibility
     # contract so existing consumers keep working), now backed by Brier not just accuracy.
+    # A skill <= 0 surface can never reach the flattering rungs (#1370): it reads the
+    # dignified "not_yet_skillful", scored between nascent (30) and developing (50).
     if n < 3:
         label, score = "nascent", 30
+    elif skilled is False:
+        label, score = "not_yet_skillful", 45
     elif brier is not None and brier <= 0.15 and n >= 12:
         label, score = "authoritative", 90
     elif brier is not None and brier <= 0.20:
@@ -172,6 +194,7 @@ def score_pairs(pairs, n_bins=10):
         "accuracy_pct": accuracy_pct,
         "brier": round(brier, 4) if brier is not None else None,
         "brier_skill": round(skill, 4) if skill is not None else None,
+        "skilled": skilled,
         "reliability_bins": [
             {
                 "lo": round(b["lo"], 2),
