@@ -35,7 +35,6 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 from constants import EXPERIMENT_START_DATE  # ADR-058
@@ -142,19 +141,10 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
-
-
-def _float_to_decimal(obj):
-    """Recursively convert floats to Decimal for DynamoDB writes."""
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: _float_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_float_to_decimal(v) for v in obj]
-    return obj
-
+from numeric import (
+    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
+    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
+)
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from retry_utils import _emit_token_metrics  # noqa: E402,F401
@@ -1080,7 +1070,7 @@ def _build_user_message(state, coach_id, today):
 def _cache_brief(coach_id, brief, today):
     """Cache the generation brief to DynamoDB for fallback use."""
     try:
-        item = _float_to_decimal(
+        item = floats_to_decimal(
             {
                 "pk": f"COACH#{coach_id}",
                 "sk": f"BRIEF#{today}",

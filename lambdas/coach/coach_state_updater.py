@@ -23,7 +23,6 @@ import os
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 from phase_filter import with_phase_filter  # ADR-058
@@ -217,19 +216,10 @@ STALENESS_THRESHOLD = 3
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
-
-
-def _float_to_decimal(obj):
-    """Recursively convert floats to Decimal for DynamoDB writes."""
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: _float_to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_float_to_decimal(v) for v in obj]
-    return obj
-
+from numeric import (
+    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
+    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
+)
 
 # Canonical emitter lives in the layer — local copy removed 2026-06-12.
 from retry_utils import _emit_token_metrics  # noqa: E402,F401
@@ -369,7 +359,7 @@ def _get_item(pk, sk):
 def _put_item(item):
     """Write an item to DynamoDB with float-to-Decimal conversion."""
     try:
-        table.put_item(Item=_float_to_decimal(item))
+        table.put_item(Item=floats_to_decimal(item))
         return True
     except Exception as e:
         logger.error("put_item failed for %s/%s: %s", item.get("pk"), item.get("sk"), e)
@@ -733,7 +723,7 @@ def _update_referenced_threads(coach_id, date, threads_referenced):
                     table.update_item(
                         Key={"pk": coach_pk, "sk": thread["sk"]},
                         UpdateExpression=("SET last_referenced = :lr, " "reference_count = if_not_exists(reference_count, :zero) + :one"),
-                        ExpressionAttributeValues=_float_to_decimal(
+                        ExpressionAttributeValues=floats_to_decimal(
                             {
                                 ":lr": date,
                                 ":zero": 0,

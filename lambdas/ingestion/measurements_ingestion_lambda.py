@@ -59,8 +59,14 @@ MEASUREMENT_FIELDS = [
 ]
 
 
-def _to_decimal(val):
-    """Convert a value to Decimal, return None if invalid."""
+def _parse_decimal_field(val):
+    """Parse a CSV scalar string into a Decimal, return None if blank/invalid.
+
+    Distinct contract from numeric.floats_to_decimal (#1207): this is a scalar
+    STRING parser (strips whitespace, treats "" as None, catches InvalidOperation)
+    for measurement CSV cells — not a recursive float->Decimal walker, so it is
+    deliberately not consolidated into the canonical helper.
+    """
     if val is None or str(val).strip() == "":
         return None
     try:
@@ -73,7 +79,7 @@ def _row_to_session(row_dict: dict) -> dict:
     """Normalize one parsed row (str keys) into a session dict."""
     result = {}
     for field in MEASUREMENT_FIELDS:
-        val = _to_decimal(row_dict.get(field))
+        val = _parse_decimal_field(row_dict.get(field))
         if val is not None:
             result[field] = val
     result["date"] = str(row_dict.get("date") or "").strip() or None

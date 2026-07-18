@@ -165,7 +165,10 @@ s3 = boto3.client("s3", region_name=_REGION)
 # =============================================================================
 
 
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from numeric import (
+    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
+    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
+)
 
 
 def _safe_float(item, field, default=None):
@@ -186,21 +189,6 @@ def _s3_json(key):
     except Exception as e:
         logger.warning("S3 read failed (%s): %s", key, e)
         return None
-
-
-def _decimalize_dict(d):
-    """Recursively convert all floats in a dict to Decimal for DynamoDB."""
-    if isinstance(d, dict):
-        return {k: _decimalize_dict(v) for k, v in d.items()}
-    if isinstance(d, list):
-        return [_decimalize_dict(i) for i in d]
-    if isinstance(d, float):
-        if math.isnan(d) or math.isinf(d):
-            return None
-        return Decimal(str(round(d, 6)))
-    if isinstance(d, int) and not isinstance(d, bool):
-        return Decimal(str(d))
-    return d
 
 
 # =============================================================================
@@ -786,7 +774,7 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
 
     try:
         table.put_item(
-            Item=_decimalize_dict(
+            Item=floats_to_decimal(
                 {
                     "pk": "NARRATIVE#arc",
                     "sk": "STATE#current",
@@ -795,17 +783,19 @@ def _detect_arc_transition(trends, guardrails, all_data, today_str):
                     "previous_phase": current_phase,
                     "transition_reason": reason,
                     "last_updated": now_iso,
-                }
+                },
+                precision=6,
             )
         )
         table.put_item(
-            Item=_decimalize_dict(
+            Item=floats_to_decimal(
                 {
                     "pk": "NARRATIVE#arc",
                     "sk": f"HISTORY#{today_str}",
                     "transition": transition,
                     "created_at": now_iso,
-                }
+                },
+                precision=6,
             )
         )
         logger.info("Arc transition: %s → %s (%s)", current_phase, new_phase, reason)

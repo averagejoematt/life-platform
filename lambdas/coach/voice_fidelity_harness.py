@@ -44,6 +44,7 @@ import boto3
 import persona_registry
 import voice_fidelity_core as vfc
 from boto3.dynamodb.conditions import Key
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from phase_filter import with_phase_filter  # ADR-058 (harmless no-op here: these records never set `phase`)
 
 logger = logging.getLogger("voice-fidelity-harness")
@@ -272,7 +273,7 @@ def lambda_handler(event, context=None):
                 "created_at": now.isoformat(),
             }
             try:
-                table.put_item(Item=_to_decimal(judgment))
+                table.put_item(Item=floats_to_decimal(judgment))
                 new_samples += 1
             except Exception as e:
                 logger.warning("judgment write failed for %s: %s", coach_id, e)
@@ -284,9 +285,9 @@ def lambda_handler(event, context=None):
     scoreboard["new_samples_this_run"] = new_samples
 
     try:
-        table.put_item(Item=_to_decimal({"pk": SCOREBOARD_PK, "sk": "latest", **scoreboard}))
+        table.put_item(Item=floats_to_decimal({"pk": SCOREBOARD_PK, "sk": "latest", **scoreboard}))
         table.put_item(
-            Item=_to_decimal(
+            Item=floats_to_decimal(
                 {
                     "pk": SCOREBOARD_PK,
                     "sk": f"RUN#{run_month}",
@@ -309,9 +310,3 @@ def lambda_handler(event, context=None):
     }
     logger.info(json.dumps(result))
     return result
-
-
-def _to_decimal(obj):
-    from numeric import floats_to_decimal
-
-    return floats_to_decimal(obj)

@@ -130,7 +130,9 @@ class TestComputeCoverage:
 
 class TestDecimalDiscipline:
     def test_to_decimal_recursive(self):
-        out = eng.to_decimal({"a": 1.5, "b": [2.5, {"c": 3.5}], "d": "s"})
+        # #1207: forecast_engine's local `to_decimal` fork was consolidated into
+        # numeric.floats_to_decimal (imported into the module, so eng.floats_to_decimal).
+        out = eng.floats_to_decimal({"a": 1.5, "b": [2.5, {"c": 3.5}], "d": "s"})
         assert isinstance(out["a"], Decimal)
         assert isinstance(out["b"][0], Decimal)
         assert isinstance(out["b"][1]["c"], Decimal)
