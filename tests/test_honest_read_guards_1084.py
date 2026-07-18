@@ -173,6 +173,34 @@ def _setup_vitals(monkeypatch, genesis, data=None, calls=None):
     monkeypatch.setattr(vitals, "_latest_item", lambda *_a, **_k: {})
     monkeypatch.setattr(vitals, "_latest_item_asof", lambda *_a, **_k: {})
 
+    # #1369: the LIVE latest-reading block now comes from the canonical resolver
+    # (web/vitals_resolver) — feed it the same whoop fixture so these tests stay
+    # end-to-end coherent. Semantics mirrored: newest scored record wins, sleep
+    # rides the newest record that carries it, honest-null otherwise.
+    def _fake_resolver(table, user_prefix, now=None):
+        recs = sorted((data or {}).get("whoop", []), key=lambda r: str(r.get("sk", "")), reverse=True)
+        latest = next((r for r in recs if r.get("recovery_score") is not None), {})
+        sleep_rec = next((r for r in recs if r.get("sleep_duration_hours") is not None), {})
+
+        def _sk(r):
+            return str(r.get("sk", "")).replace("DATE#", "")[:10] or None
+
+        rec_pct = float(latest["recovery_score"]) if latest.get("recovery_score") else None
+        return {
+            "recovery_pct": rec_pct,
+            "recovery_status": vitals.vitals_resolver.recovery_status(rec_pct),
+            "hrv_ms": float(latest["hrv"]) if latest.get("hrv") else None,
+            "rhr_bpm": float(latest["resting_heart_rate"]) if latest.get("resting_heart_rate") else None,
+            "recovery_as_of": _sk(latest) if latest else None,
+            "sleep_hours": float(sleep_rec["sleep_duration_hours"]) if sleep_rec.get("sleep_duration_hours") else None,
+            "sleep_as_of": _sk(sleep_rec) if sleep_rec else None,
+            "steps": None,
+            "steps_source": None,
+            "steps_as_of": None,
+        }
+
+    monkeypatch.setattr(vitals.vitals_resolver, "resolve_vitals", _fake_resolver)
+
 
 def test_vitals_live_trailing_windows_clamp_at_genesis(monkeypatch):
     genesis = _d(5)

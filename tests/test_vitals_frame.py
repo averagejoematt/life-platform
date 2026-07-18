@@ -34,6 +34,25 @@ def test_vitals_frame_and_night_of(monkeypatch):
 
     monkeypatch.setattr(vitals, "_query_source", fake_query_source)
     monkeypatch.setattr(vitals, "_latest_item", lambda *_a, **_k: {})
+    # #1369: the live latest-reading now comes from the canonical resolver —
+    # feed it the same record so the frame/night_of derivation stays end-to-end.
+    _r = _whoop_record("2026-06-17")
+    monkeypatch.setattr(
+        vitals.vitals_resolver,
+        "resolve_vitals",
+        lambda *_a, **_k: {
+            "recovery_pct": float(_r["recovery_score"]),
+            "recovery_status": vitals.vitals_resolver.recovery_status(float(_r["recovery_score"])),
+            "hrv_ms": float(_r["hrv"]),
+            "rhr_bpm": float(_r["resting_heart_rate"]),
+            "recovery_as_of": "2026-06-17",
+            "sleep_hours": float(_r["sleep_duration_hours"]),
+            "sleep_as_of": "2026-06-17",
+            "steps": None,
+            "steps_source": None,
+            "steps_as_of": None,
+        },
+    )
 
     resp = vitals.handle_vitals()
     assert resp["statusCode"] == 200

@@ -2105,16 +2105,19 @@ def lambda_handler(event, context):
     if not demo_mode:
         try:
             from site_writer import write_public_stats
+            from web.site_api_common import PLATFORM_STATS  # #1369: the ONE counts home
+            from web.vitals_resolver import resolve_vitals  # #1369: the ONE vitals truth
 
             # Build vitals from data already gathered above
-            # Phase-3: the ONE chosen whoop (today-if-finalized else yesterday) — the
-            # same record the recovery line and AI narrative read, so the vitals block
-            # can't disagree with the prose on the same page.
-            _w = data.get("primary_whoop") or data.get("whoop_today") or data.get("whoop") or {}
-            _wt = data.get("withings") or {}
             _hrv = data["hrv"]
-            _rec = safe_float(_w, "recovery_score") or 0
-            _rec_status = "green" if _rec >= 67 else ("yellow" if _rec >= 34 else "red")
+            # #1369 Truth Spine: the PUBLIC json's recovery/hrv/rhr/sleep come from
+            # the canonical resolver — the same module /api/pulse and /api/vitals
+            # read — so public_stats can't disagree with the live site. (The email
+            # prose keeps its own subject-date whoop selection; honest-null replaces
+            # the old `or 0` + always-colored status.)
+            _vr = resolve_vitals(table, f"USER#{USER_ID}#SOURCE#")
+            _rec = _vr["recovery_pct"]
+            _rec_status = _vr["recovery_status"]
 
             # Journey calc from profile
             _start_wt = float(profile.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
@@ -2288,13 +2291,13 @@ def lambda_handler(event, context):
                     "weight_lbs": round(_curr_wt, 1) if _curr_wt else None,
                     "weight_as_of": _weight_as_of,  # G-3: date of reading for staleness display
                     "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
-                    "hrv_ms": round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
+                    "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                     "hrv_trend": html_builder.hrv_trend_str(_hrv.get("hrv_7d"), _hrv.get("hrv_30d")),
-                    "rhr_bpm": safe_float(_w, "resting_heart_rate"),
+                    "rhr_bpm": _vr["rhr_bpm"],
                     "rhr_trend": "improving",
-                    "recovery_pct": round(_rec, 0) if _rec else None,
+                    "recovery_pct": round(_rec, 0) if _rec is not None else None,
                     "recovery_status": _rec_status,
-                    "sleep_hours": safe_float(data.get("sleep"), "sleep_duration_hours"),
+                    "sleep_hours": _vr["sleep_hours"],
                     "sleep_hours_30d_avg": _sleep_hours_30d_avg,  # HOME-3
                 },
                 journey={
@@ -2333,10 +2336,15 @@ def lambda_handler(event, context):
                     "zone2_target_min": 150,
                 },
                 platform={
-                    "mcp_tools": 121,
-                    "data_sources": 26,
-                    "lambdas": 62,
-                    "last_review_grade": "A-",
+                    # #1369: counts derive from the ONE guarded home (PLATFORM_STATS —
+                    # rewritten by sync_doc_metadata.py, pinned by
+                    # tests/test_platform_stats_truth.py). The hand-authored 121/26/62
+                    # here is what put "19/26 data sources" hero copy live against the
+                    # registry's real ~20.
+                    "mcp_tools": PLATFORM_STATS["mcp_tools"],
+                    "data_sources": PLATFORM_STATS["data_sources"],
+                    "lambdas": PLATFORM_STATS["lambdas"],
+                    "last_review_grade": PLATFORM_STATS["review_grade"],
                     "tier0_streak": _tier0_streak,
                     "days_in": _days_in,
                 },
@@ -2390,11 +2398,11 @@ def lambda_handler(event, context):
                         "weight_lbs": round(_curr_wt, 1) if _curr_wt else None,
                         "weight_as_of": _weight_as_of,
                         "weight_delta_30d": round(_curr_wt - float(_week_ago), 1) if _week_ago and _curr_wt else None,
-                        "hrv_ms": round(float(_hrv.get("hrv_yesterday") or _hrv.get("hrv_7d") or 0), 1) or None,
-                        "rhr_bpm": safe_float(_w, "resting_heart_rate"),
-                        "recovery_pct": round(_rec, 0) if _rec else None,
+                        "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
+                        "rhr_bpm": _vr["rhr_bpm"],
+                        "recovery_pct": round(_rec, 0) if _rec is not None else None,
                         "recovery_status": _rec_status,
-                        "sleep_hours": safe_float(data.get("sleep"), "sleep_duration_hours"),
+                        "sleep_hours": _vr["sleep_hours"],
                     },
                     journey={
                         "current_weight_lbs": _curr_wt,

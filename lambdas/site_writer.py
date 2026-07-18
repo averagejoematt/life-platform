@@ -56,11 +56,35 @@ from constants import (
 # ─────────────────────────────────────────────────────────────────────────────
 # ADR-058: hero copy will be rewritten in §8 with Elena voice + clean-slate framing.
 # Until then, this is a placeholder that uses the new baseline weight.
-HERO_WHY_PARAGRAPH = (
-    "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. "
-    "I connect 19 data sources to a custom AI and publish every number, every week, without filtering. "
-    f"{int(round(JOURNEY_START_WEIGHT))} lbs to 185. Every failure included. This is what systematic self-improvement actually looks like."
-)
+
+
+def _platform_stats_fallback() -> dict:
+    """#1369: platform counts from the ONE guarded home — never hand-authored here.
+
+    web.site_api_common.PLATFORM_STATS is rewritten by sync_doc_metadata.py and
+    pinned by tests/test_platform_stats_truth.py; the old baked literals in this
+    module (the hero-copy source count, the 95/19/50 fallback) are the drift this
+    replaces. Lazy import: site_writer is a root shared module and must not pull
+    the web package at import time for consumers that never write hero copy.
+    """
+    from web.site_api_common import PLATFORM_STATS
+
+    return {
+        "mcp_tools": PLATFORM_STATS["mcp_tools"],
+        "data_sources": PLATFORM_STATS["data_sources"],
+        "lambdas": PLATFORM_STATS["lambdas"],
+        "last_review_grade": PLATFORM_STATS["review_grade"],
+    }
+
+
+def _hero_why_paragraph() -> str:
+    n_sources = _platform_stats_fallback()["data_sources"]
+    return (
+        "Most people optimize in the dark — gut feelings, Instagram advice, someone's podcast take. "
+        f"I connect {n_sources} data sources to a custom AI and publish every number, every week, without filtering. "
+        f"{int(round(JOURNEY_START_WEIGHT))} lbs to 185. Every failure included. "
+        "This is what systematic self-improvement actually looks like."
+    )
 
 
 def _days_until_start() -> int:
@@ -114,7 +138,7 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
     days_until = _days_until_start()
     if days_until > 0:
         return {
-            "why_paragraph": HERO_WHY_PARAGRAPH,
+            "why_paragraph": _hero_why_paragraph(),
             "scroll_invitation": "See the actual numbers below →",
             "pre_start": True,
             "days_until_start": days_until,
@@ -131,7 +155,7 @@ def _compute_hero(vitals: dict, journey: dict) -> dict:
     goal_date = journey.get("projected_goal_date") or ""  # None while provisional → no finish line
 
     return {
-        "why_paragraph": HERO_WHY_PARAGRAPH,
+        "why_paragraph": _hero_why_paragraph(),
         "scroll_invitation": "See the actual numbers below →",
         "days_on_journey": days_on_journey,
         "start_weight_lbs": JOURNEY_START_WEIGHT,
@@ -344,15 +368,10 @@ def write_public_stats(
             "vitals": _json_safe(vitals),
             "journey": _json_safe(journey),
             "training": _json_safe(training),
-            "platform": _json_safe(
-                platform
-                or {
-                    "mcp_tools": 95,
-                    "data_sources": 19,
-                    "lambdas": 50,
-                    "last_review_grade": "A-",
-                }
-            ),
+            # #1369: the no-platform fallback derives from the ONE guarded home
+            # (web.site_api_common.PLATFORM_STATS) — the stale hand-authored
+            # 95/19/50 here is where "19 data sources" hero copy came from.
+            "platform": _json_safe(platform or _platform_stats_fallback()),
             # v1.2.0: Trend arrays for homepage sparkline charts
             "trends": _json_safe(trends or {}),
             # v1.2.0: AI brief excerpt for "What Claude Sees" homepage widget

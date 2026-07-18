@@ -45,6 +45,7 @@ from web.site_api_common import (
     pre_start_meta,
     table,
 )
+from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
 
 # ── Module-owned cache state for /api/status ─────────────
 # These were originally globals in site_api_lambda.py; moved here so the
@@ -896,29 +897,10 @@ def handle_pulse() -> dict:
     q_end = max(today_pt, today_utc)
 
     # Read latest data from each source
-    # Whoop: skip workout sub-records (DATE#...#WORKOUT#...), get most recent daily record
-    whoop = None
-    try:
-        _w_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}whoop") & Key("sk").begins_with("DATE#"),
-            ScanIndexForward=False,
-            Limit=20,  # Increased from 5 — workout sub-records can push daily records out of window
-        )
-        for _w_item in _decimal_to_float(_w_resp.get("Items", [])):
-            _w_sk = _w_item.get("sk", "")
-            if "#WORKOUT#" not in _w_sk and _w_item.get("recovery_score") is not None:
-                whoop = _w_item
-                break
-        if not whoop:
-            # No record with recovery data found — use most recent daily (non-workout) record
-            for _w_item in _decimal_to_float(_w_resp.get("Items", [])):
-                if "#WORKOUT#" not in _w_item.get("sk", ""):
-                    whoop = _w_item
-                    break
-        if not whoop:
-            whoop = {}
-    except Exception:
-        whoop = {}
+    # #1369 Truth Spine: recovery/hrv/rhr/sleep/steps come from the ONE canonical
+    # resolver — /api/vitals (→ /api/snapshot) and the public_stats writers read
+    # the same module, so two surfaces can't disagree about the same morning.
+    _vr = resolve_vitals(table, USER_PREFIX)
     withings = _latest_item("withings") or {}
     ah = None
     try:
@@ -974,25 +956,11 @@ def handle_pulse() -> dict:
     _p = _get_profile()
     start_weight = float(_p.get("journey_start_weight_lbs", EXPERIMENT_BASELINE_WEIGHT_LBS))
 
-    recovery = float(whoop.get("recovery_score", 0)) if whoop.get("recovery_score") else None
-    sleep_hrs = float(whoop.get("sleep_duration_hours", 0)) if whoop.get("sleep_duration_hours") else None
-    # Steps: prefer Garmin (more accurate with watch), fall back to Apple Health
-    steps = None
-    try:
-        _g_resp = table.query(
-            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}garmin") & Key("sk").between(f"DATE#{yesterday_pt}", f"DATE#{q_end}"),
-            ScanIndexForward=False,
-            Limit=1,
-        )
-        for _g in _g_resp.get("Items", []):
-            _gs = _g.get("steps")
-            if _gs:
-                steps = float(str(_gs))
-                break
-    except Exception:
-        pass
-    if not steps:
-        steps = float(ah.get("steps", 0)) if ah and ah.get("steps") else None
+    # #1369: the canonical resolver already applied the finalized-recovery,
+    # sleep-finalizes-separately, and garmin-then-apple-steps policies.
+    recovery = _vr["recovery_pct"]
+    sleep_hrs = _vr["sleep_hours"]
+    steps = _vr["steps"]
     # Water: get the PT-date record specifically (user logs water throughout the day in their timezone)
     water_ml = float(ah.get("water_intake_ml", 0)) if ah and ah.get("water_intake_ml") else None
     water_l = round(water_ml / 1000, 2) if water_ml else None
@@ -1171,20 +1139,24 @@ def handle_pulse() -> dict:
             "value": int(steps) if steps else None,
             "target": 8000,
             "label": f"{int(steps):,} steps" if steps else None,
+            "source": _vr["steps_source"],
+            "as_of": _vr["steps_as_of"],
         },
         "recovery": {
             "state": _recovery_state(),
             "value": round(recovery) if recovery else None,
             "recovery_pct": round(recovery) if recovery else None,
-            "hrv_ms": round(float(whoop.get("hrv", 0)), 1) if whoop.get("hrv") else None,
-            "rhr_bpm": round(float(whoop.get("resting_heart_rate", 0)), 1) if whoop.get("resting_heart_rate") else None,
+            "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
+            "rhr_bpm": round(_vr["rhr_bpm"], 1) if _vr["rhr_bpm"] is not None else None,
             "label": f"{round(recovery)}%" if recovery else None,
+            "as_of": _vr["recovery_as_of"],
         },
         "sleep": {
             "state": _sleep_state(),
             "value": round(sleep_hrs, 1) if sleep_hrs else None,
             "hours": round(sleep_hrs, 1) if sleep_hrs else None,
             "label": f"{round(sleep_hrs, 1)}h" if sleep_hrs else None,
+            "as_of": _vr["sleep_as_of"],
         },
         "journal": {
             "state": "green" if journal_today else "gray",
@@ -2215,7 +2187,17 @@ def handle_wrong() -> dict:
 
         return _ok(
             {
-                "validator": {"claims_checked": checks_run, "caught": len(catches) + numeric_caught, "recent": catches[:25]},
+                # #1369: the header count is DERIVED (detailed + undetailed) and both
+                # parts ship, so the front-end can render a total that always agrees
+                # with the rows it shows — "4 caught" over 2 rows was a live
+                # self-contradiction (older records logged counts without detail).
+                "validator": {
+                    "claims_checked": checks_run,
+                    "caught": len(catches) + numeric_caught,
+                    "caught_detailed": len(catches),
+                    "caught_undetailed": numeric_caught,
+                    "recent": catches[:25],
+                },
                 "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
                 "note": (
                     "Uncurated. The validator audits every coach claim against the data it cites; "
