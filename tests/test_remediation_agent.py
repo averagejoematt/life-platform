@@ -274,3 +274,82 @@ def test_prompt_instructs_incremental_report_and_ack_skip():
     assert "Report-first workflow" in src
     assert "Acked signals" in src
     assert "exact alarm name" in src
+
+
+# ── #1201: the loop must fail loudly when triage doesn't complete ────────────
+
+
+def test_triage_incomplete_flags_truncated_untriaged_run():
+    # The exact #1201 failure mode: signals left untriaged + a truncated _raw tail.
+    report = {
+        "auto_fixed": [],
+        "prs": [],
+        "needs_human": [],
+        "stale": [],
+        "untriaged": [{"kind": "alarm", "id": "grading-stalled"}],
+        "_raw": "Now let me create a branch and push this fix:",  # cut mid-sentence
+    }
+    assert agent.triage_incomplete(report) is True
+
+
+def test_triage_complete_run_is_not_flagged():
+    # All signals bucketed, no _raw → the loop closed; must NOT red the step.
+    assert agent.triage_incomplete({"auto_fixed": [{"pr": "#9"}], "untriaged": []}) is False
+    # Untriaged left over but the agent produced a parseable REPORT (no _raw) is an
+    # honest partial, not the truncated-transcript failure — also not flagged.
+    assert agent.triage_incomplete({"untriaged": [{"kind": "alarm", "id": "x"}]}) is False
+    # A bare _raw with nothing untriaged (nothing left to close) is not flagged either.
+    assert agent.triage_incomplete({"untriaged": [], "_raw": "..."}) is False
+
+
+def test_triage_incomplete_non_dict_is_flagged():
+    assert agent.triage_incomplete(None) is True
+
+
+def _run_main_with_transcript(monkeypatch, tmp_path, transcript):
+    """Drive agent.main() end-to-end with a canned agent transcript, stubbing the
+    boto3/SES/gh side-effects, and return main()'s exit code. Exercises the real
+    skeleton → parse → exit-code path, so this test fails if the guard is removed."""
+    monkeypatch.setenv("REMEDIATION_REPORT_PATH", str(tmp_path / "report.json"))
+    monkeypatch.setattr(agent, "gate", lambda: "shadow")
+    monkeypatch.setattr(
+        agent,
+        "gather_signals",
+        lambda ev: {
+            "alarms": [{"name": "grading-stalled"}],
+            "ci_failures": [],
+            "dlq": {},
+            "coherence": None,
+            "drift": None,
+            "urgent": None,
+        },
+    )
+    monkeypatch.setattr(agent, "load_ack_ledger", lambda: {})
+    monkeypatch.setattr(agent, "build_prompt", lambda mode, signals: "prompt")
+
+    async def _fake_run_agent(prompt):
+        return transcript
+
+    monkeypatch.setattr(agent, "run_agent", _fake_run_agent)
+    monkeypatch.setattr(agent, "update_ack_ledger", lambda *a, **k: {})
+    monkeypatch.setattr(agent, "audit_log", lambda *a, **k: None)
+    monkeypatch.setattr(agent, "email_report", lambda *a, **k: None)
+    return agent.main()
+
+
+def test_main_reds_on_truncated_transcript(monkeypatch, tmp_path):
+    # A mid-sentence transcript with no ```json fence → skeleton keeps the signal
+    # untriaged, _raw is attached → main() must exit non-zero (a failed run).
+    code = _run_main_with_transcript(monkeypatch, tmp_path, "Investigating grading-stalled. Now let me create a branch and push this fix:")
+    assert code == 1
+
+
+def test_main_green_on_completed_transcript(monkeypatch, tmp_path):
+    # A well-formed REPORT with everything triaged → main() exits 0.
+    transcript = (
+        "Triaged grading-stalled → stale.\n"
+        '```json\n{"auto_fixed": [], "prs": [], "needs_human": [], '
+        '"stale": [{"summary": "grading-stalled cleared"}], "untriaged": []}\n```'
+    )
+    code = _run_main_with_transcript(monkeypatch, tmp_path, transcript)
+    assert code == 0

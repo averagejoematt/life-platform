@@ -439,6 +439,27 @@ def parse_report(text):
     return {"auto_fixed": [], "prs": [], "needs_human": [], "stale": [], "_raw": text[-1500:]}
 
 
+# ── Loop-close guard (#1201) ────────────────────────────────────────────────
+# The self-healing loop only "closes" if the agent actually classifies each
+# signal into a bucket. When the Bedrock turn/token budget burns out
+# mid-investigation, the report keeps every signal under `untriaged` AND carries
+# a truncated `_raw` reasoning tail (the tell that the structured output never
+# parsed). #396 made that partial state HONEST in the report/email, but the
+# workflow step still exited 0 — so 3 of 4 runs (Jul 8/13/15) concluded
+# 'success' with zero triage and the recurrence went untracked. This guard makes
+# an incomplete run LOUD: the step reds instead of reporting a deceptive green.
+
+
+def triage_incomplete(report):
+    """True when the run failed to close the loop: signals remain `untriaged`
+    AND the agent's structured output never parsed (a truncated `_raw` tail is
+    present). A clean run (all signals bucketed) or one that at least produced a
+    parseable REPORT with no `_raw` returns False."""
+    if not isinstance(report, dict):
+        return True
+    return bool(report.get("untriaged")) and bool(report.get("_raw"))
+
+
 # ── Reporting ────────────────────────────────────────────────────────────────
 
 
@@ -557,6 +578,19 @@ def main():
         email_report(report, mode)
     else:
         print("auto mode — deferring report email to the merge gate")
+    # #1201: after the report/email/audit are written (operator is never left
+    # blind), red the step if the loop didn't close — signals left untriaged with
+    # a truncated `_raw` tail means the turn/token budget burned out mid-triage.
+    # This must be the LAST thing so the run reports failure, not a false 'success'.
+    if triage_incomplete(report):
+        n = len(report.get("untriaged") or [])
+        print(
+            f"::error::Remediation triage did not complete — {n} signal(s) left untriaged with a "
+            "truncated agent transcript (_raw present). The Bedrock turn/token budget likely burned "
+            "out mid-investigation; see REMEDIATION_MAX_TURNS in remediation-agent.yml. Failing the "
+            "step so the run reds instead of concluding a deceptive 'success' (#1201)."
+        )
+        return 1
     return 0
 
 
