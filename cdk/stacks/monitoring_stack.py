@@ -733,6 +733,47 @@ class MonitoringStack(Stack):
             {"FunctionName": "life-platform-dlq-consumer"},
         )
 
+        # ══════════════════════════════════════════════════════════════
+        # #1229: watch the watchdog's own delivery path.
+        # life-platform-alert-digest is the single consumer that drains the
+        # alerts-digest queue and emails the daily batch — 52 of 67 alarms route
+        # THROUGH it. It was itself unwatched: if it errors, alarm notifications
+        # pile up in the queue silently (25h retention → >1 day of failure loses
+        # notifications permanently). Both alarms route URGENT (the default `topic`,
+        # NOT the digest) — the digest path cannot announce its own death.
+        # ADR-095's "error alarm omitted by design" is specific to the traffic
+        # digest (CF logs retained 90d, next run recovers) and does NOT transfer to
+        # a 25h-retention queue. ADR-103: load-bearing notification path (~$0.20/mo).
+        # ══════════════════════════════════════════════════════════════
+        _alarm(
+            "AlertDigestErrors",
+            "life-platform-alert-digest-errors",
+            "AWS/Lambda",
+            "Errors",
+            86400,
+            "Sum",
+            1,
+            GTE,
+            {"FunctionName": "life-platform-alert-digest"},
+        )
+
+        # ApproximateAgeOfOldestMessage is in SECONDS. The queue drains once daily
+        # (Invocations=1/day), so a healthy oldest-message age tops out near ~24h
+        # (86400s) between drains. 48h (172800s) means the daily drainer missed at
+        # least a full cycle — notifications are now stranded. Period 3600s with
+        # evaluation_periods=1 (in _alarm) stays well under the 604800s week cap.
+        _alarm(
+            "AlertDigestQueueAge",
+            "life-platform-alert-digest-queue-age",
+            "AWS/SQS",
+            "ApproximateAgeOfOldestMessage",
+            3600,
+            "Maximum",
+            172800,  # 48h in seconds
+            GTE,
+            {"QueueName": "life-platform-alerts-digest-queue"},
+        )
+
         # Budget-tier escalation: tier >= 2 means website AI is paused (cost-governor,
         # ADR-063). The tier rides SSM + this metric, but nothing alerted on the jump.
         _alarm(
