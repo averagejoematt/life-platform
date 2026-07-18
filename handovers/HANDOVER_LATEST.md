@@ -1,70 +1,78 @@
-# HANDOVER — /sdlc-review born + first run: 12-lens lifecycle audit, 60 confirmed findings, 40 issues filed — 2026-07-18
+# HANDOVER — /frontier-plan born + first run: quantified-life strategy review, 52-issue backlog — 2026-07-18
 
-> Instruction thread: Matthew asked (via /plan) for a comprehensive review of the entire
-> technical approach — AWS, Claude, skills, git, ideation→production→oversight — as
-> (1) a durable "much better prompt", (2) the review actually run, (3) GitHub issues filed.
-> Grading posture: commercialization-defensible showcase · AI-engineering pedagogy ·
-> solo-operator maintainable — "not an AI slop piece". Plan approved; filing authorized by
-> the request itself; NO merges/deploys authorized — the PR is open, not merged.
+> Instruction thread: Matthew asked for a prompt to "do a great /plan" reviewing the entire
+> website from subscriber / reader / self perspectives, grounded in the science of human
+> fulfillment (beyond physical health), compared against the QS/biohacking market and the AI
+> frontier, ideating past the possible, stack-ranked into GitHub issues. Cost not a barrier,
+> run-rate increases flagged; trust in the character progression named as the product. The
+> prompt became the `/frontier-plan` command; he then invoked it and approved the full filing
+> ("yes i am good with all of this"), adding four channel ideas mid-flight (Instagram,
+> avatar video diary, WhatsApp coaches, theme word-clouds) — all folded in.
 
-## Shipped this session
+## What shipped
 
-1. **`.claude/commands/sdlc-review.md`** — the new ritual: companion to /fullreview that
-   audits the LIFECYCLE (fullreview grades artifacts; this grades the machinery + operator
-   practice). 12 lenses (ideation, planning/ADR practice, AI-engineering org, VCS, deploy
-   engineering, testing economics, release topology, ops/oversight, security-as-process,
-   cost, knowledge/continuity, commercialization DD), three-outcome-axes calibration,
-   A/B fix taxonomy, kill-on-sight list incl. "enterprise cosplay" and "documented posture
-   restated as finding".
-2. **The first run** (Workflow `wf_5bc1c2d8-af1`): 24 agents (12 graders pipelined into 12
-   finding-verifier batches), ~2.1M subagent tokens, 66 findings → **60 CONFIRMED / 6 REFUTED**.
-   Report: `docs/reviews/SDLC_REVIEW_2026-07-18.md` (+ `sdlc_review_grades_2026-07-18.json`,
-   the baseline comparability file; next run diffs against it).
-3. **Grades:** A- ideation · A- AI-practice · B+ planning · B+ deploy · B+ ops · B+ knowledge ·
-   B- vcs · B testing · B security · B cost · B commercial · **C+ release** (not the topology —
-   its compensating controls: the documented approval gate is DEAD, rollback unproven, reverts unlogged).
-4. **Headline P1s (9 Now stories):** production approval gate doesn't exist live while 4 docs
-   claim it (auto-merge safety case rests on it, #1319) · main CI normalized-red 19/100 green
-   (#1327) · site-api throttled readers 627×/30d at an unalarmed, daily-saturating cap of 5
-   (#1328) · ai-keys 132d vs 90d SLA, staleness alert firing daily unactioned (#1329) ·
-   ai_spend_attribution.py crashes on default invocation (#1335) · ADR index silently omits 12
-   ADRs, self-certifying --check (#1321) · deploy/README teaches a boot-broken MCP zip (#1322) ·
-   subscriber-email retention decided by a fictional persona's code comment, undeletable,
-   ungoverned (#1350) · release-topology ADR (#1338, PM override to Now).
-5. **Filed:** 4 epics **#1355–#1358** (dead controls · alert→action loop · contract truth ·
-   acquirer paperwork) + **36 stories #1319–#1354** (9 Now / 21 Next / 6 Later), all labeled
-   `review:sdlc-2026-07-18`, each with score line + acceptance criteria + regression guard.
-   New label **`gate:owner`** created and stamped on the 7 human-only stories. Map:
-   `docs/reviews/SDLC_BACKLOG_MANIFEST_2026-07-18.json`. Zero duplicates (extends-comments on
-   #342/#717/#1195). Six pre-seed hypotheses: 4 confirmed, "no SCA" FALSE as stated
-   (pip-audit exists; real gaps narrower), "topology wrong" REFUTED (it's defensible — but
-   undocumented, which IS the confirmed finding).
+- **`/frontier-plan` ritual** (`.claude/commands/frontier-plan.md`, already on main via the
+  #1359 sweep): Phase 0 soul-load → 3-persona live walkthrough → flourishing-science
+  coverage map → market/AI-frontier sweeps → 8-lane ideation → verify/rank/file. Companion
+  to /fullreview (artifacts) and /sdlc-review (lifecycle): this one asks *what should this
+  become next?*
+- **Research record merged**: `docs/reviews/FRONTIER_REVIEW_2026-07-18.md` + docs/README
+  index line (PR **#1368**, squash-merged; docs-only, no deploy). Preserves the coverage
+  map, market verdicts, frontier capabilities, persona findings, and the 5 research
+  warnings so future sessions inherit evidence, not just issue titles.
+- **Backlog filed — 52 issues, label `review:frontier-2026-07-18`**: 5 new epics —
+  **#1363** truth-surface integrity · **#1364** Attempt-#7 restart-as-story · **#1365**
+  defendable progression (felt-reality calibration, the Ghost) · **#1366** spectator→second-
+  N=1 participation · **#1367** shareable machine — plus upgrade comments on **#718**
+  (fulfillment) and **#1080** (coaches). 47 stories: **9 Now / 19 Next / 19 Later**
+  (verified 0 missing milestones), score lines `T×W/effort`, cost flags in-body.
+  Matthew's channel ideas landed as #1383 (Coach Line WhatsApp/Telegram), #1388 (avatar
+  video diary), #1402 (social Broadcast), #1381 (Theme River).
 
-## ⚠️ Concurrent-session incident (read before merging anything)
+## Verified (live checks, not agent claims)
 
-A second session (Opus, draining deferred issues #1227/#1240/#1251-52-44) worked the SHARED
-tree while this session ran. Its commit `bcb2e651` ("fix(drift): … #1227", branch
-`fix-1227-drift-sentinel`, pushed, **no PR open yet** as of 11:45 PT) did a broad `git add`
-that **swept this session's in-progress files into the IAM PR branch**: `.claude/commands/
-sdlc-review.md`, the SDLC report, the grades JSON (+ its own new `frontier-plan.md`).
-Handling: copied my final delta out, restored the shared tree to exactly their HEAD, moved to
-worktree `.claude/worktrees/sdlc-review-2026-07-18`, branched off origin/main. **Resolution:** the swept
-branch merged first as #1359; this branch rebased onto the new main and the add/add conflict
-on `SDLC_REVIEW_2026-07-18.md` was resolved toward this branch's newer, disposition-complete
-copy — main now carries the canonical versions. This is a live
-instance of the [[feedback_concurrent_session_worktree]] class — memory updated with the tell
-(your own files suddenly showing tracked/modified in `git status`).
+- Confirmed against live APIs before filing (≈50%-FP discipline): `/api/snapshot` recovery
+  0%/red/sleep-null vs `/api/pulse` 96%/8.4h same morning; `/api/calibration`
+  brier_skill −0.0047 labeled "authoritative/90"; hero "19 data sources" vs platform 26 vs
+  `mcp_tools:121` (registry ≈60 — new find, folded into #1369).
+- Fan-out totals: 3 recon + 4 research/walkthrough + 3 ideation agents (lean config — the
+  headroom question went unanswered so lean was the default), 49 raw ideas → deduped ~40;
+  convergent picks (Ghost, Detective, Attempt-#7, Mirror, dead OG surface) emerged from
+  2+ blind lanes independently.
+- PR #1368 gates: wiki-drift red on first push (doc-sync literal cross-PR drift — known
+  class), fixed by rebase onto main + `sync_doc_metadata.py --apply`; green on re-push,
+  merged 19:15Z.
 
-## Left open
+## Gotchas hit
 
-- **PR #1360 (docs-only: command + report + grades + manifest + this wrap) MERGED with
-  Matthew's explicit in-session approval ("yes approve to merge").**
-- The 40 filed issues are the implementation backlog — 9 Now stories are the next
-  /uplevel / fan-out targets; 7 carry `gate:owner` (Matthew: rotate ai-keys #1329, IAM grant
-  #1330, owner toggles in #1336, decisions in #1333/#1345/#1350/#1352).
-- Story 19 note from the filer: #1337 relates to #1195 (noted in body, kept standalone).
+- **Concurrent-session tree discipline held**: the shared tree was mid-flight on
+  `fix-1257-onboarding-docstring` (and earlier sessions landed #1359–#1362, #1416 during
+  this one) — all commits went through isolated worktrees; `gh pr merge` used WITHOUT
+  `--delete-branch` (worktree-switch trap); remote branch auto-deleted on merge.
+- The #1359 broad-add sweep had already carried `.claude/commands/frontier-plan.md` to
+  main (byte-identical) — checked before double-committing.
+- MEMORY.md hit its size ceiling mid-wrap; compacted 19.7→17.1KB by moving detail into
+  topic files (nothing dropped).
 
-**Build beat:** none — internal SDLC review + backlog session; nothing reader-facing shipped.
+## Residual / next picks
 
-Budget tier 1. Full findings narrative: `docs/reviews/SDLC_REVIEW_2026-07-18.md`. Prior
-session: `handovers/HANDOVER_2026-07-18_LaterDrain.md`.
+- **The NOW slice (9)**: #1369 Truth Spine · #1370 honest badge semantics · #1371 armed
+  cold-start · #1395 OG/no-JS growth surface · #1375 Restarter's Ledger · #1376
+  career-vs-season stats · #1403 daylight dark PERMA pillars · #1405 private intake
+  ledger · #1409 felt-reality calibration ledger (n accrues slowly — start early).
+  Seed: `gh issue list --label review:frontier-2026-07-18 --milestone Now`.
+- **Matthew's gate:owner decisions** (parked in issues): nudge channel (web-push vs
+  #1383), video-diary avatar/anonymity approach (#1388), Meta business setup
+  (#1383/#1402), any public form of #1405 (substances stay private).
+- **Suggested closures awaiting his OK**: #1251/#1252 (absorbed by #1369/#1371), #1244
+  (absorbed by #1375).
+- Cost if the whole slate ships: ≈ +$6–11/mo (tier-0 safe); flagged individually on
+  #1398 Detective, #1385 1M chronicle, #1386 Dispute Docket, #1392 Mirror-v2.
+- Memory: `project_frontier_review_2026_07_18` (program state) +
+  `feedback_ideation_include_offsite_channels` (always include a channels/formats lane).
+
+**Build beat:** none — strategy/backlog session; only a docs research record merged, no
+deployed surface change.
+
+**Docs:** `docs/reviews/FRONTIER_REVIEW_2026-07-18.md` + `docs/README.md` index (merged in
+PR #1368); no other canonical pages invalidated — no code, schema, tool, or site changes.
