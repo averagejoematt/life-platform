@@ -13,6 +13,8 @@ import sys
 from decimal import Decimal
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -338,3 +340,148 @@ def test_void_sk_is_idempotent_and_kind_namespaced():
     assert a["sk"] == a2["sk"] == f"CALIB#{_GENESIS}#void#hyp#shared"
     assert p["sk"] == f"CALIB#{_GENESIS}#void#pred#sleep_coach#shared"
     assert a["sk"] != p["sk"]
+
+
+# ── #1234: pk-family census PREFLIGHT (the ADR-077 totality guard) ─────────────
+#
+# The taxonomy's totality guarantee was fail-loud only for USER#…#SOURCE# families;
+# a NEW non-SOURCE top-level family (the next COACH#-like tier) would silently
+# survive every reset. run_census_preflight scans the live table, reduces to
+# distinct pk families, classify()es a representative of each, and FAILS the reset
+# on any unclassified family. These tests are NON-VACUOUS: they plant an unknown
+# family and assert the preflight raises (not silently passes), and they assert the
+# preflight is wired into restart_pipeline's dry-run sequence (main). All of them
+# reference symbols (run_census_preflight / CensusPreflightError) that DID NOT EXIST
+# before the fix, so the whole block is red on pre-fix code — the guard is real.
+
+# A set of KNOWN families that must all classify() cleanly: one SOURCE family, plus
+# three distinct non-SOURCE top-level families (COACH# / PULSE / READING#).
+_KNOWN_PAGE = [
+    {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-04-01"},  # SOURCE#whoop → raw_timeseries
+    {"pk": "USER#matthew#SOURCE#whoop", "sk": "DATE#2026-04-02"},  # same family — folds to one rep
+    {"pk": "COACH#sleep_coach", "sk": "PREDICTION#p1"},  # COACH → experiment_scoped
+    {"pk": "PULSE", "sk": "DATE#2026-04-04"},  # PULSE → system_state
+    {"pk": "READING#abc", "sk": "STATE#x"},  # READING → cross_phase
+]
+
+
+class _FakeScanTable:
+    """Minimal DynamoDB Table stand-in for a paginated pk+sk scan (no AWS). Serves
+    one page per scan() call, setting LastEvaluatedKey while pages remain."""
+
+    def __init__(self, pages):
+        self.pages = pages
+        self.calls = 0
+        self.projections = []
+
+    def scan(self, **kwargs):
+        self.projections.append(kwargs.get("ProjectionExpression"))
+        i = self.calls
+        self.calls += 1
+        items = self.pages[i] if i < len(self.pages) else []
+        resp = {"Items": items}
+        if i < len(self.pages) - 1:  # more pages queued → signal pagination
+            resp["LastEvaluatedKey"] = {"pk": "__next__"}
+        return resp
+
+
+def test_census_preflight_passes_on_known_families():
+    # The 5 rows fold to 4 distinct families (whoop dedups) — all classify cleanly.
+    fake = _FakeScanTable([_KNOWN_PAGE])
+    n = pipeline.run_census_preflight(table=fake)
+    assert n == 4
+    # It projected only pk+sk (the cheap scan) and actually classified something.
+    assert fake.projections and all(p == "pk, sk" for p in fake.projections)
+
+
+def test_census_preflight_paginates_the_scan():
+    # Families split across pages must all be seen (LastEvaluatedKey drives the loop).
+    pages = [_KNOWN_PAGE[:2], _KNOWN_PAGE[2:]]
+    fake = _FakeScanTable(pages)
+    assert pipeline.run_census_preflight(table=fake) == 4
+    assert fake.calls == 2  # both pages consumed; the last returns no LastEvaluatedKey, ending the loop
+
+
+def test_census_preflight_FAILS_on_planted_unknown_family():
+    # THE regression guard (non-vacuous): plant a brand-new top-level family with
+    # no SOURCE_CLASS entry and no _PK_RULES predicate — the next COACH#-like tier.
+    # classify() must raise KeyError on it and the preflight must FAIL the reset.
+    pages = [_KNOWN_PAGE + [{"pk": "SQUAD#alpha", "sk": "STATE#current"}]]
+    fake = _FakeScanTable(pages)
+    with pytest.raises(pipeline.CensusPreflightError) as ei:
+        pipeline.run_census_preflight(table=fake)
+    msg = str(ei.value)
+    assert "SQUAD" in msg  # the failure names the unclassified family
+    assert "SQUAD#alpha" in msg  # ...and its representative pk — proof classify() ran on it
+
+
+def test_census_preflight_also_fails_on_a_new_source_family():
+    # Strengthens the SOURCE guard too: a NEW source under USER#…#SOURCE# is its own
+    # family whose representative classify() cannot resolve → the reset fails loudly
+    # (the tagger merely report-catches this today; the preflight aborts).
+    pages = [_KNOWN_PAGE + [{"pk": "USER#matthew#SOURCE#brandnew_wearable", "sk": "DATE#2026-08-01"}]]
+    with pytest.raises(pipeline.CensusPreflightError) as ei:
+        pipeline.run_census_preflight(table=_FakeScanTable(pages))
+    assert "brandnew_wearable" in str(ei.value)
+
+
+def test_census_preflight_refuses_an_empty_census():
+    # Guards the vacuous-scan trap: a scan that silently returns nothing must NOT be
+    # certified as "all families covered" — it must fail rather than pass vacuously.
+    with pytest.raises(pipeline.CensusPreflightError) as ei:
+        pipeline.run_census_preflight(table=_FakeScanTable([[]]))
+    assert "ZERO pk families" in str(ei.value)
+
+
+def test_pk_family_mirrors_classify_keying():
+    # The family key folds a #SOURCE# pk to its base source (sub-keys collapse) and
+    # every other pk to its top-level prefix — the granularity classify() decides at.
+    assert pipeline._pk_family("USER#matthew#SOURCE#whoop") == "SOURCE#whoop"
+    assert pipeline._pk_family("USER#matthew#SOURCE#email_log#daily_brief") == "SOURCE#email_log"
+    assert pipeline._pk_family("USER#matthew#SOURCE#training_notes#EXERCISE#42") == "SOURCE#training_notes"
+    assert pipeline._pk_family("COACH#sleep_coach") == "COACH"
+    assert pipeline._pk_family("PULSE") == "PULSE"
+
+
+def test_census_preflight_is_wired_into_the_dry_run_sequence(monkeypatch):
+    # (b) The preflight must actually run in restart_pipeline's dry-run path. Drive
+    # main() in DRY-RUN (no --apply) with the census patched to record + abort; it
+    # sits BEFORE any AWS/subprocess step, so reaching it proves the wiring.
+    called = {"n": 0}
+
+    def _fake_preflight(table=None):
+        called["n"] += 1
+        raise pipeline.CensusPreflightError("planted — wiring probe")
+
+    monkeypatch.setattr(pipeline, "run_census_preflight", _fake_preflight)
+    # Keep main() offline up to the preflight (it sits before Withings/void/subprocess).
+    monkeypatch.setattr(pipeline, "read_cycle_from_ssm", lambda: 6)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["restart_pipeline.py", "--genesis", "2026-09-01", "--override-weight-lbs", "300", "--no-close-cycle", "--skip-deploy"],
+    )
+    # A failed census aborts the reset (sys.exit(4)) — that abort IS the wiring proof.
+    with pytest.raises(SystemExit) as ei:
+        pipeline.main()
+    assert ei.value.code == 4
+    assert called["n"] == 1  # the dry-run path invoked the preflight exactly once
+
+
+def test_skip_census_preflight_flag_bypasses_it(monkeypatch):
+    # The escape hatch must genuinely skip the preflight (no scan attempted).
+    def _boom(table=None):
+        raise AssertionError("preflight ran despite --skip-census-preflight")
+
+    monkeypatch.setattr(pipeline, "run_census_preflight", _boom)
+    monkeypatch.setattr(pipeline, "read_cycle_from_ssm", lambda: 6)
+    # Stop main() right after the preflight gate so we don't march into AWS steps.
+    monkeypatch.setattr(pipeline, "fetch_withings_for", lambda *_a, **_k: (_ for _ in ()).throw(SystemExit(99)))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["restart_pipeline.py", "--genesis", "2026-09-01", "--skip-census-preflight", "--no-close-cycle", "--skip-deploy"],
+    )
+    with pytest.raises(SystemExit) as ei:
+        pipeline.main()
+    assert ei.value.code == 99  # reached Withings fetch (past the skipped preflight), never raised from _boom

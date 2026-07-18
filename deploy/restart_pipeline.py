@@ -15,6 +15,10 @@ Usage:
 Every sub-script is idempotent; the orchestrator can be safely re-run.
 
 Steps (each can be skipped with --skip-<name>):
+    0. census preflight (#1234, --skip-census-preflight): scan the live table
+       (pk+sk only), reduce to distinct pk families, and phase_taxonomy.classify()
+       a representative of each — ABORT the reset (dry-run and apply) on any
+       unclassified family so a new top-level family can't silently survive it.
     1. fetch Withings reading for the target date (or fail)
     2. write config/user_goals.json + config/character_sheet.json
     2b. --close-cycle (default ON): append the new genesis to CYCLE_GENESES
@@ -89,6 +93,12 @@ import boto3
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+
+# ADR-077 registry — the single source of truth for what each pk family means.
+# READ-ONLY here (#1233 owns phase_taxonomy.py): the census preflight classifies a
+# representative of every live pk family through classify() and never mutates it.
+import phase_taxonomy as taxonomy  # noqa: E402
 
 REGION = "us-west-2"
 TABLE = "life-platform"
@@ -150,6 +160,105 @@ def snapshot_outgoing_genesis() -> str:
     if not m:
         raise RuntimeError("Could not parse EXPERIMENT_START_DATE from lambdas/constants.py")
     return m.group(1)
+
+
+# ── #1234: pk-family census PREFLIGHT — the ADR-077 totality guard ────────────
+# The taxonomy's totality guarantee used to be fail-loud only for USER#…#SOURCE#
+# families (the tagger live-scans that prefix). Non-SOURCE top-level pk families
+# were covered only by a FROZEN 2026-06-07 census fixture + manually-added
+# _PK_RULES, and the wipe iterates a hand-named PARTITIONS list — so a NEW
+# experiment-scoped top-level family (the next COACH#-like tier) would silently
+# survive every reset, the exact divergence class ADR-077 was written to kill.
+#
+# This preflight closes it: at reset time it scans the LIVE table (pk+sk only),
+# reduces to distinct pk families, and runs phase_taxonomy.classify() on a
+# representative of each. Any family classify() cannot resolve FAILS the reset —
+# a new unknown top-level family becomes fail-loud instead of silently surviving.
+# ADR-103: extends the existing load-bearing reset tooling with zero standing cost
+# (no new infra; one paginated scan that runs ONLY when a reset runs — the table
+# is ~32k items / 46 MB, pennies).
+
+
+class CensusPreflightError(RuntimeError):
+    """A live pk family that phase_taxonomy.classify() cannot resolve (or an empty
+    scan that cannot certify totality). Raised to FAIL the reset before any step."""
+
+
+def _pk_family(pk: str) -> str:
+    """The family key at the granularity classify() itself decides at.
+
+    Mirrors classify()'s keying WITHOUT importing its private helper (#1233 is
+    concurrently editing phase_taxonomy.py): a USER#…#SOURCE#<source> pk folds to
+    its base <source> (the part before the first '#' after the marker — sub-keys
+    like email_log#<type> or training_notes#EXERCISE#<id> collapse to the base);
+    every other pk folds to its top-level prefix (segment before the first '#').
+    So a NEW source OR a NEW top-level family (the next COACH#-like tier) each
+    surface as a distinct family whose representative classify() must resolve.
+    """
+    marker = "#SOURCE#"
+    idx = pk.find(marker)
+    if idx != -1:
+        base = pk[idx + len(marker) :].split("#", 1)[0]
+        return f"SOURCE#{base}"
+    return pk.split("#", 1)[0]
+
+
+def scan_pk_sk_pages(table):
+    """Yield each page of a FULL-table scan projecting ONLY pk + sk. Paginated and
+    kept a generator so a unit test can feed synthetic pages with no AWS. The
+    projection keeps the scan cheap (two string attributes per item)."""
+    kwargs = {"ProjectionExpression": "pk, sk"}
+    while True:
+        resp = table.scan(**kwargs)
+        yield resp.get("Items", [])
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+
+
+def census_families(pages) -> dict:
+    """Reduce scanned (pk, sk) items to distinct pk families → one representative
+    (pk, sk) each (first seen wins). `pages` is an iterable of item-lists (the
+    scan_pk_sk_pages generator, or synthetic pages in a test)."""
+    reps: dict = {}
+    for page in pages:
+        for item in page:
+            fam = _pk_family(item.get("pk", ""))
+            reps.setdefault(fam, (item.get("pk", ""), item.get("sk", "")))
+    return reps
+
+
+def run_census_preflight(table=None) -> int:
+    """Scan the live table, reduce to distinct pk families, and classify() a
+    representative of each. Raise CensusPreflightError on ANY family classify()
+    cannot resolve — or on an EMPTY census (the vacuous-scan trap: a scan that
+    silently returns nothing must NOT be certified as 'all families covered').
+    Returns the number of families verified. READ-ONLY (never writes)."""
+    if table is None:
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    reps = census_families(scan_pk_sk_pages(table))
+    if not reps:
+        raise CensusPreflightError(
+            "restart_pipeline census preflight: the pk+sk scan returned ZERO pk families. "
+            "Refusing to certify taxonomy totality on an empty census (the vacuous-scan trap) — "
+            "the scan must actually classify live families, not silently pass an empty set."
+        )
+    unresolved: list[tuple[str, str, str, str]] = []
+    for fam, (pk, sk) in sorted(reps.items()):
+        try:
+            taxonomy.classify(pk, sk)
+        except KeyError as e:
+            unresolved.append((fam, pk, sk, str(e)))
+    if unresolved:
+        detail = "\n".join(f"    family={f!r}  rep_pk={p!r}  sk={s!r}  ::  {msg}" for f, p, s, msg in unresolved)
+        raise CensusPreflightError(
+            f"restart_pipeline census preflight: {len(unresolved)} live pk family/families are "
+            "UNCLASSIFIED by phase_taxonomy — a reset would let them silently survive (ADR-077 "
+            "totality violation). Add each to phase_taxonomy (SOURCE_CLASS or _PK_RULES) AND the "
+            "wipe's PARTITIONS/coverage before re-running:\n" + detail
+        )
+    return len(reps)
 
 
 def read_cycle_from_ssm() -> int | None:
@@ -639,6 +748,12 @@ def main():
         help="Run bash deploy/sync_site_to_s3.sh as a pipeline step (default OFF — heavy/interactive; "
         "without the flag it stays a printed next command).",
     )
+    parser.add_argument(
+        "--skip-census-preflight",
+        action="store_true",
+        help="Skip the #1234 pk-family census preflight (the ADR-077 totality guard that fails the "
+        "reset if any live pk family is unclassified). Default: runs first, in both dry-run and apply.",
+    )
     args = parser.parse_args()
     close_cycle = not args.no_close_cycle
 
@@ -665,6 +780,29 @@ def main():
     print(f"║ close-cycle bookkeeping: {'ON' if close_cycle else 'off'}")
     print(f"║ mode: {'APPLY' if args.apply else 'DRY-RUN'}")
     print("╚══════════════════════╝")
+
+    # Step 0 (#1234): pk-family census PREFLIGHT — the ADR-077 totality guard.
+    # Runs FIRST, in dry-run AND apply (a read-only scan), before anything is
+    # fetched or written: classify() a representative of every live pk family and
+    # ABORT the reset on any unclassified family, so a NEW experiment-scoped
+    # top-level family (the next COACH#-like tier) can no longer silently survive.
+    if args.skip_census_preflight:
+        print("\n[0] Census preflight SKIPPED (--skip-census-preflight)")
+    else:
+        print("\n[0] Census preflight — every live pk family must classify() (ADR-077 totality guard, #1234)")
+        try:
+            fam_count = run_census_preflight()
+            print(f"    OK — {fam_count} distinct pk families all resolve via phase_taxonomy.classify()")
+        except CensusPreflightError as e:
+            print(f"\n✗ CENSUS PREFLIGHT FAILED\n{e}")
+            if not args.continue_on_error:
+                print(
+                    "\n   ABORTING before any reset step — add the missing taxonomy rule + wipe coverage, "
+                    "then re-run.\n   (escape hatches: --continue-on-error to proceed anyway, "
+                    "--skip-census-preflight to bypass entirely)"
+                )
+                sys.exit(4)
+            print("   --continue-on-error: proceeding despite the totality gap.")
 
     # Step 1: fetch Withings reading
     if args.override_weight_lbs:
