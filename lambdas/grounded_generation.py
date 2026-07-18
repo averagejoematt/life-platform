@@ -14,6 +14,10 @@ pieces that previously lived apart:
                          every number in the output must appear in the input.
                          This is what kills "climbed from X to Y" fabrication —
                          the invented X isn't in anything the model was given.
+                         Full calendar dates are a distinct token class (#1242):
+                         "2026-07-08" is invisible to the number gate (2026/7/8 are
+                         all benign), so an optional date allow-list catches an
+                         invented ISO/long-form date the number gate cannot see.
   3. Regen-once        — regen_once() extracts the duplicated keep-if-strictly-
                          improved harness (ai_expert_analyzer / field_notes) so
                          every surface corrects the same way: one rewrite,
@@ -190,6 +194,87 @@ def weekday_date_findings(text: str, year: int, month_hint: int = None, proximit
     return findings
 
 
+# ── fabricated-date grounding (#1242) ────────────────────────────────────────
+# A full calendar date is structurally INVISIBLE to the number gate above: the
+# ADR-104 allow-list whitelists small counts (range(0,13)) and years (2020–2030),
+# and numbers_in_text splits "2026-07-08" into 2026 / 7 / 8 — all benign — so a
+# wholly invented ISO date passes fabricated_numbers() even against an EMPTY
+# allow-list. The wednesday chronicle already solved this locally (build_recap's
+# "set of dates a beat may legitimately cite" cross-check), but that lived only in
+# the recap's structured-field path and never generalized. This promotes the
+# concept into the shared gate: a date is a DISTINCT token class from a float —
+# extracted whole, normalized to ISO, and required to appear in a supplied
+# allow-list. The number gate stays untouched (dates are strings, not floats).
+#
+# Only COMPLETE dates (carrying a year) are extracted here — a bare "July 8th" has
+# no year and is left to weekday_date_findings(); this gate is about invented full
+# calendar dates.
+_ISO_DATE_RE = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})\b")
+_MONTH_NAMES_ALT = "|".join(_MONTHS)
+# "July 8, 2026" / "July 8 2026" / "Jul... " — full month name, day, year.
+_LONGFORM_MDY_RE = re.compile(r"\b(" + _MONTH_NAMES_ALT + r")\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b", re.IGNORECASE)
+# "8 July 2026" / "8th July, 2026" — day, full month name, year.
+_LONGFORM_DMY_RE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+(" + _MONTH_NAMES_ALT + r"),?\s+(\d{4})\b", re.IGNORECASE)
+
+
+def dates_in_text(text: str) -> set:
+    """Full calendar dates named in a string, normalized to ISO (YYYY-MM-DD strings).
+
+    Matches ISO (``2026-07-08``) and long-form (``July 8, 2026`` / ``8 July 2026``)
+    tokens, validating each against the real calendar (Feb-30, day 0, non-leap
+    Feb-29 are rejected via _safe_date). Only dates carrying a year are returned —
+    a bare "July 8th" is a partial token this gate deliberately ignores.
+    """
+    out = set()
+    text = text or ""
+    for m in _ISO_DATE_RE.finditer(text):
+        d = _safe_date(m.group(1), m.group(2), m.group(3))
+        if d:
+            out.add(d.isoformat())
+    for m in _LONGFORM_MDY_RE.finditer(text):
+        d = _safe_date(m.group(3), _MONTHS[m.group(1).lower()], m.group(2))
+        if d:
+            out.add(d.isoformat())
+    for m in _LONGFORM_DMY_RE.finditer(text):
+        d = _safe_date(m.group(3), _MONTHS[m.group(2).lower()], m.group(1))
+        if d:
+            out.add(d.isoformat())
+    return out
+
+
+def allowed_dates(*sources) -> set:
+    """The legitimate-date allow-list: every full calendar date present in what the
+    model was given (prompt + data packet + canonical facts), normalized to ISO.
+
+    The date-token analogue of allowed_numbers() — generalizes the wednesday
+    chronicle recap's "set of dates a beat may legitimately cite" so any grounded
+    surface can build its allow-list the same way. Accepts strings and any
+    JSON-serializable structure (dicts/lists are json.dumps'd so nested dates count).
+    """
+    allowed = set()
+    for src in sources:
+        if src is None:
+            continue
+        text = src if isinstance(src, str) else json.dumps(src, default=str)
+        allowed |= dates_in_text(text)
+    return allowed
+
+
+def fabricated_dates(text: str, allowed) -> list:
+    """ISO strings for calendar dates cited in the output that appear in no input date.
+
+    ``allowed`` is a set/iterable of date strings in ANY format — each is normalized
+    to ISO before comparison, so an ISO date in the input matches a long-form
+    restatement in the output (and vice versa). Returns the sorted list of ISO dates
+    that are cited but ungrounded — the fabricated-date finding class.
+    """
+    allowed_iso = set()
+    for a in allowed or ():
+        if isinstance(a, str):
+            allowed_iso |= dates_in_text(a)
+    return [d for d in sorted(dates_in_text(text)) if d not in allowed_iso]
+
+
 def authoritative_facts_block(facts: dict) -> str:
     """Render canonical facts as the AUTHORITATIVE FACTS system-prompt block.
 
@@ -339,7 +424,7 @@ def band_adjective_findings(text: str, facts: dict = None, proximity: int = 40) 
     return findings
 
 
-def grounding_findings(text: str, facts: dict = None, allowed: set = None) -> list:
+def grounding_findings(text: str, facts: dict = None, allowed: set = None, allowed_dates: set = None) -> list:
     """Deterministic grounding check. Returns [{type, detail, ...}] — empty = grounded.
 
     - "contradiction": a stated RHR/recovery/HRV hard-contradicts canonical facts
@@ -348,6 +433,10 @@ def grounding_findings(text: str, facts: dict = None, allowed: set = None) -> li
       a sub-band canonical value (44% = Whoop yellow) — #1208, band_adjective_findings.
     - "fabricated_number": a number appears in the output but nowhere in the
       input allow-list (and isn't benign) — the trend/range fabrication class.
+    - "fabricated_date": a full calendar date is cited in the output that appears in
+      no supplied legitimate date — #1242, fabricated_dates(). Checked ONLY when
+      ``allowed_dates`` is passed (an empty set means "no dates are legitimate");
+      callers that don't supply it keep the pre-#1242 behavior exactly (no date check).
     """
     findings = []
     if facts and _hard_contradictions is not None:
@@ -362,6 +451,15 @@ def grounding_findings(text: str, facts: dict = None, allowed: set = None) -> li
                     "type": "fabricated_number",
                     "claimed": x,
                     "detail": f"the number {x:g} appears in the narrative but nowhere in the data provided",
+                }
+            )
+    if allowed_dates is not None:
+        for d in fabricated_dates(text, allowed_dates):
+            findings.append(
+                {
+                    "type": "fabricated_date",
+                    "claimed": d,
+                    "detail": f"the date {d} appears in the narrative but is not among the dates the data provided",
                 }
             )
     return findings
@@ -380,6 +478,8 @@ def correction_prompt(findings: list) -> str:
             )
         elif f.get("type") == "weekday_mismatch":
             lines.append(f"{i}. {f['detail']}. Use {f['actual_weekday']} for that date, or drop the day-of-week — never guess a weekday.")
+        elif f.get("type") == "fabricated_date":
+            lines.append(f"{i}. {f['detail']}. Remove the date or cite only a date that appears in the source material — never invent one.")
         else:
             lines.append(f"{i}. {f['detail']}. Remove it or describe the pattern qualitatively — never invent a figure.")
     lines.append("\nRewrite with these corrected. Keep your voice and length; do not mention that a correction was made.")
