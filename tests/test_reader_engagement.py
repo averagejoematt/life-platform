@@ -94,6 +94,64 @@ def test_predict_week_tally_inactive(monkeypatch):
     assert json.loads(r["body"])["active"] is False
 
 
+# ── _predict_subject: the #1198 stale-week fail-closed guard ──────────────────
+
+
+class _FakeS3Get:
+    """S3 client double whose get_object returns a fixed current_challenge payload."""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def get_object(self, Bucket=None, Key=None, **_kw):
+        class _Body:
+            def __init__(self, b):
+                self._b = b
+
+            def read(self):
+                return self._b
+
+        return {"Body": _Body(json.dumps(self._payload).encode())}
+
+
+_CHALLENGE = {
+    "week_id": "2026-W29",
+    "predict_metrics": [{"key": "weight", "label": "scale weight"}, {"key": "recovery", "label": "avg recovery"}],
+    "result": None,
+}
+
+
+def test_current_iso_week_format():
+    # PT-based ISO week id — the reader's 'this week'.
+    import re
+
+    assert re.fullmatch(r"\d{4}-W\d{2}", social._current_iso_week())
+
+
+def test_predict_subject_serves_current_week(monkeypatch):
+    monkeypatch.setattr(social.boto3, "client", lambda *a, **k: _FakeS3Get(_CHALLENGE))
+    monkeypatch.setattr(social, "_current_iso_week", lambda: "2026-W29")
+    subj = social._predict_subject()
+    assert subj is not None
+    assert subj["week_id"] == "2026-W29"
+    assert subj["metrics"] == {"weight": "scale weight", "recovery": "avg recovery"}
+
+
+def test_predict_subject_fails_closed_on_stale_week(monkeypatch):
+    # #1198: the challenge is frozen at a past week (e.g. a cycle reset left the
+    # outgoing cycle's W27 live) — fail closed rather than solicit dead bets whose
+    # votes land in a window that can never be revealed.
+    monkeypatch.setattr(social.boto3, "client", lambda *a, **k: _FakeS3Get(dict(_CHALLENGE, week_id="2026-W27")))
+    monkeypatch.setattr(social, "_current_iso_week", lambda: "2026-W29")
+    assert social._predict_subject() is None
+
+
+def test_predict_subject_none_without_metrics(monkeypatch):
+    monkeypatch.setattr(social.boto3, "client", lambda *a, **k: _FakeS3Get({"week_id": "2026-W29"}))
+    monkeypatch.setattr(social, "_current_iso_week", lambda: "2026-W29")
+    assert social._predict_subject() is None
+
+
 # ── board_question ──────────────────────────────────────────────────────────
 
 

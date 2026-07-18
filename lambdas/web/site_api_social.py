@@ -1474,14 +1474,26 @@ _PREDICT_CHOICES = {"up", "down", "flat"}
 BOARD_QUESTION_RATE_LIMIT = 3  # per IP per hour
 
 
+def _current_iso_week() -> str:
+    """The reader's current ISO week id (e.g. '2026-W29'), computed in Pacific Time.
+
+    The site renders every user-facing date in PT, so 'this week' — the window the
+    predict-the-week widget invites bets on — rolls over on the reader's Monday,
+    not UTC's.
+    """
+    iso = datetime.now(PT).isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
 def _predict_subject():
     """The current week's prediction subject from current_challenge.json, or None.
 
     Returns {"week_id", "metrics": {key: label}, "result": {...}|None} when the
-    weekly challenge defines a `predict_metrics` list; None otherwise, so the
-    feature fails *closed* — the widget doesn't render and POSTs are rejected when
-    there's no active subject. Read fresh (no module cache) so a new Monday
-    challenge is picked up without waiting for a cold start.
+    weekly challenge defines a `predict_metrics` list AND its week_id is the
+    current ISO week; None otherwise, so the feature fails *closed* — the widget
+    doesn't render and POSTs are rejected when there's no active subject. Read
+    fresh (no module cache) so a new Monday challenge is picked up without waiting
+    for a cold start.
     """
     try:
         s3 = boto3.client("s3", region_name=S3_REGION)
@@ -1497,6 +1509,17 @@ def _predict_subject():
         if k:
             mmap[k] = m.get("label") or k
     if not week_id or not mmap:
+        return None
+    # #1198 — fail closed on a stale week. current_challenge.json is a MANUAL,
+    # per-week S3 artifact (no lambda writes it); if a Monday passes without a
+    # re-seed, or a cycle reset leaves the outgoing cycle's frozen week live, its
+    # week_id lags the real ISO week. Serving it would solicit predictions on a
+    # window that already closed — votes land in a VOTES#predict_week bucket that
+    # can never be revealed. Refuse: callers already treat None as "no active
+    # subject" (the widget self-hides, POSTs 404).
+    current = _current_iso_week()
+    if week_id != current:
+        logger.warning("[predict_week] stale subject week_id=%r != current ISO week %r; failing closed", week_id, current)
         return None
     return {"week_id": week_id, "metrics": mmap, "result": data.get("result")}
 

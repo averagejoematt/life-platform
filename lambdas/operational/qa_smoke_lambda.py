@@ -623,6 +623,51 @@ def check_reader_truth():
 
 
 # ---------------------------------------------------------------------------
+# CHECK 9 — Predict-the-week freshness (#1198)
+# ---------------------------------------------------------------------------
+# The cockpit's predict-the-week widget solicits votes on "this week." Its subject
+# is a MANUAL, per-week S3 artifact (site/config/current_challenge.json) that no
+# lambda refreshes — if a Monday passes without a re-seed, or a cycle reset leaves
+# the outgoing cycle's week live, the widget keeps taking bets on a window that
+# already closed (votes land in a bucket that can never be revealed). The site-api
+# now fails closed on that mismatch (_predict_subject), so /api/predict_week must
+# report active:false the moment the subject goes stale. This nightly tripwire
+# catches a REGRESSION of that guard: if the API ever returns active:true with a
+# week_id that isn't the current PT ISO week, fail loudly — it fires the Monday a
+# subject goes stale, before a reader can bet on a dead week.
+
+
+def _iso_week_id(dt):
+    iso = dt.isocalendar()
+    return f"{iso[0]}-W{iso[1]:02d}"
+
+
+def check_predict_week_freshness():
+    check = Check("predict_week:freshness", "Predict-the-Week Freshness")
+    url = SITE_BASE_URL + "/api/predict_week"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "life-platform-qa-smoke"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode("utf-8", "replace"))
+    except Exception as e:
+        # Fail-soft: a fetch/parse blip must never red the nightly.
+        return [check.warn(f"/api/predict_week fetch failed (fail-soft): {str(e)[:120]}")]
+    if not data.get("active"):
+        return [check.ok("no active prediction subject (fail-closed) — no stale bets solicited")]
+    week_id = (data.get("week_id") or "").strip()
+    current = _iso_week_id(pt_now())
+    if week_id != current:
+        return [
+            check.fail(
+                f"predict-the-week is LIVE on a stale week: /api/predict_week week_id={week_id!r} "
+                f"!= current ISO week {current!r} — readers are betting on a window that already "
+                "closed (re-seed or clear current_challenge.json; #1198)"
+            )
+        ]
+    return [check.ok(f"active subject on the current ISO week ({current})")]
+
+
+# ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
@@ -708,6 +753,7 @@ def lambda_handler(event, context):
         all_checks += check_avatar_assets()  # character avatar visuals — kept (real check)
         all_checks += check_mcp_tool_calls()
         all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
+        all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
