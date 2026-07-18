@@ -980,7 +980,14 @@ async function renderScorecard(read, id) {
       const pending = preds.filter((p) => p.status === "pending" && p.date);
       pending.sort((a, b) => (a.date < b.date ? -1 : 1));
       const nearest = pending[0];
-      const countdown = nearest ? ` First verdict expected around <strong>${esc(nearest.date)}</strong>.` : "";
+      // #1371: never promise a date that has already passed (post-reset, the nearest
+      // pending call's window can predate today) — say what actually happens next.
+      const todayISO = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+      const countdown = nearest
+        ? (nearest.date < todayISO
+          ? ` The earliest call's window (${esc(nearest.date)}) has closed — it grades at the evaluator's next daily pass.`
+          : ` First verdict expected around <strong>${esc(nearest.date)}</strong>.`)
+        : "";
       h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
     }
     // Per-coach rows.

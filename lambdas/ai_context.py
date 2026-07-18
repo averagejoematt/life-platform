@@ -288,6 +288,12 @@ def format_experiment_phase_context(pctx, coaching_principles=False):
                 "month-over-month comparison cannot exist yet — never state or imply one. The window is thin: "
                 "say so rather than extrapolate."
             )
+            lines.append(
+                "  • RESET-MANUFACTURED GAPS ARE NOT LAPSES: this cycle began at genesis, so any zero-count, "
+                "empty log, or data gap dated before or at genesis was manufactured by the reset itself — "
+                "never scold it or frame it as a miss ('zero food logs' on Day 1 is the instrument arming, "
+                "not a failure). Frame early absence as a fresh start filling in, never as loss."
+            )
         if coaching_principles:
             lines.append(f"  • Weight journey: {pctx['start_weight']}→{pctx['goal_weight']} lbs.")
             for p in pctx.get("coaching_principles", []):

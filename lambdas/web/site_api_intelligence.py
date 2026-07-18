@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal  # noqa: F401
 
 import boto3  # noqa: F401 — handlers may instantiate clients
+import experiment_gates  # #1371: arming thresholds served to zero-states — same objects the engines enforce
 import stats_core  # #1240: sanctioned stats implementation (ADR-105) — handle_correlations
 from boto3.dynamodb.conditions import Key
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946 / #1197
@@ -1530,6 +1531,10 @@ def handle_hypotheses() -> dict:
         {
             "hypotheses": hypotheses,
             "count": len(hypotheses),
+            # #1371: on a cold start the engine's real arming gates + measured progress
+            # ride along, so the zero-state renders a computed trigger. Only fetched
+            # when the ledger is empty — armed instruments don't need the countdown.
+            "gates": (experiment_gates.hypothesis_gates(current_n=_data_days_this_cycle()) if not hypotheses else None),
             "_notice": "N=1 personal-platform observations — not population claims.",
         },
         cache_seconds=3600,
@@ -1621,7 +1626,7 @@ _COUPLING_PILLARS = ["sleep", "movement", "nutrition", "metabolic", "mind", "rel
 
 _COUPLING_WINDOW = 60  # trailing character-sheet records to read
 
-_COUPLING_MIN_N = 6  # a pair needs this many co-present real days or it's honestly omitted
+_COUPLING_MIN_N = experiment_gates.COUPLING_MIN_N  # a pair needs this many co-present real days or it's honestly omitted
 
 
 def _coupling_real_score(pd: dict):
@@ -1743,6 +1748,22 @@ def _corr_strength(r_val: float, stored: str) -> str:
     return stored or "weak"
 
 
+def _data_days_this_cycle() -> int | None:
+    """Days of computed daily metrics since genesis — the honest progress numerator
+    a zero-state renders against the arming gates ("currently 3/10"). A cheap
+    Select=COUNT on the computed_metrics partition; None (never a fabricated 0)
+    when the count can't be measured (#1371, ADR-104)."""
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}computed_metrics") & Key("sk").gte(f"DATE#{EXPERIMENT_START}"),
+            Select="COUNT",
+        )
+        return int(resp.get("Count", 0))
+    except Exception as e:
+        logger.warning("data_days_this_cycle count failed: %s", e)
+        return None
+
+
 def handle_correlations(event: dict = None) -> dict:
     """
     GET /api/correlations
@@ -1783,7 +1804,19 @@ def handle_correlations(event: dict = None) -> dict:
     if not items:
         # Genesis week / weekly-correlation compute hasn't run — shaped-empty 200
         # so the site shows an honest "fills as data accrues" state, not a 503.
-        return _ok({"correlations": [], "week": None, "start_date": None, "end_date": None, "count": 0}, cache_seconds=300)
+        # #1371: the zero-state carries the ENGINE's real arming gates + measured
+        # progress, so the page renders a computed trigger, never authored copy.
+        return _ok(
+            {
+                "correlations": [],
+                "week": None,
+                "start_date": None,
+                "end_date": None,
+                "count": 0,
+                "gates": experiment_gates.correlation_gates(current_n=_data_days_this_cycle()),
+            },
+            cache_seconds=300,
+        )
 
     record = items[0]
     week = record.get("sk", "").replace("WEEK#", "")

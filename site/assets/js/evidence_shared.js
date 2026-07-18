@@ -71,6 +71,23 @@ export const sec = (t, inner) => inner ? `<section class="rd-sec"><h2 class="rd-
 
 export const empty = (m) => `<p class="rd-archive">${esc(m)}</p>`;
 
+// #1371: the "warming up" grammar — hollow marks filling toward an instrument's
+// real arming threshold. current/threshold are the engine's OWN numbers (served in
+// the API's gates block), never authored. Renders nothing without a real threshold;
+// an unmeasurable current renders all-hollow with an honest "—", never a fake 0.
+export function warmup(current, threshold, label) {
+  const t = Number(threshold);
+  if (!Number.isFinite(t) || t <= 0) return "";
+  const cur = current != null && Number.isFinite(Number(current)) ? Math.max(0, Math.min(Number(current), t)) : null;
+  const marks = Math.min(t, 12); // cap the row — each mark stands for t/marks days
+  const litMarks = cur == null ? 0 : Math.floor((cur / t) * marks);
+  let dots = "";
+  for (let i = 0; i < marks; i++) dots += `<span class="wu-dot${i < litMarks ? " lit" : ""}" aria-hidden="true"></span>`;
+  const progress = `${cur == null ? "—" : fmt(cur)}/${fmt(t)}`;
+  return `<p class="warmup" role="img" aria-label="${esc(label)}: ${esc(progress)}">` +
+    `<span class="wu-marks">${dots}</span><span class="wu-label label">${esc(label)} · ${esc(progress)}</span></p>`;
+}
+
 export const note = (t) => `<p class="correlative">${t} <span class="confidence conf-low">N=1</span></p>`;
 
 export function evClass(ev) { const s = String(ev || "").toLowerCase(); if (/strong|high|robust/.test(s)) return ["backed-strong", "well supported"]; if (/mod|some|emerg|mixed/.test(s)) return ["backed-some", "moderate support"]; return ["backed-thin", "preliminary"]; }

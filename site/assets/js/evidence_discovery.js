@@ -4,7 +4,7 @@
 */
 import { dumbbell, nDots } from "/assets/js/charts.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
-import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, evClass, kvtable, postJSON, voteFollowRow, wireVoteButtons, wireFollowForms } from "/assets/js/evidence_shared.js";
+import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, warmup, evClass, kvtable, postJSON, voteFollowRow, wireVoteButtons, wireFollowForms } from "/assets/js/evidence_shared.js";
 
 // One machine-bet card: domains + status badge in the header, the falsifiable
 // statement as the body, the verdict trail once graded, the founding evidence
@@ -77,6 +77,14 @@ export async function renderDiscoveries(d) {
   const bets = all.filter((h) => h.status !== "archived");
   const expired = all.length - bets.length;
   const unchecked = bets.length > 0 && bets.every((h) => !Math.round(Number(h.check_count) || 0));
+  // #1371: the engine's real arming gate + measured progress (payload `gates`,
+  // the same MIN_DATA_DAYS the weekly engine enforces) — a computed trigger,
+  // never authored "soon" copy. Only present while the bet ledger is empty.
+  const g = live && live.gates;
+  const armingLine = g && g.min_data_days
+    ? warmup(g.current_n, g.min_data_days, "complete days toward the engine's first bets") +
+      `<p class="rd-meta label">The engine forms its first falsifiable bets once ${fmt(g.min_data_days)} complete days of this cycle's data exist (a complete day has ≥${fmt(g.min_metrics_per_day || 5)} real metrics).</p>`
+    : "";
   let hs;
   if (bets.length) {
     const intro = `<p class="rd-meta label">Falsifiable bets the engine formed from the data — re-checked every Sunday. A bet gets confirmed, refuted, or expires undecided; all three are shown.${unchecked ? " None checked yet — the first weekly check is upcoming." : ""}</p>`;
@@ -89,8 +97,8 @@ export async function renderDiscoveries(d) {
     // pre-start they must never read as findings of an experiment that hasn't
     // produced any (ADR-104). Label them as what they are: carried protocols.
     const noneYet = !fs && !is
-      ? `<p class="rd-meta label">No discoveries from this cycle yet — correlations and graded findings appear here as the data accrues.</p>`
-      : "";
+      ? armingLine + `<p class="rd-meta label">No discoveries from this cycle yet — correlations and graded findings appear here as the data accrues.</p>`
+      : armingLine;
     const protoIntro = `<p class="rd-meta label">Standing supplement protocols, deliberately carried across cycle resets — long-horizon levers under continuous measurement, not findings of the current cycle.</p>`;
     const protoCard = (h) => {
       const meta = [
@@ -115,7 +123,7 @@ export async function renderDiscoveries(d) {
     `<label class="label" for="fd-email">Email (optional — get notified if promoted)</label><input id="fd-email" type="email" data-finding-email maxlength="254">` +
     `<button class="part-btn" type="submit">Submit finding</button><p class="part-msg" data-finding-msg></p></form>`);
   if (!fs && !is && !hs)
-    return findingSec + empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
+    return armingLine + findingSec + empty("No discoveries yet — real correlations and findings surface here as the data accrues. This cycle is only days old, so it needs more data first.");
   return fs + is + hs + findingSec + note("Correlative leads, not conclusions — N=1, FDR-corrected where computed, and n is small this early in the cycle.");
 }
 

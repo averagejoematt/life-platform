@@ -62,6 +62,7 @@ from decimal import Decimal
 
 import boto3
 import digest_utils  # shared query_range implementations (#970)
+import experiment_gates  # #1371: the ONE registry of arming thresholds
 import stats_core  # bundled shared module (#529): effect sizes + block-bootstrap CIs for the deterministic verdict
 from constants import EXPERIMENT_BASELINE_WEIGHT_LBS  # ADR-058
 from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
@@ -103,11 +104,12 @@ CALIBRATION_PK = f"USER#{USER_ID}#SOURCE#calibration"  # #530: resolution ledger
 MAX_NEW_HYPOTHESES = 5
 MAX_PENDING_HYPOTHESES = 20  # don't accumulate stale hypotheses
 
-# AI-4: Validation thresholds
-MIN_DATA_DAYS = 10  # require >= 10 days with sufficient metrics before generating
-MIN_METRICS_PER_DAY = 5  # a day needs >= 5 non-null metrics to count as "complete"
+# AI-4: Validation thresholds. #1371: the arming gates live in the experiment_gates
+# registry (the site serves the same values in zero-states — no drift possible).
+MIN_DATA_DAYS = experiment_gates.HYPOTHESIS_MIN_DATA_DAYS  # days with sufficient metrics before generating
+MIN_METRICS_PER_DAY = experiment_gates.HYPOTHESIS_MIN_METRICS_PER_DAY  # non-null metrics for a "complete" day
 HARD_EXPIRY_DAYS = 30  # archive any hypothesis older than 30 days regardless of status
-MIN_SAMPLE_DAYS_FOR_CHECK = 7  # require >= 7 data days since creation before evaluating
+MIN_SAMPLE_DAYS_FOR_CHECK = experiment_gates.HYPOTHESIS_MIN_SAMPLE_DAYS_FOR_CHECK  # data days since creation before evaluating
 LOOKBACK_DAYS = 30  # #530: checks evaluate the full monitoring window (generation sees the last GENERATION_DAYS)
 GENERATION_DAYS = 14
 REQUIRED_HYPOTHESIS_FIELDS = {
@@ -163,7 +165,7 @@ SPEC_METRICS = frozenset(
 )
 VALID_SPEC_OPS = frozenset({">=", "<=", "median_split"})
 VALID_SPEC_DIRECTIONS = frozenset({"higher", "lower"})
-MIN_DAYS_PER_ARM = 5  # each arm needs 5+ days (also stats_core's bootstrap floor)
+MIN_DAYS_PER_ARM = experiment_gates.HYPOTHESIS_MIN_DAYS_PER_ARM  # each arm needs 5+ days (also stats_core's bootstrap floor)
 MAX_LAG_DAYS = 3
 
 

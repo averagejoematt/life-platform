@@ -185,7 +185,15 @@ export function renderPipeline(d) {
   const statusCell = (s) => {
     let txt = badge[s.status] || s.status;
     if (s.manual && s.days_dark != null && s.days_dark > 0) txt += ` · dark ${s.days_dark}d`;
-    return esc(txt);
+    let html = esc(txt);
+    // #1371: cycle-stamp provenance — this source's newest record predates the
+    // current genesis, so its age is carried history from an earlier attempt,
+    // not a live-cycle outage. Numbered from the record's ADR-077 cycle stamp.
+    if (s.carried) {
+      const from = s.carried_from_cycle != null ? `attempt ${esc(String(s.carried_from_cycle))}` : "a previous attempt";
+      html += ` <span class="rd-badge wu-carried">carried from ${from}</span>`;
+    }
+    return html;
   };
   // #746: apple_health is one partition fed by many streams; a dark hand-captured
   // stream (CGM/BP/State of Mind/water) is surfaced explicitly so a "fresh"
@@ -206,6 +214,9 @@ export function renderPipeline(d) {
     `<table class="rd-tbl"><thead><tr><th>source</th><th>what it feeds</th><th>last update</th><th>status</th></tr></thead><tbody>${rows
       .slice().sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
       .map((s) => `<tr class="${flagCls(s.status)}"><td class="rd-name">${esc(s.label)}</td><td>${feedsCell(s)}</td><td class="num rd-range">${lastUpdateCell(s)}</td><td>${statusCell(s)}</td></tr>`).join("")}</tbody></table>`)).join("");
+  const carriedNote = (d.experiment && src.some((s) => s.carried))
+    ? ` carried = the newest record predates this cycle's genesis (${esc(d.experiment.genesis || "")}) — history from an earlier attempt, not a live outage.`
+    : "";
   return figs([fig(sm.fresh ?? "—", "flowing"), fig(sm.paused ?? "—", "paused"), fig(sm.total ?? src.length, "live-monitored")]) + secs +
-    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made, dark Nd = a manual source quiet that many days.</p>`;
+    `<p class="correlative">Live pipeline status — fresh = flowing on schedule, paused = intentionally off, awaiting-log = a manual entry not yet made, dark Nd = a manual source quiet that many days.${carriedNote}</p>`;
 }

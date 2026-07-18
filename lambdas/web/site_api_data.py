@@ -299,16 +299,47 @@ def _apple_health_datatypes():
         return None
 
 
+def _carried_from_cycle(source: str, date_str: str) -> int | None:
+    """The ADR-077 cycle stamp on a source's latest record, or None.
+
+    Only consulted when that record's CONTENT date predates the current genesis
+    (never inferred from tombstoned_at) — the chip provenance for "carried from
+    attempt N" (#1371). Fail-soft: a missing stamp renders an unnumbered label.
+    """
+    try:
+        item = table.get_item(
+            Key={"pk": f"{USER_PREFIX}{source}", "sk": f"DATE#{date_str}"},
+            ProjectionExpression="#c",
+            ExpressionAttributeNames={"#c": "cycle"},
+        ).get("Item")
+        if item and item.get("cycle") is not None:
+            return int(item["cycle"])
+    except Exception as e:
+        logger.warning("source_freshness: carried-cycle read failed for %s: %s", source, e)
+    return None
+
+
 def handle_source_freshness() -> dict:
     """GET /api/source_freshness — live pipeline status per data source.
 
     status ∈ {fresh, stale, behavioral-stale, paused}. Behavioral sources (manual
     logs) report "behavioral-stale" rather than "stale" so a lapse in logging never
     reads as a broken pipeline. Always a shaped 200 — sparse/empty data still renders.
+
+    #1371: sources whose newest record predates the current genesis carry explicit
+    cross-cycle provenance (`carried` + `carried_from_cycle`) and the payload carries
+    the experiment anchor, so a Day-1 board can label a 110-day-old chip "carried
+    from attempt 7" instead of rendering an unexplained ghost.
     """
     now = datetime.now(timezone.utc)
     sources = []
     summary = {"fresh": 0, "stale": 0, "paused": 0, "total": 0}
+    try:
+        from coach_checkin import read_cycle
+
+        current_cycle = read_cycle()
+    except Exception:
+        current_cycle = None
 
     for sid, meta in _FRESHNESS_SOURCES.items():
         last_update = None
@@ -362,6 +393,11 @@ def handle_source_freshness() -> dict:
             entry["manual"] = True
             if status in ("stale", "behavioral-stale"):
                 entry["days_dark"] = _days_dark(last_update, now)
+        # #1371: explicit cross-cycle provenance — the newest record predates the
+        # current genesis, so its age is carried history, not a live-cycle outage.
+        if last_update and last_update < EXPERIMENT_START:
+            entry["carried"] = True
+            entry["carried_from_cycle"] = _carried_from_cycle(sid, last_update)
         # D-4 (#468): apple_health is one partition fed by many sensors, so its single
         # "fresh" hides a months-dark CGM/BP/SoM/workout stream. Surface the per-datatype
         # liveness the freshness-checker stores so the darkness is visible.
@@ -398,7 +434,15 @@ def handle_source_freshness() -> dict:
         summary["paused"] += 1
         summary["total"] += 1
 
-    return _ok({"sources": sources, "summary": summary}, cache_seconds=300)
+    return _ok(
+        {
+            "sources": sources,
+            "summary": summary,
+            # #1371: the anchor the front-end labels provenance against.
+            "experiment": {"genesis": EXPERIMENT_START, "cycle": current_cycle},
+        },
+        cache_seconds=300,
+    )
 
 
 # ── #735 (/verify/ page): cross-device agreement, the credibility signal ────
