@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """
-check_css_tokens.py — the #1103 guard: the swept sheets stay on the type scale.
+check_css_tokens.py — the #1103/#1211/#1212 guard: the CONSUMER sheets stay on the
+design system (type scale + colour tokens + the sanctioned breakpoints).
 
-Three checks over site/assets/css/{story,evidence,cockpit}.css:
+Four checks over the seven CONSUMER sheets in site/assets/css/ (#1212 extended the
+sweep from the original three to all seven — story, evidence, cockpit, mind, fonts,
+section_toc, subscribe). tokens.css is the DEFINITIONS / ALLOWLIST source — where the
+--fs-* scale, the colour primitives and the breakpoint constants are *defined* — so it
+is never a swept target (it would flag its own definitions); it only feeds the set of
+known tokens.
 
 1. RAW FONT-SIZES — every `font-size` must come from a token (`var(--fs-*)` etc.),
    be `inherit`, or carry an explicit inline `/* fs-ok: <reason> */` sanction on the
@@ -27,6 +33,15 @@ Three checks over site/assets/css/{story,evidence,cockpit}.css:
    what caught the live off-palette accents #0ea5e9 (lead-coach sky) and #16a34a
    (vice-hold green) that bypassed the ember channel.
 
+4. BREAKPOINTS (#1212) — DESIGN_SYSTEM_V5 §10.1: the site has no CSS build step, so
+   `@media` breakpoints are documented NAMED CONSTANTS. Every `(max|min)-width: Npx`
+   across site/assets/css/** must be one of the nine sanctioned numbers — the six
+   canonical `max-width` boundaries 360/480/600/760/820 plus the `min-width` token+1
+   pairs 601/761/821/901 (so a min/max pair straddling a boundary never both fire at
+   the same pixel). A tenth value is a rogue breakpoint (the story.css:582
+   `(max-width: 520px)` class). The grep in §10.1 — the "(max|min)-width: Npx" sweep
+   that returns only those nine numbers — is turned into this assertion.
+
 Exit 0 clean, 1 with findings. Run:  python3 scripts/check_css_tokens.py
 Enforced by tests/test_css_tokens.py.
 """
@@ -38,7 +53,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 CSS_DIR = REPO / "site" / "assets" / "css"
 TOKENS = CSS_DIR / "tokens.css"
-SWEPT = ["story.css", "evidence.css", "cockpit.css"]
+# The CONSUMER sheets — swept for hex / font-size / undefined-var. tokens.css is the
+# definitions/allowlist source (never swept — it *is* where the scale and palette live).
+SWEPT = ["story.css", "evidence.css", "cockpit.css", "mind.css", "fonts.css", "section_toc.css", "subscribe.css"]
+
+# DESIGN_SYSTEM_V5 §10.1: the six canonical max-width boundaries + their min-width
+# token+1 pairs. These nine numbers are the ONLY breakpoints allowed in the CSS.
+SANCTIONED_BREAKPOINTS = {360, 480, 600, 760, 820, 601, 761, 821, 901}
 
 # Custom properties set at runtime — JS el.style.setProperty / inline style="--x: …"
 # attributes in the renderers — or by generated/inline HTML. Not statically defined
@@ -60,6 +81,8 @@ PROP_DEF = re.compile(r"(--[\w-]+)\s*:")
 FONT_SIZE = re.compile(r"font-size\s*:\s*([^;}]+)")
 # CSS hex colour literals only (3/4/6/8 digits) — not 5- or 7-digit runs.
 HEX_COLOR = re.compile(r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})\b")
+# §10.1 breakpoint literal — the doc's grep, with the pixel value captured.
+BP_MEDIA = re.compile(r"\((?:max|min)-width:\s*([0-9]+)px\)")
 
 
 def strip_comments(text: str) -> str:
@@ -89,6 +112,54 @@ def raw_hex_findings(text: str) -> list:
     return hits
 
 
+def font_size_findings(name: str, text: str) -> list:
+    """Raw / literal-fallback font-sizes in `text`. A line carrying `fs-ok:` is a
+    sanctioned exception; per-line comments are stripped first. Returns finding strings."""
+    findings = []
+    for i, line in enumerate(text.splitlines(), 1):
+        sanctioned = "fs-ok:" in line
+        code = re.sub(r"/\*.*?(\*/|$)", " ", line)  # per-line comment strip
+        m = FONT_SIZE.search(code)
+        if m and not sanctioned:
+            val = m.group(1).strip()
+            literal = re.search(r"(?<![\w-])\d*\.?\d+\s*(px|rem|em|%|vw|vh)", val)
+            if literal and not val.startswith("var("):
+                findings.append(f"{name}:{i}: raw font-size `{val}` — use a --fs-* token or sanction with /* fs-ok: reason */")
+            elif literal and val.startswith("var("):
+                findings.append(f"{name}:{i}: font-size var() with a literal fallback `{val}` — resolve the token instead")
+    return findings
+
+
+def undefined_var_findings(name: str, text: str, known: set) -> list:
+    """var(--x) references that resolve to no known token. Returns finding strings."""
+    findings = []
+    for i, line in enumerate(text.splitlines(), 1):
+        code = re.sub(r"/\*.*?(\*/|$)", " ", line)
+        for vm in VAR_REF.finditer(code):
+            if vm.group(1) not in known:
+                findings.append(
+                    f"{name}:{i}: reference to undefined token `{vm.group(1)}` — "
+                    "define it in tokens.css or use a real token (silent always-active fallback)"
+                )
+    return findings
+
+
+def breakpoint_findings_in(name: str, text: str) -> list:
+    """(#1212) §10.1: every (max|min)-width value in `text` must be one of the nine
+    sanctioned breakpoints. A breakpoint inside a comment is not a live query (comments
+    are blanked first). Returns finding strings for any rogue value."""
+    findings = []
+    for i, line in enumerate(code_lines(text), 1):
+        for m in BP_MEDIA.finditer(line):
+            val = int(m.group(1))
+            if val not in SANCTIONED_BREAKPOINTS:
+                findings.append(
+                    f"{name}:{i}: rogue breakpoint `{val}px` — DESIGN_SYSTEM_V5 §10.1 sanctions only "
+                    f"{sorted(SANCTIONED_BREAKPOINTS)} (max 360/480/600/760/820 + min token+1 601/761/821/901)"
+                )
+    return findings
+
+
 def defined_props(*files: Path) -> set:
     props = set()
     for f in files:
@@ -110,23 +181,12 @@ def check() -> list:
                 f"{name}:{lineno}: raw hex colour `{hexval}` — use a tokens.css "
                 "colour (var(--…), e.g. --ember/--coach) or sanction with /* hex-ok: reason */"
             )
-        for i, line in enumerate(text.splitlines(), 1):
-            sanctioned = "fs-ok:" in line
-            code = re.sub(r"/\*.*?(\*/|$)", " ", line)  # per-line comment strip
-            m = FONT_SIZE.search(code)
-            if m and not sanctioned:
-                val = m.group(1).strip()
-                literal = re.search(r"(?<![\w-])\d*\.?\d+\s*(px|rem|em|%|vw|vh)", val)
-                if literal and not val.startswith("var("):
-                    findings.append(f"{name}:{i}: raw font-size `{val}` — use a --fs-* token or sanction with /* fs-ok: reason */")
-                elif literal and val.startswith("var("):
-                    findings.append(f"{name}:{i}: font-size var() with a literal fallback `{val}` — resolve the token instead")
-            for vm in VAR_REF.finditer(code):
-                if vm.group(1) not in known:
-                    findings.append(
-                        f"{name}:{i}: reference to undefined token `{vm.group(1)}` — "
-                        "define it in tokens.css or use a real token (silent always-active fallback)"
-                    )
+        findings.extend(font_size_findings(name, text))
+        findings.extend(undefined_var_findings(name, text, known))
+    # §10.1 breakpoint invariant (#1212) — swept across ALL sheets, tokens.css included
+    # (breakpoints are constants used everywhere; there is no allowlist file for them).
+    for sheet in sorted(CSS_DIR.glob("*.css")):
+        findings.extend(breakpoint_findings_in(sheet.name, sheet.read_text()))
     return findings
 
 

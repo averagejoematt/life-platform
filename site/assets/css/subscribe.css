@@ -61,7 +61,7 @@
 
 .sub-success { display: none; border: var(--border-hair); border-radius: var(--radius-sm); background: var(--ember-wash);
   padding: var(--sp-7) var(--sp-5); text-align: center; }
-.sub-success .si { color: var(--ember); font-family: var(--font-mono); font-size: 1.75rem; }
+.sub-success .si { color: var(--ember); font-family: var(--font-mono); font-size: 1.75rem; /* fs-ok: success-state glyph, sized to the confirmation mark */ }
 .sub-success .st { font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ember); margin-top: var(--sp-2); }
 .sub-success .sb { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
 .sub-success a { color: var(--ember); }

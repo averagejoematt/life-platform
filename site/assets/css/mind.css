@@ -25,14 +25,14 @@
 }
 .mind .ph-title {
   font-family: var(--font-serif);
-  font-size: var(--fs-display, clamp(2.4rem, 6vw, 4.5rem));
+  font-size: var(--fs-display);
   line-height: 1.02;
   margin: 0.2em 0 0.3em;
   color: var(--ink);
 }
 .mind .ph-promise {
   font-family: var(--font-serif);
-  font-size: clamp(1.05rem, 2.2vw, 1.4rem);
+  font-size: clamp(1.05rem, 2.2vw, 1.4rem); /* fs-ok: bespoke serif page-hero promise, off the triad by design */
   color: var(--ink-muted);
   line-height: 1.5;
 }
@@ -64,7 +64,7 @@
   position: relative;
   aspect-ratio: 2 / 3;
   border-radius: 3px;
-  background: linear-gradient(155deg, var(--surface) 0%, #1d1810 100%);
+  background: linear-gradient(155deg, var(--surface) 0%, var(--shelf-spine-deep) 100%);
   border: 1px solid color-mix(in srgb, var(--ink-faint) 35%, transparent);
   border-left: 3px solid var(--ember);
   box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.6);
@@ -80,7 +80,7 @@
 .sp-cover { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .sp-title {
   font-family: var(--font-serif);
-  font-size: 0.92rem;
+  font-size: 0.92rem; /* fs-ok: geometry-fitted book-spine title (2:3 card) */
   line-height: 1.12;
   color: var(--ink);
   display: -webkit-box;
@@ -88,10 +88,10 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.sp-author { margin-top: auto; font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); }
+.sp-author { margin-top: auto; font-family: var(--font-mono); font-size: 0.62rem; /* fs-ok: micro-mono book-spine byline */ color: var(--ink-faint); }
 .sp-cap {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.62rem; /* fs-ok: micro-mono book-spine caption */
   color: var(--ink-muted);
   line-height: 1.2;
   display: -webkit-box;
@@ -131,7 +131,7 @@
 
 .habit-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: clamp(1.25rem, 4vw, 2.5rem); }
 .hb-row { display: flex; flex-direction: column; gap: 0.15rem; }
-.hb-val { font-family: var(--font-mono); font-size: clamp(1.6rem, 4vw, 2.4rem); color: var(--ink); line-height: 1; }
+.hb-val { font-family: var(--font-mono); font-size: clamp(1.6rem, 4vw, 2.4rem); /* fs-ok: geometry-fitted instrument big-number */ color: var(--ink); line-height: 1; }
 .hb-row .label { color: var(--ink-faint); }
 .hb-empty { font-family: var(--font-serif); font-style: italic; color: var(--ink-muted); }
 
