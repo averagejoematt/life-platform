@@ -1312,6 +1312,128 @@ def test_i22_site_version_sha_on_main():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# I23 — the alert-digest consumer + its queue are themselves watched (#1229)
+# Root cause: life-platform-alert-digest is the single consumer through which the
+# MAJORITY of alarms (52 of 67) become visible, and it was completely unwatched —
+# no Errors alarm on the function, no age alarm on life-platform-alerts-digest-queue.
+# If it fails, alarm notifications pile up in the 25h-retention queue silently
+# (>1 day of failure permanently loses notifications). Both alarms MUST route to the
+# URGENT topic (to_digest falsy) — the digest path cannot announce its own death.
+#
+# This is a STATIC-ANALYSIS assertion (no AWS creds, no CDK synth): it AST-parses
+# monitoring_stack.py the same way test_budget_tier_alarms.py does, so it runs
+# (rather than skips) wherever this file is collected. It pins the two new alarms
+# against the digest consumer/queue exactly the way the ingestion DLQ alarm is
+# pinned (asserted below as the control), which is the pattern #1229 extends.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_MONITORING_STACK = os.path.join(ROOT, "cdk", "stacks", "monitoring_stack.py")
+
+# Positional parameter order of the in-stack `_alarm(...)` helper.
+_ALARM_PARAMS = [
+    "alarm_id",
+    "alarm_name",
+    "namespace",
+    "metric_name",
+    "period_sec",
+    "statistic",
+    "threshold",
+    "operator",
+    "dims",
+    "ext_stat",
+    "to_digest",
+]
+
+
+def _alarm_literal(node):
+    """Best-effort constant extraction; returns the identifier name for Name/Attribute."""
+    import ast
+
+    try:
+        return ast.literal_eval(node)
+    except Exception:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return None
+
+
+def _monitoring_alarm_calls():
+    """All `_alarm(...)` calls in monitoring_stack.py as {param: value} dicts."""
+    import ast
+
+    with open(_MONITORING_STACK) as f:
+        tree = ast.parse(f.read())
+    calls = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "_alarm":
+            kw = {a: None for a in _ALARM_PARAMS}
+            for i, arg in enumerate(node.args):
+                if i < len(_ALARM_PARAMS):
+                    kw[_ALARM_PARAMS[i]] = _alarm_literal(arg)
+            for k in node.keywords:
+                if k.arg in kw:
+                    kw[k.arg] = _alarm_literal(k.value)
+            calls.append(kw)
+    return calls
+
+
+def _alarm_watching(*, metric_name, dim_key, dim_value):
+    """Return the first _alarm call whose metric + dims match, or None."""
+    for c in _monitoring_alarm_calls():
+        dims = c.get("dims") or {}
+        if c.get("metric_name") == metric_name and isinstance(dims, dict) and dims.get(dim_key) == dim_value:
+            return c
+    return None
+
+
+def test_i23_alert_digest_consumer_and_queue_are_watched():
+    """I23: the alert-digest lambda (Errors) and its queue (age) each have a live,
+    URGENT-routed alarm (#1229). Static AST assertion — no AWS creds required."""
+    # Control: the ingestion DLQ alarm this pattern extends must still be pinned.
+    dlq = _alarm_watching(
+        metric_name="ApproximateNumberOfMessagesVisible",
+        dim_key="QueueName",
+        dim_value="life-platform-ingestion-dlq",
+    )
+    assert dlq is not None, "I23 FAIL: the control ingestion-dlq depth alarm went missing from monitoring_stack.py"
+
+    # 1) alert-digest Lambda Errors >= 1/day → URGENT.
+    fn_alarm = _alarm_watching(
+        metric_name="Errors",
+        dim_key="FunctionName",
+        dim_value="life-platform-alert-digest",
+    )
+    assert fn_alarm is not None, (
+        "I23 FAIL: no Errors alarm watches the life-platform-alert-digest consumer. "
+        "The lambda that drains 52/67 alarms to email is unwatched — add it to monitoring_stack.py (#1229)."
+    )
+    assert fn_alarm["to_digest"] in (None, False), (
+        "I23 FAIL: the alert-digest Errors alarm routes to the DIGEST topic — but the digest path "
+        "cannot announce its own death. It must route URGENT (the default `topic`)."
+    )
+
+    # 2) digest queue ApproximateAgeOfOldestMessage → URGENT.
+    q_alarm = _alarm_watching(
+        metric_name="ApproximateAgeOfOldestMessage",
+        dim_key="QueueName",
+        dim_value="life-platform-alerts-digest-queue",
+    )
+    assert q_alarm is not None, (
+        "I23 FAIL: no age alarm watches life-platform-alerts-digest-queue. If the daily drain fails, "
+        "notifications rot in the 25h-retention queue silently — add the age alarm to monitoring_stack.py (#1229)."
+    )
+    assert q_alarm["to_digest"] in (None, False), "I23 FAIL: the digest-queue age alarm routes to the DIGEST topic — it must route URGENT."
+    # The age threshold is in SECONDS and must clear the ~24h healthy once-daily drain
+    # ceiling, so a fire means a full missed cycle (not normal batching).
+    assert isinstance(q_alarm["threshold"], (int, float)) and q_alarm["threshold"] >= 24 * 3600, (
+        f"I23 FAIL: digest-queue age threshold {q_alarm['threshold']!r}s is <= the normal 24h "
+        "once-daily-drain ceiling — it would false-fire on healthy operation."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 
