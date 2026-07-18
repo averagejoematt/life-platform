@@ -5,6 +5,15 @@
   Non-scaling strokes so responsive stretching never thickens lines. Honours the
   design system: ember for the live signal, muted ink for flat/goal, never red.
 */
+// The SVG legibility floor (#1210): its svg <text> (aq-lab/aq-ax, radar-lbl,
+// bm-cap) is sized in viewBox units, so import the shared floor-scaler for its
+// side effect — it self-wires and floors every registered label to >=11px
+// effective, rAF-debounced on resize, on any page that renders these charts.
+// Absolute path so deploy/hash_site_assets.py rewrites the edge to the hashed
+// svgtype filename (a relative "./" import escapes the /assets/js/ hasher regex
+// and would pin the unhashed, version-skewable URL — the "frozen page" class).
+import "/assets/js/svgtype.js";
+
 const escAttr = (s) => String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 // Dual-unit weight: always show kg AND lb. `unit` is the NATIVE unit of v.

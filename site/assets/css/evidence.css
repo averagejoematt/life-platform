@@ -183,8 +183,8 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .arch-svg .ab { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
 .arch-svg .abk { stroke: var(--ember); stroke-width: 1.5; }
 .arch-svg .abg { stroke-dasharray: 3 3; }
-.arch-svg .at { fill: var(--ink); font-size: 13px; /* fs-ok: SVG viewBox units */ font-weight: 600; text-anchor: middle; }
-.arch-svg .as { fill: var(--ink-faint); font-size: 9.5px; /* fs-ok: SVG viewBox units */ text-anchor: middle; }
+.arch-svg .at { fill: var(--ink); font-size: var(--fs-arch-at); font-weight: 600; text-anchor: middle; } /* floored >=11px effective by svgtype.js (#1210) */
+.arch-svg .as { fill: var(--ink-faint); font-size: var(--fs-arch-as); text-anchor: middle; } /* floored >=11px effective by svgtype.js (#1210) */
 .arch-svg .aa { stroke: var(--ink-faint); stroke-width: 1.5; }
 .arch-svg .ad { stroke: var(--ember); stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
 .rd-figcap { margin-top: var(--sp-2); color: var(--ink-faint); }
@@ -596,7 +596,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .pring-seg { opacity: 0.14; }
 .pring-fill { transition: stroke-dashoffset 0.9s var(--ease-out); }
 .ch-body { fill: var(--ink); stroke: none; }
-.ch-center { font-size: 84px; /* fs-ok: SVG viewBox units */ fill: var(--ink); font-family: var(--font-mono); }
+.ch-center { font-size: 84px; /* fs-ok: SVG viewBox units — 84px in a 300-unit inner viewBox renders >=30px effective at the sheet's min width, always above the 11px floor (#1210) */ fill: var(--ink); font-family: var(--font-mono); }
 .ch-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2) var(--sp-3); margin-top: var(--sp-3); color: var(--ink-faint); }
 .ch-leg { display: inline-flex; align-items: center; gap: 5px; }
 .ch-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -670,7 +670,7 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
 .radar-chart svg { width: 100%; height: auto; display: block; }
 .radar-grid { stroke: var(--rule); }
 .radar-poly { fill: color-mix(in oklch, var(--ember) 14%, transparent); stroke: var(--ember-line); stroke-width: 1.5; }
-.radar-lbl { font-family: var(--font-mono); font-size: 10px; /* fs-ok: SVG viewBox units */ fill: var(--ink-faint); letter-spacing: 0.08em; }
+.radar-lbl { font-family: var(--font-mono); font-size: var(--fs-radar-lbl); fill: var(--ink-faint); letter-spacing: 0.08em; } /* floored >=11px effective by svgtype.js (#1210) */
 
 /* The tier ladder. */
 .ch-ladder { display: grid; gap: var(--sp-2); }
