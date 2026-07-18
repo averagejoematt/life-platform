@@ -3963,6 +3963,13 @@ def _price_for_model(model_id: str) -> dict:
     return _BEDROCK_PRICES["sonnet"]
 
 
+# #1230: the ADR-133 base ceiling (amendment 2026-07-08, $75→$85). The live ceiling is
+# derived from the governor's /life-platform/budget-breakdown param (#822) — it floats to
+# $100 in reader-traffic surge mode. This constant is ONLY the fail-closed fallback when
+# that read fails; never the retired $75.
+_ADR133_BASE_CEILING_USD = 85.0
+
+
 def handle_inference_receipt() -> dict:
     """GET /api/inference_receipt — today's AI calls + month-to-date, priced."""
     try:
@@ -4022,21 +4029,37 @@ def handle_inference_receipt() -> dict:
         except Exception:
             tier = None
 
+        # #1230: derive the ceiling from the governor's breakdown param (#822 / ADR-133)
+        # rather than a hardcoded literal — the base is $85 and floats to $100 in surge
+        # mode, so a hardcoded number is guaranteed to be a lie. Fail closed to the $85
+        # base (never the retired $75) if the breakdown read fails.
+        ceiling_usd = _ADR133_BASE_CEILING_USD
+        surge_active = False
+        try:
+            breakdown = json.loads(ssm.get_parameter(Name="/life-platform/budget-breakdown")["Parameter"]["Value"])
+            ceiling_usd = float(breakdown["ceiling"])
+            surge_active = bool(breakdown.get("surge_active", False))
+        except Exception:
+            pass
+
         month_total = round(sum(r["month"]["est_cost_usd"] for r in models), 2)
+        surge_clause = " — reader-traffic surge mode" if surge_active else ""
+        note = (
+            "Every Claude call routes through one audited chokepoint (ADR-062). "
+            "Costs are estimated from token metrics x list prices — the same math "
+            f"the budget governor enforces. The ${_ADR133_BASE_CEILING_USD:.0f} base ceiling "
+            f"(${ceiling_usd:.0f} in effect{surge_clause}) covers the WHOLE platform, not just AI."
+        )
         return _ok(
             {
                 "as_of": now.isoformat(timespec="seconds"),
-                "budget_ceiling_usd": 75,
+                "budget_ceiling_usd": ceiling_usd,
+                "budget_surge_active": surge_active,
                 "budget_tier": tier,
                 "ai_month_to_date_usd": month_total,
                 "models": models,
                 "features": features,
-                "note": (
-                    "Every Claude call routes through one audited chokepoint (ADR-062). "
-                    "Costs are estimated from token metrics x list prices — the same math "
-                    "the budget governor enforces. The $75 ceiling covers the WHOLE platform, "
-                    "not just AI."
-                ),
+                "note": note,
             },
             cache_seconds=900,
         )

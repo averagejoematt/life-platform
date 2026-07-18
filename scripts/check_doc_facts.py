@@ -118,9 +118,13 @@ BUDGET_NEAR = re.compile(
 )
 
 # A line framing a number as history is allowed to state the old value.
+# #1230: `original`/`reference`/`calibrat` cover the source scan's one legitimate $75 —
+# cost_governor's `_THRESHOLD_REFERENCE_CEILING = 75.0`, the ORIGINAL ADR-063 anchor the
+# tier bands scale from (documented as such); that $75 is a real constant, not a stale claim.
 HISTORICAL = re.compile(
     r"\bwas\b|\bwere\b|->|→|raised|lowered|formerly|previously|used to|as of\s*\d"
-    r"|grew from|up from|down from|pre-#|earlier|drift-ok|no longer|retired|superseded",
+    r"|grew from|up from|down from|pre-#|earlier|drift-ok|no longer|retired|superseded"
+    r"|\boriginal\b|\breference\b|calibrat",
     re.I,
 )
 APPROX = ("~", "≈", "+", "about ", "around ", "roughly ")
@@ -147,6 +151,68 @@ EXEMPT_DIRS = (
     "docs/_lint/",
     "handovers/",
 )
+
+
+# ── #1230: SOURCE-literal ceiling scan (lambdas/) ─────────────────────────────
+# The doc gate above polices prose; this polices CODE. A hardcoded ceiling dollar
+# amount baked into a value literal or a user-facing string — the exact defect #1230
+# fixed: `"budget_ceiling_usd": 75` in the public inference receipt + `"the $75 ceiling
+# ..."` in its note — is a lie the moment the ceiling moves, and ADR-133 moved it ($85
+# base / $100 surge). The live ceiling must be READ from the governor's
+# /life-platform/budget-breakdown param, never hardcoded.
+#
+# PRECISION: we scan CODE/STRING/DATA literals but SKIP full-line `#` comments and any
+# HISTORICAL-framed line. $75 legitimately survives in this tree as the ORIGINAL
+# calibration reference (cost_governor._THRESHOLD_REFERENCE_CEILING = 75.0 + the comments
+# that explain it) — policing comments would false-flag that real constant. The defect
+# class that ever reaches a reader is always a literal/string, never an inline comment.
+SRC_ROOTS = (ROOT / "lambdas",)
+# a ceiling-named dict/JSON key assigned a bare integer, e.g. `"budget_ceiling_usd": 75`.
+# `(?!\.\d)` skips floats like `"ceiling": 100.0` so a real breakdown dict never trips.
+CEILING_LITERAL = re.compile(r"""["']?[A-Za-z_]*ceiling[A-Za-z_]*["']?\s*:\s*(\d{2,3})\b(?!\.\d)""")
+
+
+def _scan_source_files() -> list[Path]:
+    out = []
+    for root in SRC_ROOTS:
+        if root.exists():
+            out += sorted(root.rglob("*.py"))
+    return out
+
+
+def _source_hits(files) -> list[str]:
+    """Stale hardcoded ceiling literals in `files`.
+
+    Two shapes: a ceiling-named dict key with a bare-int value (`"budget_ceiling_usd": 75`)
+    and a `$NN` figure glued to a ceiling word inside a source string. Skips full-line `#`
+    comments and any HISTORICAL-framed line (see the SRC scan note above). Exposed so the
+    regression test can plant a violation in a scratch file and prove the rule bites.
+    """
+    hits = []
+    for src in files:
+        try:
+            rel = src.relative_to(ROOT)
+        except ValueError:
+            rel = src  # scratch file outside the repo (the non-vacuous test)
+        for lineno, line in enumerate(src.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.lstrip()
+            if stripped.startswith("#") or HISTORICAL.search(line):
+                continue
+            flagged = set()
+            for mo in CEILING_LITERAL.finditer(line):
+                amt = _to_int(mo.group(1))
+                if amt is not None and amt not in BUDGET_OK and amt >= 50:
+                    flagged.add(amt)
+            for mo in BUDGET_NEAR.finditer(line):
+                amt = int(mo.group(1) or mo.group(2))
+                if amt not in BUDGET_OK and amt >= 50:
+                    flagged.add(amt)
+            for amt in sorted(flagged):
+                hits.append(
+                    f"{rel}:{lineno}: hardcoded ${amt} budget ceiling, truth is $85 base / $100 surge (ADR-133)\n"
+                    f"      | {stripped[:120]}"
+                )
+    return hits
 
 
 def _scan_files() -> list[Path]:
@@ -220,6 +286,9 @@ def main():
                         f"      | {line.strip()[:120]}"
                     )
 
+    # #1230: same ground truth, now over the SOURCE tree — no hardcoded ceiling in code.
+    hits += _source_hits(_scan_source_files())
+
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []
     for h in hits:
@@ -229,14 +298,17 @@ def main():
             uniq.append(h)
 
     if uniq:
-        print(f"❌ {len(uniq)} live doc line(s) state a stale platform number as current fact:")
+        print(f"❌ {len(uniq)} live doc/source line(s) state a stale platform number as current fact:")
         for h in uniq:
             print(f"   {h}")
         print("\nFix the number (ground truth: `python3 scripts/check_doc_facts.py --list`).")
         print('If the line legitimately states history, frame it so ("was N", "N->M", "as of 2026-…")')
         print("or add an inline `<!-- drift-ok: reason -->` marker.")
         sys.exit(1)
-    print(f"✅ doc facts OK — no live doc states a stale count/budget ({len(_scan_files())} files scanned).")
+    print(
+        f"✅ doc + source facts OK — no live doc/source states a stale count/budget "
+        f"({len(_scan_files())} docs + {len(_scan_source_files())} source files scanned)."
+    )
 
 
 if __name__ == "__main__":
