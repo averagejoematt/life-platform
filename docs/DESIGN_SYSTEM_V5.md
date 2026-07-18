@@ -358,7 +358,9 @@ build step**, so breakpoints are documented **named constants** (see the block a
 token exactly (360/480/600/760/820); `min-width` uses **token+1** (601/761/821/901) so a
 min/max pair straddling a boundary never both fire at the same pixel. A PR must not introduce
 a seventh value — `grep -rhoE '\((max|min)-width: *[0-9]+px\)' site/assets/css` returns only
-those nine numbers.
+those nine numbers. **Enforced (#1212):** `scripts/check_css_tokens.py` turns that grep into an
+assertion (a rogue value fails the gate), alongside the raw-hex / font-size / undefined-token
+sweep over the seven consumer sheets; run in CI via `tests/test_css_tokens.py`.
 
 ### 10.2 The bottom app-bar — @layer, not !important (#1007)
 

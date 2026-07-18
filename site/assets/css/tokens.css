@@ -110,6 +110,8 @@
   /* Derived tints (OKLCH mixing keeps the ramp even). */
   --surface-raised: color-mix(in oklch, var(--surface) 88%, var(--ink) 12%);
   --surface-sunken: color-mix(in oklch, var(--surface) 80%, var(--page) 20%);
+  --shelf-spine-deep: #1d1810;  /* warm shadow foot of the mind.css book-spine gradient
+                                   — one fixed value across both themes (a lit spine edge) */
   --ink-dim:        color-mix(in oklch, var(--ink) 70%, transparent);
   --ember-soft:     color-mix(in oklch, var(--ember) 18%, transparent);
   --ember-line:     color-mix(in oklch, var(--ember) 42%, transparent);
