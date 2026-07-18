@@ -269,14 +269,17 @@ def backup_record(sk: str, raw_item_ddb_json: dict, s3, apply: bool) -> list[str
     doc = json.dumps({"Item": raw_item_ddb_json}, indent=1, default=str)
     notes = []
     local = LOCAL_BACKUP_DIR / f"{sk}.json"
+    # LOCAL_BACKUP_DIR is intentionally /tmp (outside the repo — originals are unvetted,
+    # never committed), so display the absolute path; .relative_to(REPO_ROOT) would raise
+    # ValueError on every run because /tmp is never a repo subpath (pre-existing, #943).
     if local.exists():
-        notes.append(f"local backup exists, kept: {local.relative_to(REPO_ROOT)}")
+        notes.append(f"local backup exists, kept: {local}")
     elif apply:
         LOCAL_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
         local.write_text(doc)
-        notes.append(f"local backup written: {local.relative_to(REPO_ROOT)}")
+        notes.append(f"local backup written: {local}")
     else:
-        notes.append(f"would write local backup: {local.relative_to(REPO_ROOT)}")
+        notes.append(f"would write local backup: {local}")
 
     s3_key = f"{S3_BACKUP_PREFIX}{sk}.json"
     exists = True
