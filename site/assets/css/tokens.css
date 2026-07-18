@@ -843,7 +843,9 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .wu-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--ink-faint); background: transparent; flex: 0 0 auto; }
 .wu-dot.lit { background: var(--ember); border-color: var(--ember); }
 .wu-label { color: var(--ink-muted); }
-.wu-carried { border-style: dashed; opacity: 0.85; }
+/* Compound selector: .rd-badge's border shorthand (evidence.css, loads later)
+   would re-solidify a bare .wu-carried — 0,2,0 wins regardless of order. */
+.wu-carried, .rd-badge.wu-carried { border-style: dashed; opacity: 0.85; }
 .chart-cap { display: block; margin-top: var(--sp-2); color: var(--ink-faint); }
 .chart--empty { border: var(--honest-border); border-radius: var(--radius-xs); padding: var(--sp-4); text-align: center; }
 .chart--empty .chart-cap { margin: 0; }
