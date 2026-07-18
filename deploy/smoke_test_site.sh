@@ -96,7 +96,9 @@ check_status "Evidence · platform"  "$BASE/method/platform/"
 check_status "Evidence · data"      "$BASE/method/data/"
 check_status "Evidence · pipeline"  "$BASE/method/pipeline/"
 check_status "Methods registry"     "$BASE/method/registry/"
-check_status "404 page"             "$BASE/nonexistent-page-xyz" "404"
+# Trailing slash so the #1209 bare-path normalizer (301 /x -> /x/) doesn't intercept —
+# a genuinely missing page must 404 at the origin directly, not via a redirect hop.
+check_status "404 page"             "$BASE/nonexistent-page-xyz/" "404"
 check_status "www redirect"         "https://www.averagejoematt.com/" "200"
 echo ""
 
