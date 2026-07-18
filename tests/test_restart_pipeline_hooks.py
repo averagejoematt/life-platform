@@ -189,3 +189,147 @@ def test_validate_source_accepts_raw_timeseries_only():
     assert "not raw_timeseries" in dedup.validate_source("labs")
     # unknown = refuse loudly, never default
     assert "unknown source" in dedup.validate_source("not_a_source")
+
+
+# ── #1199: void open pre-registered bets to the CROSS_PHASE calibration ledger ──
+#
+# The reset tombstones open hypotheses + coach PREDICTION#s but never changes their
+# status, so an open bet goes phase-hidden while still 'pending' and the weekly engine
+# (with_phase_filter) can never re-see it to grade it — every reset silently dropped
+# accountability. void_open_bets_at_reset writes one 'voided_at_reset' row per open bet.
+# The regression guard: count(open hypotheses + predictions) == count(void CALIB# rows).
+
+_GENESIS = "2026-08-01"
+_CLOSING_CYCLE = 6
+
+
+class _FakeTable:
+    """Minimal DynamoDB Table stand-in: begins_with(sk) query by pk (string
+    KeyConditionExpression, like restart_intelligence_wipe) + put_item capture."""
+
+    def __init__(self, items_by_pk):
+        self._by_pk = items_by_pk
+        self.puts = []
+
+    def query(self, **kwargs):
+        vals = kwargs["ExpressionAttributeValues"]
+        pk, skp = vals[":pk"], vals.get(":skp", "")
+        items = [i for i in self._by_pk.get(pk, []) if str(i.get("sk", "")).startswith(skp)]
+        return {"Items": items}
+
+    def put_item(self, Item=None, **_kw):
+        self.puts.append(Item)
+
+
+def _fixture_table():
+    """2 open hypotheses + 2 open predictions that MUST be voided, plus terminal and
+    already-tombstoned bets that MUST NOT be — so the count invariant is non-vacuous
+    (a collector that ignored status/tombstone would over-count to 8)."""
+    return _FakeTable(
+        {
+            pipeline.HYPOTHESES_PK: [
+                {
+                    "sk": "HYPOTHESIS#a",
+                    "status": "pending",
+                    "hypothesis_id": "hyp_a",
+                    "hypothesis": "A",
+                    "confidence": "high",
+                    "test_spec": {"direction": "higher"},
+                    "created_at": "2026-07-10T00:00:00Z",
+                },
+                {"sk": "HYPOTHESIS#b", "status": "confirming", "hypothesis_id": "hyp_b", "hypothesis": "B", "confidence": "medium"},
+                {"sk": "HYPOTHESIS#c", "status": "confirmed", "hypothesis_id": "hyp_c"},  # terminal — skip
+                {"sk": "HYPOTHESIS#d", "status": "refuted", "hypothesis_id": "hyp_d"},  # terminal — skip
+                {"sk": "HYPOTHESIS#e", "status": "pending", "hypothesis_id": "hyp_e", "tombstone": True},  # prior cycle — skip
+            ],
+            "COACH#sleep_coach": [
+                {
+                    "sk": "PREDICTION#p1",
+                    "status": "pending",
+                    "prediction_id": "p1",
+                    "coach_id": "sleep_coach",
+                    "confidence": 0.8,
+                    "claim_natural": "sleep improves",
+                    "subdomain": "sleep",
+                    "created_date": "2026-07-01",
+                },
+                {"sk": "PREDICTION#p3", "status": "refuted", "prediction_id": "p3", "coach_id": "sleep_coach"},  # terminal — skip
+            ],
+            "COACH#mind_coach": [
+                {"sk": "PREDICTION#p2", "status": "confirming", "prediction_id": "p2", "coach_id": "mind_coach", "confidence": 0.6},
+                {
+                    "sk": "PREDICTION#p4",
+                    "status": "pending",
+                    "prediction_id": "p4",
+                    "coach_id": "mind_coach",
+                    "tombstone": True,
+                },  # already archived by a prior reset — skip
+            ],
+        }
+    )
+
+
+def test_collect_open_bets_excludes_terminal_and_tombstoned():
+    # Non-vacuous: exactly the 2 open hypotheses + 2 open predictions, nothing else.
+    bets = pipeline.collect_open_bets(_fixture_table())
+    kinds = sorted(k for k, _ in bets)
+    ids = sorted((b.get("hypothesis_id") or b.get("prediction_id")) for _, b in bets)
+    assert kinds == ["hypothesis", "hypothesis", "prediction", "prediction"]
+    assert ids == ["hyp_a", "hyp_b", "p1", "p2"]  # hyp_c/d (terminal), hyp_e/p4 (tombstoned), p3 excluded
+
+
+def test_void_dry_run_counts_all_open_but_writes_nothing():
+    fake = _fixture_table()
+    n = pipeline.void_open_bets_at_reset(_GENESIS, _CLOSING_CYCLE, apply=False, table=fake)
+    assert n == 4
+    assert fake.puts == []  # dry-run is read-only — the whole pipeline is dry-run-provable
+
+
+def test_void_apply_writes_one_calib_row_per_open_bet():
+    # THE regression guard: count(open hypotheses + predictions) == count(void CALIB# rows).
+    fake = _fixture_table()
+    open_bets = pipeline.collect_open_bets(fake)
+    n = pipeline.void_open_bets_at_reset(_GENESIS, _CLOSING_CYCLE, apply=True, table=fake)
+    assert n == len(open_bets) == len(fake.puts) == 4
+    for row in fake.puts:
+        assert row["pk"] == pipeline.CALIBRATION_PK  # CROSS_PHASE ledger — survives the wipe
+        assert row["sk"].startswith(f"CALIB#{_GENESIS}#void#")
+        assert row["outcome"] == "voided_at_reset"
+        assert row["voided_at_reset"] is True
+        assert row["cycle"] == _CLOSING_CYCLE  # stamped with the CLOSING cycle
+        assert row["record_type"] in ("hypothesis_void", "prediction_void")
+    # None of the terminal/tombstoned bets leaked a row.
+    voided_ids = {r.get("hypothesis_id") or r.get("prediction_id") for r in fake.puts}
+    assert voided_ids == {"hyp_a", "hyp_b", "p1", "p2"}
+
+
+def test_void_rows_are_cross_phase_and_not_brier_scorable():
+    # Ties the fix to the taxonomy + calibration coverage: the ledger row classifies
+    # CROSS_PHASE (never wiped) and 'voided_at_reset' is excluded from the Brier curve.
+    sys.path.insert(0, str(REPO_ROOT / "lambdas"))
+    import calibration_core
+    import phase_taxonomy
+
+    row = pipeline.build_void_calib_item(
+        "hypothesis",
+        {"sk": "HYPOTHESIS#a", "status": "pending", "hypothesis_id": "hyp_a", "confidence": "high"},
+        _GENESIS,
+        _CLOSING_CYCLE,
+        "2026-08-01T00:00:00Z",
+    )
+    assert phase_taxonomy.classify(row["pk"], row["sk"]) == phase_taxonomy.CROSS_PHASE
+    assert calibration_core.outcome_to_binary(row["outcome"]) is None
+    assert calibration_core.pairs_from_calibration_rows([row]) == []  # never distorts calibration
+
+
+def test_void_sk_is_idempotent_and_kind_namespaced():
+    # Re-running the reset (same genesis) overwrites the same row; a hypothesis and a
+    # prediction sharing an id can't collide (kind is in the sk).
+    hyp = {"sk": "HYPOTHESIS#x", "status": "pending", "hypothesis_id": "shared", "confidence": "low"}
+    pred = {"sk": "PREDICTION#x", "status": "pending", "prediction_id": "shared", "coach_id": "sleep_coach"}
+    a = pipeline.build_void_calib_item("hypothesis", hyp, _GENESIS, _CLOSING_CYCLE, "t1")
+    a2 = pipeline.build_void_calib_item("hypothesis", hyp, _GENESIS, _CLOSING_CYCLE, "t2")
+    p = pipeline.build_void_calib_item("prediction", pred, _GENESIS, _CLOSING_CYCLE, "t1")
+    assert a["sk"] == a2["sk"] == f"CALIB#{_GENESIS}#void#hyp#shared"
+    assert p["sk"] == f"CALIB#{_GENESIS}#void#pred#sleep_coach#shared"
+    assert a["sk"] != p["sk"]

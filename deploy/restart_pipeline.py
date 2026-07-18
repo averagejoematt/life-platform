@@ -103,6 +103,28 @@ SITE_API_DATA = REPO_ROOT / "lambdas" / "web" / "site_api_data.py"
 RESET_LOG = REPO_ROOT / "docs" / "restart" / "RESET_LOG.md"
 SSM_CYCLE_PARAM = "/life-platform/experiment-cycle"
 
+# ── #1199: void-open-bets-at-reset constants ──────────────────────────────────
+# The CROSS_PHASE calibration ledger (phase_taxonomy: "calibration" = cross_phase)
+# and the two open-bet partitions the reset would otherwise vanish ungraded.
+CALIBRATION_PK = f"USER#{USER}#SOURCE#calibration"
+HYPOTHESES_PK = f"USER#{USER}#SOURCE#hypotheses"
+# Coaches that can carry open PREDICTION# bets. Hardcoded (not imported from
+# coach_prediction_evaluator) to keep restart_pipeline free of the evaluator's
+# heavy lambda-bundle imports — same posture as bust_lambda_warm_cache's target list.
+VOID_COACH_IDS = (
+    "sleep_coach",
+    "nutrition_coach",
+    "training_coach",
+    "mind_coach",
+    "physical_coach",
+    "glucose_coach",
+    "labs_coach",
+    "explorer_coach",
+)
+# An OPEN (still-gradable) bet — matches the hypothesis engine's open set and the
+# evaluator's EVALUABLE_STATUSES. Anything else already resolved to a terminal outcome.
+_OPEN_BET_STATUSES = frozenset({"pending", "confirming"})
+
 RESET_LOG_SEED = """# RESET_LOG — the durable record of experiment resets (ADR-058/077)
 
 One line per reset, appended by `deploy/restart_pipeline.py --close-cycle` (the
@@ -298,6 +320,142 @@ def clear_predict_week_subject(apply: bool):
         s3.delete_object(Bucket="matthew-life-platform", Key="site/config/current_challenge.json")
     except Exception:
         pass  # already absent / transient — the fail-closed 'no subject' state is the goal
+
+
+def _to_ddb_decimal(obj):
+    """floats → Decimal for DynamoDB (boto3 rejects float). Leaves ints/Decimals as-is."""
+    from decimal import Decimal
+
+    if isinstance(obj, float):
+        return Decimal(str(obj))
+    if isinstance(obj, dict):
+        return {k: _to_ddb_decimal(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_ddb_decimal(v) for v in obj]
+    return obj
+
+
+def _query_all(table, pk: str, sk_prefix: str) -> list:
+    """Paginate a begins_with(sk) query into a flat list. String KeyConditionExpression
+    (like restart_intelligence_wipe / coach_prediction_evaluator) so the read is trivial
+    to fake in a unit test."""
+    items: list = []
+    kwargs = {
+        "KeyConditionExpression": "pk = :pk AND begins_with(sk, :skp)",
+        "ExpressionAttributeValues": {":pk": pk, ":skp": sk_prefix},
+    }
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            break
+        kwargs["ExclusiveStartKey"] = lek
+    return items
+
+
+def _is_open_untombstoned(item: dict) -> bool:
+    """An OPEN bet the wipe has not already archived.
+
+    Skipping already-tombstoned rows is what keeps voiding idempotent AND
+    cycle-correct: a PRIOR cycle's open-but-never-graded bet (tombstoned by the reset
+    that closed it) is not re-voided under THIS closing cycle — it already carries (or
+    got) its own void row. Only a live, phase=experiment open bet belongs to the
+    closing cycle, and that's exactly the set the tagger/wipe is about to hide."""
+    if item.get("tombstone"):
+        return False
+    return str(item.get("status", "")).strip().lower() in _OPEN_BET_STATUSES
+
+
+def collect_open_bets(table) -> list:
+    """Every still-open, not-yet-archived pre-registered bet: hypotheses
+    (USER#…#SOURCE#hypotheses / HYPOTHESIS#) + coach predictions (COACH#<id> /
+    PREDICTION#). Raw reads (NO phase filter) so we see the closing cycle's live bets
+    before the tagger/wipe hides them. Returns [(kind, item), …] where kind is
+    'hypothesis' | 'prediction'."""
+    bets: list = []
+    for h in _query_all(table, HYPOTHESES_PK, "HYPOTHESIS#"):
+        if _is_open_untombstoned(h):
+            bets.append(("hypothesis", h))
+    for coach_id in VOID_COACH_IDS:
+        for p in _query_all(table, f"COACH#{coach_id}", "PREDICTION#"):
+            if _is_open_untombstoned(p):
+                bets.append(("prediction", p))
+    return bets
+
+
+def build_void_calib_item(kind: str, bet: dict, genesis: str, closing_cycle, now_iso: str) -> dict:
+    """One CROSS_PHASE calibration-ledger row recording that an open pre-registered bet
+    was VOIDED (never graded) by the reset.
+
+    outcome='voided_at_reset' is deliberately NOT Brier-scorable
+    (calibration_core.outcome_to_binary → None), so it never distorts the calibration
+    curve — it keeps the accountability record without pretending the bet resolved. The
+    sk is keyed on the reset genesis (idempotent: a re-run overwrites the same row) and
+    namespaced by kind so a hypothesis and a prediction sharing an id can't collide."""
+    common = {
+        "outcome": "voided_at_reset",
+        "status_at_reset": bet.get("status"),
+        "voided_at_reset": True,
+        "voided_at": now_iso,
+        "reset_genesis": genesis,
+        "cycle": closing_cycle,
+    }
+    if kind == "hypothesis":
+        bet_id = bet.get("hypothesis_id") or bet.get("sk", "").replace("HYPOTHESIS#", "")
+        item = {
+            "pk": CALIBRATION_PK,
+            "sk": f"CALIB#{genesis}#void#hyp#{bet_id}",
+            "record_type": "hypothesis_void",
+            "hypothesis_id": bet_id,
+            "hypothesis": bet.get("hypothesis", ""),
+            "stated_confidence": bet.get("confidence", "low"),
+            "predicted_direction": (bet.get("test_spec") or {}).get("direction"),
+            "pre_registered_at": bet.get("pre_registered_at") or bet.get("created_at", ""),
+            **common,
+        }
+    else:  # prediction
+        coach_id = bet.get("coach_id") or ""
+        bet_id = bet.get("prediction_id") or bet.get("sk", "").replace("PREDICTION#", "")
+        item = {
+            "pk": CALIBRATION_PK,
+            "sk": f"CALIB#{genesis}#void#pred#{coach_id}#{bet_id}",
+            "record_type": "prediction_void",
+            "prediction_id": bet_id,
+            "coach_id": coach_id,
+            "claim": bet.get("claim_natural") or bet.get("claim") or "",
+            "stated_confidence": bet.get("confidence"),
+            "subdomain": bet.get("subdomain"),
+            "pre_registered_at": bet.get("created_date", ""),
+            **common,
+        }
+    return {k: v for k, v in item.items() if v is not None}
+
+
+def void_open_bets_at_reset(target_date: str, closing_cycle, apply: bool, table=None) -> int:
+    """#1199: BEFORE the tagger/wipe (the first sub-scripts) hide the closing cycle's
+    derived intelligence, stamp one 'voided_at_reset' row per OPEN pre-registered bet
+    (hypotheses + coach predictions) into the CROSS_PHASE calibration ledger.
+
+    ADR-077 justifies tombstoning hypotheses/predictions by promising 'graded outcomes
+    live in the CROSS_PHASE calibration ledger' — but the wipe only adds a tombstone, it
+    never changes status, so an open bet goes phase-hidden while still 'pending' and the
+    weekly engine (which reads with_phase_filter, ADR-058) can NEVER re-see it to grade
+    it. Every reset therefore silently dropped accountability for every open bet
+    (violating ADR-105 rule 2: no prediction surface may be write-only). This closes it.
+
+    Idempotent (sk keyed on genesis; already-tombstoned bets skipped). Returns the count
+    of void rows — planned in dry-run, written under --apply. Reads are raw/no-phase-
+    filter and read-only; the WRITE is --apply-gated like every other pipeline step."""
+    if table is None:
+        table = boto3.resource("dynamodb", region_name=REGION).Table(TABLE)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    bets = collect_open_bets(table)
+    if apply:
+        for kind, bet in bets:
+            item = build_void_calib_item(kind, bet, target_date, closing_cycle, now_iso)
+            table.put_item(Item=_to_ddb_decimal(item))
+    return len(bets)
 
 
 def bust_lambda_warm_cache(apply: bool):
@@ -539,6 +697,18 @@ def main():
     # fresh weekly subject is seeded.
     clear_predict_week_subject(args.apply)
     print(f"    ({'cleared' if args.apply else 'would clear'} site/config/current_challenge.json — predict-the-week fail-closed)")
+
+    # Step 2e (#1199): void the CLOSING cycle's OPEN pre-registered bets to the
+    # CROSS_PHASE calibration ledger BEFORE the tagger/wipe (first sub-scripts) hide
+    # them. The wipe tombstones hypotheses + coach PREDICTION#s but never changes their
+    # status, so an open bet goes phase-hidden while still 'pending' and the weekly
+    # engine (with_phase_filter) can never re-see it to grade it — every reset silently
+    # dropped accountability for every open bet. One durable, cycle-stamped
+    # 'voided_at_reset' row per open bet keeps the record honest (ADR-105 rule 2).
+    voided = void_open_bets_at_reset(target, closing_cycle, args.apply)
+    print(
+        f"    ({'voided' if args.apply else 'would void'} {voided} open pre-registered bet(s) → calibration ledger, cycle={closing_cycle})"
+    )
 
     # Step 2b (--close-cycle, default ON): register the new cycle's genesis in
     # CYCLE_GENESES (drives /api/cycle_compare + /api/timeline). Must happen
