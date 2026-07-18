@@ -144,16 +144,26 @@ export function renderScenarios(d) {
 // The Wrong Page — the AI's misses, uncurated.
 export function renderWrong(d) {
   const v = d.validator || {}, pr = d.predictions || {};
+  // #1369: the header count DERIVES from the parts the page can account for —
+  // detailed catches (the rows below) + count-only catches from older records
+  // (explicitly annotated under the table). "4 caught" over 2 unexplained rows
+  // was a live self-contradiction on the one page whose job is honesty.
+  const detailed = v.caught_detailed ?? (v.recent || []).length;
+  const undetailed = v.caught_undetailed || 0;
+  const caughtTotal = v.caught_detailed != null ? detailed + undetailed : v.caught;
   const head = figs([
     fig(fmt(v.claims_checked), "claims audited"),
-    fig(fmt(v.caught), "caught wrong"),
+    fig(fmt(caughtTotal), "caught wrong"),
     fig(fmt((pr.refuted_recent || []).length), "predictions refuted"),
   ]);
   const cr = (v.recent || []).map((c) =>
     `<tr class="${c.severity === "error" ? "rd-flag" : ""}"><td class="rd-name">${esc(String(c.date || "").slice(0, 10))}</td><td>${esc(c.coach || "")}</td><td>${esc(c.what)}</td></tr>`).join("");
+  const undetailedNote = undetailed
+    ? `<p class="rd-archive">+ ${fmt(undetailed)} earlier ${undetailed === 1 ? "catch was" : "catches were"} logged count-only (before per-catch detail was recorded) — included in the total above.</p>`
+    : "";
   const caught = cr
-    ? sec("Caught by the validator — claims the data contradicted", `<table class="rd-tbl"><thead><tr><th>date</th><th>coach</th><th>what was wrong</th></tr></thead><tbody>${cr}</tbody></table>`)
-    : sec("Caught by the validator", `<p class="rd-archive">No catches in the window — every audited claim matched the data it cited.</p>`);
+    ? sec("Caught by the validator — claims the data contradicted", `<table class="rd-tbl"><thead><tr><th>date</th><th>coach</th><th>what was wrong</th></tr></thead><tbody>${cr}</tbody></table>${undetailedNote}`)
+    : sec("Caught by the validator", undetailed ? undetailedNote : `<p class="rd-archive">No catches in the window — every audited claim matched the data it cited.</p>`);
   const lr = (pr.by_coach || []).map((c) =>
     `<tr><td class="rd-name">${esc(c.coach)}</td><td class="num">${fmt(c.confirmed)}</td><td class="num">${fmt(c.refuted)}</td><td class="num">${fmt(c.inconclusive)}</td><td class="num">${fmt(c.expired)}</td></tr>`).join("");
   const ledger = lr

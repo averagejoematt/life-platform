@@ -32,6 +32,7 @@ import weight_trend  # shared weekly-rate + projection (layer module)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058 — used by handle_timeline
 
+from web import vitals_resolver  # #1369: the ONE current-vitals truth
 from web.site_api_common import (
     CORS_HEADERS,
     EXPERIMENT_BASELINE_WEIGHT_LBS,
@@ -96,9 +97,25 @@ def handle_vitals(date: str | None = None) -> dict:
     whoop_7d = _query_source("whoop", d7, today, include_pilot=ip)
     whoop_30d = _query_source("whoop", d30, today, include_pilot=ip)
 
-    # Latest reading
-    latest = sorted([w for w in whoop_7d if w.get("recovery_score") is not None], key=lambda x: x.get("sk", ""), reverse=True)
-    latest = latest[0] if latest else {}
+    # Latest reading — LIVE reads come from the ONE canonical resolver (#1369),
+    # so /api/vitals, /api/snapshot, /api/pulse and the public_stats writers can
+    # never disagree about the same morning's numbers. Time-travel (?date=) keeps
+    # the as-of-anchor window semantics, with the same honest-null shape.
+    if date:
+        _lt = sorted([w for w in whoop_7d if w.get("recovery_score") is not None], key=lambda x: x.get("sk", ""), reverse=True)
+        _lt = _lt[0] if _lt else {}
+        _lt_sk = _lt.get("sk", "").replace("DATE#", "")[:10] or None
+        _vr = {
+            "recovery_pct": float(_lt["recovery_score"]) if _lt.get("recovery_score") else None,
+            "hrv_ms": float(_lt["hrv"]) if _lt.get("hrv") else None,
+            "rhr_bpm": float(_lt["resting_heart_rate"]) if _lt.get("resting_heart_rate") else None,
+            "sleep_hours": float(_lt["sleep_duration_hours"]) if _lt.get("sleep_duration_hours") else None,
+            "recovery_as_of": _lt_sk,
+            "sleep_as_of": _lt_sk,
+        }
+        _vr["recovery_status"] = vitals_resolver.recovery_status(_vr["recovery_pct"])
+    else:
+        _vr = vitals_resolver.resolve_vitals(table, USER_PREFIX)
 
     # 30d averages + trends. Order by date (oldest→newest) explicitly so the
     # half-vs-half trend is chronological by construction, not dependent on query
@@ -142,12 +159,9 @@ def handle_vitals(date: str | None = None) -> dict:
     weight_vals = [float(w["weight_lbs"]) for w in withings_30d if w.get("weight_lbs")]
     weight_delta_30d = round(weight_vals[-1] - weight_vals[0], 1) if len(weight_vals) >= 2 else None
 
-    recovery_pct = float(latest.get("recovery_score", 0))
-    recovery_status = "green" if recovery_pct >= 67 else ("yellow" if recovery_pct >= 34 else "red")
-
     # DPR-1.20: Page freshness for nav badges
     _today_iso = datetime.now(timezone.utc).isoformat()
-    _as_of = latest.get("sk", "").replace("DATE#", "") if latest else today
+    _as_of = _vr.get("recovery_as_of") or _vr.get("sleep_as_of") or today
     # Temporal frame: sleep/recovery/HRV/RHR are wake-date-keyed (stored under the
     # morning they set up). The reading came from the night BEFORE that morning, so
     # night_of = as_of - 1 day. Surfacing this lets the front-end say "the night of
@@ -187,18 +201,20 @@ def handle_vitals(date: str | None = None) -> dict:
                 "weight_lbs": round(current_weight) if current_weight is not None else None,
                 "weight_as_of": weight_as_of,
                 "weight_delta_30d": weight_delta_30d,
-                "hrv_ms": round(float(latest.get("hrv", 0)), 1) if latest.get("hrv") else None,
+                "hrv_ms": round(_vr["hrv_ms"], 1) if _vr["hrv_ms"] is not None else None,
                 # #1084 / ADR-105: the claim carries its n — below _MIN_AVG_N the
                 # "30d avg" is None (a 1-2 reading mean isn't an average), and
                 # hrv_30d_n says how much data backs the number when it shows.
                 "hrv_30d_avg": round(sum(hrv_vals) / len(hrv_vals), 1) if len(hrv_vals) >= _MIN_AVG_N else None,
                 "hrv_30d_n": len(hrv_vals),
                 "hrv_trend": trend(hrv_vals),
-                "rhr_bpm": round(float(latest.get("resting_heart_rate", 0)), 0) if latest.get("resting_heart_rate") else None,
+                "rhr_bpm": round(_vr["rhr_bpm"], 0) if _vr["rhr_bpm"] is not None else None,
                 "rhr_trend": trend(list(reversed(rhr_vals))),  # lower is better
-                "recovery_pct": round(recovery_pct, 0),
-                "recovery_status": recovery_status,
-                "sleep_hours": round(float(latest.get("sleep_duration_hours", 0)), 1) if latest.get("sleep_duration_hours") else None,
+                # #1369 honest absence: no reading ⇒ null % AND null status —
+                # never the old 0.0/"red" fabrication on an empty window.
+                "recovery_pct": round(_vr["recovery_pct"], 0) if _vr["recovery_pct"] is not None else None,
+                "recovery_status": _vr["recovery_status"],
+                "sleep_hours": round(_vr["sleep_hours"], 1) if _vr["sleep_hours"] is not None else None,
                 "as_of_date": _as_of,
                 # Temporal frame (additive): recovery/sleep/hrv/rhr are about last
                 # night and set up the as_of_date morning; weight (weight_as_of) is

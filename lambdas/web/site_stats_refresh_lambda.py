@@ -20,6 +20,8 @@ from datetime import date, datetime, timedelta, timezone
 import boto3
 from constants import EXPERIMENT_START_DATE  # ADR-058
 
+from web.vitals_resolver import resolve_vitals  # #1369: the ONE current-vitals truth
+
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 TABLE_NAME = os.environ.get("TABLE_NAME", "life-platform")
 S3_BUCKET = os.environ.get("S3_BUCKET", "matthew-life-platform")
@@ -47,18 +49,6 @@ def _safe_float(d, key):
         return f if f != 0.0 else None
     except Exception:
         return None
-
-
-def _recovery_status(recovery):
-    """Status color for a recovery %, or None when there's no reading.
-
-    Never returns a color without a number behind it — that was the honesty bug
-    (recovery_pct: null paired with recovery_status: "red", which read as "recovery
-    is bad" when it was actually just missing). Callers must pair this with a null %.
-    """
-    if recovery is None:
-        return None
-    return "green" if recovery >= 67 else "yellow" if recovery >= 34 else "red"
 
 
 def _get_latest(table, source, days_back=2):
@@ -90,42 +80,6 @@ def _get_latest(table, source, days_back=2):
         return {}
 
 
-def _get_latest_finalized(table, source, field, days_back=3):
-    """Most recent record for `source` whose `field` is actually populated, or {}.
-
-    Whoop's recovery_score isn't scored until the night's sleep syncs, so the newest
-    record can carry a null recovery_score. Selecting the latest FINALIZED reading
-    (today-if-scored else the most recent scored day) is the Phase-3 today-else-yesterday
-    parity — it's what keeps recovery_pct from going null beside a stale status color.
-    """
-    today = date.today().isoformat()
-    start = (date.today() - timedelta(days=days_back)).isoformat()
-    try:
-        from phase_filter import with_phase_filter
-
-        resp = table.query(
-            **with_phase_filter(
-                {
-                    "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
-                    "ExpressionAttributeValues": {
-                        ":pk": f"USER#{USER_ID}#SOURCE#{source}",
-                        ":s": f"DATE#{start}",
-                        ":e": f"DATE#{today}",
-                    },
-                    "ScanIndexForward": False,
-                    "Limit": days_back + 2,
-                }
-            )
-        )
-        for item in resp.get("Items", []):
-            if _safe_float(item, field) is not None:
-                return dict(item)
-        return {}
-    except Exception as e:
-        print(f"[WARN] DynamoDB read failed ({source}.{field}): {e}")
-        return {}
-
-
 def lambda_handler(event, context):
     print("[INFO] site-stats-refresh starting...")
 
@@ -143,7 +97,6 @@ def lambda_handler(event, context):
 
     # ── 2. Read fresh records from DynamoDB ───────────────────────────────────
     table = _dynamo.Table(TABLE_NAME)
-    whoop = _get_latest(table, "whoop")
     withings = _get_latest(table, "withings")
     habitify = _get_latest(table, "habitify")
     apple_health = _get_latest(table, "apple_health")
@@ -159,15 +112,15 @@ def lambda_handler(event, context):
     ev = existing.get("vitals", {})
 
     # ── 4. Build fresh vitals ────────────────────────────────────────────────
-    # Recovery/HRV/RHR are read from the latest FINALIZED-recovery record so the
-    # three move together from one morning's Whoop reading — and so recovery_pct is
-    # never null while the status still shows a stale color (the honesty bug). Sleep
-    # finalizes separately, so it stays on the newest record.
-    whoop_rec = _get_latest_finalized(table, "whoop", "recovery_score") or whoop
-    recovery = _safe_float(whoop_rec, "recovery_score")
-    hrv = _safe_float(whoop_rec, "hrv")
-    rhr = _safe_float(whoop_rec, "resting_heart_rate")
-    sleep = _safe_float(whoop, "sleep_duration_hours")
+    # #1369 Truth Spine: recovery/HRV/RHR/sleep come from the ONE canonical
+    # resolver (web/vitals_resolver.py) — the same module /api/pulse and
+    # /api/vitals read — so public_stats.json can't disagree with the live site.
+    # (Finalized-recovery selection + separate sleep finalization live there now.)
+    _vr = resolve_vitals(table, f"USER#{USER_ID}#SOURCE#")
+    recovery = _vr["recovery_pct"]
+    hrv = _vr["hrv_ms"]
+    rhr = _vr["rhr_bpm"]
+    sleep = _vr["sleep_hours"]
     weight = _safe_float(withings, "weight_lbs")
 
     weight_as_of = withings.get("sk", "").replace("DATE#", "") or None
@@ -184,7 +137,7 @@ def lambda_handler(event, context):
     # Status MUST track the %: never a color without a number behind it (the
     # "recovery_pct: null + recovery_status: red" honesty bug). Both null together
     # when there's no finalized reading; the front-end already omits a null-% row.
-    rec_status = _recovery_status(recovery)
+    rec_status = _vr["recovery_status"]
 
     fresh_vitals = {
         "weight_lbs": round(weight) if weight else None,
