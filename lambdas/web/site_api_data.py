@@ -255,6 +255,18 @@ def _latest_date_str(source: str) -> str | None:
 
     Uses begins_with('DATE#') so non-DATE sort keys (e.g. measurements' YEAR# rollup)
     don't shadow the real latest day. Projects sk only — cheap.
+
+    #1203: include_pilot=True — freshness is pipe/behavior LIVENESS, a "dark N days"
+    signal about real recency regardless of experiment phase. Every source on this
+    board is RAW_TIMESERIES (cross_phase, phase_taxonomy.py — "phase tags are
+    harmless/optional"), so a source whose newest DATE# predates the current cycle
+    (e.g. after a reset tags all pre-genesis records phase=pilot) must still report
+    its true last-update date and days-dark, not render last_update:null exactly when
+    the lapse is longest. This matches the operator checker (freshness_checker_lambda.py,
+    which queries these partitions with NO phase filter) and the deliberate
+    include_pilot=True device-agreement read below. Note the phase filter is a
+    FilterExpression applied AFTER Limit, so without this the newest DATE# is fetched,
+    filtered out as phase!=current, and the query returns empty — the exact blindfold.
     """
     kwargs = with_phase_filter(
         {
@@ -262,7 +274,8 @@ def _latest_date_str(source: str) -> str | None:
             "ScanIndexForward": False,
             "Limit": 1,
             "ProjectionExpression": "sk",
-        }
+        },
+        include_pilot=True,
     )
     items = table.query(**kwargs).get("Items", [])
     if not items:
@@ -589,7 +602,12 @@ def handle_last_sync() -> dict:
                     "ScanIndexForward": False,
                     "Limit": 3,  # today's record + possible sub-records; max() picks the true latest write
                     "ProjectionExpression": "sk, ingested_at, webhook_ingested_at",
-                }
+                },
+                # #1203: same cross-phase liveness basis as _latest_date_str — the pulse
+                # must report a source's true last write even when its newest DATE#
+                # predates the current cycle (post-reset phase=pilot records), or the
+                # sync line masks a genuinely dark pipe with last_seen:null.
+                include_pilot=True,
             )
             for it in table.query(**kwargs).get("Items", []):
                 ts = str(it.get("webhook_ingested_at") or it.get("ingested_at") or "")
