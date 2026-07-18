@@ -85,6 +85,7 @@ check_status "Story · journal"      "$BASE/story/journal/"
 check_status "Coaching · lab-notes" "$BASE/coaching/lab-notes/"
 check_status "Coaching · by-coach"  "$BASE/coaching/by-coach/"
 check_status "Story · timeline"     "$BASE/story/timeline/"
+check_status "Story · attempts"     "$BASE/story/attempts/"
 check_status "Story · about"        "$BASE/story/about/"
 # Evidence topics (sample across groups)
 check_status "Evidence · vitals"    "$BASE/data/vitals/"

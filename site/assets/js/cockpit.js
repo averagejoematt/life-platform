@@ -1560,3 +1560,35 @@ async function loadSync() {
 loadSync();
 setInterval(renderSyncLine, 30_000); // the "ago" ticks
 setInterval(loadSync, 300_000);      // the data re-checks
+
+/* ── #1375: the attempt masthead — day-1 emptiness is stakes, not failure ────
+   "Attempt #8 — previous best: 29 days" over the hero, derived LIVE from
+   /api/survival (+ /api/cycle_compare pre-start for the staged attempt number).
+   Same aliveDays semantics as /story/attempts/: a collapsed attempt lived
+   collapse_day − 1 days; a censored/live one has its window. Self-hides when
+   the record is empty or unreachable — never an authored number. */
+async function loadAttemptLine() {
+  const el = bind("attempt");
+  if (!el) return;
+  try {
+    const sv = await getJSON(`${API}/survival`);
+    const cycles = (sv && sv.cycles) || [];
+    if (!cycles.length) return;
+    const aliveDays = (c) => (c.collapse_day ? Math.max(0, c.collapse_day - 1) : c.window_days || 0);
+    const closed = cycles.filter((c) => !c.is_current);
+    const live = cycles.find((c) => c.is_current) || null;
+    let attemptNo = live ? live.cycle : Math.max(...cycles.map((c) => c.cycle));
+    if (!live) {
+      // Pre-start: the staged attempt number comes from the cycle registry.
+      try {
+        const cc = await getJSON(`${API}/cycle_compare`);
+        if (cc && cc.current_cycle) attemptNo = cc.current_cycle;
+      } catch (e) { /* the last recorded attempt is still honest */ }
+    }
+    const best = closed.length ? Math.max(...closed.map(aliveDays)) : null;
+    const bestTxt = best != null ? ` — previous best: ${best} day${best === 1 ? "" : "s"}` : "";
+    el.innerHTML = `<a class="ph-attempt-link" href="/story/attempts/">Attempt #${attemptNo}${escapeHTML(bestTxt)}</a>`;
+    el.hidden = false;
+  } catch (e) { /* self-hide */ }
+}
+loadAttemptLine();

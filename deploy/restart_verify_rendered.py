@@ -40,6 +40,7 @@ PAGES = [
     "/story/chronicle/",
     "/story/journal/",
     "/story/about/",
+    "/story/attempts/",
     "/story/agents/",
     "/data/",
     # /data/ Evidence topics (tests/visual_qa.py EVIDENCE_TOPICS)

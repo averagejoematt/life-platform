@@ -707,3 +707,9 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 /* The dot's shape/glow-when-fresh is the shared .fr-dot primitive (tokens.css §12c,
    #589) — the glow is EARNED: it lights only while this source's real last-write is
    inside ITS OWN registry-derived window (data-fresh-ts/-window on the span). */
+
+/* #1375: the attempt masthead — quiet mono line over the hero; ember only on
+   the live attempt's framing (it's the one thing still earning). */
+.ph-attempt { margin-top: var(--sp-1); }
+.ph-attempt .ph-attempt-link { color: var(--ember); text-decoration: none; }
+.ph-attempt .ph-attempt-link:hover { text-decoration: underline; }

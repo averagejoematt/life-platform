@@ -103,6 +103,7 @@ def site_footer(with_asof: bool = False) -> str:
         '<div class="sf-col"><p class="sf-h label">The Story</p>'
         '<a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a>'
         '<a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a>'
+        '<a href="/story/attempts/">The attempts</a>'
         '<a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div>'
         '<div class="sf-col"><p class="sf-h label">The Data</p>'
         '<a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a>'
