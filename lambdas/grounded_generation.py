@@ -28,6 +28,7 @@ flat copy of grounding_guard) so every consumer (ai_calls' V2 coach render)
 can use it.
 """
 
+import datetime as _dt
 import json
 import re
 
@@ -94,6 +95,99 @@ def fabricated_numbers(text: str, allowed: set) -> list:
             continue
         out.append(x)
     return out
+
+
+# ── weekday↔date grounding (#1220) ──────────────────────────────────────────
+# A weekday paired with a calendar date is a mechanically checkable fact — the
+# ADR-104 number gate never looked at it, so the cycle-6 chronicle draft called
+# 2026-07-13 (a Monday) a "Sunday" (stale cycle-5 genesis, which WAS a Sunday)
+# and the gate passed it. This deterministic, zero-AI check regexes weekday+date
+# pairs out of the narrative and verifies each against the real calendar.
+_WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+_WEEKDAY_RE = re.compile(r"\b(" + "|".join(_WEEKDAYS) + r")\b", re.IGNORECASE)
+_MONTHS = {
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
+}
+_MONTH_DAY_RE = re.compile(r"\b(" + "|".join(_MONTHS) + r")\s+(\d{1,2})(?:st|nd|rd|th)?\b", re.IGNORECASE)
+_THE_NTH_RE = re.compile(r"\bthe\s+(\d{1,2})(?:st|nd|rd|th)\b", re.IGNORECASE)
+
+
+def _safe_date(year, month, day):
+    """A real date or None (guards Feb-30, day 0, non-leap Feb-29, bad types)."""
+    try:
+        return _dt.date(int(year), int(month), int(day))
+    except (ValueError, TypeError):
+        return None
+
+
+def weekday_date_findings(text: str, year: int, month_hint: int = None, proximity: int = 60) -> list:
+    """Deterministic weekday↔date check. Returns [{type: "weekday_mismatch", ...}] — empty = consistent.
+
+    Every weekday word (Monday…Sunday) is paired with the nearest calendar date
+    within `proximity` characters — a full "Month Day" ("July 13th") always, and a
+    bare "the Nth" ("the 14th") when `month_hint` is supplied. The pair is verified
+    against `datetime`; a mismatch (e.g. "Sunday … July 13th" when 2026-07-13 was a
+    Monday) is a finding. No date near a weekday ⇒ nothing to check (no finding).
+    """
+    text = text or ""
+    if year is None:
+        return []
+    # (start, end, date_obj, matched_text) for every resolvable date token.
+    tokens = []
+    for m in _MONTH_DAY_RE.finditer(text):
+        d = _safe_date(year, _MONTHS[m.group(1).lower()], m.group(2))
+        if d:
+            tokens.append((m.start(), m.end(), d, m.group(0)))
+    if month_hint:
+        for m in _THE_NTH_RE.finditer(text):
+            d = _safe_date(year, month_hint, m.group(1))
+            if d:
+                tokens.append((m.start(), m.end(), d, m.group(0)))
+    findings = []
+    seen = set()
+    for wm in _WEEKDAY_RE.finditer(text):
+        stated = wm.group(1).capitalize()
+        w_start, w_end = wm.start(), wm.end()
+        best, best_dist = None, None
+        for ds, de, dobj, dstr in tokens:
+            if ds >= w_end:
+                dist = ds - w_end
+            elif de <= w_start:
+                dist = w_start - de
+            else:
+                dist = 0
+            if dist <= proximity and (best_dist is None or dist < best_dist):
+                best, best_dist = (dobj, dstr, ds), dist
+        if best is None:
+            continue
+        dobj, dstr, ds = best
+        actual = dobj.strftime("%A")
+        if actual.lower() != stated.lower():
+            key = (w_start, ds)
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append(
+                {
+                    "type": "weekday_mismatch",
+                    "stated_weekday": stated,
+                    "date": dobj.isoformat(),
+                    "actual_weekday": actual,
+                    "detail": (f'the narrative pairs "{stated}" with {dstr} ({dobj.isoformat()}), ' f"but that date was a {actual}"),
+                }
+            )
+    return findings
 
 
 def authoritative_facts_block(facts: dict) -> str:
@@ -193,6 +287,8 @@ def correction_prompt(findings: list) -> str:
     for i, f in enumerate(findings, 1):
         if f.get("type") == "contradiction" and f.get("canonical") is not None:
             lines.append(f"{i}. {f['detail']}. Use {f['canonical']:g}, or omit the metric — never invent one.")
+        elif f.get("type") == "weekday_mismatch":
+            lines.append(f"{i}. {f['detail']}. Use {f['actual_weekday']} for that date, or drop the day-of-week — never guess a weekday.")
         else:
             lines.append(f"{i}. {f['detail']}. Remove it or describe the pattern qualitatively — never invent a figure.")
     lines.append("\nRewrite with these corrected. Keep your voice and length; do not mention that a correction was made.")
