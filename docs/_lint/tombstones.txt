@@ -29,3 +29,11 @@ hevy-webhook FunctionURL is (live|active|standing)	removed 2026-07-06 (#756)
 test_layer_version_consistency	test retired with the layer (#781) — the invariant is test_i2_shared_layer_retired
 since #393.*CI deploys the site	the #393 approval-gated ci-cd.yml site path is retired (#750, 2026-07-09) — site pushes deploy via .github/workflows/site-deploy.yml with NO production-approval gate; see CONVENTIONS §2
 LifePlatformOperational.*site-api	site-api/site-api-ai moved Operational → LifePlatformServe (cdk/stacks/serve_stack.py, #793 cdk refactor 2026-07-08); see .claude/commands/deploy.md Mode 3 site-api special case
+# #1322: the manual MCP zip recipe (ADR-031 era) is retired — it staged NO lambdas/ tree,
+# so a zip built from it boot-breaks life-platform-mcp ("No module named 'reading'").
+# Since #781, deploy_lambda.sh life-platform-mcp mcp_server.py builds the mcp-shaped
+# FULL bundle (build_bundle.py --mcp). These rules keep the dead recipe from returning.
+zip -j.*mcp_server	manual MCP zip retired (#781) — it ships no lambdas/ tree and boot-breaks the function; use deploy_lambda.sh life-platform-mcp mcp_server.py (mcp-shaped full bundle)
+hard-rejects.*life-platform-mcp	stale ADR-031 claim — deploy_lambda.sh no longer rejects MCP (#781); it builds the mcp-shaped full bundle via build_bundle.py --mcp
+NEVER use deploy_lambda\.sh for MCP	inverted since #781 — deploy_lambda.sh IS the sanctioned MCP path (mcp-shaped full bundle); the manual zip is what boot-breaks
+deploy_lambda\.sh.{0,3}will refuse	stale ADR-031 claim — deploy_lambda.sh accepts life-platform-mcp since #781 (mcp-shaped full bundle)

@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +42,80 @@ def test_no_live_tombstone_references():
 def test_wiki_index_coverage_and_headers():
     r = _run("scripts/check_doc_index.py")
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_mcp_manual_zip_tombstones_fire_on_the_prefix_recipe():
+    """#1322 non-vacuity (per the #1189 vacuous-scan lesson): the rules added for the
+    retired manual MCP zip must FIRE on the exact pre-fix deploy/README.md and
+    OPERATIONAL_RUNBOOK.md lines (the recipe staged no lambdas/ tree — a zip built from
+    it boot-breaks life-platform-mcp with "No module named 'reading'"), must NOT be
+    swallowed by the retirement-line exemption, and must stay quiet on the replacement
+    guidance."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    rules = ts._rules()
+    prefix_lines = [
+        # deploy/README.md:99 (pre-fix)
+        "# ⚠️  NEVER use deploy_lambda.sh for MCP — it strips the mcp/ directory (ADR-031)",
+        # deploy/README.md:113 (pre-fix)
+        "zip -j $ZIP mcp_server.py mcp_bridge.py",
+        # deploy/README.md:108 (pre-fix)
+        "**`deploy_lambda.sh` hard-rejects `life-platform-mcp`.** The MCP Lambda is a multi-module package",
+        # deploy/OPERATIONAL_RUNBOOK.md:123 (pre-fix)
+        "For the MCP Lambda (`life-platform-mcp`), `deploy_lambda.sh` will refuse — it requires the full `mcp/` package.",
+    ]
+    for line in prefix_lines:
+        assert not ts.RETIREMENT_LINE_RE.search(line), f"pre-fix line would be exempted, gate is vacuous: {line}"
+        assert any(rx.search(line) for rx, _ in rules), f"no tombstone rule fires on the retired recipe line: {line}"
+    # the replacement guidance (the live MCP path) must not trip any live rule.
+    good = "MCP Lambda → `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` builds the mcp-shaped full bundle (--mcp)"
+    assert not ts.RETIREMENT_LINE_RE.search(good)
+    hits = [rx.pattern for rx, _ in rules if rx.search(good)]
+    assert not hits, f"replacement guidance trips tombstone rule(s): {hits}"
+
+
+def test_deploy_docs_scanned_for_tombstones():
+    """#1322: the tombstone scanner's live surface includes every top-level deploy/*.md
+    (not just README), so the retired recipe can't silently return via the runbook."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    scanned = {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=False)}
+    assert "deploy/README.md" in scanned
+    assert "deploy/OPERATIONAL_RUNBOOK.md" in scanned
+    # dated/deprecated records stay exempt (history may mention history)…
+    assert "deploy/MANIFEST.md" not in scanned
+    assert "deploy/V2_ROLLBACK.md" not in scanned
+    # …but are still reachable with --all.
+    assert "deploy/MANIFEST.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
+
+
+def test_deploy_docs_freshness_ceiling_is_not_vacuous():
+    """#1322: check_deploy_docs must FLAG a headerless deploy doc (the exact pre-fix
+    deploy/README.md shape) and a canonical doc unverified past the hard ceiling (the
+    '14 months stale' class), PASS a freshly verified page, and leave non-canonical
+    (superseded/archive) pages freshness-exempt."""
+    idx = _load("scripts/check_doc_index.py")
+    d = Path(tempfile.mkdtemp())
+    # the pre-fix README shape: a "Last updated" line but no status header.
+    (d / "README.md").write_text("# Deploy Scripts\n\n> Last updated: 2026-05-24 (v8.1.0)\n", encoding="utf-8")
+    # the 14-months-unverified class the issue names.
+    (d / "OLD.md").write_text("> **Status:** canonical · **Verified:** 2025-05-18\n\nold\n", encoding="utf-8")
+    (d / "FRESH.md").write_text("> **Status:** canonical · **Verified:** 2026-07-18\n\nfresh\n", encoding="utf-8")
+    (d / "MANIFEST.md").write_text("> **Status:** superseded · dead\n\ndead\n", encoding="utf-8")
+    (d / "NOVERIFY.md").write_text("> **Status:** canonical\n\nno date\n", encoding="utf-8")
+    problems, stale = idx.check_deploy_docs(deploy_dir=d, today=date(2026, 7, 18))
+    joined = "\n".join(problems)
+    assert any("README.md" in p and "missing status header" in p for p in problems), joined
+    assert any("OLD.md" in p and "unverified" in p for p in problems), joined
+    assert any("NOVERIFY.md" in p and "Verified" in p for p in problems), joined
+    assert not any("FRESH.md" in p or "MANIFEST.md" in p for p in problems), joined
+    # OLD.md also lands on the advisory stale report.
+    assert any(rel == "deploy/OLD.md" for _, rel, _ in stale), stale
+
+
+def test_live_deploy_docs_pass_the_deploy_gate():
+    """After the #1322 fix, the real deploy/*.md surface is header-stamped and fresh."""
+    idx = _load("scripts/check_doc_index.py")
+    problems, _ = idx.check_deploy_docs()
+    assert problems == [], "\n".join(problems)
 
 
 def test_adr_index_current():

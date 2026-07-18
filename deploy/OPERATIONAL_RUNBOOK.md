@@ -1,5 +1,7 @@
 # Operational Runbook — `deploy/`
 
+> **Status:** canonical · **Verified:** 2026-07-18 (#1322 — schedules re-checked against `cdk/stacks/`, retired MCP/layer claims fixed)
+
 Symptom-keyed index of what to run when. **If the symptom isn't listed here, escalate to `docs/RUNBOOK.md` first — that's the architectural runbook. This one is the deploy-script index.**
 
 Per ADR-059, multi-step state-mutating operations go through `restart_pipeline.py` — not via direct sub-script invocation.
@@ -12,12 +14,12 @@ These run on EventBridge / launchd / cron. **You don't manually invoke these.**
 
 | Lambda / job | Cadence | What it does | When to worry |
 |---|---|---|---|
-| `daily-brief` | 11:00 AM PT daily | Generates Day-N email | If you didn't receive yesterday's brief by 11:30 AM |
+| `daily-brief` | 17:00 UTC (10 AM PDT) daily | Generates Day-N email | If you didn't receive today's brief by 10:30 AM PT |
 | `wednesday-chronicle` | Wed 8:00 AM PT | Elena's weekly chronicle | If subscriber complaints arrive Wed afternoon |
 | Daily ingestion (whoop/withings/garmin/…) | Hourly | Pulls source data | If `find_days` returns 0 records for today after 11 AM |
-| `life-platform-canary` | Every 15 min | Probes MCP, DDB, S3, Anthropic, subscribe flow | CloudWatch alarms fire if any check fails twice in a row |
+| `life-platform-canary` | Every 4 h | Probes MCP, DDB, S3, Anthropic, subscribe flow | CloudWatch alarms fire if any check fails twice in a row |
 | `freshness-checker` | 9:45 AM PT daily | Alerts on stale sources | Daily summary email |
-| `qa-smoke` | 10:30 AM PT daily | End-to-end smoke check | Daily summary email shows N failures |
+| `qa-smoke` | 11:30 AM PT daily | End-to-end smoke check | Daily summary email shows N failures |
 
 ---
 
@@ -29,8 +31,8 @@ These run on EventBridge / launchd / cron. **You don't manually invoke these.**
 
 ```bash
 # 1. First, verify backend state is correct
-python3 deploy/restart_verify.py            # 12-check backend probe
-python3 deploy/restart_verify_rendered.py   # 27-page rendered probe
+python3 deploy/restart_verify.py            # backend health probe
+python3 deploy/restart_verify_rendered.py   # rendered public-surface probe
 
 # 2. If verify_rendered fails: the public surface is stale.
 #    Force CloudFront full invalidation:
@@ -49,7 +51,7 @@ aws lambda update-function-configuration --function-name life-platform-site-api 
     --region us-west-2
 ```
 
-### Symptom: 27/27 pages clean but `/api/journey` returns wrong start_date or weight
+### Symptom: rendered probe all-clean but `/api/journey` returns wrong start_date or weight
 
 **Likely cause:** DDB `USER#matthew PROFILE#v1` record is stale.
 
@@ -108,19 +110,18 @@ python3 deploy/restart_rollback.py --full-unwind --apply             # nuke ALL 
 ## "A single Lambda needs to be redeployed (not full CDK)"
 
 ```bash
-# Auto-detects handler name, packages from local lambdas/, uploads.
+# Resolves the live handler, stages the FULL-tree bundle (#781), uploads.
 # Source-of-truth for individual Lambda code redeploys.
 bash deploy/deploy_lambda.sh <function-name> lambdas/<source>.py
 
-# Multi-module Lambdas (e.g., daily-brief depends on ai_calls + html_builder + …):
-bash deploy/deploy_lambda.sh daily-brief lambdas/daily_brief_lambda.py \
-    --extra-files lambdas/ai_calls.py lambdas/html_builder.py lambdas/output_writers.py lambdas/board_loader.py
+# Multi-module Lambdas need nothing special — the full bundle already ships every
+# sibling and shared module (--extra-files is accepted but ignored, #781).
 
 # Rollback to previous zip:
 bash deploy/rollback_lambda.sh <function-name>
 ```
 
-For the MCP Lambda (`life-platform-mcp`), `deploy_lambda.sh` will refuse — it requires the full `mcp/` package. Use the MCP-specific bash sequence printed by the refusal message.
+For the MCP Lambda: `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` — the script auto-builds the mcp-shaped full bundle (`build_bundle.py --mcp`). The old hand-rolled MCP zip is retired (#781); see `deploy/README.md` for the post-deploy boot check (401 = healthy).
 
 ---
 
@@ -135,7 +136,7 @@ bash deploy/deploy_fleet.sh                     # one bundle → every function
 cd cdk && npx cdk deploy --all --require-approval never
 ```
 
-Test `tests/test_layer_version_consistency.py` enforces consistency between the constant and the AWS-published version.
+Test `tests/test_integration_aws.py::test_i2_shared_layer_retired` enforces that no function references the retired layer.
 
 ---
 
@@ -193,9 +194,9 @@ See `docs/RUNBOOK.md` section "Inbox noise mitigations". Briefly:
 ```bash
 # Order matters
 python3 -m pytest tests/ -q --tb=no                          # all unit + integration
-python3 deploy/restart_verify.py                             # 12-check backend probe
-python3 deploy/restart_verify_rendered.py                    # 27-page public probe
-# Expect: 1232+ tests passing, 12/12, 27/27
+python3 deploy/restart_verify.py                             # backend health probe
+python3 deploy/restart_verify_rendered.py                    # rendered public probe
+# Expect: full suite green, backend probe all-green, rendered probe all-green
 ```
 
 ---
@@ -204,8 +205,8 @@ python3 deploy/restart_verify_rendered.py                    # 27-page public pr
 
 - **`restart_pipeline.py`** — THE orchestrator. Use this for any multi-step state change.
 - **`restart_*.py`** (8 of them) — sub-scripts called by the pipeline. Each supports `--dry-run` and `--apply`. Direct invocation only for surgical fixes.
-- **`restart_verify.py`** — 12-check backend health probe.
-- **`restart_verify_rendered.py`** — 27-page public-surface token-grep gate.
+- **`restart_verify.py`** — backend health probe.
+- **`restart_verify_rendered.py`** — public-surface rendered-page token-grep gate.
 - **`restart_rollback.py`** — Insurance. Two modes: `--to-genesis YYYY-MM-DD` (back to previous date) or `--full-unwind` (drop all phase tags + tombstones).
 - **`restart_pivot_when_ready.py`** — Watchdog. Polls DDB for the genesis-day Withings reading, runs the pipeline when it lands. Used by launchd.
 - **`sync_constants_from_config.py`** — Regenerates `lambdas/constants.py` from `config/user_goals.json`.

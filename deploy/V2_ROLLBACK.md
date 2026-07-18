@@ -1,5 +1,7 @@
 # V2 site consolidation — rollback runbook
 
+> **Status:** archive · dated completed-operation record (2026-05-31); kept for history (#1322 header)
+
 **Source brief:** `~/Desktop/BRIEF_claude_code_v2_consolidation.md` (2026-05-31)
 **Pre-consolidation rollback floor:** tag `site-v1` (pushed to origin 2026-05-31, at `00fb531`).
 **Consolidation landing tag:** `site-v2` (pushed 2026-05-31, at `8679f9b`).

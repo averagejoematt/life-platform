@@ -1,12 +1,31 @@
 # Deploy Scripts — Reference Guide
 
-> Scripts in this directory are **run locally in Terminal**, never via Claude MCP tools.
-> Last updated: 2026-05-24 (v8.1.0)
+> **Status:** canonical · **Verified:** 2026-07-18 (#1322 — rewritten against the live scripts)
+>
+> Scripts in this directory are **run locally in Terminal** (or by CI) — never via Claude MCP tools.
+>
+> **The canonical deploy *rules* live in `docs/CONVENTIONS.md` §1–§2** (the #781 one-bundle
+> invariant, deploy-from-main, squash-drift checks, site-deploy-on-merge). This file only
+> describes what the scripts *are*; when a rule is stated here it's a pointer, not the truth.
+> The session driver with the function-name → source-file mapping is `.claude/commands/deploy.md`.
 >
 > **Symptom-keyed operational runbook:** `deploy/OPERATIONAL_RUNBOOK.md` — read first when something looks wrong.
 > **First time deploying?** Read `docs/QUICKSTART.md` — it has a deploy decision tree and gotchas.
 >
-> **Multi-step state changes** (anything touching multiple DDB partitions OR multiple S3 prefixes) MUST go through `deploy/restart_pipeline.py` — see ADR-059.
+> **Multi-step state changes** (anything touching multiple DDB partitions OR multiple S3 prefixes)
+> MUST go through `deploy/restart_pipeline.py` — see ADR-059.
+
+---
+
+## The one rule that matters (#781)
+
+**Every deploy path stages the SAME full-tree bundle via `deploy/build_bundle.py`** — the
+whole `lambdas/` tree + `config/food_vocabulary.json`; the mcp shape adds `mcp_server.py` +
+`mcp/`. CDK assets, `deploy_lambda.sh`, `deploy_fleet.sh`, and `deploy_site_api.sh` all go
+through it, so a partial zip that strips sibling or shared modules is structurally
+impossible, and there is no shared layer (retired by #781/ADR-131 — only the dependency
+layers, garth/Pillow, remain). `tests/test_deploy_bundle_paths.py` enforces that every
+channel stays on the staging module. Full rule: `docs/CONVENTIONS.md` §1.
 
 ---
 
@@ -14,12 +33,27 @@
 
 **"I changed a file. Which script do I run?"** See `docs/QUICKSTART.md` for the full table. Key rules:
 
-1. **Lambda code only** → `deploy_lambda.sh` or `deploy_and_verify.sh`
-2. **Shared module** (ai_calls.py, scoring_engine.py, etc.) → `deploy_fleet.sh` (#781: one full-tree bundle to every function — the layer is retired)
-3. **MCP Lambda** → `deploy_lambda.sh life-platform-mcp mcp_server.py` (builds the mcp-shaped full bundle automatically)
-4. **CDK changes** (IAM, schedules, new Lambda) → `cd cdk && npx cdk deploy <StackName>`
-5. **Site content** → `sync_site_to_s3.sh`
-6. **S3 data** → NEVER `aws s3 sync --delete` without `safe_sync.sh` (ADR-032)
+1. **Lambda code** → `bash deploy/deploy_and_verify.sh <function-name> <source-file>`
+   (wraps `deploy_lambda.sh` with a post-deploy invoke + CloudWatch log check — preferred),
+   or `bash deploy/deploy_lambda.sh <function-name> <source-file>` for the bare deploy.
+2. **MCP Lambda** → `bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` —
+   the script detects `life-platform-mcp`/`life-platform-mcp-warmer` and builds the
+   **mcp-shaped full bundle** automatically (`build_bundle.py --mcp`: whole `lambdas/` tree +
+   `mcp_server.py` + `mcp/`, so `reading/` and every shared module are inside). See
+   "MCP Lambda" below for the boot check. (The old ADR-031 hand-rolled zip recipe that used
+   to live here is **retired** — it staged no `lambdas/` tree and boot-broke the function
+   with `No module named 'reading'`; `docs/_lint/tombstones.txt` now bans it.)
+3. **site-api** → `bash deploy/deploy_site_api.sh` (full bundle + invoke-verifies a real
+   route; infra is CDK-owned in `cdk/stacks/serve_stack.py` — see `.claude/commands/deploy.md`).
+4. **Shared module** (`ai_calls.py`, `stats_core.py`, …) → `bash deploy/deploy_fleet.sh`
+   (one bundle → every function) or `cd cdk && npx cdk deploy --all`.
+5. **CDK changes** (IAM, schedules, new Lambda) → `cd cdk && npx cdk deploy <StackName>`.
+   The stack list lives in `cdk/app.py` / `docs/ARCHITECTURE.md` — don't trust a
+   hand-maintained table here. After a CDK deploy: `bash deploy/post_cdk_smoke.sh`.
+6. **Site content** → merge to `main`; a push touching `site/**` deploys automatically via
+   `.github/workflows/site-deploy.yml` (#750). Attended fallback: `bash deploy/sync_site_to_s3.sh`
+   (+ explicit fonts sync). Canonical rule: `docs/CONVENTIONS.md` §2.
+7. **S3 data** → NEVER `aws s3 sync --delete` without `deploy/lib/safe_sync.sh` (ADR-032).
 
 ---
 
@@ -30,94 +64,73 @@
 ```bash
 # Correct
 cd ~/Documents/Claude/life-platform
-bash deploy/deploy_lambda.sh daily-brief
+bash deploy/deploy_lambda.sh daily-brief lambdas/emails/daily_brief_lambda.py
 
 # Wrong — relative paths will break
 cd deploy
-bash deploy_lambda.sh daily-brief
+bash deploy_lambda.sh daily-brief lambdas/emails/daily_brief_lambda.py
+```
+
+Both arguments are required: `deploy_lambda.sh <function-name> <source-file>`. The source
+file is a sanity check (the live handler must resolve inside the bundle) — the deploy
+always ships the full tree regardless. Per-Lambda region overrides come from
+`ci/lambda_map.json`.
+
+---
+
+## Core scripts
+
+The full inventory is `ls deploy/*.sh deploy/*.py` — every script documents itself in its
+header, and one-time scripts get moved to `archive/` (see Archive Policy). **This table is
+deliberately not exhaustive and carries no count** — the previous "Active Scripts (20)"
+claim had drifted to a fraction of reality. These are the ones you'll actually reach for:
+
+| Script | Purpose |
+|--------|---------|
+| `build_bundle.py` | Stage/zip the ONE full-tree code bundle (#781) — used by every deploy path |
+| `deploy_lambda.sh <fn> <src>` | Deploy one Lambda (full bundle; mcp shape auto-detected) |
+| `deploy_and_verify.sh <fn> <src>` | `deploy_lambda.sh` + post-deploy invoke + log check — preferred |
+| `rollback_lambda.sh <fn>` | Restore the previous zip (S3 rollback artifact) |
+| `deploy_fleet.sh [--dry-run]` | Push the bundle to every function (shared-module change) |
+| `deploy_site_api.sh [path]` | site-api full bundle + invoke-verify a real route |
+| `sync_site_to_s3.sh` | Attended site sync (content-hashed, self-invalidating) |
+| `smoke_test_site.sh` | HTTP/content smoke of the public site |
+| `post_cdk_smoke.sh` | Full smoke after a CDK deploy |
+| `restart_pipeline.py` | THE orchestrator for experiment re-anchoring (ADR-059/077) |
+| `sync_doc_metadata.py` | Sync doc resource counts from CDK/registry sources of truth |
+| `lib/safe_sync.sh` | S3 sync wrapper that can never `--delete` the bucket root |
+| `maintenance_mode.sh enable\|disable\|status` | Pause non-essential Lambdas |
+| `pitr_restore_drill.sh` | Quarterly DynamoDB PITR restore drill |
+| `archive_onetime_scripts.sh` | Move completed one-time scripts to `archive/` |
+
+CloudWatch alarms and dashboards are **CDK-owned** (`cdk/stacks/monitoring_stack.py` and
+per-stack alarms) — the old `create_*_alarm.sh` / `create_operational_dashboard.sh`
+one-shots were archived to `deploy/archive/onetime/` and are no longer the way alarms
+are managed.
+
+---
+
+## MCP Lambda
+
+`bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py` builds and ships the
+mcp-shaped full bundle. Then **verify it boots** — a `statusCode: 401` from an
+unauthenticated invoke is the auth gate answering, i.e. a healthy import:
+
+```bash
+sleep 7
+aws lambda invoke --function-name life-platform-mcp --region us-west-2 --cli-binary-format raw-in-base64-out \
+  --payload '{"method":"tools/list","params":{}}' /tmp/mcp.json >/dev/null
+python3 -c "import json; d=json.load(open('/tmp/mcp.json')); assert 'errorType' not in d, d; print('mcp OK', d.get('statusCode'))"
 ```
 
 ---
 
-## Active Scripts (20)
+## Native dependencies (Garmin, Pillow, …)
 
-### Core deployment
-
-| Script | Purpose | When to use |
-|--------|---------|-------------|
-| `deploy_lambda.sh <name>` | Zip + upload a single Lambda | Any code change to a Lambda |
-| `deploy_and_verify.sh <name>` | Deploy + smoke test + auto-rollback | Preferred for production deploys |
-| `rollback_lambda.sh <name>` | Restore previous Lambda version | After a bad deploy |
-| `build_bundle.py` | Stage/zip the ONE full-tree code bundle (#781) | Used by every deploy path |
-| `deploy_fleet.sh` | Push the bundle to every function | After changing a shared module |
-
-### Testing & verification
-
-| Script | Purpose | When to use |
-|--------|---------|-------------|
-| `SMOKE_TEST_TEMPLATE.sh` | Template for Lambda smoke tests | Copy and adapt per Lambda |
-| `post_cdk_smoke.sh` | Full smoke test after CDK deploy | After `cdk deploy --all` |
-| `post_cdk_reconcile_smoke.sh` | Reconcile CDK state vs live AWS | After large CDK changes |
-| `smoke_test_cloudfront.sh` | Verify CloudFront distributions | After web stack changes |
-
-### Infrastructure setup (run once)
-
-| Script | Purpose | When to use |
-|--------|---------|-------------|
-| `create_withings_oauth_alarm.sh` | Withings 2-day consecutive error alarm | Run once — alarm persists |
-| `create_compute_staleness_alarm.sh` | Daily compute pipeline staleness alarm | Run once — alarm persists |
-| `create_lambda_edge_alarm.sh` | Lambda@Edge error alarm (us-east-1) | Run once — alarm persists |
-| `create_operational_dashboard.sh` | CloudWatch ops dashboard | Run once — dashboard persists |
-| `apply_s3_lifecycle.sh` | S3 lifecycle rules — declarative FULL bucket config (a run replaces every rule) | After changing any rule in the script |
-
-### Operations
-
-| Script | Purpose | When to use |
-|--------|---------|-------------|
-| `maintenance_mode.sh enable\|disable\|status` | Pause non-essential Lambdas | Vacation / extended absence |
-| `pitr_restore_drill.sh` | DynamoDB PITR restore test | Quarterly disaster recovery drill |
-| `archive_onetime_scripts.sh` | Move completed one-time scripts to archive/ | Post-session hygiene |
-
-### Documentation & review
-
-| Script | Purpose | When to use |
-|--------|---------|-------------|
-| `generate_review_bundle.py` | Generate files for architecture review | Before each review session |
-| `sync_doc_metadata.py` | Sync ARCHITECTURE.md resource counts | After adding Lambdas/alarms/tools |
-
----
-
-## Deploying a Lambda (step by step)
-
-The standard flow for any code change:
-
-```bash
-# 1. Edit the source file in lambdas/ or mcp/
-# 2. Deploy
-bash deploy/deploy_and_verify.sh <function-name>
-
-# ⚠️  NEVER use deploy_lambda.sh for MCP — it strips the mcp/ directory (ADR-031)
-# See "MCP Lambda" section below for the correct procedure.
-
-# 3. Check logs
-# AWS Console → Lambda → <function> → Monitor → View CloudWatch Logs
-```
-
-### MCP Lambda — special zip procedure (ADR-031)
-
-**`deploy_lambda.sh` hard-rejects `life-platform-mcp`.** The MCP Lambda is a multi-module package — single-file deploy strips the `mcp/` directory and silently breaks all endpoints.
-
-```bash
-# From project root — always use this exact procedure:
-ZIP=/tmp/mcp_deploy.zip && rm -f $ZIP
-zip -j $ZIP mcp_server.py mcp_bridge.py
-zip -r $ZIP mcp/ -x 'mcp/__pycache__/*' 'mcp/*.pyc'
-aws lambda update-function-code --function-name life-platform-mcp --zip-file fileb://$ZIP --region us-west-2
-```
-
-### Garmin Lambda — native deps
-
-Garmin requires platform-specific dependencies. Always build on Linux-compatible targets:
+Third-party packages with compiled parts ship as **dependency layers** (garth, Pillow —
+ARNs pinned in `cdk/stacks/constants.py`), never inside the code bundle. When rebuilding
+such a layer, install for the Lambda platform — packages built on macOS silently fail
+at runtime:
 
 ```bash
 pip install \
@@ -125,97 +138,28 @@ pip install \
   --only-binary=:all: \
   --python-version 3.12 \
   --implementation cp \
-  --target ./garmin_pkg \
+  --target ./pkg \
   garth garminconnect
 ```
-
-Never install Garmin deps on macOS and zip — they'll silently fail in Lambda.
-
----
-
-## CDK Deploys
-
-CDK manages all infrastructure. Run from the `cdk/` directory:
-
-```bash
-cd ~/Documents/Claude/life-platform/cdk
-
-# Preview what will change
-npx cdk diff LifePlatformEmail
-
-# Deploy one stack
-npx cdk deploy LifePlatformEmail
-
-# Deploy all stacks (takes 5–10 min)
-npx cdk deploy --all
-
-# After CDK deploy — run smoke tests
-cd ..
-bash deploy/post_cdk_smoke.sh
-```
-
-**Stack names and what they own:**
-
-| Stack | Lambdas / Resources |
-|-------|-------------------|
-| `LifePlatformCore` | DLQ, SNS alerts topic, budget |
-| `LifePlatformIngestion` | 13 ingestion Lambdas + EventBridge rules |
-| `LifePlatformCompute` | 5 compute Lambdas + EventBridge rules |
-| `LifePlatformEmail` | 8 email/digest Lambdas + EventBridge rules |
-| `LifePlatformOperational` | 8 operational Lambdas + EventBridge rules |
-| `LifePlatformMcp` | MCP Lambda + Function URL + warmer rule |
-| `LifePlatformMonitoring` | All CloudWatch alarms |
-| `LifePlatformWeb` | CloudFront distributions + S3 policies |
-
-IAM policies live in `cdk/stacks/role_policies.py` — one function per Lambda.
-
----
-
-## Alarm Scripts
-
-These create-once scripts are idempotent — safe to re-run. Running them twice just updates the alarm in place:
-
-```bash
-bash deploy/create_withings_oauth_alarm.sh     # R18/R55
-bash deploy/create_compute_staleness_alarm.sh  # Risk-7
-bash deploy/create_lambda_edge_alarm.sh        # Lambda@Edge (us-east-1)
-```
-
-The operational dashboard:
-```bash
-bash deploy/create_operational_dashboard.sh
-# Creates 'life-platform-ops' dashboard in CloudWatch
-# https://us-west-2.console.aws.amazon.com/cloudwatch/home#dashboards
-```
-
----
-
-## Maintenance Mode
-
-Pause non-essential Lambdas for vacations or extended absences:
-
-```bash
-bash deploy/maintenance_mode.sh enable   # disable non-essential rules
-bash deploy/maintenance_mode.sh status   # show which rules are enabled/disabled
-bash deploy/maintenance_mode.sh disable  # re-enable everything
-```
-
-Essential Lambdas (always stay on): ingestion (data keeps flowing), freshness checker, canary.
-Paused: daily brief, weekly/monthly digests, chronicle, anomaly detector.
 
 ---
 
 ## Archive Policy
 
-The `archive/` directory holds one-time scripts that have been run and are no longer needed. Do not delete them — they serve as a record of what was done and when.
+The `archive/` directory holds one-time scripts that have been run and are no longer
+needed. Do not delete them — they serve as a record of what was done and when.
 
-To move completed one-time scripts to archive:
 ```bash
 bash deploy/archive_onetime_scripts.sh
 ```
 
 ---
 
-## MANIFEST.md
+## Lambda inventory
 
-`deploy/MANIFEST.md` is the Lambda inventory — handler names, IAM roles, deps, and critical deploy notes. **Update it every time a Lambda is added or its handler changes.** It's the source of truth for "what handler does this Lambda use?" and "which zipping procedure does it need?"
+`deploy/MANIFEST.md` is **deprecated** (superseded 2026) — do not use it as a source of
+truth. The live inventory is:
+
+- `docs/ARCHITECTURE.md` — the system-level Lambda inventory (counts auto-synced by `sync_doc_metadata.py`)
+- `ci/lambda_map.json` — source-file → function mapping (+ per-Lambda region overrides) used by the deploy scripts
+- `.claude/commands/deploy.md` — the function-name → source-file mapping for attended deploys
