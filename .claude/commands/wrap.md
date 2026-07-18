@@ -54,6 +54,17 @@ NOT git-tracked and is a separate step from the commit in (f).
 - Add or update ONE line per touched topic under the matching section of `MEMORY.md`
   (e.g. `## Active Work`), pointing at the topic file. Don't let a topic file exist
   un-indexed.
+- **Orphan/broken-link gate (#1259) — run this every wrap; it must print nothing.**
+  A topic file reachable from neither `MEMORY.md` nor `project_shipped_archive.md` is
+  invisible to every future session (repo CI can't own this — the memory dir is outside
+  the repo). Index any `ORPHAN:` line before closing (c):
+  ```bash
+  cd ~/.claude/projects/-Users-matthewwalker-Documents-Claude-life-platform/memory/
+  for f in *.md; do [ "$f" = MEMORY.md ] && continue; base="${f%.md}"; \
+    grep -qF "$base" MEMORY.md project_shipped_archive.md || echo "ORPHAN: $f"; done
+  ```
+  (Match the basename, not `$f` — an index entry may reference a topic as a `[[wikilink]]`
+  without the `.md`, and a naive `.md` grep would false-flag it.)
 - **Rule of placement:** session-specific narrative → `handovers/` (step a). Durable
   lessons/reflexes → memory topic files (this step) or `docs/CONVENTIONS.md` if it's a
   load-bearing repo-wide rule. The CLAUDE.md status block (step b) is a terse pointer,
