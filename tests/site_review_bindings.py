@@ -189,6 +189,17 @@ PAGE_BINDINGS = [
         "endpoints": [],  # editorial
     },
     {
+        "path": "/story/attempts/",
+        "name": "Story · the attempts",
+        "door": "story",
+        "narrative_order": 5.5,
+        "story_intent": "the serial restarter's ledger — every attempt, its cause of death, and what changed; day-1 emptiness framed as stakes (#1375)",
+        "endpoints": [
+            {"url": "/api/survival", "role": "primary", "metrics": []},
+            {"url": "/api/cycle_compare", "role": "secondary", "metrics": []},
+        ],
+    },
+    {
         "path": "/story/agents/",
         "name": "Story · the agents",
         "door": "story",
