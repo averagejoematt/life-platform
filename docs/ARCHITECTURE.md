@@ -1,10 +1,10 @@
 # Life Platform — Architecture
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
 Last updated: 2026-07-18 (v8.6.0 — 64 tools, 34-module MCP package, 20 data sources, 94 Lambdas, 21 secrets, 69 alarms, 9 CDK stacks deployed).
 
-> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **three doors:** Cockpit (`/now/`, live data), Story (`/story/`, the writing hub), Evidence (`/evidence/`, the data archive); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **121 ADRs** (ADR-001 → ADR-135 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
+> **v4 "The Measured Life" front-end is live** (ADR-071) — `averagejoematt.com` is a static S3 + CloudFront site over the unchanged engine, with **Home + five doors** (v5 IA): the cockpit (`/cockpit/`, live data), the data (`/data/`, the evidence archive — old `/evidence/*` slugs 301), the coaching, the protocols, and the story (`/story/`, the writing hub); the pre-v4 site is preserved verbatim at `/legacy`. Shared code ships **bundled inside every function** (#781/ADR-131 — the shared layer is retired; see [CONVENTIONS.md §1](CONVENTIONS.md)). **121 ADRs** (ADR-001 → ADR-135 — full index auto-generated in [DECISIONS.md](DECISIONS.md)). The count line above is auto-maintained by `deploy/sync_doc_metadata.py` (pre-commit hook) — edit `PLATFORM_FACTS` there, not by hand.
 
 ---
 
@@ -51,8 +51,8 @@ The life platform is a personal health intelligence system built on AWS. It inge
 │                                                             │
 │  WEB LAYER — v4 "The Measured Life" (ADR-071)              │
 │  averagejoematt.com · CloudFront E3S424OXQZ8NBE → S3 /site  │
-│  Three doors: / (landing) · /now/ (Cockpit) ·              │
-│    /story/ (the writing) · /evidence/ (data archive)        │
+│  Five doors (v5 IA): /cockpit/ (Cockpit) · /data/ ·         │
+│    /coaching/ · /protocols/ · /story/ · / (landing)         │
 │  Old site preserved at /legacy (private; 301s via the       │
 │    v4-redirects CF function from redirects.map)             │
 │  site-api Lambda (read-only): /api/ask · /api/board_ask ·   │
@@ -87,7 +87,7 @@ The life platform is a personal health intelligence system built on AWS. It inge
 | CDK | Infrastructure as Code | `cdk/` — 9 stacks deployed. CDK owns all Lambda IAM roles + ~50 EventBridge rules. Stacks: `core_stack`, `ingestion_stack`, `email_stack`, `compute_stack`, `mcp_stack`, `operational_stack`, `serve_stack` (public serving path: site-api + site-api-ai — #793, split via `cdk refactor` 2026-07-08), `web_stack`, `monitoring_stack`. |
 | CloudTrail | Audit logging | `life-platform-trail` → S3. Data events enabled for `s3://matthew-life-platform/raw/` and `s3://matthew-life-platform/uploads/`. |
 | AWS Budget | Cost guardrail | **$85/mo all-in cap** (ADR-063, raised from $75 + surge-to-$100 rule per ADR-133), alerts at 50%/70%/85%/100%. Enforced via `cost_governor_lambda` (hourly) → SSM `/life-platform/budget-tier` → `budget_guard.py` gates AI features (1=coaches, 2=website AI, 3=hard cutoff in `bedrock_client.invoke()`). |
-| Concurrency quota | Account-level | **10** (default; quota raise request filed 2026-05-19 — AWS Support case 177921309700709) |
+| Concurrency quota | Account-level | **100** (raised 2026-05-19 from the account default of 10 — AWS Support case 177921309700709) |
 
 ---
 
@@ -132,10 +132,10 @@ Each source has its own dedicated Lambda and IAM role. EventBridge triggers fire
 
 | Function | Lambda | Cron (UTC) | PT (PDT) |
 |---|---|---|---|
-| Daily Insight Compute (IC-8) | `daily-insight-compute` | `cron(20 17 * * ? *)` | 10:20 AM |
-| Daily Metrics Compute | `daily-metrics-compute` | `cron(25 17 * * ? *)` | 10:25 AM |
-| Adaptive Mode Compute | `adaptive-mode-compute` | `cron(30 17 * * ? *)` | 10:30 AM |
-| Character Sheet Compute | `character-sheet-compute` | `cron(35 17 * * ? *)` | 10:35 AM |
+| Daily Insight Compute (IC-8) | `daily-insight-compute` | `cron(45 16 * * ? *)` | 09:45 AM |
+| Daily Metrics Compute | `daily-metrics-compute` | `cron(40 16 * * ? *)` | 09:40 AM |
+| Adaptive Mode Compute | `adaptive-mode-compute` | `cron(35 16 * * ? *)` | 09:35 AM |
+| Character Sheet Compute | `character-sheet-compute` | `cron(30 16 * * ? *)` | 09:30 AM |
 | Anomaly Detector | `anomaly-detector` | `cron(5 15 * * ? *)` | 08:05 AM |
 | Daily Brief | `daily-brief` | `cron(0 17 * * ? *)` | 10:00 AM |
 | Monday Compass | `monday-compass` | `cron(0 15 ? * MON *)` | Mon 08:00 AM |
@@ -240,7 +240,7 @@ Compute → store → read pattern. Standalone Lambdas run before Daily Brief, s
 
 ### Site API Lambda (us-west-2)
 
-**Lambda:** `life-platform-site-api` | **Stack:** LifePlatformOperational | **Region:** us-west-2 (R17-09 migration)
+**Lambda:** `life-platform-site-api` | **Stack:** LifePlatformServe (#793 — split from Operational, `serve_stack.py`) | **Region:** us-west-2 (R17-09 migration)
 **Function URL:** Routed through CloudFront (E3S424OXQZ8NBE). Lambda confirmed in us-west-2 (verified via AWS CLI 2026-03-30).
 **IAM:** Primarily read-only — `dynamodb:GetItem, Query, PutItem` + `kms:Decrypt` + `s3:GetObject` on `site/config/*`. Limited writes for interactive features (votes, follows, checkins).
 
@@ -273,7 +273,7 @@ All 7 modules ship together via the standard `Code.from_asset("../lambdas")` zip
 - `GET /api/verify_subscriber?email=` — HMAC token for subscriber gate (24hr)
 - `POST /api/subscribe` — email subscriber capture
 
-**Rate limiting:** In-memory sliding window (module-level dicts `_ask_rate_store`, `_board_rate_store`). Vote/follow rate limits use DynamoDB atomic counters with TTL. Role is primarily read-only with limited writes for interactive features (votes, follows, checkins).
+**Rate limiting:** DynamoDB-backed per-IP atomic counters (`lambdas/rate_limiter.py`, since Phase 2.1 — survives warm-container distribution). The module-level dicts `_ask_rate_store`/`_board_rate_store` are the in-memory fail-open fallback only (used if the DDB limiter is unavailable). Vote/follow rate limits also use DynamoDB atomic counters with TTL. Role is primarily read-only with limited writes for interactive features (votes, follows, checkins).
 
 ### Email / Intelligence cadence
 
@@ -380,7 +380,7 @@ Active role categories (approx counts):
 
 ## Cost Profile
 
-Target: under $25/month | Current: ~$13/month
+Target: within the **$85/mo all-in budget ceiling** (ADR-063; surge-to-$100 per ADR-133) | Current: ~$80/month all-in (tier 1)
 
 | Driver | Monthly Cost |
 |---|---|
@@ -390,8 +390,8 @@ Target: under $25/month | Current: ~$13/month
 | S3 (~2.5 GB + requests) | ~$0.50 |
 | CloudFront (4 distributions) | ~$1.50 |
 | CloudWatch (~50 alarms + logs) | ~$4-5 |
-| Anthropic API (Haiku + Sonnet, with prompt caching — ADR-049) | ~$8-12 |
-| **Total** | **~$18-23** |
+| Bedrock — Claude Sonnet/Haiku via `bedrock_client.py`, prompt-cached (ADR-062/049); the dominant driver, governed by `cost_governor` tiering | ~$60-65 |
+| **Total** | **~$78-82** |
 
 ---
 

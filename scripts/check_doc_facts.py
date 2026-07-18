@@ -268,6 +268,90 @@ def _anchor_hits(files, genesis: str, cycle: int) -> list[str]:
     return hits
 
 
+# ── #1205: cron-table drift scan (docs vs cdk/stacks/*.py) ────────────────────
+# The highest-stakes operational claim in the wiki is the compute/email cron table
+# in ARCHITECTURE.md: an incident responder reads it to reason about run order (do the
+# computes finish BEFORE the 17:00 brief?). It drifted 2 months stale — the doc said the
+# computes run 17:20-17:35 UTC (AFTER the brief) while compute_stack.py had moved them to
+# 16:30-16:45 (BEFORE it, Phase 3.1) — and NO gate caught it. This rule makes every
+# `cron(...)` a reader quotes next to a Lambda function name a synced fact: it is diffed
+# against that function's `schedule=`/`Schedule.expression("cron(...)")` string in the CDK.
+#
+# PRECISION (the whole game — a false-positive gate gets disabled):
+#   • Ground truth is the CDK: function_name -> cron, parsed per-function-block so a
+#     schedule never leaks to the wrong function. Templated crons (`cron(0 {INGEST_HOURLY}
+#     ...)`) are dropped — a resolved doc value can't be diffed against a template.
+#   • A doc line is compared ONLY when it names EXACTLY ONE known CDK function (matched
+#     hyphen-aware, so `wednesday-chronicle` never matches inside `wednesday-chronicle-
+#     schedule`) AND quotes EXACTLY ONE cron — the unambiguous "one row, one function,
+#     one cron" shape of the table. Multi-cron / multi-function lines are skipped.
+#   • HISTORICAL-framed lines are exempt as everywhere else. Frozen snapshots
+#     (docs/reviews/, docs/archive/) and ledgers (CHANGELOG) are already out of scope via
+#     _scan_files()'s EXEMPT_DIRS/EXEMPT_FILES, so stale review-bundle tables don't trip it.
+CDK_STACKS_DIR = ROOT / "cdk" / "stacks"
+CRON_RE = re.compile(r"cron\([^)]*\)")
+_CDK_FUNC_RE = re.compile(r'function_name\s*=\s*"([^"]+)"')
+_CDK_SCHED_RE = re.compile(r'schedule\s*=\s*(?:events\.Schedule\.expression\(\s*)?"(cron\([^"]*\))"')
+
+
+def _cdk_cron_map() -> dict:
+    """function_name -> cron expression, parsed from cdk/stacks/*.py.
+
+    Each function's schedule is searched only within its own block (up to the next
+    `function_name=`), so an unscheduled function can't inherit a neighbour's cron.
+    Templated crons (containing `{`) are dropped — they can't be diffed against a
+    resolved doc value.
+    """
+    cmap: dict = {}
+    if not CDK_STACKS_DIR.exists():
+        return cmap
+    for f in sorted(CDK_STACKS_DIR.glob("*.py")):
+        txt = f.read_text(encoding="utf-8")
+        funcs = list(_CDK_FUNC_RE.finditer(txt))
+        for i, fm in enumerate(funcs):
+            name = fm.group(1)
+            end = funcs[i + 1].start() if i + 1 < len(funcs) else len(txt)
+            sm = _CDK_SCHED_RE.search(txt, fm.end(), end)
+            if not sm:
+                continue
+            cron = sm.group(1)
+            if "{" in cron:  # templated (e.g. INGEST_HOURLY) — unresolvable, skip
+                continue
+            cmap.setdefault(name, cron)
+    return cmap
+
+
+def _cron_hits(files, cdk_map: dict) -> list[str]:
+    """Live doc lines quoting a cron that disagrees with the CDK schedule for the same
+    function. Exposed so the regression test can plant a stale cron in a scratch file and
+    prove the rule bites (the #1189 non-vacuous-scan lesson)."""
+    if not cdk_map:
+        return []
+    name_res = {n: re.compile(r"(?<![\w-])" + re.escape(n) + r"(?![\w-])") for n in cdk_map}
+    hits = []
+    for doc in files:
+        try:
+            rel = doc.relative_to(ROOT)
+        except ValueError:
+            rel = doc  # scratch file outside the repo (the non-vacuous test)
+        for lineno, line in enumerate(doc.read_text(encoding="utf-8").splitlines(), 1):
+            if HISTORICAL.search(line):
+                continue
+            crons = CRON_RE.findall(line)
+            if len(crons) != 1:
+                continue  # 0 crons, or ambiguous multi-cron line — can't pair reliably
+            named = [n for n, rx in name_res.items() if rx.search(line)]
+            if len(named) != 1:
+                continue  # no CDK function named, or ambiguous multi-function line
+            name, doc_cron, cdk_cron = named[0], crons[0], cdk_map[named[0]]
+            if doc_cron != cdk_cron:
+                hits.append(
+                    f"{rel}:{lineno}: cron for `{name}` claims {doc_cron}, CDK schedules {cdk_cron} (#1205)\n"
+                    f"      | {line.strip()[:120]}"
+                )
+    return hits
+
+
 def _scan_files() -> list[Path]:
     cands = [ROOT / "README.md", ROOT / "CLAUDE.md"]
     cands += sorted((ROOT / ".claude" / "commands").glob("*.md"))
@@ -344,6 +428,10 @@ def main():
 
     # #1235: no live doc states a stale experiment genesis/cycle as the current anchor.
     hits += _anchor_hits(_scan_files(), truth["experiment_genesis"], truth["experiment_cycle"])
+
+    # #1205: no live doc quotes a cron that disagrees with the CDK schedule (the compute
+    # cron table is the highest-stakes operational claim — it drifted 2 months stale).
+    hits += _cron_hits(_scan_files(), _cdk_cron_map())
 
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []
