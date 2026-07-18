@@ -211,14 +211,16 @@ def invoke(body: dict, model_name: str | None = None) -> dict:
         }
 
     # Budget guardrail (Tier-3 hard stop): the single backstop every AI call
-    # routes through. If the monthly $75 ceiling is reached, refuse — callers
+    # routes through. If the monthly ceiling is reached, refuse — callers
     # catch this and degrade (coaches → fallback brief, ai_calls → [AI_UNAVAILABLE]).
     # Fail-open: if budget_guard is unavailable, proceed (never break AI on a blip).
+    # #1230: no hardcoded dollar figure here — the ceiling floats ($85 base / $100 surge,
+    # ADR-133), so a literal is guaranteed to drift; the tier alone says AI is paused.
     try:
         from budget_guard import BudgetExceeded, current_tier
 
         if current_tier() >= 3:
-            raise BudgetExceeded("AI paused — monthly $75 budget ceiling reached (tier 3). " "Auto-resumes at month rollover.")
+            raise BudgetExceeded("AI paused — monthly budget ceiling reached (tier 3). Auto-resumes at month rollover.")
     except ImportError:
         pass
 

@@ -8,7 +8,7 @@ The coach pages + popovers serve that cached text; nothing here runs live.
 
 Cost & safety rails:
   * Haiku (cheap) — short snippets don't need Sonnet.
-  * Self-skips at budget tier >= 2 (PG-10) — never pushes the $75 ceiling.
+  * Self-skips at budget tier >= 2 (PG-10) — never pushes the monthly ceiling.
   * bedrock_client enforces the tier-3 hard stop too.
   * ER-03 gate is fail-closed: anything that doesn't pass is dropped, not shipped.
   * Honest empty: a coach with no recent output yet is simply skipped.
