@@ -35,6 +35,7 @@ from decimal import Decimal
 
 import boto3
 import stats_core
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 from phase_filter import with_phase_filter  # ADR-058: default-deny pilot data
 
 try:
@@ -82,16 +83,6 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 from digest_utils import d2f  # shared bundled helpers (#970)
-
-
-def to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [to_decimal(v) for v in obj]
-    return obj
 
 
 def fetch_series(source, field, start, end):
@@ -216,7 +207,7 @@ def resolve_matured(today_str, actuals_by_source):
         covered = bool(row["lo"] <= float(actual) <= row["hi"])
         calib = build_forecast_calibration_item(row, actual, covered, today_str)
         try:
-            table.put_item(Item=to_decimal({k: v for k, v in calib.items() if v is not None}))
+            table.put_item(Item=floats_to_decimal({k: v for k, v in calib.items() if v is not None}))
         except Exception as e:
             logger.warning(f"calibration write failed for {row['sk']}: {e}")
         try:
@@ -300,7 +291,7 @@ def lambda_handler(event: dict, context) -> dict:
             target = (today + timedelta(days=h)).isoformat()
             item = build_forecast_item(cfg, fc, today_str, target)
             try:
-                table.put_item(Item=to_decimal({k: v for k, v in item.items() if v is not None}))
+                table.put_item(Item=floats_to_decimal({k: v for k, v in item.items() if v is not None}))
             except Exception as e:
                 logger.warning(f"forecast write failed for {item['sk']}: {e}")
                 continue
@@ -326,7 +317,7 @@ def lambda_handler(event: dict, context) -> dict:
         summary = tag_record(summary, source_id="forecast")
     except ImportError:
         pass
-    table.put_item(Item=to_decimal({k: v for k, v in summary.items() if v is not None}))
+    table.put_item(Item=floats_to_decimal({k: v for k, v in summary.items() if v is not None}))
 
     result = {
         "date": today_str,

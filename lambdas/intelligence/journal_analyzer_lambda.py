@@ -34,7 +34,6 @@ import os
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -60,7 +59,10 @@ table = dynamodb.Table(TABLE_NAME)
 # J-8 (#504): cache writes must carry a phase attribute — an unstamped record
 # passes with_phase_filter forever and survives experiment resets untagged.
 from constants import EXPERIMENT_PHASE_CURRENT  # noqa: E402
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402
+from numeric import (
+    decimals_to_float as _decimal_to_float,  # noqa: E402
+    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
+)
 
 # ── Deterministic vocabularies ────────────────────────────────────────────────
 
@@ -352,18 +354,8 @@ def build_hypo_candidates(dated_entries):
 # ── I/O ───────────────────────────────────────────────────────────────────────
 
 
-def _to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: _to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_to_decimal(v) for v in obj]
-    return obj
-
-
 def _put(item):
-    table.put_item(Item=_to_decimal({k: v for k, v in item.items() if v is not None}))
+    table.put_item(Item=floats_to_decimal({k: v for k, v in item.items() if v is not None}))
 
 
 def fetch_habit_names():

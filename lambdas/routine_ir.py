@@ -17,7 +17,6 @@ Per SPEC_HEVY_ROUTINE_WRITELOOP_2026_05_31 §3 + PREREQS §B.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from decimal import Decimal
 from typing import Any
 
 IR_SCHEMA_VERSION = 1
@@ -107,22 +106,15 @@ class RoutineSpec:
     schema_version: int = IR_SCHEMA_VERSION
 
 
-def _floats_to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, list):
-        return [_floats_to_decimal(x) for x in obj]
-    if isinstance(obj, dict):
-        return {k: _floats_to_decimal(v) for k, v in obj.items()}
-    return obj
-
-
-from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
+from numeric import (
+    decimals_to_float as _decimal_to_float,  # noqa: E402,F401
+    floats_to_decimal,  # noqa: E402  # canonical float->Decimal (#1207)
+)
 
 
 def serialize(ir: RoutineSpec) -> dict[str, Any]:
     """IR -> dict (Decimal-safe; ready for DDB put_item)."""
-    return _floats_to_decimal(asdict(ir))
+    return floats_to_decimal(asdict(ir))
 
 
 def _exercise_from_raw(raw_ex: dict[str, Any]) -> ExerciseBlock:

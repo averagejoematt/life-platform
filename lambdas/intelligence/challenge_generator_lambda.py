@@ -35,10 +35,10 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
 
 import boto3
 import digest_utils  # shared query_range implementations (#970)
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 try:
     from platform_logger import get_logger
@@ -97,16 +97,6 @@ def query_range(source, start_date, end_date):
     except Exception as e:
         logger.warning(f"query_range({source}) failed: {e}")
         return []
-
-
-def to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [to_decimal(v) for v in obj]
-    return obj
 
 
 def slug(name):
@@ -499,7 +489,7 @@ def store_challenge(challenge: dict):
         "created_at": now.strftime("%Y-%m-%dT%H:%M:%S"),
     }
 
-    table.put_item(Item=to_decimal(item))
+    table.put_item(Item=floats_to_decimal(item))
     logger.info(f"Stored challenge candidate: {challenge_id} (source={source})")
     return challenge_id
 

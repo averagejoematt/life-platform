@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from boto3.dynamodb.conditions import Key
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 from mcp.config import EXPERIMENTS_PK, INSIGHTS_PK, S3_BUCKET, TRAVEL_PK, USER_ID, USER_PREFIX, logger, s3_client, table
 from mcp.core import decimal_to_float, parallel_query_sources, query_source
@@ -211,18 +212,7 @@ def _fetch_weather_range(start_date, end_date):
                     **record,
                 }
                 try:
-                    from decimal import Decimal
-
-                    def _to_decimal(obj):
-                        if isinstance(obj, float):
-                            return Decimal(str(round(obj, 4)))
-                        if isinstance(obj, dict):
-                            return {k: _to_decimal(v) for k, v in obj.items()}
-                        if isinstance(obj, list):
-                            return [_to_decimal(v) for v in obj]
-                        return obj
-
-                    table.put_item(Item=_to_decimal(db_item))
+                    table.put_item(Item=floats_to_decimal(db_item, precision=4))
                 except Exception as e:
                     logger.warning(f"Weather cache write failed for {date_str}: {e}")
 

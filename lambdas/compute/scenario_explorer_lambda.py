@@ -28,10 +28,10 @@ anyone reads the page.
 import json
 import os
 from datetime import datetime, timezone
-from decimal import Decimal
 
 import boto3
 import stats_core
+from numeric import floats_to_decimal  # bundled shared module: canonical float->Decimal (#1207)
 
 try:
     from platform_logger import get_logger
@@ -77,16 +77,6 @@ OUTCOMES = [
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
-
-
-def _to_decimal(obj):
-    if isinstance(obj, float):
-        return Decimal(str(obj))
-    if isinstance(obj, dict):
-        return {k: _to_decimal(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_to_decimal(v) for v in obj]
-    return obj
 
 
 def _quantile(sorted_vals, q):
@@ -218,7 +208,7 @@ def lambda_handler(event: dict, context) -> dict:
             payload = tag_record(payload, source_id="scenarios")
         except ImportError:
             pass
-        table.put_item(Item=_to_decimal({k: v for k, v in payload.items() if v is not None}))
+        table.put_item(Item=floats_to_decimal({k: v for k, v in payload.items() if v is not None}))
 
         cells = sum(len(lv["outcomes"]) for lv in payload["levers"])
         result = {

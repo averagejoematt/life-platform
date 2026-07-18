@@ -325,6 +325,72 @@ def test_d4_put_item_guarded_by_validator(filename):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# D5 (#1207) — no divergent float→Decimal walker outside lambdas/numeric.py
+# ══════════════════════════════════════════════════════════════════════════════
+
+MCP_DIR = os.path.join(ROOT, "mcp")
+
+# The recursive float→Decimal walker was re-implemented ~17x under five fork names
+# (def _to_decimal / _decimalize_dict / _float_to_decimal / _floats_to_decimal /
+# to_decimal) with divergent NaN/Inf semantics — the plain copies passed Decimal('NaN')
+# through, which boto3's TypeSerializer rejects at write time. Consolidated into
+# numeric.floats_to_decimal (#1207). This guard fails if any private copy — under any
+# of the historical fork names — reappears (top-level or nested).
+#
+# Deliberately NOT matched (each is a genuinely-DIFFERENT contract, so consolidating
+# would silently change behavior — the #1207 remit was to unify only the NaN/Inf guard
+# + the round-precision, expressed via floats_to_decimal(..., precision=)):
+#   * SCALAR coercers (not recursive walkers): coach_prediction_evaluator._scalar_to_decimal,
+#     measurements._parse_decimal_field.
+#   * int→Decimal / key-stringifying / zero-fallback recursive walkers, left as-is and
+#     tracked as follow-up: character_sheet_lambda._dec (int→Decimal),
+#     episode_detect_lambda._deep_dec (round(4) + int→Decimal + str(k) key coercion),
+#     weekly_correlation_compute_lambda._deep_dec (zero-fallback `_to_dec(obj) or 0`).
+#   * `try: from numeric import floats_to_decimal / except ImportError: def floats_to_decimal`
+#     fallback shims (eightsleep, garmin, enrichment, macrofactor, health_auto_export,
+#     meal_projection, training_notes) — the sanctioned canonical-name shim; its
+#     ImportError branch is dead under the one-bundle rule (#781, numeric always staged).
+_FORBIDDEN_DECIMAL_DEF = re.compile(
+    r"^\s*def\s+(?:_to_decimal|_decimalize\w*|_float_to_decimal|_floats_to_decimal|to_decimal)\s*\(",
+    re.MULTILINE,
+)
+
+
+def _iter_python_sources():
+    """All lambdas/ + mcp/ .py files, excluding caches and CDK build-staging copies
+    (cdk/_*_staging regenerate from source and must not be linted here)."""
+    for base in (LAMBDAS_DIR, MCP_DIR):
+        for root, _, files in os.walk(base):
+            if "__pycache__" in root or "_staging" in root or "cdk.out" in root:
+                continue
+            for fname in files:
+                if fname.endswith(".py"):
+                    yield os.path.join(root, fname)
+
+
+def test_d5_no_forked_floats_to_decimal():
+    """D5 (#1207): the recursive float→Decimal walker lives ONLY in lambdas/numeric.py.
+
+    Callers must `from numeric import floats_to_decimal` — not fork a private copy.
+    This is the regression guard for the ~10 divergent forks consolidated in #1207.
+    """
+    numeric_path = os.path.abspath(os.path.join(LAMBDAS_DIR, "numeric.py"))
+    offenders = []
+    for path in _iter_python_sources():
+        if os.path.abspath(path) == numeric_path:
+            continue
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        for m in _FORBIDDEN_DECIMAL_DEF.finditer(src):
+            offenders.append(f"{os.path.relpath(path, ROOT)}: {m.group(0).strip()}")
+    assert not offenders, (
+        "Divergent float→Decimal copy reintroduced — import "
+        "`from numeric import floats_to_decimal` (with precision=/NaN-guard) instead of "
+        "forking a private walker (#1207):\n  " + "\n  ".join(offenders)
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 

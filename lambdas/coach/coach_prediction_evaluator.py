@@ -31,7 +31,6 @@ pending/confirming) are skipped. Learning log uses put_item (upsert).
 
 import json
 import logging
-import math
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -202,8 +201,14 @@ _NEVER_DECIDED_DAYS = 999
 from numeric import decimals_to_float as _decimal_to_float  # noqa: E402,F401
 
 
-def _to_decimal(val):
-    """Convert a numeric value to Decimal for DynamoDB writes."""
+def _scalar_to_decimal(val):
+    """Coerce a SCALAR numeric value to a 6-dp Decimal for DynamoDB writes.
+
+    Distinct contract from numeric.floats_to_decimal (#1207): this coerces a
+    single value via float() (accepting ints/str), rounds to 6 dp, and returns
+    None on None/unparseable input — it is NOT a recursive structure walker, so
+    it is deliberately not consolidated into the canonical helper.
+    """
     if val is None:
         return None
     try:
@@ -220,21 +225,6 @@ def _safe_float(item, field, default=None):
         except (TypeError, ValueError):
             return default
     return default
-
-
-def _decimalize_dict(d):
-    """Recursively convert all floats/ints in a dict to Decimal for DynamoDB."""
-    if isinstance(d, dict):
-        return {k: _decimalize_dict(v) for k, v in d.items()}
-    if isinstance(d, list):
-        return [_decimalize_dict(i) for i in d]
-    if isinstance(d, float):
-        if math.isnan(d) or math.isinf(d):
-            return None
-        return Decimal(str(round(d, 6)))
-    if isinstance(d, int) and not isinstance(d, bool):
-        return Decimal(str(d))
-    return d
 
 
 def _slugify(text):
@@ -924,9 +914,9 @@ def _update_bayesian_confidence(coach_id, subdomain, update_type):
             Item={
                 "pk": pk,
                 "sk": sk,
-                "alpha": _to_decimal(alpha),
-                "beta_param": _to_decimal(beta_val),
-                "mean_confidence": _to_decimal(mean_confidence),
+                "alpha": _scalar_to_decimal(alpha),
+                "beta_param": _scalar_to_decimal(beta_val),
+                "mean_confidence": _scalar_to_decimal(mean_confidence),
                 "sample_size": Decimal(str(max(0, sample_size))),
                 "subdomain": subdomain,
                 "coach_id": coach_id,
@@ -968,8 +958,8 @@ def _write_learning_record(coach_id, today_str, evaluation):
             "evaluation_type": evaluation.get("evaluation_type", "machine"),
             "status": evaluation.get("status", ""),
             "metric": evaluation.get("metric", ""),
-            "actual_value": _to_decimal(evaluation.get("actual_value")),
-            "threshold": _to_decimal(evaluation.get("threshold")),
+            "actual_value": _scalar_to_decimal(evaluation.get("actual_value")),
+            "threshold": _scalar_to_decimal(evaluation.get("threshold")),
             "condition": evaluation.get("condition", ""),
             "subdomain": evaluation.get("subdomain", ""),
             "beats_null": evaluation.get("beats_null", False),
