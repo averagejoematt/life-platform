@@ -49,6 +49,20 @@ SECTIONS = [
     ("about", "About", "The experiment, in context."),
 ]
 
+# #1237: per-section OG card. The og-image sweep (lambdas/web/og_image_lambda.py PAGES)
+# draws a fresh card daily for these story sections; point each section's social preview
+# at its own card instead of the generic home card so the link preview carries real
+# topic framing. Sections without a bespoke card fall through to og-home.png.
+# Mapping rationale: chronicle→the weekly-dispatches card, build→the "For Builders" card,
+# timeline→the "walk the journey one week at a time" weekly card. Regression guard:
+# tests/test_og_card_coverage.py (every card in PAGES must be referenced non-legacy).
+OG_CARD_BY_SECTION = {
+    "chronicle": "og-chronicle.png",
+    "build": "og-builders.png",
+    "timeline": "og-weekly.png",
+}
+DEFAULT_OG_CARD = "og-home.png"
+
 SHELL = """<!DOCTYPE html>
 <html lang="en" data-door="story">
 <head>
@@ -62,7 +76,7 @@ SHELL = """<!DOCTYPE html>
   <meta property="og:url" content="https://averagejoematt.com/story/{canon}">
   <meta property="og:title" content="{title}">
   <meta property="og:description" content="{desc}">
-  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/{og_card}">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="{title}">
   <meta name="twitter:description" content="{desc}">
@@ -164,6 +178,7 @@ def main() -> None:
             desc="The chronicle, the journal, the timeline, and the context behind the experiment.",
             canon="",
             start="chronicle",
+            og_card=DEFAULT_OG_CARD,  # the /story/ hub is the general landing — keep the brand home card
             proof=chronicle_proof,
         ),
     )
@@ -176,6 +191,7 @@ def main() -> None:
                 desc=desc,
                 canon=f"{key}/",
                 start=key,
+                og_card=OG_CARD_BY_SECTION.get(key, DEFAULT_OG_CARD),
                 proof=chronicle_proof if key == "chronicle" else "",
             ),
         )

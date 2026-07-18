@@ -798,7 +798,20 @@ FOOTER = site_footer()
 # #420/#595: per-slug OG card. A slug with its own data-driven card (drawn daily by the
 # og-image sweep through the #595 engine) points its social preview at that card instead
 # of the generic home card. Default remains og-home.png.
-OG_CARD_BY_SLUG = {"character": "og-character.png"}
+# #1237: the og-image sweep (lambdas/web/og_image_lambda.py PAGES) draws a fresh
+# per-topic card daily; wire each evidence slug that has one so the link preview shows
+# real topic numbers instead of the generic home card. tests/test_og_card_coverage.py
+# is the regression guard — every card in PAGES must be referenced by a non-legacy page.
+OG_CARD_BY_SLUG = {
+    "character": "og-character.png",
+    "sleep": "og-sleep.png",
+    "glucose": "og-glucose.png",
+    "training": "og-training.png",
+    "nutrition": "og-nutrition.png",
+    "mind": "og-mind.png",
+    "labs": "og-labs.png",
+    "experiments": "og-experiments.png",
+}
 
 
 def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str:
