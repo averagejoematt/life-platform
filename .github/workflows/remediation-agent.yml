@@ -98,7 +98,12 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           CDK_ACCOUNT: "205930651321"
           S3_BUCKET: matthew-life-platform
-          REMEDIATION_MAX_TURNS: "16"
+          # #1201: raised 16→30. At 16 turns the agent burned its whole budget
+          # mid-investigation on multi-signal runs (Jul 8 had 8 signals), leaving
+          # every signal untriaged with a truncated `_raw` tail. agent.py now reds
+          # the step when that recurs (triage_incomplete), so a too-low budget can
+          # no longer masquerade as a green 'success'. Haiku-primary keeps this cheap.
+          REMEDIATION_MAX_TURNS: "30"
           DISPATCH_PAYLOAD: ${{ toJson(github.event.client_payload) }}
         run: python3 remediation/agent.py
 
