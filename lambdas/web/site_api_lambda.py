@@ -53,6 +53,7 @@ from boto3.dynamodb.conditions import Key
 
 # bundled shared module
 from phase_filter import with_phase_filter  # noqa: F401 — used by handlers below
+from text_utils import truncate_at_word  # #1224: word-boundary summary truncation (no mid-word cut)
 
 from web.site_api_agents import handle_agent_activity
 from web.site_api_autonomic import (
@@ -832,8 +833,8 @@ def lambda_handler(event, context):
                         _cd_out_item = _decimal_to_float(_cd_out_items[0])
                         coach_entry["position_summary"] = (
                             _cd_out_item.get("position_summary")
-                            or _cd_out_item.get("observatory_summary", "")[:200]
-                            or _cd_out_item.get("content", "")[:200]
+                            or truncate_at_word(_cd_out_item.get("observatory_summary", ""), 200)  # #1224: word boundary
+                            or truncate_at_word(_cd_out_item.get("content", ""), 200)  # #1224: word boundary
                         )
                         coach_entry["emotional_investment"] = _cd_out_item.get("emotional_investment", "neutral")
                         # #1226: as-of date for the digest card kicker. Prefer the
