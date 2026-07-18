@@ -304,11 +304,17 @@ _PK_RULES: list = [
     (lambda pk, sk: pk.startswith("CANARY#"), SYSTEM_STATE),  # synthetic-monitor state (canary_lambda)
     (lambda pk, sk: pk.startswith("SYSTEM#"), SYSTEM_STATE),  # ops namespace (SYSTEM#dlq-ledger)
     (lambda pk, sk: pk.startswith("OAUTH#"), SYSTEM_STATE),  # TTL'd MCP auth codes + session bearers (#779/#909)
-    # Narrator persona state (PERSONA#elena show memory + callbacks, PERSONA#margaret
-    # editor state). Durable narrative identity that deliberately spans cycles — the
-    # cycle-5 reset carried Elena straight into EP0. This classification preserves the
-    # de-facto behavior (never touched); wiping personas at reset would be a new
-    # decision needing its own wipe wiring (like ENSEMBLE#dispute in #918), not a default.
+    # Narrator persona state for personas OTHER than Elena (PERSONA#margaret editor
+    # state, etc.). Durable narrative identity that deliberately spans cycles — this
+    # classification preserves the de-facto behavior (never touched); wiping these
+    # personas at reset would be a new decision needing its own wipe wiring (like
+    # ENSEMBLE#dispute in #918), not a default.
+    #   NB (#1248): PERSONA#elena is the EXCEPTION and is handled by the earlier
+    #   first-match rule above (EXPERIMENT_SCOPED, #946) — her per-cycle story state
+    #   (open THREADs, pending CALLBACKs) is wiped at reset, NOT carried across cycles.
+    #   (The prior comment here wrongly claimed the reset "carried Elena straight into
+    #   EP0"; DDB confirms all PERSONA#elena rows tombstone at restart. The general
+    #   PERSONA#* class ruling stays with #930.)
     (lambda pk, sk: pk.startswith("PERSONA#"), CROSS_PHASE),
 ]
 
