@@ -20,7 +20,8 @@ flake8==7.3.0
 ruff==0.14.14
 black==25.9.0
 
-# Type checking (advisory — see tests/test_mypy_clean_modules.py + mypy.ini)
+# Type checking (ENFORCED/blocking on the clean-module set, advisory elsewhere —
+# see tests/test_mypy_clean_modules.py + mypy.ini)
 mypy==2.1.0
 
 # AWS SDK (for tests that call boto3 directly)

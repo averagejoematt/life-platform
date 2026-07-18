@@ -42,11 +42,11 @@ flake8 lambdas/ mcp/
 # Syntax check all Python
 find lambdas/ mcp/ -name '*.py' -exec python3 -m py_compile {} \;
 
-# Deploy a single Lambda
-bash deploy/deploy_lambda.sh <function-name>
+# Deploy a single Lambda (both args required; see deploy.md's mapping table)
+bash deploy/deploy_lambda.sh <function-name> <source-file>
 
 # Deploy + run smoke test
-bash deploy/deploy_and_verify.sh <function-name>
+bash deploy/deploy_and_verify.sh <function-name> <source-file>
 
 # CDK deploy all stacks
 cd cdk && npx cdk deploy --all
@@ -61,7 +61,7 @@ python3 mcp_bridge.py
 
 1. **Ingest**: 15 scheduled ingestion Lambda functions pull from APIs on EventBridge (8 SIMP-2 framework + 7 pattern-exempt per ADR-056/060; hourly 4am–10pm PST, except Garmin at 4x daily due to OAuth rate limits, Weather at 2x daily, Todoist at 1x daily (14:00 UTC — its 72h staleness threshold in `source_registry.py` is derived from that cadence, #471), Hevy at hourly 12-23 UTC). The standing `hevy-webhook` FunctionURL (parked since Hevy doesn't publish webhooks) was removed 2026-07-06 (#756, R21 kill list #8) — its handler source stays in git history for revival if Hevy ever ships webhooks. Gap-aware backfill — each ingestion Lambda detects missing `DATE#` records (including today) and only fetches what's absent. HAE webhook sources (CGM, water, BP, State of Mind) are near-real-time with reading-level dedup for cumulative fields.
 
-2. **Store**: Raw JSON in S3 — the raw/ zone is **three-generation fractured** (X-9/#498): most sources write `raw/matthew/{source}/{YYYY}/{MM}/{DD}.json`, legacy todoist/weather write `raw/{source}/…` with no user segment, and hevy is flat UUID-keyed (`raw/hevy/{workout_id}.json`). **Each source's actual layout is the `raw_layout` facet in `lambdas/source_registry.py` — read it, don't guess; no mass-move (raw/* is delete-protected).** Normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
+2. **Store**: Raw JSON in S3 — the raw/ zone is **three-generation fractured** (X-9/#498): most sources write `raw/matthew/{source}/{YYYY}/{MM}/{filename}`, legacy todoist/weather write `raw/{source}/…` with no user segment, and hevy is flat UUID-keyed (`raw/hevy/{workout_id}.json`). **The leaf filename ALSO varies (#1256): framework/API sources write `YYYY-MM-DD.json` (the SIMP-2 migration flipped the old `DD.json` form to the full date mid-2026 — pre-2026 objects on the flipped sources todoist/garmin are still `DD.json`), while the HAE-webhook sources (cgm/blood_pressure/state_of_mind) write `DD.json`. Each source's actual layout — prefix, scheme, AND filename — is the `raw_layout` facet in `lambdas/source_registry.py`; read it, don't construct keys (no mass-move — raw/* is delete-protected).** Normalized metrics in DynamoDB single-table (`life-platform`, PK `USER#matthew#SOURCE#{source}`, SK `DATE#{YYYY-MM-DD}`).
 
 3. **Serve/Compute**:
    - **MCP Lambda** — ~64 tools across ~23 domain modules (`mcp/tools_*.py`, including `tools_hevy.py` per ADR-060 and `tools_benchmark.py` (BENCH-1 cut-benchmarking, PRIVATE, ADR-089)), accessed via Claude Desktop and claude.ai. Source of truth is the count of top-level keys in the `TOOLS` dict in `mcp/registry.py` — use `deploy/sync_doc_metadata.py::_auto_discover_tool_count` (AST parse) — do NOT trust a hardcoded number here, it drifts. NB: `grep -c '"name":' mcp/registry.py` **over-counts** because it also matches nested `"name"` fields inside tool input schemas — do not use it as the count. **Note:** pruned 143 → 60 on 2026-07-08 (#395, ER-04) against 30-day EMF telemetry — the audited removal ledger is `docs/MCP_TOOL_AUDIT.md`; removals go through its dated AUDITED_AT ratchet, never silently.
@@ -130,7 +130,7 @@ Daily brief is "protect longest" by design. Manual reset for testing: `aws ssm p
 
 ## Self-healing Remediation Agent (ADR-064/065)
 
-Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~07:45 PT daily) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — auto-fixes the safe class, opens PRs for the rest, reports needs-human items in one curated email.
+Scheduled GitHub Actions workflow (`.github/workflows/remediation-agent.yml`, ~07:45 PT Mon/Wed/Fri — cron `45 14 * * 1,3,5`; urgent alarms still trigger it on-demand via `repository_dispatch`) triages CloudWatch alarms, failed CI runs, DLQ depth, QA-smoke results — auto-fixes the safe class, opens PRs for the rest, reports needs-human items in one curated email.
 
 **Auth:** AWS OIDC → `github-actions-remediation-role` (Bedrock + read-only diagnosis + scoped audit-log writes, NO deploy/IAM mutate). Model: Sonnet 4.6 on Bedrock — no Anthropic key.
 
