@@ -337,10 +337,17 @@ async function renderReadToday(read) {
   if (coaches.length) {
     h += `<section class="read-digest"><p class="dx-kicker label">each coach's read · click to go deeper</p><ul class="rd-list">`;
     for (const c of coaches) {
+      // #1226 (completes #787 on the digest surface): stamp each card with its
+      // read's own as-of date so a stale Day-1 vitals quote can't read as current.
+      // Graceful when the field is absent (an API deploy racing the site deploy) —
+      // coachAsOf returns "" and no kicker renders, never a crash.
+      const asOf = coachAsOf(c.analysis_generated_at, false);
       h += `<li class="rd-card" data-coach="${esc(c.coach_id + "_coach")}" style="--coach:${esc(c.color || "")}"><button type="button" class="rd-btn">` +
         `<span class="sigil-md">${sigil(c, { title: "" })}</span><span class="rd-body">` +
         `<span class="rd-top"><span class="rd-dom label">${esc(String(c.title || c.coach_id))}</span><span class="rd-name">${esc(c.name || "")}</span></span>` +
-        `<span class="rd-say">${esc(c.position_summary)}</span></span></button></li>`;
+        `<span class="rd-say">${esc(c.position_summary)}</span>` +
+        (asOf ? `<span class="rd-asof label">${esc(asOf)}</span>` : "") +
+        `</span></button></li>`;
     }
     h += `</ul></section>`;
   } else {
