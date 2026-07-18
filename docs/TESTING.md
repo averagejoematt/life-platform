@@ -17,7 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-**Total tests:** 3940 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 3948 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 
 ---
 
@@ -67,7 +67,7 @@ python3 -m pytest tests/ -m integration -v
   - `test_i1_lambda_handlers_match_expected` — all `ci/lambda_map.json` Lambdas exist in AWS
   - `test_i2_lambda_layer_version_current` — all consumers on latest layer
   - `test_i3_spot_check_lambda_invocability` — random Lambdas don't error on healthcheck
-  - `test_i9_dlq_empty` — DLQ near-zero
+  - `test_i9_dlq_no_deploy_caused_messages` — no deploy-caused DLQ messages (pre-existing transients warn, #1327)
   - `test_i10_mcp_lambda_responds` — MCP roundtrip
   - `test_i11_data_reconciliation_running` — weekly reconciliation alive
   - `test_i12_mcp_tool_shape` — tool dispatch returns expected shape

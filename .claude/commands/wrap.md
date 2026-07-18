@@ -129,6 +129,19 @@ an outcome.**
 - The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
   `**Docs:** <pages updated>` or `**Docs:** none needed — <one-clause reason>`.
 
+### (e2) Green-main gate — a wrap gate, same shape as (d)/(e) (#1327)
+
+A wrap may not declare "main GREEN" over a badge it never read (2026-07-18: a status
+block said `main GREEN (1c641b6a)` while that sha's own push run had FAILED).
+
+- Run `python3 scripts/check_main_green.py` before the wrap commit.
+  - Exit 0 (latest completed non-cancelled CI/CD run on main succeeded): done.
+  - Exit 1: either fix main now, or write the explicit decode line into the handover —
+    `**Main:** red — <one-line cause>` (e.g. "pre-existing Withings DLQ transient") —
+    then re-run with `--decoded`. **Silent omission is not an outcome.**
+- The handover carries one line either way: `**Main:** green (<sha>)` or
+  `**Main:** red — <decode>`.
+
 ### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside

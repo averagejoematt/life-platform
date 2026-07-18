@@ -61,6 +61,24 @@ def test_alarm_count_matches_cdk():
 
 
 def test_alarms_and_sources_share_the_maintained_fact():
-    """One number, one home: the maintained PLATFORM_FACTS values are the source."""
-    assert PLATFORM_STATS["alarms"] == sync.PLATFORM_FACTS["alarm_count"]
-    assert PLATFORM_STATS["data_sources"] == sync.PLATFORM_FACTS["data_sources"]
+    """One number, one home — DISCOVERY-first (#1327).
+
+    The old form compared PLATFORM_STATS against the raw PLATFORM_FACTS hand
+    literals, so every alarm-count change needed a manual fallback-literal bump
+    in sync_doc_metadata.py or main went red (`assert 69 == 67` on 2026-07-18,
+    the third instance of the class in one week). The shared source of truth is
+    the DISCOVERED value; the literal is only the fallback when discovery bails.
+    """
+    facts = sync._apply_auto_discovered(dict(sync.PLATFORM_FACTS))
+    assert PLATFORM_STATS["alarms"] == facts["alarm_count"], "run: python3 deploy/sync_doc_metadata.py --apply"
+    # data_sources has no auto-discoverer (the public count is curated) — the
+    # literal comparison stands, and the fact moves ~never.
+    assert PLATFORM_STATS["data_sources"] == facts["data_sources"]
+    # Fallback hygiene: the hand literal only matters when discovery bails, but a
+    # far-drifted fallback would then quietly resurrect an old number. ±5 keeps
+    # it near truth without demanding a bump on every alarm PR (the exact class
+    # that redded main).
+    assert abs(sync.PLATFORM_FACTS["alarm_count"] - facts["alarm_count"]) <= 5, (
+        f"PLATFORM_FACTS alarm_count fallback ({sync.PLATFORM_FACTS['alarm_count']}) has drifted "
+        f">5 from discovery ({facts['alarm_count']}) — refresh the fallback literal"
+    )

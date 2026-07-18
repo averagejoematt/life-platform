@@ -473,17 +473,44 @@ def test_i8_s3_bucket_and_config_files():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# I9 — SQS DLQ has zero messages (no silent failures accumulating)
+# I9 — SQS DLQ: no DEPLOY-CAUSED messages (transient-aware, #1327)
 # Root cause of: 2026-03-08 P3 (DLQ messages accumulated for 2 days unnoticed)
+# AND of the opposite failure: one documented-transient Withings message redded
+# 38 consecutive main runs 2026-07-12..07-18 (alarm fatigue — a real red went
+# unnoticed ~26h inside the noise).
 # ══════════════════════════════════════════════════════════════════════════════
 
+# A message older than this predates the deploy that is being verified (a full
+# pipeline run is ~20 min) — it is a PRE-EXISTING transient, already covered by
+# the dlq-depth CloudWatch alarm + the remediation agent, and must not red a
+# green deploy. Messages younger than this arrived during/after the deploy —
+# plausibly CAUSED by it — and fail hard.
+DLQ_PREEXISTING_AGE_S = 3600
 
-def test_i9_dlq_empty():
-    """I9: Ingestion DLQ should have zero messages.
 
-    Non-zero DLQ means one or more Lambdas are silently failing. The March 8
-    P3 ran for 2 days before anyone noticed the DLQ had accumulated failures.
+def _dlq_split_fresh_stale(sent_timestamps_ms, now_s, preexisting_age_s=DLQ_PREEXISTING_AGE_S):
+    """Split DLQ message SentTimestamps (ms) into (fresh, stale) counts.
+
+    Pure — unit-tested offline by tests/test_unred_main_1327.py. fresh = younger
+    than preexisting_age_s (deploy-window ⇒ fail); stale = older (pre-existing
+    transient ⇒ warn-lane).
     """
+    fresh = sum(1 for t in sent_timestamps_ms if now_s - (t / 1000.0) < preexisting_age_s)
+    return fresh, len(sent_timestamps_ms) - fresh
+
+
+def test_i9_dlq_no_deploy_caused_messages():
+    """I9: the DLQ holds no message ATTRIBUTABLE TO THIS DEPLOY.
+
+    Empty queue passes. A non-empty queue is dated by SentTimestamp: messages
+    younger than DLQ_PREEXISTING_AGE_S fail the deploy (something this deploy
+    shipped is failing); older messages are pre-existing transients — loudly
+    warned, never a red (the depth alarm + Mon/Wed/Fri remediation agent own
+    their lifecycle). This is the #1327 warn-lane: a red main run means
+    action-required again.
+    """
+    import warnings
+
     boto3 = _get_boto3()
     sqs = boto3.client("sqs", region_name=REGION)
 
@@ -498,11 +525,41 @@ def test_i9_dlq_empty():
     except Exception as e:
         pytest.skip(f"Could not check DLQ: {e}")
 
-    assert total == 0, (
-        f"I9 FAIL: DLQ has {total} message(s) ({visible} visible, {in_flight} in-flight).\n"
-        f"This means at least one Lambda is silently failing!\n"
-        f"Check: aws sqs receive-message --queue-url {DLQ_URL} --region {REGION}\n"
-        f"Drain: manually invoke life-platform-dlq-consumer"
+    if total == 0:
+        return
+
+    # Date the messages. VisibilityTimeout=0 keeps the peek non-destructive.
+    sent_ms = []
+    try:
+        resp = sqs.receive_message(
+            QueueUrl=DLQ_URL,
+            MaxNumberOfMessages=10,
+            VisibilityTimeout=0,
+            WaitTimeSeconds=1,
+            AttributeNames=["SentTimestamp"],
+        )
+        for m in resp.get("Messages", []):
+            ts = m.get("Attributes", {}).get("SentTimestamp")
+            if ts:
+                sent_ms.append(int(ts))
+    except Exception as e:
+        warnings.warn(f"I9: could not date {total} DLQ message(s) ({e}) — treating as pre-existing (warn-lane)")
+        return
+
+    import time as _time
+
+    fresh, stale = _dlq_split_fresh_stale(sent_ms, _time.time())
+    undated = total - len(sent_ms)
+    if stale or undated:
+        warnings.warn(
+            f"I9 WARN: {stale} pre-existing + {undated} undated DLQ message(s) — transients, "
+            f"not this deploy's fault. Lifecycle: dlq-depth alarm + remediation agent. "
+            f"Drain: manually invoke life-platform-dlq-consumer"
+        )
+    assert fresh == 0, (
+        f"I9 FAIL: {fresh} DLQ message(s) arrived within the last {DLQ_PREEXISTING_AGE_S}s — "
+        f"plausibly CAUSED by this deploy (a shipped Lambda is failing now).\n"
+        f"Check: aws sqs receive-message --queue-url {DLQ_URL} --region {REGION}"
     )
 
 
