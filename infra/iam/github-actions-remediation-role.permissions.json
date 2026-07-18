@@ -37,6 +37,7 @@
       "Effect": "Allow",
       "Action": [
         "cloudformation:DetectStackDrift",
+        "cloudformation:DetectStackResourceDrift",
         "cloudformation:DescribeStackDriftDetectionStatus",
         "cloudformation:DescribeStackResourceDrifts",
         "cloudformation:ListStackResources"
