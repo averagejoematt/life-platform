@@ -797,6 +797,15 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
     Kept as its own dedicated function (not folded into compute_coach_computation,
     which coach-observatory-renderer and the computation engine also use) so those
     two Lambdas don't inherit permissions they don't need.
+
+    #1196: added cloudwatch:PutMetricData. emit_grading_liveness() emits the #727
+    scientific-liveness gauge (DaysSinceLastDecided / DecidedCount / GradableCount
+    in the LifePlatform/Predictions namespace) EVERY run so the monitoring_stack
+    GradingStalled alarm has daily data. Pre-fix every emit failed AccessDenied
+    (non-fatal — caught as WARNING at coach_prediction_evaluator.py:1471), the
+    gauge never landed a single datapoint, and grading-stalled sat in ALARM on
+    missing-data-breaching and could never clear. Mirrors the identical grant
+    compute_coach_state_updater already carries. PutMetricData only accepts "*".
     """
     return _compute_base(
         needs_kms=True,
@@ -811,6 +820,11 @@ def compute_coach_prediction_evaluator() -> list[iam.PolicyStatement]:
                 sid="InvokeStanceRefresh",
                 actions=["lambda:InvokeFunction"],
                 resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-history-summarizer"],
+            ),
+            iam.PolicyStatement(
+                sid="CloudWatchMetrics",
+                actions=["cloudwatch:PutMetricData"],
+                resources=["*"],
             ),
         ],
     )
@@ -2247,6 +2261,19 @@ def site_api_ai() -> list[iam.PolicyStatement]:
             resources=[f"arn:aws:lambda:{REGION}:{ACCT}:function:coach-quality-gate"],
         ),
         _bedrock_statement(),  # ADR-062: /api/ask + /api/board_ask now use Bedrock
+        # #1196: site_api_ai_lambda._emit_ai_token_metrics() emits AnthropicInput/
+        # OutputTokens (+ cache tokens) to LifePlatform/AI on every /api/ask +
+        # /api/board_ask call. Fail-soft (caught as WARNING at
+        # site_api_ai_lambda.py:119) — so without this grant the emit fails
+        # AccessDenied and the reader-facing AI token/cost telemetry is silently
+        # dropped. Same class as coach_state_updater / coach_prediction_evaluator;
+        # surfaced by the test_put_metric_data_grant_lockstep gate. PutMetricData
+        # only accepts "*".
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],
+        ),
     ]
 
 
