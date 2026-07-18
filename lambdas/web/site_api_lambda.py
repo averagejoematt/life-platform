@@ -100,54 +100,50 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
 )
 
 # P1.1 Phase B step 6 (2026-05-26): data cluster extracted.
+# #1240: the vitals-adjacent + intelligence-adjacent clusters were split out of
+# site_api_data into site_api_vitals / site_api_intelligence (imports below).
 from web.site_api_data import (
     handle_changes_since,
-    handle_circadian,
-    handle_correlations,
     handle_cycle_compare,
     handle_device_agreement,
     handle_discoveries,
     handle_domains,
     handle_experiments,
-    handle_forecast,
     handle_fulfillment_ritual,
-    handle_genome_risks,
-    handle_glucose,
     handle_habit_registry,
     handle_habit_streaks,
     handle_habits,
-    handle_inference_receipt,
-    handle_labs,
     handle_last_sync,
     handle_ledger,
     handle_observatory_week,
-    handle_phenoage,
-    handle_pillar_coupling,
     handle_platform_stats,
     handle_presence,
     handle_protocols,
     handle_routine,
-    handle_scenarios,
-    handle_sleep_correlations,
-    handle_sleep_detail,
     handle_source_freshness,
-    handle_state_of_matthew,
     handle_supplements,
     handle_survival,
     handle_tools_baseline,
     handle_vice_streaks,
     handle_what_changed,
-    handle_wrong,
 )
 
 # P1.1 Phase B step 3 (2026-05-26): status + pulse handlers extracted.
+# #1240: intelligence-adjacent domain handlers moved here from site_api_data.
 from web.site_api_intelligence import (
+    handle_correlations,
+    handle_forecast,
     handle_hypotheses,
+    handle_inference_receipt,
     handle_intelligence_summary,
+    handle_pillar_coupling,
     handle_pulse,
     handle_pulse_history,
+    handle_scenarios,
+    handle_state_of_matthew,
     handle_status,
     handle_status_summary,
+    handle_wrong,
 )
 
 # P1.1 Phase B step 2 (2026-05-26): observatory handlers extracted to sibling module.
@@ -199,14 +195,23 @@ from web.site_api_social import (
     handle_predict_week_tally,
     handle_subscriber_count,
 )
+
+# #1240: vitals-adjacent domain handlers moved here from site_api_data.
 from web.site_api_vitals import (
     handle_achievements,
     handle_character,
     handle_character_config,
     handle_character_stats,
+    handle_circadian,
+    handle_genome_risks,
+    handle_glucose,
     handle_journey,
     handle_journey_timeline,
     handle_journey_waveform,
+    handle_labs,
+    handle_phenoage,
+    handle_sleep_correlations,
+    handle_sleep_detail,
     handle_snapshot,
     handle_timeline,
     handle_vitals,

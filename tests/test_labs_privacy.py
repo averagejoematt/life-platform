@@ -25,7 +25,7 @@ os.environ.setdefault("AWS_REGION", "us-west-2")
 os.environ.setdefault("S3_BUCKET", "matthew-life-platform")
 os.environ.setdefault("USER_ID", "matthew")
 
-from web import site_api_data as sad  # noqa: E402
+from web import site_api_vitals as sad  # noqa: E402  # #1240: handle_labs + _strip_genetic_biomarkers moved to site_api_vitals
 
 # Genetic "tells" the served payload must never contain. Synthetic-safe patterns —
 # these are category/format words, not any real person's gene or genotype.

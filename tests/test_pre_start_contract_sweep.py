@@ -40,6 +40,7 @@ from web import (  # noqa: E402
     site_api_coach as coach,
     site_api_common as common,
     site_api_data as data,
+    site_api_intelligence as intel,  # #1240: handle_forecast moved here from site_api_data
     site_api_lambda as lam,
     site_api_vitals as vitals,
 )
@@ -380,8 +381,8 @@ def _forecast_row():
 
 def test_forecast_pre_start_flag(monkeypatch):
     start = _future(monkeypatch)
-    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[_forecast_row()]))
-    b = _body(data.handle_forecast())
+    monkeypatch.setattr(intel, "table", FakeDdbTable(rows=[_forecast_row()]))
+    b = _body(intel.handle_forecast())
     assert b["available"] is True
     assert b["pre_start"] is True
     assert b["start_date"] == start
@@ -390,8 +391,8 @@ def test_forecast_pre_start_flag(monkeypatch):
 
 def test_forecast_inert_when_genesis_past(monkeypatch):
     _past(monkeypatch)
-    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[_forecast_row()]))
-    b = _body(data.handle_forecast())
+    monkeypatch.setattr(intel, "table", FakeDdbTable(rows=[_forecast_row()]))
+    b = _body(intel.handle_forecast())
     assert b["pre_start"] is False
     assert "days_until_start" not in b
 

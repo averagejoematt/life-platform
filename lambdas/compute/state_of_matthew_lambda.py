@@ -31,7 +31,7 @@ with a deterministic, template-built narrative instead of Haiku's prose.
 
 DDB record: pk USER#matthew#SOURCE#state_of_matthew (EXPERIMENT_SCOPED — derived
 weekly intelligence; see phase_taxonomy.py), sk DATE#<issued_date>. Read by
-GET /api/state_of_matthew (lambdas/web/site_api_data.py).
+GET /api/state_of_matthew (lambdas/web/site_api_intelligence.py — #1240 split).
 
 Runs weekly, Sunday 19:30 UTC (12:30 PM PT) — after hypothesis-engine (19:00 UTC)
 so this week's fresh hypothesis checks/resolutions are in before the brief reads

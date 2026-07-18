@@ -24,7 +24,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from fakes import FakeDdbTable  # noqa: E402
 from web import (
     site_api_common as common,  # noqa: E402
-    site_api_data as data,  # noqa: E402
+    site_api_data as data,  # noqa: E402  # retired-handler absence check (test_sleep_reconciliation_handler_is_retired)
+    site_api_intelligence as intel,  # noqa: E402  # #1240: handle_forecast moved here
+    site_api_vitals as vit,  # noqa: E402  # #1240: handle_circadian/handle_sleep_detail moved here
 )
 
 # ── circadian ────────────────────────────────────────────────────────────────
@@ -47,7 +49,7 @@ def test_circadian_populated_shape(monkeypatch):
     }
     monkeypatch.setattr(common, "table", FakeDdbTable(rows=[item]))
 
-    resp = data.handle_circadian()
+    resp = vit.handle_circadian()
     assert resp["statusCode"] == 200
     body = __import__("json").loads(resp["body"])
     assert body["available"] is True
@@ -65,7 +67,7 @@ def test_circadian_populated_shape(monkeypatch):
 
 def test_circadian_no_data(monkeypatch):
     monkeypatch.setattr(common, "table", FakeDdbTable(rows=[]))
-    resp = data.handle_circadian()
+    resp = vit.handle_circadian()
     assert resp["statusCode"] == 200
     body = __import__("json").loads(resp["body"])
     assert body["available"] is False
@@ -89,7 +91,7 @@ def test_sleep_detail_night_of_date_sourced_live_not_from_unified(monkeypatch):
     handle_sleep_detail's as_of_date — the LATEST live Eight Sleep night in the window —
     NOT from the retired, chronically-stale sleep_unified record. as_of_date must track
     the freshest available night."""
-    monkeypatch.setattr(data, "EXPERIMENT_START", "2026-06-01")
+    monkeypatch.setattr(vit, "EXPERIMENT_START", "2026-06-01")
 
     eight = [
         {"sk": "DATE#2026-07-01", "sleep_score": Decimal("80"), "sleep_efficiency_pct": Decimal("88")},
@@ -102,9 +104,9 @@ def test_sleep_detail_night_of_date_sourced_live_not_from_unified(monkeypatch):
     def _fake_query_source(source, *_a, **_k):
         return {"eightsleep": eight, "whoop": whoop}.get(source, [])
 
-    monkeypatch.setattr(data, "_query_source", _fake_query_source)
+    monkeypatch.setattr(vit, "_query_source", _fake_query_source)
 
-    resp = data.handle_sleep_detail()
+    resp = vit.handle_sleep_detail()
     assert resp["statusCode"] == 200
     body = __import__("json").loads(resp["body"])
     # as_of_date is the freshest live Eight Sleep night — the honest source for "night of".
@@ -150,9 +152,9 @@ def test_forecast_populated_shape(monkeypatch):
         "run_id": "r1",
         "phase": "experiment",
     }
-    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[item]))
+    monkeypatch.setattr(intel, "table", FakeDdbTable(rows=[item]))
 
-    resp = data.handle_forecast()
+    resp = intel.handle_forecast()
     assert resp["statusCode"] == 200
     body = __import__("json").loads(resp["body"])
     assert body["available"] is True
@@ -168,7 +170,7 @@ def test_forecast_populated_shape(monkeypatch):
 
 
 def test_forecast_empty(monkeypatch):
-    monkeypatch.setattr(data, "table", FakeDdbTable(rows=[]))
-    resp = data.handle_forecast()
+    monkeypatch.setattr(intel, "table", FakeDdbTable(rows=[]))
+    resp = intel.handle_forecast()
     body = __import__("json").loads(resp["body"])
     assert body["available"] is False

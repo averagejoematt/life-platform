@@ -31,7 +31,7 @@ _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO / "lambdas"))
 sys.path.insert(0, str(_REPO / "lambdas" / "web"))
 
-from web import site_api_data as sad  # noqa: E402
+from web import site_api_intelligence as sad  # noqa: E402  # #1240: handle_inference_receipt moved to site_api_intelligence
 
 
 # ── fakes ─────────────────────────────────────────────────────────────────────
