@@ -1448,6 +1448,42 @@ gh workflow run remediation-agent.yml
 
 **The merge gate is deterministic, not the agent.** The agent opens PRs labeled `auto-fix-safe`; `remediation/automerge.py` (separate workflow step) verifies allowlist/denylist/diff-bound/lint/unit-tests and merges if all green. The gate does NOT bypass `ci-cd.yml`'s production approval gate — even merged code needs manual deploy approval. Infra (`cdk/`) merges are flagged "needs cdk deploy."
 
+## QA Depth Dial (#1452)
+
+One knob — SSM `/life-platform/qa-level` — trades QA depth against spend/Actions
+minutes without editing workflows under pressure (the `/life-platform/remediation-mode`
+kill-switch shape).
+
+| Value | Standalone daily visual-qa.yml | Weekly WebKit run | Cost posture |
+|---|---|---|---|
+| `full` | full-surface AI-vision on EVERY fire (+ reader-truth) | runs | max depth — watching something closely |
+| `standard` (default) | deterministic + reader-truth daily; full AI-vision Sunday/manual (#1428) | runs | today's normal |
+| `lean` | deterministic sweep only — AI-vision + reader-truth stripped ($0 Bedrock) | skipped | cost pressure |
+| `off` | sweep + accuracy gate skipped entirely | skipped | standalone QA dark — emergency only |
+
+**Structural exemption:** the deploy-gating QA copies (`ci-cd.yml` / `site-deploy.yml`
+visual-qa jobs, the PR gates `v4-gate.yml` / `surface-drift.yml`) NEVER read the dial —
+the deploy gate cannot be disabled by it (`tests/test_qa_level_dial.py` enforces).
+
+**Fail-open:** an unreadable/unset/invalid param is `standard` — each workflow states
+the fail-open in its run log; it is never a silent default. The dial state also rides
+the Monday weekly green report (E3, `traffic_digest_lambda`) — `lean` renders warn,
+`off` renders loud/bad. The `/qa` skill reports the dial at the start of every mode,
+and `python3 scripts/qa_audit.py --live` (#1450) reads it too.
+
+**Check / set:**
+```bash
+aws ssm get-parameter --name /life-platform/qa-level --region us-west-2 \
+  --query Parameter.Value --output text
+aws ssm put-parameter --name /life-platform/qa-level --value standard \
+  --type String --overwrite --region us-west-2   # full | standard | lean | off
+```
+
+**IAM:** the traffic-digest Lambda's read is CDK-owned (`role_policies.py`,
+`OpsDialParamRead`). The workflows read via `github-actions-diagnosis-role` (manual,
+non-IaC — DEVOPS-02 deferred); until that role carries `ssm:GetParameter` on the
+param, workflow reads fail open to `standard` (logged).
+
 ## Urgent-Alarm Dispatcher (fast path, ADR-064)
 
 `life-platform-remediation-dispatcher` Lambda is subscribed to the `life-platform-alerts` SNS topic. On each fire it:

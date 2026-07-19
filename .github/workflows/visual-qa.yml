@@ -39,6 +39,13 @@
 # time already covers tier-1 pages via ci-cd.yml/site-deploy.yml's --ai-qa-max-tier
 # 1) — this keeps AI-vision spend to exactly two buckets: tier-1 at every deploy,
 # full surface once a week. See tests/visual_qa.py's module docstring for the cost math.
+#
+# #1452 — the QA-depth dial (SSM /life-platform/qa-level = full|standard|lean|off,
+# fail-open standard when unreadable, stated in the log): one knob scales THIS
+# standalone run (full = AI-vision every fire; lean = deterministic only; off =
+# skip) without editing the workflow under pressure. The deploy-gating QA copies
+# in ci-cd.yml/site-deploy.yml never read the dial — structurally exempt, the
+# deploy gate can never be disabled by it. Docs: docs/RUNBOOK.md § QA Depth Dial.
 
 name: Visual QA (standalone)
 
@@ -90,25 +97,59 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-diagnosis-role
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Determine cadence (#1428 — full-surface AI-vision only on Sunday/manual)
+      - name: Read the QA-depth dial (#1452 — SSM /life-platform/qa-level, fail-open standard)
+        id: dial
+        run: |
+          # One knob scales the NON-gating QA estate (this standalone run + the
+          # weekly WebKit run) up/down without editing workflows under pressure.
+          # The deploy-gating QA copies (ci-cd.yml / site-deploy.yml) never read
+          # this parameter — the deploy gate can not be disabled by the dial.
+          LEVEL=$(aws ssm get-parameter --name /life-platform/qa-level \
+            --query Parameter.Value --output text 2>/dev/null || true)
+          case "$LEVEL" in
+            full|standard|lean|off)
+              echo "qa-level=$LEVEL" ;;
+            *)
+              echo "qa-level unreadable or invalid ('$LEVEL') — fail-open to standard (#1452)"
+              LEVEL=standard ;;
+          esac
+          echo "level=$LEVEL" >> "$GITHUB_OUTPUT"
+
+      - name: Determine cadence (#1428 full-surface AI-vision Sunday/manual · #1452 dial scaling)
         id: cadence
         run: |
-          # UTC day-of-week: 7 = Sunday. A manual workflow_dispatch always gets
-          # the full AI-vision pass too, so an on-demand run is never partial.
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%u)" = "7" ]; then
-            echo "ai_qa_flag=--ai-qa" >> "$GITHUB_OUTPUT"
-            echo "Full-surface AI-vision pass: ON (${{ github.event_name }}, UTC day $(date -u +%u))"
+          LEVEL="${{ steps.dial.outputs.level }}"
+          AI=""
+          RT="--reader-truth"
+          if [ "$LEVEL" = "off" ]; then
+            RT=""
+            echo "qa-level=off — standalone sweep + accuracy gate SKIPPED (deploy-gating QA is exempt from the dial by design)"
+          elif [ "$LEVEL" = "lean" ]; then
+            RT=""
+            echo "qa-level=lean — deterministic sweep only (AI-vision + reader-truth stripped; \$0 Bedrock)"
+          elif [ "$LEVEL" = "full" ]; then
+            AI="--ai-qa"
+            echo "qa-level=full — full-surface AI-vision pass on EVERY fire (not just Sunday/manual)"
           else
-            echo "ai_qa_flag=" >> "$GITHUB_OUTPUT"
-            echo "Full-surface AI-vision pass: OFF (deterministic + reader-truth only; UTC day $(date -u +%u), not Sunday)"
+            # standard = the pre-#1452 behavior: UTC day-of-week 7 = Sunday. A manual
+            # workflow_dispatch always gets the full AI-vision pass, never partial.
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%u)" = "7" ]; then
+              AI="--ai-qa"
+              echo "Full-surface AI-vision pass: ON (${{ github.event_name }}, UTC day $(date -u +%u))"
+            else
+              echo "Full-surface AI-vision pass: OFF (deterministic + reader-truth only; UTC day $(date -u +%u), not Sunday)"
+            fi
           fi
+          echo "ai_qa_flag=$AI" >> "$GITHUB_OUTPUT"
+          echo "reader_truth_flag=$RT" >> "$GITHUB_OUTPUT"
 
       - name: Run visual + AI-vision QA sweep
+        if: steps.dial.outputs.level != 'off'
         run: |
-          python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} --reader-truth
+          python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} ${{ steps.cadence.outputs.reader_truth_flag }}
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
-        if: always()
+        if: always() && steps.dial.outputs.level != 'off'
         run: |
           python3 tests/accuracy_audit.py --live
 
