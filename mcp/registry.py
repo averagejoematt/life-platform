@@ -801,7 +801,13 @@ TOOLS = {
                         "description": "Short name of the intervention (e.g. 'Creatine 5g daily', 'No screens after 9pm').",
                     },
                     "hypothesis": {"type": "string", "description": "What you expect to happen (e.g. 'Will improve deep sleep % by >5%')."},
-                    "start_date": {"type": "string", "description": "Start date YYYY-MM-DD. Defaults to today."},
+                    "start_date": {
+                        "type": "string",
+                        "description": (
+                            "Start date YYYY-MM-DD. Defaults to today. FORBIDDEN when design.randomized_start "
+                            "is declared — the start is then drawn at random from the pre-declared window (#1413)."
+                        ),
+                    },
                     "tags": {
                         "type": "array",
                         "items": {"type": "string"},
@@ -899,6 +905,29 @@ TOOLS = {
                                     },
                                 },
                                 "required": ["metric", "direction", "min_effect"],
+                            },
+                            "randomized_start": {
+                                "type": "object",
+                                "description": (
+                                    "#1413 SCED: OPTIONAL randomized-start mode. Declare a FUTURE 7-14 day window; "
+                                    "the actual start date is drawn uniformly at random from it at creation (do NOT "
+                                    "pass start_date), the window+draw are frozen in the prereg artifact, and "
+                                    "end_experiment additionally runs a start-point randomization (permutation) test — "
+                                    "the observed pre/post difference ranked against every start the window could have "
+                                    "produced. Defeats coincident-trend confounds; valid under autocorrelation. "
+                                    "Example: {window_start: '2026-08-01', window_end: '2026-08-10'}."
+                                ),
+                                "properties": {
+                                    "window_start": {
+                                        "type": "string",
+                                        "description": "First candidate start date, YYYY-MM-DD (must not predate creation).",
+                                    },
+                                    "window_end": {
+                                        "type": "string",
+                                        "description": "Last candidate start date, YYYY-MM-DD (window spans 7-14 days).",
+                                    },
+                                },
+                                "required": ["window_start", "window_end"],
                             },
                         },
                         "required": ["baseline_days", "criterion", "stopping_rule"],

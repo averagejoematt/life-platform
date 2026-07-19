@@ -1258,6 +1258,9 @@ def handle_experiments() -> dict:
                 # deterministic close-path analysis (effect, CI, n's, verdict).
                 "design": item.get("design"),
                 "pre_registered_at": item.get("pre_registered_at"),
+                # #1413 SCED: provenance of the randomized-start draw (window, k,
+                # drawn_at) — the card can prove the start was drawn, not chosen.
+                "start_draw": item.get("start_draw"),
                 # #728: the public timestamped artifact frozen at creation —
                 # the page renders this as the before-the-results proof link.
                 "pre_registration_url": item.get("prereg_url"),

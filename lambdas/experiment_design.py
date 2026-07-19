@@ -23,6 +23,7 @@ Bundled module (#781 — ships in every function's code bundle, no separate laye
 imported flat (`import experiment_design`) from mcp/ and lambdas/.
 """
 
+import random
 from datetime import datetime, timedelta
 
 import stats_core
@@ -63,6 +64,12 @@ MIN_STOPPING_RULE_CHARS = 20
 MAX_STOPPING_RULE_CHARS = 500
 # stats_core's bootstrap floor; below this per arm the verdict is inconclusive, never forced.
 MIN_POINTS_PER_ARM = 5
+# #1413 SCED randomized start: the pre-declared window the start is drawn from must be
+# wide enough that the randomization test has resolution (min attainable p = 1/k), and
+# narrow enough that the declared protocol is still one experiment, not an open-ended
+# "sometime this month". 7-14 days ⇒ min p between 1/7 and 1/14.
+MIN_START_WINDOW_DAYS = 7
+MAX_START_WINDOW_DAYS = 14
 
 
 def validate_design(design):
@@ -110,7 +117,13 @@ def validate_design(design):
     if not isinstance(min_effect, (int, float)) or isinstance(min_effect, bool) or min_effect < 0:
         issues.append("criterion.min_effect must be a number >= 0")
 
-    unknown = set(design) - {"baseline_days", "washout_days", "criterion", "stopping_rule"}
+    # #1413 SCED: an OPTIONAL randomized-start declaration. The window is part of the
+    # frozen pre-registration — validated here, drawn from at creation, never edited.
+    rand = design.get("randomized_start")
+    if rand is not None:
+        issues.extend(_randomized_start_issues(rand))
+
+    unknown = set(design) - {"baseline_days", "washout_days", "criterion", "stopping_rule", "randomized_start"}
     if unknown:
         issues.append(f"unknown design fields: {sorted(unknown)}")
     unknown_c = set(criterion) - {"metric", "direction", "min_effect"}
@@ -118,6 +131,161 @@ def validate_design(design):
         issues.append(f"unknown criterion fields: {sorted(unknown_c)}")
 
     return (len(issues) == 0), issues
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# #1413: SCED randomized start — draw the intervention start from a pre-declared
+# 7-14 day window, then close with a start-point randomization (permutation) test.
+#
+# Why: a hand-picked start date correlates with how the subject already feels —
+# you start the sleep intervention the week sleep is at its worst (regression to
+# the mean gets credited) or the week momentum is building (the coincident trend
+# gets credited). Drawing the start at random from a window frozen in the prereg
+# spec breaks that correlation, and makes an EXACT test available: rank the
+# observed pre/post difference against the same statistic at every start the
+# window could have produced (stats_core.start_point_randomization_test). Valid
+# under autocorrelation, unlike naive parametric tests on an N=1 daily series
+# (ADR-105). All helpers are pure; the caller supplies `today` and the rng.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _parse_date(s):
+    try:
+        return datetime.strptime(str(s), "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
+
+
+def _randomized_start_issues(rand):
+    """Shape issues for a design's randomized_start declaration (empty list = valid)."""
+    if not isinstance(rand, dict):
+        return ["randomized_start must be an object: {window_start, window_end} (YYYY-MM-DD)"]
+    issues = []
+    start = _parse_date(rand.get("window_start"))
+    end = _parse_date(rand.get("window_end"))
+    if start is None or end is None:
+        issues.append("randomized_start.window_start and window_end must be YYYY-MM-DD dates")
+    else:
+        span = (end - start).days + 1
+        if not (MIN_START_WINDOW_DAYS <= span <= MAX_START_WINDOW_DAYS):
+            issues.append(
+                f"randomized_start window must span {MIN_START_WINDOW_DAYS}-{MAX_START_WINDOW_DAYS} days "
+                f"(got {span}) — wide enough for the randomization test to have resolution (min p = 1/k)"
+            )
+    unknown = set(rand) - {"window_start", "window_end"}
+    if unknown:
+        issues.append(f"unknown randomized_start fields: {sorted(unknown)}")
+    return issues
+
+
+def candidate_start_dates(rand):
+    """Every start date (YYYY-MM-DD, inclusive) the pre-declared window could produce."""
+    start = _parse_date(rand.get("window_start"))
+    end = _parse_date(rand.get("window_end"))
+    if start is None or end is None or end < start:
+        return []
+    return [(start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((end - start).days + 1)]
+
+
+def validate_start_window_not_past(rand, today):
+    """(ok, issue) — the window must not have begun before registration.
+
+    `today` is the registration date (YYYY-MM-DD), passed EXPLICITLY so this stays a
+    pure function (wallclock-safe in tests). A window that already started is a
+    post-hoc story, not a pre-declaration.
+    """
+    start = _parse_date(rand.get("window_start"))
+    if start is None:
+        return False, "randomized_start.window_start must be a YYYY-MM-DD date"
+    if start < _parse_date(today):
+        return False, (
+            f"randomized_start window begins {rand.get('window_start')}, before the registration date {today} — "
+            "the window must be pre-declared, never post-hoc"
+        )
+    return True, None
+
+
+def draw_start_date(rand, rng=None):
+    """Draw the intervention start uniformly from the pre-declared window.
+
+    Returns (start_date, provenance). The draw is the ONE deliberately random step
+    in the pipeline (that randomness is what buys the exact test); everything about
+    it is recorded — window, candidate count, drawn index, method — so the analysis
+    can later prove the start was drawn, not chosen. Production callers use the
+    default SystemRandom; tests inject a seeded rng.
+    """
+    dates = candidate_start_dates(rand)
+    if not dates:
+        raise ValueError(f"randomized_start window is invalid: {rand!r}")
+    rng = rng or random.SystemRandom()
+    idx = rng.randrange(len(dates))
+    return dates[idx], {
+        "method": "uniform_random",
+        "window_start": rand["window_start"],
+        "window_end": rand["window_end"],
+        "n_candidates": len(dates),
+        "drawn_index": idx,
+    }
+
+
+def randomization_series_start(design):
+    """First date of the series the randomization test runs over: baseline_days
+    before the WINDOW start, so the earliest candidate still has a full baseline."""
+    rand = design.get("randomized_start") or {}
+    start = _parse_date(rand.get("window_start"))
+    if start is None:
+        return None
+    return (start - timedelta(days=int(design["baseline_days"]))).strftime("%Y-%m-%d")
+
+
+def randomization_test(design, values_by_date, start_date, end_date):
+    """The close-path start-point randomization test for a randomized-start design.
+
+    `values_by_date` maps YYYY-MM-DD → criterion-metric value over (at least)
+    [randomization_series_start(design), end_date]; missing days are honest gaps.
+    Returns the provenance-carrying result dict, or None when the design has no
+    randomized_start, the actual start is not one of the declared candidates, or
+    the data can't support the test (thin arms — see stats_core). The washout is
+    applied identically at EVERY candidate start, mirroring the primary analysis.
+    """
+    rand = design.get("randomized_start")
+    if not rand:
+        return None
+    series_start = randomization_series_start(design)
+    first = _parse_date(series_start)
+    last = _parse_date(end_date)
+    if first is None or last is None or last < first:
+        return None
+    dates = [(first + timedelta(days=i)).strftime("%Y-%m-%d") for i in range((last - first).days + 1)]
+    values = [values_by_date.get(d) for d in dates]
+    index_of = {d: i for i, d in enumerate(dates)}
+    candidates = [index_of[d] for d in candidate_start_dates(rand) if d in index_of]
+    actual = index_of.get(start_date)
+    if actual is None or actual not in candidates:
+        return None
+    result = stats_core.start_point_randomization_test(
+        values,
+        candidates,
+        actual,
+        direction=(design.get("criterion") or {}).get("direction", "higher"),
+        washout=int(design.get("washout_days", 0) or 0),
+        min_per_arm=MIN_POINTS_PER_ARM,
+    )
+    if result is None:
+        return None
+    return {
+        **result,
+        "window_start": rand["window_start"],
+        "window_end": rand["window_end"],
+        "actual_start": start_date,
+        "direction": (design.get("criterion") or {}).get("direction"),
+        "method": (
+            "start-point randomization test (Edgington): the observed pre/post mean difference ranked "
+            "one-sided against the same statistic at every start the pre-declared window could have "
+            "produced — exact under the randomization actually performed, valid under autocorrelation"
+        ),
+        "engine": "sced-randstart-v1",
+    }
 
 
 def design_windows(start_date, end_date, design):
@@ -210,6 +378,14 @@ def analysis_summary(design, stats):
         if stats.get("cohens_d") is not None:
             line += f", d={stats['cohens_d']:g}"
         line += ")"
+    # #1413: a randomized-start design also reports its permutation p, with its
+    # honest resolution — with k candidate starts the test can never report below 1/k.
+    rand = stats.get("randomization")
+    if isinstance(rand, dict) and rand.get("p_value") is not None:
+        line += (
+            f"; randomization p={rand['p_value']:g} (one-sided, {rand.get('n_used')} candidate starts "
+            f"from the pre-declared window, min attainable p {rand.get('min_p'):g})"
+        )
     return line + f" -> {stats['verdict']}."
 
 

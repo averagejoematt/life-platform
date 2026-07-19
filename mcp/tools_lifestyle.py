@@ -875,6 +875,27 @@ def tool_create_experiment(args):
     evidence_links = experiment_design.derive_evidence_links(evidence_links or None, library_entry=lib_entry)
 
     now = datetime.now(timezone.utc)
+
+    # #1413 SCED: a randomized-start design DRAWS the intervention start from the
+    # pre-declared window at creation — a hand-picked start_date is structurally
+    # impossible in this mode (that correlation between "when I chose to start" and
+    # "how I already felt" is exactly the confound the draw exists to break), and a
+    # window that has already begun is post-hoc, not pre-declared.
+    start_draw = None
+    randomized_start = design.get("randomized_start") if isinstance(design, dict) else None
+    if randomized_start:
+        if start_date:
+            raise ValueError(
+                "randomized-start design: do not pass start_date — the start is drawn at random "
+                "from the pre-declared window at creation (SCED, #1413)"
+            )
+        ok, issue = experiment_design.validate_start_window_not_past(randomized_start, now.strftime("%Y-%m-%d"))
+        if not ok:
+            raise ValueError(f"invalid design (pre-registration rejected): {issue}")
+        start_date, start_draw = experiment_design.draw_start_date(randomized_start)
+        start_draw["drawn_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        logger.info(f"create_experiment: randomized start drawn — {start_date} from {randomized_start} (SCED #1413)")
+
     if not start_date:
         start_date = now.strftime("%Y-%m-%d")
 
@@ -926,6 +947,8 @@ def tool_create_experiment(args):
         # Floats → Decimal for DDB (min_effect is commonly fractional).
         "design": json.loads(json.dumps(design), parse_float=Decimal) if design else None,
         "pre_registered_at": now.strftime("%Y-%m-%dT%H:%M:%S") if design else None,
+        # #1413: full provenance of the randomized-start draw (window, k, index, when).
+        "start_draw": start_draw,
         # #1117: the justification contract. why_now carries its provenance stamp
         # (explicit | hypothesis | library); absent fields are simply absent —
         # ADR-104 honest-empty, the surfaces render nothing for them.
@@ -958,6 +981,9 @@ def tool_create_experiment(args):
             "experiment_type": experiment_type or None,
             "iteration": iteration,
             "design": design,  # raw JSON floats — this is the public copy, not the DDB one
+            # #1413: the draw's provenance is frozen WITH the window it came from —
+            # the artifact proves the start was drawn, not chosen, and when.
+            **({"start_draw": start_draw} if start_draw else {}),
             # #1117: the justification is part of the pre-registered thinking — frozen
             # with the design (present fields only; honest-empty stays empty).
             **{
@@ -1016,6 +1042,8 @@ def tool_create_experiment(args):
         "design": design,
         "pre_registered_at": item.get("pre_registered_at"),
         "pre_registration_url": prereg_url,
+        # #1413: how the start was drawn (None for non-randomized designs).
+        "start_draw": start_draw,
         # #1117: the justification contract, echoed with why_now provenance.
         "why_now": why_now,
         "why_now_source": why_now_source,
@@ -1457,20 +1485,39 @@ def _run_design_analysis(existing, design, end_date):
     metric = (design_f.get("criterion") or {}).get("metric", "")
     source, field, _label = experiment_design.DESIGN_METRICS[metric]
 
-    def _values(start, end):
+    def _dated_values(start, end):
+        """date → value over [start, end] (last record wins on a duplicate date)."""
         items = query_source(source, start, end)
         if source == "whoop":
             items = [normalize_whoop_sleep(i) for i in items]
-        vals = []
+        out = {}
         for it in items:
             v = _extract_metric(it, field)
-            if v is not None:
-                vals.append(v)
-        return vals
+            date = str(it.get("sk", ""))[5:15]  # sk = "DATE#YYYY-MM-DD..."
+            if v is not None and len(date) == 10:
+                out[date] = v
+        return out
+
+    def _values(start, end):
+        return [v for _d, v in sorted(_dated_values(start, end).items())]
 
     baseline_vals = _values(windows["baseline_start"], windows["baseline_end"])
     window_vals = _values(windows["analysis_start"], windows["analysis_end"])
     stats = experiment_design.evaluate_design(design_f, baseline_vals, window_vals)
+
+    # #1413 SCED: a randomized-start design ALSO closes with the start-point
+    # randomization test — the observed pre/post difference ranked against every
+    # start the pre-declared window could have produced (exact under the draw
+    # actually performed, valid under autocorrelation). Reported alongside the
+    # effect+CI, with provenance; the frozen #539 verdict rule is unchanged.
+    if design_f.get("randomized_start"):
+        series_start = experiment_design.randomization_series_start(design_f)
+        if series_start:
+            dated = _dated_values(series_start, end_date)
+            rand = experiment_design.randomization_test(design_f, dated, existing.get("start_date", ""), end_date)
+            if rand is not None:
+                stats["randomization"] = rand
+
     return {
         "windows": windows,
         "metric": metric,
