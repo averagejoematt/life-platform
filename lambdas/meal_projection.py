@@ -6,7 +6,7 @@ and a runtime pk assertion). Upsert is keyed on a stable ordinal so re-running a
 (backfill or `regroup_day`) never duplicates, and stale higher-ordinal rows from a
 prior grouping are pruned.
 
-Shared-layer module: used by both `deploy/backfill_meals.py` (local) and the
+Bundled module (#781): used by both `deploy/backfill_meals.py` (local) and the
 `manage_meals` MCP tool's `regroup_day` action (Lambda). `table` is injected so the
 module needs no AWS client of its own and stays unit-testable.
 """

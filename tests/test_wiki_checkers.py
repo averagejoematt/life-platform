@@ -436,3 +436,93 @@ def test_og_source_count_clean_on_current_tree():
     truth = facts._registry_source_count()
     hits = facts._og_source_hits(facts._scan_og_files(), truth)
     assert hits == [], "an og card still hardcodes a stale data-source count:\n" + "\n".join(hits)
+
+
+def test_governor_cadence_ground_truth_is_discovered():
+    """#1254/#1347: the governor's true cadence resolves from its OWN CDK cron
+    (`life-platform-cost-governor` in cdk/stacks/operational_stack.py), not a pinned
+    literal — re-derive it independently from source and assert the discoverer agrees."""
+    facts = _load("scripts/check_doc_facts.py")
+    cdk_map = facts._cdk_cron_map()
+    stack = (ROOT / "cdk" / "stacks" / "operational_stack.py").read_text(encoding="utf-8")
+    m = re.search(r'function_name="life-platform-cost-governor".*?schedule="(cron\([^"]*\))"', stack, re.S)
+    assert m, "could not locate life-platform-cost-governor's schedule in operational_stack.py"
+    assert cdk_map.get("life-platform-cost-governor") == m.group(1)
+    step = facts._governor_cadence_hours(cdk_map)
+    assert step == 8, f"expected the governor's true cadence to be every 8h, discovered {step}"
+
+
+def test_governor_cadence_gate_is_not_vacuous():
+    """#1347 (per the #1189 vacuous-scan lesson): the governor-cadence scan must FLAG
+    every spelling of 'cost-governor ... hourly' the corpus-wide grep actually found
+    (hyphen, underscore, and the 'An hourly governor' word-order the published essay
+    used), PASS the true '8h' phrasing, EXEMPT HISTORICAL framing, and stay silent
+    when the discovered step is 1 (an hourly schedule would make the claim true)."""
+    facts = _load("scripts/check_doc_facts.py")
+    d = Path(tempfile.mkdtemp())
+
+    # the exact drift class found beyond #1254's 3 enumerated files: RUNBOOK.md/
+    # ARCHITECTURE.md-shaped claims, an underscore spelling, and the essay's
+    # adjective-first word order — all four spellings must be caught.
+    bad = d / "stale.md"
+    bad.write_text(
+        "- **`life-platform-cost-governor`** Lambda (hourly) — projects month-end spend.\n"
+        "Enforced via `cost_governor_lambda` (hourly), which writes the tier to SSM.\n"
+        "An hourly governor projects month-end cost and degrades AI features.\n"
+    )
+    hits = facts._governor_cadence_hits([bad], 8)
+    assert len(hits) == 3, f"expected all 3 stale spellings to be flagged, got {len(hits)}:\n" + "\n".join(hits)
+    assert all("every 8h" in h for h in hits)
+
+    # the true cadence — must pass, including the "N hours" plural (contains the
+    # substring "hour" but never the word "hourly" nor the "every hour" phrase).
+    good = d / "ok.md"
+    good.write_text(
+        "life-platform-cost-governor (every 8h) projects month-end spend.\n"
+        "A cost governor checks in every 8 hours and projects month-end cost.\n"
+    )
+    assert facts._governor_cadence_hits([good], 8) == []
+
+    # a HISTORICAL-framed line naming the old (pre-#1254) cadence — must NOT be flagged.
+    hist = d / "hist.md"
+    hist.write_text("cost-governor CE polling was hourly, raised to every 4h, now every 8h.\n")
+    assert facts._governor_cadence_hits([hist], 8) == []
+
+    # a line naming "hourly" near an unrelated "governor" mention with NO cadence
+    # context at all is still policed (precision is scoped to the two words co-occurring,
+    # matching the #1254 test's own assertion shape) — but if the schedule genuinely
+    # WERE hourly (step=1), the identical line must NOT be flagged (nothing to fix).
+    assert facts._governor_cadence_hits([bad], 1) == []
+    assert facts._governor_cadence_hits([bad], None) == []
+
+
+def test_governor_cadence_surface_includes_the_1254_files_and_beyond():
+    """The scanned surface must reach every file #1254 enumerated (2 lambdas/ files +
+    1 site HTML page) PLUS the doc/essay surface #1347 found beyond them — proving the
+    generalized rule structurally cannot miss "one file over" the way the 3-literal-path
+    test could."""
+    facts = _load("scripts/check_doc_facts.py")
+    surface = {str(p.relative_to(ROOT)) for p in facts._scan_governor_surface()}
+    for expected in (
+        "lambdas/operational/cost_governor_lambda.py",  # #1254 file 1
+        "lambdas/budget_guard.py",  # #1254 file 2
+        "site/method/cost/index.html",  # #1254 file 3
+        "docs/RUNBOOK.md",  # #1347: found beyond the 3 enumerated files
+        "docs/ARCHITECTURE.md",  # #1347: found beyond the 3 enumerated files
+        "site/journal/essays/org-chart-of-one/index.html",  # #1347: found beyond them
+    ):
+        assert expected in surface, f"{expected} missing from the governor-cadence scan surface"
+    # site/legacy/ is the deliberately frozen historical mirror — excluded, same as
+    # CHANGELOG/DECISIONS are excluded from the doc surface.
+    assert not any(p.startswith("site/legacy/") for p in surface)
+
+
+def test_governor_cadence_clean_on_current_tree():
+    """After the fix, no live doc/source/site line claims the cost-governor runs
+    hourly anywhere in the corpus — not just the 3 files #1254 enumerated."""
+    facts = _load("scripts/check_doc_facts.py")
+    cdk_map = facts._cdk_cron_map()
+    step = facts._governor_cadence_hours(cdk_map)
+    assert step == 8
+    hits = facts._governor_cadence_hits(facts._scan_governor_surface(), step)
+    assert hits == [], "a live line still claims the cost-governor runs hourly:\n" + "\n".join(hits)

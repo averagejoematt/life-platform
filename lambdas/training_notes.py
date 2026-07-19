@@ -7,10 +7,10 @@ coach reads as a trajectory) with a deterministic safety floor for pain and a bo
 Haiku tail for the semantic signals. Mirrors meal_projection.py (derived projection,
 raw sovereign, deterministic-first, LLM tail bounded, frozen-as-data + correctable).
 
-Shared-layer module: the on-ingest extractor runs inside hevy_backfill_lambda and the
+Bundled module (#781): the on-ingest extractor runs inside hevy_backfill_lambda and the
 read tool (get_exercise_notes) + backfill run in the MCP package — both reach this via
-the layer. `table` and the LLM fn are injected so the core stays unit-testable with
-ZERO I/O and ZERO model calls.
+their own code bundle, no separate layer. `table` and the LLM fn are injected so the
+core stays unit-testable with ZERO I/O and ZERO model calls.
 
 Design brief: docs/specs/SPEC_HEVY_NOTES_FEEDBACK_LOOP_2026-06-21.md (invariants §1, taxonomy
 §5, extractor §6). Build: docs/specs/CLAUDE_CODE_PROMPT_HEVY_NOTES_v1.md.
