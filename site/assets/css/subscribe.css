@@ -61,10 +61,30 @@
 
 .sub-success { display: none; border: var(--border-hair); border-radius: var(--radius-sm); background: var(--ember-wash);
   padding: var(--sp-7) var(--sp-5); text-align: center; }
-.sub-success .si { color: var(--ember); font-family: var(--font-mono); font-size: 1.75rem; /* fs-ok: success-state glyph, sized to the confirmation mark */ }
 .sub-success .st { font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ember); margin-top: var(--sp-2); }
 .sub-success .sb { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
 .sub-success a { color: var(--ember); }
+
+/* state mark (#1473): the sprite icon (mail/check/flatline) replaced the old text
+   dingbat — .si now sizes the inline <use> icon, colour rides the state. */
+.si { color: var(--ember); }
+.si .ico { width: 30px; height: 30px; }
+
+/* ── /subscribe/confirm/ — the state readout card (#1473) ─────────────────── */
+.cc-wrap { max-width: 560px; margin-inline: auto; padding: var(--sp-7) var(--gutter) var(--sp-9); }
+.cc-card { border: var(--border-hair); border-radius: var(--radius-sm); background: var(--surface); }
+.cc-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-bottom: var(--border-hair); font-family: var(--font-mono);
+  font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
+.cc-head .ch-state { color: var(--ember); }
+.cc-card[data-state="err"] .ch-state { color: var(--ink-muted); }
+.cc-body { padding: var(--sp-7) var(--sp-5); text-align: center; }
+.cc-body .st { font-family: var(--font-serif); font-size: var(--fs-h3); color: var(--ember); margin-top: var(--sp-3); }
+.cc-card[data-state="wait"] .st, .cc-card[data-state="err"] .st { color: var(--ink); }
+.cc-card[data-state="err"] .si { color: var(--ink-faint); }
+.cc-body .sb { margin-top: var(--sp-3); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+.cc-body .sb a { color: var(--ember); }
+.cc-nojs { margin-top: var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); line-height: var(--lh-relaxed); }
 
 .sub-btn:focus-visible, .sub-input:focus-visible, .doors a:focus-visible, .theme-toggle:focus-visible {
   outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs);

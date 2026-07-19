@@ -18,13 +18,27 @@
   <link rel="stylesheet" href="/assets/css/story.css">
   <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <style>
-    .nf-main { min-height: 72vh; display: flex; flex-direction: column; align-items: center;
-      justify-content: center; text-align: center; padding: var(--sp-8) var(--sp-4); }
+    /* 404 as an instrument readout (#1473): the trace runs, drops out, and ends on
+       an open node — same vocabulary as the i-flatline sprite mark. Tokens only. */
+    .nf-main { max-width: var(--container-read); margin-inline: auto; min-height: 62vh;
+      padding: var(--sp-7) var(--gutter) var(--sp-9); display: flex; flex-direction: column; justify-content: center; }
+    .nf-trace { margin: 0 0 var(--sp-6); }
+    .nf-trace svg { display: block; width: 100%; height: auto; }
+    .nf-trace .tr-live { stroke: var(--ember); stroke-width: 1.5; fill: none; stroke-linecap: round; }
+    .nf-trace .tr-fade { stroke: var(--ink-faint); stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-dasharray: 2 6; }
+    .nf-trace .tr-end { stroke: var(--ink-faint); stroke-width: 1.5; fill: none; }
+    .nf-trace .tr-ax { stroke: var(--rule); stroke-width: 1; }
+    .nf-trace .tr-tick { stroke: var(--tick); stroke-width: 1; }
     .nf-kicker { color: var(--ember); }
-    .nf-h { font-family: var(--font-serif); font-size: clamp(4rem, 14vw, 7rem); line-height: 1;
-      color: var(--ink); margin: var(--sp-3) 0; }
-    .nf-sub { color: var(--ink-muted); max-width: 44ch; line-height: var(--lh-relaxed); }
-    .nf-doors { display: flex; flex-wrap: wrap; gap: var(--sp-4); justify-content: center; margin-top: var(--sp-6); }
+    .nf-h { font-family: var(--font-mono); font-size: var(--fs-data-xl); line-height: var(--lh-tight);
+      letter-spacing: var(--tracking-tight); font-variant-numeric: tabular-nums; color: var(--ink); margin: var(--sp-3) 0 0; }
+    .nf-read { font-family: var(--font-serif); font-style: italic; font-size: var(--fs-quote);
+      color: var(--ink); margin-top: var(--sp-4); max-width: var(--measure-narrow); }
+    .nf-sub { color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed);
+      margin-top: var(--sp-3); max-width: var(--measure-narrow); }
+    .nf-meta { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); margin-top: var(--sp-5); }
+    .nf-doors { display: flex; flex-wrap: wrap; gap: var(--sp-4); margin-top: var(--sp-6); }
   </style>
 </head>
 <body>
@@ -35,9 +49,20 @@
   </header>
 
   <main id="main" class="nf-main">
+    <figure class="nf-trace" aria-hidden="true">
+      <svg viewBox="0 0 560 96" preserveAspectRatio="xMidYMid meet" focusable="false">
+        <path class="tr-ax" d="M0 84 H560"/>
+        <path class="tr-tick" d="M0 84v4M70 84v4M140 84v4M210 84v4M280 84v4M350 84v4M420 84v4M490 84v4M560 84v4"/>
+        <path class="tr-live" d="M0 58 C28 54 44 40 68 44 S 112 66 144 60 188 30 220 38 268 56 300 48 328 42 344 46"/>
+        <path class="tr-fade" d="M344 46 H400"/>
+        <circle class="tr-end" cx="412" cy="46" r="3.5"/>
+      </svg>
+    </figure>
     <p class="nf-kicker label">signal lost</p>
     <h1 class="nf-h">404</h1>
-    <p class="nf-sub">This page doesn't exist — or it moved when the site did. Either way, the experiment is still running. Pick a door.</p>
+    <p class="nf-read">There&#x27;s no reading at this address.</p>
+    <p class="nf-sub">The page doesn&#x27;t exist — or it moved when the site did. The experiment is still running; every door below is live.</p>
+    <p class="nf-meta">http 404 · 0 records at this path · the loop is unaffected</p>
     <p class="nf-doors">
       <a href="/" class="cta">Back to the story →</a>
       <a href="/cockpit/" class="cta cta-quiet">Today in the cockpit →</a>

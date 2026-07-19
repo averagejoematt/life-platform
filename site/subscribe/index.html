@@ -12,7 +12,8 @@
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="theme-color" content="#080c0a">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
@@ -70,7 +71,7 @@
         </div>
       </div>
       <div class="sub-success" id="success-block">
-        <div class="si" aria-hidden="true">✓</div>
+        <div class="si" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-mail"></use></svg></div>
         <p class="st">Check your inbox</p>
         <p class="sb">Confirmation email sent. Click the link to confirm and you're in.<br><br><a href="/">← back to the experiment</a></p>
       </div>
@@ -94,10 +95,18 @@
     const action = params.get('action');
     const token = params.get('token');
 
+    // State marks come from the shared line-icon sprite (DESIGN_SYSTEM_V5 §8.1),
+    // never text dingbats: mail = incoming reading, check = confirmed, flatline = signal ends.
+    function stateIcon(sb, name) {
+      const si = sb.querySelector('.si');
+      if (si) si.innerHTML = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-' + name + '"></use></svg>';
+    }
+
     if (action === 'confirmed') {
       document.getElementById('form-block').style.display = 'none';
       const sb = document.getElementById('success-block');
       sb.style.display = 'block';
+      stateIcon(sb, 'check');
       sb.querySelector('.st').textContent = "You're in.";
       sb.querySelector('.sb').innerHTML = "Subscription confirmed. You'll get The Measured Life every Wednesday.<br><br><a href=\"/story/chronicle/\">Read the chronicle while you wait →</a>";
     }
@@ -105,6 +114,7 @@
       document.getElementById('form-block').style.display = 'none';
       const sb = document.getElementById('success-block');
       sb.style.display = 'block';
+      stateIcon(sb, 'flatline');
       sb.querySelector('.st').textContent = 'Unsubscribed.';
       sb.querySelector('.sb').innerHTML = "You've been removed. No hard feelings.<br><br><a href=\"/\">← back to the experiment</a>";
     }

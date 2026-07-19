@@ -18,6 +18,9 @@ const KNOWN = new Set([
   "ask", "milestone", "play", "pause", "podcast", "chronicle",
   // the character sheet (figure-in-ring — echoes the /data/character/ hero)
   "character",
+  // utility / subscribe-flow state marks (#1473): incoming reading, confirmed
+  // reading, signal-lost trace (also the 404 vocabulary).
+  "mail", "check", "flatline",
 ]);
 
 /*
