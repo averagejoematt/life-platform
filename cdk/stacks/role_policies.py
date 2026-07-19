@@ -1477,7 +1477,13 @@ def operational_alert_digest() -> list[iam.PolicyStatement]:
 def operational_traffic_digest() -> list[iam.PolicyStatement]:
     """Weekly traffic digest: reads CloudFront access logs from the log bucket
     (aggregate-only, IPs hashed-then-discarded, no PII retained) + one SES email
-    + CloudWatch metric for the empty-log-source heartbeat (#349)."""
+    + CloudWatch metric for the empty-log-source heartbeat (#349).
+
+    #1446 (weekly green report): also READS CloudWatch metrics (qa-smoke EMF
+    tallies, BudgetTier history, QAPausedByBudget) and the budget-tier SSM
+    parameter so the Monday ops email can roll up the QA estate. Read-only
+    additions; CloudWatch metric reads cannot be resource-scoped (same posture
+    as the cost governor's CloudWatch statement)."""
     log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
     return [
         iam.PolicyStatement(
@@ -1492,8 +1498,13 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
         ),
         iam.PolicyStatement(
             sid="CloudWatchMetrics",
-            actions=["cloudwatch:PutMetricData"],
+            actions=["cloudwatch:PutMetricData", "cloudwatch:GetMetricData", "cloudwatch:GetMetricStatistics"],
             resources=["*"],
+        ),
+        iam.PolicyStatement(
+            sid="BudgetTierParamRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
     ]
 

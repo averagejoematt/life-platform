@@ -46,6 +46,7 @@ No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
@@ -641,6 +642,33 @@ def site_files():
     return {p.replace("//", "/") for p in found}
 
 
+def coverage_stats():
+    """#1446: deterministic QA-coverage rollup for the Monday ops green report.
+
+    Derived entirely from MANIFEST at call time — never a hand-maintained
+    number (the acceptance criterion). Deliberately carries NO timestamp:
+    deploy/build_bundle.py stages this payload into every Lambda bundle, and a
+    timestamp would churn the CDK asset hash on every synth (forcing a
+    spurious full-fleet update per deploy). Content changes only when the
+    manifest itself changes.
+    """
+    by_tier: dict = {}
+    for p in MANIFEST:
+        k = f"tier{p['tier']}"
+        by_tier[k] = by_tier.get(k, 0) + 1
+    return {
+        "source": "tests/qa_manifest.py (#1426)",
+        "pages_total": len(MANIFEST),
+        "pages_by_tier": dict(sorted(by_tier.items())),
+        "visual_defs": len(visual_pages()),
+        "pages_with_visual": sum(1 for p in MANIFEST if p.get("visual")),
+        "static_core_pages": len(static_core_paths()),
+        "leak_scan_pages": len(leak_scan_paths()),
+        "smoke_pages": len(smoke_rows()),
+        "api_endpoints_declared": len({d for p in MANIFEST for d in (p.get("api_deps") or [])}),
+    }
+
+
 def self_check():
     files = site_files()
     registered = set(PAGES_BY_PATH)
@@ -659,7 +687,7 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core"])
+    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "coverage"])
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -688,6 +716,9 @@ def main():
     elif args.emit == "static_core":
         for p in static_core_paths():
             print(p)
+    elif args.emit == "coverage":
+        # sort_keys so the emitted bytes are deterministic (bundle-hash stability, #1446)
+        print(json.dumps(coverage_stats(), indent=2, sort_keys=True))
     else:
         ap.print_help()
 

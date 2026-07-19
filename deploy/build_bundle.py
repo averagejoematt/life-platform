@@ -30,8 +30,10 @@ stage_tree()/stage_mcp() directly at synth time.
 """
 
 import argparse
+import json
 import os
 import shutil
+import subprocess
 import sys
 import zipfile
 
@@ -55,6 +57,36 @@ def _ignore(directory, names):
     return ignored
 
 
+def stage_qa_coverage(out_dir):
+    """#1446: stage the QA-coverage snapshot the Monday ops green report reads.
+
+    Derived from tests/qa_manifest.py (the ONE page registry, #1426) at bundle
+    time via its `--emit coverage` emitter — never a hand-maintained number.
+    The payload is deterministic by contract (sort_keys, NO timestamp) so the
+    CDK asset hash only changes when the manifest itself changes.
+
+    Fail-SOFT: a broken emitter must never block a deploy — the green report
+    renders its honest "not collected" line when the file is absent.
+    """
+    try:
+        proc = subprocess.run(
+            [sys.executable, os.path.join(REPO_ROOT, "tests", "qa_manifest.py"), "--emit", "coverage"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.strip()[:300] or f"exit {proc.returncode}")
+        json.loads(proc.stdout)  # must be valid JSON, or we stage nothing
+        with open(os.path.join(out_dir, "qa_coverage_stats.json"), "w", encoding="utf-8") as f:
+            f.write(proc.stdout)
+    except Exception as e:
+        print(
+            f"⚠️  qa_coverage_stats.json not staged ({e}) — the Monday green report will show its honest absence line",
+            file=sys.stderr,
+        )
+
+
 def stage_tree(out_dir):
     """Stage the full lambdas/ tree + food_vocabulary.json into out_dir (fresh)."""
     if os.path.exists(out_dir):
@@ -67,6 +99,8 @@ def stage_tree(out_dir):
         shutil.copy2(vocab, os.path.join(out_dir, "food_vocabulary.json"))
     else:
         print("⚠️  config/food_vocabulary.json missing — meal grouping will fail to load vocab", file=sys.stderr)
+    # #1446: QA-coverage snapshot for the Monday ops green report (fail-soft).
+    stage_qa_coverage(out_dir)
     return out_dir
 
 
