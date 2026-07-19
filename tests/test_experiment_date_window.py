@@ -28,7 +28,9 @@ import site_api_common as C  # noqa: E402
 
 
 def _today():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # #1507: the clamp is PACIFIC (the genesis-eve incident — a UTC clamp
+    # inverted BETWEEN bounds for ~7h each genesis eve). Today = PT today.
+    return datetime.now(C.PT).strftime("%Y-%m-%d")
 
 
 def test_future_genesis_clamps_to_today(monkeypatch):
