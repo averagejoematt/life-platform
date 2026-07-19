@@ -339,6 +339,73 @@ def bootstrap_mean_diff_ci(baseline, window, n_boot=DEFAULT_N_BOOT, block_len=No
     return (diffs[lo_i], diffs[hi_i])
 
 
+def start_point_randomization_test(values, candidate_starts, actual_start, direction="higher", washout=0, min_per_arm=2):
+    """SCED start-point randomization (permutation) test — Edgington's design (#1413).
+
+    For an interrupted time series whose intervention start was DRAWN AT RANDOM from a
+    pre-declared window of candidate start points, the exact test is to rank the
+    observed pre/post statistic against the same statistic at every start the draw
+    could have produced:
+
+        T(k) = mean(values[k+washout:]) - mean(values[:k])        (None gaps skipped)
+        one-sided p = #{k : T(k) at least as extreme as T(actual)} / n_used
+
+    Valid under autocorrelation: the inference comes from the randomization actually
+    performed (conditioning on the observed series), not from an i.i.d. assumption a
+    daily physiological series never satisfies. A pure pre-existing trend yields a
+    similar T at every candidate start, so it is never credited as an effect — the
+    coincident-trend confound a hand-picked start invites.
+
+    `values` is the full chronological daily series (None for missing days);
+    `candidate_starts` are the split indices the pre-declared window maps to;
+    `actual_start` is the index actually drawn (must be one of the candidates).
+    Candidates with fewer than `min_per_arm` non-None points in either arm are
+    excluded and counted in `n_excluded` — missing data must shrink the
+    distribution visibly, never silently.
+
+    Returns a dict — p_value, observed_stat, n_candidates, n_used, n_excluded, and
+    min_p (= 1/n_used, the granularity floor: with k candidates the test can never
+    report below 1/k — honest resolution, ADR-105) — or None when the observed
+    split is unusable (direction unknown, actual not a candidate, a thin arm at the
+    actual split, or fewer than 2 usable candidates). Deterministic: no resampling,
+    the full randomization distribution is enumerated.
+    """
+    if direction not in ("higher", "lower"):
+        return None
+    vals = list(values or [])
+    candidates = list(candidate_starts or [])
+    if not vals or actual_start not in candidates:
+        return None
+    washout = max(0, int(washout or 0))
+
+    def _stat(k):
+        pre = [v for v in vals[:k] if v is not None]
+        post = [v for v in vals[k + washout :] if v is not None]
+        if len(pre) < min_per_arm or len(post) < min_per_arm:
+            return None
+        return sum(post) / len(post) - sum(pre) / len(pre)
+
+    stats_by_candidate = {k: _stat(k) for k in candidates}
+    observed = stats_by_candidate[actual_start]
+    if observed is None:
+        return None
+    used = [t for t in stats_by_candidate.values() if t is not None]
+    if len(used) < 2:
+        return None
+    if direction == "higher":
+        as_extreme = sum(1 for t in used if t >= observed)
+    else:
+        as_extreme = sum(1 for t in used if t <= observed)
+    return {
+        "p_value": round(as_extreme / len(used), 4),
+        "observed_stat": round(observed, 4),
+        "n_candidates": len(candidates),
+        "n_used": len(used),
+        "n_excluded": len(candidates) - len(used),
+        "min_p": round(1.0 / len(used), 4),
+    }
+
+
 def cohens_d(baseline, window):
     """Cohen's d for mean(window) - mean(baseline), pooled-SD. None if degenerate."""
     a = clean_series(baseline)

@@ -337,13 +337,25 @@ export async function renderExperiments(d) {
       if (x.design.stopping_rule && !isBad(x.design.stopping_rule)) {
         design += `<p class="rd-line"><span class="label">stopping rule</span> ${esc(String(x.design.stopping_rule))}</p>`;
       }
+      // #1413 SCED: the start was DRAWN, not chosen — window + draw provenance,
+      // so a coincident trend can't be quietly credited as an effect.
+      const rs = x.design.randomized_start;
+      if (rs && rs.window_start && rs.window_end) {
+        const drawn = x.start_draw && x.start_draw.n_candidates ? ` — drawn 1 of ${esc(String(x.start_draw.n_candidates))} candidate starts` : "";
+        design += `<p class="rd-line"><span class="label">randomized start</span> pre-declared window ${esc(String(rs.window_start))} → ${esc(String(rs.window_end))}${drawn}</p>`;
+      }
     }
     // #539: the deterministic close-path result — effect [CI, n/n] → verdict.
     let analysis = "";
     if (done && x.analysis && x.analysis.effect_size != null) {
       const a = x.analysis;
       const ci = a.ci95_low != null ? ` [95% CI ${esc(String(a.ci95_low))}, ${esc(String(a.ci95_high))}]` : "";
-      analysis = `<p class="rd-line"><strong>effect ${a.effect_size > 0 ? "+" : ""}${esc(String(a.effect_size))}${ci} · n ${esc(String(a.n_window))}/${esc(String(a.n_baseline))} → ${esc(String(a.verdict || ""))}</strong></p>`;
+      // #1413 SCED: the randomization p rides NEXT TO effect+CI, with its provenance
+      // (one-sided, k candidate starts from the frozen window — min attainable p 1/k).
+      const rp = a.randomization && a.randomization.p_value != null
+        ? ` · randomization p=${esc(String(a.randomization.p_value))} (one-sided, ${esc(String(a.randomization.n_used))} candidate starts)`
+        : "";
+      analysis = `<p class="rd-line"><strong>effect ${a.effect_size > 0 ? "+" : ""}${esc(String(a.effect_size))}${ci}${rp} · n ${esc(String(a.n_window))}/${esc(String(a.n_baseline))} → ${esc(String(a.verdict || ""))}</strong></p>`;
     } else if (done && x.analysis && x.analysis.verdict) {
       analysis = `<p class="rd-line label">paired analysis: ${esc(String(x.analysis.verdict))} (n ${esc(String(x.analysis.n_window ?? "?"))}/${esc(String(x.analysis.n_baseline ?? "?"))})</p>`;
     }
