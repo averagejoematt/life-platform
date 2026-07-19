@@ -57,6 +57,47 @@ The stable set the operator must handle — the agent gives the *specific* actio
 
 ---
 
+## Infra drift signals — `orphan_functions` triage is REGION-AWARE (#1228)
+
+The weekly **drift sentinel** (`deploy/drift_sentinel.py::check_orphan_functions`)
+flags a Lambda as an orphan when it's live in `REGION` (us-west-2) but isn't a
+`AWS::Lambda::Function` resource of any **region-local** CloudFormation stack — it
+already scopes the comparison to one region on both sides (see the `STACKS`
+mapping: every stack deploys to us-west-2 except `LifePlatformWeb`, which is
+us-east-1 for CloudFront). The signal you receive under `drift.flagging.orphan_functions`
+is **already region-scoped** — it is a real live-in-us-west-2 orphan by construction.
+
+**#1228 incident:** a us-west-2 orphan twin of `email-subscriber` (the managed copy
+runs in **us-east-1**, defined in `web_stack.py` / `LifePlatformWeb`) was dismissed
+as `"FALSE POSITIVE — defined in web_stack.py"` — true that the name is defined
+there, but that stack deploys to a **different region** than where the sentinel
+found the live orphan. The dismissal never checked which region the defining
+stack targets, so the sentinel's one real catch was triaged away.
+
+**Hard rule:** when a signal's `flagging.orphan_functions.orphans` names a
+function, finding that name **anywhere** in `cdk/stacks/*.py` (e.g. via `grep`)
+is NOT sufficient grounds to classify it Bucket D (stale/false-positive). Before
+dismissing:
+1. Identify which stack's `create_platform_lambda(...)` call defines that
+   function name.
+2. Look up that stack's deploy region in the `STACKS` mapping at the top of
+   `deploy/drift_sentinel.py` (or the stack's own region config in `cdk/app.py`).
+3. **Only if that region matches the orphan signal's region (us-west-2 for
+   every `orphan_functions` signal today) is "defined in code" grounds for
+   Bucket D.** A function defined in a stack that deploys to a **different
+   region** is not evidence of anything — it means nothing governs the live
+   orphan you found, and it stays a genuine drift instance.
+4. If the defining stack's region doesn't match, or no stack (in ANY region)
+   defines the function at all, classify **Bucket C (needs-human)** — name the
+   live region, the defining stack (if any) and ITS region, and recommend the
+   deletion path (`docs/MANAGED_WHERE_LEDGER.md` recovery runbook style, or
+   `deploy/cloudwatch_retire_orphans.sh` pattern for the paired alarm). **Never**
+   Bucket D on a cross-region "false positive" call — a stack existing
+   somewhere in the repo is not the same claim as "this stack governs the
+   live resource I found."
+
+---
+
 ## Content & coherence signals (the "alive but not right" class)
 
 A distinct signal source: the **Coherence Sentinel** (`coherence_sentinel_lambda`)

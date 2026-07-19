@@ -1748,10 +1748,14 @@ TOOLS = {
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Max results to return (default 30, max 100).",
+                        "description": (
+                            "Max results to return. Defaults to 100 — enough to cover the "
+                            "whole registry (67 tools) unfiltered, so a no-arg call returns "
+                            "everything rather than a partial, misleading slice. Max 100."
+                        ),
                         "minimum": 1,
                         "maximum": 100,
-                        "default": 30,
+                        "default": 100,
                     },
                 },
                 "required": [],
@@ -1873,13 +1877,25 @@ TOOLS = {
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def tool_list_available_tools(domain: str = None, keyword: str = None, limit: int = 30):
+def tool_list_available_tools(args=None):
     """List MCP tools, optionally filtered by domain (module short-name) or
     keyword (substring of tool name or description). Returns at most `limit`
     items, ordered alphabetically.
+
+    #1477: like every other tool in this registry, this takes a single `args`
+    dict — mcp.handler.handle_tools_call dispatches ALL tools positionally
+    (`fn(arguments)`), so a function written with named kwargs instead of a
+    single dict parameter gets the whole arguments dict bound to its first
+    named parameter. This tool was the one place in the registry that broke
+    that convention; every other tool_* function takes `(args)` and reads its
+    fields via `args.get(...)`.
     """
+    args = args or {}
+    domain = args.get("domain")
+    keyword = args.get("keyword")
+    limit = args.get("limit")
     if limit is None or limit < 1:
-        limit = 30
+        limit = 100
     if limit > 100:
         limit = 100
     matches = []
@@ -1910,6 +1926,9 @@ def tool_list_available_tools(domain: str = None, keyword: str = None, limit: in
         "total_matching": len(matches),
         "total_registered": len(TOOLS),
         "tools": matches[:limit],
+        # #1477: say so explicitly when `limit` cut the list short, so an
+        # honest partial listing never reads like the full inventory.
+        "truncated": len(matches) > limit,
         "filter": {"domain": domain, "keyword": keyword, "limit": limit},
     }
 

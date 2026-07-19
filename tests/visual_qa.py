@@ -395,9 +395,13 @@ def _svg_text_floor_findings(page, width):
         return []
 
 
-def _write_step_summary(path, passed, failed, warns, results):
+def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
+    # #1440: a budget-tier pause must render as its own line in the CI summary —
+    # never silently absent, never indistinguishable from a clean run.
+    if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
+        lines.append(f"⏸ **Reader-truth QA: SKIPPED-BY-BUDGET** (tier {reader_truth_status['tier']}) — not run, not a pass.\n")
     for r in results:
         v = r.get("ai_verdict") or {}
         if r["status"] == "FAIL" or r.get("warnings") or v.get("severity") in ("med", "high"):
@@ -735,6 +739,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         assess_results(results)  # mutates results in place: adds ai_verdict + may add issues
 
     # ── optional phase-aware reader-truth QA over the captured prose (#1095) ──
+    reader_truth_status = None
     if reader_truth:
         try:
             from visual_ai_qa import assess_reader_truth
@@ -742,13 +747,18 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
             sys.path.insert(0, os.path.dirname(__file__))
             from visual_ai_qa import assess_reader_truth
         print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
-        assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
+        reader_truth_status = assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
 
     passed = sum(1 for r in results if r["status"] == "PASS")
     failed = sum(1 for r in results if r["status"] == "FAIL")
     warns = sum(len(r.get("warnings", [])) for r in results)
     print(f"\n{'=' * 56}")
     print(f"Visual QA: {passed} passed, {failed} failed, {warns} warning(s) across {len(results)} pages")
+    # #1440: a budget-tier pause of the reader-truth pass must read as its own
+    # explicit state, never blend into "passed" — this is the one line a human
+    # or a CI summary skim is guaranteed to see regardless of page-level warnings.
+    if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
+        print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
     if save_screenshots:
         print(f"Screenshots: {screenshot_dir}/")
 
@@ -759,6 +769,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
                 "passed": passed,
                 "failed": failed,
                 "warnings": warns,
+                "reader_truth_status": reader_truth_status,
                 "results": results,
             },
             f,
@@ -767,7 +778,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
 
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
-        _write_step_summary(summary_path, passed, failed, warns, results)
+        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status)
 
     return failed == 0
 

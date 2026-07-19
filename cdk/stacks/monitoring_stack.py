@@ -28,6 +28,18 @@ Covers:
       compute-pipeline-stale            LifePlatform ComputePipelineStaleness Max >= 1, 86400s (digest)
       hae-webhook-no-invocations-24h    AWS/Lambda Invocations < 1, 86400s, BREACHING (digest)
     18 redundant/dead orphan alarms retired via deploy/cloudwatch_retire_orphans.sh.
+
+  #1445 (qa-smoke observability, 2026-07-18): qa_smoke_lambda.py now emits an
+  EMF LifePlatform/QaSmoke summary on EVERY run, including all-green:
+      qa-smoke-heartbeat   RunCompleted SampleCount < 1, 2 consecutive days, BREACHING (digest)
+      qa-smoke-failures    FailCount Max >= 1, 86400s (digest)
+      qa-smoke-warnings    WarnCount Max >= 1, 86400s (digest) — a warnings-only
+                            run is now visible in the daily digest, not fully silent.
+
+  #1440 (ADR-104 applied to QA itself): budget-tier pause visibility for the
+  reader-truth AI QA pass (both the CI/local harness and the nightly qa_smoke
+  hook — lambdas/reader_truth_qa.emit_budget_pause_metric()):
+    qa-paused-by-budget    LifePlatform/QA QAPausedByBudget Sum >= 1, 86400s (digest)
 """
 
 from aws_cdk import (
@@ -268,6 +280,27 @@ class MonitoringStack(Stack):
             to_digest=True,
         )
 
+        # #1440: a budget-tier pause of the reader-truth AI QA pass (either hook —
+        # tests/visual_ai_qa.assess_reader_truth on CI/local, or the nightly
+        # qa_smoke_lambda.check_reader_truth — both call
+        # reader_truth_qa.emit_budget_pause_metric(), dimension-less) must be
+        # visible even on a day nothing else fails. qa_smoke's own email only
+        # fires on a real FAILURE (a lone ⏸ pause sends nothing), so this alarm is
+        # the only guaranteed surface for a pause-only day — it lands in the SAME
+        # daily digest every other alarm here uses. ADR-104 applied to QA itself:
+        # a paused check must never be indistinguishable from a passing one.
+        _alarm(
+            "QaPausedByBudget",
+            "qa-paused-by-budget",
+            "LifePlatform/QA",
+            "QAPausedByBudget",
+            86400,
+            "Sum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
         # REL-01: heartbeats for the four silent-failure detectors above. Each fires if
         # the detector's own daily metric is ABSENT for 2 straight days — i.e. the
         # producer (pipeline-health / strava-reconcile / freshness-checker / coherence-
@@ -330,6 +363,58 @@ class MonitoringStack(Stack):
             "cost-governor-heartbeat",
             "LifePlatform/Budget",
             "BudgetTier",
+        )
+
+        # #1445: qa-smoke was previously silent unless a check FAILED — a green
+        # run and a dead Lambda both produced zero signal, so "the nightly
+        # data-health layer stopped running" was indistinguishable from "the
+        # site is healthy." qa_smoke_lambda.py now emits a
+        # LifePlatform/QaSmoke EMF summary (PassCount/WarnCount/FailCount/
+        # PausedCount/RunCompleted) on EVERY run, including all-green. Three
+        # alarms close the loop, all digest — matching the dispatcher's own
+        # "the daily sweep already handles routine ... QA smoke" posture
+        # (remediation_dispatcher_lambda.py), so a routine QA finding stays
+        # off the urgent page while still being real, queryable signal:
+        #   qa-smoke-heartbeat   — RunCompleted absent 2 straight days (the
+        #                          Lambda stopped running / died before its
+        #                          EMF line, mirrors the REL-01 heartbeats).
+        #   qa-smoke-failures    — FailCount >= 1 (was already emailed
+        #                          directly; this also makes it a queryable
+        #                          alarm the remediation agent's
+        #                          `describe_alarms(StateValue="ALARM")`
+        #                          sweep ingests as a source, same mechanism
+        #                          every other alarm class already uses).
+        #   qa-smoke-warnings    — WarnCount >= 1: a warnings-only run was
+        #                          previously fully silent (no email, no
+        #                          alarm); now it surfaces in the next daily
+        #                          digest — visible, not a full alert.
+        _heartbeat_alarm(
+            "QaSmokeHeartbeat",
+            "qa-smoke-heartbeat",
+            "LifePlatform/QaSmoke",
+            "RunCompleted",
+        )
+        _alarm(
+            "QaSmokeFailures",
+            "qa-smoke-failures",
+            "LifePlatform/QaSmoke",
+            "FailCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+        _alarm(
+            "QaSmokeWarnings",
+            "qa-smoke-warnings",
+            "LifePlatform/QaSmoke",
+            "WarnCount",
+            86400,
+            "Maximum",
+            1,
+            GTE,
+            to_digest=True,
         )
 
         # #727: scientific-liveness heartbeat. The coach-prediction-evaluator ran

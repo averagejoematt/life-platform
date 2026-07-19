@@ -151,3 +151,36 @@ def test_handler_non_empty_sends_one_email(env):
     assert "×2" in body_text
     # Batch delete called once with both messages.
     mod._sqs_mock.delete_message_batch.assert_called_once()
+
+
+def test_qa_paused_by_budget_alarm_reaches_the_digest_email(env):
+    """#1440: the qa-paused-by-budget CloudWatch alarm (monitoring_stack.py,
+    watching LifePlatform/QA QAPausedByBudget — emitted by
+    lambdas/reader_truth_qa.emit_budget_pause_metric() on a budget-tier pause of
+    the reader-truth AI QA pass, either hook — is routed to_digest=True) needs
+    NO new code in this lambda: the existing generic drain → group → format
+    pipeline already carries ANY alarm on the digest topic into the batched
+    email. This test proves that pipeline actually surfaces the new alarm's
+    name — the guaranteed 'digest/report line' for a day nothing else fails
+    (qa_smoke's own email stays silent on a pause-only night)."""
+    mod = _import_module()
+    mod._sqs_mock.receive_message.side_effect = [
+        {
+            "Messages": [
+                {
+                    "MessageId": "1",
+                    "ReceiptHandle": "h1",
+                    "Body": _alarm(
+                        "qa-paused-by-budget",
+                        reason="Threshold Crossed: 1 datapoint [1.0] was greater than or equal to the threshold (1.0).",
+                    ),
+                }
+            ]
+        },
+        {"Messages": []},
+    ]
+    result = mod.lambda_handler({}, None)
+    assert result["sent"] is True
+    call_kwargs = mod._ses_mock.send_email.call_args.kwargs
+    body_text = call_kwargs["Content"]["Simple"]["Body"]["Text"]["Data"]
+    assert "qa-paused-by-budget" in body_text  # the AI QA pause reaches the digest, never silent

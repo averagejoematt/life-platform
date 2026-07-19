@@ -167,30 +167,39 @@ def assess_reader_truth(results):
     call (so duplicated-narrative is checkable), and merges findings like the
     vision pass: high → issue + FAIL, med/low → warning. Fail-soft on every
     dependency (Bedrock, budget tier, missing prose) with an explicit skip.
+
+    Returns a status dict `{"status": ..., ...}` — NOT the mutated `results` (no
+    caller used the old return value; `results` is still mutated in place exactly
+    as before). #1440: `status` is one of "ok" | "unavailable" | "skipped_by_budget" |
+    "no_surfaces" so the caller (visual_qa.run_sweep) can report a budget pause as an
+    explicit SKIPPED-BY-BUDGET state — never as an indistinguishable pass.
     """
     bedrock = _import_bedrock()
     if not bedrock:
         for r in results:
             r.setdefault("warnings", []).append("Reader-truth QA skipped — bedrock_client unavailable")
-        return results
+        return {"status": "unavailable", "detail": "bedrock_client unavailable"}
     try:
         import reader_truth_qa  # lambdas/ is on sys.path after _import_bedrock()
     except Exception as e:  # pragma: no cover
         print(f"  ⚠ Reader-truth QA unavailable — could not import reader_truth_qa: {e}")
         for r in results:
             r.setdefault("warnings", []).append(f"Reader-truth QA skipped — reader_truth_qa unavailable: {str(e)[:100]}")
-        return results
+        return {"status": "unavailable", "detail": f"reader_truth_qa unavailable: {str(e)[:100]}"}
 
     # Budget gate — internal QA pauses FIRST (ADR-125). Honest skip, never silent.
+    # #1440: emit the QAPausedByBudget metric + tag every warning SKIPPED-BY-BUDGET
+    # (not just "skipped") so a paused run can never be mistaken for a clean one.
     try:
         import budget_guard
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
-            print(f"  ⏸ Reader-truth QA skipped — budget tier {tier} (internal QA pauses first, ADR-125)")
+            reader_truth_qa.emit_budget_pause_metric("visual_ai_qa", tier)
+            print(f"  ⏸ SKIPPED-BY-BUDGET — Reader-truth QA paused at budget tier {tier} (internal QA pauses first, ADR-125)")
             for r in results:
-                r.setdefault("warnings", []).append(f"Reader-truth QA skipped — budget tier {tier} (ADR-125)")
-            return results
+                r.setdefault("warnings", []).append(f"SKIPPED-BY-BUDGET: Reader-truth QA — budget tier {tier} (ADR-125)")
+            return {"status": "skipped_by_budget", "tier": tier}
     except ImportError:
         pass  # fail-open, same posture as the guard itself
 
@@ -210,7 +219,7 @@ def assess_reader_truth(results):
         by_path[r["path"]] = r
     if not surfaces:
         print("  ⚠ Reader-truth QA: no prose captures found — run visual_qa.py with --reader-truth")
-        return results
+        return {"status": "no_surfaces"}
 
     findings, errors = reader_truth_qa.assess_prose(surfaces, bedrock.invoke)
     for err in errors:
@@ -235,7 +244,7 @@ def assess_reader_truth(results):
         phase = reader_truth_qa.phase_context()
         day = f"{phase['days_until_start']}d pre-start" if phase["pre_start"] else f"Day {phase['day_n']}"
         print(f"  ✅ Reader-truth: {len(surfaces)} surfaces clean at {day}")
-    return results
+    return {"status": "ok", "findings": len(findings)}
 
 
 if __name__ == "__main__":
