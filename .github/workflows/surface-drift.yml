@@ -1,0 +1,52 @@
+# Surface-drift gate (#1454) — "did you also update the tests?", asked by a
+# machine on every PR. Diff-aware: blocks a PR that ADDS a site page / site-api
+# route / EventBridge schedule / site JS module without its QA registration
+# (tests/qa_manifest.py entry, tests/api_schemas/ baseline, monitoring change,
+# the #1432-scanned directory) — or a dated entry in
+# docs/qa/SURFACE_DRIFT_EXEMPTIONS.md. Never silent.
+#
+# Deliberately separate from ci-cd.yml and v4-gate.yml: NO AWS access, no
+# Playwright, no deploy capability — stdlib Python + git only, so it reports in
+# seconds and can never be the slow gate someone is tempted to skip.
+name: surface drift gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'lambdas/web/**'
+      - 'cdk/stacks/**'
+      - 'tests/qa_manifest.py'
+      # C1 (#1436): the schema-baseline directory the ROUTE leg enforces against —
+      # its appearance flips that leg from advisory to blocking.
+      - 'tests/api_schemas/**'
+      # the gate, its ledger, and this workflow must re-run the gate on themselves
+      - 'scripts/surface_drift_gate.py'
+      - 'docs/qa/SURFACE_DRIFT_EXEMPTIONS.md'
+      - '.github/workflows/surface-drift.yml'
+      # the JS leg asserts this script still directory-scans site/assets/js/
+      - 'scripts/import_site_js_graph.mjs'
+      # the ROUTE leg reuses deploy/sync_doc_metadata.discover_endpoint_paths
+      - 'deploy/sync_doc_metadata.py'
+
+permissions:
+  contents: read
+
+jobs:
+  surface-drift:
+    name: Surface-drift gate (new pages/routes/crons/JS land registered)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # full history: the gate diffs HEAD against merge-base(origin/main, HEAD)
+          # and reads base-revision file contents via `git show`
+          fetch-depth: 0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Surface-drift gate (#1454)
+        run: python3 scripts/surface_drift_gate.py --base origin/main

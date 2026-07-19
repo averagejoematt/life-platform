@@ -182,6 +182,33 @@ def _auto_discover_endpoint_count() -> int | None:
     return total if total >= endpoint_registry.SANITY_FLOOR else None
 
 
+def discover_endpoint_paths(source: str) -> set | None:
+    """The route-SET discoverer behind _auto_discover_endpoint_count (#1437), kept as
+    a stable source-string contract for the surface-drift gate (#1454) — it diffs the
+    enumerated route set between two git revisions of site_api_lambda.py. Since #1436
+    the walk itself lives in deploy/endpoint_registry.discover_endpoint_records; this
+    wrapper preserves the gate's None-on-unparseable / None-without-lambda_handler /
+    None-when-structurally-empty semantics over that one shared enumerator.
+    """
+    import ast as _ast
+
+    try:
+        tree = _ast.parse(source)
+    except Exception:
+        return None
+    if not any(isinstance(n, _ast.FunctionDef) and n.name == "lambda_handler" for n in _ast.walk(tree)):
+        return None
+    try:
+        records = endpoint_registry.discover_endpoint_records(source=source)
+    except Exception:
+        return None
+    has_routes = any("routes" in r.mechanisms for r in records.values())
+    has_simple = any("simple_routes" in r.mechanisms for r in records.values())
+    if not has_routes and not has_simple:
+        return None
+    return set(records)
+
+
 _ALARM_CONSTRUCTOR_ATTRS = ("Alarm", "create_alarm")  # cloudwatch.Alarm(...) and metric.create_alarm(...)
 
 

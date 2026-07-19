@@ -117,6 +117,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |
 | `restart/` | **Machine-written** reset-pipeline run reports (the restart scripts write here — do not relocate) |
 | `site-reviews/` | Dated site reviews |
+| `qa/` | QA gate ledgers ([SURFACE_DRIFT_EXEMPTIONS.md](qa/SURFACE_DRIFT_EXEMPTIONS.md) — the #1454 surface-drift gate's dated exemption ledger) |
 
 ---
 
