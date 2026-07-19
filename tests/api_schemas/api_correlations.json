@@ -1,0 +1,68 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/correlations",
+  "is_prefix_sample": false,
+  "path": "/api/correlations",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "correlations": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "end_date": {
+        "type": "null"
+      },
+      "gates": {
+        "keys": {
+          "current_n": {
+            "type": "integer"
+          },
+          "interp_n": {
+            "keys": {
+              "moderate": {
+                "type": "integer"
+              },
+              "strong": {
+                "type": "integer"
+              },
+              "weak": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "min_n": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "start_date": {
+        "type": "null"
+      },
+      "week": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

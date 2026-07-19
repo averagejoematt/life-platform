@@ -1,0 +1,72 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/tools_baseline",
+  "is_prefix_sample": false,
+  "path": "/api/tools_baseline",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "baseline": {
+        "keys": {
+          "hrv_ms": {
+            "type": "null"
+          },
+          "rhr_bpm": {
+            "type": "null"
+          },
+          "sleep_hours": {
+            "type": "null"
+          },
+          "sleep_score": {
+            "type": "null"
+          },
+          "weight_lbs": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "baseline_date": {
+        "type": "string"
+      },
+      "current": {
+        "keys": {
+          "hrv_ms": {
+            "type": "null"
+          },
+          "rhr_bpm": {
+            "type": "null"
+          },
+          "sleep_hours": {
+            "type": "null"
+          },
+          "sleep_score": {
+            "type": "null"
+          },
+          "weight_lbs": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "current_date": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

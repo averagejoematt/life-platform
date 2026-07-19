@@ -422,3 +422,100 @@ class TestPreStartProof:
         snap = json.loads((Path(__file__).resolve().parent.parent / "scripts" / "proof_snapshot.json").read_text())
         assert snap.get("coaching_read") == {}
         assert v4_proof.coaching_read_block_html(snap["coaching_read"]) == ""
+
+
+class TestGrowthSurface1395:
+    """#1395 — static core + data-driven OG on Home + the doors (the crawler view)."""
+
+    PRE_START = {
+        "start_weight": 315.6,
+        "goal_weight": 185.0,
+        "pre_start": True,
+        "start_date": "2026-07-19",
+        "day_n": 0,
+        "as_of": "2026-07-19",
+    }
+    CHAR = {"level": 1, "tier": "Foundation", "as_of": "2026-07-18"}
+
+    def test_home_block_is_real_content_with_provenance(self):
+        html = v4_proof.home_block_html(self.PRE_START, self.CHAR)
+        assert html.startswith("<noscript>") and html.endswith("</noscript>")
+        assert 'class="proof-static' in html
+        assert "as of 2026-07-19" in html  # ADR-104 honest-provenance stamp
+        assert "316 lb" in html and "185 lb" in html  # real, rounded numbers
+        assert "131 lb climb" in html
+        assert "Character level 1 · Foundation" in html
+
+    def test_home_block_post_start_uses_day_and_progress(self):
+        j = {
+            "start_weight": 315.6,
+            "goal_weight": 185.0,
+            "pre_start": False,
+            "day_n": 12,
+            "current_weight": 308.0,
+            "lost_lbs": 7.6,
+            "as_of": "2026-08-01",
+        }
+        html = v4_proof.home_block_html(j, self.CHAR)
+        assert "Day 12." in html
+        assert "308 lb now, 8 lb down" in html
+
+    def test_home_block_omits_when_no_numbers(self):
+        assert v4_proof.home_block_html({}, {}) == ""
+        assert v4_proof.home_block_html(None, None) == ""
+
+    def test_home_og_carries_falsifiable_number(self):
+        og = v4_proof.home_og(self.PRE_START, self.CHAR)
+        title = og[("property", "og:title")]
+        desc = og[("property", "og:description")]
+        assert "316 lb → 185 lb" in title  # a number in the unfurl title
+        assert "Sunday, July 19" in desc and "as of 2026-07-19".lower() in desc.lower()
+        assert og[("property", "og:image")].endswith("/og-home.png")
+
+    def test_data_block_and_og_from_source_freshness(self):
+        summary = {"total": 13, "fresh": 7, "labels": ["Whoop", "Withings", "Strava"], "as_of": "2026-07-19"}
+        html = v4_proof.data_block_html(summary)
+        assert "13 sources on the board, 7 fresh" in html
+        assert "<li>Whoop</li>" in html  # the real roster is crawlable
+        assert "as of 2026-07-19" in html
+        og = v4_proof.data_og(summary)
+        assert "13 sources, 7 fresh" in og[("property", "og:title")]
+
+    def test_data_block_omits_when_empty(self):
+        assert v4_proof.data_block_html({}) == ""
+        assert v4_proof.data_block_html({"total": 0}) == ""
+
+    def test_protocols_block_and_og_from_experiments(self):
+        summary = {"total": 67, "available": 4, "as_of": "2026-07-19"}
+        html = v4_proof.protocols_block_html(summary)
+        assert "67 experiments in the library, 4 ready to run now" in html
+        assert "as of 2026-07-19" in html
+        og = v4_proof.protocols_og(summary)
+        assert "67 experiments in the library" in og[("property", "og:title")]
+        assert og[("property", "og:image")].endswith("/og-experiments.png")
+
+    def test_cockpit_og_carries_level(self):
+        og = v4_proof.cockpit_og(self.CHAR)
+        assert "character level 1 · Foundation" in og[("property", "og:title")]
+        assert og[("property", "og:image")].endswith("/og-character.png")
+
+    def test_story_og_counts_dispatches(self):
+        posts = [{"title": "A"}, {"title": "B"}, {"title": ""}]
+        og = v4_proof.story_og(posts)
+        assert "2 dispatches published" in og[("property", "og:title")]
+        assert og[("property", "og:image")].endswith("/og-chronicle.png")
+
+    def test_apply_og_replaces_existing_and_inserts_missing(self):
+        html = '<head>\n  <meta name="description" content="d">\n  <meta property="og:title" content="OLD">\n</head>'
+        og = {("property", "og:title"): "NEW", ("name", "twitter:title"): "TW"}
+        out = v4_proof.apply_og(html, og)
+        assert 'content="OLD"' not in out
+        assert '<meta property="og:title" content="NEW">' in out
+        assert '<meta name="twitter:title" content="TW">' in out
+        # idempotent: a second pass yields identical output
+        assert v4_proof.apply_og(out, og) == out
+
+    def test_apply_og_escapes_ampersand(self):
+        html = '<head>\n  <meta name="description" content="d">\n</head>'
+        out = v4_proof.apply_og(html, {("property", "og:title"): "A & B"})
+        assert "A &amp; B" in out

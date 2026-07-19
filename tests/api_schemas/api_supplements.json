@@ -1,0 +1,1219 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/supplements",
+  "is_prefix_sample": false,
+  "path": "/api/supplements",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "genome_snps": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "groups": {
+        "keys": {
+          "cognitive": {
+            "keys": {
+              "desc": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "items": {
+                "items": {
+                  "keys": {
+                    "board": {
+                      "type": "string"
+                    },
+                    "cost_monthly": {
+                      "type": "integer"
+                    },
+                    "dose": {
+                      "type": "string"
+                    },
+                    "ev": {
+                      "type": "string"
+                    },
+                    "evPct": {
+                      "type": "integer"
+                    },
+                    "impact": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "paused": {
+                      "type": "boolean"
+                    },
+                    "pausedReason": {
+                      "type": "string"
+                    },
+                    "questionReason": {
+                      "type": "string"
+                    },
+                    "questioning": {
+                      "type": "boolean"
+                    },
+                    "rationale": {
+                      "type": "string"
+                    },
+                    "science": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "length_sample": 3,
+                      "type": "array"
+                    },
+                    "sources": {
+                      "items": {
+                        "keys": {
+                          "stance": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "length_sample": 3,
+                      "type": "array"
+                    },
+                    "timing": {
+                      "type": "string"
+                    },
+                    "watching": {
+                      "type": "string"
+                    },
+                    "why": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "longevity": {
+            "keys": {
+              "desc": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "items": {
+                "items": [
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 2,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 6,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "metabolic": {
+            "keys": {
+              "desc": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "items": {
+                "items": [
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "questionReason": {
+                        "type": "string"
+                      },
+                      "questioning": {
+                        "type": "boolean"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 3,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "muscle": {
+            "keys": {
+              "desc": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "items": {
+                "items": [
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "experiment": {
+                        "type": "string"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 4,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "questionReason": {
+                        "type": "string"
+                      },
+                      "questioning": {
+                        "type": "boolean"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 5,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "sleep": {
+            "keys": {
+              "desc": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "items": {
+                "items": [
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "experiment": {
+                        "type": "string"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 5,
+                        "type": "array"
+                      },
+                      "synergy": {
+                        "type": "string"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "synergy": {
+                        "type": "string"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "experiment": {
+                        "type": "string"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": {
+                          "keys": {
+                            "stance": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "synergy": {
+                        "type": "string"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "board": {
+                        "type": "string"
+                      },
+                      "cost_monthly": {
+                        "type": "integer"
+                      },
+                      "dose": {
+                        "type": "string"
+                      },
+                      "ev": {
+                        "type": "string"
+                      },
+                      "evPct": {
+                        "type": "integer"
+                      },
+                      "hoped_outcome": {
+                        "type": "string"
+                      },
+                      "impact": {
+                        "type": "string"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "measured_by": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "questionReason": {
+                        "type": "string"
+                      },
+                      "questioning": {
+                        "type": "boolean"
+                      },
+                      "rationale": {
+                        "type": "string"
+                      },
+                      "science": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "sources": {
+                        "items": [
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          {
+                            "keys": {
+                              "stance": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        ],
+                        "length_sample": 3,
+                        "type": "array"
+                      },
+                      "synergy": {
+                        "type": "string"
+                      },
+                      "timing": {
+                        "type": "string"
+                      },
+                      "watching": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 4,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "total_count": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

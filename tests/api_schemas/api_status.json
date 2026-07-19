@@ -1,0 +1,396 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/status",
+  "is_prefix_sample": false,
+  "path": "/api/status",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "cost": {
+        "keys": {
+          "budget": {
+            "type": "number"
+          },
+          "mtd": {
+            "type": "number"
+          },
+          "pct_of_budget": {
+            "type": "integer"
+          },
+          "projected": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "generated_at": {
+        "type": "string"
+      },
+      "groups": {
+        "items": [
+          {
+            "keys": {
+              "components": {
+                "items": [
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "null"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "group": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "source_app": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": {
+                          "type": "integer"
+                        },
+                        "length_sample": 90,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "group": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "source_app": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": {
+                          "type": "integer"
+                        },
+                        "length_sample": 90,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "group": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "source_app": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": null,
+                        "length_sample": 0,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 25,
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "components": {
+                "items": [
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": {
+                          "type": "integer"
+                        },
+                        "length_sample": 90,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "null"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": {
+                          "type": "integer"
+                        },
+                        "length_sample": 90,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 5,
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "components": {
+                "items": [
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "null"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": {
+                          "type": "integer"
+                        },
+                        "length_sample": 90,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "comment": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_sync_relative": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "uptime_90d": {
+                        "items": {
+                          "type": "integer"
+                        },
+                        "length_sample": 90,
+                        "type": "array"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 7,
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "components": {
+                "items": {
+                  "keys": {
+                    "comment": {
+                      "type": "null"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 6,
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 4,
+        "type": "array"
+      },
+      "health_check": {
+        "keys": {
+          "checked_at": {
+            "type": "string"
+          },
+          "failed": {
+            "type": "integer"
+          },
+          "passed": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "overall": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

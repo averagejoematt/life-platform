@@ -1,0 +1,80 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/sleep_correlations",
+  "is_prefix_sample": false,
+  "path": "/api/sleep_correlations",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "cards": {
+        "items": {
+          "keys": {
+            "coefficient": {
+              "type": "null"
+            },
+            "confidence": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "lag_days": {
+              "type": "integer"
+            },
+            "n": {
+              "type": "integer"
+            },
+            "noise": {
+              "type": "boolean"
+            },
+            "note": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "overlap_weeks": {
+              "type": "number"
+            },
+            "predictor": {
+              "type": "string"
+            },
+            "withheld": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 7,
+        "type": "array"
+      },
+      "min_coef_days": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

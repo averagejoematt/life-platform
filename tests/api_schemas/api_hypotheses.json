@@ -1,0 +1,128 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/hypotheses",
+  "is_prefix_sample": false,
+  "path": "/api/hypotheses",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "_notice": {
+        "type": "string"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "gates": {
+        "type": "null"
+      },
+      "hypotheses": {
+        "items": {
+          "keys": {
+            "check_count": {
+              "type": "number"
+            },
+            "ci95_high": {
+              "type": "null"
+            },
+            "ci95_low": {
+              "type": "null"
+            },
+            "confidence": {
+              "type": "string"
+            },
+            "created_at": {
+              "type": "string"
+            },
+            "days_observed": {
+              "type": "null"
+            },
+            "deterministic_verdict": {
+              "type": "null"
+            },
+            "domains": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 2,
+              "type": "array"
+            },
+            "effect_size": {
+              "type": "null"
+            },
+            "evidence": {
+              "type": "string"
+            },
+            "hypothesis": {
+              "type": "string"
+            },
+            "hypothesis_id": {
+              "type": "string"
+            },
+            "last_checked": {
+              "type": "null"
+            },
+            "last_evidence": {
+              "type": "null"
+            },
+            "n_comparison": {
+              "type": "null"
+            },
+            "n_condition": {
+              "type": "null"
+            },
+            "pre_registered_at": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "test_spec": {
+              "keys": {
+                "condition_metric": {
+                  "type": "string"
+                },
+                "condition_op": {
+                  "type": "string"
+                },
+                "condition_threshold": {
+                  "type": "number"
+                },
+                "direction": {
+                  "type": "string"
+                },
+                "lag_days": {
+                  "type": "number"
+                },
+                "min_effect": {
+                  "type": "number"
+                },
+                "outcome_metric": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 2,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -131,6 +131,39 @@ def ddb_ground_truth():
     return findings
 
 
+def scan_json_value_leaks(data, source_label):
+    """Walk a parsed JSON value for leaked NaN/undefined/[object Object]/None/null
+    inside STRING values (keys named 'null'/'none' are fine — only values matter).
+
+    Extracted (#1436) so this is the ONE leak-scan walk shared by:
+      - sanity_scan() below, which reads already-captured api/*.json files off disk
+        (the tests/site_review.py capture flow — a curated page-binding subset), and
+      - deploy/capture_api_schemas.py, which scans the LIVE response in-memory at
+        capture time, across the FULL AST-discovered ~115-endpoint router surface —
+        before the raw value is discarded in favor of the shape-only snapshot that
+        actually gets committed (values are never checked in, #1436 AC3: shape not
+        values). This is how the sentinel scan's coverage extends to every endpoint
+        rather than just the page-bound subset sanity_scan's callers historically hit.
+
+    Returns a list of {"source", "where", "severity": "high", "snippet"} findings.
+    """
+    findings = []
+
+    def _walk(node, path=""):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                _walk(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for i, v in enumerate(node[:50]):
+                _walk(v, f"{path}[{i}]")
+        elif isinstance(node, str):
+            if _LEAK_RE.search(node) and len(node) < 200:
+                findings.append({"source": source_label, "where": path, "severity": "high", "snippet": node[:120]})
+
+    _walk(data)
+    return findings
+
+
 def sanity_scan(run_dir):
     """Scan captured API JSON values + rendered prose for leaked sentinels / raw datetimes."""
     findings = []
@@ -141,19 +174,7 @@ def sanity_scan(run_dir):
                 data = json.load(f)
         except Exception:  # noqa: BLE001
             continue
-
-        def _walk(node, path=""):
-            if isinstance(node, dict):
-                for k, v in node.items():
-                    _walk(v, f"{path}.{k}")
-            elif isinstance(node, list):
-                for i, v in enumerate(node[:50]):
-                    _walk(v, f"{path}[{i}]")
-            elif isinstance(node, str):
-                if _LEAK_RE.search(node) and len(node) < 200:
-                    findings.append({"source": os.path.basename(fpath), "where": path, "severity": "high", "snippet": node[:120]})
-
-        _walk(data)
+        findings.extend(scan_json_value_leaks(data, os.path.basename(fpath)))
     # Rendered prose (.txt): a leaked sentinel here is what the visitor literally sees.
     for fpath in sorted(glob.glob(os.path.join(run_dir, "*.txt"))):
         try:

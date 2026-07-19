@@ -134,6 +134,19 @@
         "sesv2:SendEmail"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "SecretsDescribe",
+      "Effect": "Allow",
+      "Action": "secretsmanager:DescribeSecret",
+      "Resource": [
+        "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/ai-keys*",
+        "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/site-api-ai-key*",
+        "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/eightsleep-client*",
+        "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/notion*",
+        "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/todoist*",
+        "arn:aws:secretsmanager:us-west-2:205930651321:secret:life-platform/ingestion-keys*"
+      ]
     }
   ]
 }

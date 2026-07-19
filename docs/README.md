@@ -78,7 +78,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–135)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–136)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [CONTINUITY.md](CONTINUITY.md) | What lives outside `docs/` and how a human reads/exports it |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
@@ -118,6 +118,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | `audits/` · `v2-audits/` · `rca/` | Dated audit + post-mortem records |
 | `restart/` | **Machine-written** reset-pipeline run reports (the restart scripts write here — do not relocate) |
 | `site-reviews/` | Dated site reviews |
+| `qa/` | QA gate ledgers ([SURFACE_DRIFT_EXEMPTIONS.md](qa/SURFACE_DRIFT_EXEMPTIONS.md) — the #1454 surface-drift gate's dated exemption ledger) |
 
 ---
 

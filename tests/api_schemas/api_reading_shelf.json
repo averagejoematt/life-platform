@@ -1,0 +1,348 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/reading_shelf",
+  "is_prefix_sample": false,
+  "path": "/api/reading_shelf",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "counts": {
+        "keys": {
+          "finished": {
+            "type": "integer"
+          },
+          "queue": {
+            "type": "integer"
+          },
+          "reading": {
+            "type": "integer"
+          },
+          "set_down": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "finished": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "queue": {
+        "items": [
+          {
+            "keys": {
+              "book": {
+                "keys": {
+                  "author": {
+                    "type": "string"
+                  },
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "coverS3Key": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "keys": {
+                      "composite": {
+                        "type": "number"
+                      },
+                      "density": {
+                        "type": "number"
+                      },
+                      "prose": {
+                        "type": "number"
+                      },
+                      "structure": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "domainTags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "era": {
+                    "type": "string"
+                  },
+                  "isbn13": {
+                    "type": "string"
+                  },
+                  "themes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 4,
+                    "type": "array"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "notes": {
+                "items": {
+                  "keys": {
+                    "bookId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "noteId": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "state": {
+                "keys": {
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "book": {
+                "keys": {
+                  "author": {
+                    "type": "string"
+                  },
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "coverS3Key": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "keys": {
+                      "composite": {
+                        "type": "number"
+                      },
+                      "density": {
+                        "type": "number"
+                      },
+                      "prose": {
+                        "type": "number"
+                      },
+                      "structure": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "domainTags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 3,
+                    "type": "array"
+                  },
+                  "era": {
+                    "type": "string"
+                  },
+                  "isbn13": {
+                    "type": "string"
+                  },
+                  "themes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 4,
+                    "type": "array"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "notes": {
+                "items": {
+                  "keys": {
+                    "bookId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "noteId": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "state": {
+                "keys": {
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 5,
+        "type": "array"
+      },
+      "reading": {
+        "items": {
+          "keys": {
+            "book": {
+              "keys": {
+                "author": {
+                  "type": "string"
+                },
+                "bookId": {
+                  "type": "string"
+                },
+                "coverS3Key": {
+                  "type": "string"
+                },
+                "difficulty": {
+                  "keys": {
+                    "composite": {
+                      "type": "number"
+                    },
+                    "density": {
+                      "type": "number"
+                    },
+                    "prose": {
+                      "type": "number"
+                    },
+                    "structure": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "domainTags": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "length_sample": 2,
+                  "type": "array"
+                },
+                "era": {
+                  "type": "string"
+                },
+                "isbn13": {
+                  "type": "string"
+                },
+                "themes": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "length_sample": 4,
+                  "type": "array"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "notes": {
+              "items": {
+                "keys": {
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "noteId": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 1,
+              "type": "array"
+            },
+            "state": {
+              "keys": {
+                "bookId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "set_down": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -24,13 +24,20 @@ Usage:
     python3 tests/visual_qa.py                      # full sweep, no AI
     python3 tests/visual_qa.py --page /cockpit/         # single page
     python3 tests/visual_qa.py --screenshot         # save full-page + chart crops
-    python3 tests/visual_qa.py --screenshot --ai-qa # + Claude semantic verdict per image
+    python3 tests/visual_qa.py --screenshot --ai-qa # + Claude semantic verdict per image (full surface)
+    python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1
+                                                    # + Claude semantic verdict, tier-1 pages only (#1428;
+                                                    #   what CI runs at deploy time)
     python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
                                                     # + phase-aware truth pass over each
                                                     #   page's rendered prose (#1095)
 
 Cost: $0 for the browser sweep. --ai-qa adds a few Bedrock vision calls (Haiku,
 ~$0.001/image; pennies per run, and it no-ops cleanly if AI is unavailable/budget-paused).
+Tiered by design (#1428): CI's deploy-time gate runs --ai-qa-max-tier 1 (the 6 flagship
+doors only); the full untiered surface runs on the weekly standalone schedule
+(.github/workflows/visual-qa.yml) to keep AI-vision spend bounded — see that
+workflow's header comment for the exact cadence split.
 """
 
 import argparse
@@ -207,10 +214,18 @@ def _check_stale_text(page):
                 if (s.pattern.test(body)) {
                     const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
                     while (w.nextNode()) {
-                        if (s.pattern.test(w.currentNode.textContent)) {
+                        const txt = w.currentNode.textContent;
+                        if (s.pattern.test(txt)) {
+                            // "coming soon" on /gear/ is sanctioned, permanent-until-launched
+                            // affiliate-program copy (v4_build_gear.py — the page's own
+                            // disclosure explains it), not stuck pre-launch placeholder text.
+                            // Both occurrences carry "affiliate" in the same text node, so
+                            // that's the discriminator — the genuine "site launching April"
+                            // class has no reason to mention affiliates (#1427).
+                            if (s.desc === 'Pre-launch copy still visible' && /affiliate/i.test(txt)) continue;
                             const el = w.currentNode.parentElement;
                             if (el && el.offsetParent !== null && el.offsetHeight > 0) {
-                                issues.push({text: w.currentNode.textContent.trim().slice(0, 60), desc: s.desc});
+                                issues.push({text: txt.trim().slice(0, 60), desc: s.desc});
                                 break;
                             }
                         }
@@ -395,11 +410,13 @@ def _svg_text_floor_findings(page, width):
         return []
 
 
-def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None):
+def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None, ai_vision_status=None):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
-    # #1440: a budget-tier pause must render as its own line in the CI summary —
-    # never silently absent, never indistinguishable from a clean run.
+    # #1440/#1428: a budget-tier pause must render as its own line in the CI
+    # summary — never silently absent, never indistinguishable from a clean run.
+    if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
+        lines.append(f"⏸ **AI-vision QA: SKIPPED-BY-BUDGET** (tier {ai_vision_status['tier']}) — not run, not a pass.\n")
     if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
         lines.append(f"⏸ **Reader-truth QA: SKIPPED-BY-BUDGET** (tier {reader_truth_status['tier']}) — not run, not a pass.\n")
     for r in results:
@@ -688,6 +705,7 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     return {
         "page": name,
         "path": path,
+        "tier": page_def.get("tier"),  # #1428: lets run_sweep restrict the AI-vision layer by tier
         "status": "PASS" if not issues else "FAIL",
         "issues": issues,
         "warnings": warnings,
@@ -696,8 +714,30 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     }
 
 
-def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False, reader_truth=False):
-    """Run the v4 visual QA sweep. Returns True if no page FAILED."""
+def ai_qa_targets(results, max_tier=None):
+    """Which captured-page results get handed to the AI-vision pass (#1428).
+
+    Pure/testable (no Playwright/Bedrock dependency): max_tier=None returns every
+    result unchanged (the weekly full-surface behavior); an int restricts to results
+    whose `tier` is <= max_tier (deploy-time passes 1 for exactly the flagship doors).
+    A missing/None tier on a result is treated as tier 0 (always included) rather than
+    silently dropped — an untiered page should never vanish from AI coverage by accident.
+    """
+    if max_tier is None:
+        return results
+    return [r for r in results if (r.get("tier") if r.get("tier") is not None else 0) <= max_tier]
+
+
+def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False, reader_truth=False, ai_qa_max_tier=None):
+    """Run the v4 visual QA sweep. Returns True if no page FAILED.
+
+    ai_qa_max_tier (#1428): when set, restricts the Claude-vision assessment to
+    pages whose qa_manifest tier is <= this value (deploy-time passes `1` to cover
+    exactly the 6 flagship doors). The deterministic Playwright sweep above is
+    NEVER affected by this — `pages` (or the full PAGES list) still drives it, so
+    coverage there stays exactly what it is today. None (the default, used by the
+    weekly full-surface run) assesses every captured page — unchanged behavior.
+    """
     from playwright.sync_api import sync_playwright
 
     if screenshot_dir is None:
@@ -729,14 +769,24 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         browser.close()
 
     # ── optional Claude-vision semantic QA over the captured screenshots ──
+    # #1428: restrict WHICH pages get assessed to ai_qa_max_tier (deploy-time
+    # passes 1 → exactly the tier-1 doors); the deterministic checks above already
+    # ran over every page in `pages`/PAGES regardless, so tiering the AI layer
+    # never reduces deterministic coverage. None (weekly full-surface run) skips
+    # the filter and assesses every captured page, same as before #1428.
+    ai_vision_status = None
     if ai_qa:
         try:
             from visual_ai_qa import assess_results
         except ImportError:
             sys.path.insert(0, os.path.dirname(__file__))
             from visual_ai_qa import assess_results
-        print("\n── AI-vision QA (Claude / Bedrock) ──")
-        assess_results(results)  # mutates results in place: adds ai_verdict + may add issues
+        ai_targets = ai_qa_targets(results, ai_qa_max_tier)
+        if ai_qa_max_tier is not None:
+            print(f"\n── AI-vision QA (Claude / Bedrock) — tier <= {ai_qa_max_tier}: {len(ai_targets)}/{len(results)} pages ──")
+        else:
+            print("\n── AI-vision QA (Claude / Bedrock) — full surface ──")
+        ai_vision_status = assess_results(ai_targets)  # mutates ai_targets in place: adds ai_verdict + may add issues
 
     # ── optional phase-aware reader-truth QA over the captured prose (#1095) ──
     reader_truth_status = None
@@ -754,9 +804,11 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
     warns = sum(len(r.get("warnings", [])) for r in results)
     print(f"\n{'=' * 56}")
     print(f"Visual QA: {passed} passed, {failed} failed, {warns} warning(s) across {len(results)} pages")
-    # #1440: a budget-tier pause of the reader-truth pass must read as its own
+    # #1440/#1428: a budget-tier pause of an AI QA pass must read as its own
     # explicit state, never blend into "passed" — this is the one line a human
     # or a CI summary skim is guaranteed to see regardless of page-level warnings.
+    if ai_vision_status and ai_vision_status.get("status") == "skipped_by_budget":
+        print(f"AI-vision QA: SKIPPED-BY-BUDGET (tier {ai_vision_status['tier']}) — not run, not a pass")
     if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
         print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
     if save_screenshots:
@@ -769,6 +821,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
                 "passed": passed,
                 "failed": failed,
                 "warnings": warns,
+                "ai_vision_status": ai_vision_status,
                 "reader_truth_status": reader_truth_status,
                 "results": results,
             },
@@ -778,7 +831,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
 
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
-        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status)
+        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status, ai_vision_status)
 
     return failed == 0
 
@@ -788,6 +841,16 @@ if __name__ == "__main__":
     ap.add_argument("--page", help="Test a single page path (e.g. /cockpit/)")
     ap.add_argument("--screenshot", action="store_true", help="Save full-page + chart-crop + mobile screenshots")
     ap.add_argument("--ai-qa", action="store_true", help="Run Claude (Bedrock) semantic QA over the screenshots")
+    ap.add_argument(
+        "--ai-qa-max-tier",
+        type=int,
+        default=None,
+        help=(
+            "Restrict --ai-qa to qa_manifest pages with tier <= N (#1428; deploy-time CI passes 1 to cover exactly "
+            "the 6 flagship doors). Omit for the full-surface pass (the weekly scheduled run). Never affects the "
+            "deterministic Playwright coverage, which always runs over every page in --page/PAGES."
+        ),
+    )
     ap.add_argument(
         "--reader-truth",
         action="store_true",
@@ -803,5 +866,11 @@ if __name__ == "__main__":
             sys.exit(1)
 
     print(f"v4 Visual QA Sweep — {SITE_URL}\n{'=' * 56}")
-    ok = run_sweep(pages=pages, save_screenshots=args.screenshot, ai_qa=args.ai_qa, reader_truth=args.reader_truth)
+    ok = run_sweep(
+        pages=pages,
+        save_screenshots=args.screenshot,
+        ai_qa=args.ai_qa,
+        reader_truth=args.reader_truth,
+        ai_qa_max_tier=args.ai_qa_max_tier,
+    )
     sys.exit(0 if ok else 1)

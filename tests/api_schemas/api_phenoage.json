@@ -1,0 +1,64 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/phenoage",
+  "is_prefix_sample": false,
+  "path": "/api/phenoage",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "drivers": {
+        "items": {
+          "keys": {
+            "derived": {
+              "type": "boolean"
+            },
+            "direction": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 9,
+        "type": "array"
+      },
+      "lymphocyte_derived": {
+        "type": "boolean"
+      },
+      "missing": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "phenoage": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

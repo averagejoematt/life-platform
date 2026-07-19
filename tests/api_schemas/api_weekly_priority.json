@@ -1,0 +1,42 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/weekly_priority",
+  "is_prefix_sample": false,
+  "path": "/api/weekly_priority",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "cross_domain_notes": {
+        "keys": {},
+        "type": "object"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "weekly_priority": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

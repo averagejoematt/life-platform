@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/meal_responses",
+  "is_prefix_sample": false,
+  "path": "/api/meal_responses",
+  "shape": {
+    "keys": {
+      "meals": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

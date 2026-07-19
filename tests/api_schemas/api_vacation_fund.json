@@ -1,0 +1,102 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/vacation_fund",
+  "is_prefix_sample": false,
+  "path": "/api/vacation_fund",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "day_count": {
+        "type": "integer"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "end_date": {
+        "type": "null"
+      },
+      "extra_sources_enabled": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 2,
+        "type": "array"
+      },
+      "included_sport_types": {
+        "type": "string"
+      },
+      "manual_adjustment_usd": {
+        "type": "number"
+      },
+      "miles_usd": {
+        "type": "number"
+      },
+      "pace": {
+        "keys": {
+          "miles_per_week": {
+            "type": "null"
+          },
+          "projected_usd_1yr": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "per_source": {
+        "keys": {
+          "hevy": {
+            "type": "number"
+          },
+          "macrofactor_export": {
+            "type": "number"
+          },
+          "strava": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "per_sport_type": {
+        "keys": {},
+        "type": "object"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "rate_per_mile": {
+        "type": "number"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "total_miles": {
+        "type": "number"
+      },
+      "total_usd": {
+        "type": "number"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 2,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

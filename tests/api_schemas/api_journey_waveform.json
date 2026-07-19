@@ -1,0 +1,55 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/journey_waveform",
+  "is_prefix_sample": false,
+  "path": "/api/journey_waveform",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "day_n": {
+        "type": "integer"
+      },
+      "days": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "genesis": {
+        "type": "string"
+      },
+      "max_score": {
+        "type": "integer"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "week_n": {
+        "type": "integer"
+      },
+      "window": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

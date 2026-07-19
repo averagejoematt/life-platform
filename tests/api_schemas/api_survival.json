@@ -1,0 +1,111 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/survival",
+  "is_prefix_sample": false,
+  "path": "/api/survival",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "collapse_definition": {
+        "type": "string"
+      },
+      "confidence": {
+        "type": "string"
+      },
+      "current_silent_days": {
+        "type": "integer"
+      },
+      "cycles": {
+        "items": [
+          {
+            "keys": {
+              "censored": {
+                "type": "boolean"
+              },
+              "collapse_day": {
+                "type": "integer"
+              },
+              "cycle": {
+                "type": "integer"
+              },
+              "engaged_days": {
+                "type": "integer"
+              },
+              "genesis": {
+                "type": "string"
+              },
+              "is_current": {
+                "type": "boolean"
+              },
+              "strip": {
+                "type": "string"
+              },
+              "window_days": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "censored": {
+                "type": "boolean"
+              },
+              "collapse_day": {
+                "type": "null"
+              },
+              "cycle": {
+                "type": "integer"
+              },
+              "engaged_days": {
+                "type": "integer"
+              },
+              "genesis": {
+                "type": "string"
+              },
+              "is_current": {
+                "type": "boolean"
+              },
+              "strip": {
+                "type": "string"
+              },
+              "window_days": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 7,
+        "type": "array"
+      },
+      "horizon_days": {
+        "type": "integer"
+      },
+      "method": {
+        "type": "string"
+      },
+      "note": {
+        "type": "string"
+      },
+      "p_reach_30_pct": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

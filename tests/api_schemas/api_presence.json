@@ -1,0 +1,92 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/presence",
+  "is_prefix_sample": false,
+  "path": "/api/presence",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "available": {
+        "type": "boolean"
+      },
+      "channels": {
+        "items": {
+          "keys": {
+            "gap_days": {
+              "type": "number"
+            },
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "last_log_date": {
+              "type": "null"
+            },
+            "primary": {
+              "type": "boolean"
+            },
+            "quiet": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 5,
+        "type": "array"
+      },
+      "channels_quiet_count": {
+        "type": "integer"
+      },
+      "gap_days": {
+        "type": "number"
+      },
+      "in_lull": {
+        "type": "boolean"
+      },
+      "last_log_date": {
+        "type": "null"
+      },
+      "passive_still_flowing": {
+        "type": "boolean"
+      },
+      "planned_pause": {
+        "type": "boolean"
+      },
+      "planned_pause_reason": {
+        "type": "string"
+      },
+      "presence_class": {
+        "type": "string"
+      },
+      "resumed_after_days": {
+        "type": "null"
+      },
+      "returned": {
+        "type": "boolean"
+      },
+      "weight_delta_over_gap_lbs": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,79 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/what_changed",
+  "is_prefix_sample": false,
+  "path": "/api/what_changed",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "computed_at": {
+        "type": "string"
+      },
+      "deltas": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "honest_null": {
+        "type": "boolean"
+      },
+      "newly_unlocked": {
+        "items": {
+          "keys": {
+            "direction": {
+              "type": "string"
+            },
+            "first_seen": {
+              "type": "string"
+            },
+            "interpretation": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "metric_a": {
+              "type": "string"
+            },
+            "metric_b": {
+              "type": "string"
+            },
+            "n": {
+              "type": "number"
+            },
+            "r": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "week": {
+        "type": "string"
+      },
+      "window_end": {
+        "type": "string"
+      },
+      "window_start": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

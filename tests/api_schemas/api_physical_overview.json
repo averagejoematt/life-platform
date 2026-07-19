@@ -1,0 +1,296 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/physical_overview",
+  "is_prefix_sample": false,
+  "path": "/api/physical_overview",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "baseline_dexa": {
+        "type": "null"
+      },
+      "blood_pressure": {
+        "type": "null"
+      },
+      "cadences": {
+        "keys": {
+          "dexa": {
+            "keys": {
+              "interval_days": {
+                "type": "integer"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "phenoage": {
+            "keys": {
+              "interval_days": {
+                "type": "null"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "tape": {
+            "keys": {
+              "interval_days": {
+                "type": "null"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "weight": {
+            "keys": {
+              "expected_days_per_week": {
+                "type": "integer"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "stale_days": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "days_since_dexa": {
+        "type": "integer"
+      },
+      "dexa_scan_count": {
+        "type": "integer"
+      },
+      "latest_dexa": {
+        "keys": {
+          "body_composition": {
+            "keys": {
+              "ag_ratio": {
+                "type": "number"
+              },
+              "android_fat_pct": {
+                "type": "number"
+              },
+              "body_fat_pct": {
+                "type": "number"
+              },
+              "fat_mass_lb": {
+                "type": "number"
+              },
+              "gynoid_fat_pct": {
+                "type": "number"
+              },
+              "lean_mass_lb": {
+                "type": "number"
+              },
+              "total_mass_lb": {
+                "type": "number"
+              },
+              "visceral_fat_g": {
+                "type": "number"
+              },
+              "visceral_fat_lb": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "body_score": {
+            "keys": {
+              "grade": {
+                "type": "string"
+              },
+              "numeric": {
+                "type": "number"
+              },
+              "percentile": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "bone": {
+            "keys": {
+              "t_score": {
+                "type": "number"
+              },
+              "z_score": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "changes_vs_baseline": {
+            "keys": {
+              "almi_kg_m2": {
+                "type": "number"
+              },
+              "fat_mass_lb": {
+                "type": "number"
+              },
+              "ffmi_kg_m2": {
+                "type": "number"
+              },
+              "lean_mass_lb": {
+                "type": "number"
+              },
+              "t_score": {
+                "type": "number"
+              },
+              "total_mass_lb": {
+                "type": "number"
+              },
+              "visceral_fat_lb": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "indices": {
+            "keys": {
+              "almi_kg_m2": {
+                "type": "number"
+              },
+              "almi_percentile": {
+                "type": "number"
+              },
+              "ffmi_kg_m2": {
+                "type": "number"
+              },
+              "ffmi_rating": {
+                "type": "string"
+              },
+              "fmi_kg_m2": {
+                "type": "number"
+              },
+              "fmi_rating": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "scan_date": {
+            "type": "string"
+          },
+          "score_360": {
+            "keys": {
+              "biological_age": {
+                "type": "number"
+              },
+              "score": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "segmental_fat": {
+            "keys": {
+              "arms_pct": {
+                "type": "number"
+              },
+              "legs_pct": {
+                "type": "number"
+              },
+              "trunk_pct": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "segmental_lean": {
+            "keys": {
+              "arms_lb": {
+                "type": "number"
+              },
+              "legs_lb": {
+                "type": "number"
+              },
+              "total_lb": {
+                "type": "number"
+              },
+              "trunk_lb": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "targets": {
+            "keys": {
+              "almi_kg_m2": {
+                "type": "number"
+              },
+              "body_fat_pct": {
+                "type": "number"
+              },
+              "ffmi_kg_m2": {
+                "type": "number"
+              },
+              "lean_mass_lb": {
+                "type": "number"
+              },
+              "t_score": {
+                "type": "number"
+              },
+              "total_mass_lb": {
+                "type": "number"
+              },
+              "visceral_fat_lb": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "next_dexa_recommended": {
+        "type": "string"
+      },
+      "tape_measurements": {
+        "type": "null"
+      },
+      "tape_session_count": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

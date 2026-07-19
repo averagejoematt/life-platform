@@ -1,0 +1,92 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/coaching-dashboard",
+  "is_prefix_sample": false,
+  "path": "/api/coaching-dashboard",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "coaches": {
+        "items": {
+          "keys": {
+            "analysis_generated_at": {
+              "type": "string"
+            },
+            "coach_id": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "data_phase": {
+              "type": "string"
+            },
+            "emotional_investment": {
+              "type": "string"
+            },
+            "initials": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "observatory_link": {
+              "type": "string"
+            },
+            "position_summary": {
+              "type": "string"
+            },
+            "prediction_count": {
+              "type": "integer"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 8,
+        "type": "array"
+      },
+      "open_actions": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "predictions": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "weekly_priority": {
+        "keys": {
+          "coach_name": {
+            "type": "string"
+          },
+          "generated_at": {
+            "type": "null"
+          },
+          "text": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

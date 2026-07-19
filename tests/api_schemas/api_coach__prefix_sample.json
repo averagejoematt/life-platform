@@ -1,0 +1,491 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/coach/sleep_coach",
+  "is_prefix_sample": true,
+  "path": "/api/coach/",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "board_role": {
+        "type": "string"
+      },
+      "character": {
+        "keys": {
+          "arc": {
+            "type": "string"
+          },
+          "data_sources": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "focus_areas": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 5,
+            "type": "array"
+          },
+          "principles": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "relationship_to_matthew": {
+            "type": "string"
+          },
+          "signature_behavior": {
+            "type": "string"
+          },
+          "tendencies": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "title": {
+            "type": "string"
+          },
+          "voice": {
+            "keys": {
+              "style": {
+                "type": "string"
+              },
+              "tone": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "color": {
+        "type": "string"
+      },
+      "daily": {
+        "type": "null"
+      },
+      "disclosure": {
+        "type": "string"
+      },
+      "domain": {
+        "type": "string"
+      },
+      "emoji": {
+        "type": "string"
+      },
+      "expertise": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "memoir": {
+        "type": "null"
+      },
+      "name": {
+        "type": "string"
+      },
+      "persona_id": {
+        "type": "string"
+      },
+      "philosophy": {
+        "type": "null"
+      },
+      "recent_outputs": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "relationships": {
+        "keys": {
+          "leaned_on_by": {
+            "items": {
+              "keys": {
+                "coach": {
+                  "type": "string"
+                },
+                "weight": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "leans_on": {
+            "items": {
+              "keys": {
+                "coach": {
+                  "type": "string"
+                },
+                "weight": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 3,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "report_card": {
+        "keys": {
+          "quality_trend": {
+            "keys": {
+              "caveat": {
+                "type": "string"
+              },
+              "scores": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "track_record": {
+            "keys": {
+              "caveat": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "n_note": {
+                "type": "string"
+              },
+              "preliminary": {
+                "type": "boolean"
+              },
+              "recent": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "refuted": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "tuning_log": {
+            "items": {
+              "keys": {
+                "change_type": {
+                  "type": "string"
+                },
+                "coach": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "observed_effect": {
+                  "type": "null"
+                },
+                "rationale": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 7,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "short_bio": {
+        "type": "string"
+      },
+      "stance": {
+        "keys": {
+          "as_of": {
+            "type": "null"
+          },
+          "band_metric": {
+            "type": "string"
+          },
+          "confidence_note": {
+            "type": "string"
+          },
+          "current_value": {
+            "type": "number"
+          },
+          "focused_on_now": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "graduation_gate": {
+            "type": "string"
+          },
+          "grounding_flag": {
+            "type": "boolean"
+          },
+          "headline_read": {
+            "type": "string"
+          },
+          "how_my_read_changed": {
+            "type": "string"
+          },
+          "ladder": {
+            "items": {
+              "keys": {
+                "headline": {
+                  "type": "string"
+                },
+                "stage_id": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "rung": {
+            "keys": {
+              "cares_less_right_now": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "cares_most": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "entry": {
+                "keys": {
+                  "max": {
+                    "type": "null"
+                  },
+                  "metric": {
+                    "type": "string"
+                  },
+                  "min": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "graduation_gate": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "plan": {
+                "type": "string"
+              },
+              "read_of_him": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "watches": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "set_aside_for_now": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 3,
+            "type": "array"
+          },
+          "source": {
+            "type": "string"
+          },
+          "stage": {
+            "keys": {
+              "label": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "stance_history": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "tier": {
+        "type": "string"
+      },
+      "trait_scores": {
+        "keys": {
+          "axes": {
+            "items": {
+              "keys": {
+                "high": {
+                  "type": "string"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "low": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 5,
+            "type": "array"
+          },
+          "disclosure": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "type": {
+        "type": "string"
+      },
+      "voice": {
+        "keys": {
+          "decision_style": {
+            "keys": {
+              "comfort_with_bold_claims": {
+                "type": "string"
+              },
+              "default_evidence_threshold": {
+                "type": "string"
+              },
+              "revision_style": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "few_shot_example": {
+            "type": "string"
+          },
+          "structural_voice_rules": {
+            "keys": {
+              "analogy_domain": {
+                "type": "string"
+              },
+              "humor_style": {
+                "type": "string"
+              },
+              "opening_patterns": {
+                "keys": {
+                  "forbidden": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 5,
+                    "type": "array"
+                  },
+                  "preferred": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 5,
+                    "type": "array"
+                  },
+                  "rotation_rule": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "paragraph_structure": {
+                "type": "string"
+              },
+              "relationship_to_others": {
+                "type": "string"
+              },
+              "sentence_rhythm": {
+                "type": "string"
+              },
+              "signature_moves": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 5,
+                "type": "array"
+              },
+              "uncertainty_style": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "working_hypotheses": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

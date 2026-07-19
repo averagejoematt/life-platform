@@ -1,0 +1,38 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/constellation",
+  "is_prefix_sample": false,
+  "path": "/api/constellation",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "min_nodes": {
+        "type": "integer"
+      },
+      "node_count": {
+        "type": "integer"
+      },
+      "note": {
+        "type": "string"
+      },
+      "ready": {
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

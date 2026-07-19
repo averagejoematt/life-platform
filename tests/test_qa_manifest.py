@@ -51,45 +51,16 @@ def test_tier1_pages_are_the_doors():
 def test_tier1_and_tier2_pages_are_visually_swept():
     """Deploy-gating tiers must actually be in the Playwright sweep — a tier-1/2
     page with visual=None would claim coverage the sweep doesn't deliver.
-    Tier-2 pages not yet swept carry an explicit pending marker (#1427)."""
-    pending_1427 = {
-        # tier-2 pages registered but not yet in the sweep — #1427's work list.
-        "/story/timeline/",
-        "/coaching/by-coach/",  # swept via its two visual_variants deep-links
-        "/method/",
-        "/data/autonomic/",
-        "/data/badges/",
-        "/data/ledger/",
-        "/data/mind/",
-        "/data/reading/",
-        "/data/vices/",
-        "/data/zone2/",
-        "/method/calibration/",
-        "/method/biology/",
-        "/method/cost/",
-        "/method/cycles/",
-        "/method/data/",
-        "/method/explorer/",
-        "/method/inference/",
-        "/method/mirror/",
-        "/method/platform/",
-        "/method/postmortems/",
-        "/method/results/",
-        "/method/survival/",
-        "/method/tools/",
-        "/method/verify/",
-        "/method/voicefidelity/",
-        "/method/wrong/",
-        "/method/ask/",
-        "/protocols/discoveries/",
-        "/protocols/protocols/",
-        "/protocols/cycles/",
-    }
+
+    #1427 drained the tier-2 pending list to empty: every tier-1 and tier-2 page
+    now carries a visual def (or visual_variants). No exemptions remain at this
+    tier — a future tier-2 page that lands without a visual def reds here, by
+    design (the "new page = FOUR registries" trap, applied to render coverage)."""
     for p in qa_manifest.MANIFEST:
         if p["tier"] == 1:
             assert p.get("visual"), f"tier-1 page {p['path']} missing a visual def"
-        if p["tier"] == 2 and not p.get("visual") and not p.get("visual_variants"):
-            assert p["path"] in pending_1427, f"tier-2 page {p['path']} is neither visually swept nor on the #1427 pending list"
+        if p["tier"] == 2:
+            assert p.get("visual") or p.get("visual_variants"), f"tier-2 page {p['path']} is not visually swept"
 
 
 # ── 2. Derivation gates ───────────────────────────────────────────────────────

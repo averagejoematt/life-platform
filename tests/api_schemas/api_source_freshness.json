@@ -1,0 +1,319 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/source_freshness",
+  "is_prefix_sample": false,
+  "path": "/api/source_freshness",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "experiment": {
+        "keys": {
+          "cycle": {
+            "type": "integer"
+          },
+          "genesis": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "sources": {
+        "items": [
+          {
+            "keys": {
+              "age_hours": {
+                "type": "number"
+              },
+              "carried": {
+                "type": "boolean"
+              },
+              "carried_from_cycle": {
+                "type": "null"
+              },
+              "category": {
+                "type": "string"
+              },
+              "desc": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "is_behavioral": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_update": {
+                "type": "string"
+              },
+              "last_update_ts": {
+                "type": "string"
+              },
+              "stale_hours": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "age_hours": {
+                "type": "number"
+              },
+              "capture_channel": {
+                "type": "string"
+              },
+              "carried": {
+                "type": "boolean"
+              },
+              "carried_from_cycle": {
+                "type": "null"
+              },
+              "category": {
+                "type": "string"
+              },
+              "dark_datatypes": {
+                "items": [
+                  {
+                    "keys": {
+                      "days_dark": {
+                        "type": "null"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "manual": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "days_dark": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "manual": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 5,
+                "type": "array"
+              },
+              "datatypes": {
+                "items": [
+                  {
+                    "keys": {
+                      "age_days": {
+                        "type": "null"
+                      },
+                      "dark": {
+                        "type": "boolean"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "last_seen": {
+                        "type": "null"
+                      },
+                      "manual": {
+                        "type": "boolean"
+                      },
+                      "stale_days": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "keys": {
+                      "age_days": {
+                        "type": "number"
+                      },
+                      "dark": {
+                        "type": "boolean"
+                      },
+                      "key": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "last_seen": {
+                        "type": "string"
+                      },
+                      "manual": {
+                        "type": "boolean"
+                      },
+                      "stale_days": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                ],
+                "length_sample": 6,
+                "type": "array"
+              },
+              "desc": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "is_behavioral": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_update": {
+                "type": "string"
+              },
+              "last_update_ts": {
+                "type": "string"
+              },
+              "manual": {
+                "type": "boolean"
+              },
+              "stale_hours": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "age_hours": {
+                "type": "number"
+              },
+              "capture_channel": {
+                "type": "string"
+              },
+              "carried": {
+                "type": "boolean"
+              },
+              "carried_from_cycle": {
+                "type": "null"
+              },
+              "category": {
+                "type": "string"
+              },
+              "days_dark": {
+                "type": "integer"
+              },
+              "desc": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "is_behavioral": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_update": {
+                "type": "string"
+              },
+              "last_update_ts": {
+                "type": "string"
+              },
+              "manual": {
+                "type": "boolean"
+              },
+              "stale_hours": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "age_hours": {
+                "type": "null"
+              },
+              "category": {
+                "type": "string"
+              },
+              "desc": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "is_behavioral": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_update": {
+                "type": "null"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 13,
+        "type": "array"
+      },
+      "summary": {
+        "keys": {
+          "fresh": {
+            "type": "integer"
+          },
+          "paused": {
+            "type": "integer"
+          },
+          "stale": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

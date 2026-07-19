@@ -1,0 +1,43 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/experiment_synthesis",
+  "is_prefix_sample": false,
+  "path": "/api/experiment_synthesis",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "arc": {
+        "type": "null"
+      },
+      "chapters": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "generated_at": {
+        "type": "null"
+      },
+      "throughline": {
+        "type": "null"
+      },
+      "week_count": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -23,10 +23,26 @@ OUTPUT:
     - dry_run: bool
     - completed_at: ISO timestamp
   Audit record written to DDB: USER#admin#SOURCE#deletion_log / DATE#{ts}
+
+SUBSCRIBER DELETION (#1350):
+  Subscriber rows live under the OWNER's pk namespace (`USER#{OWNER}#SOURCE#subscribers`,
+  sk `EMAIL#{sha256}`) — a shape the generic `user_id` path above structurally cannot
+  reach (it scans `USER#{user_id}#*`, and the owner user_id is protected). A single
+  subscriber can be deleted on request via a SEPARATE event shape that targets exactly
+  one item, never the owner's other partitions:
+
+    {"subscriber_email": "person@example.com", "dry_run": true}     # count-only
+    {"subscriber_email": "person@example.com", "confirm": "DELETE"} # actual delete
+
+  This is the right-to-be-forgotten path for an individual subscriber. It is distinct
+  from the RETENTION-WINDOW bulk purge/anonymize of already-unsubscribed rows, which is
+  `deploy/subscriber_retention_purge.py` (gated on the window Matthew signs into
+  docs/DATA_GOVERNANCE.md's "Subscriber emails" retention row — see #1350).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -54,6 +70,12 @@ secrets = boto3.client("secretsmanager", region_name=REGION)
 
 # Owner account — refused by the deletion handler.
 PROTECTED_USERS = {"matthew", "admin", "system"}
+
+# #1350: subscriber rows live under the OWNER's pk namespace (email_subscriber_lambda.py
+# SUBSCRIBERS_PK), not under a per-user pk — kept in sync via the same env var, no
+# second hardcoded owner id.
+SUBSCRIBERS_OWNER_USER_ID = os.environ.get("USER_ID", "matthew")
+SUBSCRIBERS_PK = f"USER#{SUBSCRIBERS_OWNER_USER_ID}#SOURCE#subscribers"
 
 
 def _scan_user_pks(user_id: str) -> list[dict]:
@@ -150,6 +172,66 @@ def _delete_secrets(secret_names: list[str]) -> list[str]:
     return deleted
 
 
+def _subscriber_email_hash(email: str) -> str:
+    """SHA256 of lowercased email — MUST match email_subscriber_lambda._email_hash
+    exactly (same algorithm, independently reimplemented — no cross-module import
+    across the operational/ and web/ trees, so this is deliberately duplicated, not
+    shared, to avoid a spurious deploy-time coupling between two independently
+    deployed Lambdas)."""
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()
+
+
+def _get_subscriber(email_hash: str) -> dict | None:
+    """Look up one subscriber row by email hash. Returns None if absent."""
+    try:
+        resp = table.get_item(Key={"pk": SUBSCRIBERS_PK, "sk": f"EMAIL#{email_hash}"})
+        return resp.get("Item")
+    except Exception as e:
+        logger.error("subscriber_get_failed: %s", e)
+        return None
+
+
+def _delete_subscriber(email_hash: str) -> None:
+    table.delete_item(Key={"pk": SUBSCRIBERS_PK, "sk": f"EMAIL#{email_hash}"})
+
+
+def _handle_subscriber_deletion(email: str, dry_run: bool, confirmed: bool) -> dict:
+    """#1350: right-to-be-forgotten for ONE subscriber. Never touches any other
+    partition — a narrow single-item delete, unlike the broad `user_id` scan path."""
+    if not dry_run and not confirmed:
+        return {
+            "statusCode": 400,
+            "body": json.dumps({"error": "Either dry_run=true OR confirm='DELETE' is required"}),
+        }
+
+    email_hash = _subscriber_email_hash(email)
+    record = _get_subscriber(email_hash)
+
+    plan = {
+        "subscriber_email_hash": email_hash[:8] + "…",  # never echo the hash in full, never the plaintext email
+        "found": record is not None,
+        "status": record.get("status") if record else None,
+        "dry_run": dry_run,
+    }
+
+    if dry_run:
+        return {"statusCode": 200, "body": json.dumps({"plan": plan})}
+
+    if record is None:
+        return {"statusCode": 200, "body": json.dumps({"plan": plan, "note": "no matching subscriber row; nothing to delete"})}
+
+    _delete_subscriber(email_hash)
+    summary = {
+        "subscriber_email_hash": email_hash[:8] + "…",
+        "deleted": True,
+        "completed_at": datetime.now(timezone.utc).isoformat(),
+    }
+    # Audit by hash prefix only — the audit trail must never hold the plaintext email.
+    _write_audit_record(f"subscriber:{email_hash[:8]}", summary)
+    logger.info("subscriber_deletion_complete hash=%s", email_hash[:8])
+    return {"statusCode": 200, "body": json.dumps(summary)}
+
+
 def _write_audit_record(user_id: str, summary: dict) -> None:
     """Audit log: a non-deletable record of every deletion event."""
     now = datetime.now(timezone.utc)
@@ -176,6 +258,17 @@ def lambda_handler(event: dict, context) -> dict:
     Returns counts + audit metadata. Refuses on protected users or missing confirm.
     """
     try:
+        # #1350: a distinct, narrower path for a single subscriber — never routes
+        # through the user_id/PROTECTED_USERS logic below (subscriber rows live
+        # under the OWNER's pk namespace, so they can never be reached that way).
+        subscriber_email = event.get("subscriber_email")
+        if subscriber_email:
+            return _handle_subscriber_deletion(
+                subscriber_email,
+                dry_run=bool(event.get("dry_run")),
+                confirmed=event.get("confirm") == "DELETE",
+            )
+
         user_id = event.get("user_id")
         if not user_id:
             return {"statusCode": 400, "body": json.dumps({"error": "user_id required"})}

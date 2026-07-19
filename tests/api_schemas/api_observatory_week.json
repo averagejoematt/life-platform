@@ -1,0 +1,56 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/observatory_week",
+  "is_prefix_sample": false,
+  "path": "/api/observatory_week",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "null"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "domain": {
+        "type": "string"
+      },
+      "last_updated": {
+        "type": "string"
+      },
+      "notable": {
+        "type": "null"
+      },
+      "period": {
+        "type": "null"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "summary": {
+        "type": "null"
+      },
+      "time_travel": {
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
