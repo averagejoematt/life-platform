@@ -1268,6 +1268,25 @@
         }
       ],
       "why_it_mattered": "Honesty is the platform's entire moat, and it was failing at the two most visible points: the numbers (two pages, two answers) and the narrative (seven restarts read as shameful emptiness on every day-1). Structural truth — one resolver, derived counts, contract tests — makes the site agree with itself by construction, and the attempts ledger turns the most embarrassing fact into the frame that makes day 2 worth reading."
+    },
+    {
+      "id": "2026-07-19-cold-start-armed",
+      "date": "2026-07-19",
+      "title": "Day 1 reads as an instrument arming, not a broken site",
+      "shipped": "Attempt #8 starts today, and the cold start finally tells the truth about itself. Every 'not enough data yet' threshold the engines actually enforce now lives in ONE registry the site reads back — so an empty correlations page renders the real trigger ('first pairs at n≥10 overlapping days — currently 0/10') as a row of hollow marks that fill as days accrue, instead of authored 'check back soon' copy. Months-old source chips on the pipeline board are now labeled 'carried from a previous attempt' with the cycle genesis decoded, instead of reading like outages. And the AI coaches carry a hard day-one rule: a gap the reset itself manufactured ('zero food logs' on the first morning) is the instrument arming, never a scolding. Same session, the quiet flourishing layer went live: the daily LLM-coded journal signals (values lived, gratitude, flow, social quality) became a first-class queryable series with model provenance on every row — and two character pillars now draw from it.",
+      "gotcha": "A refactor made one database write's destination dynamic — and the CI gate that proves every partition the site reads has a writer could no longer see it, redding two pipelines. Locally the failure hid behind pytest -x stopping at an unrelated stale generated page. Fix: write destinations stay inline literals, and full suites run without -x before a merge queue.",
+      "honest_miss": "The 'carried from attempt N' chips mostly can't name N yet — raw sensor records never got cycle stamps, and the serving role can't read the cycle parameter — so they fall back to 'a previous attempt'. Honest, but vaguer than designed.",
+      "prs": [
+        {
+          "label": "PR #1457",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1457"
+        },
+        {
+          "label": "PR #1459",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1459"
+        }
+      ],
+      "why_it_mattered": "A restart is the platform's most dangerous moment for trust — the morning the numbers vanish is exactly when a reader decides whether the honesty was real. Making the empty states computed, provenance-labeled, and unscolding is what lets attempt #8 open in public without the site lying about its own blank spots."
     }
   ]
 }

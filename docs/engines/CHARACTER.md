@@ -1,6 +1,6 @@
 # Character Engine — pillars, EMA levels, XP
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#956/#965, ENGINE_VERSION 1.6.0, ADR-134 + amendment)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18 (post-#1403 values_alignment + flourishing primary input)
 > Math audit + 420-day simulation verdicts: [CHARACTER_MATH_AUDIT_2026-07.md](CHARACTER_MATH_AUDIT_2026-07.md) (epic #956).
 > **Sources of truth:** `lambdas/character_engine.py` (v1.6.0), `lambdas/compute/character_sheet_lambda.py`, `config/character_sheet.json` (v1.5.0, deployed to `s3://…/config/matthew/character_sheet.json`)
 
@@ -63,6 +63,15 @@ component each — all **day-count** metrics so volume gaming buys nothing:
 - **reading → mind `reading_practice`** (weight .10, behavioral): distinct ADR-097 session days
   in the trailing 7 vs a 4-day target, via GSI2 `READING_SESSION` (reading is CROSS_PHASE — no
   phase filter).
+- **flourishing → mind `values_alignment`** (weight .10, measured — #1403): distinct
+  values-in-action the journal-enrichment pass evidenced today (`SOURCE#flourishing`
+  row, `lambdas/flourishing.py`): none-on-a-journaled-day = 20 (a real low — the LLM
+  read the prose and found none), 1 = 60, 2 = 80, 3+ = 100; no row = None
+  (uninstrumented, ADR-104). Rebalance: t1_habit_compliance and journal_consistency
+  each .15 → .10 (mind weights still sum 1.0). The row is also the PRIMARY
+  Relationships social input (the #910 entry-scan is now the fallback). Both pillars
+  surface `_flourishing_provenance` ("LLM-coded from journal text (model …)") in
+  details whenever the row fed a score.
 - **todoist → consistency `task_follow_through`** (weight .15, measured): `100 − 12.5 ×
   overdue_count` — follow-through as overdue pressure, the one todoist signal task-volume
   gaming can't inflate. Measured class: the record is an automatic daily pull, so absence is an
