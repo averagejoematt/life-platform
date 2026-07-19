@@ -1,194 +1,152 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-door="story">
 <head>
   <meta charset="UTF-8">
-    <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Privacy Policy — averagejoematt</title>
+  <meta name="description" content="Privacy policy for averagejoematt.com — how subscriber data is handled, in plain terms.">
+  <link rel="canonical" href="https://averagejoematt.com/privacy/">
+  <meta property="og:title" content="Privacy Policy — averagejoematt">
+  <meta property="og:description" content="Privacy policy and AI disclaimer for averagejoematt.com.">
+  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-    <meta property="og:title" content="Privacy Policy — Matthew">
-  <meta property="og:description" content="Privacy policy and AI disclaimer for averagejoematt.com.">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Privacy policy for averagejoematt.com — how subscriber data is handled.">
-  <title>Privacy Policy — averagejoematt</title>
-    <link rel="alternate" type="application/rss+xml" title="The Measured Life" href="/rss.xml">
-  <link rel="icon" href="/favicon.ico">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="alternate" type="application/rss+xml" title="averagejoematt" href="/rss.xml">
   <link rel="stylesheet" href="/assets/css/fonts.css">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/story.css">
+  <script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();</script>
   <style>
-    /* Old-design token shim — the page content predates v4; map its tokens
-       onto the v4 design system instead of resurrecting base.css. */
-    :root {
-      --text: var(--ink); --text-muted: var(--ink-muted); --text-faint: var(--ink-faint);
-      --accent: var(--ember); --border: var(--rule);
-      --border-subtle: var(--rule); --page-padding: var(--gutter);
-      --font-display: var(--font-serif);
-      --text-h1: var(--fs-h1); --text-base: var(--fs-body); --text-xs: var(--fs-small);
-      --lh-display: 1.15; --lh-body: var(--lh-relaxed);
-      --ls-display: -0.01em; --ls-label: 0.06em; --ls-tag: 0.08em;
-      --space-2: var(--sp-2); --space-3: var(--sp-3); --space-4: var(--sp-4);
-      --space-6: var(--sp-5); --space-8: var(--sp-6); --space-10: var(--sp-7);
-      --space-12: var(--sp-7); --space-16: var(--sp-8); --space-20: var(--sp-8);
-    }
-  </style>
-  <style>
-    .policy-layout {
-      max-width: 680px;
-      margin: 0 auto;
-      padding: var(--space-16) var(--page-padding) var(--space-20);
-    }
-    .policy-title {
-      font-family: var(--font-display);
-      font-size: var(--text-h1);
-      line-height: var(--lh-display);
-      letter-spacing: var(--ls-display);
-      color: var(--text);
-      margin-bottom: var(--space-3);
-    }
-    .policy-updated {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      margin-bottom: var(--space-12);
-      padding-bottom: var(--space-6);
-      border-bottom: 1px solid var(--border);
-    }
-    .policy-section {
-      margin-bottom: var(--space-10);
-    }
-    .policy-section h2 {
-      font-family: var(--font-mono);
-      font-size: var(--text-base);
-      color: var(--accent);
-      letter-spacing: var(--ls-tag);
-      text-transform: uppercase;
-      margin-bottom: var(--space-4);
-      padding-bottom: var(--space-2);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-    .policy-section p {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      margin-bottom: var(--space-4);
-    }
-    .policy-section p:last-child { margin-bottom: 0; }
-    .policy-section ul {
-      margin: var(--space-2) 0 var(--space-4) var(--space-6);
-      color: var(--text-muted);
-      font-size: var(--text-base);
-      line-height: var(--lh-body);
-    }
-    .policy-section ul li { margin-bottom: var(--space-2); }
-    .policy-section a { color: var(--accent); text-decoration: underline; text-underline-offset: 0.15em; }
+    /* Policy as an honest ledger (#1473): serif human title, mono numbered section
+       heads (the machine files the paperwork), the TL;DR in Matthew's voice. Tokens
+       only — the pre-v4 token shim this page used to carry is gone. */
+    .policy-layout { max-width: var(--container-read); margin-inline: auto;
+      padding: var(--sp-7) var(--gutter) var(--sp-9); }
+    .policy-kicker { color: var(--ember); }
+    .policy-title { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h1);
+      line-height: var(--lh-tight); color: var(--ink); margin-top: var(--sp-3); }
+    .policy-updated { margin-top: var(--sp-4); padding-bottom: var(--sp-5); border-bottom: 1px solid var(--rule);
+      font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ink-faint); }
+    .policy-tldr { margin-top: var(--sp-6); border: var(--border-hair); border-left: 2px solid var(--ember);
+      border-radius: var(--radius-sm); background: var(--surface); padding: var(--sp-5); }
+    .policy-tldr .pt-h { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ember); }
+    .policy-tldr p { margin-top: var(--sp-3); font-family: var(--font-serif); font-size: var(--fs-quote);
+      line-height: var(--lh-snug); color: var(--ink); }
+    .policy-section { margin-top: var(--sp-7); }
+    .policy-section h2 { display: flex; align-items: baseline; gap: var(--sp-3);
+      font-family: var(--font-mono); font-weight: var(--weight-reg); font-size: var(--fs-label);
+      letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink);
+      padding-bottom: var(--sp-2); border-bottom: 1px solid var(--rule); }
+    .policy-section h2 .ps-n { color: var(--ember); }
+    .policy-section p { margin-top: var(--sp-4); color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+    .policy-section ul { margin: var(--sp-4) 0 0 var(--sp-5); display: grid; gap: var(--sp-2);
+      color: var(--ink-muted); font-size: var(--fs-body); line-height: var(--lh-relaxed); }
+    .policy-section li::marker { color: var(--ember); }
+    .policy-section strong { color: var(--ink); font-weight: var(--weight-med); }
+    .policy-section a { color: var(--ember); text-decoration: underline; text-underline-offset: 0.15em; }
     .policy-section a:hover { text-decoration-thickness: 2px; }
-    .tl-dr {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      padding: var(--space-6) var(--space-8);
-      margin-bottom: var(--space-10);
-      border-radius: 0 8px 8px 0;
-    }
-    .tl-dr p {
-      font-size: var(--text-base);
-      color: var(--text-muted);
-      line-height: var(--lh-body);
-      margin: 0;
-    }
-    .tl-dr strong { color: var(--text); }
+    .policy-back { margin-top: var(--sp-8); padding-top: var(--sp-6); border-top: 1px solid var(--rule); }
+    .policy-back a { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+      text-transform: uppercase; color: var(--ember); text-decoration: none; }
+    .policy-back a:hover { text-decoration: underline; text-underline-offset: 0.15em; }
   </style>
-  <link rel="canonical" href="https://averagejoematt.com/privacy/">
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="story-top">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">privacy</span></a>
+    <nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><a href="/subscribe/" class="nav-follow" aria-label="Follow the experiment">follow</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>
+  </header>
 
-<header class="story-top">
-  <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"></span><span class="brand-name">averagejoematt</span> <span class="brand-door label">privacy</span></a>
-  <nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><a href="/subscribe/" class="nav-follow" aria-label="Follow the experiment">follow</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>
-</header>
+  <main id="main" class="policy-layout">
 
+    <p class="policy-kicker label">the paperwork</p>
+    <h1 class="policy-title">Privacy Policy</h1>
+    <p class="policy-updated">last updated · july 2026</p>
 
+    <div class="policy-tldr">
+      <p class="pt-h">the short version</p>
+      <p>I collect your email address to send you The Measured Life. I don&#x27;t sell it, share it with advertisers, or send you anything other than what you signed up for. You can unsubscribe anytime. That&#x27;s it.</p>
+    </div>
 
+    <section class="policy-section">
+      <h2><span class="ps-n">01</span> who this is</h2>
+      <p>This site — averagejoematt.com — is a personal project run by Matthew, a solo developer in Seattle. It is not a company. There are no advertisers and no investors; any affiliate arrangements are limited to the disclosed product links on the <a href="/gear/">gear page</a>.</p>
+      <p>Questions or requests: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a></p>
+    </section>
 
-<main class="policy-layout">
+    <section class="policy-section">
+      <h2><span class="ps-n">02</span> what I collect</h2>
+      <p>When you subscribe, I collect:</p>
+      <ul>
+        <li><strong>Email address</strong> — required to send The Measured Life.</li>
+        <li><strong>Why you&#x27;re here / how you found this</strong> — optional free-text fields on the subscribe form. Helps me understand the audience. Never shared.</li>
+        <li><strong>Subscribe source</strong> — which page or referral link you used.</li>
+        <li><strong>Confirmation timestamp</strong> — when you confirmed your double opt-in.</li>
+      </ul>
+      <p>I do not collect your name unless you volunteer it. I do not collect payment information — this newsletter is free. I do not use tracking pixels or third-party analytics in the emails.</p>
+    </section>
 
-  <h1 class="policy-title">Privacy<br>Policy</h1>
-  <p class="policy-updated">Last updated July 2026</p>
+    <section class="policy-section">
+      <h2><span class="ps-n">03</span> how I use it</h2>
+      <p>Your email address is used for exactly one thing: sending you The Measured Life, which you signed up for. I will never sell or share your email with any third party, advertiser, or sponsor.</p>
+    </section>
 
-  <div class="tl-dr">
-    <p><strong>TL;DR:</strong> I collect your email address to send you The Measured Life. I don't sell it, share it with advertisers, or send you anything other than what you signed up for. You can unsubscribe anytime. That's it.</p>
-  </div>
+    <section class="policy-section">
+      <h2><span class="ps-n">04</span> where data lives</h2>
+      <p>Subscriber data is stored in Amazon DynamoDB (AWS us-west-2, encrypted at rest). Email delivery is handled via Amazon SES. No subscriber data is stored in any third-party marketing platform or CRM.</p>
+    </section>
 
-  <div class="policy-section">
-    <h2>Who this is</h2>
-    <p>This site — averagejoematt.com — is a personal project run by Matthew, a solo developer in Seattle. It is not a company. There are no advertisers and no investors; any affiliate arrangements are limited to the disclosed product links on the <a href="/gear/">gear page</a>.</p>
-    <p>Questions or requests: <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a></p>
-  </div>
+    <section class="policy-section">
+      <h2><span class="ps-n">05</span> unsubscribing</h2>
+      <p>Every email includes an unsubscribe link. Click it and you&#x27;re removed immediately — no re-engagement emails, no questions asked. You can also email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I&#x27;ll remove you within 24 hours.</p>
+      <p>After unsubscribing, your email is deleted from the subscriber list entirely.</p>
+    </section>
 
-  <div class="policy-section">
-    <h2>What I collect</h2>
-    <p>When you subscribe, I collect:</p>
-    <ul>
-      <li><strong>Email address</strong> — required to send The Measured Life.</li>
-      <li><strong>Why you're here / how you found this</strong> — optional free-text fields on the subscribe form. Helps me understand the audience. Never shared.</li>
-      <li><strong>Subscribe source</strong> — which page or referral link you used.</li>
-      <li><strong>Confirmation timestamp</strong> — when you confirmed your double opt-in.</li>
-    </ul>
-    <p>I do not collect your name unless you volunteer it. I do not collect payment information — this newsletter is free. I do not use tracking pixels or third-party analytics in the emails.</p>
-  </div>
+    <section class="policy-section">
+      <h2><span class="ps-n">06</span> cookies and tracking</h2>
+      <p>This site uses no tracking cookies and no third-party analytics. There is no Google Analytics, Meta Pixel, or equivalent.</p>
+      <p>The one thing I do look at is standard server access logs — the same first-party request records every web server keeps. Once a week I aggregate them into a simple count of page views, how many distinct visitors came, and which ones returned, so I know whether anyone finds this useful. To count distinct visitors I hash the IP address in memory and immediately discard it; no raw IP, no individual visitor, and nothing about you personally is ever stored, emailed, or linked across sessions. The output is plain totals.</p>
+    </section>
 
-  <div class="policy-section">
-    <h2>How I use it</h2>
-    <p>Your email address is used for exactly one thing: sending you The Measured Life, which you signed up for. I will never sell or share your email with any third party, advertiser, or sponsor.</p>
-  </div>
+    <section class="policy-section">
+      <h2><span class="ps-n">07</span> your rights</h2>
+      <p>You can request a copy of any data I hold about you, ask for corrections, or request deletion. Email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I&#x27;ll respond within 7 days.</p>
+    </section>
 
-  <div class="policy-section">
-    <h2>Where data lives</h2>
-    <p>Subscriber data is stored in Amazon DynamoDB (AWS us-west-2, encrypted at rest). Email delivery is handled via Amazon SES. No subscriber data is stored in any third-party marketing platform or CRM.</p>
-  </div>
+    <section class="policy-section">
+      <h2><span class="ps-n">08</span> AI-generated content</h2>
+      <p>The <a href="/ask/">/ask</a> and <a href="/board/">/board</a> pages use AI (Claude by Anthropic) to generate responses based on my personal health and life data. Answers are informational only — they reflect patterns in my data and should not be treated as medical, nutritional, or professional advice.</p>
+      <p>Questions you type into /ask or /board are sent to Anthropic&#x27;s API to generate a response. I do not store your questions. Anthropic&#x27;s data handling is governed by their <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
+    </section>
 
-  <div class="policy-section">
-    <h2>Unsubscribing</h2>
-    <p>Every email includes an unsubscribe link. Click it and you're removed immediately — no re-engagement emails, no questions asked. You can also email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I'll remove you within 24 hours.</p>
-    <p>After unsubscribing, your email is deleted from the subscriber list entirely.</p>
-  </div>
+    <section class="policy-section">
+      <h2><span class="ps-n">09</span> changes</h2>
+      <p>Material changes will be notified to subscribers before taking effect. The last-updated date above reflects the current version.</p>
+    </section>
 
-  <div class="policy-section">
-    <h2>Cookies and tracking</h2>
-    <p>This site uses no tracking cookies and no third-party analytics. There is no Google Analytics, Meta Pixel, or equivalent.</p>
-    <p>The one thing I do look at is standard server access logs — the same first-party request records every web server keeps. Once a week I aggregate them into a simple count of page views, how many distinct visitors came, and which ones returned, so I know whether anyone finds this useful. To count distinct visitors I hash the IP address in memory and immediately discard it; no raw IP, no individual visitor, and nothing about you personally is ever stored, emailed, or linked across sessions. The output is plain totals.</p>
-  </div>
+    <p class="policy-back"><a href="/subscribe/">← back to subscribe</a></p>
 
-  <div class="policy-section">
-    <h2>Your rights</h2>
-    <p>You can request a copy of any data I hold about you, ask for corrections, or request deletion. Email <a href="mailto:matt@averagejoematt.com">matt@averagejoematt.com</a> and I'll respond within 7 days.</p>
-  </div>
+  </main>
 
-  <div class="policy-section">
-    <h2>AI-generated content</h2>
-    <p>The <a href="/ask/">/ask</a> and <a href="/board/">/board</a> pages use AI (Claude by Anthropic) to generate responses based on my personal health and life data. Answers are informational only — they reflect patterns in my data and should not be treated as medical, nutritional, or professional advice.</p>
-    <p>Questions you type into /ask or /board are sent to Anthropic's API to generate a response. I do not store your questions. Anthropic's data handling is governed by their <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener">privacy policy</a>.</p>
-  </div>
+  <aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/cockpit/">the cockpit</a> — Start with today&#x27;s live read</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p></footer>
 
-  <div class="policy-section">
-    <h2>Changes</h2>
-    <p>Material changes will be notified to subscribers before taking effect. The last-updated date above reflects the current version.</p>
-  </div>
-
-  <div style="margin-top:var(--space-12);padding-top:var(--space-8);border-top:1px solid var(--border);">
-    <a href="/subscribe" style="color:var(--accent);font-size:var(--text-xs);letter-spacing:var(--ls-label);text-transform:uppercase;text-decoration:none;">← Back to subscribe</a>
-  </div>
-
-</main>
-
-<aside class="loop-forward" aria-label="Continue the loop"><p class="lf-next"><span class="label">next on the loop</span> <a href="/cockpit/">the cockpit</a> — Start with today&#x27;s live read</p><p class="lf-return"><span class="label">or come back</span> <a href="/subscribe/">follow by email</a> for the next entry</p></aside><footer class="site-foot"><nav class="site-foot-cols" aria-label="Site map"><div class="sf-col"><p class="sf-h label">The Story</p><a href="/story/chronicle/">Chronicle</a><a href="/story/panel/">Podcast</a><a href="/story/journal/">In my own words</a><a href="/story/timeline/">Timeline</a><a href="/story/attempts/">The attempts</a><a href="/story/agents/">The agents</a><a href="/story/about/">About</a></div><div class="sf-col"><p class="sf-h label">The Data</p><a href="/data/">All topics</a><a href="/method/ask/">Ask the data</a><a href="/data/labs/">Labs</a><a href="/data/training/">Training</a><a href="/data/sleep/">Sleep</a><a href="/data/ledger/">The ledger</a></div><div class="sf-col"><p class="sf-h label">The Protocols</p><a href="/protocols/">All protocols</a><a href="/protocols/supplements/">Supplements</a><a href="/protocols/experiments/">Experiments</a><a href="/protocols/challenges/">Challenges</a></div><div class="sf-col"><p class="sf-h label">The Coaching</p><a href="/coaching/">The Read</a><a href="/coaching/by-coach/">By Coach</a><a href="/coaching/scorecard/">Scorecard</a><a href="/coaching/team/">The Team</a><a href="/coaching/lab-notes/">AI lab notes</a></div><div class="sf-col"><p class="sf-h label">The Technology</p><a href="/method/">The machine</a><a href="/story/build/">Build log</a><a href="/method/platform/">The platform</a><a href="/method/pipeline/">Pipeline status</a><a href="/method/cost/">Cost</a><a href="/gear/">The gear</a></div><div class="sf-col"><p class="sf-h label">Follow &amp; context</p><a href="/subscribe/">Follow by email</a><a href="/rss.xml">RSS</a><a href="/story/about/">About</a><a href="/privacy/">Privacy</a></div></nav><p class="sf-base label"><span>averagejoematt</span><a href="/">← home</a></p></footer>
-
-<script>(function(){try{var t=localStorage.getItem("ajm-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}
-var tb=document.querySelector(".theme-toggle");if(tb)tb.addEventListener("click",function(){var c=document.documentElement.dataset.theme||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.dataset.theme=c==="light"?"dark":"light";try{localStorage.setItem("ajm-theme",document.documentElement.dataset.theme);}catch(e){}});})();</script>
+  <script>
+    (function(){
+      var tb = document.querySelector(".theme-toggle");
+      if (tb) tb.addEventListener("click", function(){
+        var cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.dataset.theme = cur === "light" ? "dark" : "light";
+        try { localStorage.setItem("ajm-theme", document.documentElement.dataset.theme); } catch (e) {}
+      });
+    })();
+  </script>
 </body>
 </html>
