@@ -21,6 +21,9 @@ on:
       # #1039: the realistic-data fixtures the render gate's populated pass mocks
       # with — a fixture-shape change must re-run the gate against itself too.
       - 'tests/fixtures/render_gate/**'
+      # #1432: the JS module-graph import gate — a change to it must re-run itself.
+      - 'scripts/import_site_js_graph.mjs'
+      - 'scripts/site_js_loader.mjs'
   push:
     branches: [main]
     paths:
@@ -71,6 +74,20 @@ jobs:
             test -f "$f" || { echo "::error::missing required v4 file: $f"; exit 1; }
           done
           echo "✓ Home, Cockpit, Data, Protocols, Coaching, Story + tokens present"
+
+      # ────────────────────────────────────────────────────────────────
+      # JS module-graph import gate (#1432) — replaces `node --check`.
+      # `node --check` (any flavor — plain file-mode OR --input-type=module)
+      # can MISS a real SyntaxError buried in a function body (V8 lazy/pre-
+      # parse skips full validation there — see #1156/#1159, memory
+      # reference_node_check_lazy_parse). A real `import()` forces Node to
+      # fully parse every module, top to bottom, before any code runs — the
+      # guarantee `--check` can't give at any flag setting. GitHub-hosted
+      # runners ship Node, so no setup-node step is needed (same assumption
+      # deploy/sync_site_to_s3.sh's existing #377 gate already makes).
+      # ────────────────────────────────────────────────────────────────
+      - name: JS module-graph import gate (#1432 — real import(), not node --check)
+        run: node scripts/import_site_js_graph.mjs
 
   # ════════════════════════════════════════════════════════════════
   # Render + accuracy gate (#408) — shift-left QA on site PRs.
