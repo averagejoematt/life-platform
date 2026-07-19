@@ -1,9 +1,9 @@
 # Life Platform — Onboarding Guide
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
 
 > First-day mental model. For commands (AWS auth, deploy, rollback), see `docs/QUICKSTART.md`.
-> Last updated: 2026-06-08 (v8.4.0 — v4 front-end live; ADR-077 phase taxonomy + ADR-078 commercial wedge; PG front-door work)
+> Last updated: 2026-07-19 (#1348 — pipeline windows/crons re-derived from `cdk/stacks/`; ingestion count 15 (8+7); v5 IA; KMS + secrets live-checked)
 >
 > **Resuming a Claude chat session?** Read `handovers/HANDOVER_LATEST.md` first — that's the canonical "what's the current state" doc. This file is the slower onboarding for a fresh contributor.
 
@@ -15,31 +15,35 @@ A personal health intelligence system built on AWS for a single user (Matthew). 
 
 The end result: ask Claude a question about your health, and it queries actual readings rather than relying on memory or estimates.
 
-Public surface: `averagejoematt.com` — the v4 "The Measured Life" site (ADR-071): three doors over the engine — **Cockpit** (`/now/`, live data), **Story** (`/story/`, the writing), **Evidence** (`/evidence/`, the data archive), with a cinematic landing at `/`. The pre-v4 site is preserved verbatim at `/legacy` (private rollback). Served static from S3 + CloudFront; the engine is read-only from the front-end.
+Public surface: `averagejoematt.com` — "The Measured Life" (ADR-071, v5 IA): Home + 5 doors over the engine — **the cockpit** (`/cockpit/`, live data), **the data** (`/data/`, the evidence archive), **the coaching**, **the protocols**, **the story** (`/story/`, the writing hub) — with a cinematic landing at `/`. The pre-v4 site is preserved verbatim at `/legacy` (private rollback, never linked from the UI). Served static from S3 + CloudFront; the engine is read-only from the front-end.
 
 ---
 
 ## High-Level Data Flow
 
 ```
-19 sources (API + webhook + manual)
+~20 sources (API + webhook + manual)
     │
     ▼
-14 ingestion Lambdas (8 SIMP-2 framework + 6 pattern-exempt — ADR-056)
-  • EventBridge cron (hourly 4am–10pm PT; Garmin 4x/day; Weather + Todoist 2x/day)
+15 ingestion Lambdas (8 SIMP-2 framework + 7 pattern-exempt — ADR-056/060)
+  • EventBridge cron (hourly at UTC hours 12–23 + 0–5, `INGEST_HOURLY` — skips the
+    overnight-PT hours; exceptions: Weather 2x/day, Todoist 1x/day at 14:00 UTC,
+    Hevy hourly 12–23 UTC only, Garmin PAUSED — no schedule, manual invoke, ADR-074)
   • HAE webhook (CGM, BP, water, State of Mind — near real-time)
-  • S3 triggers (apple_health XML, macrofactor CSV, measurements)
+  • S3/poll triggers (macrofactor CSV via dropbox-poll, measurements)
     │
     ▼
-Raw JSON in S3 (`raw/{source}/{datatype}/{YYYY}/{MM}/{DD}.json`)
+Raw JSON in S3 (layouts VARY by source — read the `raw_layout` facet in
+  `lambdas/source_registry.py`; never construct raw/ keys by hand)
   + DynamoDB single-table (`life-platform`)
       PK = USER#matthew#SOURCE#{source}
       SK = DATE#YYYY-MM-DD
     │
     ▼
-5 compute Lambdas (10:20–10:35 AM PT, pre-compute):
-  character-sheet · adaptive-mode · daily-metrics-compute ·
-  daily-insight-compute · hypothesis-engine
+5 compute Lambdas (pre-compute):
+  character-sheet · adaptive-mode · daily-metrics-compute · daily-insight-compute
+  (daily 16:30–16:45 UTC ≈ 9:30–9:45 AM PDT, all BEFORE the 17:00 UTC brief)
+  · hypothesis-engine (weekly, Sun 19:00 UTC)
     │
     ▼
 Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
@@ -50,7 +54,7 @@ Coach Intelligence pipeline (deterministic math → 8 parallel LLM coaches):
     │
     ▼
 7 email Lambdas (daily-brief at 17:00 UTC (10 AM PDT), weekly digests, chronicle, etc.)
-  + og-image-generator (11:30 AM PT, 6 PNG share cards)
+  + og-image-generator (19:30 UTC = 12:30 PM PDT, 6 PNG share cards)
   + site-stats-refresh (writes public_stats.json)
     │
     ▼
@@ -73,7 +77,7 @@ site-api Lambda (~118 endpoints, primarily read-only — ADR-037) ← averagejoe
 | **Secrets Manager** (`life-platform/*`) | All credentials | 21 active secrets. See `docs/SECRETS_MAP.md` |
 | **CloudFront** (4 distributions) | CDN for `averagejoematt.com`, `dash`, `blog`, `buddy` | S3 website endpoint origins (ADR-053/054). Site syncs invalidate via CDK helpers |
 | **MCP Lambda** | 68 tools across 24 domain modules in `mcp/` | The interface Claude uses to query data |
-| **Anthropic API** | Coach generation + daily brief sections | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative |
+| **AWS Bedrock** (ADR-062) | All Claude inference (coach generation, daily brief sections) via `lambdas/bedrock_client.invoke()` — IAM auth, no API key | Prompt caching enabled (ADR-049); Haiku for structured, Sonnet for narrative; budget-tier gated (ADR-063/133) |
 
 ---
 
@@ -88,18 +92,20 @@ PK: USER#matthew#SOURCE#<source>   (e.g. USER#matthew#SOURCE#whoop)
 SK: DATE#YYYY-MM-DD
 ```
 
-Coach state, ensemble digests, narrative arcs, predictions, and learning records live in dedicated PK prefixes (`COACH#`, `ENSEMBLE#`, `NARRATIVE#`, `PREDICTION#`, `LEARNING#`). No GSI by design (ADR-005). All partition writes use UTC midnight (ADR-050).
+Coach state, ensemble digests, narrative arcs, predictions, and learning records live in dedicated PK prefixes (`COACH#`, `ENSEMBLE#`, `NARRATIVE#`, `PREDICTION#`, `LEARNING#`). Two sanctioned GSIs exist (GSI1 recall-due sparse index, GSI2 reading state/time — ADR-097, documented in `lambdas/reading/reading_keys.py`); all other access goes through the composite key, and adding another GSI requires an ADR. All partition writes use UTC midnight (ADR-050).
 
 ### 2. Ingest → Store → Compute → Serve, with strict ordering
 
 EventBridge enforces the timing:
 
 ```
-06:45–09:00 AM PT   Ingestion (14 Lambdas — APIs, webhooks, S3 triggers)
-09:05  AM PT        Anomaly detector
-10:20–10:35 AM PT   Compute (5 pre-compute Lambdas + coach pipeline)
-11:00  AM PT        Daily Brief email (reads pre-computed results)
-11:30  AM PT        OG image cards (reads public_stats.json)
+hourly, 12–23 + 0–5 UTC   Ingestion (15 Lambdas — APIs hourly via INGEST_HOURLY;
+                          webhook/S3 sources land as they arrive; gap-aware backfill)
+15:05 UTC (8:05 AM PDT)   Anomaly detector
+16:30–16:45 UTC           Compute (character-sheet 16:30 · adaptive-mode 16:35 ·
+(9:30–9:45 AM PDT)        daily-metrics 16:40 · daily-insight 16:45) + coach pipeline
+17:00 UTC (10:00 AM PDT)  Daily Brief email (reads pre-computed results)
+19:30 UTC (12:30 PM PDT)  OG image cards (reads public_stats.json)
 ```
 
 If compute runs before ingestion completes, it uses yesterday's data. If the brief runs before compute, it reads stale results. Compute Lambdas degrade gracefully — a missing section won't fail the brief.
@@ -131,7 +137,7 @@ Lambda-generated files (`public_stats.json`, OG images, journal posts) live unde
 
 ### 8. Site-website CloudFront uses S3 website endpoints + AES256 (ADR-053/054)
 
-Don't try to migrate to KMS default encryption — S3 website endpoints can't serve KMS-encrypted objects. The CMK is retained for explicit-KMS use cases (e.g., `raw/` archives) but is **scheduled for deletion 2026-06-16** unless re-justified.
+Don't try to migrate to KMS default encryption — S3 website endpoints can't serve KMS-encrypted objects. The CMK (`alias/life-platform-s3`) that once covered explicit-KMS use cases was deleted on schedule in June 2026 — the alias no longer exists (live-verified 2026-07-19).
 
 ---
 
@@ -139,7 +145,7 @@ Don't try to migrate to KMS default encryption — S3 website endpoints can't se
 
 | If I want to find... | Look here |
 |----------------------|-----------|
-| Why a decision was made | `docs/DECISIONS.md` (78 ADRs, ADR-001 → ADR-078) |
+| Why a decision was made | `docs/DECISIONS.md` (the full ADR ledger) |
 | How to deploy / roll back | `docs/QUICKSTART.md` + `docs/RUNBOOK.md` |
 | What field a source writes to | `docs/SCHEMA.md` |
 | Full system inventory (Lambdas, alarms, secrets, KMS) | `docs/ARCHITECTURE.md` |
@@ -157,7 +163,7 @@ Don't try to migrate to KMS default encryption — S3 website endpoints can't se
 
 ---
 
-## The Data Sources (19)
+## The Data Sources
 
 | Category | Sources |
 |----------|---------|
@@ -170,7 +176,7 @@ Don't try to migrate to KMS default encryption — S3 website endpoints can't se
 | Manual/periodic | Labs (blood work), DEXA (body comp scan), Genome (SNPs), Supplements, Measurements (S3 trigger), Food Delivery (quarterly CSV) |
 | Derived | Day grade, Habit scores, Character sheet, Computed metrics |
 
-V2 outcome (2026-05-17): SIMP-2 ingestion framework now adopted by 8 Lambdas; 6 pattern-exempt (Notion, MacroFactor, Apple Health, HAE, Dropbox, Food Delivery) per ADR-056 with documented per-source rationale.
+Current split (ADR-056/060, per `docs/ARCHITECTURE.md`): 8 SIMP-2 framework adopters (`whoop`, `garmin`, `strava`, `withings`, `eightsleep`, `habitify`, `todoist`, `weather`) + 7 pattern-exempt (`notion`, `macrofactor`, `dropbox-poll`, `food-delivery-ingestion`, `health-auto-export-webhook`, `measurements-ingestion`, `hevy-backfill`), each with documented per-source rationale. Direct `apple_health` XML ingestion was retired (ADR-103/#474) — the HAE webhook is the Apple Health path now.
 
 ---
 
@@ -189,7 +195,7 @@ The handover captures: version bump, what changed, what's pending, and context f
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
 | Withings data gap | OAuth token expired | `python3 setup/fix_withings_oauth.py` |
-| Garmin gap | OAuth rate-limited (429) — known weakness | Wait for backoff, then re-auth manually |
+| Garmin gap | Ingestion PAUSED by design — no schedule (ADR-074/#497: vendor 429-blocks server-side OAuth refresh) | Manual re-auth (`python3 setup/setup_garmin_browser_auth.py`) + manual invoke; restoring the cron is a deliberate ADR-074 revival step in `ingestion_stack.py` |
 | Daily Brief missing sections | Compute Lambda failed upstream | CloudWatch logs for `daily-metrics-compute` |
 | MacroFactor data stale | CSV not dropped to Dropbox folder | Export from MacroFactor → drop to Dropbox |
 | MCP tool timeout | Query too broad or cold start | Narrow date range; wait for warm container |
@@ -215,7 +221,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 | **DLQ** | Dead Letter Queue — failed async Lambda invocations. Drained every 6 hours by `dlq-consumer`. |
 | **SOT** | Source of Truth — which device/service owns each health domain (e.g., Whoop owns sleep). See `mcp/config.py`. |
 | **PITR** | Point-in-Time Recovery — DynamoDB's 35-day rolling backup. |
-| **CDK** | AWS Cloud Development Kit — Python IaC. 8 stacks in `cdk/stacks/`. |
+| **CDK** | AWS Cloud Development Kit — Python IaC. 9 stacks in `cdk/stacks/`. |
 | **P40** | Protocol 40 — the 65-habit personal framework tracked via Habitify. 9 P40 groups with T0/T1/T2 tier weighting. |
 | **Character Sheet** | Gamified scoring aggregating 7 health pillars into a level 1-100 with RPG tiers (Foundation → Elite). |
 | **Board of Directors** | Three boards: Personal (14 advisors), Technical (12), Product (8). All configured in S3 (Personal) or code (Tech/Product). See `docs/BOARDS.md`. |
@@ -225,7 +231,7 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 | **ENSEMBLE# digest** | Cross-coach summary written after all 8 coaches generate (`ENSEMBLE#YYYY-MM-DD`). |
 | **NARRATIVE# arc** | Multi-day story arcs and thematic assignments managed by the narrative orchestrator. |
 | **PREDICTION# / LEARNING#** | Outcome verdicts and audit records for coach predictions (closed loop per ADR-055). |
-| **SIMP-2** | Shared ingestion framework (`lambdas/ingestion_framework.py`) adopted by 8 of 14 ingestion Lambdas (ADR-056). |
+| **SIMP-2** | Shared ingestion framework (`lambdas/ingestion_framework.py`) adopted by 8 of 15 ingestion Lambdas (ADR-056/060). |
 | **Voice spec** | Structural definition of a coach's tone, vocabulary, sentence patterns. |
 | **Computation engine** | Lambda (`coach-computation-engine`) that runs all deterministic math before coach generation. |
 | **Narrative orchestrator** | Lambda (`coach-narrative-orchestrator`) — showrunner that assigns themes and sequences generation. |
@@ -241,9 +247,9 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 3. **`public_stats.json` is the website heartbeat.** Home, story, mission, observatory pages all read from this one S3 file, written by daily-brief at 17:00 UTC (10 AM PDT). Daily brief failure = stale website data.
 4. **All EventBridge crons are fixed UTC.** Schedules don't drift with DST. PT times in docs are for humans only.
 5. **Pipeline ordering is strict.** Ingestion → Anomaly → Compute → Brief → OG. Changing schedules without preserving order produces stale results.
-6. **Budget is $15/month target, $20 AWS Budget cap.** Current actual ~$13/month after V2 cost optimization (~$3.65/mo saved per Phase 5).
+6. **Budget is an $85/month enforced ceiling** (ADR-063 + the ADR-133 amendment; floats to $100 in reader-traffic surge mode). Steady-state run-rate ~$25–40/mo; the cost-governor projects month-end spend every 8h and degrades AI features by budget tier (`lambdas/budget_guard.py`). See `docs/COST_TRACKER.md`.
 7. **Coaches are stateful entities with persistent memory and cross-coach awareness over 12 months.** All math happens in the deterministic computation engine — the LLM never does math.
-8. **The KMS CMK (`alias/life-platform-s3`) is scheduled for deletion 2026-06-16.** Re-justify or let it expire — see ADR-053.
+8. **The KMS CMK (`alias/life-platform-s3`) was deleted on schedule in June 2026** — the alias no longer exists (live-verified 2026-07-19). The bucket stays AES256 (ADR-053/054); don't reintroduce default KMS.
 
 ---
 
@@ -260,4 +266,4 @@ Reviews are run from `docs/REVIEW_METHODOLOGY.md`. The platform is at audit V2 (
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-07-19 (#1348 — pipeline windows/crons + ingestion split re-derived from `cdk/stacks/`; secrets count + KMS-alias deletion live-checked read-only)

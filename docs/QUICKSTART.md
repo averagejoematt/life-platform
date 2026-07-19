@@ -288,13 +288,14 @@ aws lambda list-functions --region us-west-2 \
 ## Pipeline Ordering
 
 ```
-06:45–09:00 AM PT   INGESTION    15 Lambdas (8 SIMP-2 + 7 exempt — ADR-056/060)
-09:05 AM PT         ANOMALY      Anomaly detector runs on ingested data
-10:20–10:35 AM PT   COMPUTE      character-sheet, daily-metrics, daily-insight,
-                                 adaptive-mode, hypothesis-engine + coach pipeline
-17:00 UTC (10am PDT) DAILY BRIEF  Reads computed results, sends email, writes
-                                 public_stats.json + character_stats.json
-11:30 AM PT         OG IMAGES    6 PNG share cards from public_stats.json
+hourly, 12–23 + 0–5 UTC  INGESTION    15 Lambdas (8 SIMP-2 + 7 exempt — ADR-056/060)
+15:05 UTC (8:05am PDT)   ANOMALY      Anomaly detector runs on ingested data
+16:30–16:45 UTC          COMPUTE      character-sheet 16:30, adaptive-mode 16:35,
+                                      daily-metrics 16:40, daily-insight 16:45
+                                      (+ coach pipeline; hypothesis-engine weekly Sun 19:00 UTC)
+17:00 UTC (10am PDT)     DAILY BRIEF  Reads computed results, sends email, writes
+                                      public_stats.json + character_stats.json
+19:30 UTC (12:30pm PDT)  OG IMAGES    6 PNG share cards from public_stats.json
 ```
 
 If compute runs before ingestion completes, it uses yesterday's data. If the brief runs before compute, it reads stale computed results.
