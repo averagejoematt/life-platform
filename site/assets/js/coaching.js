@@ -105,12 +105,21 @@ function entriesFor(s, data) {
     const byc = (data && data.by_coach) || {};
     const names = {};
     for (const p of (data && data.predictions) || []) names[p.coach_id] = p.coach_name;
-    Object.keys(byc).sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0)).forEach((cid) => {
-      const c = byc[cid];
-      if (!c.total) return;
-      const rate = c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : `${c.decided || 0} decided`;
-      out.push({ id: cid, title: names[cid] || cid, date: rate });
-    });
+    // #1376: a coach with zero calls THIS season never appeared in `predictions`
+    // — fall back to the roster names so a fresh-slate coach still gets a title.
+    for (const bareId of Object.keys(byc)) if (!names[bareId] && BOARD_PERSONAS[`${bareId}_coach`]) names[bareId] = BOARD_PERSONAS[`${bareId}_coach`].name;
+    Object.keys(byc)
+      .filter((cid) => byc[cid].total || (byc[cid].lifetime && byc[cid].lifetime.total))
+      .sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0) || ((byc[b].lifetime && byc[b].lifetime.decided) || 0) - ((byc[a].lifetime && byc[a].lifetime.decided) || 0))
+      .forEach((cid) => {
+        const c = byc[cid];
+        const cl = c.lifetime || {};
+        // #1376: fresh slate this season never disappears — it reads the career rate instead.
+        const rate = c.total
+          ? (c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : `${c.decided || 0} decided`)
+          : `fresh slate · career ${cl.decided || 0} decided`;
+        out.push({ id: cid, title: names[cid] || cid, date: rate });
+      });
     return out;
   }
   return [];
@@ -960,16 +969,21 @@ async function renderScorecard(read, id) {
   const data = (await tryJSON("/api/predictions")) || {};
   const momentUrl = _momentUrlFor(await momentsIndex()); // #404 share permalinks
   const o = data.overall || {};
+  const life = o.lifetime || {}; // #1376: career (every cycle) beside this season
   const byc = data.by_coach || {};
   const preds = data.predictions || [];
   const names = {};
   for (const p of preds) names[p.coach_id] = p.coach_name;
+  // #1376: a coach with zero calls THIS season (fresh slate) never appeared in
+  // `preds` — fall back to the same roster names used on the "convene the board" card.
+  for (const bareId of Object.keys(byc)) if (!names[bareId] && BOARD_PERSONAS[`${bareId}_coach`]) names[bareId] = BOARD_PERSONAS[`${bareId}_coach`].name;
   const decided = o.decided || 0;
 
   if (String(id) === "all" || !id) {
     let h = `<p class="dx-kicker label">the scorecard · every call, graded</p><h2 class="dx-title">The board's track record</h2>`;
     h += `<p class="dx-prose">The coaches don't just talk — they make falsifiable calls, and a deterministic evaluator grades each one against the data once its window closes. This is the honest tally. <span class="label">Self-assessment of the board's own calls, not external validation.</span></p>`;
-    // The headline tiles.
+    // The headline tiles — this season.
+    h += `<p class="dx-kicker label sc-sub">this season${data.cycle ? ` · cycle ${esc(data.cycle)}` : ""}</p>`;
     h += `<div class="sc-tiles">` +
       `<div class="sc-tile"><span class="sc-n">${decided ? `${o.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${decided ? ` · ${decided} decided` : ""}</span></div>` +
       `<div class="sc-tile"><span class="sc-n">${o.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
@@ -988,19 +1002,42 @@ async function renderScorecard(read, id) {
           ? ` The earliest call's window (${esc(nearest.date)}) has closed — it grades at the evaluator's next daily pass.`
           : ` First verdict expected around <strong>${esc(nearest.date)}</strong>.`)
         : "";
-      h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
+      // #1376: a fresh cycle reads "fresh slate — career: n=X", never a bare
+      // "none have resolved yet" that hides the record a reset didn't actually erase.
+      const freshCareer = life.decided > 0
+        ? ` Fresh slate — career: n=${life.decided} decided (${life.accuracy_pct}% hit rate) across every cycle so far.`
+        : "";
+      h += `<p class="dx-prose sc-note">The board has made <strong>${o.total || 0}</strong> calls so far this cycle; none have resolved yet — each one grades only after its 2–4 week window closes.${countdown}${o.inconclusive ? ` ${o.inconclusive} came back with no clear signal.` : ""}${freshCareer} The record fills in as the experiment runs. Watch a coach's calls under their name at left.</p>`;
     }
-    // Per-coach rows.
-    const rows = Object.keys(byc).filter((c) => byc[c].total).sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0));
+    // The career tiles — every cycle, sports-card pattern (#1376). A reset wipes
+    // this SEASON honestly to zero; it must never wipe the record from view too.
+    if (life.total > 0) {
+      h += `<p class="dx-kicker label sc-sub">career · every cycle</p>`;
+      h += `<div class="sc-tiles">` +
+        `<div class="sc-tile"><span class="sc-n">${life.decided ? `${life.accuracy_pct}%` : "—"}</span><span class="sc-l label">hit rate${life.decided ? ` · ${life.decided} decided` : ""}</span></div>` +
+        `<div class="sc-tile"><span class="sc-n">${life.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
+        `<div class="sc-tile"><span class="sc-n">${life.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
+        `<div class="sc-tile"><span class="sc-n">${life.pending || 0}</span><span class="sc-l label">still open</span></div>` +
+        `</div>`;
+    }
+    // Per-coach rows — include a coach with ONLY a career record (fresh slate
+    // this season) so its track record never disappears from the list (#1376).
+    const rows = Object.keys(byc)
+      .filter((c) => byc[c].total || (byc[c].lifetime && byc[c].lifetime.total))
+      .sort((a, b) => (byc[b].decided || 0) - (byc[a].decided || 0) || ((byc[b].lifetime && byc[b].lifetime.decided) || 0) - ((byc[a].lifetime && byc[a].lifetime.decided) || 0));
     if (rows.length) {
       h += `<p class="dx-kicker label sc-sub">by coach</p><ul class="sc-coachlist">`;
       for (const cid of rows) {
         const c = byc[cid];
-        const rate = c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : "—";
+        const cl = c.lifetime || {};
+        const rate = c.total ? (c.hit_rate_pct != null ? `${c.hit_rate_pct}%` : "—") : "fresh slate";
+        const mix = c.total
+          ? `${c.confirmed || 0}✓ · ${c.refuted || 0}✗ · ${c.pending || 0} open`
+          : `career: ${cl.confirmed || 0}✓ · ${cl.refuted || 0}✗ · ${cl.total || 0} total`;
         h += `<li class="sc-row"><button type="button" class="sc-coachbtn" data-coach="${esc(cid)}">` +
           `<span class="sc-coach">${esc(names[cid] || cid)}</span>` +
           `<span class="sc-rate label">${esc(rate)}</span>` +
-          `<span class="sc-mix label">${c.confirmed || 0}✓ · ${c.refuted || 0}✗ · ${c.pending || 0} open</span></button></li>`;
+          `<span class="sc-mix label">${esc(mix)}</span></button></li>`;
       }
       h += `</ul>`;
     }
@@ -1017,17 +1054,31 @@ async function renderScorecard(read, id) {
 
   // A single coach's record.
   const c = byc[id] || {};
+  const cl = c.lifetime || {}; // #1376: career beside this season
   const name = names[id] || id;
   const mine = preds.filter((p) => p.coach_id === id);
   const decidedC = c.decided || 0;
   let h = `<p class="dx-kicker label">scorecard · one coach</p><h2 class="dx-title">${esc(name)}</h2>`;
+  h += `<p class="dx-kicker label sc-sub">this season</p>`;
   h += `<div class="sc-tiles">` +
     `<div class="sc-tile"><span class="sc-n">${decidedC ? `${c.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${decidedC ? ` · ${decidedC} decided` : ""}</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
     `<div class="sc-tile"><span class="sc-n">${c.pending || 0}</span><span class="sc-l label">still open</span></div>` +
     `</div>`;
-  if (!decidedC) h += `<p class="dx-prose sc-note">${esc(name)} has ${c.total || 0} calls on the board; none have resolved yet. Each grades after its window closes.</p>`;
+  if (!decidedC) {
+    const freshCareer = cl.decided > 0 ? ` Fresh slate — career: n=${cl.decided} decided (${cl.hit_rate_pct}% hit rate) across every cycle so far.` : "";
+    h += `<p class="dx-prose sc-note">${esc(name)} has ${c.total || 0} calls on the board this cycle; none have resolved yet. Each grades after its window closes.${freshCareer}</p>`;
+  }
+  if (cl.total > 0) {
+    h += `<p class="dx-kicker label sc-sub">career · every cycle</p>`;
+    h += `<div class="sc-tiles">` +
+      `<div class="sc-tile"><span class="sc-n">${cl.decided ? `${cl.hit_rate_pct}%` : "—"}</span><span class="sc-l label">hit rate${cl.decided ? ` · ${cl.decided} decided` : ""}</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${cl.confirmed || 0}</span><span class="sc-l label">confirmed</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${cl.refuted || 0}</span><span class="sc-l label">refuted</span></div>` +
+      `<div class="sc-tile"><span class="sc-n">${cl.pending || 0}</span><span class="sc-l label">still open</span></div>` +
+      `</div>`;
+  }
   const show = mine.slice(0, 14);
   if (show.length) h += `<p class="dx-kicker label sc-sub">the calls</p>` + show.map((p) => _scCallHTML(p, momentUrl(p))).join("");
   h += `<p class="bc-datalink label"><a href="/coaching/scorecard/#all">← the whole board</a></p>`;

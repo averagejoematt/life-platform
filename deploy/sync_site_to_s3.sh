@@ -64,6 +64,11 @@ if [ "${1:-}" != "--dry-run" ]; then
   # into /cockpit/'s <noscript> — the #729/#730 treatment for the flagship page. Best-
   # effort; keeps the last baked block if the live API is unreachable.
   python3 "$(dirname "$0")/../scripts/v4_build_cockpit_proof.py" || echo "  ⚠️  cockpit proof skipped (offline?) — keeping existing baked block"
+  # #1395: bake Home's static core (baseline→goal + countdown/day + level) into `/`'s
+  # <noscript> + refresh its data-driven OG tags — so the most-shared URL's crawler /
+  # no-JS / link-unfurl view is real content, not a blank cinematic shell. Best-effort;
+  # load_journey() falls back to the committed snapshot when the live API is unreachable.
+  python3 "$(dirname "$0")/../scripts/v4_build_home_proof.py" || echo "  ⚠️  home proof skipped (offline?) — keeping existing baked block"
   # #804: regenerate the /coaching/ shells with the board's live read baked into the
   # "read" landing's <noscript> (weekly priority + each coach's read) — the #729/#730/
   # #788 treatment for the core differentiator. The generator is the source of truth

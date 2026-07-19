@@ -87,19 +87,29 @@ tools incl. the three new).
 - CloudFront `/api/*` viewer-path invalidation before live-verifying (again held true).
 
 ## Residual / next picks
+
+> **Reconciled 2026-07-19 under the #1340 residual-queue gate** — every bullet below now
+> cites an issue number or carries an explicit `not-work —` tag; none were silently dropped.
+
 - **Sunday+ (post-genesis, tomorrow)**: `python3 deploy/restart_verify.py`; verify the
   17:00 UTC brief writes 64/20/94 natively + the first intake brief line renders; re-seed
-  prereg only if a pipeline re-run happened. Cycle-8 prereg publish still awaits
-  Matthew's OK (`handovers/prereg_dryrun_cycle8.txt`).
+  prereg only if a pipeline re-run happened — **not-work — standing post-genesis
+  verification routine, not a backlog item.** Cycle-8 prereg publish still awaits
+  Matthew's OK (`handovers/prereg_dryrun_cycle8.txt`) — **not-work — pending Matthew
+  decision, not a filed issue** (same item as the decision-menu bullet below).
 - **site-api can't read SSM `/life-platform/experiment-cycle`** → freshness payload
   `experiment.cycle: null` and carried chips read "a previous attempt" (fail-soft,
-  honest). IAM grant is user-NAMED → in the decision menu.
+  honest). IAM grant is user-NAMED → in the decision menu — **not-work — pending a
+  Matthew-named IAM grant, not yet a filed issue** (same item as the decision-menu SSM
+  IAM line below).
 - Now remainder: #1409 felt-reality calibration (fable, W5 — n accrues weekly, time-
   sensitive), #1395 growth surface, #1376 career-vs-season, #1426 QA tier manifest
   (unlocks the qa-strategy epic), design pipeline #1462→#1464 (+pilot #1469); #1338 held
   on #1319. Epics #1194/#1195.
-- Decision menu (Matthew): #1319 approval-gate posture, prereg publish OK, SSM IAM line,
-  #1114 portrait pick, #1243/#748/#1187/#1029, gate:owner #1350/#1329, #741.
+- Decision menu (Matthew): #1319 approval-gate posture, #1114 portrait pick,
+  #1243/#748/#1187/#1029, gate:owner #1350/#1329, #741 — all filed issues. Prereg publish
+  OK and the SSM cycle-param IAM line are **not-work — pending a Matthew decision/grant,
+  not filed issues** (see the two bullets above).
 
 **Main:** green (28ee812a) — its full CI/CD run concluded SUCCESS (fleet deploy included);
 verified via `check_main_green.py` at wrap.

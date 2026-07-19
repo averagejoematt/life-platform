@@ -66,13 +66,51 @@
       "date": "2026-06-11",
       "title": "The Empty Journal",
       "url": "/journal/posts/week-02/",
-      "label": "Prologue · Part II"
+      "label": "Prologue \u00b7 Part II"
     },
     {
       "date": "2026-06-07",
       "title": "The Body Votes First",
       "url": "/journal/posts/week-01/",
-      "label": "Prologue · Part I"
+      "label": "Prologue \u00b7 Part I"
     }
-  ]
+  ],
+  "journey": {
+    "start_weight": 315.6,
+    "goal_weight": 185.0,
+    "current_weight": null,
+    "lost_lbs": null,
+    "day_n": 0,
+    "pre_start": true,
+    "start_date": "2026-07-19",
+    "as_of": "2026-07-19",
+    "source": "snapshot"
+  },
+  "data_sources": {
+    "total": 13,
+    "fresh": 7,
+    "labels": [
+      "Whoop",
+      "Withings",
+      "Strava",
+      "Eight Sleep",
+      "Apple Health",
+      "Todoist",
+      "Habitify",
+      "MacroFactor",
+      "Hevy",
+      "Tape measure",
+      "Food delivery",
+      "Weather",
+      "Garmin"
+    ],
+    "as_of": "2026-07-19",
+    "source": "snapshot"
+  },
+  "protocols": {
+    "total": 67,
+    "available": 4,
+    "as_of": "2026-07-19",
+    "source": "snapshot"
+  }
 }
