@@ -18,9 +18,9 @@
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
 <<<<<<< HEAD
-**Total tests:** 4061 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 4064 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 =======
-**Total tests:** 4061 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
+**Total tests:** 4064 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 >>>>>>> origin/main
 
 ---
