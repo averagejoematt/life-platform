@@ -110,6 +110,7 @@ from web.site_api_data import (
     handle_discoveries,
     handle_domains,
     handle_experiments,
+    handle_fulfillment_index,
     handle_fulfillment_ritual,
     handle_habit_registry,
     handle_habit_streaks,
@@ -371,6 +372,7 @@ ROUTES = {
     "/api/habits": handle_habits,
     "/api/vice_streaks": handle_vice_streaks,
     "/api/fulfillment_ritual": handle_fulfillment_ritual,  # #769 (ADR-124): C-floor aggregate-only publish surface
+    "/api/fulfillment_index": handle_fulfillment_index,  # #1404: asymmetric-channel fulfillment index (passive baseline, journal adds resolution only)
     "/api/character_calibration": handle_character_calibration,  # #1409: felt-reality calibration ledger (aggregates only)
     "/api/journey_timeline": handle_journey_timeline,
     "/api/journey_waveform": handle_journey_waveform,

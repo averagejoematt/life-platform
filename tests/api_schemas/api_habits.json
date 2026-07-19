@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/habits",
   "is_prefix_sample": false,
   "path": "/api/habits",
@@ -23,7 +23,7 @@
         "type": "string"
       },
       "best_day": {
-        "type": "integer"
+        "type": "null"
       },
       "causality_captured": {
         "type": "integer"
@@ -52,14 +52,9 @@
         "type": "integer"
       },
       "day_of_week_avgs": {
-        "items": [
-          {
-            "type": "null"
-          },
-          {
-            "type": "integer"
-          }
-        ],
+        "items": {
+          "type": "null"
+        },
         "length_sample": 7,
         "type": "array"
       },
@@ -85,30 +80,8 @@
         "type": "object"
       },
       "history": {
-        "items": {
-          "keys": {
-            "date": {
-              "type": "string"
-            },
-            "perfect": {
-              "type": "boolean"
-            },
-            "t0_done": {
-              "type": "integer"
-            },
-            "t0_total": {
-              "type": "integer"
-            },
-            "tier01_pct": {
-              "type": "integer"
-            },
-            "tier0_pct": {
-              "type": "integer"
-            }
-          },
-          "type": "object"
-        },
-        "length_sample": 1,
+        "items": null,
+        "length_sample": 0,
         "type": "array"
       },
       "keystone_correlations": {
@@ -123,12 +96,52 @@
         "type": "null"
       },
       "per_habit": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "adherence_pct": {
+              "type": "integer"
+            },
+            "completed_days": {
+              "type": "integer"
+            },
+            "days": {
+              "items": {
+                "keys": {
+                  "date": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "length_sample": 1,
+              "type": "array"
+            },
+            "group": {
+              "type": "string"
+            },
+            "last_completed": {
+              "type": "null"
+            },
+            "name": {
+              "type": "string"
+            },
+            "scheduled_days": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 59,
         "type": "array"
       },
       "worst_day": {
-        "type": "integer"
+        "type": "null"
       }
     },
     "type": "object"

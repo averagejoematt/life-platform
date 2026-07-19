@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/coach/sleep_coach",
   "is_prefix_sample": true,
   "path": "/api/coach/",
@@ -111,8 +111,25 @@
         "type": "null"
       },
       "recent_outputs": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "summary": {
+              "type": "string"
+            },
+            "themes": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 8,
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       },
       "relationships": {
@@ -235,16 +252,10 @@
       "stance": {
         "keys": {
           "as_of": {
-            "type": "null"
-          },
-          "band_metric": {
             "type": "string"
           },
           "confidence_note": {
             "type": "string"
-          },
-          "current_value": {
-            "type": "number"
           },
           "focused_on_now": {
             "items": {
@@ -252,9 +263,6 @@
             },
             "length_sample": 3,
             "type": "array"
-          },
-          "graduation_gate": {
-            "type": "string"
           },
           "grounding_flag": {
             "type": "boolean"
@@ -264,76 +272,6 @@
           },
           "how_my_read_changed": {
             "type": "string"
-          },
-          "ladder": {
-            "items": {
-              "keys": {
-                "headline": {
-                  "type": "string"
-                },
-                "stage_id": {
-                  "type": "string"
-                }
-              },
-              "type": "object"
-            },
-            "length_sample": 4,
-            "type": "array"
-          },
-          "rung": {
-            "keys": {
-              "cares_less_right_now": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 3,
-                "type": "array"
-              },
-              "cares_most": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 3,
-                "type": "array"
-              },
-              "entry": {
-                "keys": {
-                  "max": {
-                    "type": "null"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "min": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "graduation_gate": {
-                "type": "string"
-              },
-              "headline": {
-                "type": "string"
-              },
-              "plan": {
-                "type": "string"
-              },
-              "read_of_him": {
-                "type": "string"
-              },
-              "stage_id": {
-                "type": "string"
-              },
-              "watches": {
-                "items": {
-                  "type": "string"
-                },
-                "length_sample": 2,
-                "type": "array"
-              }
-            },
-            "type": "object"
           },
           "set_aside_for_now": {
             "items": {
@@ -360,8 +298,32 @@
         "type": "object"
       },
       "stance_history": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "as_of": {
+              "type": "string"
+            },
+            "headline_read": {
+              "type": "string"
+            },
+            "how_my_read_changed": {
+              "type": "string"
+            },
+            "stage": {
+              "keys": {
+                "label": {
+                  "type": "string"
+                },
+                "rationale": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       },
       "tier": {
