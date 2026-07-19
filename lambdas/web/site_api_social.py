@@ -1370,16 +1370,23 @@ def _handle_ritual_log(event: dict) -> dict:
     # never the evening_ritual record the public wellbeing aggregate reads. The
     # write path is shared (same signed link, same rate limit); only the
     # destination differs, so the public read surface structurally can't see it.
-    from ritual_link import PRIVATE_RITUAL_METRICS
+    from ritual_link import PRIVATE_RITUAL_METRICS, WEEKLY_PROBE_METRICS
 
     try:
         table.update_item(
-            # Both destinations INLINE as USER_PREFIX-joined literals — the orphan
+            # ALL destinations INLINE as USER_PREFIX-joined literals — the orphan
             # gate (tests/test_site_partition_orphans.py) resolves web writers only
             # inside the put/update call itself; a hoisted or dynamic pk makes
             # evening_ritual read as writerless (redded e1bcf766's Unit Tests).
+            # #1409: weekly felt-reality probe taps land in felt_probe (their own
+            # cadence + the calibration engine's read surface), never the daily
+            # evening_ritual aggregate.
             Key={
-                "pk": (f"{USER_PREFIX}private_intake" if metric in PRIVATE_RITUAL_METRICS else f"{USER_PREFIX}evening_ritual"),
+                "pk": (
+                    f"{USER_PREFIX}private_intake"
+                    if metric in PRIVATE_RITUAL_METRICS
+                    else f"{USER_PREFIX}felt_probe" if metric in WEEKLY_PROBE_METRICS else f"{USER_PREFIX}evening_ritual"
+                ),
                 "sk": f"DATE#{date_str}",
             },
             UpdateExpression="SET #m = :v, #ts = :ts, #src = :src",

@@ -1588,6 +1588,115 @@ def handle_vice_streaks() -> dict:
     )
 
 
+def handle_character_calibration() -> dict:
+    """
+    GET /api/character_calibration — the felt-reality calibration ledger (#1409).
+
+    Pairs each weekly felt-reality probe (Sunday one-tap, SOURCE#felt_probe,
+    0-4 ordinal) with the probed pillar's mean level_score over the 7 days
+    ending that Sunday (SOURCE#character_sheet), and serves per-pillar
+    calibration: pearson r + Fisher CI + Pyper–Peterman n_eff — all
+    deterministic stats_core computation, no LLM anywhere (ADR-105).
+
+    Publication posture (ADR-124 C-floor, like /api/fulfillment_ritual):
+    AGGREGATES ONLY — r/CI/n/n_eff/coverage per pillar; individual weekly probe
+    values are never served. Confidence grammar (ADR-105): below
+    FELT_CALIBRATION_MIN_WEEKS a pillar renders "uncalibrated (n=X)" with the
+    arming trigger and NO r; between MIN and CI_MIN weeks r is a point estimate
+    with NO band (never fabricated); the band appears only when n can carry it.
+    A skipped Sunday is a coverage gap (n doesn't accrue), never a zero.
+    Cache: 3600s (recomputes at most weekly by nature).
+    """
+    from experiment_gates import FELT_CALIBRATION_CI_MIN_WEEKS, FELT_CALIBRATION_MIN_WEEKS, felt_calibration_gates
+    from ritual_link import PROBE_PILLAR_MAP
+    from stats_core import effective_sample_size, fisher_ci, pearson_r
+
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    probes = _query_source("felt_probe", EXPERIMENT_START, today)
+    sheets = _query_source("character_sheet", EXPERIMENT_START, today)
+
+    # pillar level_score by date (fall back raw_score; skip absent — never zero-fill)
+    level_by_date: dict[str, dict[str, float]] = {}
+    for rec in sheets:
+        d = rec.get("date") or str(rec.get("sk", "")).replace("DATE#", "")
+        if not d:
+            continue
+        per = {}
+        for pillar in set(PROBE_PILLAR_MAP.values()):
+            pdata = rec.get(f"pillar_{pillar}") or {}
+            v = pdata.get("level_score", pdata.get("raw_score"))
+            if v is not None:
+                per[pillar] = float(v)
+        level_by_date[d] = per
+
+    # Sundays with at least one probe item — the ledger's coverage spine.
+    probe_by_date: dict[str, dict] = {}
+    for rec in probes:
+        d = rec.get("date") or str(rec.get("sk", "")).replace("DATE#", "")
+        if d:
+            probe_by_date[d] = rec
+
+    pillars_out = []
+    for metric, pillar in sorted(PROBE_PILLAR_MAP.items()):
+        felt_vals, level_means, weeks = [], [], []
+        for d in sorted(probe_by_date):
+            v = probe_by_date[d].get(metric)
+            if v is None:
+                continue  # skipped item that Sunday — coverage gap, not a zero
+            d_obj = datetime.strptime(d, "%Y-%m-%d")
+            window = [(d_obj - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
+            levels = [level_by_date[w][pillar] for w in window if w in level_by_date and pillar in level_by_date[w]]
+            if not levels:
+                continue  # no sheet coverage that week — the pair can't form
+            felt_vals.append(float(v))
+            level_means.append(sum(levels) / len(levels))
+            weeks.append(d)
+        n = len(felt_vals)
+        entry = {
+            "pillar": pillar,
+            "probe_metric": metric,
+            "n_weeks": n,
+            "latest_week": weeks[-1] if weeks else None,
+            "gates": felt_calibration_gates(current_n=n),
+        }
+        if n >= FELT_CALIBRATION_MIN_WEEKS:
+            r = pearson_r(felt_vals, level_means, min_n=FELT_CALIBRATION_MIN_WEEKS)
+            if r is None:
+                entry["state"] = "uncalibrated"
+                entry["why"] = "no variance yet — every probe or level identical"
+            else:
+                n_eff = effective_sample_size(felt_vals, level_means)
+                entry["state"] = "calibrated"
+                entry["r"] = round(r, 3)
+                entry["n_eff"] = round(n_eff, 1)
+                if n >= FELT_CALIBRATION_CI_MIN_WEEKS:
+                    lo, hi = fisher_ci(r, max(4.0, n_eff))
+                    entry["ci95"] = [round(lo, 3), round(hi, 3)]
+                else:
+                    # ADR-105: point estimate only — the band would be fabricated at this n
+                    entry["ci95"] = None
+        else:
+            entry["state"] = "uncalibrated"
+        pillars_out.append(entry)
+
+    probed = set(PROBE_PILLAR_MAP.values())
+    for pillar in ("nutrition", "metabolic", "mind", "consistency"):
+        if pillar not in probed:
+            pillars_out.append({"pillar": pillar, "state": "unprobed", "why": "no felt-reality instrument maps to this pillar yet"})
+
+    covered = len(probe_by_date)
+    return _ok(
+        {
+            "pillars": pillars_out,
+            "probe_weeks_covered": covered,
+            "as_of_date": today,
+            "cadence": "weekly (Sunday evening one-tap, 3 items)",
+            "method": "pearson r of felt (0-4) vs 7-day mean pillar level_score; Fisher 95% CI on Pyper-Peterman n_eff",
+        },
+        cache_seconds=3600,
+    )
+
+
 def handle_fulfillment_ritual() -> dict:
     """
     GET /api/fulfillment_ritual
