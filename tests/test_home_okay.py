@@ -20,9 +20,11 @@ def test_okay_beat_present_and_high_on_the_page():
     beats — family gets their answer near the top, not buried."""
     assert 'class="beat beat-okay"' in HOME
     assert "Is he okay this week?" in HOME
-    # High: before the constellation beat (#1469 — it replaced the retired
-    # beat-loop card row) and before the dispatches/chronicle beat.
-    assert HOME.find("beat-okay") < HOME.find("beat-constellation")
+    # High: within the first two beats. The constellation now deliberately LEADS
+    # (#1469 follow-up, Matthew 2026-07-19 — the seven-pillar hover figure was too
+    # loved to sit deep), with okay immediately after it and both before the
+    # dispatches/chronicle beat.
+    assert HOME.find("beat-constellation") < HOME.find("beat-okay")
     assert HOME.find("beat-okay") < HOME.find("beat-dispatches")
 
 
