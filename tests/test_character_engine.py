@@ -46,7 +46,7 @@ from character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.7.0"  # #1373: progression-receipt transition capture
+    assert ENGINE_VERSION == "1.8.0"  # #1411: fitted-not-authored — active effects carry fit badges
 
 
 # ── F-01: Confidence scoring ──

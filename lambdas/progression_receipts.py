@@ -97,8 +97,29 @@ def sha256_hex(text: str) -> str:
 def config_hash(config: dict) -> str:
     """Fingerprint of the FULL engine config (canonical JSON) — any knob change
     (weight, band, streak gate, target) changes the hash, which is exactly the
-    drift the receipt exists to expose."""
-    return sha256_hex(canonical_json(config or {}))
+    drift the receipt exists to expose.
+
+    #1411: the effect-fit annotations (fit_status / fit_n_eff / fit_ci_95 /
+    fit_badge / …) are normalized OUT before hashing. They are runtime-merged
+    evidence metadata about the config, not scoring knobs — they change no
+    computed number (modifiers, XP, levels are all fit-blind), and the compute
+    path merges the latest quarterly fit into the config it hands the engine,
+    so hashing them would make every replay against the pristine S3 config a
+    spurious config_drift and roll the hash each quarter with zero mechanical
+    change."""
+    cfg = config or {}
+    effects = cfg.get("cross_pillar_effects")
+    if isinstance(effects, list):
+        cfg = dict(cfg)
+        cfg["cross_pillar_effects"] = [
+            (
+                {k: v for k, v in e.items() if not (isinstance(k, str) and (k.startswith("fit_") or k == "fitted_at"))}
+                if isinstance(e, dict)
+                else e
+            )
+            for e in effects
+        ]
+    return sha256_hex(canonical_json(cfg))
 
 
 def digest_of(receipt: dict) -> str:

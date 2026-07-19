@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.7.0"  # #1373: progression receipts — per-pillar transition capture at fire time
+ENGINE_VERSION = "1.8.0"  # #1411: fitted-not-authored — active effects carry fit_status/n_eff/CI badges (ADR-105)
+# v1.7.0 — #1373: progression receipts — per-pillar transition capture at fire time
 # v1.6.1 — #1125: character_level_up events persist their drivers at fire time
 # v1.6.0 — #965: hevy→movement, reading→mind, todoist→consistency wired (ADR-134 amendment)
 # v1.5.0 — #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
@@ -1569,6 +1570,15 @@ def compute_cross_pillar_effects(
                     "emoji": effect.get("emoji", ""),
                     "condition": condition,
                     "targets": targets,
+                    # #1411 (ADR-105): an active effect always states whether the
+                    # data ever confirmed it. The fit fields arrive merged into the
+                    # config by effect_fitter.merge_fit_into_config (quarterly
+                    # re-fit); with nothing merged, the honest default is the
+                    # authored prior — "fitted" can never appear out of thin air.
+                    "fit_status": effect.get("fit_status", "authored-prior"),
+                    "fit_n_eff": effect.get("fit_n_eff"),
+                    "fit_ci_95": effect.get("fit_ci_95"),
+                    "fit_badge": effect.get("fit_badge") or _default_fit_badge(effect),
                 }
             )
             for target_pillar, mod_spec in targets.items():
@@ -1585,6 +1595,16 @@ def compute_cross_pillar_effects(
                     modifiers[target_pillar] = modifiers.get(target_pillar, 0) + mod_value
 
     return active, modifiers
+
+
+def _default_fit_badge(effect):
+    """#1411: badge for an effect no fit has annotated — the authored-prior
+    grammar with the honest n (0: never tested). effect_fitter.badge_text is
+    the full grammar; this engine-local default keeps the engine importable
+    without the fitter and can never say "fitted"."""
+    n_eff = effect.get("fit_n_eff")
+    n_txt = f"{n_eff:.0f}" if isinstance(n_eff, (int, float)) else "0"
+    return f"authored prior — not yet confirmed (n_eff={n_txt})"
 
 
 def _evaluate_condition(condition_str, pillar_levels, vice_streaks=None):

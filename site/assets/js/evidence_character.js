@@ -378,14 +378,19 @@ export async function renderCharacter(d) {
         const sign = (Number((v || {}).value) || 0) >= 0 ? "+" : "−";
         return `<span class="ch-fx-t"><span class="ch-ric" style="color:var(--pillar-${esc(t)},var(--ember))">${t === "_all" ? "" : domainIcon(t)}</span>${t === "_all" ? "all pillars" : ""} ${sign}${pct}%</span>`;
       }).join("");
+      /* #1411 (ADR-105): the fit badge — fitted (n_eff + CI) or "authored prior —
+         not yet confirmed". Served merged from the latest quarterly re-fit; an
+         absent field is the honest authored default, never a fabricated fit. */
+      const badge = e.fit_badge || "authored prior — not yet confirmed (n_eff=0)";
       return `<div class="ch-fx${active === true ? " is-active" : ""}${active === null ? " is-inert" : ""}">
         <span class="ch-fx-name">${esc(e.name || "")}</span>
         <span class="ch-fx-cond label">${active === true ? "active — " : active === false ? "activates when " : ""}${esc(String(e.condition || "").replace(/_/g, " "))}</span>
         <span class="ch-fx-targets">${targets}</span>
+        <span class="ch-fx-fit label">${e.fit_status === "fitted" ? "✓ " : ""}${esc(badge)}</span>
       </div>`;
     }).join("");
     const effects = fxChips ? sec("Cross-pillar effects", `<div class="ch-fxgrid">${fxChips}</div>
-      <p class="rd-why">The pillars aren't independent — the engine models the physiology: poor sleep drags training and mind; strong nutrition and movement compound into metabolic health; everything above the line at once earns an alignment bonus. Active effects are evaluated from today's real scores.</p>`) : "";
+      <p class="rd-why">The pillars aren't independent — the engine models the physiology: poor sleep drags training and mind; strong nutrition and movement compound into metabolic health; everything above the line at once earns an alignment bonus. Active effects are evaluated from today's real scores. Each effect also wears its evidence status: these started life as authored priors, and every quarter the engine re-fits them against the lived data (lagged pairs, bootstrap CI, FDR-corrected) — an effect only earns "fitted" when its interval excludes no-effect, and a prior that fails to confirm is published on <a href="/method/wrong/">the wrong page</a>.</p>`) : "";
 
     /* 9 · What feeds each pillar — component weights + targets, disclosure per pillar. */
     const feeds = Object.keys(cfg.pillars || {}).length ? sec("What feeds each pillar", `<div class="ch-feeds">` +

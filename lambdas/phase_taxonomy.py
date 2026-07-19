@@ -164,6 +164,11 @@ SOURCE_CLASS: dict[str, str] = {
     # same rationale as "benchmarks" (comparing cuts across resets is the point).
     "training_reference": CROSS_PHASE,  # #930/#951: BENCH-1 proven by-band prescription singleton,
     # derived from the same 14-year history — cross-phase reference like weight_episodes.
+    "effect_fits": CROSS_PHASE,  # #1411/ADR-105: quarterly cross-pillar effect fits (FIT#<date> —
+    # lagged-pair r, block-bootstrap CI, BH-FDR, n_eff, fitted|authored-prior verdicts). Like
+    # "calibration", it measures the PLATFORM's priors against the whole cross-cycle history —
+    # wiping it at reset would un-earn every badge and destroy the only record of priors that
+    # failed to confirm (/method/wrong publishes those as findings).
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
     "character_receipt": EXPERIMENT_SCOPED,  # #1373: audit-grade progression receipts — one per

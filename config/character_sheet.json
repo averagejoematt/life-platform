@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "version": "1.5.0",
-    "description": "Character Sheet v1.5.0 (#965 source wiring, ADR-134 amendment): hevy strength days feed movement (strength_sessions, behavioral), reading-session days feed mind (reading_practice, behavioral), the todoist overdue queue feeds consistency (task_follow_through, measured) \u2014 all day-count metrics, volume-gaming resistant. On v1.4.0's #956 math-v2 base.",
-    "last_updated": "2026-07-18",
+    "version": "1.6.0",
+    "description": "Character Sheet v1.6.0 (#1411 fitted-not-authored, ADR-105): every cross-pillar effect declares fit_status='authored-prior' \u2014 the config can only declare the prior; 'fitted' is earned from data by the quarterly effect_fitter re-fit (lagged pairs, block-bootstrap CI, BH-FDR) and merged at compute/serve time, never hand-written here. On v1.5.0's #965 source wiring.",
+    "last_updated": "2026-07-19",
     "review_ref": "docs/engines/CHARACTER_MATH_AUDIT_2026-07.md"
   },
   "baseline": {
@@ -341,7 +341,8 @@
           "type": "multiplicative",
           "value": -0.05
         }
-      }
+      },
+      "fit_status": "authored-prior"
     },
     {
       "name": "Training Boost",
@@ -352,7 +353,8 @@
           "type": "multiplicative",
           "value": 0.05
         }
-      }
+      },
+      "fit_status": "authored-prior"
     },
     {
       "name": "Focus Buff",
@@ -363,7 +365,8 @@
           "type": "multiplicative",
           "value": 0.03
         }
-      }
+      },
+      "fit_status": "authored-prior"
     },
     {
       "name": "Synergy Bonus",
@@ -374,7 +377,8 @@
           "type": "multiplicative",
           "value": 0.08
         }
-      }
+      },
+      "fit_status": "authored-prior"
     },
     {
       "name": "Alignment Bonus",
@@ -385,7 +389,8 @@
           "type": "multiplicative",
           "value": 0.03
         }
-      }
+      },
+      "fit_status": "authored-prior"
     },
     {
       "name": "Vice Shield",
@@ -396,7 +401,8 @@
           "type": "multiplicative",
           "value": 0.03
         }
-      }
+      },
+      "fit_status": "authored-prior"
     }
   ],
   "avatar": {
