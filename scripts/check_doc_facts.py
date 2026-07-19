@@ -442,6 +442,77 @@ def _og_source_hits(files, truth: int) -> list[str]:
     return hits
 
 
+# ── #1351: DATA_GOVERNANCE.md fact gate (repo visibility, deletion-lambda status,
+# Verified-header freshness) ──────────────────────────────────────────────────
+# The compliance-answer doc misstated a load-bearing privacy control in BOTH
+# directions at once: it claimed the repo was "still PUBLIC" three days after it
+# actually flipped PRIVATE (2026-07-13, understating a real fix as an open exposure),
+# and claimed delete_user_data_lambda was merely "scaffolded; not yet wired" after it
+# had been implemented, CDK-deployed with an error alarm, and unit-tested. Neither
+# direction had a gate. This adds one, plus a Verified-header staleness ceiling (the
+# existing per-doc freshness ceiling machinery is check_doc_index.py's canonical-doc
+# sweep — this is DATA_GOVERNANCE-specific per the #1351 acceptance criterion).
+#
+# PRECISION: HISTORICAL-framed lines are exempt as everywhere else, so a corrected doc
+# is free to narrate "was PUBLIC until 2026-07-13" without re-tripping the gate.
+DATA_GOVERNANCE_PATH = ROOT / "docs" / "DATA_GOVERNANCE.md"
+DATA_GOVERNANCE_VERIFIED_MAX_AGE_DAYS = 90
+REPO_STILL_PUBLIC_CLAIM = re.compile(r"repo(?:sitory)?\s+is\s+(?:still\s+)?PUBLIC\b|is\s+still\s+PUBLIC\b", re.I)
+DELETE_LAMBDA_STALE_CLAIM = re.compile(r"scaffolded;?\s*not\s+yet\s+wired", re.I)
+VERIFIED_HEADER_RE = re.compile(r"\*\*Verified:\*\*\s*(\d{4}-\d{2}-\d{2})")
+# Deliberately NARROWER than the shared HISTORICAL regex: the shared one treats any
+# "as of <date>" as historical framing (right for a dated cost/count snapshot like
+# "$75 as of 2026-05"), but the EXACT pre-fix #1351 defect line was itself framed
+# "As of 2026-07-10 the repo is still PUBLIC..." — a genuine current-state claim, not
+# history, just dated. Reusing the shared regex here would silently exempt that exact
+# defect (proven by the vacuous-scan test below), so these two checks use true
+# past-tense/superseded language only.
+_DG_HISTORICAL = re.compile(r"\bwas\b|\bwere\b|formerly|previously|used to|no longer|retired|superseded|\bold\b", re.I)
+
+
+def _data_governance_hits(doc_path: Path, today=None) -> list[str]:
+    """DATA_GOVERNANCE.md-specific fact checks (#1351). `today` is injectable
+    (a `datetime.date`) so the regression test never depends on wall-clock — the
+    live gate (called with today=None from main()) uses the real date."""
+    import datetime as _dt
+
+    if not doc_path.exists():
+        return []
+    today = today or _dt.date.today()
+    text = doc_path.read_text(encoding="utf-8")
+    hits = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        if _DG_HISTORICAL.search(line):
+            continue
+        if REPO_STILL_PUBLIC_CLAIM.search(line):
+            hits.append(
+                f"docs/DATA_GOVERNANCE.md:{lineno}: claims the repo is PUBLIC — truth is PRIVATE since "
+                f"2026-07-13 (#1351)\n      | {line.strip()[:120]}"
+            )
+        if DELETE_LAMBDA_STALE_CLAIM.search(line):
+            hits.append(
+                f"docs/DATA_GOVERNANCE.md:{lineno}: claims delete_user_data_lambda is 'scaffolded; not yet "
+                f"wired' — it is implemented, CDK-deployed (life-platform-delete-user-data, operational_stack.py) "
+                f"with an error alarm, and unit-tested (tests/test_delete_user_data.py) (#1351)\n      | {line.strip()[:120]}"
+            )
+    mo = VERIFIED_HEADER_RE.search(text)
+    if not mo:
+        hits.append("docs/DATA_GOVERNANCE.md: no '**Verified:** YYYY-MM-DD' header found (#1351)")
+    else:
+        try:
+            verified = _dt.date.fromisoformat(mo.group(1))
+        except ValueError:
+            hits.append(f"docs/DATA_GOVERNANCE.md: Verified header {mo.group(1)!r} is not a valid date (#1351)")
+        else:
+            age_days = (today - verified).days
+            if age_days > DATA_GOVERNANCE_VERIFIED_MAX_AGE_DAYS:
+                hits.append(
+                    f"docs/DATA_GOVERNANCE.md: Verified header is {age_days}d stale ({mo.group(1)}, today {today}) — "
+                    f"re-verify within {DATA_GOVERNANCE_VERIFIED_MAX_AGE_DAYS}d (#1351)"
+                )
+    return hits
+
+
 def _scan_files() -> list[Path]:
     cands = [ROOT / "README.md", ROOT / "CLAUDE.md"]
     cands += sorted((ROOT / ".claude" / "commands").glob("*.md"))
@@ -529,6 +600,10 @@ def main():
         print("error: could not discover SOURCE_REGISTRY count for the og-card scan", file=sys.stderr)
         sys.exit(2)
     hits += _og_source_hits(_scan_og_files(), registry_n)
+
+    # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
+    # status, Verified-header freshness).
+    hits += _data_governance_hits(DATA_GOVERNANCE_PATH)
 
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []

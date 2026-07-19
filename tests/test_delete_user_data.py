@@ -90,6 +90,74 @@ def test_real_run_requires_explicit_confirm(env):
     assert resp["statusCode"] == 400
 
 
+def test_subscriber_deletion_missing_confirm_or_dryrun_returns_400(env):
+    m = _import(env)
+    resp = m.lambda_handler({"subscriber_email": "person@example.com"}, None)
+    assert resp["statusCode"] == 400
+
+
+def test_subscriber_deletion_dry_run_returns_plan_without_deleting(env):
+    m = _import(env)
+    fake_record = {"status": "confirmed", "email": "person@example.com"}
+    with patch.object(m, "_get_subscriber", return_value=fake_record):
+        resp = m.lambda_handler({"subscriber_email": "person@example.com", "dry_run": True}, None)
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert body["plan"]["found"] is True
+    assert body["plan"]["status"] == "confirmed"
+    # never echoes the plaintext email back
+    assert "person@example.com" not in resp["body"]
+    assert not m._table_mock.delete_item.called
+
+
+def test_subscriber_deletion_dry_run_not_found(env):
+    m = _import(env)
+    with patch.object(m, "_get_subscriber", return_value=None):
+        resp = m.lambda_handler({"subscriber_email": "ghost@example.com", "dry_run": True}, None)
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert body["plan"]["found"] is False
+
+
+def test_subscriber_deletion_real_run_deletes_and_audits(env):
+    m = _import(env)
+    fake_record = {"status": "unsubscribed", "email": "person@example.com"}
+    with patch.object(m, "_get_subscriber", return_value=fake_record):
+        with patch.object(m, "_delete_subscriber") as del_sub:
+            with patch.object(m, "_write_audit_record") as audit:
+                resp = m.lambda_handler({"subscriber_email": "person@example.com", "confirm": "DELETE"}, None)
+    assert resp["statusCode"] == 200
+    body = json.loads(resp["body"])
+    assert body["deleted"] is True
+    del_sub.assert_called_once()
+    audit.assert_called_once()
+    # audit is keyed by hash prefix, never the plaintext email
+    audit_user_id = audit.call_args[0][0]
+    assert "person@example.com" not in audit_user_id
+    assert audit_user_id.startswith("subscriber:")
+
+
+def test_subscriber_deletion_real_run_not_found_no_delete_call(env):
+    m = _import(env)
+    with patch.object(m, "_get_subscriber", return_value=None):
+        with patch.object(m, "_delete_subscriber") as del_sub:
+            resp = m.lambda_handler({"subscriber_email": "ghost@example.com", "confirm": "DELETE"}, None)
+    assert resp["statusCode"] == 200
+    del_sub.assert_not_called()
+
+
+def test_subscriber_email_hash_matches_web_lambda_algorithm(env):
+    """The independently duplicated hash function must produce IDENTICAL output to
+    email_subscriber_lambda._email_hash — otherwise a subscriber deletion request
+    would look up the wrong sk and silently no-op."""
+    import hashlib
+
+    m = _import(env)
+    email = "Person@Example.COM"
+    expected = hashlib.sha256(email.strip().lower().encode()).hexdigest()
+    assert m._subscriber_email_hash(email) == expected
+
+
 def test_real_run_invokes_batch_delete_and_audit(env):
     m = _import(env)
     with patch.object(m, "_scan_user_pks", return_value=[{"pk": "USER#x#SOURCE#y", "sk": "DATE#1"}]):

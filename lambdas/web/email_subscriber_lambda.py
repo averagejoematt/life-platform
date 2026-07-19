@@ -16,8 +16,15 @@ Record schema:
   source      subscribe_page | referral | ...
   ip_hash     SHA256 of source IP (for abuse detection, non-identifying)
 
-Raj directive: NEVER hard-delete subscriber records.
-  Unsub writes status=unsubscribed + unsubbed_at. Row is retained for analytics.
+Retention (#1350): unsub writes status=unsubscribed + unsubbed_at; this Lambda never
+  deletes on unsubscribe. Whether/when an unsubscribed row is later purged or
+  anonymized is an owner-signed decision — see the "Subscriber emails" row in
+  docs/DATA_GOVERNANCE.md. Until that row is signed, rows are retained (today's de
+  facto posture, now documented rather than an undocumented in-code directive). Once
+  signed, `deploy/subscriber_retention_purge.py` enacts the chosen window/mode. A
+  single subscriber can be deleted on request (right-to-be-forgotten, independent of
+  the retention window) via `delete_user_data_lambda`'s `{"subscriber_email": "...",
+  "confirm": "DELETE"}` event shape.
 
 Routes (via API Gateway query param ?action=):
   POST ?action=subscribe   — create pending record, send confirmation email
@@ -450,7 +457,8 @@ def _send_welcome_email(email: str) -> None:
 
 
 def handle_unsubscribe(email: str) -> dict:
-    """Mark status=unsubscribed. Raj directive: NEVER hard-delete. Row retained for analytics."""
+    """Mark status=unsubscribed. Never deletes here — see the retention pointer in the
+    module docstring (#1350: docs/DATA_GOVERNANCE.md "Subscriber emails" row)."""
     email = email.strip().lower()
     email_hash = _email_hash(email)
     now_iso = datetime.now(timezone.utc).isoformat()

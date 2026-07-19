@@ -1866,11 +1866,13 @@ def operational_delete_user_data() -> list[iam.PolicyStatement]:
     """Delete-user-data (P7.3): wipes a user's data from DDB + S3 + Secrets.
     Audit record written to DDB USER#admin#SOURCE#deletion_log.
     Refuses to operate on protected users (matthew/admin/system) — enforced in code.
+    GetItem added for #1350: the single-subscriber deletion path looks up ONE row
+    (USER#{owner}#SOURCE#subscribers / EMAIL#{hash}) before deleting it.
     """
     return [
         iam.PolicyStatement(
             sid="DynamoDB",
-            actions=["dynamodb:Scan", "dynamodb:BatchWriteItem", "dynamodb:DeleteItem", "dynamodb:PutItem"],
+            actions=["dynamodb:GetItem", "dynamodb:Scan", "dynamodb:BatchWriteItem", "dynamodb:DeleteItem", "dynamodb:PutItem"],
             resources=[TABLE_ARN],
         ),
         iam.PolicyStatement(
