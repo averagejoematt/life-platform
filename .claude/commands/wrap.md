@@ -128,6 +128,12 @@ an outcome.**
   ```
 - The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
   `**Docs:** <pages updated>` or `**Docs:** none needed — <one-clause reason>`.
+- **Decisions gate (#1343) — same silent-omission-is-not-an-outcome shape.** Ask: did this
+  session make a governance-consequential decision (an architecture/data/deploy-posture
+  choice, not just an implementation detail) that isn't already in `docs/DECISIONS.md`?
+  If yes, file the ADR in the same commit and run `scripts/generate_adr_index.py --apply`
+  (already required above). The handover carries one line either way:
+  `**Decisions:** ADR-NNN filed` or `**Decisions:** none needed — <one-clause reason>`.
 
 ### (e2) Green-main gate — a wrap gate, same shape as (d)/(e) (#1327)
 
@@ -172,3 +178,6 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 - **Docs or explicit skip, never silence (wiki contract).** Every wrap's handover carries
   a `**Docs:** <pages or "none needed — reason">` line; step (e) cannot be skipped
   implicitly, and the wiki checkers must be green at the wrap commit.
+- **Decisions or explicit skip, never silence (#1343).** Every wrap's handover carries a
+  `**Decisions:** <ADR-NNN filed or "none needed — reason">` line — a governance decision
+  must never land only in a workflow file or a commit message.
