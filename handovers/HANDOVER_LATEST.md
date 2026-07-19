@@ -1,143 +1,136 @@
-# HANDOVER — The all-nighter backlog drain: 44 issues closed (154→110), waves 1–4, Day-1 ops, the plan-gate discovery — 2026-07-19 (overnight)
+# HANDOVER — Day-1 Next-tier drain: #1527 perf saga, wave 1+2 all merged+deployed, first /design-sync, the CI-outage discovery — 2026-07-19 (day)
 
-> Instruction thread: "ultracode +4M — drive the OPEN ISSUE COUNT from ~154 toward zero,
-> quality AND efficiency; every close is SHIPPED / VERIFIED-ALREADY-DONE / DISPOSED,
-> never silent; triage table first; fan out disjoint smalls in verified waves; solo the
-> fable stories; decisions pre-made: #1319 restore-the-gate LAST, prereg publish OK,
-> SSM IAM grant + CDK parity, #1114 new portrait batch to a contact sheet, #1350/#1329
-> to one-command readiness. Matthew pre-authorized all merges and deploys; honest count
-> over theater." Full pre-session brief in the /clear message of session
-> `session_016Xq3vYgSCzyaQ5zMXChh4M`.
+> Instruction thread: "ultracode +2M — continue the backlog drain into the Next tier, same
+> three-kinds-of-close contract. FIRST PICK #1527 (board perf), then #1526/#1404/#1372/
+> #1373/#1378/rigor #1410–#1413/QA+design Next; first /design-sync; #1469 pilot prep;
+> Sunday standing ops folded in early; all merges+deploys pre-authorized; wrap per /wrap."
+> The five owner-decision slots (#1319, SNS, #1114, #1350, #1329) arrived as UNFILLED
+> template brackets — treated as pending, no action taken on any of them.
 
-## Outcome — 44 issues closed honestly (154 → 110 open), all live
+## Outcome — 10 stories closed honestly (all SHIPPED + live-verified), 2 incidents found+fixed, 1 new incident-class discovery filed
 
-**Triage first (the contract):** full-board table posted before building — 6 buckets;
-3 epic rollups closed on child evidence (#717, #1194, #1195); the dispose bucket proved
-honestly tiny (#1404 is NOT absorbed by #1403 — distinct passive-channel index; board
-was well-groomed).
+**#1527 (flagship, solo — a three-act saga):** parallel+projected PREDICTION# fetches
+(PR #1530) **regressed origin to 12–16s live** — boto3 Session-per-thread is GIL-bound
+pure-Python setup at 256MB (~1/6 vCPU); laptop timing masked it. Hotfix #1532 (ONE
+shared-table call shape; parity byte-identical) → ~2.4s; serve_stack 256→1024MB (#1534,
+CPU scales with memory, ~cost-neutral) → **p50 0.58/0.66s, 3/3 clean cold-cache gating
+samples** (each after a completed invalidation). Guard suite proven RED pre-fix; #726's
+one-store pin follows the indirection. INCIDENT_LOG row for the regression window (P4).
 
-**Day-1 standing ops:** cycle-8 prereg PUBLISHED + live-verified (chronicle row, both
-Prologue posts, manifest, invalidation — claims frozen). SSM cycle-param IAM grant
-applied (Matthew's CLI had a line-continuation break — corrected via policy file),
-then codified in CDK (`role_policies.site_api()` ExperimentCycleRead, PR #1485,
-deployed) and the manual inline policy deleted — parity clean;
-`/api/source_freshness` serves `experiment.cycle: 8` live. `restart_verify.py` 9/12
-(3 fails = pre-genesis-PT timing: day_n=0, no weigh-in yet, no post-genesis sheet —
-re-run Sunday, not-work — attended). Tonight's nudge fired with the full ritual
-section (intake tap in). Tomorrow's SUNDAY nudge carries the NEW felt-reality probe.
+**Wave 1 (worktree-implementers, every diff driver-verified, full suite no -x per merge):**
+- **#1526** (PR #1528): deterministic `wait invalidation-completed` in sync_site_to_s3
+  (creds-side) + bounded cache-aware smoke retries (`deploy/lib/cache_aware_fetch.sh`);
+  the workflow's blind `sleep 60` removed; IAM GetInvalidation verified live + codified.
+- **#1372** (PR #1529): the Evidence Bar — `stats_core.correlation_evidence` (sample/
+  CI-width/FDR composition), additive `evidence` on /api/correlations + /api/discoveries,
+  point-not-band at LOW; live (correlations honestly empty until the first weekly matrix).
+- **#1378** (PR #1531): prereg hash-freeze — cycle-8 stamped honestly (frozen 07-18T22:02,
+  stamped 07-19T06:56, both recorded), sha `4751…ed4f` **verified live via curl|shasum**;
+  seal on the Prologue page; predict-week rebuilt from frozen specs (W29 — re-run Monday
+  for W30, #1378 notes); the lock EMAIL is eve-only by design → first fires cycle 9.
+- **#1373** (PR #1533): progression receipts — capture at fire time, replay verdicts,
+  `SOURCE#character_receipt` (EXPERIMENT_SCOPED), /api/character_receipt live; **first
+  receipt written + self-verified** (digest 842ff146…, replay_verified=true, engine 1.7.0).
 
-**Solo (fable-class, each guard-red-proven, merged, deployed, live-verified):**
-- **#1426 QA tier manifest** (PR #1493): `tests/qa_manifest.py` — 80 pages registered,
-  archive entries GENERATED from `v4_build_evidence.REGISTRY`; all four hand lists
-  derive from it (visual_qa 36=36 set-verified; restart_verify_rendered 35→77 pages,
-  live 84/84 clean; smoke 22→80 pages; bindings 36=36); completeness gate proven red
-  on an unregistered page. The four-registry trap is dead.
-- **#1409 felt-reality calibration ledger** (PR #1499): weekly 3-item probe
-  (felt_vitality/rest/connection) rides the signed one-tap rail Sunday-only →
-  NEW `SOURCE#felt_probe` (raw_timeseries); `/api/character_calibration` — pearson r
-  vs 7-day mean pillar level_score + Fisher CI on n_eff, ADR-105 grammar (no r below
-  5 weeks, no band below 8), aggregates only; card + provenance line on
-  `/data/character/`; gates in `experiment_gates.py`. 14 guards, all red on pre-fix
-  origin/main. Live: honest `uncalibrated 0/5` on all three probed pillars.
-- **#1464 design brief** (PR #1501): `docs/design/DESIGN_PARTNER_BRIEF.md` — north-star
-  distillation, 10 hard constraints, **Slop Litmus v1** (10 points), proposals/<slug>
-  contract, ADR-106 posture. (Sync-to-project completes on first `/design-sync` run —
-  #1463's command shipped tonight too.)
+**Wave 2 (rigor batch — real cross-PR engine conflicts resolved file-by-file, regenerated
+generated pages via generators, never hand-merged):**
+- **#1413** (PR #1538): SCED randomized start — pre-declared window, uniform draw frozen
+  into prereg, Edgington permutation test on close, cards + method pages.
+- **#1411** (PR #1539): fitted-not-authored effects — effect_fitter (lagged r, block
+  bootstrap CI, BH-FDR, AR(1) n_eff), quarterly re-fit in hypothesis-engine,
+  `SOURCE#effect_fits` (CROSS_PHASE), badges + /api/wrong stream. **First fit ran: 1/6
+  fitted over 112d, 5 authored-prior — honest.**
+- **#1412** (PR #1541): character targets from personal variance (p75 bands, MIN_N=30,
+  fallbacks labeled "population prior"); engine v1.8.0 merge conflict resolved (kept
+  1.8.0 + #1412's no-bump note); /method/game/ regenerated (engine v1.8.0 · config
+  v1.6.0); config uploaded to S3; baselines snapshot seeded (n≈125 real bands).
 
-**Fan-out waves (every PR adversarially verified or driver-reviewed before merge; 5
-finding-verifier agents ran; ~50%-false-positive rule held — the verifiers caught real
-issues):** Wave 1: #1477 MCP domain-filter fix, #1480 notion journal dark-guard, #1432
-import()-graph gate, #1437 endpoint-count derivation (115), #1440 budget-pause
-visibility, #1444+#1445 urgent-SNS IaC + qa-smoke metrics, #1453+#1334 GitHub billing
-observability, #1228+#1257 drift-guard repo halves (AWS deletes verified live — closed
-with evidence). Wave 2: #1495 todoist write trio (a verifier DISCOVERY — never worked
-live), #1478 get_capture_queues, #1479 chat-mode library, #1462 design bundle builder,
-#1431 JS unit harness (53 tests), #1436 API schema snapshots (105), #1376
-career-vs-season, #1395 static core + OG (the crawler view lives). Wave 3: #1332+#1340+
-#1342 wrap gates + INCIDENT_LOG backfill (9 rows), #1339+#1341+#1343 ADR hygiene
-(+ADR-136 site auto-deploy governance), #1323 Makefile, #1325 main ruleset (LIVE:
-ruleset 19162901 blocks force-push/deletion), #1326 hooks+stash cleared, #1331 rollback
-keys on QA verdict, #1347 tombstone hardening, #1351 DATA_GOVERNANCE truth, #1329/#1350
-code halves (one-command readiness — owner acts remain). Wave 4: #1454 surface-drift
-gate, #1465 /design-implement, #1468 journeys + loop-forward CTAs (78 pages), #1427
-sweep extension (79/79 live), #1428 tiered AI vision, #1463 /design-sync, plus the
-schema recapture (#1525).
+**Solo interstitials:** **#1404** (PR #1537, fable): asymmetric-channel fulfillment index —
+passive baseline (connection tap 0.5 / interactions 0.2 / journal-presence 0.15 /
+values-Todoist 0.15, adoption-gated ADR-104: behavioral=0, pre-adoption=frozen), journal
+enrichment adds a resolution block that provably cannot touch the verdict; live at
+/api/fulfillment_index serving the honest Day-1 `insufficient_signal` (coverage 0.15 —
+evening_ritual wiped at reset; adoption restarts with tonight's first tap). Coaching Day-1
+static core (PR #1536 — #1528's live finding: /coaching/ had NO proof-static block; the
+board published its first cycle-8 read mid-session, so live now bakes the REAL Kai
+Nakamura read; the awaiting-block guards every future reset). Sunday-digest genesis-week
+crash (PR #1540 — present-None `.get(k, {})` trap; digest redeployed + re-sent 18:20,
+DLQ drained to 0). Nudge-test Sunday wall-clock repair (PR #1535 — main CI was RED on
+genesis Sunday; dates pinned + detail-copy fix). Schema recaptures #1542/#1545.
 
-**Incidents found + fixed same night (all in INCIDENT_LOG):**
-- **P3 genesis-eve 500**: `/api/fulfillment_ritual` 500'd ~4h — `_clamp_today` clamped
-  UTC while handlers use PT uppers; recurs every future reset. Fixed (PR #1507) +
-  regression tests + the pre-existing UTC-semantics tests realigned (PR #1521 after my
-  own miss briefly redded main — full-suite-before-merge reflex re-learned).
-- **Two site auto-rollbacks of healthy deploys**: (1) smoke asserted
-  `/api/character_calibration` while the IAM Plan gate (R8-ST6, by design) blocked the
-  fleet — pre-empted on the second pass by fast-path `deploy_site_api.sh`; (2) a
-  CloudFront cache-race: smoke read a cached pre-deploy `/coaching/` — healed via
-  manual `sync_site_to_s3.sh`, 121/121 smoke green after. (#1331's verdict-keying now
-  live narrows the class; the cache-race variant is #1526.)
-- **Driver error, owned**: a blind `git add -A` during queue reconciliation committed
-  conflict markers into main via #1518 — repaired keep-both (bd96a14e), both gates
-  (#1351 + #1347) preserved, full suite green.
+**Design lane:** first **/design-sync** ran — created "AverageJoeMatt Design System v5"
+(project bdbc3dc0-1a0c-41a2-9ab7-03b2de8ddf20), 78 files pushed + list_files-verified
+(June archive untouched); #1464 fully closed. **#1469 pilot proposals authored + pushed**
+(proposals/home-first-screen/, 19 files: 3 variants × preview/rationale/notes/screens) +
+screenshots sent to Matthew for the pick (A loop-diagrammatic / B ledger-evidential /
+C editorial; B flags a deliberate Litmus-5 trade).
 
-**THE #1319 DISCOVERY (decision-menu head-item):** the production approval gate wasn't
-deleted — it was silently DROPPED when the repo flipped PRIVATE (2026-07-13):
-required-reviewers environment protection needs GitHub Team/Enterprise; the restore
-call 422s on the current plan. #1319 + #1338 stay OPEN on Matthew's fork: (a) plan
-upgrade (~$4/mo) → restore is one command (`gh api .../environments/production -X PUT`
-with reviewer id 174924761, verified staged); (b) sign the gate-less posture into the
-ADR (draft covers both branches, scratchpad `adr-1338-draft.md` — re-draft from issue
-comments if lost).
+**THE CI-OUTAGE DISCOVERY (#1544):** push-event workflows on main STOPPED QUEUING at
+~18:17 UTC — six consecutive merges got zero CI/CD + zero Site-deploy runs while
+PR-branch workflows kept running. Leading hypothesis: Actions spending-limit/minutes
+exhaustion (private repo; the #1453 lane's exact fear). Billing API needs `gh auth
+refresh -s user` (owner). Session response: manual `deploy_fleet.sh` (95/95 green, MCP
+included) + `deploy_site_api.sh` + `sync_site_to_s3.sh` (its new #1526 invalidation-wait
+visibly working) — **site at cec2a3c4 == main, smoke 152/152, nothing waited on the dead
+pipeline.** Until resolved: every merge needs a manual deploy + a check that a run
+actually queued.
 
-**Verified at close:** fleet run 29675370138 — Plan GREEN (post-CDK-deploys), Deploy
-GREEN, post-deploy checks GREEN (visual QA still finishing at wrap). Site at HEAD,
-121/121 smoke, all five flagship live-verifies pass (honest calibration zero-states,
-fulfillment 200, static cores, loop-forward CTAs, career/season fields). MCP
-LastModified 05:56 UTC (68 tools). Full local suite 5757+ passed; only the documented
-live-AWS i16 Day-1 flake (CI-excluded).
+**Sunday standing ops:** restart_verify 9/12 → 10/12 (day_n=1 ✓); **Withings genesis
+weigh-in still missing** (partition empty cycle-to-date; ingestion invoked manually —
+`no_data` 6 days back: scale hasn't synced or weigh-in didn't happen on it — attended).
+Character sheet computed for 07-18 (pre-genesis honest Level-1). 17:00 brief SENT 17:07
+(honest Day-0 F grade). Felt-probe verify (SOURCE#felt_probe + calibration n=1) lands
+TONIGHT after Matthew's taps — next session or attended.
 
-## Gotchas hit (durable ones to memory)
-- gh pr merge shows a stale "has conflicts" hint right after a branch push — poll
-  `mergeStateStatus` until it leaves UNKNOWN/DIRTY, then merge.
-- NEVER `git add -A` mid-conflict — resolve file-by-file; parse-check before commit.
-- Site smoke can race CloudFront invalidation on freshly-asserted content (#1526).
-- The pre-commit hook auto-runs `sync_doc_metadata --apply` in worktrees — agents must
-  revert literal churn; the driver reconciles per merge (held all night, ~15 merges).
-- An agent's cwd dies when its worktree is auto-cleaned — `cd` absolute before git ops.
-- GitHub environment protection silently drops on visibility flip (the #1319 class) —
-  #1320's GitHub-leg asserts will catch the next one.
+## Gotchas hit (durable ones → memory)
+- Lambda CPU is memory-fractional: a perf change validated on laptop CPU can invert at
+  256MB; boto3 Session construction is GIL-serialized; resource-derived `meta.client`
+  auto-transforms values (typed AttributeValues mis-parse as Maps). Measure AT ORIGIN.
+- Push-event CI can die silently while PR-event CI stays green — verify a run QUEUED
+  after every merge (`gh run list --branch main`), not just that gates were green.
+- `d.get(k, {})` doesn't guard a present-None key — the genesis-week empty read is the
+  factory for present-Nones (digest crash class, recurs each reset).
+- v4_build_* regeneration silently drops the #1468 chrome — ALWAYS re-run
+  `v4_apply_chrome.py` after any page regeneration (test_site_chrome catches it).
+- Generated-page merge conflicts: resolve by REGENERATING via the generator on the
+  merged engine, never by hand-merging HTML.
+- `gh pr merge` can report CLEAN then fail on a literal race — re-merge main + re-derive
+  literals + push, don't fight the hint.
 
 ## Residual / next picks
-- **Decision menu (Matthew)** — see the session-close message: #1319 plan-vs-posture
-  (unblocks #1338), SNS confirm-click, #1114 portrait pick (PR #1512 contact sheet),
-  #1350 retention window sign+run, #1329 ai-keys rotate (one command), #1330/#1336/
-  #1345 owner acts, #741 publish, #1029 re-entry checklist (domain renews 2026-08-20),
-  #1187 music bed, prereg — DONE tonight (published).
-- Sunday attended (not-work — standing ops): `restart_verify.py` post-weigh-in; brief
-  writes 64/20/94 natively; first probe taps land in `SOURCE#felt_probe`; first
-  post-#1428 deploy shows "tier<=1: 6/36" AI-QA line.
-- Now-milestone remainder: #1469 (pilot — needs design-project round-trip + Matthew's
-  pick), epics #1425/#1460/#1461/#1476 close via children.
-- #1526 smoke-vs-invalidation race hardening (filed at wrap).
-- **#1527 FIRST PICK next session**: /api/predictions+calibration origin perf (~3.6s
-  after #1505) — clears the /method/board/ LCP budget red on the fleet run's visual-QA.
-- Standing alarms (#1329 checklist): ai-keys staleness still firing until Matthew
-  rotates (now routed to the curated email, one-command script ready); no other
-  unactioned staleness known at wrap.
+- **Decision menu (Matthew)** — see the session-close message: #1544 CI outage (billing
+  check needs owner auth), #1469 variant pick (screenshots sent), #1319 plan-vs-posture
+  (unblocks #1338), SNS confirm-click (not-work — owner click), #1114 portrait pick
+  (PR #1512), #1350 retention sign+run, #1329 ai-keys rotate, Withings weigh-in sync
+  (not-work — physical-device check).
+- Tonight attended (not-work — standing ops): first felt-probe taps → SOURCE#felt_probe
+  + /api/character_calibration n=1; first connection tap re-adopts the fulfillment-index
+  channel (coverage 0.15→0.65).
+- Monday: re-run `deploy/build_genesis_predict_week.py --apply` for W30 (#1378 note);
+  first Monday ops email carries the #1446 green report.
+- Next-tier remainder: #1410 (Ghost/BSTS — fable, big), #1406, QA Next under #1425,
+  design Next #1466/#1467/#1470–#1474, chat epic #1476 children (#1481–#1484), #1455.
+- #1543 does not exist — issue numbering gap is #1544's neighbor; no orphan.
+- Standing alarms (#1329 checklist): ai-keys staleness continues until Matthew rotates
+  (one-command script ready); no other unactioned staleness known at wrap.
 
-**Main:** green (b473d028 — latest completed ci-cd run succeeded, verified via
-check_main_green.py). Context: the earlier fleet run 29675370138 shows failure from its
-Visual-QA job alone (Deploy/tests/smoke all green, fleet live-verified) — one real perf
-budget breach, /method/board/ cold-cache LCP from #1505's ~3.6s origin endpoints, filed
-#1527 (Now, first pick).
-**Build beat:** `2026-07-19-backlog-drain-day1` (this session).
-**Docs:** SCHEMA (felt_probe partition), CONVENTIONS §4c/§8a, DATA_GOVERNANCE,
-INCIDENT_LOG (11 rows), DESIGN_PARTNER_BRIEF, JOURNEYS, CHAT_MODES, MANAGED_WHERE,
-QA exemption ledgers, ADR-136 + ADR index — all shipped inside the night's PRs;
-wrap adds SCHEMA felt_probe note verification + doc gates green.
-**Decisions:** ADR-136 filed (in #1516); the release-topology ADR (#1338) deliberately
-awaits the #1319 fork — not-work — owner decision pending.
-**Incidents:** 2 row(s) added this wrap (05:40 cache-race rollback; the 03:45 rollback
-+ genesis-eve 500 rows landed via #1514/#1507 earlier tonight).
-**Stash/hooks:** clean (stash emptied by #1326; hook freshly installed; one accidental
-autostash mid-session popped immediately).
+**Main:** green (5cacecba) — check_main_green exit 0; a push run DID queue for the final
+merge at 19:20 and succeeded (partial resumption — the five middle merges + sibling
+workflows still have zero runs, which points at a GH event-delivery incident over a hard
+billing stop; #1544 updated with the evidence). Local full suite on the final tree: 5909
+passed / 0 failed; fleet 95/95; smoke 152/152 at HEAD.
+**Build beat:** `2026-07-19-day1-next-tier-drain` (this session).
+**Docs:** SCHEMA (character_receipt, effect_fits partitions — in-PR), INCIDENT_LOG (+3
+rows), qa exemption ledgers (in-PR), DESIGN docs untouched (sync used them as-is);
+CLAUDE.md endpoint literal auto-bumped 116→118 by doc-sync.
+**Decisions:** none needed — all governance-consequential choices landed inside existing
+ADR frames (ADR-104/105 implementations; #1544's posture decision is Matthew's fork).
+**Incidents:** 3 row(s) added this session (the #1527 12–16s regression window; the
+Sunday wall-clock nudge main-CI red; the genesis-week digest DLQ crash) + #1544 filed
+for the CI outage (row to be added once root cause confirmed — owner leg pending).
+**Stash/hooks:** clean (one transient stash used+popped same-command during a
+pre-existing-lint check — stack empty at wrap; hook fresh). Postflight's one 🔴 is
+`email-subscriber: NOT DEPLOYED` — the #1350 owner-gated purge lambda awaiting
+Matthew's sign + cdk deploy (pre-existing, on the decision menu; not this session's).
 
-Prior session (same day): `HANDOVER_2026-07-18_BigArchPaydown.md`.
+Prior session (overnight, same day): `HANDOVER_2026-07-19_AllNighter-BacklogDrain.md`.

@@ -1318,6 +1318,45 @@
         }
       ],
       "why_it_mattered": "An experiment that restarts eight times lives or dies on how cheap and honest a restart is. Tonight the machine drained a quarter of its own backlog in one sitting while the instrument learned to grade itself against felt reality — and every close had to prove its guard failed before the fix existed. That discipline is the difference between a backlog that shrinks and a count that's theater."
+    },
+    {
+      "id": "2026-07-19-day1-next-tier-drain",
+      "date": "2026-07-19",
+      "title": "Day 1 proper: the rigor bar became running code — and a perf fix that made things worse first",
+      "shipped": "Cycle 8's first full day shipped ten stories, all live by evening. The statistics spine got real: every correlation claim now carries an Evidence Bar (sample depth, confidence-interval width, false-discovery status composed into one served score — never hand-graded); every XP and level change writes an audit receipt that replays itself through the live engine and reports drift; cross-pillar effects are now FITTED from the data instead of authored (first fit: 1 of 6 effects earned 'fitted' over 112 days — the other five honestly wear 'authored prior'); component targets derive from personal variance percentiles instead of round numbers; future experiments draw their start date at random from a pre-declared window and close with a permutation test; and the frozen pre-registration is now sealed with a public SHA-256 anyone can verify with one curl. A fulfillment index also went live on passive one-tap channels — built so a skipped-journal week degrades detail, never the verdict.",
+      "gotcha": "The performance fix for the coach board was the day's humility lesson: parallelizing eight database reads made the live endpoint FOUR TIMES SLOWER (12–16s) — building a fresh AWS session per thread is pure-Python setup the interpreter serializes, and at the function's tiny CPU slice that cost dwarfed the queries. The laptop benchmark had looked great. Fixed within minutes by sharing one connection across threads plus a memory bump: 3.6s → 0.6s. Performance claims are now proven at origin, after deploy, or not at all.",
+      "honest_miss": "Mid-afternoon, GitHub quietly stopped running the deploy pipeline for merges to main — six merges, zero runs, no red X, just absence (suspected spending-limit on the private repo). Everything shipped anyway via the manual deploy path with the same gates run by hand, but the outage was only noticed because a checklist asks 'did a run actually queue?'. Also: the Sunday digest crashed ten times on the first post-reset week's empty data before being caught, fixed, and re-sent the same morning.",
+      "prs": [
+        {
+          "label": "PR #1530",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1530"
+        },
+        {
+          "label": "PR #1529",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1529"
+        },
+        {
+          "label": "PR #1531",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1531"
+        },
+        {
+          "label": "PR #1533",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1533"
+        },
+        {
+          "label": "PR #1537",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1537"
+        },
+        {
+          "label": "PR #1539",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1539"
+        },
+        {
+          "label": "PR #1541",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1541"
+        }
+      ],
+      "why_it_mattered": "The thesis says the numbers must be trustworthy before they're interesting — today the rigor stopped being documentation and became running code that grades the platform's own claims, including the two that failed in public (the slower 'optimization' and the silently dead pipeline)."
     }
   ]
 }
