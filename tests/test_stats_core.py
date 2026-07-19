@@ -452,3 +452,82 @@ class TestDetectChangepoints:
         r1 = stats_core.detect_changepoints(s)
         r2 = stats_core.detect_changepoints(s)
         assert r1 == r2
+
+
+# ── correlation_evidence — the Evidence Bar's one deterministic source (#1372) ─
+class TestCorrelationEvidence:
+    def test_deterministic(self):
+        a = stats_core.correlation_evidence(0.5, 30, fdr_significant=True)
+        b = stats_core.correlation_evidence(0.5, 30, fdr_significant=True)
+        assert a == b
+
+    def test_score_bounded_and_shape(self):
+        ev = stats_core.correlation_evidence(0.5, 30, fdr_significant=True)
+        assert 0.0 <= ev["score"] <= 1.0
+        assert set(ev) == {"score", "level", "n", "n_eff", "ci95", "ci_width", "ci_excludes_zero", "fdr_significant"}
+        assert ev["n"] == 30
+        assert ev["ci95"] is not None and ev["ci95"][0] < 0.5 < ev["ci95"][1]
+
+    def test_monotone_in_n(self):
+        # More overlapping days = never-weaker evidence (and strictly stronger here:
+        # both the sample ramp and the Fisher CI width move with n).
+        scores = [stats_core.correlation_evidence(0.5, n, fdr_significant=True)["score"] for n in (5, 10, 21, 45, 90)]
+        assert scores == sorted(scores)
+        assert scores[0] < scores[-1]
+
+    def test_fdr_bump_is_exactly_the_component_weight(self):
+        with_fdr = stats_core.correlation_evidence(0.5, 30, fdr_significant=True)
+        without = stats_core.correlation_evidence(0.5, 30, fdr_significant=False)
+        assert abs((with_fdr["score"] - without["score"]) - 0.2) < 1e-9
+        assert with_fdr["fdr_significant"] is True
+        assert without["fdr_significant"] is False
+
+    def test_fdr_none_serves_none_never_false(self):
+        ev = stats_core.correlation_evidence(0.5, 30, fdr_significant=None)
+        assert ev["fdr_significant"] is None
+        # Un-checked contributes 0 — same score as an explicit False.
+        assert ev["score"] == stats_core.correlation_evidence(0.5, 30, fdr_significant=False)["score"]
+
+    def test_low_n_serves_no_ci_the_point_not_a_band(self):
+        # n <= 3: fisher_ci is undefined — the payload must say so (ci95 None) so the
+        # front-end draws a point, never a fabricated band (DESIGN_SYSTEM_V5 §7a).
+        ev = stats_core.correlation_evidence(0.9, 3, fdr_significant=True)
+        assert ev["ci95"] is None
+        assert ev["ci_width"] is None
+        assert ev["ci_excludes_zero"] is None
+        assert ev["level"] == "low"
+
+    def test_level_mirrors_confidence_grammar_thresholds(self):
+        assert stats_core.correlation_evidence(0.4, 7)["level"] == "low"
+        assert stats_core.correlation_evidence(0.4, 8)["level"] == "medium"
+        assert stats_core.correlation_evidence(0.4, 20)["level"] == "medium"
+        assert stats_core.correlation_evidence(0.4, 21)["level"] == "high"
+
+    def test_n_eff_shrinks_score_and_level(self):
+        raw = stats_core.correlation_evidence(0.5, 30)
+        shrunk = stats_core.correlation_evidence(0.5, 30, n_eff=7.5)
+        assert shrunk["score"] < raw["score"]
+        assert shrunk["level"] == "low" and raw["level"] == "high"
+        assert shrunk["n"] == 30 and shrunk["n_eff"] == 7.5
+
+    def test_n_eff_never_inflates_past_raw_n(self):
+        ev = stats_core.correlation_evidence(0.5, 10, n_eff=50)
+        assert ev["n_eff"] == 10.0
+
+    def test_ci_excludes_zero_sign_logic(self):
+        strong = stats_core.correlation_evidence(0.8, 60)
+        weak = stats_core.correlation_evidence(0.1, 10)
+        assert strong["ci_excludes_zero"] is True
+        assert weak["ci_excludes_zero"] is False
+
+    def test_garbage_inputs_never_raise(self):
+        for r, n in [(None, None), ("x", "y"), (float("nan"), 10), (1.0, 5), (0.5, -3), (0.5, 0)]:
+            ev = stats_core.correlation_evidence(r, n)
+            assert 0.0 <= ev["score"] <= 1.0
+            assert ev["level"] in ("low", "medium", "high")
+
+    def test_zero_n_is_the_honest_floor(self):
+        ev = stats_core.correlation_evidence(0.5, 0)
+        assert ev["score"] == 0.0
+        assert ev["n"] == 0 and ev["n_eff"] == 0.0
+        assert ev["ci95"] is None and ev["level"] == "low"

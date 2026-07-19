@@ -262,10 +262,32 @@ class TestCoachingReadBlock:
         assert "The week's call" not in html and "The one priority" not in html  # no priority block when text is absent
 
     def test_missing_data_omits_block_never_fabricates(self):
-        # ADR-104: no content -> no block; the JS view still renders.
+        # ADR-104: no payload at all -> no block; the JS view still renders.
         assert v4_proof.coaching_read_block_html({}) == ""
         assert v4_proof.coaching_read_block_html(None) == ""
-        assert v4_proof.coaching_read_block_html({"weekly_priority": {}, "coaches": []}) == ""
+
+    def test_day1_empty_read_ships_honest_awaiting_block(self):
+        # The Day-1 window (#1528's live finding): a real payload with no coach
+        # content must ship a dated "awaiting the first read" static core — honest
+        # absence stated, never a fabricated read and never "" (a blank crawler
+        # view reds the static-core smoke guard and auto-rolls-back the deploy).
+        html = v4_proof.coaching_read_block_html({"weekly_priority": {}, "coaches": [], "as_of": "2026-07-19", "source": "live-empty"})
+        assert 'class="proof-static' in html
+        assert "as of 2026-07-19" in html
+        assert "hasn't published its first read" in html
+        # no fabricated voices, no roster markup
+        assert "Each coach" not in html and "blockquote" not in html
+        assert html.startswith("<noscript>") and html.endswith("</noscript>")
+
+    def test_day1_loader_returns_awaiting_marker_when_dashboard_and_snapshot_empty(self, monkeypatch):
+        monkeypatch.setattr(v4_proof, "pre_start_date", lambda: "")
+        monkeypatch.setattr(v4_proof, "_fetch_json", lambda path, timeout=8: {"weekly_priority": {}, "coaches": [{"position_summary": ""}]})
+        monkeypatch.setattr(v4_proof, "_snapshot", lambda: {})
+        out = v4_proof.load_coaching_read()
+        assert out["source"] == "live-empty"
+        assert out["as_of"]  # dated — the honest stamp the static core renders
+        # and the block builder turns exactly this marker into the awaiting core
+        assert "hasn't published its first read" in v4_proof.coaching_read_block_html(out)
 
     def test_escapes_html_in_coach_content(self):
         html = v4_proof.coaching_read_block_html(

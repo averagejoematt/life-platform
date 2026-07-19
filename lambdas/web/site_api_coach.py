@@ -21,6 +21,7 @@ Endpoints:
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from decimal import Decimal  # noqa: F401
 
@@ -711,6 +712,15 @@ def handle_coach_team(event):
         ops = {k: v for k, v in _registry().get("personas", {}).items() if v.get("operational")}
         weight = _latest_weight_lbs() or EXPERIMENT_BASELINE_WEIGHT_LBS
         huddle, focus, stages = [], [], {}
+        # #1527: the per-coach calibration reads below each walked a full
+        # PREDICTION# partition sequentially — prefetch them concurrently.
+        _cal_records = _prefetch_calibration_partitions(
+            [
+                pid.removesuffix("_coach")
+                for pid in persona_registry.OPERATIONAL_COACH_IDS
+                if pid.removesuffix("_coach") in _CALIB_COACH_NAMES
+            ]
+        )
         for pid in persona_registry.OPERATIONAL_COACH_IDS:
             p = ops.get(pid)
             if not p:
@@ -730,7 +740,7 @@ def handle_coach_team(event):
             _bare = pid.removesuffix("_coach")
             _cal = {}
             if _bare in _CALIB_COACH_NAMES:
-                _summ, _, _lifetime_summ, _ = _score_coach_calibration(_bare)
+                _summ, _, _lifetime_summ, _ = _score_coach_calibration(_bare, records=_cal_records.get(_bare, []))
                 _cal = {
                     "brier": _summ["brier"],
                     "calibration": _summ["calibration"],
@@ -1272,8 +1282,87 @@ _CALIB_COACH_NAMES = {
 }
 _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
 
+# ── #1527: parallel, projected PREDICTION#-partition fetch ────────────────────
+# /api/predictions and /api/calibration each walked all 8 coaches' full
+# PREDICTION# partitions SEQUENTIALLY once #1376 made both surfaces
+# career-backed (~3.6s at origin — /method/board/'s cold-cache LCP blew the
+# 2500ms QA budget). The fetch itself is unchanged — still ONE unfiltered query
+# per coach, so season stays a derived subset of career (the #1376
+# no-double-counting invariant) — the per-coach queries just run concurrently,
+# projected down to the fields either surface actually reads.
 
-def _score_coach_calibration(cid):
+# Every top-level attribute the predictions/calibration/team surfaces consume;
+# aliased wholesale because some (status) are DynamoDB reserved words.
+_PREDICTION_PROJECTION_FIELDS = (
+    "status",
+    "outcome",
+    "confidence",
+    "tombstone",
+    "phase",
+    "claim_natural",
+    "created_date",
+    "evaluation",
+    "outcome_notes",
+    "subdomain",
+)
+
+
+def _query_partition(pk, sk_prefix, projection_fields=None):
+    """ONE unfiltered, newest-first, Limit-1500 fetch of pk/sk_prefix — the ONE
+    call shape both the real path and the test fakes' query hooks parse.
+
+    Called from worker threads against the SHARED module-global table handle,
+    deliberately: the underlying botocore client is thread-safe, and Table.query
+    is a stateless per-call request transform on top of it (no lazy attribute
+    loads on this path — `.name` resolves at construction). The two tempting
+    alternatives both failed live at this function's 256MB (~1/6 vCPU):
+    per-thread boto3 Sessions are GIL-serialized pure-Python setup (12–16s at
+    origin), and the resource-derived `meta.client` auto-transforms values, so
+    hand-built typed AttributeValues mis-parse as Maps (ValidationException).
+    """
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+        "ScanIndexForward": False,  # sk is date-prefixed → newest first
+        "Limit": 1500,
+    }
+    if projection_fields:
+        names = {f"#f{i}": f for i, f in enumerate(projection_fields)}
+        kwargs["ProjectionExpression"] = ", ".join(names)
+        kwargs["ExpressionAttributeNames"] = names
+    resp = table.query(**kwargs)
+    return [_decimal_to_float(r) for r in resp.get("Items", [])]
+
+
+def _fetch_prediction_partition(coach_pk):
+    """ONE unfiltered fetch of a coach's whole PREDICTION# partition (career),
+    projected to the consumed fields. Raises on query failure — callers map
+    that to [] so a single bad partition degrades exactly as it did before."""
+    return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
+
+
+def _parallel_fetch(jobs):
+    """Run {key: thunk} concurrently; a failed job logs and yields [] (the same
+    shaped-empty degradation the old sequential per-coach try/except gave)."""
+    out = {}
+    if not jobs:
+        return out
+    with ThreadPoolExecutor(max_workers=min(9, len(jobs))) as ex:
+        futures = {key: ex.submit(fn) for key, fn in jobs.items()}
+        for key, fut in futures.items():
+            try:
+                out[key] = fut.result()
+            except Exception as _e:
+                logger.warning(f"[coach-partition-fetch] {key}: {_e}")
+                out[key] = []
+    return out
+
+
+def _prefetch_calibration_partitions(cids):
+    """All requested coaches' PREDICTION# partitions, concurrently → {cid: records}."""
+    return _parallel_fetch({cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in cids})
+
+
+def _score_coach_calibration(cid, records=None):
     """Fetch a coach's resolved PREDICTION# records and score them (#538), split
     into THIS SEASON (current cycle, phase-visible) and CAREER — every cycle
     ever, tombstoned archives included (#1376: career vs season, sports-card
@@ -1289,18 +1378,16 @@ def _score_coach_calibration(cid):
     Returns (season_summary, season_pairs, career_summary, career_pairs) — the
     pairs are folded into the platform-wide aggregates so per-coach and
     platform numbers (both season and career) always come from the same place.
+
+    `records` is the coach's already-fetched partition when the caller batched
+    the fetches concurrently (#1527); left None, this fetches it itself.
     """
-    coach_pk = f"COACH#{_CALIB_COACH_ID_MAP[cid]}"
-    records = []
-    try:
-        resp = table.query(
-            KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
-            ScanIndexForward=False,
-            Limit=1500,  # career query: every cycle this coach has ever predicted in
-        )
-        records = [_decimal_to_float(r) for r in resp.get("Items", [])]
-    except Exception as _e:
-        logger.warning(f"[calibration] {cid}: {_e}")
+    if records is None:
+        records = []
+        try:
+            records = _fetch_prediction_partition(f"COACH#{_CALIB_COACH_ID_MAP[cid]}")
+        except Exception as _e:
+            logger.warning(f"[calibration] {cid}: {_e}")
     career_pairs = calibration_core.pairs_from_prediction_records(records)
     career_summary = calibration_core.score_pairs(career_pairs)
 
@@ -1330,29 +1417,30 @@ def handle_calibration(event):
     shape for the career, all-cycles view — sports solved this decades ago.
     """
     try:
+        # #1527: all 8 coach partitions + the hypothesis ledger fetched
+        # concurrently — total fetch latency is max(single query), not the sum.
+        def _fetch_hyp_ledger():
+            # Hypothesis-engine calibration ledger (word confidences → same [0,1]
+            # axis). CROSS_PHASE (phase_taxonomy.py) — never wiped, so ONE fetch
+            # already holds every cycle; season is the current-cycle slice by
+            # resolution date, the same "genesis anchors the current run"
+            # convention RAW_TIMESERIES reads use. Unprojected: CALIB# rows are
+            # small and their consumed fields vary by record_type.
+            return _query_partition(USER_PREFIX + "calibration", "CALIB#")
+
+        jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
+        jobs["hypothesis-ledger"] = _fetch_hyp_ledger
+        fetched = _parallel_fetch(jobs)
+        hyp_rows = fetched.pop("hypothesis-ledger")
+
         per_coach = []
         platform_pairs = []  # season
         platform_career_pairs = []  # career (all cycles, #1376)
         for cid, name in _CALIB_COACH_NAMES.items():
-            summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid)
+            summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid, records=fetched[cid])
             platform_pairs.extend(pairs)
             platform_career_pairs.extend(career_pairs)
             per_coach.append({"coach_id": cid, "coach_name": name, **summary, "lifetime": career_summary})
-
-        # Hypothesis-engine calibration ledger (word confidences → same [0,1] axis).
-        # CROSS_PHASE (phase_taxonomy.py) — never wiped, so ONE fetch already holds
-        # every cycle; season is the current-cycle slice by resolution date, the
-        # same "genesis anchors the current run" convention RAW_TIMESERIES reads use.
-        hyp_rows = []
-        try:
-            hresp = table.query(
-                KeyConditionExpression=Key("pk").eq(USER_PREFIX + "calibration") & Key("sk").begins_with("CALIB#"),
-                ScanIndexForward=False,
-                Limit=1500,
-            )
-            hyp_rows = [_decimal_to_float(r) for r in hresp.get("Items", [])]
-        except Exception as _e:
-            logger.warning(f"[calibration] hypothesis ledger: {_e}")
         hyp_rows_season = [r for r in hyp_rows if str(r.get("resolved_at") or "")[:10] >= EXPERIMENT_START]
 
         hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows_season)
@@ -1477,6 +1565,11 @@ def handle_predictions(event):
             return _error(400, "Invalid coach_id")
 
         scan_coaches = [coach_filter] if coach_filter else _pred_coach_ids
+        # #1527: fetch every scanned coach's partition concurrently up front —
+        # the loop below stays purely computational.
+        fetched = _parallel_fetch(
+            {cid: (lambda pk=f"COACH#{_pred_coach_id_map[cid]}": _fetch_prediction_partition(pk)) for cid in scan_coaches}
+        )
         all_predictions = []
         by_coach = {}
         # The real graded calls live in PREDICTION# records (status set by the daily
@@ -1487,24 +1580,18 @@ def handle_predictions(event):
         _LIFETIME_ZERO = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
 
         for cid in scan_coaches:
-            coach_pk = f"COACH#{_pred_coach_id_map[cid]}"
             by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
             # #1376: career (all cycles, tombstoned archives included) beside this
             # season — same sports-card pattern as /api/calibration.
             by_coach[cid]["lifetime"] = dict(_LIFETIME_ZERO)
 
             try:
-                # ONE unfiltered fetch of the whole PREDICTION# partition (career);
-                # season is derived from it below via singleton_visible, the same
-                # predicate with_phase_filter applies server-side (ADR-058/#946) —
-                # so season can never diverge from or double-count against career.
-                resp = table.query(
-                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
-                    ScanIndexForward=False,  # pred_id is date-prefixed → newest first
-                    Limit=1500,
-                )
-                for rec in resp.get("Items", []):
-                    rec = _decimal_to_float(rec)
+                # ONE unfiltered fetch of the whole PREDICTION# partition (career,
+                # prefetched concurrently above — #1527); season is derived from it
+                # below via singleton_visible, the same predicate with_phase_filter
+                # applies server-side (ADR-058/#946) — so season can never diverge
+                # from or double-count against career.
+                for rec in fetched.get(cid, []):
                     p_status = rec.get("status", "pending")
                     if p_status not in _BUCKETS:
                         p_status = "pending"

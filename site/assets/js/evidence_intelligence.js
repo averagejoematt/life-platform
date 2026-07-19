@@ -5,6 +5,7 @@
   change.
 */
 import { lineChart, dualWeight, nDots } from "/assets/js/charts.js";
+import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { esc, tryJSON, has, fmt, ttl, fmtShort, todayPT, fig, figs, sec, empty, note, warmup } from "/assets/js/evidence_shared.js";
 import { dataFigure } from "/assets/js/evidence_datafigure.js";
 
@@ -234,11 +235,16 @@ export async function renderCorrelations(d) {
   const belowFloor = pairs.length - tabled.length;
   const head = figs([fig(obj.count ?? pairs.length, "pairs", null, "pearson_r"), sig ? fig(sig, "FDR-significant", null, "bh_fdr") : "", hypCount ? fig(hypCount, "open bets") : "", obj.week && fig(obj.week, "week")]);
   const pTxt = (p) => (p.p === 0 ? "&lt;0.001" : p.p == null ? "—" : fmt(p.p, 3));
+  // #1372 — the Evidence Bar column: the served per-claim rigor score (n / CI width /
+  // FDR, composed by stats_core.correlation_evidence). The column only exists when the
+  // payload carries evidence objects — an older cached payload renders the old table,
+  // never a column of dashes.
+  const hasEv = tabled.some((p) => p && p.evidence);
   // #551 — the n column reads as sample-size DOTS (the confidence grammar): a reader SEES
   // the evidence weight, not just a number. Real overlapping-day n only, never padded.
-  const rows = tabled.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${pTxt(p)}</td><td class="corr-n">${nDots(p.n, { unit: "overlapping days" })}</td><td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
+  const rows = tabled.slice(0, 30).map((p) => `<tr class="${p.fdr_significant ? "rd-flag" : ""}"><td class="rd-name">${esc(p.label_a || p.metric_a)} <span class="rd-unit">↔</span> ${esc(p.label_b || p.metric_b)}</td><td class="num">${fmt(p.r, 2)}</td><td class="num rd-range">${pTxt(p)}</td><td class="corr-n">${nDots(p.n, { unit: "overlapping days" })}</td>${hasEv ? `<td class="corr-evb">${p.evidence ? evidenceBar(p.evidence) : "—"}</td>` : ""}<td>${p.fdr_significant ? `<span class="rd-flagmark">FDR ✓</span>` : esc(p.strength || "")}</td></tr>`).join("");
   const floorNote = belowFloor ? `<p class="rd-desc">${belowFloor} more pair${belowFloor === 1 ? "" : "s"} had fewer than 5 overlapping days this week — below the floor for claiming a pattern, so they aren't tabled.</p>` : "";
-  const tbl = sec("Correlation matrix — strongest first", `<table class="rd-tbl"><thead><tr><th>pair</th><th>r</th><th>p</th><th>n</th><th>significance</th></tr></thead><tbody>${rows}</tbody></table>${floorNote}`);
+  const tbl = sec("Correlation matrix — strongest first", `<table class="rd-tbl"><thead><tr><th>pair</th><th>r</th><th>p</th><th>n</th>${hasEv ? "<th>evidence</th>" : ""}<th>significance</th></tr></thead><tbody>${rows}</tbody></table>${floorNote}`);
   return head + betsLine + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
 }
 

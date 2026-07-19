@@ -92,7 +92,13 @@ class ServeStack(Stack):
             alerts_topic=None,
             custom_policies=rp.site_api(),
             timeout_seconds=30,  # Phase 1.6 (2026-05-16): 15s→30s. Matches CloudFront default; complex /api/changes-since queries hit 15s ceiling.
-            memory_mb=256,
+            # #1527 (2026-07-19): 256→1024. Lambda CPU scales with memory; at 256MB
+            # (~1/6 vCPU) the career-backed predictions/calibration endpoints were
+            # GIL-bound deserializing 8 coaches' PREDICTION# partitions (~2.2s at
+            # origin even after the fetches went concurrent+projected) vs the
+            # /method/board/ 2500ms LCP budget. ~4× CPU ≈ same per-request cost
+            # (4× the GB-s rate for ~1/4 the ms) at this traffic.
+            memory_mb=1024,
             environment={
                 "USER_ID": "matthew",
                 "TABLE_NAME": TABLE_NAME,
