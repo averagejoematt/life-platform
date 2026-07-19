@@ -1,0 +1,10 @@
+{
+  "name": "life-platform-site-js-tests",
+  "private": true,
+  "description": "Dev-only unit-test harness for site/assets/js/ pure functions (#1431). Node's built-in node:test runner — zero production dependency, the site itself stays framework-free (CLAUDE.md 'No framework/deps'). See docs/CONVENTIONS.md for the JS quality-gate inventory.",
+  "type": "module",
+  "scripts": {
+    "test:js": "node --test"
+  },
+  "devDependencies": {}
+}
