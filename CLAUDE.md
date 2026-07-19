@@ -152,7 +152,7 @@ python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --override-weight-lbs <w
 python3 deploy/restart_pipeline.py --genesis YYYY-MM-DD --keep-chronicle DATE#... --apply
 ```
 
-Regenerates constants, deploys Core/Compute/Email (constants ship in every bundle — #781), phase-tags DDB, wipes intelligence, rolls the accountability ledger into a durable `LIFETIME#` aggregate + zeroes `TOTALS#current` (`deploy/restart_ledger_reset.py` — ADR-072/077), rebuilds character, curates the chronicle, syncs site + docs, verifies the 41-URL v4 surface (34 pages + 7 JSON endpoints, #918). Rollback: `deploy/restart_rollback.py`.
+Regenerates constants, deploys Core/Compute/Email (constants ship in every bundle — #781), phase-tags DDB, wipes intelligence, rolls the accountability ledger into a durable `LIFETIME#` aggregate + zeroes `TOTALS#current` (`deploy/restart_ledger_reset.py` — ADR-072/077), rebuilds character, curates the chronicle, syncs site + docs, verifies the 84-URL v4 surface (77 pages + 7 JSON endpoints, #918). Rollback: `deploy/restart_rollback.py`.
 
 **Phase taxonomy (ADR-077):** what resets vs. what's kept is decided by `lambdas/phase_taxonomy.py` — the single registry (`cross_phase` / `raw_timeseries` / `experiment_scoped` / `system_state`) that both the tagger and wipe derive from, with a coverage assertion so no scoped partition can silently survive a reset. Archived records are stamped `cycle=N` (SSM `/life-platform/experiment-cycle`) so the archive is navigable by reset generation. See `docs/PHASE_TAXONOMY.md`. Run the tagger/wipe in dry-run (no `--apply`) to preview the surface.
 

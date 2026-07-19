@@ -45,15 +45,14 @@ For each, verify the response has data and dates are within the experiment windo
    - Content sections are present (not empty divs)
 2. Identify the relevant API endpoint(s) for that page and WebFetch them to check data freshness.
 
-Page-to-API mapping:
-- /glucose/ → /api/glucose_overview, /api/glucose_trend, /api/meal_glucose
-- /sleep/ → /api/sleep_detail
-- /training/ → /api/training_overview
-- /nutrition/ → /api/nutrition_overview
-- /mind/ → /api/mind_overview
-- /physical/ → /api/vitals
-- /story/ → /api/journey
-- /pulse/ → /api/pulse
+Page-to-API mapping: **derive it from THE page registry** — `tests/qa_manifest.py`
+(#1426; the `api_deps` facet per page, plus `tests/site_review_bindings.py` for
+secondary endpoints). Do not maintain a mapping here. Quick lookups:
+```bash
+python3 tests/qa_manifest.py --emit paths          # every live page
+python3 -c "import sys; sys.path.insert(0,'tests'); from qa_manifest import PAGES_BY_PATH; print(PAGES_BY_PATH['/data/glucose/']['api_deps'])"
+```
+(The pre-#1426 hand mapping here listed pre-v4 slugs like /glucose/ — 301s now.)
 
 ### Output format
 Summarize results as a checklist:

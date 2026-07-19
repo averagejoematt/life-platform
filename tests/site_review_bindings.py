@@ -280,21 +280,34 @@ PAGE_BINDINGS = [
 
 
 def _build_evidence_bindings():
-    """Append a binding for each evidence topic the visual_qa sweep covers.
+    """Append a binding for each evidence topic the visual sweep covers.
 
-    Kept in lockstep with visual_qa.EVIDENCE_TOPICS so coverage matches the
-    screenshots; primary endpoint comes from REGISTRY, secondary from the
+    Derived from THE page registry (tests/qa_manifest.py, #1426) — the archive
+    pages carrying a visual def — so coverage matches the screenshots by
+    construction; primary endpoint comes from REGISTRY, secondary from the
     hand-curated map above.
     """
     here = os.path.dirname(os.path.abspath(__file__))
     if here not in sys.path:
         sys.path.insert(0, here)
-    import visual_qa  # noqa: E402
+    # #1426: topic coverage now derives from THE page registry — the archive
+    # pages in the visual sweep (qa_manifest entries with a visual def), same
+    # lockstep as before but with the manifest as the one source.
+    import qa_manifest  # noqa: E402
+
+    swept = {
+        p["path"]
+        for p in qa_manifest.MANIFEST
+        # topic pages only — the bare /data/ + /method/ hubs bind separately below
+        if p.get("visual") and len(p["path"].strip("/").split("/")) == 2 and p["path"].split("/")[1] in ("data", "method")
+    }
+    evidence_topics = [p.strip("/").split("/")[1] for p in sorted(swept) if p.startswith("/data/")]
+    method_topics = [p.strip("/").split("/")[1] for p in sorted(swept) if p.startswith("/method/") and p != "/method/character/"]
 
     order = 10
     for base, door, topics in (
-        ("/data", "evidence", visual_qa.EVIDENCE_TOPICS),
-        ("/method", "method", visual_qa.METHOD_TOPICS),
+        ("/data", "evidence", evidence_topics),
+        ("/method", "method", method_topics),
     ):
         for slug in topics:
             endpoints = []

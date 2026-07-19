@@ -29,50 +29,15 @@ from lambdas.constants import EXPERIMENT_START_DATE
 
 BASE = "https://averagejoematt.com"
 
-# Pages to fetch and inspect — the v4 "Measured Life" surface (ADR-071), aligned
-# with tests/visual_qa.py PAGES + scripts/v4_build_sitemap.py. The previous list
-# here was the PRE-v4 page map (all of it 301s now), so the token grep ran
-# against redirect targets it didn't intend (2026-07-10 clean-sweep audit).
-PAGES = [
-    "/",
-    "/cockpit/",
-    "/story/",
-    "/story/chronicle/",
-    "/story/journal/",
-    "/story/about/",
-    "/story/attempts/",
-    "/story/agents/",
-    "/data/",
-    # /data/ Evidence topics (tests/visual_qa.py EVIDENCE_TOPICS)
-    "/data/vitals/",
-    "/data/physical/",
-    "/data/labs/",
-    "/data/glucose/",
-    "/data/sleep/",
-    "/data/training/",
-    "/data/nutrition/",
-    "/data/habits/",
-    "/data/character/",
-    # /method/ door (visual_qa METHOD_TOPICS + the character explainer)
-    "/method/character/",
-    "/method/board/",
-    "/method/pipeline/",
-    "/method/intelligence/",
-    "/method/predictions/",
-    "/method/scenarios/",
-    "/method/benchmarks/",
-    # /protocols/ door
-    "/protocols/",
-    "/protocols/experiments/",
-    "/protocols/challenges/",
-    "/protocols/supplements/",
-    # /coaching/ door
-    "/coaching/",
-    "/coaching/by-coach/",
-    "/coaching/scorecard/",
-    "/coaching/team/",
-    "/coaching/lab-notes/",
-]
+# Pages to fetch and inspect — derived from THE page registry
+# (tests/qa_manifest.py, #1426): every real HTML page whose manifest entry has
+# leak_scan=True (pure redirect stubs excluded). The pre-#1426 hand list here
+# covered 35 pages; the manifest facet covers the full live surface, so the
+# token grep now sweeps every page the public can reach.
+sys.path.insert(0, str(REPO_ROOT / "tests"))
+from qa_manifest import leak_scan_paths  # noqa: E402
+
+PAGES = leak_scan_paths()
 
 # JSON endpoints to fetch and inspect for stale fields. cycle_compare must show
 # the NEW cycle; the two feed indexes must not carry prior-cycle entries.
