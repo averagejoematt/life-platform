@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-07-19 (v8.6.0 — 94 Lambdas, 21 active secrets, 67 MCP tools, ~71 alarms)
+> Last updated: 2026-07-19 (v8.6.0 — 94 Lambdas, 21 active secrets, 67 MCP tools, ~72 alarms)
 
 ---
 
@@ -113,7 +113,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Field | Value |
 |-------|-------|
 | Alert topic | `life-platform-alerts` → email to `awsdev@mattsusername.com` |
-| CloudWatch alarms | **~71 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
+| CloudWatch alarms | **~72 metric alarms** (base + invocation-count + DDB item size + canary + duration + freshness + pipeline health) |
 
 ---
 
