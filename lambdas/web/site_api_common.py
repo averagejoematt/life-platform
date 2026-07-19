@@ -152,8 +152,8 @@ def _decimal_to_float(obj):
     return obj
 
 
-def _clamp_today(date_str: str) -> str:
-    """Clamp a date (YYYY-MM-DD) to today as an UPPER bound.
+def _clamp_today(date_str: str, _now_date: str | None = None) -> str:
+    """Clamp a date (YYYY-MM-DD) to today as an UPPER bound — today in PACIFIC.
 
     Guards the future-genesis 500: a reset stages EXPERIMENT_START in the FUTURE
     (genesis = tomorrow), and any handler that uses it as a DynamoDB query lower
@@ -161,8 +161,16 @@ def _clamp_today(date_str: str) -> str:
     lower > upper (DynamoDB requires upper >= lower), 500'ing the endpoint.
     Clamping to today yields the empty [today, today] range ('no data yet').
     No-op once genesis <= today. Use this for ANY genesis-derived query lower
-    bound that bypasses _query_source (which has its own start>end guard)."""
-    return min(date_str, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    bound that bypasses _query_source (which has its own start>end guard).
+
+    PACIFIC, not UTC (genesis-eve incident, 2026-07-19 00:00-07:00 UTC): handlers
+    build their UPPER bound from `datetime.now(PT)`, so a UTC clamp here left a
+    ~7-hour window each genesis eve where lower(UTC today = genesis) > upper(PT
+    today = genesis-1) — /api/fulfillment_ritual 500'd through it live. PT date
+    is <= UTC date at every moment, so the PT clamp is safe for BOTH kinds of
+    upper bound. `_now_date` is a test seam only."""
+    today = _now_date or datetime.now(PT).strftime("%Y-%m-%d")
+    return min(date_str, today)
 
 
 def pre_start_meta() -> dict | None:
