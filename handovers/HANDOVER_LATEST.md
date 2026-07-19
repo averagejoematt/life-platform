@@ -1,123 +1,143 @@
-# HANDOVER — Big-architecture paydown: cold-start armed (#1371), private intake ledger (#1405), flourishing daylighted (#1403), deploy README (#1322) — 2026-07-18 (evening)
+# HANDOVER — The all-nighter backlog drain: 44 issues closed (154→110), waves 1–4, Day-1 ops, the plan-gate discovery — 2026-07-19 (overnight)
 
-> Instruction thread: continue the HIGH-VALUE backlog paydown, BIAS TOWARD THE BIG
-> fable/opus architectural stories a fan-out can't half-do; fan out disjoint smalls;
-> exclude gate:owner into ONE end-of-session decision menu. "Properly" = real fix +
-> non-vacuous guard proven RED pre-fix, merged AND deployed + verified live. Matthew
-> pre-authorized all merges and deploys ("i approve all merges and deploys etc. this
-> session"). NOTE: a PARALLEL plan-only session (design partner pipeline,
-> `HANDOVER_2026-07-18_DesignPartnerPlan.md`) ran tonight — no tree conflicts; its
-> handover archived here, its backlog is #1460–#1475.
+> Instruction thread: "ultracode +4M — drive the OPEN ISSUE COUNT from ~154 toward zero,
+> quality AND efficiency; every close is SHIPPED / VERIFIED-ALREADY-DONE / DISPOSED,
+> never silent; triage table first; fan out disjoint smalls in verified waves; solo the
+> fable stories; decisions pre-made: #1319 restore-the-gate LAST, prereg publish OK,
+> SSM IAM grant + CDK parity, #1114 new portrait batch to a contact sheet, #1350/#1329
+> to one-command readiness. Matthew pre-authorized all merges and deploys; honest count
+> over theater." Full pre-session brief in the /clear message of session
+> `session_016Xq3vYgSCzyaQ5zMXChh4M`.
 
-## Outcome — 4 issues closed properly (3 big solo + 1 fan-out), all live
+## Outcome — 44 issues closed honestly (154 → 110 open), all live
 
-**Standing ops first:** public_stats platform counts had NOT self-healed (still
-121/26/62 at 15:52 PT — root cause: today's 17:06 UTC brief ran BEFORE the 21:50 UTC
-deploy carried the #1369 writer). Healed the S3 block directly from PLATFORM_STATS
-(64/20/94), invalidated `/public_stats.json`, verified live; tomorrow's brief writes
-truth natively. `restart_verify.py` NOT run — still pre-genesis PT (Sunday+ item).
+**Triage first (the contract):** full-board table posted before building — 6 buckets;
+3 epic rollups closed on child evidence (#717, #1194, #1195); the dispose bucket proved
+honestly tiny (#1404 is NOT absorbed by #1403 — distinct passive-channel index; board
+was well-groomed).
 
-**Solo (each: guard red pre-fix in a pristine origin/main worktree, render/live verified):**
-- **#1371 cold start as an armed instrument** (PR #1457): NEW `lambdas/experiment_gates.py`
-  — the ONE registry of arming thresholds; correlation engine (`_INTERP_N_REQUIRED`,
-  min-n), hypothesis engine (MIN_* family) and coupling floor import from it
-  (identity-assert guard). `/api/correlations`+`/api/hypotheses` shaped-empty payloads
-  carry gates + measured current_n (null when unmeasurable, never 0);
-  `/api/source_freshness` stamps `carried`/`carried_from_cycle` + the experiment anchor;
-  ai_context early-phase block gains the RESET-MANUFACTURED-GAPS no-scold clause (reaches
-  every narrative surface via the one formatter); "warming up" hollow-mark grammar
-  (`.warmup` tokens.css + `warmup()` evidence_shared.js) on correlations + discoveries
-  zero-states; scorecard never promises a past date. 12 guards (7 red pre-fix);
-  render-qa 4/4 surfaces at 1280+390 (its one finding — dashed border losing the
-  cascade — fixed via `.rd-badge.wu-carried` compound selector). **Live-verified**:
-  gates serve `0/10` (honest pre-genesis), carried chips + anchor live.
-- **#1405 private intake ledger** (PR #1458): `intake_count` (0–4) joins the signed
-  evening-nudge tap links, routed to `SOURCE#private_intake` — never the
-  public-aggregated evening_ritual record. NEW `lambdas/intake_response.py`: evening-D
-  count vs whoop D+1 (hrv/recovery/rem) — Pyper–Peterman n_eff, p on n_eff,
-  zero-vs-nonzero block-bootstrap CI (all stats_core); dose bins arm at 15 nonzero
-  evenings. MCP `log_evening_intake`+`get_intake_response`; quiet fail-soft daily-brief
-  line (n+CI per ADR-105). `tests/test_intake_privacy_contract.py` pins the privacy
-  boundary BOTH ways (presence red pre-fix; identifiers banned from site/, web reads,
-  generated-artifact writers; response-level planted-field test). Tonight's 8 PM PT
-  nudge carries the third tap row.
-- **#1403 flourishing daylighted** (PR #1459): NEW `lambdas/flourishing.py` — daily
-  provenance-stamped `SOURCE#flourishing` projection of the Haiku enrichment PERMA
-  signals; enrichment writes rows every run + `{"flourishing_only": true}` zero-LLM
-  backfill (**ran post-deploy: 18 rows from 47 enriched entries since Jan, verified in
-  DDB with model stamps**). MCP `get_flourishing_trend` (EMA + provenance +
-  anti-rumination framing). Pillar wiring: flourishing row = PRIMARY Relationships
-  social input; Mind gains config-gated `values_alignment` (journaled-zero = real 20,
-  no row = None); weights rebalanced sum-1.0, **S3 config uploaded + verified**
-  (`config/matthew/character_sheet.json`). 13 guards (5 wiring guards red pre-fix).
+**Day-1 standing ops:** cycle-8 prereg PUBLISHED + live-verified (chronicle row, both
+Prologue posts, manifest, invalidation — claims frozen). SSM cycle-param IAM grant
+applied (Matthew's CLI had a line-continuation break — corrected via policy file),
+then codified in CDK (`role_policies.site_api()` ExperimentCycleRead, PR #1485,
+deployed) and the manual inline policy deleted — parity clean;
+`/api/source_freshness` serves `experiment.cycle: 8` live. `restart_verify.py` 9/12
+(3 fails = pre-genesis-PT timing: day_n=0, no weigh-in yet, no post-genesis sheet —
+re-run Sunday, not-work — attended). Tonight's nudge fired with the full ritual
+section (intake tap in). Tomorrow's SUNDAY nudge carries the NEW felt-reality probe.
 
-**Fan-out (worktree-implementer, verified before merge):**
-- **#1322 deploy README** (PR #1456): README + OPERATIONAL_RUNBOOK rewritten against
-  the live scripts; the boot-broken ADR-031 manual MCP zip recipe tombstoned (4 patterns
-  in `docs/_lint/tombstones.txt`, scanner covers live `deploy/*.md`); check_doc_index
-  gains the blocking deploy-docs status-header+freshness gate. Guard proof: 5 tombstone
-  hits + 4 headerless docs on pre-fix tree.
+**Solo (fable-class, each guard-red-proven, merged, deployed, live-verified):**
+- **#1426 QA tier manifest** (PR #1493): `tests/qa_manifest.py` — 80 pages registered,
+  archive entries GENERATED from `v4_build_evidence.REGISTRY`; all four hand lists
+  derive from it (visual_qa 36=36 set-verified; restart_verify_rendered 35→77 pages,
+  live 84/84 clean; smoke 22→80 pages; bindings 36=36); completeness gate proven red
+  on an unregistered page. The four-registry trap is dead.
+- **#1409 felt-reality calibration ledger** (PR #1499): weekly 3-item probe
+  (felt_vitality/rest/connection) rides the signed one-tap rail Sunday-only →
+  NEW `SOURCE#felt_probe` (raw_timeseries); `/api/character_calibration` — pearson r
+  vs 7-day mean pillar level_score + Fisher CI on n_eff, ADR-105 grammar (no r below
+  5 weeks, no band below 8), aggregates only; card + provenance line on
+  `/data/character/`; gates in `experiment_gates.py`. 14 guards, all red on pre-fix
+  origin/main. Live: honest `uncalibrated 0/5` on all three probed pillars.
+- **#1464 design brief** (PR #1501): `docs/design/DESIGN_PARTNER_BRIEF.md` — north-star
+  distillation, 10 hard constraints, **Slop Litmus v1** (10 points), proposals/<slug>
+  contract, ADR-106 posture. (Sync-to-project completes on first `/design-sync` run —
+  #1463's command shipped tonight too.)
 
-**Merge discipline:** /reconcile-branch per PR (merge main → `sync_doc_metadata --apply`
-→ linearize → squash); mcp_tools literal 64→67, test_count 3948→~3990 across the queue.
+**Fan-out waves (every PR adversarially verified or driver-reviewed before merge; 5
+finding-verifier agents ran; ~50%-false-positive rule held — the verifiers caught real
+issues):** Wave 1: #1477 MCP domain-filter fix, #1480 notion journal dark-guard, #1432
+import()-graph gate, #1437 endpoint-count derivation (115), #1440 budget-pause
+visibility, #1444+#1445 urgent-SNS IaC + qa-smoke metrics, #1453+#1334 GitHub billing
+observability, #1228+#1257 drift-guard repo halves (AWS deletes verified live — closed
+with evidence). Wave 2: #1495 todoist write trio (a verifier DISCOVERY — never worked
+live), #1478 get_capture_queues, #1479 chat-mode library, #1462 design bundle builder,
+#1431 JS unit harness (53 tests), #1436 API schema snapshots (105), #1376
+career-vs-season, #1395 static core + OG (the crawler view lives). Wave 3: #1332+#1340+
+#1342 wrap gates + INCIDENT_LOG backfill (9 rows), #1339+#1341+#1343 ADR hygiene
+(+ADR-136 site auto-deploy governance), #1323 Makefile, #1325 main ruleset (LIVE:
+ruleset 19162901 blocks force-push/deletion), #1326 hooks+stash cleared, #1331 rollback
+keys on QA verdict, #1347 tombstone hardening, #1351 DATA_GOVERNANCE truth, #1329/#1350
+code halves (one-command readiness — owner acts remain). Wave 4: #1454 surface-drift
+gate, #1465 /design-implement, #1468 journeys + loop-forward CTAs (78 pages), #1427
+sweep extension (79/79 live), #1428 tiered AI vision, #1463 /design-sync, plus the
+schema recapture (#1525).
 
-## Un-red main mid-wrap (the session's own regression, caught + fixed)
-The #1405 routing made the ritual write pk dynamic → the orphan-partition gate
-(`test_site_partition_orphans`) saw `evening_ritual` as writerless and redded e1bcf766 +
-4e886736 (my local full-suite ran `-x` and stopped at the OTHER failure — the stale
-generated `/method/game/` page, which the reconcile bot fixed on main before my regen
-push). Fix `28ee812a`: both write destinations INLINE as USER_PREFIX-joined literals in
-the update_item call (the gate resolves web writers only inside put/update calls) +
-line-level read-shape rule in the privacy contract. **28ee812a's CI/CD ran GREEN
-end-to-end and fleet-deployed everything** (daily-brief/mcp/journal-enrichment/
-evening-nudge all LastModified 01:13–01:15 UTC; deployed MCP bundle AST-verified: 67
-tools incl. the three new).
+**Incidents found + fixed same night (all in INCIDENT_LOG):**
+- **P3 genesis-eve 500**: `/api/fulfillment_ritual` 500'd ~4h — `_clamp_today` clamped
+  UTC while handlers use PT uppers; recurs every future reset. Fixed (PR #1507) +
+  regression tests + the pre-existing UTC-semantics tests realigned (PR #1521 after my
+  own miss briefly redded main — full-suite-before-merge reflex re-learned).
+- **Two site auto-rollbacks of healthy deploys**: (1) smoke asserted
+  `/api/character_calibration` while the IAM Plan gate (R8-ST6, by design) blocked the
+  fleet — pre-empted on the second pass by fast-path `deploy_site_api.sh`; (2) a
+  CloudFront cache-race: smoke read a cached pre-deploy `/coaching/` — healed via
+  manual `sync_site_to_s3.sh`, 121/121 smoke green after. (#1331's verdict-keying now
+  live narrows the class; the cache-race variant is #1526.)
+- **Driver error, owned**: a blind `git add -A` during queue reconciliation committed
+  conflict markers into main via #1518 — repaired keep-both (bd96a14e), both gates
+  (#1351 + #1347) preserved, full suite green.
 
-## Gotchas hit (durable ones in memory)
-- **Orphan gate needs inline write literals**: a hoisted/dynamic pk in a web put/update
-  call makes the partition read as writerless — `reference_orphan_gate_inline_writer_literal`.
-- **`pytest -x` masks the second failure** — the orphan red hid behind the game-page red
-  locally; full suite without `-x` before pushing a multi-PR queue.
-- **`config/character_sheet.json` feeds a GENERATED site page** (`/method/game/` via
-  `scripts/v4_build_game_explained.py`) — config change ⇒ regenerate same-commit, else
-  Unit Tests red one cycle later (the reconcile bot self-healed it this time).
-- **Parallel-session handover collision**: the plan-only session's staged `git mv` of
-  HANDOVER_LATEST rode into my un-red commit (shared index!) — harmless here, but check
-  `git status` staged state before committing when a parallel session is live.
-- CloudFront `/api/*` viewer-path invalidation before live-verifying (again held true).
+**THE #1319 DISCOVERY (decision-menu head-item):** the production approval gate wasn't
+deleted — it was silently DROPPED when the repo flipped PRIVATE (2026-07-13):
+required-reviewers environment protection needs GitHub Team/Enterprise; the restore
+call 422s on the current plan. #1319 + #1338 stay OPEN on Matthew's fork: (a) plan
+upgrade (~$4/mo) → restore is one command (`gh api .../environments/production -X PUT`
+with reviewer id 174924761, verified staged); (b) sign the gate-less posture into the
+ADR (draft covers both branches, scratchpad `adr-1338-draft.md` — re-draft from issue
+comments if lost).
+
+**Verified at close:** fleet run 29675370138 — Plan GREEN (post-CDK-deploys), Deploy
+GREEN, post-deploy checks GREEN (visual QA still finishing at wrap). Site at HEAD,
+121/121 smoke, all five flagship live-verifies pass (honest calibration zero-states,
+fulfillment 200, static cores, loop-forward CTAs, career/season fields). MCP
+LastModified 05:56 UTC (68 tools). Full local suite 5757+ passed; only the documented
+live-AWS i16 Day-1 flake (CI-excluded).
+
+## Gotchas hit (durable ones to memory)
+- gh pr merge shows a stale "has conflicts" hint right after a branch push — poll
+  `mergeStateStatus` until it leaves UNKNOWN/DIRTY, then merge.
+- NEVER `git add -A` mid-conflict — resolve file-by-file; parse-check before commit.
+- Site smoke can race CloudFront invalidation on freshly-asserted content (#1526).
+- The pre-commit hook auto-runs `sync_doc_metadata --apply` in worktrees — agents must
+  revert literal churn; the driver reconciles per merge (held all night, ~15 merges).
+- An agent's cwd dies when its worktree is auto-cleaned — `cd` absolute before git ops.
+- GitHub environment protection silently drops on visibility flip (the #1319 class) —
+  #1320's GitHub-leg asserts will catch the next one.
 
 ## Residual / next picks
+- **Decision menu (Matthew)** — see the session-close message: #1319 plan-vs-posture
+  (unblocks #1338), SNS confirm-click, #1114 portrait pick (PR #1512 contact sheet),
+  #1350 retention window sign+run, #1329 ai-keys rotate (one command), #1330/#1336/
+  #1345 owner acts, #741 publish, #1029 re-entry checklist (domain renews 2026-08-20),
+  #1187 music bed, prereg — DONE tonight (published).
+- Sunday attended (not-work — standing ops): `restart_verify.py` post-weigh-in; brief
+  writes 64/20/94 natively; first probe taps land in `SOURCE#felt_probe`; first
+  post-#1428 deploy shows "tier<=1: 6/36" AI-QA line.
+- Now-milestone remainder: #1469 (pilot — needs design-project round-trip + Matthew's
+  pick), epics #1425/#1460/#1461/#1476 close via children.
+- #1526 smoke-vs-invalidation race hardening (filed at wrap).
+- **#1527 FIRST PICK next session**: /api/predictions+calibration origin perf (~3.6s
+  after #1505) — clears the /method/board/ LCP budget red on the fleet run's visual-QA.
+- Standing alarms (#1329 checklist): ai-keys staleness still firing until Matthew
+  rotates (now routed to the curated email, one-command script ready); no other
+  unactioned staleness known at wrap.
 
-> **Reconciled 2026-07-19 under the #1340 residual-queue gate** — every bullet below now
-> cites an issue number or carries an explicit `not-work —` tag; none were silently dropped.
+**Main:** green (b473d028 — latest completed ci-cd run succeeded, verified via
+check_main_green.py). Context: the earlier fleet run 29675370138 shows failure from its
+Visual-QA job alone (Deploy/tests/smoke all green, fleet live-verified) — one real perf
+budget breach, /method/board/ cold-cache LCP from #1505's ~3.6s origin endpoints, filed
+#1527 (Now, first pick).
+**Build beat:** `2026-07-19-backlog-drain-day1` (this session).
+**Docs:** SCHEMA (felt_probe partition), CONVENTIONS §4c/§8a, DATA_GOVERNANCE,
+INCIDENT_LOG (11 rows), DESIGN_PARTNER_BRIEF, JOURNEYS, CHAT_MODES, MANAGED_WHERE,
+QA exemption ledgers, ADR-136 + ADR index — all shipped inside the night's PRs;
+wrap adds SCHEMA felt_probe note verification + doc gates green.
+**Decisions:** ADR-136 filed (in #1516); the release-topology ADR (#1338) deliberately
+awaits the #1319 fork — not-work — owner decision pending.
+**Incidents:** 2 row(s) added this wrap (05:40 cache-race rollback; the 03:45 rollback
++ genesis-eve 500 rows landed via #1514/#1507 earlier tonight).
+**Stash/hooks:** clean (stash emptied by #1326; hook freshly installed; one accidental
+autostash mid-session popped immediately).
 
-- **Sunday+ (post-genesis, tomorrow)**: `python3 deploy/restart_verify.py`; verify the
-  17:00 UTC brief writes 64/20/94 natively + the first intake brief line renders; re-seed
-  prereg only if a pipeline re-run happened — **not-work — standing post-genesis
-  verification routine, not a backlog item.** Cycle-8 prereg publish still awaits
-  Matthew's OK (`handovers/prereg_dryrun_cycle8.txt`) — **not-work — pending Matthew
-  decision, not a filed issue** (same item as the decision-menu bullet below).
-- **site-api can't read SSM `/life-platform/experiment-cycle`** → freshness payload
-  `experiment.cycle: null` and carried chips read "a previous attempt" (fail-soft,
-  honest). IAM grant is user-NAMED → in the decision menu — **not-work — pending a
-  Matthew-named IAM grant, not yet a filed issue** (same item as the decision-menu SSM
-  IAM line below).
-- Now remainder: #1409 felt-reality calibration (fable, W5 — n accrues weekly, time-
-  sensitive), #1395 growth surface, #1376 career-vs-season, #1426 QA tier manifest
-  (unlocks the qa-strategy epic), design pipeline #1462→#1464 (+pilot #1469); #1338 held
-  on #1319. Epics #1194/#1195.
-- Decision menu (Matthew): #1319 approval-gate posture, #1114 portrait pick,
-  #1243/#748/#1187/#1029, gate:owner #1350/#1329, #741 — all filed issues. Prereg publish
-  OK and the SSM cycle-param IAM line are **not-work — pending a Matthew decision/grant,
-  not filed issues** (see the two bullets above).
-
-**Main:** green (28ee812a) — its full CI/CD run concluded SUCCESS (fleet deploy included);
-verified via `check_main_green.py` at wrap.
-**Build beat:** `2026-07-19-cold-start-armed` (merged + deployed + verified only;
-#1405 deliberately absent from the public beat — Matthew-private surface).
-**Docs:** SCHEMA.md (flourishing + private_intake partitions), engines/CHARACTER doc
-(values_alignment component) — see wrap commit; MCP catalog + counts via doc-sync;
-tombstones/deploy-docs updates shipped inside #1322 itself.
-
-Prior sessions (same day): `HANDOVER_2026-07-18_DesignPartnerPlan.md` (parallel,
-plan-only), `HANDOVER_2026-07-18_QaStrategy.md`, `HANDOVER_2026-07-18_LaterDrainCycle8Reset.md`.
+Prior session (same day): `HANDOVER_2026-07-18_BigArchPaydown.md`.

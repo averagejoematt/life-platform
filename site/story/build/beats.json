@@ -1287,6 +1287,37 @@
         }
       ],
       "why_it_mattered": "A restart is the platform's most dangerous moment for trust — the morning the numbers vanish is exactly when a reader decides whether the honesty was real. Making the empty states computed, provenance-labeled, and unscolding is what lets attempt #8 open in public without the site lying about its own blank spots."
+    },
+    {
+      "id": "2026-07-19-backlog-drain-day1",
+      "date": "2026-07-19",
+      "title": "Day 1 opened with a 44-issue overnight drain — and the instrument grading itself",
+      "shipped": "The night before Day 1 of cycle 8, an overnight multi-agent session closed 44 backlog issues (154 open → 110), every one shipped with a regression guard proven to fail on the pre-fix tree, merged, deployed, and live-verified. The headliners: ONE page registry now drives every QA sweep (the four hand-maintained page lists are dead — 79 of 80 live pages in the Playwright sweep, up from 36); the character sheet earned a felt-reality calibration card (a 20-second Sunday probe pairs how the week actually felt against each pillar's level — served honestly as 'uncalibrated, 0 of 5 weeks' until the data exists); the crawler view came alive (real numbers in every page's noscript static core + data-driven OG tags — shares stop unfurling blank); career-vs-season stats survived the reset (lifetime n beside the fresh cycle's zero, sports-card style); and the design-partner pipeline (bundle builder, /design-sync, /design-implement, the anti-slop brief) went end-to-end buildable.",
+      "gotcha": "Genesis eve itself found a bug: /api/fulfillment_ritual 500'd for four hours because a date clamp used UTC while its callers used Pacific — a seven-hour window that inverts a DynamoDB BETWEEN every single reset eve. Fixed the same night, with the incident logged and a regression test pinned to the Pacific contract.",
+      "honest_miss": "The production deploy approval gate documented in four places turned out not to exist — and the root cause was nobody's delete: flipping the repo private silently dropped the protection rule because the billing plan doesn't support it on private repos. Two auto-rollbacks also fired on HEALTHY deploys (a deploy-ordering race and a CloudFront cache race) — the safety net works, but twice tonight it worked against us; both classes now have fixes or filed hardening.",
+      "prs": [
+        {
+          "label": "PR #1493",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1493"
+        },
+        {
+          "label": "PR #1499",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1499"
+        },
+        {
+          "label": "PR #1504",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1504"
+        },
+        {
+          "label": "PR #1505",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1505"
+        },
+        {
+          "label": "PR #1507",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1507"
+        }
+      ],
+      "why_it_mattered": "An experiment that restarts eight times lives or dies on how cheap and honest a restart is. Tonight the machine drained a quarter of its own backlog in one sitting while the instrument learned to grade itself against felt reality — and every close had to prove its guard failed before the fix existed. That discipline is the difference between a backlog that shrinks and a count that's theater."
     }
   ]
 }
