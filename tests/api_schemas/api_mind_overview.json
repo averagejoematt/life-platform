@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/mind_overview",
   "is_prefix_sample": false,
   "path": "/api/mind_overview",
@@ -111,8 +111,44 @@
         "type": "array"
       },
       "vice_timeline": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "held": {
+              "type": "integer"
+            },
+            "streaks": {
+              "keys": {
+                "No Fried Food": {
+                  "type": "integer"
+                },
+                "No Phone 30 Mins Before Bed": {
+                  "type": "integer"
+                },
+                "No alcohol": {
+                  "type": "integer"
+                },
+                "No mindless scrolling": {
+                  "type": "integer"
+                },
+                "No solo takeout": {
+                  "type": "integer"
+                },
+                "No sweets": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "total": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       }
     },

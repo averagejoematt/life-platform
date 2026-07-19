@@ -1,8 +1,8 @@
 {
   "captured_at": "2026-07-19T05:51:54.378264+00:00",
-  "fetch_path": "/api/vice_streaks",
+  "fetch_path": "/api/fulfillment_ritual",
   "is_prefix_sample": false,
-  "path": "/api/vice_streaks",
+  "path": "/api/fulfillment_ritual",
   "shape": {
     "keys": {
       "_meta": {
@@ -22,34 +22,28 @@
       "as_of_date": {
         "type": "string"
       },
-      "total_held": {
+      "check_in_count": {
         "type": "integer"
       },
-      "total_tracked": {
+      "streak_days": {
         "type": "integer"
       },
-      "vices": {
+      "trend_7d": {
         "items": {
           "keys": {
-            "best_streak": {
-              "type": "integer"
+            "connection": {
+              "type": "null"
             },
-            "current_streak": {
-              "type": "integer"
-            },
-            "holding": {
-              "type": "boolean"
-            },
-            "name": {
+            "date": {
               "type": "string"
             },
-            "relapses_90d": {
-              "type": "integer"
+            "mood_valence": {
+              "type": "null"
             }
           },
           "type": "object"
         },
-        "length_sample": 6,
+        "length_sample": 7,
         "type": "array"
       }
     },

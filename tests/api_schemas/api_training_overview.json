@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/training_overview",
   "is_prefix_sample": false,
   "path": "/api/training_overview",
@@ -31,8 +31,21 @@
             "type": "number"
           },
           "weekly_trend": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "minutes": {
+                  "type": "number"
+                },
+                "sessions": {
+                  "type": "integer"
+                },
+                "week": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
             "type": "array"
           }
         },
@@ -162,8 +175,21 @@
             "type": "null"
           },
           "daily_steps_trend": {
-            "items": null,
-            "length_sample": 0,
+            "items": {
+              "keys": {
+                "date": {
+                  "type": "string"
+                },
+                "is_weekend": {
+                  "type": "boolean"
+                },
+                "steps": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
             "type": "array"
           },
           "total_miles_30d": {

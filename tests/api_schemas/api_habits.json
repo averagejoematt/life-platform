@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/habits",
   "is_prefix_sample": false,
   "path": "/api/habits",
@@ -23,7 +23,7 @@
         "type": "string"
       },
       "best_day": {
-        "type": "null"
+        "type": "integer"
       },
       "causality_captured": {
         "type": "integer"
@@ -52,9 +52,14 @@
         "type": "integer"
       },
       "day_of_week_avgs": {
-        "items": {
-          "type": "null"
-        },
+        "items": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer"
+          }
+        ],
         "length_sample": 7,
         "type": "array"
       },
@@ -80,8 +85,30 @@
         "type": "object"
       },
       "history": {
-        "items": null,
-        "length_sample": 0,
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "perfect": {
+              "type": "boolean"
+            },
+            "t0_done": {
+              "type": "integer"
+            },
+            "t0_total": {
+              "type": "integer"
+            },
+            "tier01_pct": {
+              "type": "integer"
+            },
+            "tier0_pct": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
         "type": "array"
       },
       "keystone_correlations": {
@@ -101,7 +128,7 @@
         "type": "array"
       },
       "worst_day": {
-        "type": "null"
+        "type": "integer"
       }
     },
     "type": "object"

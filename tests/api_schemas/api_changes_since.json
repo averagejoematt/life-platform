@@ -1,6 +1,6 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
-  "fetch_path": "/api/changes-since?ts=1783827634",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "fetch_path": "/api/changes-since?ts=1783835527",
   "is_prefix_sample": false,
   "path": "/api/changes-since",
   "shape": {

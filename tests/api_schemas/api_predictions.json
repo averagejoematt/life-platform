@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/predictions",
   "is_prefix_sample": false,
   "path": "/api/predictions",
@@ -38,6 +38,35 @@
               "inconclusive": {
                 "type": "integer"
               },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "number"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "pending": {
                 "type": "integer"
               },
@@ -66,6 +95,35 @@
               },
               "inconclusive": {
                 "type": "integer"
+              },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "null"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
               },
               "pending": {
                 "type": "integer"
@@ -96,6 +154,35 @@
               "inconclusive": {
                 "type": "integer"
               },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "null"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "pending": {
                 "type": "integer"
               },
@@ -124,6 +211,35 @@
               },
               "inconclusive": {
                 "type": "integer"
+              },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "null"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
               },
               "pending": {
                 "type": "integer"
@@ -154,6 +270,35 @@
               "inconclusive": {
                 "type": "integer"
               },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "number"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "pending": {
                 "type": "integer"
               },
@@ -182,6 +327,35 @@
               },
               "inconclusive": {
                 "type": "integer"
+              },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "number"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
               },
               "pending": {
                 "type": "integer"
@@ -212,6 +386,35 @@
               "inconclusive": {
                 "type": "integer"
               },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "number"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "pending": {
                 "type": "integer"
               },
@@ -241,6 +444,35 @@
               "inconclusive": {
                 "type": "integer"
               },
+              "lifetime": {
+                "keys": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "decided": {
+                    "type": "integer"
+                  },
+                  "expired": {
+                    "type": "integer"
+                  },
+                  "hit_rate_pct": {
+                    "type": "number"
+                  },
+                  "inconclusive": {
+                    "type": "integer"
+                  },
+                  "pending": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
               "pending": {
                 "type": "integer"
               },
@@ -255,6 +487,9 @@
           }
         },
         "type": "object"
+      },
+      "cycle": {
+        "type": "integer"
       },
       "overall": {
         "keys": {
@@ -272,6 +507,35 @@
           },
           "inconclusive": {
             "type": "integer"
+          },
+          "lifetime": {
+            "keys": {
+              "accuracy_pct": {
+                "type": "number"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
           },
           "pending": {
             "type": "integer"
