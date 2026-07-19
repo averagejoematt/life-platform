@@ -1,0 +1,55 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/intelligence_summary",
+  "is_prefix_sample": false,
+  "path": "/api/intelligence_summary",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "computed_at": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "correlations": {
+        "keys": {
+          "count": {
+            "type": "integer"
+          },
+          "last_week": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "experiments": {
+        "keys": {
+          "active": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "hypotheses": {
+        "keys": {
+          "by_status": {
+            "keys": {
+              "pending": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

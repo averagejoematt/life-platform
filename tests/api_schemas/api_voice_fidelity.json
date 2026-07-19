@@ -1,0 +1,65 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/voice_fidelity",
+  "is_prefix_sample": false,
+  "path": "/api/voice_fidelity",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "accuracy_pct": {
+        "type": "null"
+      },
+      "candidate_pool_size": {
+        "type": "null"
+      },
+      "chance_accuracy_pct": {
+        "type": "null"
+      },
+      "coaches": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "confusion": {
+        "keys": {},
+        "type": "object"
+      },
+      "correct": {
+        "type": "null"
+      },
+      "disclosure": {
+        "type": "string"
+      },
+      "n": {
+        "type": "integer"
+      },
+      "run_month": {
+        "type": "null"
+      },
+      "updated_at": {
+        "type": "null"
+      },
+      "verdict": {
+        "type": "string"
+      },
+      "worst_confused_pair": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

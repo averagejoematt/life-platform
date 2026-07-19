@@ -1,0 +1,170 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/reading_overview",
+  "is_prefix_sample": false,
+  "path": "/api/reading_overview",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "cockpit_line": {
+        "keys": {
+          "current": {
+            "keys": {
+              "book": {
+                "keys": {
+                  "author": {
+                    "type": "string"
+                  },
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "coverS3Key": {
+                    "type": "string"
+                  },
+                  "difficulty": {
+                    "keys": {
+                      "composite": {
+                        "type": "number"
+                      },
+                      "density": {
+                        "type": "number"
+                      },
+                      "prose": {
+                        "type": "number"
+                      },
+                      "structure": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "domainTags": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "era": {
+                    "type": "string"
+                  },
+                  "isbn13": {
+                    "type": "string"
+                  },
+                  "themes": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "length_sample": 4,
+                    "type": "array"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "notes": {
+                "items": {
+                  "keys": {
+                    "bookId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "noteId": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "state": {
+                "keys": {
+                  "bookId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "input_streak_days": {
+            "type": "integer"
+          },
+          "read_today": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "profile": {
+        "keys": {},
+        "type": "object"
+      },
+      "stats": {
+        "keys": {
+          "finished_count": {
+            "type": "integer"
+          },
+          "input_streak_days": {
+            "type": "integer"
+          },
+          "read_today": {
+            "type": "boolean"
+          },
+          "sessions_90d": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "wheel": {
+        "keys": {
+          "distribution": {
+            "keys": {},
+            "type": "object"
+          },
+          "domains": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

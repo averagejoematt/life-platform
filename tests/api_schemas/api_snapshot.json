@@ -1,0 +1,308 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/snapshot",
+  "is_prefix_sample": false,
+  "path": "/api/snapshot",
+  "shape": {
+    "keys": {
+      "character": {
+        "keys": {
+          "_meta": {
+            "keys": {
+              "cache_seconds": {
+                "type": "integer"
+              },
+              "generated_at": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "character": {
+            "keys": {
+              "as_of_date": {
+                "type": "string"
+              },
+              "level": {
+                "type": "integer"
+              },
+              "pre_experiment": {
+                "type": "boolean"
+              },
+              "tier": {
+                "type": "string"
+              },
+              "tier_emoji": {
+                "type": "string"
+              },
+              "xp_total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "days_until_start": {
+            "type": "integer"
+          },
+          "pillars": {
+            "items": {
+              "keys": {
+                "emoji": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "raw_score": {
+                  "type": "integer"
+                },
+                "tier": {
+                  "type": "string"
+                },
+                "xp_delta": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 7,
+            "type": "array"
+          },
+          "pre_start": {
+            "type": "boolean"
+          },
+          "start_date": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "generated_at": {
+        "type": "string"
+      },
+      "journey": {
+        "keys": {
+          "_meta": {
+            "keys": {
+              "cache_seconds": {
+                "type": "integer"
+              },
+              "generated_at": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "journey": {
+            "keys": {
+              "current_weight_lbs": {
+                "type": "null"
+              },
+              "day_n": {
+                "type": "integer"
+              },
+              "days_to_goal": {
+                "type": "null"
+              },
+              "days_until_start": {
+                "type": "integer"
+              },
+              "goal_weight_lbs": {
+                "type": "number"
+              },
+              "height_inches": {
+                "type": "number"
+              },
+              "last_weighin_date": {
+                "type": "null"
+              },
+              "lost_lbs": {
+                "type": "null"
+              },
+              "pre_start": {
+                "type": "boolean"
+              },
+              "progress_pct": {
+                "type": "null"
+              },
+              "projected_goal_date": {
+                "type": "null"
+              },
+              "projected_goal_date_earliest": {
+                "type": "null"
+              },
+              "projected_goal_date_latest": {
+                "type": "null"
+              },
+              "projection_confidence": {
+                "type": "null"
+              },
+              "rate_provisional": {
+                "type": "null"
+              },
+              "remaining_lbs": {
+                "type": "null"
+              },
+              "start_date": {
+                "type": "string"
+              },
+              "start_weight_lbs": {
+                "type": "number"
+              },
+              "started_date": {
+                "type": "string"
+              },
+              "week_n": {
+                "type": "integer"
+              },
+              "weekly_rate_ci_high": {
+                "type": "null"
+              },
+              "weekly_rate_ci_low": {
+                "type": "null"
+              },
+              "weekly_rate_lbs": {
+                "type": "null"
+              },
+              "weighin_count": {
+                "type": "integer"
+              },
+              "weighin_span_days": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "readiness": {
+        "type": "null"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "vitals": {
+        "keys": {
+          "_meta": {
+            "keys": {
+              "cache_seconds": {
+                "type": "integer"
+              },
+              "generated_at": {
+                "type": "string"
+              },
+              "request_id": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "page_freshness": {
+            "keys": {
+              "/character": {
+                "type": "string"
+              },
+              "/explorer": {
+                "type": "string"
+              },
+              "/glucose": {
+                "type": "string"
+              },
+              "/habits": {
+                "type": "string"
+              },
+              "/live": {
+                "type": "string"
+              },
+              "/nutrition": {
+                "type": "string"
+              },
+              "/physical": {
+                "type": "string"
+              },
+              "/sleep": {
+                "type": "string"
+              },
+              "/training": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "vitals": {
+            "keys": {
+              "as_of_date": {
+                "type": "string"
+              },
+              "frame": {
+                "type": "string"
+              },
+              "hrv_30d_avg": {
+                "type": "null"
+              },
+              "hrv_30d_n": {
+                "type": "integer"
+              },
+              "hrv_ms": {
+                "type": "number"
+              },
+              "hrv_trend": {
+                "type": "string"
+              },
+              "night_of": {
+                "type": "string"
+              },
+              "recovery_pct": {
+                "type": "number"
+              },
+              "recovery_status": {
+                "type": "string"
+              },
+              "rhr_bpm": {
+                "type": "number"
+              },
+              "rhr_trend": {
+                "type": "string"
+              },
+              "sleep_hours": {
+                "type": "number"
+              },
+              "time_travel": {
+                "type": "boolean"
+              },
+              "weight_as_of": {
+                "type": "null"
+              },
+              "weight_delta_30d": {
+                "type": "null"
+              },
+              "weight_lbs": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

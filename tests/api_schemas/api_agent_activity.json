@@ -1,0 +1,116 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/agent_activity",
+  "is_prefix_sample": false,
+  "path": "/api/agent_activity",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "events": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "has_activity": {
+        "type": "boolean"
+      },
+      "roster": {
+        "items": {
+          "keys": {
+            "cadence": {
+              "type": "string"
+            },
+            "detail": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 4,
+        "type": "array"
+      },
+      "summary": {
+        "keys": {
+          "ai_quality_canary": {
+            "keys": {
+              "flags": {
+                "type": "integer"
+              },
+              "runs": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "automerge_gate": {
+            "keys": {
+              "flags": {
+                "type": "integer"
+              },
+              "runs": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "coherence_sentinel": {
+            "keys": {
+              "flags": {
+                "type": "integer"
+              },
+              "runs": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "remediation_agent": {
+            "keys": {
+              "flags": {
+                "type": "integer"
+              },
+              "runs": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "week_end": {
+        "type": "string"
+      },
+      "week_start": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

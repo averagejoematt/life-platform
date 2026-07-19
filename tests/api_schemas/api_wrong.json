@@ -1,0 +1,82 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/wrong",
+  "is_prefix_sample": false,
+  "path": "/api/wrong",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "note": {
+        "type": "string"
+      },
+      "predictions": {
+        "keys": {
+          "by_coach": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "refuted_recent": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "validator": {
+        "keys": {
+          "caught": {
+            "type": "integer"
+          },
+          "caught_detailed": {
+            "type": "integer"
+          },
+          "caught_undetailed": {
+            "type": "integer"
+          },
+          "claims_checked": {
+            "type": "integer"
+          },
+          "recent": {
+            "items": {
+              "keys": {
+                "coach": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string"
+                },
+                "what": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 2,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

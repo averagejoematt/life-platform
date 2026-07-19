@@ -1,0 +1,37 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/meal_glucose",
+  "is_prefix_sample": false,
+  "path": "/api/meal_glucose",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "has_cgm": {
+        "type": "boolean"
+      },
+      "meals": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "period_days": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

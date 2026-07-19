@@ -1,0 +1,280 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/pulse",
+  "is_prefix_sample": false,
+  "path": "/api/pulse",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulse": {
+        "keys": {
+          "date": {
+            "type": "string"
+          },
+          "day_number": {
+            "type": "integer"
+          },
+          "days_until_start": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "glyphs": {
+            "keys": {
+              "journal": {
+                "keys": {
+                  "gap_days": {
+                    "type": "null"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "streak_days": {
+                    "type": "integer"
+                  },
+                  "written_today": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "lift": {
+                "keys": {
+                  "days_since_last": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "trained_today": {
+                    "type": "boolean"
+                  },
+                  "workout_type": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "mind": {
+                "keys": {
+                  "label": {
+                    "type": "null"
+                  },
+                  "score": {
+                    "type": "null"
+                  },
+                  "state": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "movement": {
+                "keys": {
+                  "as_of": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "integer"
+                  },
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "recovery": {
+                "keys": {
+                  "as_of": {
+                    "type": "string"
+                  },
+                  "delta_1d": {
+                    "type": "integer"
+                  },
+                  "hrv_ms": {
+                    "type": "number"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "recovery_pct": {
+                    "type": "integer"
+                  },
+                  "rhr_bpm": {
+                    "type": "number"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "scale": {
+                "keys": {
+                  "as_of": {
+                    "type": "string"
+                  },
+                  "delta": {
+                    "type": "null"
+                  },
+                  "delta_label": {
+                    "type": "null"
+                  },
+                  "direction": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "sleep": {
+                "keys": {
+                  "as_of": {
+                    "type": "string"
+                  },
+                  "delta_1d": {
+                    "type": "number"
+                  },
+                  "hours": {
+                    "type": "number"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              },
+              "water": {
+                "keys": {
+                  "as_of": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "null"
+                  },
+                  "liters": {
+                    "type": "null"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "number"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "narrative": {
+            "type": "string"
+          },
+          "notable_signals": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "pre_start": {
+            "type": "boolean"
+          },
+          "signals_reporting": {
+            "type": "integer"
+          },
+          "signals_total": {
+            "type": "integer"
+          },
+          "since_yesterday": {
+            "items": [
+              {
+                "keys": {
+                  "delta": {
+                    "type": "integer"
+                  },
+                  "signal": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "keys": {
+                  "delta": {
+                    "type": "number"
+                  },
+                  "signal": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "length_sample": 2,
+            "type": "array"
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "status_color": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

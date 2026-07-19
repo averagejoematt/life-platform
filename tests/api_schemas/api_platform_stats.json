@@ -1,0 +1,77 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/platform_stats",
+  "is_prefix_sample": false,
+  "path": "/api/platform_stats",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "active_secrets": {
+        "type": "integer"
+      },
+      "adrs": {
+        "type": "integer"
+      },
+      "alarms": {
+        "type": "integer"
+      },
+      "board_product": {
+        "type": "integer"
+      },
+      "board_technical": {
+        "type": "integer"
+      },
+      "cdk_stacks": {
+        "type": "integer"
+      },
+      "data_sources": {
+        "type": "integer"
+      },
+      "goal_weight": {
+        "type": "integer"
+      },
+      "lambdas": {
+        "type": "integer"
+      },
+      "mcp_tools": {
+        "type": "integer"
+      },
+      "monthly_cost": {
+        "type": "string"
+      },
+      "review_count": {
+        "type": "integer"
+      },
+      "review_grade": {
+        "type": "string"
+      },
+      "site_pages": {
+        "type": "integer"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "start_weight": {
+        "type": "number"
+      },
+      "test_count": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

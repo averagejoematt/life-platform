@@ -1,0 +1,75 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/pillar_coupling",
+  "is_prefix_sample": false,
+  "path": "/api/pillar_coupling",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "edges": {
+        "items": {
+          "keys": {
+            "a": {
+              "type": "string"
+            },
+            "b": {
+              "type": "string"
+            },
+            "n": {
+              "type": "integer"
+            },
+            "p": {
+              "type": "number"
+            },
+            "r": {
+              "type": "number"
+            },
+            "significant": {
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 15,
+        "type": "array"
+      },
+      "honest_null": {
+        "type": "boolean"
+      },
+      "min_n": {
+        "type": "integer"
+      },
+      "pillars": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 6,
+        "type": "array"
+      },
+      "window_days": {
+        "type": "integer"
+      },
+      "window_end": {
+        "type": "string"
+      },
+      "window_start": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,43 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/healthz",
+  "is_prefix_sample": false,
+  "path": "/api/healthz",
+  "shape": {
+    "keys": {
+      "checks": {
+        "keys": {
+          "dynamodb": {
+            "keys": {
+              "latency_ms": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "lambda_warm": {
+            "type": "boolean"
+          },
+          "last_daily_refresh": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "response_ms": {
+        "type": "integer"
+      },
+      "status": {
+        "type": "string"
+      },
+      "version": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,259 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/nutrition_overview",
+  "is_prefix_sample": false,
+  "path": "/api/nutrition_overview",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "eating_window": {
+        "type": "null"
+      },
+      "nutrition": {
+        "keys": {
+          "as_of": {
+            "type": "null"
+          },
+          "avg_calories": {
+            "type": "null"
+          },
+          "avg_carbs_g": {
+            "type": "null"
+          },
+          "avg_deficit": {
+            "type": "null"
+          },
+          "avg_fat_g": {
+            "type": "null"
+          },
+          "avg_fiber_g": {
+            "type": "null"
+          },
+          "avg_protein_g": {
+            "type": "null"
+          },
+          "cal_7d_avg": {
+            "type": "null"
+          },
+          "days_logged": {
+            "type": "integer"
+          },
+          "lag_days": {
+            "type": "null"
+          },
+          "latest_calories": {
+            "type": "null"
+          },
+          "latest_date": {
+            "type": "null"
+          },
+          "latest_protein_g": {
+            "type": "null"
+          },
+          "pro_7d_avg": {
+            "type": "null"
+          },
+          "protein_floor_g": {
+            "type": "integer"
+          },
+          "protein_floor_hit_days": {
+            "type": "integer"
+          },
+          "protein_floor_hit_pct": {
+            "type": "integer"
+          },
+          "protein_hit_days": {
+            "type": "integer"
+          },
+          "protein_hit_pct": {
+            "type": "integer"
+          },
+          "protein_target_g": {
+            "type": "integer"
+          },
+          "stalled": {
+            "type": "boolean"
+          },
+          "tdee": {
+            "type": "null"
+          },
+          "today_pending": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "nutrition_trend": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "periodization": {
+        "keys": {
+          "rest_day": {
+            "keys": {
+              "avg_calories": {
+                "type": "null"
+              },
+              "avg_carbs_g": {
+                "type": "null"
+              },
+              "avg_fat_g": {
+                "type": "null"
+              },
+              "avg_fiber_g": {
+                "type": "null"
+              },
+              "avg_protein_g": {
+                "type": "null"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "protein_hit_pct": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "training_day": {
+            "keys": {
+              "avg_calories": {
+                "type": "null"
+              },
+              "avg_carbs_g": {
+                "type": "null"
+              },
+              "avg_fat_g": {
+                "type": "null"
+              },
+              "avg_fiber_g": {
+                "type": "null"
+              },
+              "avg_protein_g": {
+                "type": "null"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "protein_hit_pct": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "recovery_deficit_overlay": {
+        "keys": {
+          "caption": {
+            "type": "null"
+          },
+          "confidence": {
+            "type": "string"
+          },
+          "days": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "min_days": {
+            "type": "integer"
+          },
+          "overlap_days": {
+            "type": "integer"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "weekday_vs_weekend": {
+        "keys": {
+          "weekday": {
+            "keys": {
+              "avg_calories": {
+                "type": "null"
+              },
+              "avg_carbs_g": {
+                "type": "null"
+              },
+              "avg_fat_g": {
+                "type": "null"
+              },
+              "avg_fiber_g": {
+                "type": "null"
+              },
+              "avg_protein_g": {
+                "type": "null"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "protein_hit_pct": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "weekend": {
+            "keys": {
+              "avg_calories": {
+                "type": "null"
+              },
+              "avg_carbs_g": {
+                "type": "null"
+              },
+              "avg_fat_g": {
+                "type": "null"
+              },
+              "avg_fiber_g": {
+                "type": "null"
+              },
+              "avg_protein_g": {
+                "type": "null"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "protein_hit_pct": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

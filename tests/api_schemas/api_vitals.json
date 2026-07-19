@@ -1,0 +1,111 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/vitals",
+  "is_prefix_sample": false,
+  "path": "/api/vitals",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "page_freshness": {
+        "keys": {
+          "/character": {
+            "type": "string"
+          },
+          "/explorer": {
+            "type": "string"
+          },
+          "/glucose": {
+            "type": "string"
+          },
+          "/habits": {
+            "type": "string"
+          },
+          "/live": {
+            "type": "string"
+          },
+          "/nutrition": {
+            "type": "string"
+          },
+          "/physical": {
+            "type": "string"
+          },
+          "/sleep": {
+            "type": "string"
+          },
+          "/training": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "vitals": {
+        "keys": {
+          "as_of_date": {
+            "type": "string"
+          },
+          "frame": {
+            "type": "string"
+          },
+          "hrv_30d_avg": {
+            "type": "null"
+          },
+          "hrv_30d_n": {
+            "type": "integer"
+          },
+          "hrv_ms": {
+            "type": "number"
+          },
+          "hrv_trend": {
+            "type": "string"
+          },
+          "night_of": {
+            "type": "string"
+          },
+          "recovery_pct": {
+            "type": "number"
+          },
+          "recovery_status": {
+            "type": "string"
+          },
+          "rhr_bpm": {
+            "type": "number"
+          },
+          "rhr_trend": {
+            "type": "string"
+          },
+          "sleep_hours": {
+            "type": "number"
+          },
+          "time_travel": {
+            "type": "boolean"
+          },
+          "weight_as_of": {
+            "type": "null"
+          },
+          "weight_delta_30d": {
+            "type": "null"
+          },
+          "weight_lbs": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
