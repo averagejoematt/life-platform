@@ -81,6 +81,7 @@ EXPECTED_ROUTE_MAP = {
     "/api/food_delivery_overview": "handle_food_delivery_overview",
     "/api/forecast": "handle_forecast",
     "/api/frequent_meals": "handle_frequent_meals",
+    "/api/fulfillment_index": "handle_fulfillment_index",
     "/api/fulfillment_ritual": "handle_fulfillment_ritual",
     "/api/character_calibration": "handle_character_calibration",  # #1409
     "/api/genome_risks": "handle_genome_risks",

@@ -14,7 +14,8 @@ Endpoints routed from this module (kept in sync by tests/test_site_api_data_spli
   /api/cycle_compare, /api/survival
   /api/device_agreement, /api/last_sync, /api/source_freshness, /api/presence
   /api/discoveries, /api/ledger, /api/what_changed
-  /api/experiments, /api/supplements, /api/vice_streaks, /api/fulfillment_ritual
+  /api/experiments, /api/supplements, /api/vice_streaks, /api/fulfillment_ritual,
+  /api/fulfillment_index
   /api/character_calibration (#1409 — felt-reality calibration ledger, aggregates only)
   /api/habits, /api/habit_streaks, /api/habit_registry
   /api/routine (#1066 — the prescribed training block, counts-only projection)
@@ -1779,6 +1780,114 @@ def handle_fulfillment_ritual() -> dict:
             "trend_7d": trend,
             "check_in_count": check_in_count,
             "streak_days": streak,
+            "as_of_date": today,
+        },
+        cache_seconds=900,
+    )
+
+
+def handle_fulfillment_index() -> dict:
+    """
+    GET /api/fulfillment_index — the asymmetric-channel fulfillment index
+    (#1404, epic #718). All composition rules live in
+    lambdas/fulfillment_index.py (pure, unit-tested); this handler only
+    fetches rows and serves the result.
+
+    Publication posture mirrors /api/fulfillment_ritual (ADR-124): aggregates
+    only, bad weeks included, absence honest (insufficient_signal state / null
+    means), never a fabricated number. Cache: 900s.
+    """
+    import fulfillment_index as fi
+
+    today = datetime.now(PT).strftime("%Y-%m-%d")
+    window_start = _experiment_date(90)
+    trend_start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=29)).strftime("%Y-%m-%d")
+
+    def _window(source, projection=None):
+        kwargs = {
+            "KeyConditionExpression": Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").between(f"DATE#{window_start}", f"DATE#{today}~"),
+            "ScanIndexForward": True,
+        }
+        try:
+            resp = table.query(**with_phase_filter(kwargs))  # ADR-058: current-cycle reads
+            return _decimal_to_float(resp.get("Items", []))
+        except Exception as _e:
+            logger.warning(f"[fulfillment_index] {source}: {_e}")
+            return []
+
+    def _adoption_date(source):
+        """First row EVER (cross-cycle, deliberately unfiltered — adoption is a
+        capability fact about the instrumentation, not a cycle datum). None ⇒
+        the channel has never produced a row."""
+        try:
+            resp = table.query(
+                KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}{source}") & Key("sk").begins_with("DATE#"),
+                ScanIndexForward=True,
+                Limit=1,
+            )
+            items = resp.get("Items", [])
+            if not items:
+                return None
+            return str(items[0].get("sk", "")).replace("DATE#", "")[:10] or None
+        except Exception:
+            return None
+
+    def _date_of(it):
+        return (it.get("date") or str(it.get("sk", "")).replace("DATE#", ""))[:10]
+
+    ritual_by_date = {_date_of(it): it for it in _window("evening_ritual")}
+    interactions_by_date = {}
+    for it in _window("interactions"):
+        interactions_by_date.setdefault(_date_of(it), []).append(it)
+    journal_dates = {_date_of(it) for it in _window("notion")}
+    todoist_by_date = {_date_of(it): it for it in _window("todoist")}
+    flourishing_by_date = {_date_of(it): it for it in _window("flourishing")}
+
+    adoption = {
+        "connection_tap": _adoption_date("evening_ritual"),
+        "interactions": _adoption_date("interactions"),
+        "journal_presence": _adoption_date("notion"),
+        # values_todoist adoption is detected within the fetched window (there is
+        # no cheap first-tagged-ever query). A convention adopted >90d ago and
+        # untouched since reads as not-adopted — the FORGIVING direction: the
+        # channel freezes out of coverage rather than zeroing the index.
+        "values_todoist": next(
+            (d for d in sorted(todoist_by_date) if fi.values_tagged_completions(todoist_by_date[d]) > 0),
+            None,
+        ),
+    }
+
+    days = []
+    cursor = datetime.strptime(trend_start, "%Y-%m-%d")
+    end = datetime.strptime(today, "%Y-%m-%d")
+    while cursor <= end:
+        d = cursor.strftime("%Y-%m-%d")
+        adopted = {name: bool(adoption[name] and adoption[name] <= d) for name in fi.CHANNEL_NAMES}
+        scores = {
+            "connection_tap": fi.score_connection_tap(ritual_by_date.get(d)),
+            "interactions": fi.score_interactions(interactions_by_date.get(d)),
+            "journal_presence": fi.score_journal_presence(d in journal_dates),
+            "values_todoist": fi.score_values_todoist(todoist_by_date.get(d)),
+        }
+        day = fi.compose_day(d, adopted, scores)
+        fi.attach_resolution(day, flourishing_by_date.get(d))
+        days.append(day)
+        cursor += timedelta(days=1)
+
+    mean_7d, n_7d = fi.window_mean(days[-7:])
+    mean_30d, n_30d = fi.window_mean(days)
+
+    return _ok(
+        {
+            "today": days[-1] if days else None,
+            "trend_7d": days[-7:],
+            "mean_7d": mean_7d,
+            "n_scored_7d": n_7d,
+            "mean_30d": mean_30d,
+            "n_scored_30d": n_30d,
+            "channels_adopted": adoption,
+            "coverage_floor": fi.COVERAGE_FLOOR,
+            "disclosure": fi.DISCLOSURE,
             "as_of_date": today,
         },
         cache_seconds=900,

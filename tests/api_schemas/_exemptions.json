@@ -1,54 +1,58 @@
 {
   "/api/board_ask": {
     "category": "write-path",
-    "reason": "POST-only AI panel endpoint; dispatched by a SEPARATE lambda (site_api_ai_lambda.py) \u2014 this router's ROUTES entry is a reservation placeholder only, never itself invoked"
+    "reason": "POST-only AI panel endpoint; dispatched by a SEPARATE lambda (site_api_ai_lambda.py) — this router's ROUTES entry is a reservation placeholder only, never itself invoked"
   },
   "/api/board_question": {
     "category": "write-path",
-    "reason": "POST-only \u2014 board follow-up turn (write)"
+    "reason": "POST-only — board follow-up turn (write)"
   },
   "/api/challenge_checkin": {
     "category": "write-path",
-    "reason": "POST-only \u2014 records a challenge check-in (write)"
+    "reason": "POST-only — records a challenge check-in (write)"
   },
   "/api/challenge_follow": {
     "category": "write-path",
-    "reason": "POST-only \u2014 follow/unfollow a challenge (write)"
+    "reason": "POST-only — follow/unfollow a challenge (write)"
   },
   "/api/challenge_vote": {
     "category": "write-path",
-    "reason": "POST-only \u2014 votes on a challenge (write)"
+    "reason": "POST-only — votes on a challenge (write)"
   },
   "/api/character_receipt": {
     "category": "capture-failed",
-    "reason": "#1373: route lands in this PR \u2014 not yet deployed, so a live shape capture is impossible pre-merge. Post-deploy: run deploy/capture_api_schemas.py to snapshot the real shape and DROP this entry."
+    "reason": "#1373: route lands in this PR — not yet deployed, so a live shape capture is impossible pre-merge. Post-deploy: run deploy/capture_api_schemas.py to snapshot the real shape and DROP this entry."
   },
   "/api/experiment_follow": {
     "category": "write-path",
-    "reason": "POST-only \u2014 follow/unfollow an experiment (write)"
+    "reason": "POST-only — follow/unfollow an experiment (write)"
   },
   "/api/experiment_suggest": {
     "category": "write-path",
-    "reason": "POST-only \u2014 reader-submitted experiment suggestion (write)"
+    "reason": "POST-only — reader-submitted experiment suggestion (write)"
   },
   "/api/experiment_vote": {
     "category": "write-path",
-    "reason": "POST-only \u2014 votes on an experiment (write)"
+    "reason": "POST-only — votes on an experiment (write)"
+  },
+  "/api/fulfillment_index": {
+    "category": "capture-failed",
+    "reason": "#1404: route lands in this PR — not yet deployed, so a live shape capture is impossible pre-merge. Post-deploy: run deploy/capture_api_schemas.py to snapshot the real shape and DROP this entry."
   },
   "/api/nudge": {
     "category": "write-path",
-    "reason": "POST-only \u2014 evening nudge action (write)"
+    "reason": "POST-only — evening nudge action (write)"
   },
   "/api/ritual_log": {
     "category": "write-path",
-    "reason": "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC token (ADR-124, #769) \u2014 no read-only variant exists; there is no safe way to probe it that doesn't attempt a write"
+    "reason": "GET-verb but MUTATING: one-tap evening-ritual write gated by a signed HMAC token (ADR-124, #769) — no read-only variant exists; there is no safe way to probe it that doesn't attempt a write"
   },
   "/api/submit_finding": {
     "category": "write-path",
-    "reason": "POST-only \u2014 reader-submitted finding, writes to S3 (write)"
+    "reason": "POST-only — reader-submitted finding, writes to S3 (write)"
   },
   "/api/verify_subscriber": {
     "category": "requires-path-param",
-    "reason": "requires ?email= \u2014 a real subscriber address; probing an arbitrary address would leak that address's subscription status (privacy), and there is no safe synthetic value"
+    "reason": "requires ?email= — a real subscriber address; probing an arbitrary address would leak that address's subscription status (privacy), and there is no safe synthetic value"
   }
 }
