@@ -1,0 +1,131 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/experiment_detail?id=no-screens-before-bed",
+  "is_prefix_sample": false,
+  "path": "/api/experiment_detail",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "active_run": {
+        "type": "null"
+      },
+      "completed_runs": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "completed_runs_count": {
+        "type": "integer"
+      },
+      "description": {
+        "type": "string"
+      },
+      "difficulty": {
+        "type": "string"
+      },
+      "duration_tier": {
+        "type": "string"
+      },
+      "evidence_citation": {
+        "type": "string"
+      },
+      "evidence_summary": {
+        "type": "string"
+      },
+      "evidence_tier": {
+        "type": "string"
+      },
+      "experiment_type": {
+        "type": "string"
+      },
+      "follower_count": {
+        "type": "integer"
+      },
+      "hypothesis_template": {
+        "type": "string"
+      },
+      "id": {
+        "type": "string"
+      },
+      "metrics_behavioral": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "metrics_measurable": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "name": {
+        "type": "string"
+      },
+      "pillar": {
+        "type": "string"
+      },
+      "pillar_icon": {
+        "type": "string"
+      },
+      "pillar_label": {
+        "type": "string"
+      },
+      "promoted_date": {
+        "type": "null"
+      },
+      "protocol_template": {
+        "type": "string"
+      },
+      "related_protocols": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "runs": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "status": {
+        "type": "string"
+      },
+      "suggested_duration_days": {
+        "type": "integer"
+      },
+      "tags": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 4,
+        "type": "array"
+      },
+      "total_runs": {
+        "type": "integer"
+      },
+      "votes": {
+        "type": "integer"
+      },
+      "why_it_matters": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

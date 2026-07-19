@@ -1,0 +1,148 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/achievements",
+  "is_prefix_sample": false,
+  "path": "/api/achievements",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "achievements": {
+        "items": [
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "earned": {
+                "type": "boolean"
+              },
+              "earned_date": {
+                "type": "null"
+              },
+              "icon": {
+                "type": "null"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "unlock_hint": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "earned": {
+                "type": "boolean"
+              },
+              "earned_date": {
+                "type": "null"
+              },
+              "icon": {
+                "type": "null"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "unlock_hint": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "earned": {
+                "type": "boolean"
+              },
+              "earned_date": {
+                "type": "null"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "unlock_hint": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 40,
+        "type": "array"
+      },
+      "summary": {
+        "keys": {
+          "completed_challenges": {
+            "type": "integer"
+          },
+          "current_level": {
+            "type": "integer"
+          },
+          "current_streak": {
+            "type": "integer"
+          },
+          "current_weight": {
+            "type": "integer"
+          },
+          "days_tracked": {
+            "type": "integer"
+          },
+          "earned": {
+            "type": "integer"
+          },
+          "perfect_challenges": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

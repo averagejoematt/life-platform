@@ -26,6 +26,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
+from v4_proof import (  # noqa: E402  — #1395 static core + data-driven OG on the door hubs
+    data_block_html,
+    data_og,
+    load_data_sources,
+    load_protocols,
+    protocols_block_html,
+    protocols_og,
+)
 
 # slug, title, blurb, group, mode, endpoint, root, legacy[, "unlisted"]
 #   mode: data (fetch+render) · interactive (render+wire, no fetch) ·
@@ -814,9 +822,21 @@ OG_CARD_BY_SLUG = {
 }
 
 
-def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str:
+def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof: str = "", og: dict | None = None) -> str:
     reg = json.dumps(registry_json(pillar["groups"]))
     og_image = f"https://averagejoematt.com/assets/images/{OG_CARD_BY_SLUG.get(start_slug, 'og-home.png')}"
+    # #1395: the door HUBS carry a data-driven OG override (a dated, falsifiable number
+    # in the title/description) + a <noscript> static core; the topic shells keep the
+    # topical title/desc + per-slug card. `og` is a scripts/v4_proof._og_tags() dict.
+    og_title = title
+    og_desc = desc
+    if og:
+        og_title = og.get(("property", "og:title"), title)
+        og_desc = og.get(("property", "og:description"), desc)
+        og_image = og.get(("property", "og:image"), og_image)
+    # Empty proof must leave the topic shells byte-identical (no stray blank line — it
+    # would needlessly diff all ~48 topic pages and could conflict across concurrent PRs).
+    proof_slot = f"{proof}\n    " if proof else ""
     return f"""<!DOCTYPE html>
 <html lang="en" data-door="{pillar["door"]}">
 <head>
@@ -828,12 +848,12 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com{canonical}">
-  <meta property="og:title" content="{esc(title)}">
-  <meta property="og:description" content="{esc(desc)}">
+  <meta property="og:title" content="{esc(og_title)}">
+  <meta property="og:description" content="{esc(og_desc)}">
   <meta property="og:image" content="{og_image}">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{esc(title)}">
-  <meta name="twitter:description" content="{esc(desc)}">
+  <meta name="twitter:title" content="{esc(og_title)}">
+  <meta name="twitter:description" content="{esc(og_desc)}">
   <link rel="icon" href="/favicon.ico">
   {FONTS}
   <link rel="stylesheet" href="/assets/css/tokens.css">
@@ -852,7 +872,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar) -> str
       <p class="ph-promise">{esc(pillar["lede"])}</p>
       {loop_ribbon(pillar["door"])}
     </div>
-    <nav class="ev-tabs" data-tabs aria-label="Sections"></nav>
+    {proof_slot}<nav class="ev-tabs" data-tabs aria-label="Sections"></nav>
     <div class="ev-layout">
       <aside class="ev-side" data-side aria-label="Topics"></aside>
       <section class="ev-main" data-main>
@@ -887,8 +907,20 @@ def main() -> int:
         # in" placeholders made the worst first impression on the page. Other pillars
         # keep registry order. Hash deep-links still win in evidence.js.
         first = "physical" if (pillar["dir"] == "data" and "physical" in slugs) else slugs[0]
+        # #1395: the Data + Protocols HUBS get a <noscript> static core (real headline
+        # numbers + as-of) and a data-driven OG override, so the crawler / no-JS / unfurl
+        # view is real content, not a blank shell. Method is footer-tier (no unfurl
+        # surface) and keeps the plain shell. Best-effort: an offline build (both API and
+        # snapshot empty) yields "" and the hub ships without the block, never a fake.
+        hub_proof, hub_og = "", None
+        if pillar["dir"] == "data":
+            summary = load_data_sources()
+            hub_proof, hub_og = data_block_html(summary), data_og(summary)
+        elif pillar["dir"] == "protocols":
+            summary = load_protocols()
+            hub_proof, hub_og = protocols_block_html(summary), protocols_og(summary)
         (out / "index.html").write_text(
-            shell(first, pillar["base"], f"The {pillar['title']} — averagejoematt", pillar["lede"], pillar),
+            shell(first, pillar["base"], f"The {pillar['title']} — averagejoematt", pillar["lede"], pillar, proof=hub_proof, og=hub_og),
             encoding="utf-8",
         )
         n = 0

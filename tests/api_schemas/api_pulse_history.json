@@ -1,0 +1,31 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/pulse_history",
+  "is_prefix_sample": false,
+  "path": "/api/pulse_history",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "pulse_history": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

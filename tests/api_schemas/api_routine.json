@@ -1,0 +1,81 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/routine",
+  "is_prefix_sample": false,
+  "path": "/api/routine",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "available": {
+        "type": "boolean"
+      },
+      "block": {
+        "keys": {
+          "phase": {
+            "type": "string"
+          },
+          "phase_started": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "routine": {
+        "keys": {
+          "archetype": {
+            "type": "string"
+          },
+          "days_out": {
+            "type": "integer"
+          },
+          "exercise_count": {
+            "type": "integer"
+          },
+          "pushed": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "target_date": {
+            "type": "string"
+          },
+          "total_sets": {
+            "type": "integer"
+          },
+          "variant": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "start_date": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

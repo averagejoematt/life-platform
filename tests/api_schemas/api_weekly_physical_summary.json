@@ -1,0 +1,52 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/weekly_physical_summary",
+  "is_prefix_sample": false,
+  "path": "/api/weekly_physical_summary",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "days": {
+        "items": {
+          "keys": {
+            "activities": {
+              "items": null,
+              "length_sample": 0,
+              "type": "array"
+            },
+            "date": {
+              "type": "string"
+            },
+            "day_of_week": {
+              "type": "string"
+            },
+            "steps": {
+              "type": "null"
+            },
+            "total_active_minutes": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 7,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

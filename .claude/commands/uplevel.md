@@ -34,10 +34,18 @@ Fan out a multi-agent survey (Workflow tool; ~6–8 agents, one per lens):
   moment of boredom or confusion? What would make them come back tomorrow?
 
 Seeds come from the LIVE backlog, not a static list (ADR-099 — GitHub issues are the single
-source of truth for forward work): run `gh issue list --label type:story --milestone Now
---state open --limit 30` and treat the top-ranked open stories as candidate seeds. Agents may
-build on them but must NOT limit themselves to them — fresh discovery outranks backlog replay.
-When a session ships a story, the PR carries `Fixes #N`.
+source of truth for forward work): run the actionable-only query below (it excludes
+`gate:owner` — issues blocked on a human-only act — per ADR-099's 2026-07-18 amendment, #1339,
+so the seed set is never polluted with work no session can actually start) and treat the
+top-ranked results as candidate seeds:
+```bash
+gh issue list --label type:story --milestone Now --state open --json number,title,labels --limit 30 \
+  | jq '[.[] | select(.labels | map(.name) | index("gate:owner") | not)]'
+```
+An empty result is a real, visible signal ("nothing actionable is queued in Now") rather than a
+list silently full of items no session can start — read it as a prompt to re-tier Next, not a
+bug. Agents may build on the seeds but must NOT limit themselves to them — fresh discovery
+outranks backlog replay. When a session ships a story, the PR carries `Fixes #N`.
 
 **Then verify adversarially:** historical false-positive rate for survey findings is ~50%.
 Each candidate must be confirmed against actual code/live state (a second agent or your own

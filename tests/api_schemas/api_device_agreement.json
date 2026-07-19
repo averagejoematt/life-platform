@@ -1,0 +1,124 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/device_agreement",
+  "is_prefix_sample": false,
+  "path": "/api/device_agreement",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "combined_agreement_rate_pct": {
+        "type": "number"
+      },
+      "daily": {
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "garmin_rhr_bpm": {
+              "type": "number"
+            },
+            "rhr_abs_diff_bpm": {
+              "type": "number"
+            },
+            "rhr_agreement": {
+              "type": "string"
+            },
+            "whoop_rhr_bpm": {
+              "type": "number"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 90,
+        "type": "array"
+      },
+      "device_confidence": {
+        "type": "string"
+      },
+      "flagged_disagreement_days": {
+        "items": {
+          "keys": {
+            "date": {
+              "type": "string"
+            },
+            "flags": {
+              "items": {
+                "type": "string"
+              },
+              "length_sample": 1,
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 90,
+        "type": "array"
+      },
+      "garmin_last_date": {
+        "type": "string"
+      },
+      "garmin_paused": {
+        "type": "boolean"
+      },
+      "hrv_agreement": {
+        "type": "null"
+      },
+      "interpretation": {
+        "type": "string"
+      },
+      "period": {
+        "keys": {
+          "end": {
+            "type": "string"
+          },
+          "overlapping_days": {
+            "type": "integer"
+          },
+          "start": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "rhr_agreement": {
+        "keys": {
+          "agree_days": {
+            "type": "integer"
+          },
+          "agreement_rate_pct": {
+            "type": "number"
+          },
+          "flagged_days": {
+            "type": "integer"
+          },
+          "minor_days": {
+            "type": "integer"
+          },
+          "threshold_note": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "status": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

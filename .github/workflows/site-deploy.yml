@@ -150,6 +150,9 @@ jobs:
   # Mirrors the ci-cd.yml `visual-qa` job and visual-qa.yml — keep the
   # three step lists in sync (same pinned Playwright, same role, same
   # scripts) so a red here means the same thing as a red there.
+  # #1428: --ai-qa-max-tier 1 restricts the AI-vision layer to the 6 tier-1
+  # doors at deploy time (deterministic sweep + --reader-truth stay full
+  # surface); the full AI-vision pass runs weekly on visual-qa.yml instead.
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA
@@ -178,7 +181,9 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         run: |
-          python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
+          # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
+          # time; the deterministic sweep + --reader-truth are unaffected (full surface).
+          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |
@@ -186,6 +191,13 @@ jobs:
 
       - name: Upload screenshots + report
         if: always()
+        # continue-on-error (#1331): this is a diagnostics side-channel, not the QA
+        # verdict itself — the gate already passed/failed in the steps above. Without
+        # this, account-wide GitHub Actions artifact-quota exhaustion (recalculates
+        # every 6-12h, unrelated to this deploy) can fail JUST this upload post-step
+        # after "GATE PASSED", flipping this job's conclusion to failure and firing
+        # rollback-site-on-failure on a healthy deploy (observed 2026-07-16/17).
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: site-deploy-visual-qa-screenshots

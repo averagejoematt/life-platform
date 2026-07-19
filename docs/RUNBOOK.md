@@ -1360,8 +1360,8 @@ See ADR-058/077 in `docs/DECISIONS.md` for the design rationale.
 
 The monthly AWS budget — **$85 base** (ADR-133 amendment 2026-07-08; was $75), floating to **$100 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system:
 
-- **`life-platform-cost-governor`** Lambda (hourly) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
-- **`lambdas/budget_guard.py`** (shared-layer module) — calling code uses `allow(feature)` to gate AI by tier.
+- **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 0/8 * * ? *)`, `cdk/stacks/operational_stack.py`) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
+- **`lambdas/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
 
 **Tier behavior** (priority: protect daily brief longest):
 

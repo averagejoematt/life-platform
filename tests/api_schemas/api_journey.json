@@ -1,0 +1,106 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/journey",
+  "is_prefix_sample": false,
+  "path": "/api/journey",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "journey": {
+        "keys": {
+          "current_weight_lbs": {
+            "type": "null"
+          },
+          "day_n": {
+            "type": "integer"
+          },
+          "days_to_goal": {
+            "type": "null"
+          },
+          "days_until_start": {
+            "type": "integer"
+          },
+          "goal_weight_lbs": {
+            "type": "number"
+          },
+          "height_inches": {
+            "type": "number"
+          },
+          "last_weighin_date": {
+            "type": "null"
+          },
+          "lost_lbs": {
+            "type": "null"
+          },
+          "pre_start": {
+            "type": "boolean"
+          },
+          "progress_pct": {
+            "type": "null"
+          },
+          "projected_goal_date": {
+            "type": "null"
+          },
+          "projected_goal_date_earliest": {
+            "type": "null"
+          },
+          "projected_goal_date_latest": {
+            "type": "null"
+          },
+          "projection_confidence": {
+            "type": "null"
+          },
+          "rate_provisional": {
+            "type": "null"
+          },
+          "remaining_lbs": {
+            "type": "null"
+          },
+          "start_date": {
+            "type": "string"
+          },
+          "start_weight_lbs": {
+            "type": "number"
+          },
+          "started_date": {
+            "type": "string"
+          },
+          "week_n": {
+            "type": "integer"
+          },
+          "weekly_rate_ci_high": {
+            "type": "null"
+          },
+          "weekly_rate_ci_low": {
+            "type": "null"
+          },
+          "weekly_rate_lbs": {
+            "type": "null"
+          },
+          "weighin_count": {
+            "type": "integer"
+          },
+          "weighin_span_days": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,203 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/methods",
+  "is_prefix_sample": false,
+  "path": "/api/methods",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "categories": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 6,
+        "type": "array"
+      },
+      "stats": {
+        "items": [
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "fingerprint": {
+                "type": "string"
+              },
+              "formula": {
+                "type": "string"
+              },
+              "function": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "limitations": {
+                "type": "string"
+              },
+              "min_n": {
+                "type": "integer"
+              },
+              "module": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "recorded_fingerprint": {
+                "type": "string"
+              },
+              "used_by": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "fingerprint": {
+                "type": "string"
+              },
+              "formula": {
+                "type": "string"
+              },
+              "function": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "limitations": {
+                "type": "string"
+              },
+              "min_n": {
+                "type": "null"
+              },
+              "module": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "recorded_fingerprint": {
+                "type": "string"
+              },
+              "used_by": {
+                "type": "null"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "fingerprint": {
+                "type": "string"
+              },
+              "formula": {
+                "type": "string"
+              },
+              "function": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "limitations": {
+                "type": "string"
+              },
+              "min_n": {
+                "type": "null"
+              },
+              "module": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "recorded_fingerprint": {
+                "type": "string"
+              },
+              "used_by": {
+                "type": "string"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "category": {
+                "type": "string"
+              },
+              "fingerprint": {
+                "type": "string"
+              },
+              "formula": {
+                "type": "string"
+              },
+              "function": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "limitations": {
+                "type": "string"
+              },
+              "min_n": {
+                "type": "integer"
+              },
+              "module": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "recorded_fingerprint": {
+                "type": "string"
+              },
+              "used_by": {
+                "type": "null"
+              },
+              "window": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 18,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

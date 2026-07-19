@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/cycle_compare",
+  "is_prefix_sample": false,
+  "path": "/api/cycle_compare",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "current_cycle": {
+        "type": "integer"
+      },
+      "cycles": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "note": {
+        "type": "string"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "start_date": {
+        "type": "string"
+      },
+      "window_days": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

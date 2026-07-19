@@ -227,7 +227,7 @@ def handle_platform_stats() -> dict:
 
 # ── Source freshness (public pipeline-status feed) ──────────────────────────
 # #392: the board derives from the ONE canonical registry (source_registry.py,
-# shared-layer module) instead of hand-mirroring freshness_checker_lambda under
+# bundled module, #781) instead of hand-mirroring freshness_checker_lambda under
 # a "KEEP IN SYNC" comment — the mirrors had drifted (withings/strava read as
 # infrastructure; food_delivery thresholds disagreed). Per-source rationale
 # lives in the registry. Behavioral staleness stays honestly visible here —

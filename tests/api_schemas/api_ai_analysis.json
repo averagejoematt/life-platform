@@ -1,0 +1,35 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/ai_analysis",
+  "is_prefix_sample": false,
+  "path": "/api/ai_analysis",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "analysis": {
+        "type": "null"
+      },
+      "expert_key": {
+        "type": "string"
+      },
+      "generated_at": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

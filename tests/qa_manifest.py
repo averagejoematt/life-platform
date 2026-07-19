@@ -75,33 +75,15 @@ def _evidence_rows():
     return rows
 
 
-# ── Visual defs for the archive topics already in the Playwright sweep ────────
-# Exactly the pre-#1426 tests/visual_qa.py coverage (EVIDENCE_TOPICS +
-# METHOD_TOPICS + the /method/character/ explainer + the three protocols topic
-# pages). #1427 extends visual coverage to the rest — flipping a page in is a
+# ── Visual defs for the archive topics ────────────────────────────────────────
+# Every archive/readout page (the /data/ · /protocols/ · /method/ topic pages
+# generated from scripts/v4_build_evidence.REGISTRY) shares one template —
+# evidence.js always mounts content into a `[data-readout]` element, for every
+# mode (data/interactive/editorial) — verified by grep across the built site/
+# (#1427). So _readout_visual applies uniformly to ALL archive rows now, not
+# just the pre-#1426 hand-picked subset; flipping a page into the sweep is a
 # one-line visual= change here, not a new list anywhere.
 CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training", "character"}
-_VISUAL_EVIDENCE = {
-    "/data/vitals/",
-    "/data/physical/",
-    "/data/labs/",
-    "/data/glucose/",
-    "/data/sleep/",
-    "/data/training/",
-    "/data/nutrition/",
-    "/data/habits/",
-    "/data/character/",
-    "/method/board/",
-    "/method/pipeline/",
-    "/method/intelligence/",
-    "/method/predictions/",
-    "/method/scenarios/",
-    "/method/benchmarks/",
-    "/method/character/",
-    "/protocols/experiments/",
-    "/protocols/challenges/",
-    "/protocols/supplements/",
-}
 
 
 def _readout_visual(path: str, title: str) -> dict:
@@ -127,7 +109,7 @@ def _archive_entries():
                 "content_class": "live-data" if live else "narrative",
                 "api_deps": [endpoint] if (live and endpoint) else [],
                 "js_modules": ["evidence.js"],
-                "visual": _readout_visual(path, title) if path in _VISUAL_EVIDENCE else None,
+                "visual": _readout_visual(path, title),
                 "leak_scan": True,
                 "smoke": "200",
                 "unlisted": "unlisted" in flags,
@@ -143,6 +125,7 @@ _CURATED = [
     {
         "path": "/",
         "name": "Home (constellation)",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": ["/api/journey", "/api/character"],
@@ -167,6 +150,7 @@ _CURATED = [
     {
         "path": "/cockpit/",
         "name": "Cockpit",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": ["/api/character", "/api/pulse", "/api/journey"],
@@ -184,6 +168,7 @@ _CURATED = [
     {
         "path": "/story/",
         "name": "Story hub",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "narrative",
         "api_deps": ["/journal/posts.json"],
@@ -258,7 +243,7 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": ["story.js"],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "build dispatches content"}]},
     },
     {
         "path": "/story/panel/",
@@ -267,7 +252,7 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": ["/panelcast/episodes.json"],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "panelcast content"}]},
     },
     {
         "path": "/story/timeline/",
@@ -276,11 +261,12 @@ _CURATED = [
         "content_class": "live-data",
         "api_deps": ["/api/timeline"],
         "js_modules": ["story.js"],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "timeline content"}]},
     },
     {
         "path": "/data/",
         "name": "Data hub",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": [],
@@ -293,6 +279,7 @@ _CURATED = [
     {
         "path": "/protocols/",
         "name": "Protocols hub",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": [],
@@ -309,7 +296,10 @@ _CURATED = [
         "content_class": "live-data",
         "api_deps": [],
         "js_modules": ["evidence.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-readout]",
+            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "method readout rendered"}],
+        },
     },
     {
         "path": "/method/game/",
@@ -318,7 +308,12 @@ _CURATED = [
         "content_class": "generated",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "game explainer content"},
+                {"selector": ".gx-pillar", "min_count": 7, "desc": "7 pillar cards rendered"},
+            ]
+        },
     },
     {
         "path": "/method/registry/",
@@ -327,12 +322,18 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "methods registry content"},
+                {"selector": ".mr-stat", "min_count": 1, "desc": "registry stat entries rendered"},
+            ]
+        },
     },
     # ── Coaching door (promoted 2026-06-20) ──────────────────────────────────
     {
         "path": "/coaching/",
         "name": "Coaching hub (My Team)",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": ["/api/coaches", "/api/coach_team"],
@@ -415,7 +416,10 @@ _CURATED = [
         "content_class": "live-data",
         "api_deps": ["/api/coach_team"],
         "js_modules": ["coaching.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "team roster/profile rendered (legacy slug)"}],
+        },
     },
     {
         "path": "/coaching/qa/",
@@ -424,7 +428,10 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": ["coaching.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "reader Q&A content rendered"}],
+        },
     },
     {
         "path": "/coaching/read/",
@@ -433,7 +440,10 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": ["coaching.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "the-read content rendered"}],
+        },
     },
     # ── Mind (redirect shell → /data/reading/) ───────────────────────────────
     {
@@ -461,7 +471,12 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "gear content"},
+                {"selector": ".gr-card", "min_count": 1, "desc": "gear cards rendered"},
+            ]
+        },
     },
     {
         "path": "/journal/essays/org-chart-of-one/",
@@ -470,7 +485,7 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, article, .post-body", "not_empty": True, "desc": "essay content"}]},
     },
     {
         "path": "/privacy/",
@@ -479,7 +494,7 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "privacy policy content"}]},
     },
     {
         "path": "/subscribe/",
@@ -488,7 +503,7 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "subscribe page content"}]},
     },
     {
         "path": "/subscribe/confirm/",
@@ -497,7 +512,10 @@ _CURATED = [
         "content_class": "utility",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        # Real content (JS renders a confirmed/expired/check-your-inbox state from
+        # the ?confirmed=/?error= query params — default state with no params is
+        # "Check your inbox"), so it earns a check despite tier-4 (#1427).
+        "visual": {"checks": [{"selector": "#cc-title, main", "not_empty": True, "desc": "confirm-state message rendered"}]},
     },
     {
         "path": "/404.html",
@@ -506,6 +524,8 @@ _CURATED = [
         "content_class": "utility",
         "api_deps": [],
         "js_modules": [],
+        # Error page — status-only is the right coverage (smoke already verifies the
+        # 200 on direct S3 fetch); no meaningful render behavior to check (#1427).
         "visual": None,
     },
     {
@@ -516,6 +536,8 @@ _CURATED = [
         "api_deps": [],
         "js_modules": [],
         "leak_scan": False,
+        # Pure meta-refresh redirect stub — no content to check; the target page
+        # (/subscribe/) is visually swept directly (#1427).
         "visual": None,
     },
 ]
@@ -535,6 +557,11 @@ def _build():
         p.setdefault("leak_scan", True)
         p.setdefault("smoke", "200")
         p.setdefault("unlisted", False)
+        # #1395: does this page ship a build-time <noscript> static core (headline
+        # numbers + "as of" provenance) so the no-JS / crawler / link-unfurl view is
+        # real content, not a blank shell? True only for the growth-surface pages
+        # (Home + the doors); deploy/smoke_test_site.sh asserts it per page.
+        p.setdefault("static_core", False)
     seen = {}
     for p in pages:
         if p["path"] in seen:
@@ -549,17 +576,25 @@ PAGES_BY_PATH = {p["path"]: p for p in MANIFEST}
 
 # ── Consumer facets ───────────────────────────────────────────────────────────
 def visual_pages():
-    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage."""
+    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage.
+
+    Each entry carries `tier` (from its parent manifest entry, #1428) so the
+    sweep can restrict the AI-vision layer to a tier subset (deploy-time =
+    tier 1 only) without touching which pages the deterministic Playwright
+    checks cover — that stays the full set, unchanged.
+    """
     out = []
     for p in MANIFEST:
         if p.get("visual"):
             d = dict(p["visual"])
             d["path"] = p["path"]
             d["name"] = p["name"]
+            d["tier"] = p["tier"]
             out.append(d)
         for var in p.get("visual_variants", []) or []:
             d = dict(var)
             d["path"] = p["path"] + d.pop("fragment", "")
+            d["tier"] = p["tier"]
             out.append(d)
     return out
 
@@ -572,6 +607,11 @@ def leak_scan_paths():
 def smoke_rows():
     """deploy/smoke_test_site.sh — 'path|name|expected_status' per page."""
     return [f"{p['path']}|{p['name']}|{p['smoke']}" for p in MANIFEST]
+
+
+def static_core_paths():
+    """deploy/smoke_test_site.sh — pages that MUST ship a build-time static core (#1395)."""
+    return [p["path"] for p in MANIFEST if p.get("static_core")]
 
 
 def site_files():
@@ -610,7 +650,7 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak"])
+    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core"])
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -635,6 +675,9 @@ def main():
             print(row)
     elif args.emit == "leak":
         for p in leak_scan_paths():
+            print(p)
+    elif args.emit == "static_core":
+        for p in static_core_paths():
             print(p)
     else:
         ap.print_help()

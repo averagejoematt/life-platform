@@ -27,7 +27,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
-from v4_proof import chronicle_list_html, load_chronicle, load_chronicle_pending  # noqa: E402  — #730/#803 static proof
+from v4_proof import (  # noqa: E402  — #730/#803 static proof + #1395 data-driven OG
+    chronicle_list_html,
+    load_chronicle,
+    load_chronicle_pending,
+    story_og,
+)
 
 OUT = Path("site/story")
 
@@ -74,12 +79,12 @@ SHELL = """<!DOCTYPE html>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/story/{canon}">
-  <meta property="og:title" content="{title}">
-  <meta property="og:description" content="{desc}">
+  <meta property="og:title" content="{og_title}">
+  <meta property="og:description" content="{og_desc}">
   <meta property="og:image" content="https://averagejoematt.com/assets/images/{og_card}">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{title}">
-  <meta name="twitter:description" content="{desc}">
+  <meta name="twitter:title" content="{og_title}">
+  <meta name="twitter:description" content="{og_desc}">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
@@ -168,7 +173,11 @@ def main() -> None:
     # (which defaults to the chronicle view) and the /story/chronicle/ sub-page.
     # #803: also bakes an honest "why didn't this week land" disclosure — a currently
     # withheld week and/or a break in the Week-N numbering — instead of a silent skip.
-    chronicle_proof = chronicle_list_html(load_chronicle(), pending=load_chronicle_pending())
+    posts = load_chronicle()
+    chronicle_proof = chronicle_list_html(posts, pending=load_chronicle_pending())
+    # #1395: the /story/ HUB carries a data-driven OG (the count of published
+    # dispatches, dated) on the weekly-chronicle card instead of the generic home card.
+    hub_og = story_og(posts)
 
     # hub (defaults to chronicle)
     write(
@@ -178,20 +187,25 @@ def main() -> None:
             desc="The chronicle, the journal, the timeline, and the context behind the experiment.",
             canon="",
             start="chronicle",
-            og_card=DEFAULT_OG_CARD,  # the /story/ hub is the general landing — keep the brand home card
+            og_card="og-chronicle.png",  # #1395: the story hub leads with the chronicle card
+            og_title=hub_og[("property", "og:title")],
+            og_desc=hub_og[("property", "og:description")],
             proof=chronicle_proof,
         ),
     )
     # per-section sub-pages
     for key, label, desc in SECTIONS:
+        section_title = f"{label} — The Story — averagejoematt"
         write(
             OUT / key / "index.html",
             SHELL.format(
-                title=f"{label} — The Story — averagejoematt",
+                title=section_title,
                 desc=desc,
                 canon=f"{key}/",
                 start=key,
                 og_card=OG_CARD_BY_SECTION.get(key, DEFAULT_OG_CARD),
+                og_title=section_title,
+                og_desc=desc,
                 proof=chronicle_proof if key == "chronicle" else "",
             ),
         )
