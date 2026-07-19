@@ -31,6 +31,11 @@ Usage:
     python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
                                                     # + phase-aware truth pass over each
                                                     #   page's rendered prose (#1095)
+    python3 tests/visual_qa.py --browser webkit --mobile --max-tier 2 --screenshot
+                                                    # the weekly ADVISORY iOS-Safari-engine run
+                                                    #   (#1434; .github/workflows/webkit-mobile-qa.yml):
+                                                    #   WebKit at an iPhone-class profile over the
+                                                    #   tier-1/2 manifest pages
 
 Cost: $0 for the browser sweep. --ai-qa adds a few Bedrock vision calls (Haiku,
 ~$0.001/image; pennies per run, and it no-ops cleanly if AI is unavailable/budget-paused).
@@ -714,6 +719,22 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
     }
 
 
+def sweep_pages(pages, max_tier=None):
+    """Which page defs the DETERMINISTIC sweep drives (#1434).
+
+    Pure/testable (no Playwright dependency), mirroring ai_qa_targets semantics:
+    max_tier=None returns the list unchanged (every existing caller — the gating
+    deploy-time sweep and the daily standalone run — passes nothing, so their
+    coverage is byte-for-byte what it was). An int restricts to page defs whose
+    qa_manifest `tier` is <= max_tier: the weekly WebKit run passes 2 to sweep
+    exactly the flagship doors + live-data topic pages. A missing/None tier is
+    treated as tier 0 (always included) rather than silently dropped.
+    """
+    if max_tier is None:
+        return pages
+    return [p for p in pages if (p.get("tier") if p.get("tier") is not None else 0) <= max_tier]
+
+
 def ai_qa_targets(results, max_tier=None):
     """Which captured-page results get handed to the AI-vision pass (#1428).
 
@@ -728,7 +749,17 @@ def ai_qa_targets(results, max_tier=None):
     return [r for r in results if (r.get("tier") if r.get("tier") is not None else 0) <= max_tier]
 
 
-def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=False, reader_truth=False, ai_qa_max_tier=None):
+def run_sweep(
+    pages=None,
+    save_screenshots=False,
+    screenshot_dir=None,
+    ai_qa=False,
+    reader_truth=False,
+    ai_qa_max_tier=None,
+    browser_name="chromium",
+    mobile=False,
+    max_tier=None,
+):
     """Run the v4 visual QA sweep. Returns True if no page FAILED.
 
     ai_qa_max_tier (#1428): when set, restricts the Claude-vision assessment to
@@ -737,6 +768,18 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
     NEVER affected by this — `pages` (or the full PAGES list) still drives it, so
     coverage there stays exactly what it is today. None (the default, used by the
     weekly full-surface run) assesses every captured page — unchanged behavior.
+
+    browser_name / mobile / max_tier (#1434): the weekly advisory WebKit run
+    (.github/workflows/webkit-mobile-qa.yml) passes browser_name="webkit",
+    mobile=True, max_tier=2 to drive the iOS-Safari engine at an iPhone-class
+    viewport over the tier-1/2 pages — the backdrop-filter/position:fixed bug
+    class Chromium emulation cannot see (memory: project_mobile_pwa). mobile=True
+    opens the context at 390x844, dpr 3, is_mobile + has_touch (explicit metrics
+    rather than a Playwright device descriptor so a descriptor rename between
+    Playwright versions can never silently change the run; the UA stays the
+    engine default — the site does no UA sniffing, the ENGINE is the coverage).
+    capture_page's own in-page viewport passes (390/844, 360/800, 1280) behave
+    exactly as before. Defaults reproduce today's gating runs byte-for-byte.
     """
     from playwright.sync_api import sync_playwright
 
@@ -750,10 +793,19 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         save_screenshots = True
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+        browser = getattr(p, browser_name).launch(headless=True)
+        if mobile:
+            context = browser.new_context(
+                viewport={"width": 390, "height": 844},
+                device_scale_factor=3,
+                is_mobile=True,
+                has_touch=True,
+                color_scheme="dark",
+            )
+        else:
+            context = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
 
-        for page_def in pages or PAGES:
+        for page_def in sweep_pages(pages or PAGES, max_tier):
             # --reader-truth needs each page's rendered innerText (the prose dump).
             result = capture_page(context, page_def, screenshot_dir, save_screenshots, capture_prose=reader_truth)
             results.append(result)
@@ -818,6 +870,9 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         json.dump(
             {
                 "timestamp": datetime.now(timezone.utc).isoformat(),
+                "browser": browser_name,
+                "mobile": mobile,
+                "max_tier": max_tier,
                 "passed": passed,
                 "failed": failed,
                 "warnings": warns,
@@ -856,6 +911,26 @@ if __name__ == "__main__":
         action="store_true",
         help="Run the phase-aware reader-truth QA over each page's rendered prose (#1095; high severity gates like --ai-qa)",
     )
+    ap.add_argument(
+        "--browser",
+        choices=["chromium", "webkit", "firefox"],
+        default="chromium",
+        help="Playwright engine to drive (#1434; the weekly advisory iOS-Safari-engine run passes webkit)",
+    )
+    ap.add_argument(
+        "--mobile",
+        action="store_true",
+        help="Open the browser context at an iPhone-class mobile profile (390x844, dpr 3, touch) instead of 1440x900 desktop (#1434)",
+    )
+    ap.add_argument(
+        "--max-tier",
+        type=int,
+        default=None,
+        help=(
+            "Restrict the DETERMINISTIC sweep to qa_manifest pages with tier <= N (#1434; the weekly WebKit run passes 2 "
+            "for the flagship doors + live-data topic pages). Omit for full coverage — every existing gating run does."
+        ),
+    )
     args = ap.parse_args()
 
     pages = None
@@ -865,12 +940,16 @@ if __name__ == "__main__":
             print(f"Unknown page: {args.page}\nAvailable: {', '.join(p['path'] for p in PAGES)}")
             sys.exit(1)
 
-    print(f"v4 Visual QA Sweep — {SITE_URL}\n{'=' * 56}")
+    profile = f" [{args.browser}{', mobile' if args.mobile else ''}{f', tier<={args.max_tier}' if args.max_tier is not None else ''}]"
+    print(f"v4 Visual QA Sweep — {SITE_URL}{profile if profile != ' [chromium]' else ''}\n{'=' * 56}")
     ok = run_sweep(
         pages=pages,
         save_screenshots=args.screenshot,
         ai_qa=args.ai_qa,
         reader_truth=args.reader_truth,
         ai_qa_max_tier=args.ai_qa_max_tier,
+        browser_name=args.browser,
+        mobile=args.mobile,
+        max_tier=args.max_tier,
     )
     sys.exit(0 if ok else 1)
