@@ -104,6 +104,7 @@ from web.site_api_common import (  # config; AWS; CORS; caches; helpers; request
 # site_api_data into site_api_vitals / site_api_intelligence (imports below).
 from web.site_api_data import (
     handle_changes_since,
+    handle_character_calibration,
     handle_cycle_compare,
     handle_device_agreement,
     handle_discoveries,
@@ -368,6 +369,7 @@ ROUTES = {
     "/api/habits": handle_habits,
     "/api/vice_streaks": handle_vice_streaks,
     "/api/fulfillment_ritual": handle_fulfillment_ritual,  # #769 (ADR-124): C-floor aggregate-only publish surface
+    "/api/character_calibration": handle_character_calibration,  # #1409: felt-reality calibration ledger (aggregates only)
     "/api/journey_timeline": handle_journey_timeline,
     "/api/journey_waveform": handle_journey_waveform,
     # Sprint 11: glucose + sleep intelligence pages

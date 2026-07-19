@@ -192,6 +192,8 @@ check_status "/api/source_freshness" "$BASE/api/source_freshness"
 check_status "/api/platform_stats"  "$BASE/api/platform_stats"
 # #1112 — the head coach's detail route (lead tier) must resolve, not 404
 check_status "/api/coach/eli_marsh" "$BASE/api/coach/eli_marsh"
+# #1409 — the felt-reality calibration ledger (aggregates only)
+check_status "/api/character_calibration" "$BASE/api/character_calibration"
 echo ""
 
 if [[ "$QUICK" != "--quick" ]]; then

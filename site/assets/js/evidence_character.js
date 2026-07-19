@@ -205,9 +205,10 @@ export async function renderCharacter(d) {
       ? `A fresh cycle at Level 1 — the record begins Day 1, ${pre0.startLabel}. The first character sheet computes after the first night of data.`
       : "The character sheet computes nightly — it fills in as the first days of data land.");
   }
-  const [stats, wave, j, cfgRaw, ach, pres] = await Promise.all([
+  const [stats, wave, j, cfgRaw, ach, pres, calib] = await Promise.all([
     tryJSON("/data/character_stats.json"), tryJSON("/api/journey_waveform"), tryJSON("/api/journey"),
     tryJSON("/api/character_config"), tryJSON("/api/achievements"), tryJSON("/api/presence"),
+    tryJSON("/api/character_calibration"),
   ]);
   // The mechanics contract (P1.2) — fail-soft: without it the mechanics panels
   // simply don't render and the sheet stands on P1.1 alone.
@@ -259,6 +260,35 @@ export async function renderCharacter(d) {
     <input id="ch-scrub" data-ch-scrub type="range" min="0" max="1" step="1" value="1" aria-label="Scrub the character sheet to a past date">
     <span class="label" data-ch-scrub-label>today</span>
   </div>`;
+
+  /* 2b · Felt-reality calibration (#1409) — the sheet grades itself against how
+     the week actually felt. Weekly Sunday probe (3 one-tap items) vs each probed
+     pillar's 7-day mean level score: pearson r + Fisher CI on n_eff, computed
+     deterministically server-side. Aggregates only; the confidence grammar is
+     honest — below the arming floor there is NO r (uncalibrated, with the real
+     trigger), between floors r is a point estimate with NO band (ADR-105). */
+  let calCard = "";
+  if (calib && Array.isArray(calib.pillars)) {
+    const probed = calib.pillars.filter((c) => c.state !== "unprobed");
+    const calibrated = probed.filter((c) => c.state === "calibrated");
+    const minW = (probed[0] && probed[0].gates && probed[0].gates.min_weeks) || 5;
+    const provLine = calibrated.length
+      ? `Calibrated against felt reality: ` + calibrated.map((c) =>
+          `<strong style="color:var(--pillar-${esc(c.pillar)},var(--ember))">${esc(ttl(c.pillar))}</strong> r=<strong class="num">${fmt(c.r)}</strong> (n_eff ${fmt(c.n_eff)})`).join(" · ")
+      : `Uncalibrated — <strong class="num">${esc(String((probed[0] && probed[0].n_weeks) || 0))}</strong> of ${esc(String(minW))} probe weeks banked. The card earns its r honestly, one Sunday at a time.`;
+    const rows = calib.pillars.map((c) => {
+      const name = `<span class="ch-cal-p" style="color:var(--pillar-${esc(c.pillar)},var(--ember))">${esc(ttl(c.pillar))}</span>`;
+      if (c.state === "unprobed") return `<div class="ch-cal-row is-unprobed">${name}<span class="label">unprobed — no felt-reality instrument maps here yet</span></div>`;
+      if (c.state !== "calibrated") return `<div class="ch-cal-row is-uncal">${name}<span class="label">uncalibrated (n=${esc(String(c.n_weeks))}) — arms at ${esc(String((c.gates && c.gates.min_weeks) || minW))} probe weeks</span></div>`;
+      const band = c.ci95 ? ` · 95% CI [${fmt(c.ci95[0])}, ${fmt(c.ci95[1])}]` : ` · point estimate (band arms at ${esc(String((c.gates && c.gates.ci_min_weeks) || 8))} weeks)`;
+      return `<div class="ch-cal-row is-cal">${name}<span class="num">r=${fmt(c.r)}</span><span class="label"> · n_eff ${fmt(c.n_eff)} of ${esc(String(c.n_weeks))}${band}</span></div>`;
+    }).join("");
+    calCard = sec("Calibration — does it match how it feels?", `
+      <p class="rd-prose" data-cal-prov>${provLine}</p>
+      <div class="ch-cal" id="calibration">${rows}</div>
+      <p class="rd-why">Every Sunday evening, three one-tap questions — how alive, how rested, how connected the week actually felt (0–4, ≤20 seconds). Each answer is paired with that pillar's mean level over the same seven days, and the correlation above is the sheet grading itself: a level that climbs while the felt scores don't will show up here as a falling r. Skipped Sundays are coverage gaps — n simply doesn't accrue; nothing is zero-filled (${esc(String(calib.probe_weeks_covered || 0))} probe week${(calib.probe_weeks_covered || 0) === 1 ? "" : "s"} banked so far).</p>
+      <p class="rd-archive">${esc(calib.method || "")}</p>`);
+  }
 
   /* 3 · The tier ladder. */
   const tiers = (stats && stats.tiers) || [];
@@ -461,7 +491,7 @@ export async function renderCharacter(d) {
       <p class="rd-archive">The full rulebook — every weight, target, streak gate, and honest-absence rule, generated from the engine's actual config — is <a href="/method/game/">The Game, Explained</a>; the plain-language version lives on <a href="/method/character/">the character explainer</a>. The engine itself runs nightly in the platform's compute layer, and every number in this section is read live from its config.</p>`)
     : `<p class="rd-archive">How the engine works — the pillar weights, the XP economy, the streak gates — is documented in full in <a href="/method/game/">The Game, Explained</a> (generated from the engine's actual config) and in plain language on <a href="/method/character/">the character explainer</a>; the algorithms run nightly in the platform's compute layer.</p>`;
 
-  return hero + quiet + scrub + statblock + ladder + mechanics + record + badges + sub + math +
+  return hero + quiet + scrub + statblock + calCard + ladder + mechanics + record + badges + sub + math +
     note("A motivational lens on real data, not a medical score — every input is correlative and N=1.");
 }
 

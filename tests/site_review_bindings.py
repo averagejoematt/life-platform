@@ -66,6 +66,7 @@ EVIDENCE_PRIMARY = _evidence_primary()
 # Secondary endpoints an evidence renderer fetches BEYOND its primary
 # (hand-curated from site/assets/js/evidence.js renderers; cite the renderer).
 EVIDENCE_SECONDARY = {
+    "character": ["/api/character_calibration"],  # #1409 felt-reality card — evidence_character.js:renderCharacter
     "physical": ["/api/weight_progress", "/api/journey"],  # evidence.js:renderPhysical
     "training": ["/api/strength_benchmarks", "/api/weekly_physical_summary", "/api/workouts"],  # renderTraining
     "sleep": ["/api/circadian"],  # renderSleep (#487: /api/sleep_reconciliation retired)
