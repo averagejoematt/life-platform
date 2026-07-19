@@ -141,11 +141,11 @@
           "behavioral": true
         },
         "t1_habit_compliance": {
-          "weight": 0.15,
+          "weight": 0.1,
           "behavioral": true
         },
         "journal_consistency": {
-          "weight": 0.15,
+          "weight": 0.1,
           "behavioral": true
         },
         "state_of_mind_valence": {
@@ -161,6 +161,10 @@
           "weight": 0.1,
           "target_days_week": 4,
           "behavioral": true
+        },
+        "values_alignment": {
+          "weight": 0.1,
+          "description": "Distinct values-in-action the journal-enrichment pass evidenced today (SOURCE#flourishing, #1403). LLM-coded from journal text - provenance surfaced wherever rendered."
         }
       }
     },

@@ -193,3 +193,44 @@ def tool_get_mood(args):
 
 
 # ── BS-MP2: Journal Sentiment Trajectory ─────────────────────────────────
+
+
+def tool_get_flourishing_trend(args):
+    """#1403: EMA trends per PERMA signal from SOURCE#flourishing — the daily
+    LLM-coded projection of journal enrichment (values/gratitude/flow/growth/
+    ownership/social). Every number is a language model's reading of prose, and
+    the payload says so (provenance per ADR-104)."""
+    from flourishing import SIGNALS, ema_series, provenance_line
+
+    days = max(7, min(365, int(args.get("days") or 90)))
+    span = max(3, min(60, int(args.get("ema_span") or 14)))
+    start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    resp = table.query(
+        KeyConditionExpression=Key("pk").eq(f"{USER_PREFIX}flourishing") & Key("sk").gte(f"DATE#{start}"),
+        ScanIndexForward=True,
+    )
+    rows = [decimal_to_float(r) for r in resp.get("Items", [])]
+    trends = {}
+    for sig in SIGNALS:
+        series = [(r.get("date") or str(r.get("sk", "")).replace("DATE#", "")[:10], r.get(sig)) for r in rows if r.get(sig) is not None]
+        if not series:
+            trends[sig] = {"n": 0, "ema": None, "latest": None}
+            continue
+        trends[sig] = {
+            "n": len(series),
+            "ema": ema_series([v for _, v in series], span=span),
+            "latest": {"date": series[-1][0], "value": series[-1][1]},
+        }
+    model = rows[-1].get("enrichment_model") if rows else None
+    return {
+        "window_days": days,
+        "ema_span": span,
+        "days_with_rows": len(rows),
+        "signals": trends,
+        "provenance": provenance_line(model),
+        "_framing": (
+            "These are inputs you influence, not a verdict on you. A low stretch is "
+            "information about conditions (sleep, load, season), never identity — and "
+            "if reviewing them feels heavy, a tracking break is a sanctioned move."
+        ),
+    }

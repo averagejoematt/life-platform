@@ -29,7 +29,7 @@ from mcp.tools_hevy import tool_get_workout_detail, tool_get_workouts
 
 # ADR-066 (2026-05-31): Hevy routine write-loop fat tool.
 from mcp.tools_hevy_routine import tool_manage_hevy_routine
-from mcp.tools_journal import tool_get_mood
+from mcp.tools_journal import tool_get_flourishing_trend, tool_get_mood
 from mcp.tools_labs import tool_get_freshness_status, tool_get_labs
 from mcp.tools_lifestyle import (
     tool_create_experiment,
@@ -557,6 +557,27 @@ TOOLS = {
                     "source": {"type": "string", "description": "Origin of the insight: 'chat' (default) or 'email'."},
                 },
                 "required": ["text"],
+            },
+        },
+    },
+    "get_flourishing_trend": {
+        "fn": tool_get_flourishing_trend,
+        "schema": {
+            "name": "get_flourishing_trend",
+            "description": (
+                "EMA trends of the daily PERMA signals LLM-coded from the journal "
+                "(#1403: values lived, gratitude, flow, growth signals, ownership, "
+                "social quality — SOURCE#flourishing). Every payload carries model "
+                "provenance and anti-rumination framing. Use for: 'how are my values "
+                "trending?', 'flourishing signals this month', 'social quality trend'."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "description": "Trailing window in days (7-365, default 90)."},
+                    "ema_span": {"type": "integer", "description": "EMA span in days (3-60, default 14)."},
+                },
+                "required": [],
             },
         },
     },

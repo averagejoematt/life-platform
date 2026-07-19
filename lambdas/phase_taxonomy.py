@@ -116,6 +116,7 @@ SOURCE_CLASS: dict[str, str] = {
     "habitify": RAW_TIMESERIES,  # raw completion; habit_scores is the derived one
     "habit_causality": RAW_TIMESERIES,  # #422: user-authored why/trigger/reward per habit-day — a logged fact, kept forever
     "private_intake": RAW_TIMESERIES,  # #1405: Matthew-private evening intake count — logged fact, cross-cycle physiology, NEVER public-served
+    "flourishing": RAW_TIMESERIES,  # #1403: daily PERMA projection over journal enrichment (flourishing.py) — fact layer, follows the notion parent
     "todoist": RAW_TIMESERIES,
     "weather": RAW_TIMESERIES,
     "macrofactor": RAW_TIMESERIES,
