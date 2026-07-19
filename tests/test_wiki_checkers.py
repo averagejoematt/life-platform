@@ -87,6 +87,33 @@ def test_deploy_docs_scanned_for_tombstones():
     assert "deploy/MANIFEST.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
 
 
+def test_makefile_scanned_for_tombstones():
+    """#1323: the Makefile is a second entry-point system (`make <target>`) that can
+    route an operator onto a retired script exactly like a stale doc line can — it
+    must be on the tombstone scanner's live surface so the build_layer.sh rule (added
+    for #781) actually fires on it, instead of the candidate list silently excluding
+    it forever."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    scanned = {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=False)}
+    assert "Makefile" in scanned
+
+
+def test_makefile_tombstone_rule_fires_on_the_prefix_layer_target():
+    """Non-vacuity (per the #1189 vacuous-scan lesson): the build_layer.sh rule must
+    FIRE on the exact pre-#1323 Makefile line (`layer:` target shelling out to the
+    deleted deploy/build_layer.sh), and NOT be swallowed by the retirement-line
+    exemption."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    rules = ts._rules()
+    prefix_line = "\tbash deploy/build_layer.sh"
+    assert not ts.RETIREMENT_LINE_RE.search(prefix_line), f"pre-fix line would be exempted, gate is vacuous: {prefix_line}"
+    assert any(rx.search(prefix_line) for rx, _ in rules), "no tombstone rule fires on the retired build_layer.sh line"
+    # the replacement guidance (the live fleet-deploy path) must not trip any live rule.
+    good = "\tbash deploy/deploy_fleet.sh"
+    hits = [rx.pattern for rx, _ in rules if rx.search(good)]
+    assert not hits, f"replacement guidance trips tombstone rule(s): {hits}"
+
+
 def test_deploy_docs_freshness_ceiling_is_not_vacuous():
     """#1322: check_deploy_docs must FLAG a headerless deploy doc (the exact pre-fix
     deploy/README.md shape) and a canonical doc unverified past the hard ceiling (the

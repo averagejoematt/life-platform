@@ -13,6 +13,8 @@ THE PROBLEM THIS SOLVES:
 SCOPE:
   Scans the LIVE docs surface: docs/*.md (top level), docs/design/, docs/coaching/,
   docs/content/, docs/design-review/, docs/engines/, plus README.md, CLAUDE.md,
+  Makefile (#1323 — the Makefile is a second, un-audited entry-point system that
+  can route an operator onto a retired script exactly like a stale doc can),
   .claude/commands/*.md, deploy/*.md (#1322 — the deploy directory's own runbooks
   steered operators onto the retired boot-broken manual MCP zip; MANIFEST.md and
   V2_ROLLBACK.md are exempt as dated/deprecated records).
@@ -85,7 +87,7 @@ SOURCE_DIRS = ("lambdas", "mcp")
 
 
 def _scan_files(include_exempt: bool) -> list[Path]:
-    candidates: list[Path] = [ROOT / "README.md", ROOT / "CLAUDE.md"]
+    candidates: list[Path] = [ROOT / "README.md", ROOT / "CLAUDE.md", ROOT / "Makefile"]
     candidates += sorted((ROOT / "deploy").glob("*.md"))  # #1322: the whole live deploy-doc surface, not just README
     candidates += sorted((ROOT / ".claude" / "commands").glob("*.md"))
     candidates += sorted((ROOT / "docs").rglob("*.md"))
