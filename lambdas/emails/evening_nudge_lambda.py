@@ -169,9 +169,13 @@ def _check_evening_ritual(date_str: str) -> tuple[list[str], str]:
     missing_metrics.extend(_missing_felt_probe(date_str))
     if not missing_metrics:
         return [], f"Connection {int(connection)}/4 · Mood {int(mood_valence)}/4 · Intake {int(intake)}"
-    if len(missing_metrics) < 3:
-        return missing_metrics, f"Partially logged — {len(missing_metrics)} tap{'s' if len(missing_metrics) != 1 else ''} left"
-    return missing_metrics, "Not logged yet"
+    # "Not logged yet" only when the whole CORE ritual is untouched — on probe
+    # Sundays a fully-logged core with the 3 probe taps open is partial progress,
+    # not "not logged" (the pre-#1409 `len < 3` shorthand mislabeled exactly that).
+    core_missing = [m for m in missing_metrics if m in ("connection", "mood_valence", "intake_count")]
+    if len(core_missing) == 3:
+        return missing_metrics, "Not logged yet"
+    return missing_metrics, f"Partially logged — {len(missing_metrics)} tap{'s' if len(missing_metrics) != 1 else ''} left"
 
 
 def _missing_felt_probe(date_str: str) -> list[str]:
