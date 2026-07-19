@@ -1483,7 +1483,11 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
     tallies, BudgetTier history, QAPausedByBudget) and the budget-tier SSM
     parameter so the Monday ops email can roll up the QA estate. Read-only
     additions; CloudWatch metric reads cannot be resource-scoped (same posture
-    as the cost governor's CloudWatch statement)."""
+    as the cost governor's CloudWatch statement).
+
+    #1452 (QA-depth dial): + ssm:GetParameter on /life-platform/qa-level so the
+    green report can surface the dial state (E3) — a lean/off estate must never
+    read as a fully-swept green week. Read-only."""
     log_bucket_arn = "arn:aws:s3:::matthew-life-platform-cf-logs"
     return [
         iam.PolicyStatement(
@@ -1502,9 +1506,12 @@ def operational_traffic_digest() -> list[iam.PolicyStatement]:
             resources=["*"],
         ),
         iam.PolicyStatement(
-            sid="BudgetTierParamRead",
+            sid="OpsDialParamRead",
             actions=["ssm:GetParameter"],
-            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
+            resources=[
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier",
+                f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/qa-level",  # #1452
+            ],
         ),
     ]
 

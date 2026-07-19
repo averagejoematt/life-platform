@@ -206,6 +206,15 @@ the expensive part (Haiku, ~$0.001/image); the deterministic Playwright checks a
   `QAPausedByBudget` CloudWatch metric — never a silent skip (D1, mirrors #1440's
   `reader_truth_qa` pattern).
 
+**The QA-depth dial (#1452):** SSM `/life-platform/qa-level` (`full|standard|lean|off`)
+scales the NON-gating copies only — the standalone daily run and the weekly WebKit
+advisory read it (fail-open to `standard` when unreadable, stated in the run log). The
+gating copies (and the PR gates `v4-gate.yml`/`surface-drift.yml`) are **structurally
+exempt**: they must never reference the parameter, so the deploy gate can never be
+disabled by the dial (`tests/test_qa_level_dial.py` enforces both sides). Dial state
+surfaces in the Monday green report and in `/qa` + `scripts/qa_audit.py --live`.
+Full semantics: `docs/RUNBOOK.md` § QA Depth Dial.
+
 All three step lists must stay in sync — change one, change all three. Run it on demand:
 `gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`,
 add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
