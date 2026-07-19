@@ -88,6 +88,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [MANAGED_WHERE_LEDGER.md](MANAGED_WHERE_LEDGER.md) | Out-of-IaC resources — what's managed where |
 | [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) | The v5 site brief (intent · standards · change discipline) |
 | [design/PORTRAIT_RUNBOOK.md](design/PORTRAIT_RUNBOOK.md) | Coach-portrait style bible + commissioning gate (ADR-106) |
+| [design/DESIGN_PARTNER_BRIEF.md](design/DESIGN_PARTNER_BRIEF.md) | The design-session contract + Slop Litmus v1 — synced into the v5 design project as BRIEF.md (#1464) |
 | [COST_TRACKER.md](COST_TRACKER.md) | The $85 budget (surge $100 — ADR-133) + real run-rate |
 | [RESERVED_CONCURRENCY.md](RESERVED_CONCURRENCY.md) | Concurrency strategy |
 | [A11Y_BASELINE.md](A11Y_BASELINE.md) | Accessibility baseline (pre-v4 audit) |
