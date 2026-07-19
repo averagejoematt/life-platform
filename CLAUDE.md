@@ -68,7 +68,7 @@ python3 mcp_bridge.py
    - **Compute Lambdas** (5) — `character-sheet`, `adaptive-mode`, `daily-metrics-compute`, `daily-insight-compute` run daily before the 17:00 UTC brief; `hypothesis-engine` runs weekly (Sun 19:00 UTC); all store pre-computed results to DynamoDB
    - **Email Lambdas** (7) — daily brief at 17:00 UTC (10 AM PDT) reads pre-computed results
    - **OG Image Lambda** — generates 6 data-driven PNG share cards daily at 11:30 AM PT using Pillow
-   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with ~116 endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file); infra (role/env/alarms) is CDK-owned in `serve_stack.py` (`LifePlatformServe` — split from Operational by #793 via `cdk refactor` so ops holds can't freeze the serving path; ownership rules per #794 — see `.claude/commands/deploy.md`).
+   - **Site API Lambda** (us-west-2, read-only) — serves averagejoematt.com with ~117 endpoints including `/api/vitals`, `/api/labs`, `/api/changes-since`, `/api/observatory_week`, `/api/vacation_fund`. **Multi-module package** (`web/*.py`): code deploys via `deploy_site_api.sh` (the full-tree bundle, never single-file); infra (role/env/alarms) is CDK-owned in `serve_stack.py` (`LifePlatformServe` — split from Operational by #793 via `cdk refactor` so ops holds can't freeze the serving path; ownership rules per #794 — see `.claude/commands/deploy.md`).
 
 ## Key Technical Conventions
 

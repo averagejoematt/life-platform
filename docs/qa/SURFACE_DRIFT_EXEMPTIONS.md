@@ -40,3 +40,4 @@ registration and leave the line as record (or supersede it with a dated note).
 ## Entries
 
 - 2026-07-18 | js | site/sw.js | service worker must live at the site root for scope; already present pre-gate, parse-covered by the deploy-time node gate in deploy/sync_site_to_s3.sh
+- 2026-07-19 | route | /api/character_receipt | #1373 progression receipts — new route ships in the same PR with a dated `_exemptions.json` capture-failed entry (route not deployed yet, no live shape to snapshot); post-deploy the driver runs deploy/capture_api_schemas.py, commits the real baseline, and drops the JSON exemption

@@ -1654,6 +1654,29 @@ Queried by MCP tools: `get_character_sheet`, `get_pillar_detail`, `get_level_his
 
 ---
 
+## Character Progression Receipt Partition (#1373)
+
+**pk:** `USER#matthew#SOURCE#character_receipt`
+**sk:** `DATE#YYYY-MM-DD`
+
+One item per character-sheet compute day — the audit-grade receipt for that day's XP/level changes, written by `compute/character_sheet_lambda.py::write_progression_receipt` immediately after the sheet stores (engine ≥ v1.7.0 captures the transitions at fire time; `store_character_sheet` strips the capture from the sheet item, so this partition is its only home). Built/replayed by the shared module `lambdas/progression_receipts.py`; served read-only by `/api/character_receipt` for the `/data/character/` drill-down. Sick-day freezes and pre-#1373 history have **no** receipt — one is never fabricated for a change with no recorded inputs (ADR-104). Numbers are stored at **full float precision** (no rounding) so a replay from the stored item feeds the engine bit-identical inputs and the digest is reproducible. Phase taxonomy: `experiment_scoped` (follows `character_sheet` — tagged + tombstoned + cycle-stamped at restart).
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `date` | string | YYYY-MM-DD of the sheet day this receipt audits |
+| `engine_version` | string | `character_engine.ENGINE_VERSION` that produced the transitions (the formula version) |
+| `receipt_schema_version` | number | Receipt layout version (1) |
+| `config_hash` | string | sha256 of the canonical-JSON S3 engine config in force at compute time |
+| `input_rows` | list | Contributing input-row **keys**, never copies: `{pk, sks:[...]}` groups for every DDB row that fed `assemble_data` (+ the 21-day EMA sheet window + credited challenges + the food-delivery streak row when its modifier applied), plus `{derived, values}` entries for key-less day-list projections (hevy/reading). Only rows actually fetched appear |
+| `transitions` | map | `{day_number, pillars: {<pillar>: {inputs, outputs}}, headline: {inputs, outputs}}` — per-pillar: `inputs` = previous state (level/tier/streaks/xp_total/xp_debt/xp_buffer), `level_score` (post-modifier EMA), `unadjusted_level_score`, `raw_score`, `raw_score_unblended`, `data_coverage`, `presence_dark`, `not_instrumented`, `bonus_xp`; `outputs` = level/tier/streaks/coverage_hold/xp_earned/xp_delta/xp_total/xp_debt/xp_buffer + filtered `events`. Headline: `prev_character_level` → `character_level` + character-level events |
+| `digest` | string | sha256 over the canonical JSON of (date, engine_version, receipt_schema_version, config_hash, input_rows, transitions) — the deterministic replay digest |
+| `replay_verified` | bool | Write-time self-verify verdict (replay under the same config must reproduce the digest; `false` = nondeterminism, also emitted as the `ReceiptReplayMismatch` EMF metric in `LifePlatform/Character`) |
+| `computed_at`, `run_id`, `phase` | — | Standard compute provenance via `tag_record` |
+
+Drift alarm: `qa_smoke_lambda.check_receipt_replay` replays the last 7 receipts nightly against the live engine + config — a mismatch with an **unchanged** config hash + engine version reds the QA report (real drift); config/engine changes since a receipt read as a labeled warning (`config_drift` / `engine_drift`), never silently re-rendered.
+
+---
+
 ## Computed Metrics Partition (v2.82.0 / IC MAINT)
 
 **pk:** `USER#matthew#SOURCE#computed_metrics`  

@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
-ENGINE_VERSION = "1.6.1"  # #1125: character_level_up events persist their drivers at fire time
+ENGINE_VERSION = "1.7.0"  # #1373: progression receipts — per-pillar transition capture at fire time
+# v1.6.1 — #1125: character_level_up events persist their drivers at fire time
 # v1.6.0 — #965: hevy→movement, reading→mind, todoist→consistency wired (ADR-134 amendment)
 # v1.5.0 — #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
 # modifiers/challenge XP are engine inputs, dark down-streaks persist, headline renormalized (ADR-134)
@@ -242,6 +243,28 @@ def _compute_xp(raw_score, previous_xp, config, day_number=None, previous_debt=0
     new_debt = min(debt_cap, max(0, -balance))
 
     return earned, xp_delta, new_xp, new_debt
+
+
+def pillar_xp_transition(raw_score, prev_xp, prev_debt, bonus_xp, xp_hold, config, day_number=None):
+    """The ONE pillar-day XP transition rule (#964 hold semantics + #913 debt).
+
+    Extracted from compute_character_sheet so the #1373 progression-receipt
+    replay exercises the IDENTICAL code path the nightly compute ran — never a
+    reimplementation that could drift. Returns (xp_earned, xp_delta, new_xp,
+    new_debt).
+
+    xp_hold=True (coverage below the floor, or not instrumented at all): the
+    day carries no XP judgment in either direction — but a completed challenge
+    still credits, debt-first (#961)."""
+    if xp_hold:
+        xp_earned, xp_delta = 0, 0
+        new_xp, new_debt = prev_xp, prev_debt
+        if bonus_xp:  # a completed challenge still credits, debt-first
+            balance = prev_xp - prev_debt + bonus_xp
+            new_xp, new_debt = max(0, balance), max(0, -balance)
+            xp_delta = bonus_xp
+        return xp_earned, xp_delta, new_xp, new_debt
+    return _compute_xp(raw_score, prev_xp, config, day_number=day_number, previous_debt=prev_debt, bonus_xp=bonus_xp)
 
 
 def _roll_xp_buffer(prev_buffer, prev_xp, new_xp, xp_per_level, buffer_cap=None):
@@ -1773,6 +1796,10 @@ def compute_character_sheet(
 
     all_events = []
     pillar_results = {}
+    # #1373: per-pillar transition capture — the exact inputs the gates judged
+    # and the outputs they produced, persisted to the receipt partition by the
+    # compute lambda (store_character_sheet strips it from the sheet item).
+    progression_transitions: dict[str, Any] = {}
     for pillar_name in pillar_raw_scores:
         prev_state = prev_pillars.get(pillar_name)
         level_state = evaluate_level_changes(
@@ -1802,17 +1829,11 @@ def compute_character_sheet(
         # bands as "a mediocre day" and bleed a permanent phantom −100 debt,
         # contradicting ADR-104's "a device gap is not a failure".
         xp_hold = bool(level_state.get("coverage_hold")) or bool(pillar_details[pillar_name].get("_not_instrumented"))
-        if xp_hold:
-            xp_earned, xp_delta = 0, 0
-            new_xp, new_debt = prev_xp, prev_debt
-            if bonus_xp:  # a completed challenge still credits, debt-first
-                balance = prev_xp - prev_debt + bonus_xp
-                new_xp, new_debt = max(0, balance), max(0, -balance)
-                xp_delta = bonus_xp
-        else:
-            xp_earned, xp_delta, new_xp, new_debt = _compute_xp(
-                pillar_raw_scores[pillar_name], prev_xp, config, day_number=_day_number, previous_debt=prev_debt, bonus_xp=bonus_xp
-            )
+        # #1373: the transition rule is a named function so the progression-
+        # receipt replay runs the IDENTICAL code path, never a reimplementation.
+        xp_earned, xp_delta, new_xp, new_debt = pillar_xp_transition(
+            pillar_raw_scores[pillar_name], prev_xp, prev_debt, bonus_xp, xp_hold, config, day_number=_day_number
+        )
         level_state["xp_total"] = new_xp
         # #954: roll the demotion buffer forward with today's XP change — fills
         # on gain, drains on loss, never the wrap-prone % of lifetime XP.
@@ -1825,6 +1846,43 @@ def compute_character_sheet(
             xp_per_level_cfg,
             buffer_cap=_leveling_cfg.get("xp_buffer_cap"),
         )
+
+        # #1373: capture the transition at fire time — events copied FILTERED
+        # (type/pillar/levels/tiers only) before the annotation pass below
+        # mutates them, so replay compares like for like.
+        progression_transitions[pillar_name] = {
+            "inputs": {
+                "prev": (
+                    {k: prev_state.get(k) for k in ("level", "tier", "streak_above", "streak_below", "xp_total", "xp_debt", "xp_buffer")}
+                    if prev_state
+                    else None
+                ),
+                "level_score": adjusted_level_scores[pillar_name],
+                "unadjusted_level_score": pillar_level_scores[pillar_name],
+                "raw_score": pillar_raw_scores[pillar_name],
+                "raw_score_unblended": pillar_details[pillar_name].get("_raw_unblended"),
+                "data_coverage": pillar_details[pillar_name].get("_data_coverage"),
+                "presence_dark": pillar_name in dark_persist_pillars,
+                "not_instrumented": bool(pillar_details[pillar_name].get("_not_instrumented", False)),
+                "bonus_xp": bonus_xp,
+            },
+            "outputs": {
+                "level": level_state["level"],
+                "tier": level_state["tier"],
+                "streak_above": level_state["streak_above"],
+                "streak_below": level_state["streak_below"],
+                "coverage_hold": bool(level_state.get("coverage_hold", False)),
+                "xp_earned": xp_earned,
+                "xp_delta": xp_delta,
+                "xp_total": new_xp,
+                "xp_debt": new_debt,
+                "xp_buffer": level_state.get("xp_buffer", 0),
+                "events": [
+                    {k: ev.get(k) for k in ("type", "pillar", "old_level", "new_level", "old_tier", "new_tier") if k in ev}
+                    for ev in level_state.get("events", [])
+                ],
+            },
+        }
 
         pillar_results[pillar_name] = {
             "raw_score": pillar_raw_scores[pillar_name],
@@ -1917,6 +1975,25 @@ def compute_character_sheet(
     elif character_level < prev_char_level:
         all_events.append({"type": "character_level_down", "old_level": prev_char_level, "new_level": character_level})
 
+    # #1373: headline transition — replay recomputes the weighted floor-mean
+    # from the replayed pillar levels + CURRENT config weights, so a weight
+    # edit is detectable drift (the weights live under config_hash, not here).
+    progression_transitions_all = {
+        "day_number": _day_number,
+        "pillars": progression_transitions,
+        "headline": {
+            "inputs": {"prev_character_level": prev_char_level},
+            "outputs": {
+                "character_level": character_level,
+                "events": [
+                    {"type": ev["type"], "old_level": ev.get("old_level"), "new_level": ev.get("new_level")}
+                    for ev in all_events
+                    if ev.get("type") in ("character_level_up", "character_level_down")
+                ],
+            },
+        },
+    }
+
     total_xp = sum(pr["xp_total"] for pr in pillar_results.values())
     total_xp_debt = sum(pr.get("xp_debt", 0) or 0 for pr in pillar_results.values())
 
@@ -1947,6 +2024,9 @@ def compute_character_sheet(
         "headline_excluded_pillars": headline_excluded,
         "computed_at": datetime.now(timezone.utc).isoformat(),
         "engine_version": ENGINE_VERSION,
+        # #1373: fire-time transition capture — consumed by progression_receipts,
+        # stripped from the persisted sheet item by store_character_sheet.
+        "progression_transitions": progression_transitions_all,
     }
     # #961: record-level challenge summary (site_writer contract).
     if challenge_bonus:
@@ -1971,7 +2051,10 @@ def store_character_sheet(table_resource: Any, user_prefix: str, record: dict[st
     scripts) silently leak as live data post-launch.
     """
     item = {"pk": user_prefix + "character_sheet", "sk": "DATE#" + record["date"]}
-    item.update(floats_to_decimal(record, precision=4))
+    # #1373: the fire-time transition capture persists to the RECEIPT partition
+    # (SOURCE#character_receipt, full float precision for digest replay) — the
+    # sheet item never carries it.
+    item.update(floats_to_decimal({k: v for k, v in record.items() if k != "progression_transitions"}, precision=4))
     if record.get("date", "") < EXPERIMENT_START_DATE:
         item["phase"] = "pilot"
     try:

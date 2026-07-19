@@ -166,6 +166,11 @@ SOURCE_CLASS: dict[str, str] = {
     # derived from the same 14-year history — cross-phase reference like weight_episodes.
     # — EXPERIMENT_SCOPED: derived intelligence/progress (tag + wipe + cycle-stamp) —
     "character_sheet": EXPERIMENT_SCOPED,  # RPG-style derived scores; wiped "all" + rebuilt
+    "character_receipt": EXPERIMENT_SCOPED,  # #1373: audit-grade progression receipts — one per
+    # character_sheet compute day (inputs + rule outputs + replay digest). Derived from the same
+    # run as its sheet, so it follows character_sheet's class exactly: tagged + tombstoned +
+    # cycle-stamped at restart, phase-filtered on read. Dated drill-down reads may include
+    # archived receipts deliberately (history is cross-cycle, provenance-labeled).
     "habit_scores": EXPERIMENT_SCOPED,  # see vice_streaks split note in ADR-077 dec G
     "computed_metrics": EXPERIMENT_SCOPED,
     "forecast": EXPERIMENT_SCOPED,  # #541: daily EWMA expectations — derived, recomputed every

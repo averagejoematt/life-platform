@@ -46,7 +46,7 @@ from character_engine import (
 
 
 def test_engine_version():
-    assert ENGINE_VERSION == "1.6.1"
+    assert ENGINE_VERSION == "1.7.0"  # #1373: progression-receipt transition capture
 
 
 # ── F-01: Confidence scoring ──

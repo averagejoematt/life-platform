@@ -85,6 +85,10 @@ PARTITIONS = [
     # character_sheet + habit_scores: tombstone everything — §6 rebuilds from scratch
     # so that level/streak cascades start at zero on Day 1 (no leak from old state).
     ("character_sheet", "all", {}),
+    # #1373: progression receipts follow their sheet exactly — a receipt audits a
+    # specific sheet-day, so it archives with that day (dated drill-down reads keep
+    # serving archived receipts deliberately; the current-cycle "latest" view resets).
+    ("character_receipt", "all", {}),
     ("habit_scores", "all", {}),
     # computed_metrics + ledger: only pre-genesis history is tombstoned; post-genesis
     # records continue accumulating from Day 1 forward. (ledger TOTALS#current is

@@ -619,6 +619,94 @@ def mark_challenges_consumed(items):
 
 
 # ==============================================================================
+# PROGRESSION RECEIPT INPUT PROVENANCE (#1373)
+# ==============================================================================
+
+
+def collect_input_rows(data, history_records, challenge_items=None):
+    """The DDB keys of every row that fed today's compute (#1373 AC1).
+
+    Grouped {pk, sks:[...]} — KEYS ONLY, never row copies. Only rows that were
+    actually fetched appear (ADR-104: a receipt never claims inputs that were
+    not recorded). Derived day-lists that carry no row keys (hevy/reading day
+    projections) are recorded as {derived, values} entries so the provenance
+    is complete without pretending they were rows.
+    """
+    groups = {}
+
+    def _add(rec):
+        if isinstance(rec, dict) and rec.get("pk") and rec.get("sk"):
+            groups.setdefault(str(rec["pk"]), set()).add(str(rec["sk"]))
+
+    for key in ("whoop", "macrofactor", "apple", "habit_scores", "flourishing", "engagement_state", "todoist", "labs_latest"):
+        _add(data.get(key))
+    for key in ("journal_entries", "sleep_14d", "strava_7d", "strava_42d", "macrofactor_14d", "withings_30d"):
+        for rec in data.get(key) or []:
+            _add(rec)
+    for rec in history_records or []:  # the 21-day EMA window of prior sheets
+        _add(rec)
+    for ch in challenge_items or []:  # challenges whose XP credited today (#961)
+        _add(ch)
+    if (data.get("raw_score_modifiers") or {}).get("nutrition", {}).get("source") == "food_delivery":
+        groups.setdefault("USER#matthew#SOURCE#food_delivery", set()).add("STREAK#current")
+
+    rows = [{"pk": pk, "sks": sorted(sks)} for pk, sks in sorted(groups.items())]
+    for derived_key in ("hevy_workout_days_7d", "reading_session_days_7d"):
+        values = data.get(derived_key)
+        if values:
+            rows.append({"derived": derived_key, "values": list(values)})
+    return rows
+
+
+def write_progression_receipt(record, config, data, history_records, challenge_items, yesterday_str):
+    """Build + self-verify + store the day's progression receipt (#1373).
+
+    Non-fatal by design — the sheet is primary and already stored; a receipt
+    failure logs ERROR and the nightly qa_smoke receipt check surfaces the gap.
+    The self-verify replays the freshly built receipt against the SAME config:
+    a mismatch there is nondeterminism, logged + emitted as the
+    ReceiptReplayMismatch EMF metric (the #1373 drift alarm's write-time leg).
+    """
+    try:
+        import progression_receipts as pr
+
+        input_rows = collect_input_rows(data, history_records, challenge_items)
+        receipt = pr.build_receipt(record, config, input_rows=input_rows)
+        if receipt is None:
+            logger.warning(
+                "[character][receipt] record carries no progression transitions — no receipt written (never fabricated, ADR-104)"
+            )
+            return None
+        verdict = pr.replay(receipt, config)
+        receipt["replay_verified"] = bool(verdict.get("verified"))
+        print(
+            pr.emf_replay_metric_line(
+                date=yesterday_str,
+                mismatch=not verdict.get("verified"),
+                timestamp_ms=int(time.time() * 1000),
+            )
+        )
+        if not verdict.get("verified"):
+            logger.error(
+                "[character][RECEIPT-DRIFT] self-replay mismatch for %s (same config — nondeterminism): %s",
+                yesterday_str,
+                json.dumps(verdict.get("mismatches", [])[:5], default=str),
+            )
+        pr.store_receipt(table, USER_PREFIX + "character_receipt", receipt)
+        logger.info(
+            "[character][receipt] stored for %s — digest %s, replay_verified=%s, %d input-row groups",
+            yesterday_str,
+            receipt["digest"][:12],
+            receipt["replay_verified"],
+            len(input_rows),
+        )
+        return receipt
+    except Exception as e:
+        logger.error("[character][receipt] failed for %s (sheet stored; receipt missing): %s", yesterday_str, e)
+        return None
+
+
+# ==============================================================================
 # LAMBDA HANDLER
 # ==============================================================================
 
@@ -818,6 +906,9 @@ def lambda_handler(event, context):
     # store used to eat the bonus (marked consumed, never credited anywhere).
     if _challenge_items:
         mark_challenges_consumed(_challenge_items)
+
+    # ── #1373: progression receipt — the audit-grade drill-down record ──
+    write_progression_receipt(record, config, data, history_records, _challenge_items, yesterday_str)
 
     elapsed = time.time() - t0
     logger.info("[character] Done in %.1fs", elapsed)
