@@ -28,6 +28,7 @@ its entry without this module knowing anything about that UI.
 import hashlib
 import inspect
 
+import bsts_lite
 import calibration_core
 import stats_core
 
@@ -244,6 +245,36 @@ REGISTRY = {
             "experiment_design.randomization_test — the end_experiment close-path analysis for "
             "randomized-start designs (#1413); reported on /data/ experiment cards next to the "
             "effect + CI, and in the analysis summary sentence."
+        ),
+    ),
+    "bsts_lite_counterfactual": _entry(
+        "bsts_lite_counterfactual",
+        "BSTS-lite synthetic-control counterfactual (the Ghost)",
+        bsts_lite.fit_counterfactual,
+        "Randomization inference",
+        "y_t = beta·[1, controls_t] + mu_t + eps_t with mu a local-level random walk; "
+        "beta by OLS on the pre-period, level variances by maximum innovations likelihood "
+        "over a fixed signal-to-noise grid; post-period ghost = frozen level + regression, "
+        "variance P_T + t·sigma_eta² + sigma_eps² + OLS prediction covariance",
+        "The pre-period declared in the FROZEN design spec (pre_days before the intervention "
+        "start, default 28) for fitting; the washout-trimmed post-period for the effect. Only "
+        "days where the criterion AND every declared control have values — gaps dropped and "
+        "counted, never imputed.",
+        "Spec (controls, pre-window, MAPE gate) is frozen at pre-registration — applied post-hoc "
+        "it is spec shopping, which the design gate exists to forbid. The ghost is withheld with "
+        "a stated reason when the pre-period one-step-ahead MAPE exceeds the frozen gate, when "
+        "fewer than 14 aligned pre-days exist, or when MAPE is unevaluable (criterion near zero). "
+        "First-order only: a local level plus static regression — no seasonality or dynamic "
+        "coefficients, so a strong weekly cycle the controls don't carry inflates MAPE and "
+        "(correctly) withholds the ghost. The effect CI uses the full forecast-error covariance "
+        "(shared level error correlates post days); the interval widens with distance from start "
+        "by construction — the model's honesty about extrapolation, drawn as-is on the card.",
+        "bcde99d1a787",
+        min_n=14,
+        used_by=(
+            "experiment_design.counterfactual_analysis — the end_experiment close path for designs "
+            "that froze a counterfactual spec (#1410); rendered on /data/ experiment cards as the "
+            "ghost trace + widening band, and in the analysis summary sentence."
         ),
     ),
     "ewma_fit": _entry(

@@ -31,6 +31,7 @@ on:
 permissions:
   contents: read
   id-token: write   # only used by the advisory judge/emit step
+  issues: write     # advisory-failure issue filing (#1447)
 
 env:
   AWS_REGION: us-west-2
@@ -84,3 +85,23 @@ jobs:
           python3 tests/golden_brief_eval.py --judge --emit | tee /tmp/golden_judge.txt
           head -1 /tmp/golden_judge.txt >> "$GITHUB_STEP_SUMMARY"
           echo "::endgroup::"
+
+      # #1447 — this workflow gates nothing (the deterministic harnesses gate at
+      # deploy time via ci-cd.yml); a red here previously evaporated into run
+      # history. File/update ONE deduped auto-filed issue on failure; auto-close
+      # it on the next green run. Runs last, always.
+      - name: File/resolve advisory failure issue (#1447)
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: golden-brief-eval
+          workflow-name: Golden-brief eval
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            The weekly golden-brief/golden-surface falsifiability re-run (the
+            deterministic harnesses tests/golden_brief_eval.py +
+            tests/golden_surface_eval.py, or their self-tests) failed on
+            schedule — voice/gate drift caught outside the deploy path. The
+            advisory Haiku judge steps are continue-on-error and cannot be the
+            cause; see the run's step log for which harness redded.

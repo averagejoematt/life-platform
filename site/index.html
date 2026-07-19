@@ -203,6 +203,31 @@
          loaded /api/journey weight. No new fetch, no AI, no lambda write. Absent data reads
          honestly absent ("not measured this week"); an "as of" date stamps every read. The
          no-JS fallback below is a static pointer to the live cockpit (full static bake is #788). -->
+    <!-- #1469 follow-up (Matthew, 2026-07-19): the constellation is the FIRST beat after
+         the loop stage — the fold belongs to the dial (variant A), but the seven-pillar
+         hover figure was too loved to sit four beats deep. -->
+    <section class="beat beat-constellation" id="pillars" aria-label="The seven pillars and how they pull on each other">
+      <p class="beat-kicker label">the pillars · measured co-movement</p>
+      <h2 class="beat-h">Seven areas of one life, pulling on each other.</h2>
+      <figure class="constellation" aria-label="The seven pillars and how they pull on each other">
+        <svg viewBox="0 0 360 360" role="group" aria-describedby="constellation-desc">
+          <g data-edges></g>
+          <g data-nodes></g>
+        </svg>
+        <figcaption id="constellation-desc" class="label">
+          <!-- #590: edges are MEASURED co-movement, not a hand-drawn guess. #407: node size = score. -->
+          <span class="const-legend" aria-hidden="true"><i class="cl-dot cl-sm"></i>low<i class="cl-dot cl-lg"></i>high</span>
+          Seven areas of life — he calls them <strong>pillars</strong> — each scored <strong>out of 100</strong>; node size
+          tracks the score (small = low, a young experiment starts low, not broken). The lines show how two pillars
+          <strong>actually move together</strong> in the measured data<span data-bind="const-window"></span>: a
+          <span class="cn-key cn-key-pos">solid ember line</span> means they <strong>rise and fall together</strong>,
+          a <span class="cn-key cn-key-neg">dashed line</span> means they <strong>trade off</strong>; thin or faint lines
+          mean the pattern is weak, or there's only a few days of data behind it. A pillar with no lines hasn't shown
+          a clear pattern with the others yet. <strong>Tap a pillar to open its evidence.</strong>
+        </figcaption>
+      </figure>
+    </section>
+
     <section class="beat beat-okay" id="okay" aria-label="Is he okay this week — the plain-language version">
       <p class="beat-kicker label">for family &amp; friends · the short version</p>
       <h2 class="beat-h">Is he okay this week?</h2>
@@ -233,32 +258,6 @@
     <section class="beat beat-since" data-home-since-wrap hidden aria-label="What's new">
       <div class="home-since" data-home-since hidden></div>
       <p class="nu-line label" data-home-unlocked hidden></p>
-    </section>
-
-    <!-- #1469: the old .beat-loop card row is gone — the loop is taught once, properly,
-         by the fold dial above. The constellation (formerly the hero figure) lives here
-         instead: it is a pillar-correlation instrument, not a loop teacher. Markup is
-         unchanged so story.js drawConstellation + the qa_manifest visual checks hold. -->
-    <section class="beat beat-constellation" aria-label="The seven pillars and how they pull on each other">
-      <p class="beat-kicker label">the pillars · measured co-movement</p>
-      <h2 class="beat-h">Seven areas of one life, pulling on each other.</h2>
-      <figure class="constellation" aria-label="The seven pillars and how they pull on each other">
-        <svg viewBox="0 0 360 360" role="group" aria-describedby="constellation-desc">
-          <g data-edges></g>
-          <g data-nodes></g>
-        </svg>
-        <figcaption id="constellation-desc" class="label">
-          <!-- #590: edges are MEASURED co-movement, not a hand-drawn guess. #407: node size = score. -->
-          <span class="const-legend" aria-hidden="true"><i class="cl-dot cl-sm"></i>low<i class="cl-dot cl-lg"></i>high</span>
-          Seven areas of life — he calls them <strong>pillars</strong> — each scored <strong>out of 100</strong>; node size
-          tracks the score (small = low, a young experiment starts low, not broken). The lines show how two pillars
-          <strong>actually move together</strong> in the measured data<span data-bind="const-window"></span>: a
-          <span class="cn-key cn-key-pos">solid ember line</span> means they <strong>rise and fall together</strong>,
-          a <span class="cn-key cn-key-neg">dashed line</span> means they <strong>trade off</strong>; thin or faint lines
-          mean the pattern is weak, or there's only a few days of data behind it. A pillar with no lines hasn't shown
-          a clear pattern with the others yet. <strong>Tap a pillar to open its evidence.</strong>
-        </figcaption>
-      </figure>
     </section>
 
     <!-- P2.1 — the waveform LEADS the arc (the most shareable, least-braggy proof), right under

@@ -23,6 +23,7 @@ Bundled module (#781 — ships in every function's code bundle, no separate laye
 imported flat (`import experiment_design`) from mcp/ and lambdas/.
 """
 
+import math
 import random
 from datetime import datetime, timedelta
 
@@ -123,7 +124,15 @@ def validate_design(design):
     if rand is not None:
         issues.extend(_randomized_start_issues(rand))
 
-    unknown = set(design) - {"baseline_days", "washout_days", "criterion", "stopping_rule", "randomized_start"}
+    # #1410: an OPTIONAL counterfactual (ghost) spec. Frozen at pre-registration
+    # like everything else in the design — control series, pre-window, and the
+    # MAPE gate are declared BEFORE the data exists, so there is no post-hoc
+    # spec shopping at close time.
+    cf = design.get("counterfactual")
+    if cf is not None:
+        issues.extend(_counterfactual_issues(cf, (criterion.get("metric") if isinstance(criterion, dict) else None)))
+
+    unknown = set(design) - {"baseline_days", "washout_days", "criterion", "stopping_rule", "randomized_start", "counterfactual"}
     if unknown:
         issues.append(f"unknown design fields: {sorted(unknown)}")
     unknown_c = set(criterion) - {"metric", "direction", "min_effect"}
@@ -288,6 +297,174 @@ def randomization_test(design, values_by_date, start_date, end_date):
     }
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# #1410: the Ghost — a BSTS-lite synthetic-control counterfactual for every
+# concluded intervention whose design declared one.
+#
+# Why: post − pre answers "did it change?"; the ghost answers "compared to
+# WHAT?" — the criterion forecast from its own pre-period behavior (local level)
+# plus control series the intervention shouldn't move (bsts_lite.py). The spec —
+# controls, pre-window, MAPE gate — is part of the FROZEN design (validated at
+# create alongside criterion/stopping_rule), so there is no post-hoc spec
+# shopping. The pre-fit MAPE gate withholds the ghost with a stated reason when
+# the model couldn't track the pre-period (ADR-104: a dignified refusal, never a
+# fabricated counterfactual). All helpers pure; callers fetch the series.
+# ══════════════════════════════════════════════════════════════════════════════
+
+CF_MIN_PRE_POINTS = 14  # below this the ghost has no honest footing (aligned days)
+CF_MIN_PRE_DAYS, CF_MAX_PRE_DAYS = 14, 120
+CF_DEFAULT_PRE_DAYS = 28
+CF_DEFAULT_MAPE_GATE_PCT = 15.0
+CF_MAX_CONTROLS = 3
+# Series payload cap for the card chart — post windows are ≤ ~8 weeks in
+# practice; this is a hard bound on the served array, never a silent truncation
+# of the ANALYSIS (the effect uses every aligned day regardless).
+CF_MAX_SERIES_POINTS = 120
+
+
+def _counterfactual_issues(cf, criterion_metric):
+    issues = []
+    if not isinstance(cf, dict):
+        return ["counterfactual must be an object: {controls?, pre_days?, mape_gate_pct?}"]
+    controls = cf.get("controls", [])
+    if not isinstance(controls, list) or len(controls) > CF_MAX_CONTROLS:
+        issues.append(f"counterfactual.controls must be a list of at most {CF_MAX_CONTROLS} metric slugs")
+    else:
+        for m in controls:
+            if m not in DESIGN_METRICS:
+                issues.append(f"counterfactual.controls: unknown metric '{m}' (must be one of {sorted(DESIGN_METRICS)})")
+            elif m == criterion_metric:
+                issues.append("counterfactual.controls must not include the criterion metric itself")
+        if len(set(controls)) != len(controls):
+            issues.append("counterfactual.controls must not repeat a metric")
+    pre_days = cf.get("pre_days", CF_DEFAULT_PRE_DAYS)
+    if not isinstance(pre_days, int) or isinstance(pre_days, bool) or not (CF_MIN_PRE_DAYS <= pre_days <= CF_MAX_PRE_DAYS):
+        issues.append(f"counterfactual.pre_days must be an integer in [{CF_MIN_PRE_DAYS}, {CF_MAX_PRE_DAYS}]")
+    gate = cf.get("mape_gate_pct", CF_DEFAULT_MAPE_GATE_PCT)
+    if not isinstance(gate, (int, float)) or isinstance(gate, bool) or not (1 <= gate <= 50):
+        issues.append("counterfactual.mape_gate_pct must be a number in [1, 50]")
+    unknown = set(cf) - {"controls", "pre_days", "mape_gate_pct"}
+    if unknown:
+        issues.append(f"unknown counterfactual fields: {sorted(unknown)}")
+    return issues
+
+
+def counterfactual_series_start(design, start_date):
+    """First date the ghost's inputs need: pre_days before the intervention start."""
+    cf = design.get("counterfactual") or {}
+    pre_days = int(cf.get("pre_days", CF_DEFAULT_PRE_DAYS) or CF_DEFAULT_PRE_DAYS)
+    return (_parse_date(start_date) - timedelta(days=pre_days)).strftime("%Y-%m-%d")
+
+
+def counterfactual_analysis(design, dated_criterion, dated_controls, start_date, end_date):
+    """Fit the frozen ghost spec at close. Pure — callers fetch the dated series.
+
+    dated_criterion: {date: value} for the criterion metric, from
+      counterfactual_series_start() through end_date.
+    dated_controls: {metric_slug: {date: value}} for each declared control.
+
+    Returns the analysis block: state "ok" (effect + CI + the served series) or
+    state "no_counterfactual" with a stated reason — never None-and-silent, so
+    the close-path record always says WHY a declared ghost is absent.
+    """
+    import bsts_lite
+
+    cf = design.get("counterfactual") or {}
+    controls = list(cf.get("controls") or [])
+    gate_pct = float(cf.get("mape_gate_pct", CF_DEFAULT_MAPE_GATE_PCT) or CF_DEFAULT_MAPE_GATE_PCT)
+    spec = {
+        "controls": controls,
+        "pre_days": int(cf.get("pre_days", CF_DEFAULT_PRE_DAYS) or CF_DEFAULT_PRE_DAYS),
+        "mape_gate_pct": gate_pct,
+        "engine": "bsts-lite-v1",
+    }
+
+    def _refuse(reason, **extra):
+        return {"state": "no_counterfactual", "reason": reason, "spec": spec, **extra}
+
+    windows = design_windows(start_date, end_date, design)
+    if windows is None:
+        return _refuse("washout consumed the whole experiment window")
+
+    pre_start = counterfactual_series_start(design, start_date)
+    pre_end = (_parse_date(start_date) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    def _aligned_days(d_from, d_to):
+        """Dates in [d_from, d_to] where the criterion AND every control have a
+        value — a day missing any input is dropped (counted, never imputed)."""
+        days, dropped = [], 0
+        cur, last = _parse_date(d_from), _parse_date(d_to)
+        while cur <= last:
+            d = cur.strftime("%Y-%m-%d")
+            if dated_criterion.get(d) is not None and all((dated_controls.get(m) or {}).get(d) is not None for m in controls):
+                days.append(d)
+            elif dated_criterion.get(d) is not None or any((dated_controls.get(m) or {}).get(d) is not None for m in controls):
+                dropped += 1
+            cur += timedelta(days=1)
+        return days, dropped
+
+    pre_dates, pre_dropped = _aligned_days(pre_start, pre_end)
+    post_dates, post_dropped = _aligned_days(windows["analysis_start"], windows["analysis_end"])
+    if len(pre_dates) < CF_MIN_PRE_POINTS:
+        return _refuse(
+            f"insufficient pre-period: {len(pre_dates)} aligned days (need {CF_MIN_PRE_POINTS}+)",
+            n_pre=len(pre_dates),
+            n_pre_dropped=pre_dropped,
+        )
+    if not post_dates:
+        return _refuse("no aligned post-period days", n_pre=len(pre_dates), n_post_dropped=post_dropped)
+
+    pre_y = [float(dated_criterion[d]) for d in pre_dates]
+    pre_x = [[float(dated_controls[m][d]) for m in controls] for d in pre_dates] if controls else None
+    post_x = [[float(dated_controls[m][d]) for m in controls] for d in post_dates] if controls else None
+
+    fit = bsts_lite.fit_counterfactual(pre_y, len(post_dates), pre_x=pre_x, post_x=post_x)
+    if fit is None:
+        return _refuse("model could not be fit (collinear controls or degenerate pre-period)", n_pre=len(pre_dates))
+    if fit["mape_pct"] is None:
+        return _refuse("pre-fit MAPE unevaluable (criterion too close to zero on most pre-period days)", n_pre=fit["n_pre"])
+    if fit["mape_pct"] > gate_pct:
+        return _refuse(
+            f"pre-fit MAPE {fit['mape_pct']:g}% exceeds the frozen gate {gate_pct:g}%",
+            mape_pct=fit["mape_pct"],
+            n_pre=fit["n_pre"],
+        )
+
+    observed_post = [float(dated_criterion[d]) for d in post_dates]
+    eff = bsts_lite.effect_summary(observed_post, fit)
+    if eff is None:
+        return _refuse("no usable post-period observations", n_pre=fit["n_pre"])
+
+    # The served series (capped, honest about it): observed vs ghost with the
+    # honestly-widening 95% band. Confidence grammar level rides along so the
+    # renderer can apply LOW ⇒ point-marks-only, never a fabricated band.
+    idx = list(range(len(post_dates)))[:CF_MAX_SERIES_POINTS]
+    series = {
+        "dates": [post_dates[i] for i in idx],
+        "observed": [round(observed_post[i], 2) for i in idx],
+        "ghost": [round(fit["ghost"][i], 2) for i in idx],
+        "ci_low": [round(fit["ghost"][i] - bsts_lite.Z95 * math.sqrt(fit["point_var"][i]), 2) for i in idx],
+        "ci_high": [round(fit["ghost"][i] + bsts_lite.Z95 * math.sqrt(fit["point_var"][i]), 2) for i in idx],
+        "truncated": len(post_dates) > CF_MAX_SERIES_POINTS,
+    }
+    level = "high" if fit["n_pre"] >= 21 else "medium"  # CF_MIN_PRE_POINTS floors out "low"
+    return {
+        "state": "ok",
+        "spec": spec,
+        "n_pre": fit["n_pre"],
+        "n_pre_dropped": pre_dropped,
+        "n_post": len(post_dates),
+        "n_post_dropped": post_dropped,
+        "mape_pct": fit["mape_pct"],
+        "q": fit["q"],
+        "effect_mean": eff["effect_mean"],
+        "ci95_low": eff["ci95_low"],
+        "ci95_high": eff["ci95_high"],
+        "level": level,
+        "series": series,
+    }
+
+
 def design_windows(start_date, end_date, design):
     """The four analysis dates, all inclusive YYYY-MM-DD.
 
@@ -386,6 +563,17 @@ def analysis_summary(design, stats):
             f"; randomization p={rand['p_value']:g} (one-sided, {rand.get('n_used')} candidate starts "
             f"from the pre-declared window, min attainable p {rand.get('min_p'):g})"
         )
+    # #1410: the ghost's answer to "compared to what?" — or its stated refusal.
+    # Numbers only ever come from counterfactual_analysis; nothing is narrated.
+    cf = stats.get("counterfactual")
+    if isinstance(cf, dict):
+        if cf.get("state") == "ok":
+            line += (
+                f"; vs the counterfactual: {cf['effect_mean']:+g} "
+                f"(95% CI [{cf['ci95_low']:g}, {cf['ci95_high']:g}], pre-fit MAPE {cf['mape_pct']:g}%, n_pre {cf['n_pre']})"
+            )
+        elif cf.get("reason"):
+            line += f"; no counterfactual ({cf['reason']})"
     return line + f" -> {stats['verdict']}."
 
 
