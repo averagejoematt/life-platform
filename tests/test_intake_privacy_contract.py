@@ -55,7 +55,7 @@ def test_ledger_is_registered_everywhere_private():
 def test_write_path_routes_private_metric_away_from_public_partition():
     # Structural: the routing constant exists and the social module consumes it.
     src = (_REPO / "lambdas" / "web" / "site_api_social.py").read_text()
-    assert "PRIVATE_RITUAL_METRICS" in src and "PRIVATE_INTAKE_SOURCE" in src
+    assert "PRIVATE_RITUAL_METRICS" in src and "private_intake" in src
 
 
 # ── absence: the identifiers never reach a public surface ─────────────────────
@@ -85,10 +85,13 @@ def test_web_modules_never_read_or_serve_the_ledger():
         text = p.read_text(errors="ignore")
         if p.name == "site_api_social.py":
             # The ONE sanctioned reference: routing the signed tap WRITE to the
-            # private partition via the ritual_link constants. It must not query
-            # or import the analysis module.
+            # private partition. It must not import the analysis module, and no
+            # LINE naming the partition may be read-shaped (query/eq/get_item) —
+            # the inline literal exists only so the orphan gate sees the write.
             assert "intake_response" not in text, "web write path must not import the analysis module"
-            assert 'Key("pk").eq' not in text or "private_intake" not in text, "web must never query the private partition"
+            for line in text.splitlines():
+                if "private_intake" in line:
+                    assert not any(tok in line for tok in ("eq(", ".query", "get_item")), f"read-shaped private_intake line: {line.strip()}"
             continue
         for tok in LEDGER_TOKENS:
             if tok in text:

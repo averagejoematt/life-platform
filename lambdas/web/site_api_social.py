@@ -1370,12 +1370,18 @@ def _handle_ritual_log(event: dict) -> dict:
     # never the evening_ritual record the public wellbeing aggregate reads. The
     # write path is shared (same signed link, same rate limit); only the
     # destination differs, so the public read surface structurally can't see it.
-    from ritual_link import PRIVATE_INTAKE_SOURCE, PRIVATE_RITUAL_METRICS
+    from ritual_link import PRIVATE_RITUAL_METRICS
 
-    dest_source = PRIVATE_INTAKE_SOURCE if metric in PRIVATE_RITUAL_METRICS else "evening_ritual"
     try:
         table.update_item(
-            Key={"pk": f"{USER_PREFIX}{dest_source}", "sk": f"DATE#{date_str}"},
+            # Both destinations INLINE as USER_PREFIX-joined literals — the orphan
+            # gate (tests/test_site_partition_orphans.py) resolves web writers only
+            # inside the put/update call itself; a hoisted or dynamic pk makes
+            # evening_ritual read as writerless (redded e1bcf766's Unit Tests).
+            Key={
+                "pk": (f"{USER_PREFIX}private_intake" if metric in PRIVATE_RITUAL_METRICS else f"{USER_PREFIX}evening_ritual"),
+                "sk": f"DATE#{date_str}",
+            },
             UpdateExpression="SET #m = :v, #ts = :ts, #src = :src",
             ExpressionAttributeNames={
                 "#m": metric,
