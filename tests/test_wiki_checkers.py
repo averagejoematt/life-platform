@@ -438,6 +438,65 @@ def test_og_source_count_clean_on_current_tree():
     assert hits == [], "an og card still hardcodes a stale data-source count:\n" + "\n".join(hits)
 
 
+<<<<<<< HEAD
+def test_data_governance_gate_is_not_vacuous():
+    """#1351 (per the #1189 vacuous-scan lesson): the DATA_GOVERNANCE.md scan must FLAG
+    the exact pre-fix claims (repo 'still PUBLIC', delete lambda 'scaffolded; not yet
+    wired', a >90d-stale Verified header), PASS the corrected claims, and EXEMPT a
+    HISTORICAL-framed line naming the same old facts."""
+    facts = _load("scripts/check_doc_facts.py")
+    d = Path(tempfile.mkdtemp())
+
+    # the EXACT #1351 pre-fix repo-visibility claim — must be caught.
+    bad_repo = d / "bad_repo.md"
+    bad_repo.write_text("**As of 2026-07-10 the repo is still PUBLIC and this exposure is OPEN**\n")
+    hits = facts._data_governance_hits(bad_repo, today=date(2026, 7, 18))
+    assert hits, "DATA_GOVERNANCE repo-visibility scan is VACUOUS — did not flag the planted 'still PUBLIC' claim"
+    assert any("PUBLIC" in h for h in hits)
+
+    # the EXACT #1351 pre-fix delete-lambda claim — must be caught.
+    bad_lambda = d / "bad_lambda.md"
+    bad_lambda.write_text("`lambdas/delete_user_data_lambda.py` scaffolded; not yet wired to a request-driven trigger.\n")
+    hits = facts._data_governance_hits(bad_lambda, today=date(2026, 7, 18))
+    assert hits, "DATA_GOVERNANCE delete-lambda scan is VACUOUS — did not flag the planted stale claim"
+    assert any("scaffolded" in h for h in hits)
+
+    # a stale Verified header (>90d) — must be caught; a fresh one must not.
+    stale_header = d / "stale_header.md"
+    stale_header.write_text("**Verified:** 2026-01-01\n")
+    hits = facts._data_governance_hits(stale_header, today=date(2026, 7, 18))
+    assert hits, "DATA_GOVERNANCE Verified-freshness scan is VACUOUS — did not flag a >90d-stale header"
+    assert any("stale" in h for h in hits)
+
+    fresh_header = d / "fresh_header.md"
+    fresh_header.write_text("**Verified:** 2026-07-01\n")
+    assert facts._data_governance_hits(fresh_header, today=date(2026, 7, 18)) == []
+
+    # the corrected claims — must pass.
+    good = d / "good.md"
+    good.write_text(
+        "The repo has been PRIVATE since 2026-07-13.\n"
+        "`lambdas/delete_user_data_lambda.py` is implemented, CDK-deployed, and unit-tested.\n"
+        "**Verified:** 2026-07-18\n"
+    )
+    assert facts._data_governance_hits(good, today=date(2026, 7, 18)) == []
+
+    # a HISTORICAL-framed line naming the old facts — must NOT be flagged.
+    hist = d / "hist.md"
+    hist.write_text(
+        "The repo was still PUBLIC until 2026-07-13; delete_user_data_lambda used to be scaffolded; not yet wired.\n"
+        "**Verified:** 2026-07-18\n"
+    )
+    assert facts._data_governance_hits(hist, today=date(2026, 7, 18)) == []
+
+
+def test_data_governance_gate_clean_on_current_tree():
+    """After the fix, docs/DATA_GOVERNANCE.md states none of the stale claims and carries
+    a fresh Verified header (#1351)."""
+    facts = _load("scripts/check_doc_facts.py")
+    hits = facts._data_governance_hits(facts.DATA_GOVERNANCE_PATH)
+    assert hits == [], "docs/DATA_GOVERNANCE.md still trips the #1351 fact gate:\n" + "\n".join(hits)
+=======
 def test_governor_cadence_ground_truth_is_discovered():
     """#1254/#1347: the governor's true cadence resolves from its OWN CDK cron
     (`life-platform-cost-governor` in cdk/stacks/operational_stack.py), not a pinned
@@ -526,3 +585,4 @@ def test_governor_cadence_clean_on_current_tree():
     assert step == 8
     hits = facts._governor_cadence_hits(facts._scan_governor_surface(), step)
     assert hits == [], "a live line still claims the cost-governor runs hourly:\n" + "\n".join(hits)
+>>>>>>> origin/main
