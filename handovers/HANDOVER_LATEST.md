@@ -58,12 +58,18 @@ crash (PR #1540 — present-None `.get(k, {})` trap; digest redeployed + re-sent
 DLQ drained to 0). Nudge-test Sunday wall-clock repair (PR #1535 — main CI was RED on
 genesis Sunday; dates pinned + detail-copy fix). Schema recaptures #1542/#1545.
 
-**Design lane:** first **/design-sync** ran — created "AverageJoeMatt Design System v5"
-(project bdbc3dc0-1a0c-41a2-9ab7-03b2de8ddf20), 78 files pushed + list_files-verified
-(June archive untouched); #1464 fully closed. **#1469 pilot proposals authored + pushed**
-(proposals/home-first-screen/, 19 files: 3 variants × preview/rationale/notes/screens) +
-screenshots sent to Matthew for the pick (A loop-diagrammatic / B ledger-evidential /
-C editorial; B flags a deliberate Litmus-5 trade).
+**Design lane — the round-trip pilot COMPLETED end-to-end (#1469 CLOSED):** first
+**/design-sync** created "AverageJoeMatt Design System v5" (project
+bdbc3dc0-1a0c-41a2-9ab7-03b2de8ddf20, 78 files, June archive untouched; #1464 closed);
+3 variant proposals authored + pushed to proposals/home-first-screen/; **Matthew picked
+variant A ("the loop, drawn live") from rendered screenshots** (taste-pause honored,
+artifact pick-sheet at claude.ai/code/artifact/98a150cd…); /design-implement re-expressed
+it (PR #1547 — Litmus 10/10 on shipped code, one glow = the live day counter, 0px
+overflow @390, constellation preserved as a beat figure); Matthew approved the merge;
+deploy GREEN through smoke + gating visual-QA, dial live-verified (4 stations, day
+counter binding). Epic A's proof-of-life is real. Follow-up (Matthew's call, unfiled):
+the old .beat-loop card row + #407 teaser dropped from the fold per the proposal —
+restore the biographical hero paragraphs elsewhere if wanted.
 
 **THE CI-OUTAGE DISCOVERY (#1544):** push-event workflows on main STOPPED QUEUING at
 ~18:17 UTC — six consecutive merges got zero CI/CD + zero Site-deploy runs while
@@ -99,7 +105,7 @@ TONIGHT after Matthew's taps — next session or attended.
 
 ## Residual / next picks
 - **Decision menu (Matthew)** — see the session-close message: #1544 CI outage (billing
-  check needs owner auth), #1469 variant pick (screenshots sent), #1319 plan-vs-posture
+  check needs owner auth), #1319 plan-vs-posture
   (unblocks #1338), SNS confirm-click (not-work — owner click), #1114 portrait pick
   (PR #1512), #1350 retention sign+run, #1329 ai-keys rotate, Withings weigh-in sync
   (not-work — physical-device check).
