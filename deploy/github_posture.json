@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "deploy/github_posture.json — the DOCUMENTED GitHub-side control posture (#1320, epic #1355).",
+    "This file is the machine-readable mirror of what the docs claim; deploy/drift_sentinel.py's",
+    "check_github_config()/check_github_push_runs() GET-assert live GitHub state against it weekly.",
+    "RULES: (1) every entry carries a `source` naming the doc that makes the claim — this file",
+    "declares the documented posture, never a wish; (2) a PR that amends the claiming docs (e.g.",
+    "the #1319 approval-gate fork) MUST flip the matching entry in the same PR, or the sentinel",
+    "will honestly report the divergence every Monday; (3) never run black on this file (JSON)."
+  ],
+  "environment_production": {
+    "name": "production",
+    "required_reviewers": true,
+    "source": "ADR-065 ('CI's production approval gate stays intact') + CLAUDE.md CI/CD section + ci-cd.yml ('requires manual approval via GitHub Environment: production'). KNOWN-DIVERGED as of 2026-07-19: the private-flip dropped the gate (#1319, reference_github_env_protection_private_flip) — this assert fires by design until #1319 either restores the gate or amends all four claiming surfaces AND flips this entry to false."
+  },
+  "main_ruleset": {
+    "id": 19162901,
+    "enforcement": "active",
+    "rule_types": ["deletion", "non_fast_forward"],
+    "include_refs": ["refs/heads/main"],
+    "source": "docs/CONVENTIONS.md drift-discovery table + docs/MANAGED_WHERE_LEDGER.md (#1325): exactly main-block-force-push-and-deletion, rules [deletion, non_fast_forward] only, enforcement active, no pull_request/required_status_checks rule."
+  },
+  "vulnerability_alerts": {
+    "enabled": true,
+    "source": "ci-cd.yml pip-audit advisory step ('Dependabot will open a bump PR for the affected package') + ADR-082 (Dependabot is the CVE remediation channel). KNOWN-DIVERGED as of 2026-07-19: alerts are disabled live (SDLC review 2026-07-18 finding P2-4) — enabling is a one-click owner toggle (repo Settings -> Security, or PUT /repos/{repo}/vulnerability-alerts); this assert fires by design until the toggle happens."
+  },
+  "push_run_detector": {
+    "grace_minutes": 30,
+    "lookback_days": 7,
+    "max_commits": 30,
+    "gap_cluster_threshold": 2,
+    "source": "#1544: six consecutive squash merges to main (2026-07-19 16:17-19:20 UTC) produced ZERO push-event workflow runs — not red, ABSENT. A trigger-matching merge with no queued run within grace_minutes is the alarm condition."
+  }
+}
