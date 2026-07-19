@@ -33,6 +33,13 @@ permissions:
   id-token: write   # only used by the advisory judge/emit step
   issues: write     # advisory-failure issue filing (#1447)
 
+# CI-minutes hygiene (#1453): a manual workflow_dispatch overlapping the Monday
+# schedule queues instead of doubling up (a partial judge/emit run mid-flight
+# should finish, not be killed — cancel-in-progress stays false here).
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-west-2
   AWS_ACCOUNT_ID: "205930651321"

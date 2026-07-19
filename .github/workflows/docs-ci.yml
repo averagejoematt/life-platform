@@ -47,6 +47,12 @@ on:
 permissions:
   contents: read
 
+# CI-minutes hygiene (#1453): a superseded push/PR update cancels its predecessor's
+# still-running gate instead of letting both burn Actions minutes to completion.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   wiki-gates:
     name: Wiki drift gates

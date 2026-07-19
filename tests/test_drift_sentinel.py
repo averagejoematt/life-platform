@@ -150,7 +150,7 @@ def test_site_sha_ancestry_survives_git_fetch_failure(monkeypatch):
 # ── sweep status aggregation + summary (AC1/AC4) ─────────────────────────────
 
 
-def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc=None, gh_config=None, gh_push=None):
+def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc=None, gh_config=None, gh_push=None, quota=None):
     monkeypatch.setattr(ds, "check_cfn_drift", lambda *a, **k: cfn)
     monkeypatch.setattr(ds, "check_postflight", lambda: post)
     monkeypatch.setattr(ds, "check_orphan_functions", lambda: orphan)
@@ -160,6 +160,11 @@ def _patch_all(monkeypatch, cfn, post, orphan, bucket, doc=None, site=None, oidc
     monkeypatch.setattr(ds, "check_oidc_iam", lambda: oidc or {"status": "clean"})
     monkeypatch.setattr(ds, "check_github_config", lambda: gh_config or {"status": "clean", "surfaces": {}})
     monkeypatch.setattr(ds, "check_github_push_runs", lambda *a, **k: gh_push or {"status": "clean", "stalled": [], "gap_commits": []})
+    monkeypatch.setattr(
+        ds,
+        "check_github_quota",
+        lambda: quota or {"status": "unavailable", "billing_api": {"available": False, "detail": "test"}, "top_workflows_7d": []},
+    )
 
 
 def test_sweep_clean(monkeypatch):
@@ -689,3 +694,142 @@ def test_push_runs_exempts_bot_reconcile_commits(monkeypatch):
     assert res["status"] == "clean"
     assert res["gap_commits"] == []
     assert res["bot_commits_exempt"] == 1
+
+
+# ── GitHub quota/billing observability (#1334, #1453) ────────────────────────
+
+
+def test_run_duration_seconds_parses_iso_timestamps():
+    run = {"startedAt": "2026-07-14T10:00:00Z", "updatedAt": "2026-07-14T10:05:30Z"}
+    assert ds._run_duration_seconds(run) == 330
+
+
+def test_run_duration_seconds_soft_fails_on_bad_timestamps():
+    assert ds._run_duration_seconds({"startedAt": "not-a-date", "updatedAt": "also-not"}) is None
+    assert ds._run_duration_seconds({}) is None
+
+
+def test_github_quota_billing_unavailable_falls_back_to_proxy(monkeypatch):
+    # The realistic case: GITHUB_TOKEN lacks the `user` scope billing needs (confirmed
+    # 2026-07-18 live) — must report a clearly-labeled unavailable reason, never crash,
+    # and never claim "error"/"degraded" for a structural, known limitation.
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: None)
+    monkeypatch.setattr(
+        ds,
+        "_gh_run_list_trailing",
+        lambda **k: [
+            {"workflowName": "CI/CD", "startedAt": "2026-07-14T00:00:00Z", "updatedAt": "2026-07-14T00:10:00Z"},
+            {"workflowName": "CI/CD", "startedAt": "2026-07-15T00:00:00Z", "updatedAt": "2026-07-15T00:05:00Z"},
+            {"workflowName": "Docs CI", "startedAt": "2026-07-14T00:00:00Z", "updatedAt": "2026-07-14T00:02:00Z"},
+        ],
+    )
+    res = ds.check_github_quota()
+    assert res["status"] == "unavailable"
+    assert res["billing_api"]["available"] is False
+    assert "user" in res["billing_api"]["detail"]
+    top = {w["workflow"]: w["wall_clock_minutes"] for w in res["top_workflows_7d"]}
+    assert top["CI/CD"] == 15.0
+    assert top["Docs CI"] == 2.0
+    assert "warn" not in res
+
+
+def test_github_quota_billing_available_under_threshold_is_clean(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: {"total_minutes_used": 900, "included_minutes": 3000})
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    res = ds.check_github_quota()
+    assert res["status"] == "clean"
+    assert res["billing_api"]["available"] is True
+    assert res["billing_api"]["pct_used"] == 30.0
+    assert "warn" not in res
+
+
+def test_github_quota_billing_over_70pct_warns_and_drifts(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: {"total_minutes_used": 2200, "included_minutes": 3000})
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", lambda **k: [])
+    res = ds.check_github_quota()
+    assert res["status"] == "drift"
+    assert res["billing_api"]["pct_used"] == pytest.approx(73.3, abs=0.1)
+    assert "70%" in res["warn"]
+
+
+def test_github_quota_top_workflows_proxy_error_is_soft(monkeypatch):
+    monkeypatch.setattr(ds, "_gh_api_json", lambda path, **k: None)
+
+    def _boom(**k):
+        raise RuntimeError("gh: rate limited")
+
+    monkeypatch.setattr(ds, "_gh_run_list_trailing", _boom)
+    res = ds.check_github_quota()
+    assert res["status"] == "unavailable"  # still fail-soft, never crashes the sweep
+    assert "rate limited" in res["top_workflows_error"]
+    assert res["top_workflows_7d"] == []
+
+
+def test_sweep_stays_clean_when_quota_unavailable(monkeypatch):
+    # The common real-world case (no user-scoped PAT wired in): an "unavailable" quota
+    # check must NOT drag an otherwise-clean weekly sweep into drift or degraded.
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "clean"
+    assert rec["checks"]["github_quota"]["status"] == "unavailable"
+
+
+def test_sweep_drifts_when_quota_warns(monkeypatch):
+    _patch_all(
+        monkeypatch,
+        cfn={"status": "clean", "stacks": {}},
+        post={"config_drift": {"status": "clean"}, "layer_uniformity": {"status": "clean"}, "asset_completeness": {"status": "clean"}},
+        orphan={"status": "clean", "orphans": []},
+        bucket={"status": "clean", "missing_prefixes": []},
+        quota={
+            "status": "drift",
+            "warn": "GitHub Actions minutes at 90.0% of the 3000-min allowance (warn threshold 70%)",
+            "billing_api": {"available": True, "pct_used": 90.0, "total_minutes_used": 2700, "included_minutes": 3000},
+            "top_workflows_7d": [],
+        },
+    )
+    rec = ds.run_sweep()
+    assert rec["status"] == "drift"
+    assert "90.0%" in rec["summary"]
+
+
+def test_quota_html_renders_unavailable_reason():
+    record = {
+        "checks": {
+            "github_quota": {
+                "status": "unavailable",
+                "billing_api": {"available": False, "detail": "billing API unavailable: needs the user scope"},
+                "top_workflows_7d": [{"workflow": "CI/CD", "wall_clock_minutes": 42.0}],
+            }
+        }
+    }
+    html = drift_report.quota_html(record)
+    assert "unavailable" in html
+    assert "needs the user scope" in html
+    assert "CI/CD" in html and "42.0" in html
+
+
+def test_quota_html_renders_warn_bold_when_over_threshold():
+    record = {
+        "checks": {
+            "github_quota": {
+                "status": "drift",
+                "warn": "GitHub Actions minutes at 85.0% of the 3000-min allowance (warn threshold 70%)",
+                "billing_api": {"available": True, "pct_used": 85.0, "total_minutes_used": 2550, "included_minutes": 3000},
+                "top_workflows_7d": [],
+            }
+        }
+    }
+    html = drift_report.quota_html(record)
+    assert "<b>" in html and "85.0%" in html
+
+
+def test_quota_html_empty_when_no_record_or_no_quota_check():
+    assert drift_report.quota_html(None) == ""
+    assert drift_report.quota_html({"checks": {}}) == ""

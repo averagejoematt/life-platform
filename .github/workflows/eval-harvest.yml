@@ -25,6 +25,12 @@ permissions:
   contents: read
   id-token: write
 
+# CI-minutes hygiene (#1453): a manual workflow_dispatch overlapping the monthly
+# schedule queues instead of doubling up.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-west-2
   AWS_ACCOUNT_ID: "205930651321"

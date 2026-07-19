@@ -271,6 +271,7 @@ def update_report_and_email(decisions, mode):
     subj = f"🤖 Remediation [auto]: {len(merged)} merged, {len(prs)} PRs, {len(nh)} need you"
     if unt:
         subj += f", {len(unt)} untriaged"
+    _drift_record = drift_report.read_latest(_s3, LOG_BUCKET)
     html = (
         f"<p><b>Mode:</b> {mode} · {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}</p>"
         + (
@@ -286,7 +287,9 @@ def update_report_and_email(decisions, mode):
         + block("⏳ Not triaged this run", unt, lambda i: f"{i.get('kind','')}: {i.get('id','')}")
         # Weekly drift sentinel status — always rendered so a clean week is explicitly
         # clean (never silent about infra drift). AC4 of #394.
-        + drift_report.status_html(drift_report.read_latest(_s3, LOG_BUCKET))
+        + drift_report.status_html(_drift_record)
+        # GitHub Actions quota/billing glance — always rendered alongside it (#1334, #1453).
+        + drift_report.quota_html(_drift_record)
     )
     try:
         _ses.send_email(

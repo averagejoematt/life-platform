@@ -43,6 +43,16 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
      merge older than the grace window with no queued run is the alarm. Path-
      filter aware (a commit touching only e.g. handovers/ legitimately triggers
      nothing — see PUSH_TRIGGER_GLOBS).
+  8. GITHUB QUOTA/BILLING (#1334, #1453) — GitHub became a metered production
+     dependency when the repo went private (2026-07-13): CI, site-deploy, and this
+     agent itself all run on Actions minutes billed against the account's plan
+     allowance. Attempts the Actions billing-usage API (minutes used vs. the
+     included allowance, warn at 70%) — FAIL-SOFT: the workflow's built-in
+     GITHUB_TOKEN cannot read billing endpoints (confirmed 2026-07-18: 404 "needs
+     the user scope"), so this reports a clearly-labeled "billing API unavailable"
+     line rather than erroring. Independently lists the top wall-clock-consuming
+     workflows over the trailing 7 days (`gh run list`, needs only `actions: read`)
+     so a run-rate regression is attributable even without billing-API access.
 
 Output: a findings record written to s3://<bucket>/drift-log/{latest,<date>}.json
 (mirrors the Coherence Sentinel's coherence-log pattern) so the remediation agent can
@@ -883,6 +893,142 @@ def check_github_push_runs(max_file_lookups=15):
     return result
 
 
+# ── 8. GitHub quota/billing observability (#1334, #1453) ────────────────────
+
+# GitHub Pro's DOCUMENTED (public, not account-specific) included-Actions-minutes
+# allowance — https://docs.github.com/billing/managing-billing-for-github-actions,
+# checked 2026-07-18. The account's actual plan tier is NOT programmatically
+# readable with the workflow's default token (see `check_github_quota` docstring),
+# so this constant is the warn-threshold basis ONLY when the plan is Pro/Team; if
+# the account is ever confirmed on a different tier this needs a matching update.
+GITHUB_ACTIONS_INCLUDED_MINUTES = 3000
+GITHUB_ACTIONS_WARN_PCT = 70
+
+
+def _gh_api_json(path, timeout=30):
+    """`gh api <path>` as parsed JSON; None (never raise) on any failure — billing
+    endpoints are EXPECTED to fail with the workflow's default GITHUB_TOKEN (no
+    `user` scope), so the caller treats None as "unavailable", not an error."""
+    import subprocess
+
+    try:
+        out = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=timeout, cwd=_ROOT)
+    except Exception:  # noqa: BLE001
+        return None
+    if out.returncode != 0:
+        return None
+    try:
+        return json.loads(out.stdout)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _gh_run_list_trailing(days=7, limit=200, timeout=60):
+    """`gh run list` for the trailing N days, JSON-decoded. Raises on failure — the
+    caller wraps this so a failure here shows up as a labeled sub-error, not a
+    crash of the whole check."""
+    import subprocess
+    from datetime import timedelta
+
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    out = subprocess.run(
+        ["gh", "run", "list", "--limit", str(limit), "--created", f">={since}", "--json", "workflowName,startedAt,updatedAt"],
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        cwd=_ROOT,
+    )
+    if out.returncode != 0:
+        raise RuntimeError((out.stderr or "gh run list failed")[:300])
+    return json.loads(out.stdout or "[]")
+
+
+def _run_duration_seconds(run):
+    """Wall-clock duration of one `gh run list` record; None if timestamps are
+    missing/unparseable (skipped, not counted as zero)."""
+    try:
+        start = datetime.fromisoformat(run["startedAt"].replace("Z", "+00:00"))
+        end = datetime.fromisoformat(run["updatedAt"].replace("Z", "+00:00"))
+        return max((end - start).total_seconds(), 0)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def check_github_quota():
+    """GitHub Actions quota/billing observability (#1334, #1453).
+
+    Two independent, both fail-soft, sub-checks:
+
+    1. BILLING API — `GET /users/{owner}/settings/billing/actions` (the real minutes-
+       used-vs-included figure). This needs the `user` OAuth scope; the Actions
+       built-in GITHUB_TOKEN does not carry it and gets a 404 "needs the user scope"
+       (verified live 2026-07-18 — see docs/COST_TRACKER.md). Rather than treating
+       that as an error (which would make this check flap "degraded" every week for
+       a structural, known limitation), a failed billing call is reported as an
+       explicit `"billing_api": {"available": False, "detail": "..."}` — the
+       "billing API unavailable: <reason>" line #1453 asks for. If a scoped PAT is
+       ever wired in (see docs/COST_TRACKER.md for the exact `gh auth refresh`
+       command), this starts reporting real numbers with no code change needed.
+    2. TOP-CONSUMING WORKFLOWS — a same-scope wall-clock proxy: sums each run's
+       (updatedAt - startedAt) per workflow name over the trailing 7 days via
+       `gh run list` (needs only `actions: read`, which the built-in token gets).
+       This is NOT true billable minutes (Actions bills per-job, and parallel jobs
+       in one workflow multiply wall-clock down, not up) — it's a same-direction
+       proxy good enough to say "workflow X grew 3x this week," per #1453 AC2.
+
+    `status` is "drift" (escalated into the weekly needs-human signal) only when
+    real billing data says usage crossed the 70% warn line — the proxy path never
+    sets warn, since it isn't calibrated against the real quota.
+    """
+    result = {"billing_api": {"available": False}, "top_workflows_7d": []}
+
+    repo = os.environ.get("GITHUB_REPOSITORY", "averagejoematt/life-platform")
+    owner = repo.split("/")[0]
+    billing = _gh_api_json(f"users/{owner}/settings/billing/actions")
+    if billing is None:
+        result["billing_api"] = {
+            "available": False,
+            "detail": (
+                "billing API unavailable: GET /users/{owner}/settings/billing/actions needs the "
+                "'user' OAuth scope, which the workflow's built-in GITHUB_TOKEN does not carry "
+                "(confirmed 2026-07-18). A scoped PAT would need `gh auth refresh -h github.com "
+                "-s user` — see docs/COST_TRACKER.md for the human-side follow-up. Falling back "
+                "to the trailing-7d wall-clock proxy below."
+            ),
+        }
+    else:
+        used = billing.get("total_minutes_used")
+        included = billing.get("included_minutes", GITHUB_ACTIONS_INCLUDED_MINUTES)
+        pct = (used / included * 100) if (used is not None and included) else None
+        result["billing_api"] = {
+            "available": True,
+            "total_minutes_used": used,
+            "included_minutes": included,
+            "pct_used": round(pct, 1) if pct is not None else None,
+            "total_paid_minutes_used": billing.get("total_paid_minutes_used"),
+        }
+        if pct is not None and pct >= GITHUB_ACTIONS_WARN_PCT:
+            result["warn"] = (
+                f"GitHub Actions minutes at {pct:.1f}% of the {included}-min allowance " f"(warn threshold {GITHUB_ACTIONS_WARN_PCT}%)"
+            )
+
+    try:
+        runs = _gh_run_list_trailing()
+        by_workflow: dict[str, float] = {}
+        for r in runs:
+            name = r.get("workflowName") or "(unnamed)"
+            dur = _run_duration_seconds(r)
+            if dur is not None:
+                by_workflow[name] = by_workflow.get(name, 0) + dur
+        top = sorted(by_workflow.items(), key=lambda kv: kv[1], reverse=True)[:10]
+        result["top_workflows_7d"] = [{"workflow": name, "wall_clock_minutes": round(secs / 60, 1)} for name, secs in top]
+    except Exception as e:  # noqa: BLE001
+        result["top_workflows_error"] = str(e)[:300]
+
+    result["status"] = "drift" if result.get("warn") else ("unavailable" if not result["billing_api"]["available"] else "clean")
+    return result
+
+
 # ── Assemble + persist ───────────────────────────────────────────────────────
 
 
@@ -897,6 +1043,7 @@ def run_sweep():
         "site_sha_ancestry": check_site_sha_ancestry(),
         "github_config": check_github_config(),
         "github_push_runs": check_github_push_runs(),
+        "github_quota": check_github_quota(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -938,6 +1085,9 @@ def _summary(status, checks):
         c = checks.get(key, {})
         if c.get("status") == "drift":
             parts.append(label)
+    gq = checks.get("github_quota", {})
+    if gq.get("status") == "drift" and gq.get("warn"):
+        parts.append(gq["warn"])
     errored = [k for k, v in checks.items() if v.get("status") == "error"]
     if errored:
         parts.append(f"{len(errored)} check(s) could not run: {', '.join(errored)}")
@@ -983,6 +1133,8 @@ def print_summary(record):
                 detail = f" — {bad}"
             elif name == "github_push_runs":
                 detail = f" — {c.get('detail', '')}"
+            elif name == "github_quota":
+                detail = f" — {c.get('warn', '')}"
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")
@@ -990,6 +1142,20 @@ def print_summary(record):
         # needs-owner line (the exact PAT permission to add) — visible, never red.
         if name in ("github_config", "github_push_runs") and c.get("needs_owner"):
             print(f"      [needs-owner] {c['needs_owner']}")
+        # GitHub quota/billing facts always print, regardless of status (#1334/#1453 —
+        # this is a monthly-glance line, not just an alert): the real usage pct when
+        # the billing API is available, the fail-soft reason when it isn't, and the
+        # top-consuming workflows either way so run-rate regressions are attributable.
+        if name == "github_quota":
+            b = c.get("billing_api", {})
+            if b.get("available"):
+                print(f"      Actions minutes used: {b.get('total_minutes_used')}/{b.get('included_minutes')} ({b.get('pct_used')}%)")
+            else:
+                print(f"      {b.get('detail', 'billing API unavailable')}")
+            for w in c.get("top_workflows_7d", [])[:5]:
+                print(f"      · {w['workflow']}: {w['wall_clock_minutes']} min (7d wall-clock proxy)")
+            if c.get("top_workflows_error"):
+                print(f"      [warn] top-workflows proxy: {c['top_workflows_error']}")
 
 
 def main() -> int:

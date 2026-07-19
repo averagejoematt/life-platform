@@ -12,6 +12,11 @@ auto) so the drift status lands in the ONE curated report:
   * status_html(record) → a one-line status rendered on EVERY report — a clean week
     reports explicitly clean (loud empty state), a drifted/degraded week is loud. AC4:
     the report is never silent about drift.
+  * quota_html(record) → the GitHub Actions quota/billing glance (#1334, #1453),
+    rendered on EVERY report the same way — real minutes-used-vs-allowance and a 70%
+    warn line when the billing API is reachable, a labeled "unavailable" reason when
+    it isn't (the workflow's default token lacks the `user` scope), plus the top
+    wall-clock-consuming workflows over the trailing 7 days either way.
 """
 
 from __future__ import annotations
@@ -73,3 +78,29 @@ def status_html(record):
         joined = " ".join(sorted(set(gaps)))
         html += f"<p><b>needs-owner (not an alarm):</b> {joined}</p>"
     return html
+
+
+def quota_html(record):
+    """GitHub Actions quota/billing line for the report (#1334, #1453). Always
+    renders when a `github_quota` check exists on the record — a clean/unavailable
+    week still shows the monthly-glance facts, never silently omits them."""
+    if not record:
+        return ""
+    gq = record.get("checks", {}).get("github_quota")
+    if not gq:
+        return ""
+    billing = gq.get("billing_api", {})
+    if billing.get("available"):
+        pct = billing.get("pct_used")
+        icon = "🔴" if gq.get("status") == "drift" else "🟢"
+        line = f"{icon} {billing.get('total_minutes_used')}/{billing.get('included_minutes')} min used ({pct}%)"
+        if gq.get("warn"):
+            line += f" — <b>{gq['warn']}</b>"
+    else:
+        icon = "⚪"
+        line = f"{icon} billing API unavailable: {billing.get('detail', 'unknown reason')}"
+    top = gq.get("top_workflows_7d", [])[:5]
+    top_html = ""
+    if top:
+        top_html = "<ul>" + "".join(f"<li>{w['workflow']}: {w['wall_clock_minutes']} min (7d wall-clock proxy)</li>" for w in top) + "</ul>"
+    return f"<h3>GitHub Actions quota glance</h3><p>{line}</p>{top_html}"
