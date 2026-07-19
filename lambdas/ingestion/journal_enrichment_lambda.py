@@ -350,6 +350,24 @@ def query_journal_entries(start_date, end_date, full_sync=False):
     return [i for i in items if "#journal#" in i.get("sk", "")]
 
 
+def _write_flourishing_rows(entries) -> int:
+    """#1403: group the queried entries by date and upsert one SOURCE#flourishing
+    row per day that has enrichment. Pure projection over stored fields —
+    idempotent, no LLM calls, raw entries untouched."""
+    from flourishing import write_flourishing_row
+
+    by_date: dict[str, list] = {}
+    for item in entries:
+        d = item.get("date") or str(item.get("sk", "")).replace("DATE#", "")[:10]
+        if d:
+            by_date.setdefault(d, []).append(item)
+    written = 0
+    for d, day_entries in sorted(by_date.items()):
+        if write_flourishing_row(table, USER_ID, d, day_entries, MODEL, SCHEMA_VERSION):
+            written += 1
+    return written
+
+
 def lambda_handler(event, context):
     try:
         """
@@ -390,6 +408,16 @@ def lambda_handler(event, context):
 
         entries = query_journal_entries(start_date, end_date, full_sync)
         logger.info(f"Found {len(entries)} journal entries")
+
+        # #1403: flourishing_only mode — project SOURCE#flourishing rows from the
+        # ALREADY-STORED enrichment without a single Haiku call. This is how the
+        # months of dark PERMA signal backfill: {"start": ..., "end": ...,
+        # "flourishing_only": true}.
+        if event.get("flourishing_only"):
+            rows = _write_flourishing_rows(entries)
+            summary = {"entries_found": len(entries), "flourishing_rows": rows, "date_range": f"{start_date} → {end_date}"}
+            logger.info(f"Flourishing-only complete: {summary}")
+            return {"statusCode": 200, "body": json.dumps(summary)}
 
         enriched = 0
         skipped = 0
@@ -449,11 +477,21 @@ def lambda_handler(event, context):
                 errors += 1
                 logger.error(f"  ✗ Error enriching {sk}: {e}")
 
+        # #1403: after enrichment, project the window's SOURCE#flourishing rows.
+        # Re-queried (not the pre-loop list) so freshly-written enrichment is in;
+        # fail-soft — the projection must never fail the enrichment run.
+        flourishing_rows = 0
+        try:
+            flourishing_rows = _write_flourishing_rows(query_journal_entries(start_date, end_date, full_sync))
+        except Exception as fe:
+            logger.error(f"flourishing projection failed (non-fatal): {fe}")
+
         summary = {
             "entries_found": len(entries),
             "enriched": enriched,
             "skipped": skipped,
             "errors": errors,
+            "flourishing_rows": flourishing_rows,
             "date_range": f"{start_date} → {end_date}",
         }
         logger.info(f"Complete: {summary}")

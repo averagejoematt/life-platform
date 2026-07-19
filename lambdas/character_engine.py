@@ -728,7 +728,25 @@ def compute_mind_raw(data: dict[str, Any], config: dict[str, Any]) -> tuple[floa
         reading_target = components.get("reading_practice", {}).get("target_days_week", 4)
         scores["reading_practice"] = _pct_of_target(len(reading_days), reading_target, 1.25) if reading_days is not None else None
 
-    return _weighted_pillar_score(scores, components)
+    # Values alignment (#1403): distinct values-in-action the enrichment pass
+    # found in the day's journal (SOURCE#flourishing row). Config-gated like
+    # reading_practice; a journaled day with zero values evidenced is a REAL low
+    # (20), a day with no flourishing row is uninstrumented (None) — ADR-104.
+    if "values_alignment" in components:
+        from flourishing import values_alignment_score
+
+        flourishing = data.get("flourishing") or {}
+        scores["values_alignment"] = values_alignment_score(
+            _safe_float(flourishing, "values_lived_count"),
+            bool(flourishing),
+        )
+
+    raw, details = _weighted_pillar_score(scores, components)
+    if "values_alignment" in components and (data.get("flourishing") or {}).get("enrichment_model"):
+        from flourishing import provenance_line
+
+        details["_flourishing_provenance"] = provenance_line((data.get("flourishing") or {}).get("enrichment_model"))
+    return raw, details
 
 
 # Ordered rungs of the categorical `enriched_social_quality` field emitted by
@@ -775,14 +793,18 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
     entries = data.get("journal_entries") or []
 
     # Social interaction frequency.
-    # Primary path: the numeric social_connection_score / enriched_social_connection
-    # (future-proof — no producer writes them yet, first-found wins as before).
-    # Fallback (#910): derive social_score from the categorical
-    # enriched_social_quality the enrichment lambda actually emits, averaging the
-    # mapped rungs across the day's entries (mirrors #902's mood_avg averaging).
-    social_score = None
+    # #1403 primary path: the day's SOURCE#flourishing row — the aggregated,
+    # provenance-stamped projection of the same enrichment (already averaged
+    # across the day's entries at write time). First-class input, so the
+    # Relationships pillar is no longer wired only through a read-time fallback.
+    flourishing = data.get("flourishing") or {}
+    social_score = _safe_float(flourishing, "social_quality_score")
+    # Legacy numeric path: social_connection_score / enriched_social_connection
+    # (no producer writes them yet, first-found wins as before).
     quality_scores = []
     for entry in entries:
+        if social_score is not None:
+            break
         sc = _safe_float(entry, "social_connection_score") or _safe_float(entry, "enriched_social_connection")
         if sc is not None:
             social_score = sc
@@ -820,7 +842,14 @@ def compute_relationships_raw(data: dict[str, Any], config: dict[str, Any]) -> t
     else:
         scores["social_mood_correlation"] = None
 
-    return _weighted_pillar_score(scores, components)
+    raw, details = _weighted_pillar_score(scores, components)
+    # #1403 provenance: when the social input came from the flourishing row, say
+    # so — these are LLM-coded readings of prose, never sensor data (ADR-104).
+    if _safe_float(flourishing, "social_quality_score") is not None:
+        from flourishing import provenance_line
+
+        details["_flourishing_provenance"] = provenance_line(flourishing.get("enrichment_model"))
+    return raw, details
 
 
 #  Primary pillars whose raw scores feed the derived consistency inputs (#962).

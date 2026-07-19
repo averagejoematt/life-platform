@@ -335,6 +335,10 @@ def assemble_data(yesterday_str):
     # SoM daily aggregates (som_avg_valence) live on the apple_health record, not a
     # separate state_of_mind partition — reuse the already-fetched apple record.
     data["state_of_mind"] = data.get("apple") or {}
+    # #1403: the day's SOURCE#flourishing row (the PERMA fact layer projected by
+    # journal_enrichment) — primary input for Relationships' social component and
+    # the Mind values_alignment component. Absent row = uninstrumented day.
+    data["flourishing"] = fetch_date("flourishing", yesterday_str)
 
     # #913: presence signal (adaptive_mode_lambda.compute_and_store_engagement)
     # — drives neglect atrophy + character_mood in the engine. The dated record
