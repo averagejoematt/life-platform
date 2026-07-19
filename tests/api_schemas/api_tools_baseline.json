@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/tools_baseline",
   "is_prefix_sample": false,
   "path": "/api/tools_baseline",
@@ -22,16 +22,16 @@
       "baseline": {
         "keys": {
           "hrv_ms": {
-            "type": "null"
+            "type": "number"
           },
           "rhr_bpm": {
-            "type": "null"
+            "type": "number"
           },
           "sleep_hours": {
-            "type": "null"
+            "type": "number"
           },
           "sleep_score": {
-            "type": "null"
+            "type": "number"
           },
           "weight_lbs": {
             "type": "number"
@@ -45,16 +45,16 @@
       "current": {
         "keys": {
           "hrv_ms": {
-            "type": "null"
+            "type": "number"
           },
           "rhr_bpm": {
-            "type": "null"
+            "type": "number"
           },
           "sleep_hours": {
-            "type": "null"
+            "type": "number"
           },
           "sleep_score": {
-            "type": "null"
+            "type": "number"
           },
           "weight_lbs": {
             "type": "null"

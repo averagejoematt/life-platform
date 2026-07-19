@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/current_challenge",
   "is_prefix_sample": false,
   "path": "/api/current_challenge",
@@ -20,7 +20,42 @@
         "type": "object"
       },
       "current_challenge": {
-        "type": "null"
+        "keys": {
+          "note": {
+            "type": "string"
+          },
+          "predict_metrics": {
+            "items": {
+              "keys": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "prereg_sha256": {
+            "type": "string"
+          },
+          "prereg_url": {
+            "type": "string"
+          },
+          "result": {
+            "type": "null"
+          },
+          "title": {
+            "type": "string"
+          },
+          "week_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "type": "object"
