@@ -674,6 +674,12 @@ def check_receipt_replay():
         if not config:
             c.warn("character config unavailable from S3 — replay skipped this run")
             return [c]
+        # #1412: replay against the SAME effective config the nightly compute
+        # hashed into the receipt (personal-variance targets overlaid) — the raw
+        # S3 config alone would read as permanent unlabeled config drift.
+        import personal_baselines
+
+        config = personal_baselines.effective_character_config(config, table, USER_PREFIX)
         drifted, mismatched = [], []
         for it in items:
             date = str(it.get("date") or it.get("sk", "")).replace("DATE#", "")[:10]
