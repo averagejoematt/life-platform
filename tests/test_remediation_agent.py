@@ -509,3 +509,167 @@ def test_main_green_on_completed_transcript(monkeypatch, tmp_path):
     )
     code = _run_main_with_transcript(monkeypatch, tmp_path, transcript)
     assert code == 0
+
+
+# ── #1329: manual-rotation secret staleness → curated needs-human ──────────────
+# Replaces freshness-checker's raw daily SNS (which re-fired unactioned for 12+
+# days on life-platform/ai-keys, #1329 evidence) with a deterministic backstop —
+# same shape as the #1204 alarm-aging escalation above.
+
+
+class _FakeSecretsManager:
+    """Minimal describe_secret stub — DescribeSecret only, never GetSecretValue
+    (this agent must never see key material)."""
+
+    def __init__(self, last_changed):
+        self._last_changed = last_changed  # {secret_name: datetime}
+
+    def describe_secret(self, SecretId):
+        if SecretId not in self._last_changed:
+            raise RuntimeError(f"no such secret: {SecretId}")
+        return {"LastChangedDate": self._last_changed[SecretId]}
+
+
+def test_stale_secret_signals_flags_only_past_threshold():
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime(2026, 7, 19, tzinfo=timezone.utc)
+    sm = _FakeSecretsManager(
+        {
+            "life-platform/ai-keys": now - timedelta(days=132),  # #1329's real evidence: 132d
+            "life-platform/todoist": now - timedelta(days=30),  # comfortably fresh
+        }
+    )
+    out = agent.stale_secret_signals(now=now, sm_client=sm)
+    ages = {s["name"]: s["age_days"] for s in out}
+    assert ages == {"life-platform/ai-keys": 132}
+
+
+def test_stale_secret_signals_describe_error_is_fail_soft():
+    class _Boom:
+        def describe_secret(self, SecretId):
+            raise RuntimeError("AccessDenied")
+
+    from datetime import datetime, timezone
+
+    out = agent.stale_secret_signals(now=datetime(2026, 7, 19, tzinfo=timezone.utc), sm_client=_Boom())
+    assert out == []  # a describe hiccup / missing IAM grant must not raise or false-fire
+
+
+def test_stale_secret_escalation_carries_the_current_ai_keys_item():
+    # Non-vacuous proof this PR's acceptance criteria demands: the curated-email path
+    # demonstrably carries the CURRENT ai-keys item (132d, #1329's live evidence) —
+    # driven through the real stale_secret_escalations(), not a mock of it.
+    signals = {"secrets_stale": [{"name": "life-platform/ai-keys", "age_days": 132}]}
+    esc = dict(agent.stale_secret_escalations(signals))
+    assert "life-platform/ai-keys" in esc
+    issue = esc["life-platform/ai-keys"]["issue"]
+    assert "132d" in issue
+    assert "12d past" in issue  # active age = 132 - MANUAL_ROTATION_STALE_DAYS(120)
+    assert "#1329" in issue
+    assert "rotate_ai_keys.sh" in esc["life-platform/ai-keys"]["action"]
+
+
+def test_stale_secret_escalation_recurrence_boundary_is_seven_days():
+    # #1329's defined recurrence condition: active age (days past the rotation SLA)
+    # > 7 days with no linked issue. Exactly at the boundary must NOT yet recur —
+    # one day past must.
+    at_boundary = {"secrets_stale": [{"name": "life-platform/todoist", "age_days": 127}]}  # active = 7
+    past_boundary = {"secrets_stale": [{"name": "life-platform/todoist", "age_days": 128}]}  # active = 8
+    assert agent.stale_secret_escalations(at_boundary) == []
+    esc = dict(agent.stale_secret_escalations(past_boundary))
+    assert "life-platform/todoist" in esc
+
+
+def test_stale_secret_escalation_freshly_crossed_threshold_lets_llm_triage_first():
+    # Just crossed 120d (121d → active age 1d) — under the recurrence window, so the
+    # deterministic backstop stays quiet and the LLM triage sees it fresh, unescalated.
+    signals = {"secrets_stale": [{"name": "life-platform/ai-keys", "age_days": 121}]}
+    assert agent.stale_secret_escalations(signals) == []
+
+
+def test_stale_secret_escalation_no_signals_is_empty():
+    assert agent.stale_secret_escalations({}) == []
+    assert agent.stale_secret_escalations({"secrets_stale": []}) == []
+
+
+def test_main_surfaces_stale_secret_into_needs_human(monkeypatch, tmp_path):
+    # End-to-end non-vacuous proof, mirroring test_main_surfaces_aged_alarm_into_needs_human:
+    # the agent transcript never mentions the secret at all, yet the deterministic
+    # backstop lands it in needs_human anyway. Without the #1329 wiring this fails.
+    import json as _json
+
+    monkeypatch.setenv("REMEDIATION_REPORT_PATH", str(tmp_path / "r.json"))
+    monkeypatch.setattr(agent, "gate", lambda: "shadow")
+    monkeypatch.setattr(
+        agent,
+        "gather_signals",
+        lambda ev: {
+            "alarms": [],
+            "ci_failures": [],
+            "dlq": {},
+            "coherence": None,
+            "drift": None,
+            "urgent": None,
+            "secrets_stale": [{"name": "life-platform/ai-keys", "age_days": 132}],
+        },
+    )
+    monkeypatch.setattr(agent, "load_ack_ledger", lambda: {})
+    monkeypatch.setattr(agent, "build_prompt", lambda mode, signals: "prompt")
+    transcript = (
+        "Nothing to triage this run.\n" '```json\n{"auto_fixed": [], "prs": [], "needs_human": [], "stale": [], "untriaged": []}\n```'
+    )
+
+    async def _fake(prompt):
+        return transcript
+
+    monkeypatch.setattr(agent, "run_agent", _fake)
+    monkeypatch.setattr(agent, "update_ack_ledger", lambda *a, **k: {})
+    monkeypatch.setattr(agent, "audit_log", lambda *a, **k: None)
+    monkeypatch.setattr(agent, "email_report", lambda *a, **k: None)
+
+    code = agent.main()
+    report = _json.load(open(tmp_path / "r.json"))
+    nh_text = _json.dumps(report["needs_human"])
+    assert "life-platform/ai-keys" in nh_text
+    assert "132d" in nh_text
+    assert code == 0
+
+
+def test_secrets_stale_signal_does_not_short_circuit_clean_run(monkeypatch, tmp_path):
+    # A stale secret alone (no alarms/ci/dlq/coherence/drift/urgent) must still be
+    # treated as an actionable signal, not swallowed by the "clean run" early-return
+    # (which would email a bare {} and never mention the secret at all).
+    import json as _json
+
+    monkeypatch.setenv("REMEDIATION_REPORT_PATH", str(tmp_path / "r.json"))
+    monkeypatch.setattr(agent, "gate", lambda: "shadow")
+    monkeypatch.setattr(
+        agent,
+        "gather_signals",
+        lambda ev: {
+            "alarms": [],
+            "ci_failures": [],
+            "dlq": {},
+            "coherence": None,
+            "drift": None,
+            "urgent": None,
+            "secrets_stale": [{"name": "life-platform/ai-keys", "age_days": 132}],
+        },
+    )
+    monkeypatch.setattr(agent, "load_ack_ledger", lambda: {})
+    monkeypatch.setattr(agent, "build_prompt", lambda mode, signals: "prompt")
+
+    async def _fake(prompt):
+        return '```json\n{"auto_fixed": [], "prs": [], "needs_human": [], "stale": [], "untriaged": []}\n```'
+
+    monkeypatch.setattr(agent, "run_agent", _fake)
+    monkeypatch.setattr(agent, "update_ack_ledger", lambda *a, **k: {})
+    monkeypatch.setattr(agent, "audit_log", lambda *a, **k: None)
+    emailed = {}
+    monkeypatch.setattr(agent, "email_report", lambda report, mode: emailed.update(report=report, mode=mode))
+
+    code = agent.main()
+    assert emailed.get("report") != {}  # NOT the clean-run bare-{} email
+    assert "life-platform/ai-keys" in _json.dumps(emailed.get("report", {}).get("needs_human", []))
+    assert code == 0

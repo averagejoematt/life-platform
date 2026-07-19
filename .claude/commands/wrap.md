@@ -23,6 +23,12 @@ Run these steps **in order**. Each has a hard guardrail — read it before actin
    merged/deployed status), what was verified (tests, smoke, live checks), gotchas hit,
    and the residual/next-picks queue. This file is the live driver the next session reads
    first (see `/uplevel` Phase 0 and `docs/README.md`).
+4. **Standing-alarms checklist (#1329):** any standing freshness/staleness alarms? A
+   digest-routed alarm or a manual-rotation secret reminder (see `docs/SECRETS_ROTATION.md`
+   "Monitoring" + the remediation agent's last curated needs-human email — Mon/Wed/Fri,
+   `remediation/agent.py`'s `aged_alarm_escalations`/`stale_secret_escalations`) can sit
+   unactioned across sessions with no other prompt to notice it. Note anything still
+   outstanding in the next-picks queue you just wrote in step 3 — don't let it silently age.
 
 ### (b) Replace — never stack — the CLAUDE.md session-status block
 
