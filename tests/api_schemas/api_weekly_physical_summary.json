@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/weekly_physical_summary",
   "is_prefix_sample": false,
   "path": "/api/weekly_physical_summary",
@@ -20,28 +20,52 @@
         "type": "object"
       },
       "days": {
-        "items": {
-          "keys": {
-            "activities": {
-              "items": null,
-              "length_sample": 0,
-              "type": "array"
+        "items": [
+          {
+            "keys": {
+              "activities": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "date": {
+                "type": "string"
+              },
+              "day_of_week": {
+                "type": "string"
+              },
+              "steps": {
+                "type": "null"
+              },
+              "total_active_minutes": {
+                "type": "integer"
+              }
             },
-            "date": {
-              "type": "string"
-            },
-            "day_of_week": {
-              "type": "string"
-            },
-            "steps": {
-              "type": "null"
-            },
-            "total_active_minutes": {
-              "type": "integer"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
+          {
+            "keys": {
+              "activities": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "date": {
+                "type": "string"
+              },
+              "day_of_week": {
+                "type": "string"
+              },
+              "steps": {
+                "type": "integer"
+              },
+              "total_active_minutes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        ],
         "length_sample": 7,
         "type": "array"
       }

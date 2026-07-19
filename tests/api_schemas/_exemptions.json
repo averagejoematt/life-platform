@@ -19,11 +19,6 @@
     "category": "write-path",
     "reason": "POST-only \u2014 votes on a challenge (write)"
   },
-  "/api/character_calibration": {
-    "category": "capture-failed",
-    "dated": "2026-07-19",
-    "reason": "route merged 2026-07-19 (#1409) but the fleet deploy was gated that night \u2014 recapture at the deploy checkpoint and drop this entry"
-  },
   "/api/experiment_follow": {
     "category": "write-path",
     "reason": "POST-only \u2014 follow/unfollow an experiment (write)"
@@ -35,11 +30,6 @@
   "/api/experiment_vote": {
     "category": "write-path",
     "reason": "POST-only \u2014 votes on an experiment (write)"
-  },
-  "/api/fulfillment_ritual": {
-    "category": "capture-failed",
-    "fetch_path": "/api/fulfillment_ritual",
-    "reason": "capture-failed-500: dict body"
   },
   "/api/nudge": {
     "category": "write-path",

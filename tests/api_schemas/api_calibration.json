@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/calibration",
   "is_prefix_sample": false,
   "path": "/api/calibration",
@@ -23,54 +23,414 @@
         "type": "string"
       },
       "coaches": {
-        "items": {
-          "keys": {
-            "accuracy_pct": {
-              "type": "null"
+        "items": [
+          {
+            "keys": {
+              "accuracy_pct": {
+                "type": "null"
+              },
+              "brier": {
+                "type": "null"
+              },
+              "brier_skill": {
+                "type": "null"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "lifetime": {
+                "keys": {
+                  "accuracy_pct": {
+                    "type": "number"
+                  },
+                  "brier": {
+                    "type": "number"
+                  },
+                  "brier_skill": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "reliability_bins": {
+                    "items": {
+                      "keys": {
+                        "hi": {
+                          "type": "number"
+                        },
+                        "lo": {
+                          "type": "number"
+                        },
+                        "mean_confidence": {
+                          "type": "number"
+                        },
+                        "n": {
+                          "type": "integer"
+                        },
+                        "observed_rate": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 2,
+                    "type": "array"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "skilled": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "null"
+              }
             },
-            "brier": {
-              "type": "null"
-            },
-            "brier_skill": {
-              "type": "null"
-            },
-            "calibration": {
-              "type": "string"
-            },
-            "coach_id": {
-              "type": "string"
-            },
-            "coach_name": {
-              "type": "string"
-            },
-            "confirmed": {
-              "type": "integer"
-            },
-            "label": {
-              "type": "string"
-            },
-            "n": {
-              "type": "integer"
-            },
-            "refuted": {
-              "type": "integer"
-            },
-            "reliability_bins": {
-              "items": null,
-              "length_sample": 0,
-              "type": "array"
-            },
-            "score": {
-              "type": "integer"
-            },
-            "skilled": {
-              "type": "null"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
+          {
+            "keys": {
+              "accuracy_pct": {
+                "type": "null"
+              },
+              "brier": {
+                "type": "null"
+              },
+              "brier_skill": {
+                "type": "null"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "lifetime": {
+                "keys": {
+                  "accuracy_pct": {
+                    "type": "number"
+                  },
+                  "brier": {
+                    "type": "number"
+                  },
+                  "brier_skill": {
+                    "type": "number"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "reliability_bins": {
+                    "items": {
+                      "keys": {
+                        "hi": {
+                          "type": "number"
+                        },
+                        "lo": {
+                          "type": "number"
+                        },
+                        "mean_confidence": {
+                          "type": "number"
+                        },
+                        "n": {
+                          "type": "integer"
+                        },
+                        "observed_rate": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "skilled": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "accuracy_pct": {
+                "type": "null"
+              },
+              "brier": {
+                "type": "null"
+              },
+              "brier_skill": {
+                "type": "null"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "lifetime": {
+                "keys": {
+                  "accuracy_pct": {
+                    "type": "number"
+                  },
+                  "brier": {
+                    "type": "number"
+                  },
+                  "brier_skill": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "reliability_bins": {
+                    "items": {
+                      "keys": {
+                        "hi": {
+                          "type": "number"
+                        },
+                        "lo": {
+                          "type": "number"
+                        },
+                        "mean_confidence": {
+                          "type": "number"
+                        },
+                        "n": {
+                          "type": "integer"
+                        },
+                        "observed_rate": {
+                          "type": "number"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "length_sample": 1,
+                    "type": "array"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "skilled": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "accuracy_pct": {
+                "type": "null"
+              },
+              "brier": {
+                "type": "null"
+              },
+              "brier_skill": {
+                "type": "null"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "coach_id": {
+                "type": "string"
+              },
+              "coach_name": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "lifetime": {
+                "keys": {
+                  "accuracy_pct": {
+                    "type": "null"
+                  },
+                  "brier": {
+                    "type": "null"
+                  },
+                  "brier_skill": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "n": {
+                    "type": "integer"
+                  },
+                  "refuted": {
+                    "type": "integer"
+                  },
+                  "reliability_bins": {
+                    "items": null,
+                    "length_sample": 0,
+                    "type": "array"
+                  },
+                  "score": {
+                    "type": "integer"
+                  },
+                  "skilled": {
+                    "type": "null"
+                  }
+                },
+                "type": "object"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          }
+        ],
         "length_sample": 8,
         "type": "array"
+      },
+      "cycle": {
+        "type": "integer"
       },
       "disclosure": {
         "type": "string"
@@ -95,6 +455,46 @@
           "label": {
             "type": "string"
           },
+          "lifetime": {
+            "keys": {
+              "accuracy_pct": {
+                "type": "null"
+              },
+              "brier": {
+                "type": "null"
+              },
+              "brier_skill": {
+                "type": "null"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "null"
+              }
+            },
+            "type": "object"
+          },
           "n": {
             "type": "integer"
           },
@@ -118,13 +518,13 @@
       "interval_forecasts": {
         "keys": {
           "accuracy_pct": {
-            "type": "number"
+            "type": "null"
           },
           "brier": {
-            "type": "number"
+            "type": "null"
           },
           "brier_skill": {
-            "type": "number"
+            "type": "null"
           },
           "calibration": {
             "type": "string"
@@ -135,6 +535,65 @@
           "label": {
             "type": "string"
           },
+          "lifetime": {
+            "keys": {
+              "accuracy_pct": {
+                "type": "number"
+              },
+              "brier": {
+                "type": "number"
+              },
+              "brier_skill": {
+                "type": "number"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": {
+                  "keys": {
+                    "hi": {
+                      "type": "number"
+                    },
+                    "lo": {
+                      "type": "number"
+                    },
+                    "mean_confidence": {
+                      "type": "number"
+                    },
+                    "n": {
+                      "type": "integer"
+                    },
+                    "observed_rate": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
           "n": {
             "type": "integer"
           },
@@ -142,34 +601,15 @@
             "type": "integer"
           },
           "reliability_bins": {
-            "items": {
-              "keys": {
-                "hi": {
-                  "type": "number"
-                },
-                "lo": {
-                  "type": "number"
-                },
-                "mean_confidence": {
-                  "type": "number"
-                },
-                "n": {
-                  "type": "integer"
-                },
-                "observed_rate": {
-                  "type": "number"
-                }
-              },
-              "type": "object"
-            },
-            "length_sample": 1,
+            "items": null,
+            "length_sample": 0,
             "type": "array"
           },
           "score": {
             "type": "integer"
           },
           "skilled": {
-            "type": "boolean"
+            "type": "null"
           }
         },
         "type": "object"
@@ -177,13 +617,13 @@
       "platform": {
         "keys": {
           "accuracy_pct": {
-            "type": "number"
+            "type": "null"
           },
           "brier": {
-            "type": "number"
+            "type": "null"
           },
           "brier_skill": {
-            "type": "number"
+            "type": "null"
           },
           "calibration": {
             "type": "string"
@@ -194,6 +634,65 @@
           "label": {
             "type": "string"
           },
+          "lifetime": {
+            "keys": {
+              "accuracy_pct": {
+                "type": "number"
+              },
+              "brier": {
+                "type": "number"
+              },
+              "brier_skill": {
+                "type": "number"
+              },
+              "calibration": {
+                "type": "string"
+              },
+              "confirmed": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              },
+              "n": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "reliability_bins": {
+                "items": {
+                  "keys": {
+                    "hi": {
+                      "type": "number"
+                    },
+                    "lo": {
+                      "type": "number"
+                    },
+                    "mean_confidence": {
+                      "type": "number"
+                    },
+                    "n": {
+                      "type": "integer"
+                    },
+                    "observed_rate": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "score": {
+                "type": "integer"
+              },
+              "skilled": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
           "n": {
             "type": "integer"
           },
@@ -201,34 +700,15 @@
             "type": "integer"
           },
           "reliability_bins": {
-            "items": {
-              "keys": {
-                "hi": {
-                  "type": "number"
-                },
-                "lo": {
-                  "type": "number"
-                },
-                "mean_confidence": {
-                  "type": "number"
-                },
-                "n": {
-                  "type": "integer"
-                },
-                "observed_rate": {
-                  "type": "number"
-                }
-              },
-              "type": "object"
-            },
-            "length_sample": 1,
+            "items": null,
+            "length_sample": 0,
             "type": "array"
           },
           "score": {
             "type": "integer"
           },
           "skilled": {
-            "type": "boolean"
+            "type": "null"
           }
         },
         "type": "object"

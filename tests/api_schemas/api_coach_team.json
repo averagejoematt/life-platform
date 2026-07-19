@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
   "fetch_path": "/api/coach_team",
   "is_prefix_sample": false,
   "path": "/api/coach_team",
@@ -35,55 +35,118 @@
         "type": "null"
       },
       "huddle": {
-        "items": {
-          "keys": {
-            "calibration": {
-              "keys": {
-                "brier": {
-                  "type": "null"
+        "items": [
+          {
+            "keys": {
+              "calibration": {
+                "keys": {
+                  "brier": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "lifetime_brier": {
+                    "type": "number"
+                  },
+                  "lifetime_scored_n": {
+                    "type": "integer"
+                  },
+                  "scored_n": {
+                    "type": "integer"
+                  }
                 },
-                "calibration": {
-                  "type": "string"
-                },
-                "scored_n": {
-                  "type": "integer"
-                }
+                "type": "object"
               },
-              "type": "object"
+              "emoji": {
+                "type": "string"
+              },
+              "graduation_gate": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "held_since": {
+                "type": "null"
+              },
+              "name": {
+                "type": "string"
+              },
+              "persona_id": {
+                "type": "string"
+              },
+              "read_of_him": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "watch": {
+                "type": "string"
+              }
             },
-            "emoji": {
-              "type": "string"
-            },
-            "graduation_gate": {
-              "type": "string"
-            },
-            "headline": {
-              "type": "string"
-            },
-            "held_since": {
-              "type": "null"
-            },
-            "name": {
-              "type": "string"
-            },
-            "persona_id": {
-              "type": "string"
-            },
-            "read_of_him": {
-              "type": "string"
-            },
-            "source": {
-              "type": "string"
-            },
-            "stage_id": {
-              "type": "string"
-            },
-            "watch": {
-              "type": "string"
-            }
+            "type": "object"
           },
-          "type": "object"
-        },
+          {
+            "keys": {
+              "calibration": {
+                "keys": {
+                  "brier": {
+                    "type": "null"
+                  },
+                  "calibration": {
+                    "type": "string"
+                  },
+                  "lifetime_brier": {
+                    "type": "null"
+                  },
+                  "lifetime_scored_n": {
+                    "type": "integer"
+                  },
+                  "scored_n": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "graduation_gate": {
+                "type": "string"
+              },
+              "headline": {
+                "type": "string"
+              },
+              "held_since": {
+                "type": "null"
+              },
+              "name": {
+                "type": "string"
+              },
+              "persona_id": {
+                "type": "string"
+              },
+              "read_of_him": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "stage_id": {
+                "type": "string"
+              },
+              "watch": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
         "length_sample": 8,
         "type": "array"
       },

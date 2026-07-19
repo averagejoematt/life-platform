@@ -1,0 +1,92 @@
+{
+  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "fetch_path": "/api/character_calibration",
+  "is_prefix_sample": false,
+  "path": "/api/character_calibration",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "cadence": {
+        "type": "string"
+      },
+      "method": {
+        "type": "string"
+      },
+      "pillars": {
+        "items": [
+          {
+            "keys": {
+              "gates": {
+                "keys": {
+                  "ci_min_weeks": {
+                    "type": "integer"
+                  },
+                  "current_n": {
+                    "type": "integer"
+                  },
+                  "min_weeks": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "latest_week": {
+                "type": "null"
+              },
+              "n_weeks": {
+                "type": "integer"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "probe_metric": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "pillar": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 7,
+        "type": "array"
+      },
+      "probe_weeks_covered": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
