@@ -597,6 +597,13 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .rt-v { white-space: nowrap; color: var(--ember); }
 .rt-v.rt-na { color: var(--ink-faint); }
 .rt-flag { grid-column: 3; color: var(--ink-faint); font-size: 0.66rem; text-transform: uppercase; letter-spacing: var(--tracking-label); }
+/* #1410 — the Ghost: observed (chart-line) vs counterfactual (dashed muted) with the
+   served, honestly-widening 95% band. Same band vocabulary as the projection cone. */
+.gh-fig { margin: var(--sp-2) 0 0; }
+.gh-fig svg { display: block; width: 100%; height: 84px; }
+.gh-band { fill: var(--band-fill-med); stroke: var(--band-edge-med); stroke-width: 0.5; }
+.gh-ghost { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; stroke-dasharray: 5 4; stroke-linejoin: round; }
+.gh-fig figcaption { margin-top: var(--sp-1); color: var(--ink-faint); }
 /* P0.6 — projection cone: ember-wash widening band, ember mid-line, muted goal + rung marks. */
 .pc-cone { fill: var(--ember-wash); stroke: var(--ember-line); stroke-width: 0.5; }
 .pc-mid { stroke: var(--ember); stroke-width: 2; stroke-linejoin: round; }

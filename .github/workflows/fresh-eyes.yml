@@ -21,6 +21,7 @@ on:
 permissions:
   contents: read
   id-token: write # AWS OIDC
+  issues: write # advisory-failure issue filing (#1447)
 
 concurrency:
   group: fresh-eyes-discovery
@@ -66,3 +67,21 @@ jobs:
           path: qa-screenshots-fresh-eyes/
           retention-days: 14
           if-no-files-found: ignore
+
+      # #1447 — advisory: a red here only cost the week's pre-computed
+      # fresh-eyes board, so nothing surfaced it. File/update ONE deduped
+      # auto-filed issue on failure; auto-close on the next green run.
+      - name: File/resolve advisory failure issue (#1447)
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: fresh-eyes-discovery
+          workflow-name: Fresh-Eyes Discovery
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            The weekly unattended fresh-eyes discovery (scripts/fresh_eyes_discovery.py:
+            live-site screenshots -> Bedrock vision read -> backlog dedup -> ranked
+            board email) failed, so the coming week's /uplevel Phase-1 board was NOT
+            pre-computed or emailed. Diagnostic screenshots, if captured, are on the
+            run as the fresh-eyes-screenshots artifact.

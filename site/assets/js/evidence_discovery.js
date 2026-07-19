@@ -310,6 +310,27 @@ export async function renderExperiments(d) {
   // the progress bar, the primary metric, the mechanism, compliance; completed
   // runs become "receipt" cards — baseline→result drawn (the effect size), the
   // key finding as the headline, the reflection as the second (human) voice.
+  // #1410 the Ghost: observed vs counterfactual, SERVED series only. The band is
+  // the served 95% interval — it widens with distance from start by construction
+  // (the model's honesty, drawn as-is); LOW confidence would draw NO band per the
+  // grammar (cf.level is floored at "medium" by the pre-period gate, but the rule
+  // is enforced here so a future looser gate can't fabricate a band).
+  const ghostChart = (cf) => {
+    const s = cf.series;
+    const n = s.observed.length;
+    if (n < 2) return "";
+    const W = 320, H = 84, P = 6;
+    const all = s.observed.concat(s.ghost, cf.level !== "low" ? s.ci_low.concat(s.ci_high) : []);
+    const lo = Math.min(...all), hi = Math.max(...all);
+    const span = hi - lo || 1;
+    const xx = (i) => (P + (i * (W - 2 * P)) / (n - 1)).toFixed(1);
+    const yy = (v) => (H - P - ((v - lo) * (H - 2 * P)) / span).toFixed(1);
+    const path = (arr) => arr.map((v, i) => `${i ? "L" : "M"}${xx(i)} ${yy(v)}`).join(" ");
+    const band = cf.level !== "low"
+      ? `<path class="gh-band" d="${path(s.ci_low)} ${s.ci_high.slice().reverse().map((v, k) => `L${xx(n - 1 - k)} ${yy(v)}`).join(" ")} Z"/>`
+      : "";
+    return `<figure class="gh-fig"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Observed vs counterfactual: the ghost line is what the model forecast without the intervention; the band is its 95% interval, widening with distance from the start.">${band}<path class="gh-ghost" d="${path(s.ghost)}" vector-effect="non-scaling-stroke"/><path class="chart-line" d="${path(s.observed)}" vector-effect="non-scaling-stroke"/></svg><figcaption class="label">observed (solid) vs the ghost (dashed) · band = 95% interval, widening honestly${s.truncated ? " · series truncated for display" : ""}</figcaption></figure>`;
+  };
   const runCard = (x) => {
     const done = /complete|done|ended|closed/i.test(x.status || "");
     const verdict = x.hypothesis_confirmed === true ? "confirmed" : x.hypothesis_confirmed === false ? "not confirmed" : (x.outcome || x.status || "running");
@@ -358,6 +379,19 @@ export async function renderExperiments(d) {
       analysis = `<p class="rd-line"><strong>effect ${a.effect_size > 0 ? "+" : ""}${esc(String(a.effect_size))}${ci}${rp} · n ${esc(String(a.n_window))}/${esc(String(a.n_baseline))} → ${esc(String(a.verdict || ""))}</strong></p>`;
     } else if (done && x.analysis && x.analysis.verdict) {
       analysis = `<p class="rd-line label">paired analysis: ${esc(String(x.analysis.verdict))} (n ${esc(String(x.analysis.n_window ?? "?"))}/${esc(String(x.analysis.n_baseline ?? "?"))})</p>`;
+    }
+    // #1410 the Ghost: observed vs the frozen-spec counterfactual — the chart is
+    // the served series only (SERVED numbers, never client-computed), the band
+    // widens honestly with distance from start, and a refused ghost states its
+    // reason instead of rendering (a bad pre-fit is a fact, not a blank).
+    if (done && x.analysis && x.analysis.counterfactual) {
+      const cf = x.analysis.counterfactual;
+      if (cf.state === "ok" && cf.series && Array.isArray(cf.series.observed) && cf.series.observed.length) {
+        const eff = `${cf.effect_mean > 0 ? "+" : ""}${cf.effect_mean}`;
+        analysis += `<p class="rd-line"><span class="label">vs counterfactual</span> <strong>${esc(eff)}</strong> [95% CI ${esc(String(cf.ci95_low))}, ${esc(String(cf.ci95_high))}] · pre-fit MAPE ${esc(String(cf.mape_pct))}% · n_pre ${esc(String(cf.n_pre))}</p>${ghostChart(cf)}`;
+      } else if (cf.reason) {
+        analysis += `<p class="rd-line label">no counterfactual — ${esc(String(cf.reason))}</p>`;
+      }
     }
     const preReg = x.pre_registered_at ? String(x.pre_registered_at).slice(0, 10) : null;
     // #1117 — the justification contract, in the #1116 supp-loop grammar: why now
