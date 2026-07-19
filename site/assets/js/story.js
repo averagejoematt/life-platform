@@ -34,6 +34,36 @@ function esc(s) {
 }
 const trend = (d) => (d == null ? "flat" : d > 0.05 ? "up" : d < -0.05 ? "down" : "flat");
 
+/* ── #1469 "the loop, drawn live" — scroll position = position on the loop ────
+   The verse crossing a viewport-center band sets [data-focus] on the stage; the
+   dial's matching station + outgoing arc take the flat ember accent. This is a
+   STATE change (teaches the loop order — Slop Litmus 6), purely additive: with
+   JS off station 01 stays lit, and under prefers-reduced-motion the whole loop
+   reads statically lit ("all") with no scroll choreography. threshold:0 + a
+   center rootMargin band per the height-independent rule (§10.3) — a fractional
+   threshold would never fire on a verse taller than viewport/threshold. */
+function wireLoopDial() {
+  const stage = $("[data-stage]");
+  if (!stage) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    stage.setAttribute("data-focus", "all");
+    return;
+  }
+  if (!("IntersectionObserver" in window)) return; // static fallback: station 01 lit
+  const io = new IntersectionObserver(
+    (es) => {
+      for (const e of es) {
+        if (!e.isIntersecting) continue;
+        const s = e.target.getAttribute("data-station");
+        if (s) stage.setAttribute("data-focus", s);
+      }
+    },
+    { threshold: 0, rootMargin: "-40% 0px -40% 0px" },
+  );
+  stage.querySelectorAll(".verse[data-station]").forEach((v) => io.observe(v));
+}
+wireLoopDial();
+
 /* ── the relational constellation (v2, #590) ─────────────────────────────────
    Edges are NO LONGER a hand-drawn topological guess — they are the REAL
    trailing-window co-movement between pillars (/api/pillar_coupling: masked-day
@@ -770,12 +800,15 @@ async function load() {
     }
     // #949 — the countdown moment gets its conversion hook: an inline follow CTA
     // right under the count, pre-start only (post-start the close beat owns it).
-    const dcWrap = dn.closest(".hero-daycount");
+    // #1469: the day counter now lives at the dial hub (pointer-events:none overlay),
+    // so the CTA mounts under the dial figure inside .dial-wrap instead.
+    const dcWrap = dn.closest(".hero-daycount, .dial-wrap");
     if (dcWrap && !$(".hero-cta-pre")) {
       const cta = document.createElement("p");
       cta.className = "hero-cta hero-cta-pre";
       cta.innerHTML = `<a href="/subscribe/" class="cta">Get Day 1 in your inbox →</a> <a href="/rss.xml" class="cta cta-quiet">or follow via RSS</a>`;
-      dcWrap.insertAdjacentElement("afterend", cta);
+      if (dcWrap.classList.contains("dial-wrap")) dcWrap.appendChild(cta);
+      else dcWrap.insertAdjacentElement("afterend", cta);
     }
   } else if (dayN >= 1) {
     if (dn) { dn.textContent = String(dayN); if (window.__moCount) window.__moCount(dn); }

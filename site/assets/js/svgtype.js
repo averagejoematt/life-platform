@@ -38,6 +38,8 @@ export const SVG_TYPE_FLOORS = [
   { sel: ".arch-svg .as", cssVar: "--fs-arch-as", base: 9.5, floor: 11 }, // architecture diagram box subtitle
   { sel: ".att-svg .att-tick, .att-svg .att-label, .att-svg .att-censor, .att-svg .att-live-mark", cssVar: "--fs-att-sm", base: 11, floor: 11 }, // attempts overlay ticks/labels (#1375)
   { sel: ".att-svg .att-death", cssVar: "--fs-att-death", base: 13, floor: 12 }, // attempts overlay death mark (#1375)
+  { sel: ".loop-dial .ld-lab", cssVar: "--fs-ld-lab", base: 10.5, floor: 11 }, // home loop-dial station labels (#1469)
+  { sel: ".loop-dial .ld-verb", cssVar: "--fs-ld-verb", base: 9.5, floor: 11 }, // home loop-dial arc verbs (#1469)
 ];
 
 // The live user→screen horizontal scale of an svg: getScreenCTM().a is exact
