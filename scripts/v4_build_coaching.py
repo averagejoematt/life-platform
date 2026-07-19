@@ -26,12 +26,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
-from v4_proof import (  # noqa: E402  — #729/#730/#804 static proof
+from v4_proof import (  # noqa: E402  — #729/#730/#804 static proof + #1395 data-driven OG
+    coaching_og,
     coaching_read_block_html,
     load_coaching_read,
     load_scorecard,
     scorecard_block_html,
 )
+
+_OG_HOME = "https://averagejoematt.com/assets/images/og-home.png"
 
 OUT = Path("site/coaching")
 
@@ -77,12 +80,12 @@ SHELL = """<!DOCTYPE html>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="averagejoematt">
   <meta property="og:url" content="https://averagejoematt.com/coaching/{canon}">
-  <meta property="og:title" content="{title}">
-  <meta property="og:description" content="{desc}">
-  <meta property="og:image" content="https://averagejoematt.com/assets/images/og-home.png">
+  <meta property="og:title" content="{og_title}">
+  <meta property="og:description" content="{og_desc}">
+  <meta property="og:image" content="{og_image}">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="{title}">
-  <meta name="twitter:description" content="{desc}">
+  <meta name="twitter:title" content="{og_title}">
+  <meta name="twitter:description" content="{og_desc}">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4EFE4">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0C08">
   <link rel="icon" href="/favicon.ico">
@@ -175,7 +178,12 @@ def main() -> None:
     # visitor / crawler / LLM / the first seconds before scripts load sees the site's
     # core differentiator (the coach voices), not an empty shell. JS still renders the
     # rich interactive read. Falls back to the committed snapshot when offline.
-    read_proof = coaching_read_block_html(load_coaching_read())
+    read = load_coaching_read()
+    read_proof = coaching_read_block_html(read)
+    # #1395: the /coaching/ HUB carries a data-driven OG (the pre-start convene date, or
+    # the live read's stamp) instead of the generic boilerplate. Section shells keep the
+    # topical title/desc + the generic home card.
+    hub_og = coaching_og(read)
 
     write(
         OUT / "index.html",
@@ -185,6 +193,9 @@ def main() -> None:
             canon="",
             start="read",
             proof=read_proof,
+            og_title=hub_og[("property", "og:title")],
+            og_desc=hub_og[("property", "og:description")],
+            og_image=hub_og[("property", "og:image")],
         ),
     )
     for key, label, desc in SECTIONS:
@@ -194,14 +205,18 @@ def main() -> None:
             proof = scorecard_proof
         else:
             proof = ""
+        section_title = f"{label} — The Coaching — averagejoematt"
         write(
             OUT / key / "index.html",
             SHELL.format(
-                title=f"{label} — The Coaching — averagejoematt",
+                title=section_title,
                 desc=desc,
                 canon=f"{key}/",
                 start=key,
                 proof=proof,
+                og_title=section_title,
+                og_desc=desc,
+                og_image=_OG_HOME,
             ),
         )
     print(f"✅ wrote site/coaching/index.html + {len(SECTIONS)} section shells: " + ", ".join(k for k, _, _ in SECTIONS))

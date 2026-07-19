@@ -29,7 +29,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from v4_proof import cockpit_block_html, load_character  # noqa: E402
+from v4_proof import apply_og, cockpit_block_html, cockpit_og, load_character  # noqa: E402
 
 NOW = Path("site/cockpit/index.html")
 
@@ -61,20 +61,25 @@ def main() -> int:
     if not NOW.exists():
         print("error: site/cockpit/index.html not found — run from repo root.", file=sys.stderr)
         return 2
-    block = cockpit_block_html(load_character())
+    char = load_character()
+    html = NOW.read_text(encoding="utf-8")
+    # #1395: data-driven OG first (the cockpit shell shipped with NO OG tags at all) —
+    # always safe, falls back to a topical title when no level is available.
+    html = apply_og(html, cockpit_og(char))
+
+    block = cockpit_block_html(char)
     if not block:
         # No live data AND no snapshot — keep the existing baked block rather
         # than blanking the page's only static content (last-known-good).
-        print("  ⚠️  no character data (API + snapshot both empty) — keeping the existing baked block.", file=sys.stderr)
+        NOW.write_text(html, encoding="utf-8")
+        print("  ⚠️  no character data (API + snapshot both empty) — OG refreshed, keeping the existing baked block.", file=sys.stderr)
         return 0
-    html = NOW.read_text(encoding="utf-8")
     out = inject(html, block)
     if out is None:
         print("error: no injection anchor found in site/cockpit/index.html.", file=sys.stderr)
         return 2
-    if out != html:
-        NOW.write_text(out, encoding="utf-8")
-    print("updated site/cockpit/index.html — cockpit proof baked (level + pillars + as-of).")
+    NOW.write_text(out, encoding="utf-8")
+    print("updated site/cockpit/index.html — cockpit proof + data-driven OG baked (level + pillars + as-of).")
     return 0
 
 

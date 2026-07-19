@@ -237,6 +237,50 @@ if [[ "$QUICK" != "--quick" ]]; then
   check_body_not_contains "Cockpit: no stale copy"    "$NOW_FILE"   'coming soon\|launching april\|lorem ipsum\|TODO'
   echo ""
 
+  # ── Static core / crawler view (#1395) ────────────────────────────────────────
+  # THE growth-surface guard: every page the manifest marks static_core:true must
+  # ship a NON-EMPTY build-time <noscript> static core (class "proof-static") carrying
+  # real headline numbers + an "as of <build time>" provenance stamp — so the no-JS /
+  # crawler / HN-Twitter-Slack link-unfurl view is real content, not the blank client-
+  # rendered shell it was before #1395. This is a real regression guard: on the pre-fix
+  # tree Home + /data/ + /protocols/ shipped NO static core, so this block FAILS there.
+  # Page list derives from tests/qa_manifest.py (the ONE registry, #1426) — never a
+  # hand list here.
+  echo "── Static core (crawler/no-JS view, from qa_manifest) ────"
+  if SC_PATHS=$(python3 "$QA_MANIFEST" --emit static_core); then
+    while IFS= read -r sc_path; do
+      [[ -z "$sc_path" ]] && continue
+      SC_BODY=$(curl -s --max-time 15 "$BASE$sc_path")
+      if echo "$SC_BODY" | grep -q 'class="proof-static' && echo "$SC_BODY" | grep -qi 'as of'; then
+        echo "  ✅ static core + provenance present · $sc_path"; PASS=$((PASS + 1))
+      else
+        echo "  ❌ static core MISSING (blank crawler view) · $sc_path — expected a <noscript> proof-static block with an 'as of' stamp"; FAIL=$((FAIL + 1))
+      fi
+    done <<< "$SC_PATHS"
+  else
+    echo "  ❌ qa_manifest static_core emit failed — static-core guard did not run"; FAIL=$((FAIL + 1))
+  fi
+  echo ""
+
+  # ── Data-driven OG (#1395) — a falsifiable number in the unfurl, not boilerplate ──
+  # The growth doors' og:title must carry a real number/date, never the old generic
+  # "the measured life" boilerplate. Spot-check Home + /data/ + /protocols/.
+  echo "── Data-driven OG tags (link-unfurl view) ───────────────"
+  check_og_has_number() {
+    local label="$1" path="$2"
+    local title
+    title=$(curl -s --max-time 15 "$BASE$path" | grep -oE '<meta property="og:title" content="[^"]*"' | head -1)
+    if echo "$title" | grep -qE '[0-9]'; then
+      echo "  ✅ $label — $title"; PASS=$((PASS + 1))
+    else
+      echo "  ❌ $label — og:title carries no number (generic boilerplate?): $title"; FAIL=$((FAIL + 1))
+    fi
+  }
+  check_og_has_number "Home og:title has a number"      "/"
+  check_og_has_number "Data og:title has a number"      "/data/"
+  check_og_has_number "Protocols og:title has a number" "/protocols/"
+  echo ""
+
   # ── Cache headers ────────────────────────────────────────────────────────────
   echo "── Cache headers ─────────────────────────────────────────"
   check_header "HTML page: short TTL (max-age=300)"  "$BASE/story/"               "cache-control:.*max-age=300"
