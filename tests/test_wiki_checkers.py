@@ -438,7 +438,6 @@ def test_og_source_count_clean_on_current_tree():
     assert hits == [], "an og card still hardcodes a stale data-source count:\n" + "\n".join(hits)
 
 
-<<<<<<< HEAD
 def test_data_governance_gate_is_not_vacuous():
     """#1351 (per the #1189 vacuous-scan lesson): the DATA_GOVERNANCE.md scan must FLAG
     the exact pre-fix claims (repo 'still PUBLIC', delete lambda 'scaffolded; not yet
@@ -496,7 +495,8 @@ def test_data_governance_gate_clean_on_current_tree():
     facts = _load("scripts/check_doc_facts.py")
     hits = facts._data_governance_hits(facts.DATA_GOVERNANCE_PATH)
     assert hits == [], "docs/DATA_GOVERNANCE.md still trips the #1351 fact gate:\n" + "\n".join(hits)
-=======
+
+
 def test_governor_cadence_ground_truth_is_discovered():
     """#1254/#1347: the governor's true cadence resolves from its OWN CDK cron
     (`life-platform-cost-governor` in cdk/stacks/operational_stack.py), not a pinned
@@ -585,4 +585,3 @@ def test_governor_cadence_clean_on_current_tree():
     assert step == 8
     hits = facts._governor_cadence_hits(facts._scan_governor_surface(), step)
     assert hits == [], "a live line still claims the cost-governor runs hourly:\n" + "\n".join(hits)
->>>>>>> origin/main

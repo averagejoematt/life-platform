@@ -442,7 +442,6 @@ def _og_source_hits(files, truth: int) -> list[str]:
     return hits
 
 
-<<<<<<< HEAD
 # ── #1351: DATA_GOVERNANCE.md fact gate (repo visibility, deletion-lambda status,
 # Verified-header freshness) ──────────────────────────────────────────────────
 # The compliance-answer doc misstated a load-bearing privacy control in BOTH
@@ -510,7 +509,10 @@ def _data_governance_hits(doc_path: Path, today=None) -> list[str]:
                 hits.append(
                     f"docs/DATA_GOVERNANCE.md: Verified header is {age_days}d stale ({mo.group(1)}, today {today}) — "
                     f"re-verify within {DATA_GOVERNANCE_VERIFIED_MAX_AGE_DAYS}d (#1351)"
-=======
+                )
+    return hits
+
+
 # ── #1254/#1347: cost-governor cadence proximity scan (corpus-wide) ───────────
 # #1254 fixed the "the governor runs hourly" claim (true cadence: every 8h, per the
 # CDK cron `cron(0 0/8 * * ? *)`) on 3 ENUMERATED files, guarded by a test that
@@ -608,7 +610,6 @@ def _governor_cadence_hits(files, step_hours: int | None) -> list[str]:
                     f"{rel}:{lineno}: cost-governor cadence claims hourly, CDK schedule is every {step_hours}h "
                     f"({GOVERNOR_FUNCTION_NAME}, #1254/#1347)\n"
                     f"      | {line.strip()[:160]}"
->>>>>>> origin/main
                 )
     return hits
 
