@@ -48,7 +48,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 9 stacks, ingest→store→serve; counts auto-synced) |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | The AWS account by the numbers |
 | [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) | What calls what; single points of failure |
-| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 67 MCP tools by domain (generated — never hand-edit) |
+| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 68 MCP tools by domain (generated — never hand-edit) |
 | [MCP_TOOL_AUDIT.md](MCP_TOOL_AUDIT.md) | The tool-removal ledger (#395 prune ratchet) |
 | [API.md](API.md) | Site-API endpoints |
 | [engines/](engines/) | The algorithm pages: [SCORING](engines/SCORING.md) · [CHARACTER](engines/CHARACTER.md) · [READINESS](engines/READINESS.md) · [HYPOTHESIS](engines/HYPOTHESIS.md) · [COACH_STANCE](engines/COACH_STANCE.md) |
