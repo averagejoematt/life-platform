@@ -125,9 +125,11 @@ rows), qa exemption ledgers (in-PR), DESIGN docs untouched (sync used them as-is
 CLAUDE.md endpoint literal auto-bumped 116→118 by doc-sync.
 **Decisions:** none needed — all governance-consequential choices landed inside existing
 ADR frames (ADR-104/105 implementations; #1544's posture decision is Matthew's fork).
-**Incidents:** 3 row(s) added this session (the #1527 12–16s regression window; the
-Sunday wall-clock nudge main-CI red; the genesis-week digest DLQ crash) + #1544 filed
-for the CI outage (row to be added once root cause confirmed — owner leg pending).
+**Incidents:** 4 row(s) added this session (the #1527 12–16s regression window; the
+Sunday wall-clock nudge main-CI red; the genesis-week digest DLQ crash; the wrap-deploy
+TRUE-POSITIVE rollback — /method/registry/ 390px overflow from #1413's source token,
+fixed #1546, deploy green, live-verified) + #1544 filed for the CI outage (row once
+root cause confirmed — owner leg pending).
 **Stash/hooks:** clean (one transient stash used+popped same-command during a
 pre-existing-lint check — stack empty at wrap; hook fresh). Postflight's one 🔴 is
 `email-subscriber: NOT DEPLOYED` — the #1350 owner-gated purge lambda awaiting
