@@ -4,8 +4,11 @@
 
 > **What each page is for, and why it matters to the platform** — one scannable registry so
 > future redesigns start from intent, not guesswork. Pair with [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md)
-> (the why), [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) (the how-it-looks), and
-> [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) (the how-to-change-it).
+> (the why), [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) (the how-it-looks),
+> [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) (the how-to-change-it), and
+> [design/JOURNEYS.md](design/JOURNEYS.md) (the per-audience path *through* this registry —
+> entry → hook → next station → return trigger, and the audit of every door's actual exit
+> links against it, #1468).
 >
 > Intent-only by design (no counts/dates — those drift). If a page's *purpose* changes, update it here.
 

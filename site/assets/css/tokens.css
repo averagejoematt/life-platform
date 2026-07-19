@@ -1052,6 +1052,20 @@ a.vg-lit:hover { background: var(--ember-wash); }
 .cause-why { color: var(--ink-muted); font-style: italic; margin: var(--sp-1) 0 0; font-size: 0.95em; }
 .cause-amt { color: var(--ink-faint); margin-top: var(--sp-1); }
 
+/* ── .loop-forward — the "next station on the loop" close (#1468). One deliberate
+   forward link + one constant return trigger, on every doors-nav page, right before
+   the footer — see scripts/v4_chrome.py::loop_forward + docs/design/JOURNEYS.md.
+   Deliberately lighter than .loop-ribbon (a close, not a wayfinder) and sits ABOVE
+   the footer's own hairline so the page reads: content → next station → sitemap. */
+.loop-forward { max-width: var(--container); margin: var(--sp-6) auto 0; padding: 0 var(--gutter);
+  display: grid; gap: var(--sp-1); font-size: var(--fs-small); }
+.loop-forward .label { color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-label);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; margin-inline-end: var(--sp-1); }
+.loop-forward .lf-next { color: var(--ink-muted); }
+.loop-forward .lf-return { color: var(--ink-faint); }
+.loop-forward a { color: var(--ember); text-decoration: none; border-bottom: 1px solid var(--ember-line); }
+.loop-forward a:hover { border-color: var(--ember); }
+
 /* ── Shared footer mega-menu (CC-05) — on all three doors ─────────────────── */
 .site-foot { border-top: var(--border-hair); margin-top: var(--sp-7); padding: var(--sp-6) var(--gutter) var(--sp-5); }
 .site-foot-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-5); max-width: var(--container); margin-inline: auto; }
