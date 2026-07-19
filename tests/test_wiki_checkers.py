@@ -588,6 +588,74 @@ def test_governor_cadence_clean_on_current_tree():
     assert hits == [], "a live line still claims the cost-governor runs hourly:\n" + "\n".join(hits)
 
 
+def test_verified_advisory_fires_on_the_pre_fix_stamp():
+    """#1348 non-vacuity (per the #1189 vacuous-scan lesson): the Verified-stamp
+    advisory must FIRE on the exact pre-fix OPERATOR_GUIDE/ONBOARDING shape — a
+    canonical doc stamped 2026-05-19, read on 2026-07-19 (61d) — and stay quiet
+    at or inside the 60d ceiling, on non-canonical statuses, and on docs without
+    a Verified header (header presence is check_doc_index's gate)."""
+    facts = _load("scripts/check_doc_facts.py")
+    d = Path(tempfile.mkdtemp())
+    stale = d / "STALE.md"
+    stale.write_text("# Guide\n\n> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19\n", encoding="utf-8")
+    boundary = d / "BOUNDARY.md"  # exactly 60d — inside the ceiling, must not warn
+    boundary.write_text("> **Status:** canonical · **Verified:** 2026-05-20\n", encoding="utf-8")
+    fresh = d / "FRESH.md"
+    fresh.write_text("> **Status:** canonical · **Verified:** 2026-07-18\n", encoding="utf-8")
+    log = d / "LOG.md"  # ancient but non-canonical — freshness-exempt
+    log.write_text("> **Status:** log · **Verified:** 2025-01-01\n", encoding="utf-8")
+    noverify = d / "NOVERIFY.md"
+    noverify.write_text("> **Status:** canonical\n\nno date\n", encoding="utf-8")
+    warns = facts._verified_staleness_warnings([stale, boundary, fresh, log, noverify], today=date(2026, 7, 19))
+    joined = "\n".join(warns)
+    assert len(warns) == 1, joined
+    assert "STALE.md" in warns[0] and "2026-05-19" in warns[0] and "61d" in warns[0], joined
+
+
+def test_verified_advisory_scans_the_day1_docs():
+    """The advisory's surface must include the two Day-1 docs whose 60-day silent
+    staleness motivated it (#1348) — and both must carry a canonical status +
+    parseable Verified header so a future stale stamp actually warns."""
+    facts = _load("scripts/check_doc_facts.py")
+    files = facts._scan_files()
+    rels = {str(p.relative_to(ROOT)) for p in files}
+    assert "docs/ONBOARDING.md" in rels and "docs/OPERATOR_GUIDE.md" in rels
+    for rel in ("docs/ONBOARDING.md", "docs/OPERATOR_GUIDE.md"):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        assert facts.CANONICAL_STATUS_RE.search(text), f"{rel} lost its canonical status header"
+        assert facts.VERIFIED_HEADER_RE.search(text), f"{rel} lost its Verified header"
+    # …and a far-future clock proves the loop DOES warn on them (never vacuous).
+    warns = facts._verified_staleness_warnings([ROOT / "docs" / "ONBOARDING.md"], today=date(2036, 1, 1))
+    assert warns, "ONBOARDING.md never triggers the advisory even a decade out — the loop is vacuous"
+
+
+def test_verified_advisory_is_warn_only():
+    """The advisory must not be able to red CI. Run the whole gate with the
+    advisory's injectable clock (CHECK_DOC_FACTS_TODAY — a test hook scoped to
+    the advisory alone) set a decade out, so EVERY canonical doc is guaranteed
+    stale: the advisory must print, and the exit code must still be 0. This is
+    wall-clock-free and independent of which live docs happen to be stale at
+    run time (the golden-test wall-clock lesson)."""
+    import os
+
+    env = dict(os.environ, CHECK_DOC_FACTS_TODAY="2036-01-01")
+    r = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/check_doc_facts.py")],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert r.returncode == 0, "the Verified-stamp advisory redded the gate — it must be warn-only:\n" + r.stdout + r.stderr
+    assert "Verified-stamp advisory" in r.stdout, "advisory output missing despite a decade-stale clock:\n" + r.stdout
+    # …and on the refreshed tree the two Day-1 docs no longer warn on the real
+    # issue date — their stamps were bumped by this issue's fix.
+    facts = _load("scripts/check_doc_facts.py")
+    live_warns = facts._verified_staleness_warnings(
+        [ROOT / "docs" / "ONBOARDING.md", ROOT / "docs" / "OPERATOR_GUIDE.md"], today=date(2026, 7, 19)
+    )
+    assert live_warns == [], "the #1348 refresh should have bumped both Day-1 stamps:\n" + "\n".join(live_warns)
+
+
 def test_governor_cadence_every_nh_class_is_not_vacuous():
     """#1354 (per the #1189 vacuous-scan lesson): the second stale-cadence class
     COST_TRACKER.md carried — a governor-naming line claiming a SPECIFIC wrong

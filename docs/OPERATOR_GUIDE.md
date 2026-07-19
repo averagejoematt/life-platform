@@ -1,23 +1,23 @@
 # Life Platform — Operator Guide
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
 
 > Everything you need to run this platform. Read this on Day 1.
 > For architectural decisions: ARCHITECTURE.md
 > For emergency procedures: RUNBOOK.md
 > For deployment steps: QUICKSTART.md
-> Last updated: 2026-05-19 (V2 audit refresh)
+> Last updated: 2026-07-19 (#1348 — pipeline windows/crons re-derived from `cdk/stacks/`; secrets count live-checked)
 
 ---
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 68 MCP tools. **94 Lambdas** run the ingest → compute → email pipeline daily.
+The Life Platform is a personal health intelligence system. It pulls data from ~20 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 68 MCP tools. **94 Lambdas** run the ingest → compute → email pipeline daily.
 
 **Pipeline (UTC, ADR-052):**
-- Ingestion: 06:45-09:00 PT
-- 16:30 UTC `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
-- 11:30 PT OG images
+- Ingestion: hourly at UTC hours 12–23 + 0–5 (`INGEST_HOURLY`, `ingestion_stack.py` — skips the overnight-PT hours). Exceptions: Weather 2x/day, Todoist 1x/day (14:00 UTC), Hevy hourly 12–23 UTC only, Garmin PAUSED (no schedule — ADR-074)
+- 15:05 UTC `anomaly-detector` → 16:30 `character-sheet-compute` → 16:35 `adaptive-mode-compute` → 16:40 `daily-metrics-compute` → 16:45 `daily-insight-compute` → 17:00 `daily-brief`
+- 19:30 UTC (12:30 PM PDT) OG images
 
 AWS run-rate (real CE, 2026-06-08 sweep): steady-state **~$25-40/mo** against an **$85/mo enforced ceiling** (ADR-063 + ADR-133 amendment; $100 in reader-traffic surge mode; cost-governor degrades AI by tier). Bedrock AI is the swing factor and is in-budget. See `docs/COST_TRACKER.md`.
 
@@ -99,7 +99,7 @@ Before you can operate the platform, you need:
 
 ### DLQ has messages
 
-The DLQ `life-platform-ingestion-dlq` is normally near-empty. As of 2026-05-19 it shows 66 messages — investigate via the dlq-consumer Lambda:
+The DLQ `life-platform-ingestion-dlq` is normally near-empty. If it isn't, investigate via the dlq-consumer Lambda:
 
 ```bash
 aws sqs get-queue-attributes \
@@ -191,7 +191,7 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 
 ## Secrets & Credentials
 
-- **12 active secrets** in AWS Secrets Manager under `life-platform/` prefix (as of 2026-05-19).
+- **21 active secrets** in AWS Secrets Manager under `life-platform/` prefix (live-verified 2026-07-19; inventory: `docs/SECRETS_MAP.md`).
 - **0 in deletion window** (live-verified 2026-07-10). Note: `notion` was RESTORED 2026-05-24 and is live-but-idle — flagged retire-candidate in `SECRETS_MAP.md` (owner decision pending).
 - OAuth tokens (Whoop, Withings, Strava, Garmin, Eight Sleep) auto-refresh on each successful API call.
 - MCP API key auto-rotates every 90 days via `life-platform-key-rotator`.
@@ -206,14 +206,15 @@ V2 P4.1 finding (2026-05, registry then at ~133 tools): only ~11 used in 30 days
 The pipeline runs in strict order (ADR-052). Changing schedules without maintaining this order produces stale results.
 
 ```
-06:45-09:00 PT     →  Ingestion (multiple Lambdas fetch from APIs)
-09:05 PT (16:05Z)  →  Anomaly detector
+hourly, 12–23 + 0–5 UTC  →  Ingestion (15 Lambdas — API sources hourly via INGEST_HOURLY;
+                            webhook/S3 sources land as they arrive)
+15:05 UTC (8:05 AM PDT)  →  Anomaly detector
 16:30 UTC          →  character-sheet-compute
 16:35 UTC          →  adaptive-mode-compute
 16:40 UTC          →  daily-metrics-compute
 16:45 UTC          →  daily-insight-compute
 17:00 UTC          →  daily-brief (4 AI calls → email + S3 files; async-invokes coach-quality-gate per coach)
-11:30 PT           →  OG image generator
+19:30 UTC (12:30 PM PDT) →  OG image generator
 ```
 
 All EventBridge crons are fixed UTC. PT references shift 1 hour at DST boundaries; UTC never does.
@@ -242,4 +243,4 @@ The 2026-05 raise request (Support case 177921309700709) was approved — the li
 
 ---
 
-**Verified:** 2026-05-19 (V2 audit operational sweep)
+**Verified:** 2026-07-19 (#1348 — pipeline/cron facts re-derived from `cdk/stacks/`; secrets count live-verified read-only)

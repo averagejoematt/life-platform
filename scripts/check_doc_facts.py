@@ -513,6 +513,61 @@ def _data_governance_hits(doc_path: Path, today=None) -> list[str]:
     return hits
 
 
+# ── #1348: Verified-stamp >60d ADVISORY (canonical docs, warn-only) ───────────
+# ONBOARDING.md and OPERATOR_GUIDE.md sat at "Verified: 2026-05-19" for 60+ days
+# while the facts they teach moved underneath them (the compute window moved to
+# 16:30–16:45 UTC in Phase 3.1, ingestion went hourly, Garmin's cron was paused)
+# — and nothing even WARNED until the 2026-07-18 SDLC review read them by hand.
+# check_doc_index.py already has the 90d freshness report and the BLOCKING 180d
+# ceiling; this is the earlier, cheaper tripwire: WARN (never fail) when any
+# canonical doc's `**Verified:**` header exceeds 60d, printed in the same CI runs
+# that execute the rest of this gate (docs-ci + ci-cd's docs job). Advisory by
+# design — an ignored warning ages into check_doc_index's 90d report and then its
+# 180d hard gate, so this adds no new standing process and can't red a build.
+#
+# SURFACE: the same _scan_files() docs the fact gate reads — ledgers/archives
+# (CHANGELOG, DECISIONS, docs/archive/, …) stay exempt; history is allowed to age.
+# Docs without a canonical status or without a Verified header are out of scope
+# (check_doc_index polices header presence).
+VERIFIED_ADVISORY_MAX_AGE_DAYS = 60
+CANONICAL_STATUS_RE = re.compile(r"^> \*\*Status:\*\* canonical\b", re.MULTILINE)
+
+
+def _verified_staleness_warnings(files, today=None, max_age_days=VERIFIED_ADVISORY_MAX_AGE_DAYS) -> list[str]:
+    """Canonical docs whose `**Verified:**` header is older than `max_age_days` (#1348).
+
+    WARN-ONLY by contract: callers print these and must never fold them into the
+    failing `hits` list. `today` is injectable (a `datetime.date`) so the regression
+    test never depends on wall-clock; exposed so the test can plant a deliberately
+    stale fixture and prove the advisory fires (the #1189 non-vacuous-scan lesson).
+    """
+    import datetime as _dt
+
+    today = today or _dt.date.today()
+    warns = []
+    for doc in files:
+        try:
+            rel = doc.relative_to(ROOT)
+        except ValueError:
+            rel = doc  # scratch file outside the repo (the non-vacuous test)
+        text = doc.read_text(encoding="utf-8")
+        if not CANONICAL_STATUS_RE.search(text):
+            continue
+        mo = VERIFIED_HEADER_RE.search(text)
+        if not mo:
+            continue  # header presence is check_doc_index's gate, not an advisory's
+        try:
+            verified = _dt.date.fromisoformat(mo.group(1))
+        except ValueError:
+            continue  # malformed date — likewise check_doc_index's problem
+        age_days = (today - verified).days
+        if age_days > max_age_days:
+            warns.append(
+                f"{rel}: Verified {mo.group(1)} — {age_days}d old (advisory ceiling {max_age_days}d) — re-verify + bump the header (#1348)"
+            )
+    return warns
+
+
 # ── #1254/#1347: cost-governor cadence proximity scan (corpus-wide) ───────────
 # #1254 fixed the "the governor runs hourly" claim (true cadence: every 8h, per the
 # CDK cron `cron(0 0/8 * * ? *)`) on 3 ENUMERATED files, guarded by a test that
@@ -793,6 +848,28 @@ def main():
         if k not in seen:
             seen.add(k)
             uniq.append(h)
+
+    # #1348: Verified-stamp advisory — WARN-ONLY, printed whether or not the gate
+    # fails below, and deliberately never appended to `hits` (it cannot red CI).
+    # CHECK_DOC_FACTS_TODAY (YYYY-MM-DD) is a TEST hook scoped to this advisory
+    # alone: it lets the regression test prove warn-only end-to-end without
+    # depending on which live docs happen to be stale at run time (the golden-
+    # test wall-clock lesson). It never touches the blocking gates above.
+    import datetime as _dt
+    import os as _os
+
+    _adv_today = None
+    if _os.environ.get("CHECK_DOC_FACTS_TODAY"):
+        _adv_today = _dt.date.fromisoformat(_os.environ["CHECK_DOC_FACTS_TODAY"])
+    stale_verified = _verified_staleness_warnings(_scan_files(), today=_adv_today)
+    if stale_verified:
+        print(
+            f"⚠️  Verified-stamp advisory (#1348, non-blocking) — "
+            f"{len(stale_verified)} canonical doc(s) unverified > {VERIFIED_ADVISORY_MAX_AGE_DAYS}d:"
+        )
+        for w in stale_verified:
+            print(f"   {w}")
+        print()
 
     if uniq:
         print(f"❌ {len(uniq)} live doc/source line(s) state a stale platform number as current fact:")
