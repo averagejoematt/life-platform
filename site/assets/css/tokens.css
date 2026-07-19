@@ -637,6 +637,25 @@ a { color: inherit; text-underline-offset: 0.18em; }
 .ciw-band.cf-low  { background: none; }
 .ciw-dot { position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--ember); }
 .ciw-dot.cf-low { background: var(--ink-muted); }
+/* Evidence Bar (#1372) — chess-eval-style per-claim rigor micro-widget. The fill is a
+   SERVED deterministic score (stats_core.correlation_evidence); the grammar tints it
+   (high = ember fill, medium = muted fill, low = a point mark, never a fabricated band).
+   Explainer tip is pure CSS on hover/focus — the wrapper is focusable, so tap works. */
+.evb { position: relative; display: inline-flex; align-items: center; gap: 5px; vertical-align: middle; cursor: help; }
+.evb:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.evb-svg { width: 76px; height: 8px; display: block; flex: 0 0 auto; }
+.evb-rail { fill: var(--rule); }
+.evb.cf-high .evb-fill { fill: var(--ember); opacity: 0.9; }
+.evb.cf-med .evb-fill { fill: var(--ink-muted); opacity: 0.75; }
+.evb-pt { stroke: var(--ink-muted); stroke-width: 2; }
+.evb-score { font-size: var(--fs-label); color: var(--ink-faint); }
+.evb-tip { display: none; position: absolute; bottom: calc(100% + 6px); left: 0; z-index: var(--z-overlay, 60); width: 250px; max-width: 74vw;
+  padding: var(--sp-2) var(--sp-3); background: var(--surface-raised); border: var(--border-hair); border-radius: var(--radius-sm);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18); white-space: normal; text-transform: none; letter-spacing: normal; text-align: left; }
+.evb:hover .evb-tip, .evb:focus .evb-tip, .evb:focus-within .evb-tip { display: block; }
+.evb-tip-l { display: block; font-family: var(--font-sans); font-size: var(--fs-small); line-height: var(--lh-relaxed, 1.5); color: var(--ink); }
+.evb-tip-l + .evb-tip-l { margin-top: var(--sp-1); color: var(--ink-muted); }
+td .evb .evb-tip { left: auto; right: 0; }
 /* P0.7 — BMI, de-emphasized: muted, small, never ember. The caption does the talking. */
 .rd-bmi { margin: var(--sp-2) 0 0; display: flex; align-items: baseline; gap: var(--sp-2); }
 .rd-bmi-v { font-size: var(--fs-h3, 1.5rem); color: var(--ink-muted); }

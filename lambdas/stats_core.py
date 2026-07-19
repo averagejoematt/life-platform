@@ -170,6 +170,85 @@ def fisher_ci(r, n, confidence=0.95):
     return (math.tanh(z_r - z_crit * se), math.tanh(z_r + z_crit * se))
 
 
+def correlation_evidence(r, n, n_eff=None, fdr_significant=None):
+    """Per-claim evidence-strength readout for a correlation claim (#1372, ADR-105).
+
+    The Evidence Bar's ONE deterministic source: composes sample depth, interval
+    precision, and multiple-comparison status into a single 0..1 score plus the
+    structured facts a front-end renders. No authored strength grades anywhere —
+    every component is computed:
+
+      - sample (weight 0.5): log-saturating ramp on the effective sample size —
+        0 at n_eff <= 2, ~0.67 at n_eff = 21 (the confidence grammar's HIGH
+        threshold), 1.0 at n_eff >= 90 (the rolling correlation window).
+      - precision (weight 0.3): 1 minus the width of the 95% Fisher CI on r
+        (r-units, floored at 0) — a tighter interval is a stronger claim. When
+        no CI is computable (n <= 3 or |r| >= 1) the component contributes 0
+        and ci95 is served as None so the front-end draws a point, never a
+        fabricated band (DESIGN_SYSTEM_V5 §7a).
+      - FDR (weight 0.2): survived Benjamini-Hochberg correction across the
+        week's whole matrix. False or un-checked (None) contributes 0; None is
+        served through as None so the UI can say "not checked", never "failed".
+
+    `level` mirrors charts.js confLevel's n thresholds (>=21 high / >=8 medium /
+    else low) applied to the effective n, so the served level and every existing
+    client-side confidence treatment read the same grammar.
+
+    Pure and deterministic: same inputs -> same dict; no I/O, no clock, no
+    randomness. Tolerant of None/garbage inputs (returns the honest low/zero
+    shape rather than raising) — it sits on a public serving path.
+    """
+    try:
+        n_int = max(0, int(n))
+    except (TypeError, ValueError):
+        n_int = 0
+    try:
+        ne = float(n_eff) if n_eff is not None else float(n_int)
+    except (TypeError, ValueError):
+        ne = float(n_int)
+    # Effective n can only shrink the evidence, never inflate it past raw n.
+    ne = max(0.0, min(float(n_int), ne)) if n_int else 0.0
+    try:
+        r_f = float(r) if r is not None else None
+    except (TypeError, ValueError):
+        r_f = None
+    if r_f is not None and not math.isfinite(r_f):
+        r_f = None
+
+    # Sample component — log-saturating in effective n (monotone, caps at 90d).
+    s_n = min(1.0, math.log1p(max(0.0, ne - 2.0)) / math.log1p(88.0))
+
+    # Precision component — width of the REAL 95% Fisher CI on r, or nothing.
+    ci = fisher_ci(r_f, ne) if r_f is not None else None
+    if ci:
+        lo, hi = ci
+        width = hi - lo
+        s_ci = max(0.0, 1.0 - width)
+        ci_out = [round(lo, 3), round(hi, 3)]
+        ci_excludes_zero = lo > 0.0 or hi < 0.0
+        ci_width = round(width, 3)
+    else:
+        s_ci = 0.0
+        ci_out = None
+        ci_excludes_zero = None
+        ci_width = None
+
+    s_fdr = 1.0 if fdr_significant is True else 0.0
+    fdr_out = True if fdr_significant is True else (False if fdr_significant is False else None)
+    score = round(0.5 * s_n + 0.3 * s_ci + 0.2 * s_fdr, 3)
+    level = "high" if ne >= 21 else ("medium" if ne >= 8 else "low")
+    return {
+        "score": score,
+        "level": level,
+        "n": n_int,
+        "n_eff": round(ne, 1),
+        "ci95": ci_out,
+        "ci_width": ci_width,
+        "ci_excludes_zero": ci_excludes_zero,
+        "fdr_significant": fdr_out,
+    }
+
+
 def _block_resample(n, block_len, rng):
     """Indices for one moving-block bootstrap replicate of length n."""
     idx = []
