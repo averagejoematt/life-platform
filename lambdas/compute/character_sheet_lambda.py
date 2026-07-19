@@ -35,6 +35,7 @@ from decimal import Decimal
 
 import boto3
 import character_engine
+import personal_baselines  # #1412: personal-variance targets overlay (ADR-105 rule 4)
 from constants import EXPERIMENT_PHASE_CURRENT, EXPERIMENT_START_DATE  # ADR-058
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058: default-deny pilot data / #946
 
@@ -806,6 +807,13 @@ def lambda_handler(event, context):
         # RAISE so the async failure is visible (DLQ + Errors metric + alarm) instead
         # of a returned dict that reads as success. (Elite review 2026-06-15)
         raise RuntimeError("character-sheet: failed to load config from S3 — aborting")
+
+    # #1412 (ADR-105 rule 4): overlay personal-variance targets from the stored
+    # baselines snapshot — a deep copy, so the in-process config cache stays
+    # pristine. This IS the config the engine runs under and the #1373 receipt
+    # hashes: qa_smoke and the site-api verify build the same effective config,
+    # so a monthly baselines refresh shows as labeled config_drift, by design.
+    config = personal_baselines.effective_character_config(config, table, USER_PREFIX)
 
     logger.info(f"[character] Config loaded — {len(config.get('pillars', {}))} pillars")
 

@@ -27,6 +27,24 @@ NOT personalized here (ADR-105 rule 4's carve-out — legitimate population-deri
 constants, kept and LABELLED as such where used): ACWR's Gabbett zones and clinical lab
 ranges. #543 changes ACWR's *estimator* (rolling mean → EWMA) and surfaces the
 ratio-coupling caveat, but keeps the Gabbett zone thresholds — see acwr_compute_lambda.
+
+#1412 extends the machinery to the CHARACTER ENGINE's pillar-component targets
+(CHARACTER_TARGET_SPECS below): sleep duration/deep/REM targets and the daily-steps
+target derive from percentile bands over Matthew's own year of history (p75 = "a good
+day by his own distribution"), with per-target provenance {method, window_days, n} and
+the same MIN_N floor-guard — below it the authored constant survives, explicitly
+labeled "population prior, n<30" wherever surfaced. Deliberately NOT derived (the
+documented carve-outs, per rule 4's "or document why not"):
+  - pillar/component WEIGHTS and EMA lambdas — priority/policy choices, not
+    distributional thresholds; there is no personal distribution they estimate.
+  - protein_total / calorie_adherence — goal-derived from body weight + the
+    MacroFactor adaptive target (already personal), not from observed variance.
+  - zone2_adequacy (150 min), training_frequency, strength/reading day targets —
+    protocol commitments; deriving them from observed behavior would ratify drift.
+  - clinical ranges (BP, glucose, labs, RHR) — population/clinical semantics.
+Each derived target also carries a documented population GUARDRAIL band (`bounds`)
+the personal value clamps into, labeled when applied — a bad stretch may lower his
+p75, but a target may never drift into clinically indefensible territory silently.
 """
 
 MIN_N = 30  # floor-guard: a band replaces its constant only with >= this many observations
@@ -49,6 +67,52 @@ BASELINES_SK = "SNAPSHOT#LATEST"
 FALLBACK_ANCHORS = {
     "readiness_hrv_ratio": {"p10": 0.75, "p50": 1.0, "p90": 1.25},
     "grade_trend_pct": {"lo": -5.0, "hi": 5.0},
+}
+
+# ── #1412: character pillar-component targets derived from personal variance ──
+# The exact below-floor label the acceptance criteria require, verbatim, wherever a
+# fallback is surfaced (component details, /api/character_config, receipts).
+POPULATION_PRIOR_LABEL = "population prior, n<30"
+
+CHARACTER_TARGET_METHOD = "percentile_band"
+
+# metric → where its derived value lands in character_sheet.json config, which
+# percentile of Matthew's own distribution becomes the target, the population
+# guardrail band it clamps into (documented ADR-105 carve-out — labeled when
+# applied), and output rounding (ndigits; 0 → int).
+CHARACTER_TARGET_SPECS = {
+    "sleep_duration_hours": {
+        "pillar": "sleep",
+        "component": "duration_vs_target",
+        "key": "target_hours",
+        "percentile": 75,
+        "bounds": (6.5, 9.0),  # never target less sleep than the clinical floor
+        "round": 2,
+    },
+    "deep_sleep_fraction": {
+        "pillar": "sleep",
+        "component": "deep_sleep_pct",
+        "key": "target_pct",
+        "percentile": 75,
+        "bounds": (0.10, 0.25),
+        "round": 4,
+    },
+    "rem_sleep_fraction": {
+        "pillar": "sleep",
+        "component": "rem_pct",
+        "key": "target_pct",
+        "percentile": 75,
+        "bounds": (0.15, 0.30),
+        "round": 4,
+    },
+    "daily_steps": {
+        "pillar": "movement",
+        "component": "daily_steps",
+        "key": "target",
+        "percentile": 75,
+        "bounds": (6000.0, 15000.0),
+        "round": 0,
+    },
 }
 
 
@@ -132,6 +196,44 @@ def compute_bands(hrv_ratios, grade_trends):
     }
 
 
+def _band_character_target(values):
+    """Three-anchor percentile band {p25, p50, p75, n} over one metric's own history,
+    or None below the MIN_N floor-guard (#1412). Non-numeric/None entries dropped."""
+    clean = []
+    for v in values or []:
+        if v is None:
+            continue
+        try:
+            clean.append(float(v))
+        except (TypeError, ValueError):
+            continue
+    if len(clean) < MIN_N:
+        return None
+    return {
+        "p25": round(percentile(clean, 25), 4),
+        "p50": round(percentile(clean, 50), 4),
+        "p75": round(percentile(clean, 75), 4),
+        "n": len(clean),
+    }
+
+
+def compute_character_target_bands(series_by_metric, window_days=None):
+    """Turn collected per-metric history into character-target bands (#1412).
+
+    Returns {metric: band or None} for EVERY metric in CHARACTER_TARGET_SPECS —
+    None means "too thin, authored constant survives (labeled)". `window_days`
+    (the lambda's lookback) is stamped into each band as derivation provenance.
+    Pure — the lambda owns the fetch. Deterministic; no I/O.
+    """
+    out = {}
+    for metric in CHARACTER_TARGET_SPECS:
+        band = _band_character_target((series_by_metric or {}).get(metric))
+        if band is not None and window_days is not None:
+            band["window_days"] = int(window_days)
+        out[metric] = band
+    return out
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # READ HALF — consumers load the stored bands and score against them
 # ─────────────────────────────────────────────────────────────────────────────
@@ -163,7 +265,7 @@ def load_baselines(table, user_prefix):
     for metric, band in bands.items():
         if not isinstance(band, dict):
             continue
-        out[metric] = {k: (_to_float(v) if k != "n" else int(_to_float(v) or 0)) for k, v in band.items()}
+        out[metric] = {k: (int(_to_float(v) or 0) if k in ("n", "window_days") else _to_float(v)) for k, v in band.items()}
     return out
 
 
@@ -211,3 +313,90 @@ def grade_trend_signal(trend_pct, baselines):
     if trend_pct < band["lo"]:
         return "declining", src
     return "stable", src
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #1412: character-engine target derivation (READ half)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def derive_component_target(metric, baselines):
+    """Resolve ONE character-component target from the stored bands (#1412).
+
+    Returns (value, provenance):
+      - band present, n >= MIN_N → (the personal percentile value, rounded per
+        spec and clamped into the documented guardrail bounds — labeled when
+        the clamp bites), provenance {source: personal, method, window_days, n}.
+      - below floor / absent → (None, {source: population_prior,
+        label: "population prior, n<30", n}) — the caller keeps the authored
+        constant and surfaces the label (the ADR-105 acceptance contract).
+    """
+    spec = CHARACTER_TARGET_SPECS[metric]
+    band = (baselines or {}).get(metric)
+    n = int(band.get("n") or 0) if isinstance(band, dict) else 0
+    pkey = f"p{spec['percentile']}"
+    if isinstance(band, dict) and n >= MIN_N and band.get(pkey) is not None:
+        value = float(band[pkey])
+        provenance = {
+            "source": "personal",
+            "method": f"{CHARACTER_TARGET_METHOD}_{pkey}",
+            "window_days": band.get("window_days"),
+            "n": n,
+        }
+        lo, hi = spec["bounds"]
+        clamped = min(max(value, lo), hi)
+        if clamped != value:
+            provenance["clamped"] = True
+            provenance["bounds"] = [lo, hi]
+            value = clamped
+        ndigits = spec.get("round", 2)
+        value = int(round(value)) if ndigits == 0 else round(value, ndigits)
+        return value, provenance
+    return None, {"source": "population_prior", "label": POPULATION_PRIOR_LABEL, "n": n}
+
+
+def apply_character_targets(config, baselines):
+    """Overlay personal-variance targets onto a character config (#1412).
+
+    Returns a DEEP COPY — the input is never mutated (the engine caches the S3
+    config in-process; mutating it would leak the overlay into the cached copy
+    and double-apply on warm starts). For every derivable component:
+      - personal band cleared the floor → the target value is replaced;
+      - below floor → the authored value survives untouched;
+    and either way the component gains `target_provenance` (method/window/n or
+    the population-prior label), which the engine surfaces into component
+    details and /api/character_config. Components with no derivation spec are
+    untouched — no fabricated labels (ADR-104). Deterministic: identical
+    (config, baselines) always yields an identical effective config, which is
+    what lets #1373 receipt config-hashes agree across write and replay.
+    """
+    if not config:
+        return config
+    import copy
+
+    cfg = copy.deepcopy(config)
+    for metric, spec in CHARACTER_TARGET_SPECS.items():
+        component = (cfg.get("pillars") or {}).get(spec["pillar"], {}).get("components", {}).get(spec["component"])
+        if not isinstance(component, dict):
+            continue  # component absent from this config — nothing to personalize
+        value, provenance = derive_component_target(metric, baselines)
+        if value is not None:
+            component[spec["key"]] = value
+        provenance["metric"] = metric
+        component["target_provenance"] = provenance
+    return cfg
+
+
+def effective_character_config(config, table, user_prefix):
+    """The ONE way every consumer builds the config the engine actually runs
+    under (#1412): nightly compute, qa_smoke receipt replay, and the site-api
+    receipt verify all call THIS, so the #1373 config hash agrees across write
+    and replay — a baselines refresh shows as labeled config_drift, never a
+    permanent unlabeled mismatch. Never raises; any failure falls back to the
+    authored config with population-prior labels (load_baselines returns {}).
+    """
+    try:
+        baselines = load_baselines(table, user_prefix)
+    except Exception:
+        baselines = {}
+    return apply_character_targets(config, baselines)

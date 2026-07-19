@@ -66,7 +66,7 @@ MECHANICS_FUNCTIONS = (
     "_level_step",
     "evaluate_level_changes",
 )
-RECORDED_ENGINE_FINGERPRINT = "afcf20a07964"  # verified against engine v1.6.0, 2026-07-12 (#1124)
+RECORDED_ENGINE_FINGERPRINT = "e56973e1c2ee"  # verified against engine v1.7.0 + #1412 provenance passthrough, 2026-07-19
 
 
 def engine_fingerprint() -> str:
@@ -207,6 +207,11 @@ def _pillars_section(config: dict) -> str:
         "the behavior didn't happen and it scores <strong>0 at full weight</strong>; when a sensor has no data, the engine has no "
         "evidence either way, so the component drops out of the weight sum instead (ADR-104). "
         f"The pillar weights below sum to {esc(pct(weight_sum))} of the headline character level.</p>"
+        '<p class="rd-prose">A handful of component targets — sleep duration, deep and REM share, daily steps — are not fixed '
+        "opinions: once at least 30 observations of Matthew's own history exist, the target is re-derived monthly as the 75th "
+        "percentile of his own distribution, clamped inside documented safety bounds (ADR-105 rule 4: thresholds come from "
+        "personal variance, not authored taste). Until a metric clears that floor, the numbers below stand — explicitly labeled "
+        "a population prior. Every derived target carries its provenance: method, window, and sample size.</p>"
     )
     return _sec("pillars", "The seven pillars", intro + f'<div class="gx-grid">{"".join(cards)}</div>')
 

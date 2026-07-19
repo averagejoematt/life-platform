@@ -40,6 +40,11 @@ _config_cache = {"data": None, "ts": 0}
 _CONFIG_TTL_S = 300  # 5 minutes
 
 ENGINE_VERSION = "1.7.0"  # #1373: progression receipts — per-pillar transition capture at fire time
+# #1412 (no version bump — no transition-formula change): component targets may arrive
+# personalized via personal_baselines.apply_character_targets; _weighted_pillar_score
+# surfaces each target's derivation provenance into component details. Target values
+# live in CONFIG, so a baselines refresh shows as labeled config_drift in receipt
+# replay (#1373) — by design, never an engine_drift.
 # v1.6.1 — #1125: character_level_up events persist their drivers at fire time
 # v1.6.0 — #965: hevy→movement, reading→mind, todoist→consistency wired (ADR-134 amendment)
 # v1.5.0 — #956 math v2: XP zero-point at "a decent day", XP gated on instrumentation,
@@ -1044,6 +1049,12 @@ def _weighted_pillar_score(component_scores, components_config):
             details[comp_name] = {"score": 0.0, "weight": weight, "absent": True}
         else:
             details[comp_name] = {"score": score, "weight": weight}
+        # #1412 (ADR-105 rule 4): surface the target's derivation provenance —
+        # personal {method, window_days, n} or the explicit "population prior,
+        # n<30" label — wherever the component score is surfaced. Attached by
+        # personal_baselines.apply_character_targets; never fabricated here.
+        if isinstance(comp_cfg, dict) and isinstance(comp_cfg.get("target_provenance"), dict):
+            details[comp_name]["target_provenance"] = comp_cfg["target_provenance"]
         if score is not None and weight > 0:
             weighted_sum += score * weight
             total_weight += weight

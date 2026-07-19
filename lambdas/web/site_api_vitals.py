@@ -641,15 +641,31 @@ def handle_character_config() -> dict:
         logger.warning("character_config: config load failed: %s", e)
         return _ok({"config": None, "available": False}, cache_seconds=300)
 
+    # #1412 (ADR-105 rule 4): serve the EFFECTIVE targets — personal-variance
+    # derived where the floor cleared, authored + "population prior, n<30"
+    # labeled where not — with per-target provenance {method, window, n}.
+    try:
+        import personal_baselines as _pb
+
+        cfg = _pb.effective_character_config(cfg, table, USER_PREFIX)
+    except Exception as e:
+        logger.warning("character_config: baselines overlay failed (authored config served): %s", e)
+
     def _scalars(o: dict) -> dict:
         return {k: v for k, v in (o or {}).items() if isinstance(v, (int, float, str, bool))}
+
+    def _component_out(cv: dict) -> dict:
+        out = _scalars(cv)
+        if isinstance((cv or {}).get("target_provenance"), dict):
+            out["target_provenance"] = cv["target_provenance"]
+        return out
 
     pillars_out = {}
     for name, p in (cfg.get("pillars") or {}).items():
         pillars_out[name] = {
             "weight": p.get("weight"),
             "ema_lambda": p.get("ema_lambda"),
-            "components": {cn: _scalars(cv) for cn, cv in (p.get("components") or {}).items()},
+            "components": {cn: _component_out(cv) for cn, cv in (p.get("components") or {}).items()},
         }
     leveling = {k: v for k, v in (cfg.get("leveling") or {}).items() if k in _CHAR_CONFIG_LEVELING_KEYS}
     tiers = [{"name": t.get("name"), "min_level": t.get("min_level"), "max_level": t.get("max_level")} for t in cfg.get("tiers") or []]
@@ -729,6 +745,11 @@ def handle_character_receipt(date: str | None = None, verify: bool = False) -> d
             bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
             s3 = _boto3.client("s3", region_name=S3_REGION)
             cfg = json.loads(s3.get_object(Bucket=bucket, Key=f"config/{USER_ID}/character_sheet.json")["Body"].read())
+            # #1412: verify against the SAME effective config the compute hashed
+            # into the receipt (personal-variance targets overlaid).
+            import personal_baselines as _pb
+
+            cfg = _pb.effective_character_config(cfg, table, USER_PREFIX)
             body["replay"] = _pr.replay(item, cfg, engine=_ce)
         except Exception as e:  # verify is best-effort; the receipt itself still serves
             logger.warning("character_receipt: replay failed: %s", e)

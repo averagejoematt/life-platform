@@ -18,16 +18,27 @@ Metrics banded (the #543 inventory that is safely personalizable):
   grade_trend_pct     — the week-over-week day-grade swing distribution → {p25, p75} band
       that replaces the hand-set +-5% "improving/declining" cutoffs in compute_momentum.
 
+Character-engine target bands (#1412, v1.1.0 — personal_baselines.CHARACTER_TARGET_SPECS):
+  sleep_duration_hours / deep_sleep_fraction / rem_sleep_fraction — from Matthew's whoop
+      sleep history (mirrors character_engine's field fallbacks: hours, pct, or seconds).
+  daily_steps — from apple_health steps history.
+  Each band is {p25, p50, p75, n, window_days}; the character consumers take p75 as the
+  target ("a good day by his own distribution"), guardrail-clamped + provenance-labeled
+  by personal_baselines.apply_character_targets. Below MIN_N the authored config value
+  survives, labeled "population prior, n<30".
+
 NOT banded (ADR-105 rule 4 carve-out — population-derived constants kept + labelled):
-  ACWR Gabbett zones, clinical lab ranges.
+  ACWR Gabbett zones, clinical lab ranges, protocol commitments (zone2 minutes,
+  training/reading day targets), goal-derived macros — see personal_baselines docstring.
 
 Writes to DynamoDB SOURCE#personal_baselines | SNAPSHOT#LATEST:
-  bands              map    {metric: {anchors..., n} or absent when thin}
+  bands              map    {metric: {anchors..., n[, window_days]} or absent when thin}
   computed_at        str    ISO timestamp
   lookback_days      int
   method_version     str
 
 v1.0.0 — 2026-07-05 (#543)
+v1.1.0 — 2026-07-19 (#1412: character-engine target bands)
 """
 
 import logging
@@ -53,7 +64,7 @@ USER_ID = os.environ.get("USER_ID", "matthew")
 USER_PREFIX = f"USER#{USER_ID}#SOURCE#"
 
 LOOKBACK_DAYS = 365
-METHOD_VERSION = "1.0.0"
+METHOD_VERSION = "1.1.0"
 
 dynamodb = boto3.resource("dynamodb", region_name=_REGION)
 table = dynamodb.Table(TABLE_NAME)
@@ -62,8 +73,8 @@ table = dynamodb.Table(TABLE_NAME)
 from digest_utils import d2f as _d2f  # shared bundled helpers (#970)
 
 
-def _fetch_computed_metrics(start, end):
-    """Query computed_metrics DATE# records in [start, end]. include_pilot=True: the
+def _fetch_source(source, start, end):
+    """Query one source's DATE# records in [start, end]. include_pilot=True: the
     personal distribution is physiological, not experiment-scoped (mirrors ACWR, ADR-058).
     """
     from phase_filter import with_phase_filter
@@ -73,7 +84,7 @@ def _fetch_computed_metrics(start, end):
         {
             "KeyConditionExpression": "pk = :pk AND sk BETWEEN :s AND :e",
             "ExpressionAttributeValues": {
-                ":pk": USER_PREFIX + "computed_metrics",
+                ":pk": USER_PREFIX + source,
                 ":s": "DATE#" + start,
                 ":e": "DATE#" + end,
             },
@@ -88,8 +99,12 @@ def _fetch_computed_metrics(start, end):
                 break
             kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
     except Exception as exc:
-        logger.warning("_fetch_computed_metrics(%s..%s) failed: %s", start, end, exc)
+        logger.warning("_fetch_source(%s, %s..%s) failed: %s", source, start, end, exc)
     return records
+
+
+def _fetch_computed_metrics(start, end):
+    return _fetch_source("computed_metrics", start, end)
 
 
 def _sf(rec, field):
@@ -148,6 +163,65 @@ def _grade_trends(records):
     return trends
 
 
+def _sleep_series(records):
+    """Extract (durations_hours, deep_fractions, rem_fractions) from whoop history.
+
+    Mirrors character_engine.compute_sleep_raw's field fallbacks exactly (#1412):
+    hours fields first, then pct fields (normalized when given as 0-100), then
+    seconds ratios — so the distribution the target derives from is the same
+    quantity the component scores daily. Implausible values are dropped, never
+    coerced (ADR-104: no fabricated observations).
+    """
+    durations, deep_fracs, rem_fracs = [], [], []
+    for rec in records or []:
+        dur = _sf(rec, "sleep_duration_hours") or _sf(rec, "total_sleep_seconds")
+        if dur is not None and dur > 24:
+            dur = dur / 3600.0
+        if dur is None or not (0 < dur <= 24):
+            continue
+        durations.append(round(dur, 4))
+
+        deep = _sf(rec, "deep_sleep_pct")
+        if deep is None:
+            deep_s, total_s = _sf(rec, "deep_sleep_seconds"), _sf(rec, "total_sleep_seconds")
+            if deep_s and total_s and total_s > 0:
+                deep = deep_s / total_s
+        if deep is None:
+            deep_h = _sf(rec, "slow_wave_sleep_hours")
+            if deep_h and dur > 0:
+                deep = deep_h / dur
+        if deep is not None and deep > 1:
+            deep = deep / 100.0
+        if deep is not None and 0 < deep < 1:
+            deep_fracs.append(deep)
+
+        rem = _sf(rec, "rem_sleep_pct")
+        if rem is None:
+            rem_s, total_s = _sf(rec, "rem_sleep_seconds"), _sf(rec, "total_sleep_seconds")
+            if rem_s and total_s and total_s > 0:
+                rem = rem_s / total_s
+        if rem is None:
+            rem_h = _sf(rec, "rem_sleep_hours")
+            if rem_h and dur > 0:
+                rem = rem_h / dur
+        if rem is not None and rem > 1:
+            rem = rem / 100.0
+        if rem is not None and 0 < rem < 1:
+            rem_fracs.append(rem)
+    return durations, deep_fracs, rem_fracs
+
+
+def _steps_series(records):
+    """Daily step counts from apple_health history — zero/absent days dropped (a
+    wearable gap is not a 0-step day; ADR-104 measured-class semantics)."""
+    out = []
+    for rec in records or []:
+        steps = _sf(rec, "steps")
+        if steps and steps > 0:
+            out.append(steps)
+    return out
+
+
 def _write_snapshot(bands, lookback_days):
     now_iso = datetime.now(timezone.utc).isoformat()
     # Only store non-None bands; a thin metric is simply absent → consumer falls back.
@@ -192,6 +266,32 @@ def _impl(event, context):
     logger.info("Series: hrv_ratios n=%d, grade_trends n=%d (MIN_N=%d)", len(hrv_ratios), len(grade_trends), personal_baselines.MIN_N)
 
     bands = personal_baselines.compute_bands(hrv_ratios, grade_trends)
+
+    # ── #1412: character-engine target bands from the same personal history ──
+    whoop_records = _fetch_source("whoop", start, end)
+    apple_records = _fetch_source("apple_health", start, end)
+    durations, deep_fracs, rem_fracs = _sleep_series(whoop_records)
+    steps = _steps_series(apple_records)
+    logger.info(
+        "Character series: sleep n=%d, deep n=%d, rem n=%d, steps n=%d (MIN_N=%d)",
+        len(durations),
+        len(deep_fracs),
+        len(rem_fracs),
+        len(steps),
+        personal_baselines.MIN_N,
+    )
+    bands.update(
+        personal_baselines.compute_character_target_bands(
+            {
+                "sleep_duration_hours": durations,
+                "deep_sleep_fraction": deep_fracs,
+                "rem_sleep_fraction": rem_fracs,
+                "daily_steps": steps,
+            },
+            window_days=LOOKBACK_DAYS,
+        )
+    )
+
     _write_snapshot(bands, LOOKBACK_DAYS)
 
     elapsed = round(time.time() - t0, 1)
