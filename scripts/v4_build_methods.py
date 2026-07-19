@@ -94,7 +94,10 @@ STYLE = """
 .mr-field dt { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
 .mr-field dd { margin: var(--sp-1) 0 0; color: var(--ink-muted); line-height: var(--lh-relaxed); max-width: var(--measure); }
 .mr-source { margin-top: var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
-.mr-source code { color: var(--ink-muted); }
+.mr-source code { color: var(--ink-muted); overflow-wrap: anywhere; }
+/* a module::function source token (45+ mono chars, e.g. start_point_randomization_test)
+   must break mid-token at 390px — the #1413 entry overflowed the viewport by 31px and
+   redded the gating visual-QA (the wrap-deploy rollback, 2026-07-19). */
 .mr-modules { display: grid; gap: var(--sp-4); margin-top: var(--sp-4); min-width: 0; }
 @media (min-width: 640px) { .mr-modules { grid-template-columns: 1fr 1fr; } }
 .mr-module { border: var(--border-hair); border-radius: var(--radius); padding: var(--sp-4); min-width: 0; }
