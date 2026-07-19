@@ -150,6 +150,9 @@ jobs:
   # Mirrors the ci-cd.yml `visual-qa` job and visual-qa.yml — keep the
   # three step lists in sync (same pinned Playwright, same role, same
   # scripts) so a red here means the same thing as a red there.
+  # #1428: --ai-qa-max-tier 1 restricts the AI-vision layer to the 6 tier-1
+  # doors at deploy time (deterministic sweep + --reader-truth stay full
+  # surface); the full AI-vision pass runs weekly on visual-qa.yml instead.
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA
@@ -178,7 +181,9 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         run: |
-          python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
+          # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
+          # time; the deterministic sweep + --reader-truth are unaffected (full surface).
+          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |

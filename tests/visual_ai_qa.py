@@ -14,11 +14,22 @@ a structured JSON verdict. Verdicts merge back into the harness `results`:
   - severity "high"  → adds an issue + flips the page to FAIL
   - severity "med"/"low" → adds a warning (advisory)
 
-Degrades cleanly: if Bedrock/`bedrock_client` is unavailable or the $75 budget guard is at
-tier 3, AI-QA is skipped with a warning — the deterministic checks still stand.
+Degrades cleanly: if Bedrock/`bedrock_client` is unavailable, AI-QA is skipped with a
+warning — the deterministic checks still stand. Budget-aware (#1428): checks
+budget_guard feature "visual_ai_qa" (internal QA band, pauses at tier >= 1, ADR-125)
+UPFRONT and reports an explicit SKIPPED-BY-BUDGET status + CloudWatch metric — the
+same honest-pause contract #1440 gave reader_truth_qa, not a per-page "AI-QA error"
+from the bedrock_client Tier-3 hard-stop backstop.
 
-Entry point: `assess_results(results)` — mutates the list in place. Called by
-visual_qa.run_sweep when `--ai-qa` is passed; also runnable standalone on a report.json.
+Tiered by page (#1428): visual_qa.run_sweep can restrict WHICH captured pages get
+handed to assess_results via its `ai_qa_max_tier` param — CI's deploy-time gate passes
+tier 1 only (the 6 flagship doors); the weekly standalone schedule passes no filter
+(full surface). assess_results itself has no tier logic — it assesses whatever list of
+results it's given; the caller does the filtering.
+
+Entry point: `assess_results(results)` — mutates the list in place, returns a status dict.
+Called by visual_qa.run_sweep when `--ai-qa` is passed; also runnable standalone on a
+report.json.
 
 Second entry point (#1095): `assess_reader_truth(results)` — the PHASE-AWARE truth
 pass over the harness's rendered-prose dumps (visual_qa.py --reader-truth). Where
@@ -41,6 +52,10 @@ import sys
 # Haiku cross-region profile (vision-capable, cheap). bedrock_client maps the short name.
 _VISION_MODEL = os.environ.get("VISUAL_AI_MODEL", "claude-haiku-4-5-20251001")
 _MAX_IMAGES_PER_PAGE = int(os.environ.get("VISUAL_AI_MAX_IMAGES", "3"))
+
+# budget_guard._FEATURE_CUTOFF key (#1428) — internal QA band, pauses at tier >= 1
+# (ADR-125), same posture as reader_truth_qa/coherence_semantic below.
+_BUDGET_FEATURE = "visual_ai_qa"
 
 _PROMPT = """You are a meticulous UI QA reviewer looking at screenshot(s) of ONE page of a \
 personal health dashboard ("{name}", path {path}). The site is data-driven — charts and \
@@ -121,13 +136,43 @@ def assess_results(results):
     """Run Claude-vision QA over each page's captured screenshots; mutate `results` in place.
 
     Adds `ai_verdict` per page. High-severity → issue + status FAIL; med/low → warning.
-    No-ops gracefully (per page) on any Bedrock error or if the budget guard is at tier 3.
+    No-ops gracefully (per page) on any Bedrock error.
+
+    Budget-aware (#1428): checks budget_guard.allow("visual_ai_qa") UPFRONT — internal
+    QA pauses at tier >= 1 (ADR-125), same band as reader_truth_qa/coherence_semantic.
+    A paused run emits the QAPausedByBudget CloudWatch metric (shared with #1440's
+    reader-truth hook — one alarm catches either) and returns an explicit
+    {"status": "skipped_by_budget", "tier": N} so the caller can render SKIPPED-BY-BUDGET
+    rather than have the pause surface only as a per-page "AI-QA error" from the
+    bedrock_client Tier-3 hard-stop backstop (silent-by-accident before this fix).
+
+    Returns a status dict `{"status": "ok"|"unavailable"|"skipped_by_budget", ...}` —
+    mirroring assess_reader_truth's contract. `results` is still mutated in place exactly
+    as before; no caller relied on the old (implicit None) return value.
     """
     bedrock = _import_bedrock()
     if not bedrock:
         for r in results:
             r.setdefault("warnings", []).append("AI-QA skipped — bedrock_client unavailable")
-        return results
+        return {"status": "unavailable", "detail": "bedrock_client unavailable"}
+
+    try:
+        import budget_guard  # lambdas/ is on sys.path after _import_bedrock()
+
+        if not budget_guard.allow(_BUDGET_FEATURE):
+            tier = budget_guard.current_tier()
+            try:
+                import reader_truth_qa
+
+                reader_truth_qa.emit_budget_pause_metric("visual_ai_qa", tier)
+            except Exception:
+                pass  # metric emission is best-effort; the pause itself must still be honest
+            print(f"  ⏸ SKIPPED-BY-BUDGET — AI-vision QA paused at budget tier {tier} (internal QA pauses first, ADR-125)")
+            for r in results:
+                r.setdefault("warnings", []).append(f"SKIPPED-BY-BUDGET: AI-vision QA — budget tier {tier} (ADR-125)")
+            return {"status": "skipped_by_budget", "tier": tier}
+    except ImportError:
+        pass  # fail-open, same posture as the guard itself
 
     for r in results:
         shots = [s for s in r.get("screenshots", []) if s.get("kind") in ("page", "chart")][:_MAX_IMAGES_PER_PAGE]
@@ -152,7 +197,7 @@ def assess_results(results):
         elif sev in ("med", "low"):
             r.setdefault("warnings", []).append(f"AI-vision ({sev}): {summary[:140]}")
 
-    return results
+    return {"status": "ok"}
 
 
 def _truth_line(f):

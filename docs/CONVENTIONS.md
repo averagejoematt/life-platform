@@ -178,17 +178,37 @@ after any change: `python3 -m pytest tests/ -m "deploy_critical and not integrat
 ### 4b. Visual-QA fires independently of the pipeline (#749)
 
 The reader-facing regression net (Playwright sweep + Bedrock vision QA + the accuracy
-gate) exists in **two** places:
+gate) exists in **three** places, and the deterministic sweep always covers the full
+page set in all three — only the AI-vision layer is tiered (#1428, see below):
 
-- **Pipeline copy** (`ci-cd.yml` job `visual-qa`, `needs: deploy`) — still GATES the
-  pipeline post-deploy; the site auto-rollback keys off its failure.
+- **Pipeline copy** (`ci-cd.yml` job `visual-qa`, `needs: deploy`) — GATES the pipeline
+  post-deploy for lambda/CDK deploys.
+- **Site-deploy copy** (`site-deploy.yml` job `visual-qa`, `needs: deploy-site`) — GATES
+  the auto-deploy-on-merge path for `site/**` changes; the site auto-rollback keys off
+  either gating copy's failure.
 - **Standalone copy** (`.github/workflows/visual-qa.yml`) — `workflow_dispatch` + daily
   20:07 UTC cron against the LIVE site. Gates nothing, rolls back nothing; a failure
-  reds the run + posts to the SNS digest. This is what keeps the net firing when the
-  pipeline copy is skipped (red upstream job, or a push with nothing to deploy).
+  reds the run + posts to the SNS digest. This is what keeps the net firing when a
+  gating copy is skipped (red upstream job, or a push with nothing to deploy).
 
-The two step lists must stay in sync — change one, change both. Run it on demand:
-`gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`).
+**Tiered AI-vision cadence (#1428, cost control):** the Claude/Bedrock vision pass is
+the expensive part (Haiku, ~$0.001/image); the deterministic Playwright checks are free
+(CI minutes only) and are NEVER restricted by this.
+- Both gating copies pass `--ai-qa-max-tier 1` — AI-vision covers exactly the 6 tier-1
+  flagship doors (`tests/qa_manifest.py`) on every deploy.
+- The standalone copy's full, untiered AI-vision pass (`--ai-qa`, no tier filter) fires
+  only on the Sunday occurrence of its existing daily cron, or on any manual
+  `workflow_dispatch` — no second cron was added; the flag is computed at runtime from
+  UTC day-of-week (see the workflow's "Determine cadence" step). Non-Sunday daily fires
+  still run the deterministic sweep + `--reader-truth` (both full surface, unaffected).
+- Budget-tier pauses on the AI-vision pass (`budget_guard` feature `"visual_ai_qa"`,
+  internal-QA band, cutoff tier 1) render as an explicit SKIPPED-BY-BUDGET line + the
+  `QAPausedByBudget` CloudWatch metric — never a silent skip (D1, mirrors #1440's
+  `reader_truth_qa` pattern).
+
+All three step lists must stay in sync — change one, change all three. Run it on demand:
+`gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`,
+add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
 
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
