@@ -1357,6 +1357,41 @@
         }
       ],
       "why_it_mattered": "The thesis says the numbers must be trustworthy before they're interesting — today the rigor stopped being documentation and became running code that grades the platform's own claims, including the two that failed in public (the slower 'optimization' and the silently dead pipeline)."
+    },
+    {
+      "id": "2026-07-19-day2-ghost-and-qa-depth",
+      "date": "2026-07-19",
+      "title": "Day 2: every experiment gets a ghost — and the QA estate learns to watch itself",
+      "shipped": "Twelve more stories closed by evening, all live. The headliner is the Ghost: every concluded experiment now fits a synthetic-control counterfactual — a pure-Python state-space model trained on the pre-period with control metrics frozen at pre-registration — so the result reads 'observed minus what would have happened anyway,' drawn on the card as a dashed ghost line inside an interval that honestly widens the further it forecasts. When the model can't track the pre-period, it refuses with a stated reason instead of rendering. Around it: the QA estate grew structural checks for the forgotten static pages, a weekly iOS-Safari-engine mobile sweep, accessibility auditing (in flight), a coverage-drift auditor that immediately confessed 39 API dependencies nobody was smoke-checking, a depth dial, and failure-filing for the advisory workflows that used to fail silently. The Monday ops email now opens with a green report. The cost tracker was rewritten from the actual AWS bill. And the homepage radar — the seven-pillar constellation readers loved — was rescued from four screens deep to sit right under the new loop dial.",
+      "gotcha": "A merge queue moving fast enough can convince the deploy pipeline that its own work is already done: four site deploys queued in twenty minutes, and the one carrying the constellation fix reported success while quietly skipping its deploy step — live served the previous commit for half an hour. The tell (a stale version stamp) and the fix (manual sync) were already written down from the last time; the lesson that stuck is that the check is now part of every merge, not just the suspicious ones.",
+      "honest_miss": "The new GitHub-side watchdog, on its very first run against reality, flagged two things that are simply true and unflattering: the repo's vulnerability alerts are switched off, and the production approval gate documented in four places still doesn't exist. Both now appear as standing lines in the weekly report until the owner acts — the system is designed to keep saying so rather than get used to it.",
+      "why_it_mattered": "The thesis needs 'it worked' to survive the question 'compared to what?' — the Ghost makes that question answerable for every experiment from here on, and the QA additions mean the machine increasingly catches its own gaps before a reader (or the owner) does.",
+      "prs": [
+        {
+          "label": "PR #1551",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1551"
+        },
+        {
+          "label": "PR #1550",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1550"
+        },
+        {
+          "label": "PR #1557",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1557"
+        },
+        {
+          "label": "PR #1558",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1558"
+        },
+        {
+          "label": "PR #1552",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1552"
+        },
+        {
+          "label": "PR #1554",
+          "url": "https://github.com/averagejoematt/life-platform/pull/1554"
+        }
+      ]
     }
   ]
 }
