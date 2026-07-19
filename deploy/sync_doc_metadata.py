@@ -675,6 +675,25 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
                 if isinstance(target, ast.Name) and target.id in ("PAGES", "JSON_ENDPOINTS"):
                     if all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.value.elts):
                         counts[target.id] = len(node.value.elts)
+    if "PAGES" not in counts:
+        # #1426: PAGES is no longer a literal — it derives from THE page registry
+        # (tests/qa_manifest.py leak_scan facet). Count via the emitter subprocess
+        # so discovery stays import-side-effect-free in this module.
+        import subprocess
+
+        try:
+            out = subprocess.run(
+                [sys.executable, str(ROOT / "tests" / "qa_manifest.py"), "--emit", "leak"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+            n = len([ln for ln in out.stdout.splitlines() if ln.strip()])
+            if n:
+                counts["PAGES"] = n
+        except Exception:
+            pass
     pages = counts.get("PAGES")
     endpoints = counts.get("JSON_ENDPOINTS")
     if pages is None or endpoints is None or pages < 10 or endpoints < 3:
