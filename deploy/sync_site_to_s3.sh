@@ -288,7 +288,22 @@ if [[ -n "$CF_DIST_ID" ]]; then
     --paths "/*" \
     --query "Invalidation.Id" \
     --output text)
-  echo "✅ Invalidation created: $INVALIDATION_ID (takes ~30s to propagate)"
+  echo "✅ Invalidation created: $INVALIDATION_ID — waiting for Completed (#1526)..."
+  # #1526: same-deploy content assertions (the smoke's static-core/OG guards) raced
+  # this invalidation on 2026-07-19 (05:40 UTC) — smoke read a stale edge and
+  # auto-rolled-back a HEALTHY deploy. Block here, where the AWS credentials live,
+  # until CloudFront reports the invalidation Completed, so anything sequenced
+  # after this deploy (site-deploy.yml's smoke job) reads fresh edges. The waiter
+  # polls ~20s (typical completion ≤60s, hard cap 10 min); a waiter timeout WARNS
+  # but never fails a deploy whose invalidation exists — the smoke's bounded
+  # content-retry (deploy/lib/cache_aware_fetch.sh) covers any residue.
+  if aws cloudfront wait invalidation-completed \
+      --distribution-id "$CF_DIST_ID" --id "$INVALIDATION_ID"; then
+    echo "✅ Invalidation $INVALIDATION_ID completed — edges serve this build."
+  else
+    echo "⚠️  invalidation-completed wait did not confirm — $INVALIDATION_ID is still in flight;"
+    echo "    proceeding (deploy is written; smoke's bounded retries cover the propagation window)."
+  fi
 fi
 
 echo ""
