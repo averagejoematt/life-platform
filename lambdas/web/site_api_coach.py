@@ -21,7 +21,6 @@ Endpoints:
 
 import json
 import os
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from decimal import Decimal  # noqa: F401
@@ -1307,41 +1306,38 @@ _PREDICTION_PROJECTION_FIELDS = (
     "subdomain",
 )
 
-_partition_tls = threading.local()
 
+def _query_partition(pk, sk_prefix, projection_fields=None):
+    """ONE unfiltered, newest-first, Limit-1500 fetch of pk/sk_prefix — the ONE
+    call shape both the real path and the test fakes' query hooks parse.
 
-def _partition_table():
-    """Table handle for a (possibly worker-thread) partition fetch.
-
-    Tests monkeypatch this module's `table` with an in-memory fake — any
-    non-boto3 handle is used as-is. Against real DynamoDB each thread gets its
-    own session-backed Table, because boto3 sessions/resources are not
-    thread-safe; the thread-local survives warm invocations so the session
-    cost is paid once per container thread.
+    Called from worker threads against the SHARED module-global table handle,
+    deliberately: the underlying botocore client is thread-safe, and Table.query
+    is a stateless per-call request transform on top of it (no lazy attribute
+    loads on this path — `.name` resolves at construction). The two tempting
+    alternatives both failed live at this function's 256MB (~1/6 vCPU):
+    per-thread boto3 Sessions are GIL-serialized pure-Python setup (12–16s at
+    origin), and the resource-derived `meta.client` auto-transforms values, so
+    hand-built typed AttributeValues mis-parse as Maps (ValidationException).
     """
-    t = table
-    if not type(t).__module__.startswith("boto3"):
-        return t
-    cached = getattr(_partition_tls, "table", None)
-    if cached is None:
-        cached = boto3.session.Session().resource("dynamodb", region_name=t.meta.client.meta.region_name).Table(t.name)
-        _partition_tls.table = cached
-    return cached
+    kwargs = {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with(sk_prefix),
+        "ScanIndexForward": False,  # sk is date-prefixed → newest first
+        "Limit": 1500,
+    }
+    if projection_fields:
+        names = {f"#f{i}": f for i, f in enumerate(projection_fields)}
+        kwargs["ProjectionExpression"] = ", ".join(names)
+        kwargs["ExpressionAttributeNames"] = names
+    resp = table.query(**kwargs)
+    return [_decimal_to_float(r) for r in resp.get("Items", [])]
 
 
 def _fetch_prediction_partition(coach_pk):
     """ONE unfiltered fetch of a coach's whole PREDICTION# partition (career),
     projected to the consumed fields. Raises on query failure — callers map
     that to [] so a single bad partition degrades exactly as it did before."""
-    names = {f"#f{i}": f for i, f in enumerate(_PREDICTION_PROJECTION_FIELDS)}
-    resp = _partition_table().query(
-        KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
-        ScanIndexForward=False,  # pred_id is date-prefixed → newest first
-        Limit=1500,  # career query: every cycle this coach has ever predicted in
-        ProjectionExpression=", ".join(names),
-        ExpressionAttributeNames=names,
-    )
-    return [_decimal_to_float(r) for r in resp.get("Items", [])]
+    return _query_partition(coach_pk, "PREDICTION#", _PREDICTION_PROJECTION_FIELDS)
 
 
 def _parallel_fetch(jobs):
@@ -1428,13 +1424,9 @@ def handle_calibration(event):
             # axis). CROSS_PHASE (phase_taxonomy.py) — never wiped, so ONE fetch
             # already holds every cycle; season is the current-cycle slice by
             # resolution date, the same "genesis anchors the current run"
-            # convention RAW_TIMESERIES reads use.
-            hresp = _partition_table().query(
-                KeyConditionExpression=Key("pk").eq(USER_PREFIX + "calibration") & Key("sk").begins_with("CALIB#"),
-                ScanIndexForward=False,
-                Limit=1500,
-            )
-            return [_decimal_to_float(r) for r in hresp.get("Items", [])]
+            # convention RAW_TIMESERIES reads use. Unprojected: CALIB# rows are
+            # small and their consumed fields vary by record_type.
+            return _query_partition(USER_PREFIX + "calibration", "CALIB#")
 
         jobs = {cid: (lambda pk=f"COACH#{_CALIB_COACH_ID_MAP[cid]}": _fetch_prediction_partition(pk)) for cid in _CALIB_COACH_NAMES}
         jobs["hypothesis-ledger"] = _fetch_hyp_ledger
