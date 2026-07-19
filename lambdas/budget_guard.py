@@ -84,6 +84,14 @@ _FEATURE_CUTOFF = {
     # "Reader Truth" category. Internal QA like coherence_semantic: a paused run
     # is reported as an explicit skip (⏸/warning), never silent green.
     "reader_truth_qa": 1,
+    # visual_ai_qa (#1428): the Claude-vision screenshot QA pass (tests/visual_ai_qa.py
+    # assess_results) — the visual analogue of reader_truth_qa/coherence_semantic.
+    # Internal QA, pauses FIRST like the rest of band 1; a paused run reports an
+    # explicit SKIPPED-BY-BUDGET (never silent) and the deterministic Playwright
+    # checks still stand. Was previously UNLISTED (defaulted to the tier-3 hard-stop
+    # cutoff and only surfaced as a per-page "AI-QA error") — the same class of defect
+    # ADR-125 fixed for coherence_semantic.
+    "visual_ai_qa": 1,
     # ── Band 2: reader NARRATIVE content — pauses only under real pressure, a full
     #    tier AFTER all internal AI. The biggest recurring daily bucket, so it's
     #    the real cost lever, but the reader product is never the first sacrifice.

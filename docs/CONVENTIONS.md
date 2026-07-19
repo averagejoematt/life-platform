@@ -178,17 +178,37 @@ after any change: `python3 -m pytest tests/ -m "deploy_critical and not integrat
 ### 4b. Visual-QA fires independently of the pipeline (#749)
 
 The reader-facing regression net (Playwright sweep + Bedrock vision QA + the accuracy
-gate) exists in **two** places:
+gate) exists in **three** places, and the deterministic sweep always covers the full
+page set in all three — only the AI-vision layer is tiered (#1428, see below):
 
-- **Pipeline copy** (`ci-cd.yml` job `visual-qa`, `needs: deploy`) — still GATES the
-  pipeline post-deploy; the site auto-rollback keys off its failure.
+- **Pipeline copy** (`ci-cd.yml` job `visual-qa`, `needs: deploy`) — GATES the pipeline
+  post-deploy for lambda/CDK deploys.
+- **Site-deploy copy** (`site-deploy.yml` job `visual-qa`, `needs: deploy-site`) — GATES
+  the auto-deploy-on-merge path for `site/**` changes; the site auto-rollback keys off
+  either gating copy's failure.
 - **Standalone copy** (`.github/workflows/visual-qa.yml`) — `workflow_dispatch` + daily
   20:07 UTC cron against the LIVE site. Gates nothing, rolls back nothing; a failure
-  reds the run + posts to the SNS digest. This is what keeps the net firing when the
-  pipeline copy is skipped (red upstream job, or a push with nothing to deploy).
+  reds the run + posts to the SNS digest. This is what keeps the net firing when a
+  gating copy is skipped (red upstream job, or a push with nothing to deploy).
 
-The two step lists must stay in sync — change one, change both. Run it on demand:
-`gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`).
+**Tiered AI-vision cadence (#1428, cost control):** the Claude/Bedrock vision pass is
+the expensive part (Haiku, ~$0.001/image); the deterministic Playwright checks are free
+(CI minutes only) and are NEVER restricted by this.
+- Both gating copies pass `--ai-qa-max-tier 1` — AI-vision covers exactly the 6 tier-1
+  flagship doors (`tests/qa_manifest.py`) on every deploy.
+- The standalone copy's full, untiered AI-vision pass (`--ai-qa`, no tier filter) fires
+  only on the Sunday occurrence of its existing daily cron, or on any manual
+  `workflow_dispatch` — no second cron was added; the flag is computed at runtime from
+  UTC day-of-week (see the workflow's "Determine cadence" step). Non-Sunday daily fires
+  still run the deterministic sweep + `--reader-truth` (both full surface, unaffected).
+- Budget-tier pauses on the AI-vision pass (`budget_guard` feature `"visual_ai_qa"`,
+  internal-QA band, cutoff tier 1) render as an explicit SKIPPED-BY-BUDGET line + the
+  `QAPausedByBudget` CloudWatch metric — never a silent skip (D1, mirrors #1440's
+  `reader_truth_qa` pattern).
+
+All three step lists must stay in sync — change one, change all three. Run it on demand:
+`gh workflow run visual-qa.yml` (or locally `python3 tests/visual_qa.py --screenshot --ai-qa`,
+add `--ai-qa-max-tier 1` to reproduce exactly what the deploy-time gates run).
 
 ### 4c. Merge-day derived-artifact drift auto-reconciles on main (#1173)
 
@@ -209,19 +229,22 @@ still valid; the bot is the net under it, not a replacement for pre-merge hygien
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
    Do NOT widen the whitelist reflexively; inspect the generator diff, fix main
    manually (`git pull` → run the generator → review → push).
-2. **Push rejected** — branch protection blocks the `github-actions[bot]` push
-   (this repo is a **personal/User-owned** repo, so `enforce_admins:false` lets
-   Matthew bypass but the bot is not an admin). NB the classic-protection PR-bypass
-   list (`bypass_pull_request_allowances`) is **organization-only** — it does not
-   exist on a personal repo, so you cannot add the app there. The one-time fix
-   applied 2026-07-13 (#1173): turn OFF "Require a pull request before merging" on
-   `main` (`gh api -X DELETE repos/<owner>/<repo>/branches/main/protection/required_pull_request_reviews`)
-   — near-vacuous here anyway (0 required approvals, admins already bypass, no
-   required status checks), so its only effect was blocking the reconcile bot.
-   Alternative if the PR rule must stay: push with a Matthew-owned PAT (admin →
-   bypasses), but a PAT push **retriggers** a duplicate `push` run (the default
-   `GITHUB_TOKEN` deliberately does not). Or a concurrent human push raced it
-   twice — the queued run reconciles next.
+2. **Push rejected** — as of 2026-07-13 (#1173) "Require a pull request before
+   merging" was turned OFF on `main` entirely
+   (`gh api -X DELETE repos/<owner>/<repo>/branches/main/protection/required_pull_request_reviews`),
+   and classic branch protection on `main` is now **absent** —
+   `gh api repos/<owner>/<repo>/branches/main/protection` returns 404
+   "Branch not protected" (verified live, not residual). The only control on
+   `main` is the minimal **ruleset** added 2026-07-18 (#1325,
+   `main-block-force-push-and-deletion`, id `19162901`) — it blocks
+   **non-fast-forward pushes and branch deletion only**: no required checks, no
+   PR rule, `enforcement: active`, `bypass_actors: []`. A normal (fast-forward,
+   non-deleting) push from `github-actions[bot]` — including the reconcile bot's
+   commit and a squash-merge — is unaffected; only a force-push or a delete of
+   `main` is rejected. If the reconcile push is ever rejected, it means someone
+   force-pushed or the ruleset was misconfigured — check
+   `gh api repos/<owner>/<repo>/rulesets/19162901` before assuming a PR-gate
+   problem (there isn't one).
 3. **A generator crashed** — same failure the test suite would have shown; fix the
    generator like any red test. Reproduce locally: run the generators from repo root
    on a clean main checkout; `git status` must end clean (they are idempotent).
@@ -376,6 +399,8 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | MCP tool count | `deploy/sync_doc_metadata.py::_auto_discover_tool_count` — the top-level keys in `TOOLS` in `mcp/registry.py`. **Do not** `grep -c '"name":'` — it over-counts nested schema fields |
 | Test count | `PLATFORM_STATS["test_count"]` in `lambdas/web/site_api_common.py`, auto-bumped by the sync + the pre-commit hook |
 | Live site build | `curl -s https://averagejoematt.com/version.json` → compare `build` to `git rev-parse --short HEAD`; a mismatch means the viewer's device is stale |
+| `main` classic branch protection | `gh api repos/<owner>/<repo>/branches/main/protection` → must 404 "Branch not protected" (removed 2026-07-13, #1173; a 200 here means protection was re-added out of band — reconcile the doc, don't assume this table is wrong) |
+| `main` ruleset posture | `gh api repos/<owner>/<repo>/rulesets` → must show exactly `main-block-force-push-and-deletion` (id `19162901`) with `rules: [deletion, non_fast_forward]` only, `enforcement: active`, no `pull_request`/`required_status_checks` rule (#1325). Full record: `gh api repos/<owner>/<repo>/rulesets/19162901` |
 
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it

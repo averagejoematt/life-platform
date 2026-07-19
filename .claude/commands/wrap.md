@@ -9,7 +9,7 @@ handover filename and titles. If empty, derive one from what the session actuall
 
 ## Instructions
 
-Run these five steps **in order**. Each has a hard guardrail — read it before acting.
+Run these steps **in order**. Each has a hard guardrail — read it before acting.
 
 ### (a) Archive the outgoing handover, write the new one
 
@@ -65,6 +65,25 @@ NOT git-tracked and is a separate step from the commit in (f).
   ```
   (Match the basename, not `$f` — an index entry may reference a topic as a `[[wikilink]]`
   without the `.md`, and a naive `.md` grep would false-flag it.)
+- **Body-follows-index rule (#1342)** — when a `MEMORY.md` index line is corrected (a stale
+  fact hedged or fixed), the SAME wrap rewrites the topic file's BODY too. An index-only
+  patch is not an outcome: a corrected index line over a still-wrong body is worse than no
+  fix at all — the next session trusts the index, opens the body for depth, and gets the
+  stale directive anyway (this is exactly how `project_launch_dates.md`'s "always use
+  2026-04-01" survived three genesis re-anchors after its index line was hedged).
+- **Memory-body fact-drift grep (#1342) — run this every wrap; review any hit before
+  closing (c).** `check_doc_facts.py` guards the repo doc surface for stale genesis/
+  date/stack-name literals but structurally can't see this dir (it's outside git) — this
+  is the wrap-time equivalent for the memory bodies, checked against the same ground
+  truth (`lambdas/constants.py`):
+  ```bash
+  python3 scripts/check_memory_body_facts.py
+  ```
+  Fix any flagged body (a categorical genesis/date directive disagreeing with the live
+  `EXPERIMENT_START_DATE`, or a retired-stack-ownership literal — extend
+  `STALE_STACK_CLAIMS` in the script when a new ownership move needs policing) before
+  closing (c). The script no-ops harmlessly if the memory dir isn't present (e.g. a
+  fresh machine) — it is a session reflex, not something repo CI can enforce.
 - **Rule of placement:** session-specific narrative → `handovers/` (step a). Durable
   lessons/reflexes → memory topic files (this step) or `docs/CONVENTIONS.md` if it's a
   load-bearing repo-wide rule. The CLAUDE.md status block (step b) is a terse pointer,
@@ -148,6 +167,45 @@ block said `main GREEN (1c641b6a)` while that sha's own push run had FAILED).
 - The handover carries one line either way: `**Main:** green (<sha>)` or
   `**Main:** red — <decode>`.
 
+### (e3) Incident gate — a wrap gate, same shape as (d)/(e)/(e2) (#1332)
+
+Every session ends with either a `docs/INCIDENT_LOG.md` row for any incident-class event
+that happened this session, or an explicit `**Incidents:** none` line — silent omission is
+not an outcome (mirrors the build-beat gate, #736). This closed the gap where ≥6 site
+auto-rollback firings and several other incident-class events lived only in memory topic
+files or a handover clause while `docs/INCIDENT_LOG.md` looked like a clean month.
+
+- **Incident-class events**: an auto-rollback firing (site-deploy or a Lambda smoke gate),
+  main red for >1h, a data gap discovered, or a quota/budget-tier event — real OR a false
+  positive (a false alarm still cost investigation time and belongs in the record, tagged
+  as such).
+- For each one, add a row to the Incident History table in `docs/INCIDENT_LOG.md` (match
+  the existing columns: Date | Severity | Summary | Root Cause | TTD | TTR | Data Loss?)
+  and bump the `Last updated:` line at the top of the file.
+- The new `handovers/HANDOVER_LATEST.md` must carry one line either way:
+  `**Incidents:** <N row(s) added — one-clause list>` or `**Incidents:** none`.
+- A live auto-rollback firing already publishes to SNS — this row is the audit half of
+  that event. Add it the SAME session the firing happens (or the next wrap with visibility
+  into it) — do not let it wait for a quarterly backfill.
+
+### (e4) Residual-queue gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3) (#1340)
+
+Every residual/next-picks bullet in the new `handovers/HANDOVER_LATEST.md` must either
+cite a GitHub issue number or carry an explicit `not-work — <reason>` tag — silent
+omission fails this checklist. The residual queue is not a sanctioned shadow backlog:
+ADR-099's "new work enters as an issue or not at all" invariant has to hold here too, or a
+parked defect gets independently re-discovered (and re-paid-for) by a later review.
+
+- Before closing the wrap, run the gate against the handover you just wrote in step (a):
+  ```bash
+  python3 scripts/check_residual_queue.py
+  ```
+  It must print `OK` — zero ungated bullets.
+- If a bullet is a real, unfiled follow-up: file it (`gh issue create …`, ADR-099 shape),
+  then cite its number in the bullet. If it's a standing ops reminder or a decision only
+  Matthew can make (not a backlog item), tag it `not-work — <one-clause reason>` instead
+  of inventing an issue for it.
+
 ### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
@@ -178,6 +236,14 @@ session — status block, handover, build beat (9 R22 smalls #836–#845)`).
 - **Docs or explicit skip, never silence (wiki contract).** Every wrap's handover carries
   a `**Docs:** <pages or "none needed — reason">` line; step (e) cannot be skipped
   implicitly, and the wiki checkers must be green at the wrap commit.
+- **Incident or explicit skip, never silence (#1332).** Every wrap's handover carries a
+  `**Incidents:** <rows added or "none">` line; step (e3) cannot be skipped implicitly.
+- **Residual queue cites an issue, never silence (#1340).** Every residual/next-picks
+  bullet carries a `#<issue>` or a `not-work — <reason>` tag; step (e4)'s gate script must
+  print `OK` before the wrap commit.
+- **Body follows index, never an index-only patch (#1342).** A `MEMORY.md` index-line
+  correction is not complete until the same wrap rewrites the topic file's body too; step
+  (c)'s memory-body-drift grep must be reviewed clean (or its hits fixed) before closing.
 - **Decisions or explicit skip, never silence (#1343).** Every wrap's handover carries a
   `**Decisions:** <ADR-NNN filed or "none needed — reason">` line — a governance decision
   must never land only in a workflow file or a commit message.

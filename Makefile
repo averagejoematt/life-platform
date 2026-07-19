@@ -3,7 +3,7 @@
 # All targets run from the repo root.
 
 .PHONY: help test lint syntax preflight deploy-mcp deploy-site deploy-cdk-web \
-        deploy-cdk-operational layer commit clean
+        deploy-cdk-operational fleet commit clean
 
 PYTHON  := python3
 PYTEST  := $(PYTHON) -m pytest
@@ -59,32 +59,29 @@ check: lint syntax test  ## lint + syntax + test (full pre-deploy check)
 
 # ── Lambda Deploys ────────────────────────────────────────────────────────────
 
-layer:  ## Rebuild Lambda layer (shared modules: ai_calls, board_loader, etc.)
-	bash deploy/build_layer.sh
+fleet:  ## Push a shared-module change to every function's bundle (#781 retired the old `layer` rebuild step — one bundle, no layer)
+	bash deploy/deploy_fleet.sh
 
-deploy-mcp:  ## Deploy MCP Lambda (life-platform-mcp)
-	bash deploy/deploy_lambda.sh life-platform-mcp
+deploy-mcp:  ## Deploy MCP Lambda (life-platform-mcp) — mcp-shaped full bundle (#781)
+	bash deploy/deploy_lambda.sh life-platform-mcp mcp_server.py
 
-deploy-site-api:  ## Deploy site-api Lambda (life-platform-site-api)
-	bash deploy/deploy_lambda.sh life-platform-site-api
+deploy-site-api:  ## Deploy site-api Lambda — full-tree bundle (NOT deploy_lambda.sh: sibling imports, see ci/lambda_map.json)
+	bash deploy/deploy_site_api.sh
 
 deploy-anomaly:  ## Deploy anomaly-detector Lambda
-	bash deploy/deploy_lambda.sh anomaly-detector
+	bash deploy/deploy_lambda.sh anomaly-detector lambdas/emails/anomaly_detector_lambda.py
 
 deploy-daily-brief:  ## Deploy daily-brief Lambda
-	bash deploy/deploy_lambda.sh daily-brief
+	bash deploy/deploy_lambda.sh daily-brief lambdas/emails/daily_brief_lambda.py
 
 # ── Site Deploys ──────────────────────────────────────────────────────────────
 
 deploy-site:  ## Sync site/ to S3 (averagejoematt.com static pages)
 	bash deploy/sync_site_to_s3.sh
 
-deploy-sprint7:  ## Deploy Sprint 7 site changes (tier-0 script)
-	bash deploy/deploy_sprint7_tier0.sh
-
 # ── CDK Deploys ───────────────────────────────────────────────────────────────
 
-deploy-cdk-web:  ## CDK deploy LifePlatformWeb (us-east-1: CloudFront, site-api Lambda)
+deploy-cdk-web:  ## CDK deploy LifePlatformWeb (us-east-1: CloudFront distributions only; site-api Lambda infra is owned by LifePlatformServe, us-west-2, #793)
 	cd cdk && npx cdk deploy LifePlatformWeb
 
 deploy-cdk-operational:  ## CDK deploy LifePlatformOperational (us-west-2: ops Lambdas)
@@ -106,8 +103,8 @@ commit:  ## Stage all modified tracked files and open commit prompt
 # ── Housekeeping ──────────────────────────────────────────────────────────────
 
 clean:  ## Remove local build/cache cruft (all gitignored; regenerated on demand)
-	rm -rf cdk/cdk.out layer-build
+	rm -rf cdk/cdk.out
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 	rm -rf .mypy_cache .pytest_cache .ruff_cache cdk/.pytest_cache
-	@echo "Cleaned cdk.out + caches. Left intact: .venv, cdk/.venv, cdk/layer-build (CDK asset — needed for synth, rebuilt by build_layer.sh), datadrops/, qa-screenshots/, captures/."
+	@echo "Cleaned cdk.out + caches. Left intact: .venv, cdk/.venv, datadrops/, qa-screenshots/, captures/."
 	@echo "(For the big .venv dirs use: rm -rf .venv cdk/.venv show_and_tell/.venv && reinstall.)"
