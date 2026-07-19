@@ -99,6 +99,19 @@ def _registry():
     return persona_registry.load_registry(_S3, _S3_BUCKET)
 
 
+def _current_cycle():
+    """Current experiment cycle (int) or None (#1376). Fail-soft SSM read via
+    coach_checkin.read_cycle (cached once per warm container, same fail-soft
+    contract phase_taxonomy.experiment_stamp relies on) — a missing param/grant
+    must never break the calibration/predictions surfaces, only omit the label."""
+    try:
+        from coach_checkin import read_cycle
+
+        return read_cycle()
+    except Exception:
+        return None
+
+
 def _latest_weight_lbs():
     """Most recent Withings weight_lbs, or None (caller falls back to baseline)."""
     try:
@@ -716,8 +729,16 @@ def handle_coach_team(event):
             _bare = pid.removesuffix("_coach")
             _cal = {}
             if _bare in _CALIB_COACH_NAMES:
-                _summ, _ = _score_coach_calibration(_bare)
-                _cal = {"brier": _summ["brier"], "calibration": _summ["calibration"], "scored_n": _summ["n"]}
+                _summ, _, _lifetime_summ, _ = _score_coach_calibration(_bare)
+                _cal = {
+                    "brier": _summ["brier"],
+                    "calibration": _summ["calibration"],
+                    "scored_n": _summ["n"],
+                    # #1376: the huddle's confidence read shouldn't go dark on cycle
+                    # 1 of a fresh season — carry the career figure alongside.
+                    "lifetime_scored_n": _lifetime_summ["n"],
+                    "lifetime_brier": _lifetime_summ["brier"],
+                }
             huddle.append(
                 {
                     "persona_id": pid,
@@ -1252,29 +1273,41 @@ _CALIB_COACH_ID_MAP = {c: f"{c}_coach" for c in _CALIB_COACH_NAMES}
 
 
 def _score_coach_calibration(cid):
-    """Fetch a coach's resolved PREDICTION# records and score them (#538).
+    """Fetch a coach's resolved PREDICTION# records and score them (#538), split
+    into THIS SEASON (current cycle, phase-visible) and CAREER — every cycle
+    ever, tombstoned archives included (#1376: career vs season, sports-card
+    pattern).
 
-    Returns (summary_dict, scorable_pairs) — the pairs are folded into the
-    platform-wide aggregate so per-coach and platform numbers come from one place.
+    ONE unfiltered fetch of the whole COACH#…/PREDICTION# partition backs both
+    views — season is derived from it client-side via `singleton_visible`
+    (the exact predicate `with_phase_filter` applies server-side, #946), so it
+    is guaranteed to be a strict subset of the career records. A second,
+    independently-filtered query could drift or double-count if its own Limit
+    truncated differently; deriving season FROM the career fetch cannot.
+
+    Returns (season_summary, season_pairs, career_summary, career_pairs) — the
+    pairs are folded into the platform-wide aggregates so per-coach and
+    platform numbers (both season and career) always come from the same place.
     """
     coach_pk = f"COACH#{_CALIB_COACH_ID_MAP[cid]}"
     records = []
     try:
         resp = table.query(
-            **with_phase_filter(
-                {  # ADR-058: hide pilot predictions
-                    "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
-                    "ScanIndexForward": False,
-                    "Limit": 500,
-                }
-            )
+            KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
+            ScanIndexForward=False,
+            Limit=1500,  # career query: every cycle this coach has ever predicted in
         )
         records = [_decimal_to_float(r) for r in resp.get("Items", [])]
     except Exception as _e:
         logger.warning(f"[calibration] {cid}: {_e}")
-    pairs = calibration_core.pairs_from_prediction_records(records)
-    summary = calibration_core.score_pairs(pairs)
-    return summary, pairs
+    career_pairs = calibration_core.pairs_from_prediction_records(records)
+    career_summary = calibration_core.score_pairs(career_pairs)
+
+    season_records = [r for r in records if singleton_visible(r)]  # ADR-058: hide pilot/archived predictions
+    season_pairs = calibration_core.pairs_from_prediction_records(season_records)
+    season_summary = calibration_core.score_pairs(season_pairs)
+
+    return season_summary, season_pairs, career_summary, career_pairs
 
 
 def handle_calibration(event):
@@ -1283,41 +1316,61 @@ def handle_calibration(event):
     Every forecast the platform makes, graded against what actually happened: a Brier
     score + reliability curve per coach and platform-wide, folding in the hypothesis
     engine's own calibration ledger. The honesty moat, made public and legible.
+
+    #1376: an experiment reset tags every EXPERIMENT_SCOPED PREDICTION# archived
+    (phase=pilot + cycle=<closing>, ADR-077) so `with_phase_filter` — correctly —
+    stops surfacing it, and a fresh season starts back at n=0. That's honest for
+    "this season", but the platform-wide `platform` block ALSO folded in the
+    CROSS_PHASE hypothesis/forecast ledger (never wiped, so it kept counting
+    every cycle) — the confirmed leak: platform read n=23 while every coach read
+    n=0 "nascent", career and season smashed into one number. Every block below
+    now carries BOTH: the top-level fields stay season-scoped (unchanged shape
+    for existing readers), and a nested `lifetime` object carries the same
+    shape for the career, all-cycles view — sports solved this decades ago.
     """
     try:
         per_coach = []
-        platform_pairs = []
+        platform_pairs = []  # season
+        platform_career_pairs = []  # career (all cycles, #1376)
         for cid, name in _CALIB_COACH_NAMES.items():
-            summary, pairs = _score_coach_calibration(cid)
+            summary, pairs, career_summary, career_pairs = _score_coach_calibration(cid)
             platform_pairs.extend(pairs)
-            per_coach.append({"coach_id": cid, "coach_name": name, **summary})
+            platform_career_pairs.extend(career_pairs)
+            per_coach.append({"coach_id": cid, "coach_name": name, **summary, "lifetime": career_summary})
 
         # Hypothesis-engine calibration ledger (word confidences → same [0,1] axis).
+        # CROSS_PHASE (phase_taxonomy.py) — never wiped, so ONE fetch already holds
+        # every cycle; season is the current-cycle slice by resolution date, the
+        # same "genesis anchors the current run" convention RAW_TIMESERIES reads use.
         hyp_rows = []
         try:
             hresp = table.query(
-                **with_phase_filter(
-                    {
-                        "KeyConditionExpression": Key("pk").eq(USER_PREFIX + "calibration") & Key("sk").begins_with("CALIB#"),
-                        "ScanIndexForward": False,
-                        "Limit": 500,
-                    }
-                )
+                KeyConditionExpression=Key("pk").eq(USER_PREFIX + "calibration") & Key("sk").begins_with("CALIB#"),
+                ScanIndexForward=False,
+                Limit=1500,
             )
             hyp_rows = [_decimal_to_float(r) for r in hresp.get("Items", [])]
         except Exception as _e:
             logger.warning(f"[calibration] hypothesis ledger: {_e}")
-        hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows)
+        hyp_rows_season = [r for r in hyp_rows if str(r.get("resolved_at") or "")[:10] >= EXPERIMENT_START]
+
+        hyp_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows_season)
+        hyp_career_pairs = calibration_core.pairs_from_calibration_rows(hyp_rows)
         hypotheses = calibration_core.score_pairs(hyp_pairs)
+        hypotheses_lifetime = calibration_core.score_pairs(hyp_career_pairs)
 
         # Interval forecasts (#1246): forecast_resolution rows live in the SAME CALIB#
         # ledger but carry `covered` (did the 80% interval hold?), not an `outcome`
         # word — a genuinely graded binary the scoreboard was silently dropping, so
         # /api/calibration read platform n=0 while /api/forecast graded the same rows.
-        forecast_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows)
+        forecast_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows_season)
+        forecast_career_pairs = calibration_core.pairs_from_forecast_resolution_rows(hyp_rows)
         interval_forecasts = calibration_core.score_pairs(forecast_pairs)
+        interval_forecasts_lifetime = calibration_core.score_pairs(forecast_career_pairs)
 
         platform = calibration_core.score_pairs(platform_pairs + hyp_pairs + forecast_pairs)
+        platform_lifetime = calibration_core.score_pairs(platform_career_pairs + hyp_career_pairs + forecast_career_pairs)
+        platform["lifetime"] = platform_lifetime
 
         # Rank coaches by Brier (best first); the never-graded fall to the bottom.
         per_coach.sort(key=lambda c: (c["n"] == 0, c["brier"] if c["brier"] is not None else 1.0))
@@ -1326,8 +1379,9 @@ def handle_calibration(event):
             {
                 "platform": platform,
                 "coaches": per_coach,
-                "hypotheses": hypotheses,
-                "interval_forecasts": interval_forecasts,
+                "hypotheses": {**hypotheses, "lifetime": hypotheses_lifetime},
+                "interval_forecasts": {**interval_forecasts, "lifetime": interval_forecasts_lifetime},
+                "cycle": _current_cycle(),
                 "disclosure": (
                     "Self-graded: every prediction here was resolved against the platform's own data by a "
                     "deterministic evaluator — no human scoring. Brier score: 0 is perfect, 0.25 is the "
@@ -1429,25 +1483,39 @@ def handle_predictions(event):
         # natural-language strings with no status — the old read returned all-zero).
         _BUCKETS = ("confirmed", "refuted", "pending", "inconclusive", "expired")
 
+        _LIFETIME_ZERO = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
+
         for cid in scan_coaches:
             coach_pk = f"COACH#{_pred_coach_id_map[cid]}"
             by_coach[cid] = {"total": 0, "confirmed": 0, "refuted": 0, "pending": 0, "inconclusive": 0, "expired": 0, "decided": 0}
+            # #1376: career (all cycles, tombstoned archives included) beside this
+            # season — same sports-card pattern as /api/calibration.
+            by_coach[cid]["lifetime"] = dict(_LIFETIME_ZERO)
 
             try:
+                # ONE unfiltered fetch of the whole PREDICTION# partition (career);
+                # season is derived from it below via singleton_visible, the same
+                # predicate with_phase_filter applies server-side (ADR-058/#946) —
+                # so season can never diverge from or double-count against career.
                 resp = table.query(
-                    **with_phase_filter(
-                        {  # ADR-058: hide pilot predictions
-                            "KeyConditionExpression": Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
-                            "ScanIndexForward": False,  # pred_id is date-prefixed → newest first
-                            "Limit": 300,
-                        }
-                    )
+                    KeyConditionExpression=Key("pk").eq(coach_pk) & Key("sk").begins_with("PREDICTION#"),
+                    ScanIndexForward=False,  # pred_id is date-prefixed → newest first
+                    Limit=1500,
                 )
                 for rec in resp.get("Items", []):
                     rec = _decimal_to_float(rec)
                     p_status = rec.get("status", "pending")
                     if p_status not in _BUCKETS:
                         p_status = "pending"
+
+                    by_coach[cid]["lifetime"]["total"] += 1
+                    by_coach[cid]["lifetime"][p_status] += 1
+                    if p_status in ("confirmed", "refuted"):
+                        by_coach[cid]["lifetime"]["decided"] += 1
+
+                    if not singleton_visible(rec):  # archived cycle — career-only, not this season
+                        continue
+
                     by_coach[cid]["total"] += 1
                     by_coach[cid][p_status] += 1
                     if p_status in ("confirmed", "refuted"):
@@ -1476,6 +1544,10 @@ def handle_predictions(event):
 
             decided = by_coach[cid]["decided"]
             by_coach[cid]["hit_rate_pct"] = round(by_coach[cid]["confirmed"] / decided * 100, 1) if decided else None
+            ldecided = by_coach[cid]["lifetime"]["decided"]
+            by_coach[cid]["lifetime"]["hit_rate_pct"] = (
+                round(by_coach[cid]["lifetime"]["confirmed"] / ldecided * 100, 1) if ldecided else None
+            )
 
         # Surface decided calls first (the scorecard signal), then by recency.
         _order = {"confirmed": 0, "refuted": 0, "pending": 1, "inconclusive": 1, "expired": 2}
@@ -1483,7 +1555,7 @@ def handle_predictions(event):
         all_predictions.sort(key=lambda x: x.get("date", ""), reverse=True)
         all_predictions = all_predictions[:limit]
 
-        # Compute overall stats
+        # Compute overall stats — season (unchanged shape) + career (#1376).
         total = sum(c["total"] for c in by_coach.values())
         confirmed = sum(c["confirmed"] for c in by_coach.values())
         refuted = sum(c["refuted"] for c in by_coach.values())
@@ -1492,6 +1564,15 @@ def handle_predictions(event):
         expired = sum(c["expired"] for c in by_coach.values())
         resolved = confirmed + refuted
         accuracy_pct = round(confirmed / resolved * 100, 1) if resolved > 0 else None
+
+        l_total = sum(c["lifetime"]["total"] for c in by_coach.values())
+        l_confirmed = sum(c["lifetime"]["confirmed"] for c in by_coach.values())
+        l_refuted = sum(c["lifetime"]["refuted"] for c in by_coach.values())
+        l_pending = sum(c["lifetime"]["pending"] for c in by_coach.values())
+        l_inconclusive = sum(c["lifetime"]["inconclusive"] for c in by_coach.values())
+        l_expired = sum(c["lifetime"]["expired"] for c in by_coach.values())
+        l_resolved = l_confirmed + l_refuted
+        l_accuracy_pct = round(l_confirmed / l_resolved * 100, 1) if l_resolved > 0 else None
 
         return _ok(
             {
@@ -1504,9 +1585,20 @@ def handle_predictions(event):
                     "expired": expired,
                     "decided": resolved,
                     "accuracy_pct": accuracy_pct,
+                    "lifetime": {
+                        "total": l_total,
+                        "confirmed": l_confirmed,
+                        "refuted": l_refuted,
+                        "pending": l_pending,
+                        "inconclusive": l_inconclusive,
+                        "expired": l_expired,
+                        "decided": l_resolved,
+                        "accuracy_pct": l_accuracy_pct,
+                    },
                 },
                 "by_coach": by_coach,
                 "predictions": all_predictions,
+                "cycle": _current_cycle(),
             },
             cache_seconds=300,
         )
