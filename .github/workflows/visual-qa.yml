@@ -21,19 +21,34 @@
 # a failure reds this run and notifies SNS (the remediation agent also triages
 # failed runs). Steps mirror the pipeline job exactly (same pinned Playwright,
 # same OIDC role github-actions-deploy-role, same scripts) so a red here means
-# the same thing as a red there. The AI-vision layer self-skips (warning) when
-# bedrock:InvokeModel is absent or the budget guard is at tier 3.
+# the same thing as a red there. The AI-vision layer self-skips (SKIPPED-BY-BUDGET
+# warning) when bedrock:InvokeModel is absent or the budget guard is at tier >= 1
+# (internal QA pauses first, ADR-125).
 #
 # Cron: fixed UTC (repo convention — no DST drift). 20:07 UTC ≈ 12:07/13:07 PT,
 # after the 11 AM PT compute/email/OG-image cycle has refreshed the day's data,
 # and offset from the taken workflow slots (14:45, 15:17, 16:23 UTC).
+#
+# #1428 — tiered AI-vision cadence, ONE cron, no new trigger added:
+# the deterministic Playwright sweep + --reader-truth run on EVERY fire of the
+# existing daily cron (unchanged). The full-surface Claude-vision pass
+# (--ai-qa, no tier filter) only runs on the Sunday fire of that SAME cron (day-
+# of-week computed at runtime — see the "Determine cadence" step) or on any
+# manual workflow_dispatch, so a human triggering this on demand always gets
+# the full AI-vision read. Non-Sunday daily fires skip --ai-qa entirely (deploy
+# time already covers tier-1 pages via ci-cd.yml/site-deploy.yml's --ai-qa-max-tier
+# 1) — this keeps AI-vision spend to exactly two buckets: tier-1 at every deploy,
+# full surface once a week. See tests/visual_qa.py's module docstring for the cost math.
 
 name: Visual QA (standalone)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '7 20 * * *'   # daily 20:07 UTC (fixed UTC — no DST drift)
+    - cron: '7 20 * * *'   # daily 20:07 UTC (fixed UTC — no DST drift); the
+                            # full AI-vision pass below only fires on the Sunday
+                            # occurrence of this SAME cron (#1428) — see the
+                            # "Determine cadence" step, no second cron added
 
 # Never two sweeps at once (screenshot artifacts + Bedrock spend); a pipeline
 # visual-qa run is a different workflow and may overlap harmlessly (read-only).
@@ -74,9 +89,22 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/github-actions-diagnosis-role
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Determine cadence (#1428 — full-surface AI-vision only on Sunday/manual)
+        id: cadence
+        run: |
+          # UTC day-of-week: 7 = Sunday. A manual workflow_dispatch always gets
+          # the full AI-vision pass too, so an on-demand run is never partial.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%u)" = "7" ]; then
+            echo "ai_qa_flag=--ai-qa" >> "$GITHUB_OUTPUT"
+            echo "Full-surface AI-vision pass: ON (${{ github.event_name }}, UTC day $(date -u +%u))"
+          else
+            echo "ai_qa_flag=" >> "$GITHUB_OUTPUT"
+            echo "Full-surface AI-vision pass: OFF (deterministic + reader-truth only; UTC day $(date -u +%u), not Sunday)"
+          fi
+
       - name: Run visual + AI-vision QA sweep
         run: |
-          python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
+          python3 tests/visual_qa.py --screenshot ${{ steps.cadence.outputs.ai_qa_flag }} --reader-truth
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         if: always()

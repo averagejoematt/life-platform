@@ -476,3 +476,381 @@ def coaching_read_block_html(read: dict) -> str:
     )
     lines.append("</section></noscript>")
     return "".join(lines)
+
+
+# ── #1395: the growth surface — static core + data-driven OG on Home + the doors ──
+#
+# The OG / no-JS / crawler view of Home, /data/, and /protocols/ was a blank shell
+# (client-rendered), so every HN/Twitter/Slack unfurl and search snippet showed
+# nothing (frontier review Epic G / trust-leak #10). This extends the #729/#730/#788/
+# #804 proof machinery to those surfaces: a <noscript> static core carrying real,
+# dated headline numbers, and per-page data-driven OG tags whose title/description
+# carry a falsifiable number (never generic boilerplate). Every number comes from a
+# published API the page already speaks to; nothing is fabricated (ADR-104/105), and
+# every block carries an honest "as of" stamp so a stale crawl reads as
+# honest-but-possibly-stale, never as fabricated live data.
+
+
+def _meta_stamp(d) -> str:
+    """The API payload's own `_meta.generated_at` date (YYYY-MM-DD), or ''."""
+    try:
+        return str(d.get("_meta", {}).get("generated_at", ""))[:10]
+    except Exception:
+        return ""
+
+
+def _fmt_lbs(x) -> str:
+    """Whole-pound display of a weight (315.6 -> '316'), '' if not a number."""
+    if not isinstance(x, (int, float)):
+        return ""
+    return f"{int(round(float(x)))}"
+
+
+def _long_date(iso: str) -> str:
+    """'2026-07-19' -> 'Sunday, July 19' (falls back to the raw string)."""
+    try:
+        return datetime.date.fromisoformat(iso).strftime("%A, %B %-d")
+    except Exception:
+        return iso
+
+
+# ── data loaders (each with the committed-snapshot fallback) ─────────────────
+
+
+def load_journey() -> dict:
+    """The weight-journey headline from /api/journey — Home's own JS dep (ADR-104).
+
+    Keeps only what Home renders: the baseline/goal, day-of-experiment, pre-start
+    state and the honest stamp. Pre-start (a staged future genesis, #949) the numbers
+    are the baseline + countdown, never a wiped prior cycle's progress."""
+    d = _fetch_json("/api/journey")
+    j = d.get("journey") if isinstance(d, dict) else None
+    if isinstance(j, dict) and (j.get("start_weight_lbs") is not None or j.get("start_date")):
+        return {
+            "start_weight": j.get("start_weight_lbs"),
+            "goal_weight": j.get("goal_weight_lbs"),
+            "current_weight": j.get("current_weight_lbs"),
+            "lost_lbs": j.get("lost_lbs"),
+            "day_n": j.get("day_n"),
+            "pre_start": bool(j.get("pre_start")),
+            "start_date": j.get("start_date") or j.get("started_date") or "",
+            "as_of": _meta_stamp(d) or _today(),
+            "source": "live",
+        }
+    return _snapshot().get("journey", {})
+
+
+def load_data_sources() -> dict:
+    """The data door's headline from /api/source_freshness (the pipeline's own feed).
+
+    Returns the source count, the fresh count, and the list of source labels — all
+    real, all crawlable. `fresh` counts only status=='fresh' (behavioral-stale and
+    paused are honestly NOT counted as fresh, ADR-104)."""
+    d = _fetch_json("/api/source_freshness")
+    sources = d.get("sources") if isinstance(d, dict) else None
+    if isinstance(sources, list) and sources:
+        labels = [str(s.get("label") or s.get("id") or "").strip() for s in sources]
+        labels = [x for x in labels if x]
+        fresh = sum(1 for s in sources if s.get("status") == "fresh")
+        return {
+            "total": len(sources),
+            "fresh": fresh,
+            "labels": labels,
+            "as_of": _meta_stamp(d) or _today(),
+            "source": "live",
+        }
+    return _snapshot().get("data_sources", {})
+
+
+def load_protocols() -> dict:
+    """The protocols door's headline from /api/experiments (the library feed).
+
+    Returns the experiment-library total and how many are `available` to run now —
+    the falsifiable "levers" count the door is about. A library with zero entries is
+    reported honestly as zero (never omitted into a blank)."""
+    d = _fetch_json("/api/experiments")
+    exps = d.get("experiments") if isinstance(d, dict) else None
+    if isinstance(exps, list):
+        available = sum(1 for e in exps if e.get("status") == "available")
+        return {
+            "total": len(exps),
+            "available": available,
+            "as_of": _meta_stamp(d) or _today(),
+            "source": "live",
+        }
+    return _snapshot().get("protocols", {})
+
+
+# ── render helpers (return "" rather than fabricate on missing data) ─────────
+
+_DOORS_TAIL = (
+    "The live view (today's numbers, the AI board's read, the interactive charts) needs "
+    'JavaScript. The doors: <a href="/cockpit/">the cockpit</a> · <a href="/data/">the data</a> · '
+    '<a href="/coaching/">the coaching</a> · <a href="/protocols/">the protocols</a> · '
+    '<a href="/story/">the story</a>.'
+)
+
+
+def home_block_html(journey: dict, char: dict) -> str:
+    """Home's static core (#1395): the mission in real numbers — baseline → goal, the
+    day-of-experiment (or the countdown pre-start), and the live character level —
+    baked into `/`'s served HTML as <noscript>, so a crawler / LLM / no-JS visitor
+    reads the actual experiment, not the blank cinematic shell.
+
+    Numbers come from /api/journey (Home's own dep) + /api/character; a missing value
+    is dropped, never faked (ADR-104). No data at all -> "" and Home ships unchanged."""
+    journey = journey or {}
+    sw = _fmt_lbs(journey.get("start_weight"))
+    gw = _fmt_lbs(journey.get("goal_weight"))
+    as_of = journey.get("as_of", "") or _today()
+    if not sw and not gw:
+        return ""
+
+    lines = [
+        '<noscript><section class="proof-static dx-prose" aria-label="The experiment, in numbers">',
+        f'<p class="label">An honest documentary of an ordinary life, rebuilt with AI — as of {_esc(as_of)}</p>',
+    ]
+    climb = ""
+    if sw and gw:
+        climb = f" — a {int(sw) - int(gw)} lb climb"
+    if journey.get("pre_start") and journey.get("start_date"):
+        when = _long_date(journey["start_date"])
+        lines.append(
+            f"<p><strong>The experiment begins {_esc(when)}.</strong> Baseline {_esc(sw)} lb, goal "
+            f"{_esc(gw)} lb{_esc(climb)} — measured every day and published either way.</p>"
+        )
+    else:
+        day_n = journey.get("day_n")
+        lost = _fmt_lbs(journey.get("lost_lbs"))
+        cur = _fmt_lbs(journey.get("current_weight"))
+        day_txt = f"Day {int(day_n)}. " if isinstance(day_n, (int, float)) else ""
+        if cur and lost:
+            prog = f"{_esc(day_txt)}From {_esc(sw)} lb toward {_esc(gw)} lb — {_esc(cur)} lb now, {_esc(lost)} lb down."
+        else:
+            prog = f"{_esc(day_txt)}From {_esc(sw)} lb toward {_esc(gw)} lb{_esc(climb)} — measured every day, published either way."
+        lines.append(f"<p><strong>{prog}</strong></p>")
+
+    level = (char or {}).get("level")
+    if level is not None:
+        tier = (char or {}).get("tier", "")
+        tier_txt = f" · {_esc(tier)}" if tier else ""
+        lines.append(
+            f"<p>Character level {int(level)}{tier_txt} — a 1–100 read of the whole day across seven "
+            "pillars (sleep, movement, nutrition, metabolic, mind, relationships, consistency), each "
+            "scored from real wearable &amp; lab data.</p>"
+        )
+    lines.append(f"<p>{_DOORS_TAIL}</p>")
+    lines.append("</section></noscript>")
+    return "".join(lines)
+
+
+def data_block_html(summary: dict) -> str:
+    """The data door's static core (#1395): the real source roster + fresh count baked
+    into `/data/`'s served HTML as <noscript>. Every source label is real (from
+    /api/source_freshness); nothing is invented."""
+    summary = summary or {}
+    total = summary.get("total")
+    if not isinstance(total, int) or total <= 0:
+        return ""
+    fresh = summary.get("fresh", 0)
+    as_of = summary.get("as_of", "") or _today()
+    labels = summary.get("labels") or []
+    roster = ""
+    if labels:
+        roster = "<ul>" + "".join(f"<li>{_esc(x)}</li>" for x in labels) + "</ul>"
+    return (
+        '<noscript><section class="proof-static dx-prose" aria-label="The data, in numbers">'
+        f'<p class="label">The data — every source the platform reads · as of {_esc(as_of)}</p>'
+        f"<p><strong>{int(total)} sources on the board, {int(fresh)} fresh right now.</strong> "
+        "The body and the mind — wearables, labs, glucose, journals — read daily, live and over time.</p>"
+        f"{roster}"
+        "<p>The live trends, the cross-source signals, and the flagged-when-thin caveats need "
+        'JavaScript. Start on <a href="/data/">the data</a>.</p>'
+        "</section></noscript>"
+    )
+
+
+def protocols_block_html(summary: dict) -> str:
+    """The protocols door's static core (#1395): the experiment-library count baked into
+    `/protocols/`'s served HTML as <noscript>. Counts come from /api/experiments."""
+    summary = summary or {}
+    total = summary.get("total")
+    if not isinstance(total, int):
+        return ""
+    available = summary.get("available", 0)
+    as_of = summary.get("as_of", "") or _today()
+    return (
+        '<noscript><section class="proof-static dx-prose" aria-label="The protocols, in numbers">'
+        f'<p class="label">The protocols — the levers, and whether they moved · as of {_esc(as_of)}</p>'
+        f"<p><strong>{int(total)} experiments in the library, {int(available)} ready to run now.</strong> "
+        "Supplements, timed protocols, and challenges — each one changes an input to move the data, "
+        "graded on whether it actually did.</p>"
+        "<p>The live protocol state and the discoveries they chase need JavaScript. "
+        'Start on <a href="/protocols/">the protocols</a>.</p>'
+        "</section></noscript>"
+    )
+
+
+# ── per-page data-driven OG tags (a dated, falsifiable number, never boilerplate) ──
+#
+# Each door maps to the closest EXISTING og-image card (the og-image lambda draws 14
+# daily cards; #1395 reuses them, it does not extend the lambda). Where no bespoke
+# card exists (data, coaching) the generic og-home card is the honest closest — noted
+# as a follow-up gap in the PR, not faked with a mislabeled card.
+
+
+def _og_tags(url: str, title: str, desc: str, card: str) -> dict:
+    """The full data-driven OG/Twitter set for a page (property/name -> content)."""
+    img = f"{SITE}/assets/images/{card}"
+    return {
+        ("property", "og:type"): "website",
+        ("property", "og:site_name"): "averagejoematt",
+        ("property", "og:url"): url,
+        ("property", "og:title"): title,
+        ("property", "og:description"): desc,
+        ("property", "og:image"): img,
+        ("name", "twitter:card"): "summary_large_image",
+        ("name", "twitter:title"): title,
+        ("name", "twitter:description"): desc,
+    }
+
+
+def home_og(journey: dict, char: dict) -> dict:
+    """Home's data-driven OG: baseline → goal + the countdown/day + level."""
+    journey = journey or {}
+    sw = _fmt_lbs(journey.get("start_weight")) or "316"
+    gw = _fmt_lbs(journey.get("goal_weight")) or "185"
+    as_of = journey.get("as_of", "") or _today()
+    title = f"averagejoematt — {sw} lb → {gw} lb, measured in public"
+    if journey.get("pre_start") and journey.get("start_date"):
+        desc = (
+            f"The experiment begins {_long_date(journey['start_date'])}: baseline {sw} lb, goal {gw} lb, "
+            f"every number published either way. As of {as_of}."
+        )
+    else:
+        day_n = journey.get("day_n")
+        lost = _fmt_lbs(journey.get("lost_lbs"))
+        day_txt = f"Day {int(day_n)}: " if isinstance(day_n, (int, float)) else ""
+        gained = f"{lost} lb down. " if lost else ""
+        desc = f"{day_txt}{sw} lb toward {gw} lb — {gained}Every number published either way. As of {as_of}."
+    level = (char or {}).get("level")
+    if level is not None:
+        desc += f" Character level {int(level)}."
+    return _og_tags(f"{SITE}/", title, desc, "og-home.png")
+
+
+def cockpit_og(char: dict) -> dict:
+    """Cockpit's data-driven OG: the live character level + tier."""
+    char = char or {}
+    level = char.get("level")
+    tier = char.get("tier", "")
+    as_of = char.get("as_of", "") or _today()
+    if level is not None:
+        lvl = f"level {int(level)}" + (f" · {tier}" if tier else "")
+        title = f"The Cockpit — character {lvl}"
+        desc = (
+            f"Am I winning, and what's the one thing right now? The daily instrument: seven pillars "
+            f"scored from real data. Character {lvl} as of {as_of}."
+        )
+    else:
+        title = "The Cockpit — the daily instrument"
+        desc = "Am I winning, and what's the one thing right now? Seven pillars scored from real data, daily."
+    return _og_tags(f"{SITE}/cockpit/", title, desc, "og-character.png")
+
+
+def data_og(summary: dict) -> dict:
+    """The data door's data-driven OG: the live source count + fresh count."""
+    summary = summary or {}
+    total = summary.get("total")
+    as_of = summary.get("as_of", "") or _today()
+    if isinstance(total, int) and total > 0:
+        fresh = int(summary.get("fresh", 0))
+        title = f"The Data — {total} sources, {fresh} fresh"
+        desc = (
+            f"Every source the platform reads: {total} tracked, {fresh} fresh as of {as_of}. "
+            "The body and the mind, live and over time — correlative, read-only, flagged when thin."
+        )
+    else:
+        title = "The Data — every source the platform reads"
+        desc = "The body and the mind, live and over time — correlative, read-only, flagged when thin."
+    # No bespoke og-data card exists; og-home (the platform overview) is the honest closest.
+    return _og_tags(f"{SITE}/data/", title, desc, "og-home.png")
+
+
+def protocols_og(summary: dict) -> dict:
+    """The protocols door's data-driven OG: the experiment-library count."""
+    summary = summary or {}
+    total = summary.get("total")
+    as_of = summary.get("as_of", "") or _today()
+    if isinstance(total, int):
+        available = int(summary.get("available", 0))
+        title = f"The Protocols — {total} experiments in the library"
+        desc = (
+            f"{total} experiments, {available} ready to run, as of {as_of}. The levers that move the "
+            "data — supplements, protocols, challenges — graded on whether they actually did."
+        )
+    else:
+        title = "The Protocols — the levers you pull"
+        desc = "Supplements, experiments, and challenges — what gets changed to move the data, and whether it moved."
+    return _og_tags(f"{SITE}/protocols/", title, desc, "og-experiments.png")
+
+
+def coaching_og(read: dict) -> dict:
+    """The coaching door's data-driven OG: the pre-start convene date, else the live read stamp."""
+    read = read or {}
+    as_of = read.get("as_of", "") or _today()
+    if read.get("pre_start") and read.get("start_date"):
+        title = f"The Coaching — the AI board convenes {_long_date(read['start_date'])}"
+        desc = (
+            f"A board of named AI coaches reads the data and argues about it. Its first read lands "
+            f"once Day 1's numbers exist ({_long_date(read['start_date'])}). As of {as_of}."
+        )
+    else:
+        title = "The Coaching — the AI board's live read"
+        desc = (
+            "What the AI board is saying about the data right now — the read, by coach, the "
+            f"disagreements, and the weekly lab notes. As of {as_of}."
+        )
+    # No bespoke og-coaching card exists; og-home is the honest closest.
+    return _og_tags(f"{SITE}/coaching/", title, desc, "og-home.png")
+
+
+def story_og(posts: list) -> dict:
+    """The story door's data-driven OG: the count of published dispatches."""
+    n = len([p for p in (posts or []) if p.get("title")])
+    if n > 0:
+        title = f"The Story — {n} dispatches published"
+        desc = (
+            f"The chronicle, the journal, and the timeline — {n} weekly dispatches so far, newest "
+            f"first (as of {_today()}). The writing and the why behind the experiment."
+        )
+    else:
+        title = "The Story — the writing and the why"
+        desc = "The chronicle, the journal, the timeline, and the context behind the experiment."
+    return _og_tags(f"{SITE}/story/", title, desc, "og-chronicle.png")
+
+
+# ── OG applier for the hand-authored pages (Home, Cockpit) ────────────────────
+# The generator-built doors (data/protocols/coaching/story) receive their OG tags
+# straight into the head template. Home + Cockpit are hand-authored shells; this
+# upgrades their <head> in place — replacing an existing tag's content or inserting
+# the tag after the description meta — idempotently, so re-runs converge.
+
+_DESC_ANCHOR = re.compile(r'(<meta name="description"[^>]*>)')
+
+
+def apply_og(html: str, og: dict) -> str:
+    """Set every (kind, key)->value in `og` on `html`'s <head>, in place. Idempotent."""
+    for (kind, key), value in og.items():
+        attr = "property" if kind == "property" else "name"
+        pat = re.compile(rf'(<meta {attr}="{re.escape(key)}" content=")[^"]*(")')
+        tag = f'<meta {attr}="{key}" content="{_esc(value)}">'
+        if pat.search(html):
+            html = pat.sub(lambda m: m.group(1) + _esc(value) + m.group(2), html, count=1)
+        else:
+            m = _DESC_ANCHOR.search(html)
+            if m:
+                html = html[: m.end()] + "\n  " + tag + html[m.end() :]
+            else:  # no description meta — fall back to just after <head>
+                html = html.replace("<head>", "<head>\n  " + tag, 1)
+    return html

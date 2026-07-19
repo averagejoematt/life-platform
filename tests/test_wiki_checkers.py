@@ -87,6 +87,33 @@ def test_deploy_docs_scanned_for_tombstones():
     assert "deploy/MANIFEST.md" in {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=True)}
 
 
+def test_makefile_scanned_for_tombstones():
+    """#1323: the Makefile is a second entry-point system (`make <target>`) that can
+    route an operator onto a retired script exactly like a stale doc line can — it
+    must be on the tombstone scanner's live surface so the build_layer.sh rule (added
+    for #781) actually fires on it, instead of the candidate list silently excluding
+    it forever."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    scanned = {str(p.relative_to(ROOT)) for p in ts._scan_files(include_exempt=False)}
+    assert "Makefile" in scanned
+
+
+def test_makefile_tombstone_rule_fires_on_the_prefix_layer_target():
+    """Non-vacuity (per the #1189 vacuous-scan lesson): the build_layer.sh rule must
+    FIRE on the exact pre-#1323 Makefile line (`layer:` target shelling out to the
+    deleted deploy/build_layer.sh), and NOT be swallowed by the retirement-line
+    exemption."""
+    ts = _load("scripts/check_doc_tombstones.py")
+    rules = ts._rules()
+    prefix_line = "\tbash deploy/build_layer.sh"
+    assert not ts.RETIREMENT_LINE_RE.search(prefix_line), f"pre-fix line would be exempted, gate is vacuous: {prefix_line}"
+    assert any(rx.search(prefix_line) for rx, _ in rules), "no tombstone rule fires on the retired build_layer.sh line"
+    # the replacement guidance (the live fleet-deploy path) must not trip any live rule.
+    good = "\tbash deploy/deploy_fleet.sh"
+    hits = [rx.pattern for rx, _ in rules if rx.search(good)]
+    assert not hits, f"replacement guidance trips tombstone rule(s): {hits}"
+
+
 def test_deploy_docs_freshness_ceiling_is_not_vacuous():
     """#1322: check_deploy_docs must FLAG a headerless deploy doc (the exact pre-fix
     deploy/README.md shape) and a canonical doc unverified past the hard ceiling (the
@@ -154,6 +181,66 @@ def test_adr_index_record_parse_agrees_with_permissive_scan():
         assert f"{n:03d}" in nums, f"ADR-{n:03d} (h3-headed) missing from the parsed records (#1321)"
     assert len(nums) == len(set(nums)), "duplicate ADR record rows"
     assert set(nums) == set(gen._ANY_ADR_HEADING_RE.findall(src)), "record parse disagrees with the permissive heading scan (#1321)"
+
+
+def test_adr_index_flags_unmarked_supersession():
+    """#1343 regression guard: a record whose Status is bare 'Active' while a LATER
+    record's own body names it with supersedes/amends/retires, and the target carries
+    no marker back, must be flagged. Proven RED on a synthetic fixture shaped exactly
+    like the pre-fix ADR-013/ADR-027 (retired by ADR-131, still reading 'Active', no
+    back-reference) — this is the non-vacuity proof: the guard must actually fire, not
+    just exist."""
+    gen = _load("scripts/generate_adr_index.py")
+    doc = (
+        "## ADR-013 — Shared Lambda Layer for Common Modules\n\n"
+        "**Status:** Active  \n**Date:** 2026-03-05\nbody with no marker\n\n"
+        "## ADR-131: One code-distribution channel\n\n"
+        "**Status:** Accepted  \n**Date:** 2026-07-06\n"
+        "This decision retires ADR-013 and bundles everything into one channel.\n"
+    )
+    flags = gen._find_unmarked_supersessions(doc)
+    assert len(flags) == 1, flags
+    assert "ADR-013" in flags[0] and "ADR-131" in flags[0], flags
+
+
+def test_adr_index_does_not_flag_a_marked_supersession():
+    """The GREEN counterpart: once the target record's own Status field (or body) carries
+    a marker, the same citing text no longer flags — this is the fix #1343 applies to the
+    real ADR-013/ADR-027/ADR-005 records, proven here on a minimal fixture."""
+    gen = _load("scripts/generate_adr_index.py")
+    doc = (
+        "## ADR-013 — Shared Lambda Layer for Common Modules\n\n"
+        "**Status:** Superseded by ADR-131  \n**Date:** 2026-03-05\nbody\n\n"
+        "## ADR-131: One code-distribution channel\n\n"
+        "**Status:** Accepted  \n**Date:** 2026-07-06\n"
+        "This decision retires ADR-013 and bundles everything into one channel.\n"
+    )
+    assert gen._find_unmarked_supersessions(doc) == []
+
+
+def test_adr_index_does_not_flag_an_amendment_with_a_body_marker():
+    """A record that stays Active but gains an 'Amended by' body note (ADR-005's
+    real-world shape after ADR-097) must not be flagged — amending is not retiring, and
+    the Status legitimately stays Active."""
+    gen = _load("scripts/generate_adr_index.py")
+    doc = (
+        "## ADR-005 — No GSI on DynamoDB Table\n\n"
+        "**Status:** Active  \n**Date:** 2026-02-25\nbody\n\n"
+        "**Amended by:** ADR-097 — adds two GSIs for one domain.\n\n"
+        "## ADR-097: Two GSIs for the reading domain\n\n"
+        "**Status:** Accepted  \n**Date:** 2026-06-29\n"
+        "This amends ADR-005 for one domain only.\n"
+    )
+    assert gen._find_unmarked_supersessions(doc) == []
+
+
+def test_adr_index_live_tree_has_no_unmarked_supersessions():
+    """Non-vacuity in the other direction: the live docs/DECISIONS.md — after the
+    #1343 sweep marked ADR-013/ADR-027/ADR-005 — must pass the guard with zero flags."""
+    gen = _load("scripts/generate_adr_index.py")
+    src = (ROOT / "docs" / "DECISIONS.md").read_text(encoding="utf-8")
+    flags = gen._find_unmarked_supersessions(src)
+    assert flags == [], flags
 
 
 def test_doc_facts_clean():
