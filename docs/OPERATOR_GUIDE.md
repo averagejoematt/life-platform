@@ -12,7 +12,7 @@
 
 ## System in 60 Seconds
 
-The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 67 MCP tools. **94 Lambdas** run the ingest → compute → email pipeline daily.
+The Life Platform is a personal health intelligence system. It pulls data from ~19 sources (wearables, apps, food logs, labs), stores everything in DynamoDB single-table (`life-platform`, us-west-2), and makes it queryable by Claude through 68 MCP tools. **94 Lambdas** run the ingest → compute → email pipeline daily.
 
 **Pipeline (UTC, ADR-052):**
 - Ingestion: 06:45-09:00 PT
