@@ -28,6 +28,21 @@ What it checks (all read-only; CloudFormation drift-detection API calls are free
      right after a deploy; this is the STANDING scheduled version that catches
      out-of-band drift BETWEEN deploys (no new always-on infra — read-only HTTPS GET
      + local `git merge-base --is-ancestor`).
+  6. GITHUB CONFIG POSTURE (#1320, epic #1355) — GET-only `gh api` asserts of the
+     GitHub-side controls the docs make claims about, against the checked-in
+     documented posture in deploy/github_posture.json: `production` environment
+     protection (the #1319 dead-approval-gate class), the `main` branch ruleset
+     (id 19162901: force-push + deletion blocks, #1325), and vulnerability/
+     Dependabot-alert enablement (ADR-082's CVE-remediation channel). Never
+     mutates GitHub. Fail-soft on token-scope gaps: an unreadable surface reports
+     an honest "credential lacks scope X" needs-owner line (with the exact
+     fine-grained-PAT permission to add), never a red.
+  7. MAIN-PUSH RUN LIVENESS (#1544) — push-event workflow runs stopped QUEUING
+     for six consecutive merges on 2026-07-19 (~3h, not red — ABSENT). This
+     compares /commits on main vs /actions/runs?event=push: a trigger-matching
+     merge older than the grace window with no queued run is the alarm. Path-
+     filter aware (a commit touching only e.g. handovers/ legitimately triggers
+     nothing — see PUSH_TRIGGER_GLOBS).
 
 Output: a findings record written to s3://<bucket>/drift-log/{latest,<date>}.json
 (mirrors the Coherence Sentinel's coherence-log pattern) so the remediation agent can
@@ -456,6 +471,418 @@ def check_doc_literals():
     return {"status": "drift" if mismatches else "clean", "mismatches": mismatches}
 
 
+# ── 6/7. GitHub config posture (#1320) + main-push run liveness (#1544) ──────
+
+GITHUB_POSTURE_FILE = os.path.join(_ROOT, "deploy", "github_posture.json")
+DEFAULT_REPO = "averagejoematt/life-platform"
+
+# The one-time owner fix for every scope-gapped surface below (#1320 gate:owner
+# remainder): a fine-grained PAT scoped to this repo, stored as the repo secret
+# GH_POSTURE_TOKEN (the sentinel prefers it over the ambient GH_TOKEN when set).
+PAT_FIX = (
+    "fix: create a fine-grained PAT scoped to this repo with repository permissions "
+    "Administration:read + Actions:read + Contents:read (+ the implied Metadata:read) "
+    "and store it as the GH_POSTURE_TOKEN repo secret — the workflow's built-in "
+    "GITHUB_TOKEN can never carry Administration:read"
+)
+
+# Path globs that trigger push-event workflows on main. MAINTAINED LITERAL: the
+# union of every push-triggered workflow's `on.push.paths` filters — a main
+# commit matching NONE of these legitimately queues zero runs, so the #1544
+# detector must not alarm on it. tests/test_drift_sentinel.py::
+# test_push_trigger_globs_match_workflows parses the live workflow YAMLs and
+# reds CI when this set drifts (the PLATFORM_FACTS maintained-literal pattern).
+PUSH_TRIGGER_GLOBS = (
+    # ci-cd.yml
+    "lambdas/**",
+    "mcp/**",
+    "mcp_server.py",
+    "tests/**",
+    "cdk/**",
+    "ci/**",
+    "config/**",
+    ".github/workflows/**",
+    "requirements*.txt",
+    "pyproject.toml",
+    ".flake8",
+    # docs-ci.yml
+    "docs/**",
+    "README.md",
+    "CLAUDE.md",
+    ".claude/commands/**",
+    "deploy/sync_doc_metadata.py",
+    "scripts/check_doc_*.py",
+    "scripts/generate_adr_index.py",
+    "scripts/generate_mcp_tool_catalog.py",
+    # site-deploy.yml (+ v4-gate.yml shares site/**)
+    "site/**",
+    ".github/workflows/site-deploy.yml",
+    # v4-gate.yml
+    "scripts/v4_*.py",
+    "tests/js/**",
+    "package.json",
+)
+
+
+def _load_github_posture():
+    with open(GITHUB_POSTURE_FILE) as f:
+        return json.load(f)
+
+
+def _github_repo():
+    return os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO)
+
+
+def _matches_push_trigger(path):
+    """True if a changed file at `path` matches any push-workflow path filter.
+
+    GitHub glob semantics, approximated for the actual pattern set: `x/**` is a
+    prefix match, a bare filename is exact, anything else with a `*` is fnmatch."""
+    import fnmatch
+
+    for pat in PUSH_TRIGGER_GLOBS:
+        if pat.endswith("/**"):
+            if path.startswith(pat[:-2]):
+                return True
+        elif "*" in pat:
+            if fnmatch.fnmatch(path, pat):
+                return True
+        elif path == pat:
+            return True
+    return False
+
+
+def _gh_api_result(path, timeout=60):
+    """GET-only `gh api <path>` → (data, None) on success, (None, errinfo) on failure.
+
+    errinfo = {"classification": "scope"|"absent"|"error", "detail": "..."} — "scope"
+    means the credential can't read the surface (403 / resource-not-accessible /
+    missing-scope), "absent" is a semantic 404 (the thing doesn't exist / is off),
+    "error" is everything else (transient, parse, gh missing). Never raises. This
+    NEVER mutates GitHub: plain `gh api` issues a GET.
+
+    Prefers the GH_POSTURE_TOKEN env var (the owner-supplied fine-grained PAT — see
+    PAT_FIX) over the ambient GH_TOKEN when set and non-empty."""
+    import subprocess
+
+    env = dict(os.environ)
+    posture_token = env.get("GH_POSTURE_TOKEN")
+    if posture_token:
+        env["GH_TOKEN"] = posture_token
+    try:
+        out = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=timeout, cwd=_ROOT, env=env)
+    except Exception as e:  # noqa: BLE001
+        return None, {"classification": "error", "detail": f"gh api {path}: {e}"[:300]}
+    if out.returncode == 0:
+        try:
+            return (json.loads(out.stdout) if out.stdout.strip() else {}), None
+        except Exception as e:  # noqa: BLE001
+            return None, {"classification": "error", "detail": f"gh api {path}: parse: {e}"[:300]}
+    text = ((out.stdout or "") + " " + (out.stderr or "")).strip()
+    low = text.lower()
+    if "http 403" in low or "resource not accessible" in low or "must have admin" in low or ("needs the" in low and "scope" in low):
+        cls = "scope"
+    elif "http 404" in low:
+        cls = "absent"
+    else:
+        cls = "error"
+    return None, {"classification": cls, "detail": text[:300]}
+
+
+def _parse_gh_date(s):
+    return datetime.fromisoformat((s or "").replace("Z", "+00:00"))
+
+
+def check_github_config():
+    """#1320 — GET-only asserts of documented GitHub config vs. live state.
+
+    Three surfaces, each compared against deploy/github_posture.json (the
+    machine-readable mirror of the doc claims — never a hardcoded wish):
+
+      * environment_production — the `production` environment's protection rules
+        must include `required_reviewers` iff the posture says so. As of
+        2026-07-19 the docs still claim the manual-approval gate while live has
+        only branch_policy (the #1319 private-flip drop) — so this fires, by
+        design, until #1319 reconciles docs + posture + live.
+      * main_ruleset — ruleset 19162901 must be `active` with exactly the
+        documented rule types (deletion + non_fast_forward) on refs/heads/main.
+      * vulnerability_alerts — Dependabot/vulnerability alerts enablement must
+        match the posture (docs claim Dependabot as the CVE remediation channel;
+        live-disabled is the SDLC-review P2-4 finding).
+
+    Fail-soft: a surface the credential can't read reports status "unavailable"
+    plus a needs_owner line naming the exact fine-grained-PAT permission (see
+    PAT_FIX) — never a red. Overall: drift > error > unavailable > clean."""
+    try:
+        posture = _load_github_posture()
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"read github_posture.json: {e}"}
+
+    repo = _github_repo()
+    surfaces = {}
+    scope_gaps = []
+
+    # 1. production environment protection (the #1319 class)
+    want_env = posture.get("environment_production", {})
+    data, err = _gh_api_result(f"repos/{repo}/environments/{want_env.get('name', 'production')}")
+    if err:
+        if err["classification"] == "scope":
+            surfaces["environment_production"] = {"status": "unavailable", "detail": err["detail"]}
+            scope_gaps.append("environments/production (needs fine-grained Actions:read)")
+        elif err["classification"] == "absent":
+            surfaces["environment_production"] = {"status": "drift", "detail": "the `production` environment does not exist live"}
+        else:
+            surfaces["environment_production"] = {"status": "error", "detail": err["detail"]}
+    else:
+        rule_types = sorted(r.get("type") for r in data.get("protection_rules", []) if r.get("type"))
+        has_reviewers = "required_reviewers" in rule_types
+        if bool(want_env.get("required_reviewers")) == has_reviewers:
+            surfaces["environment_production"] = {"status": "clean", "live_protection_rule_types": rule_types}
+        else:
+            surfaces["environment_production"] = {
+                "status": "drift",
+                "documented": {"required_reviewers": bool(want_env.get("required_reviewers"))},
+                "live_protection_rule_types": rule_types,
+                "detail": f"documented posture requires_reviewers={bool(want_env.get('required_reviewers'))} "
+                f"but live protection rules are {rule_types} (source: {want_env.get('source', 'github_posture.json')[:120]}…)",
+            }
+
+    # 2. main branch ruleset (#1325 posture)
+    want_rs = posture.get("main_ruleset", {})
+    data, err = _gh_api_result(f"repos/{repo}/rulesets/{want_rs.get('id')}")
+    if err:
+        if err["classification"] == "scope":
+            surfaces["main_ruleset"] = {"status": "unavailable", "detail": err["detail"]}
+            scope_gaps.append(f"rulesets/{want_rs.get('id')} (needs fine-grained Administration:read)")
+        elif err["classification"] == "absent":
+            surfaces["main_ruleset"] = {
+                "status": "drift",
+                "detail": f"ruleset {want_rs.get('id')} ({'/'.join(want_rs.get('rule_types', []))}) no longer exists — "
+                "force-push/deletion protection on main is GONE",
+            }
+        else:
+            surfaces["main_ruleset"] = {"status": "error", "detail": err["detail"]}
+    else:
+        problems = []
+        if data.get("enforcement") != want_rs.get("enforcement", "active"):
+            problems.append(f"enforcement={data.get('enforcement')!r} (documented {want_rs.get('enforcement', 'active')!r})")
+        live_rules = sorted(r.get("type") for r in data.get("rules", []) if r.get("type"))
+        want_rules = sorted(want_rs.get("rule_types", []))
+        if live_rules != want_rules:
+            problems.append(f"rules={live_rules} (documented exactly {want_rules})")
+        include = (data.get("conditions", {}).get("ref_name", {}) or {}).get("include", [])
+        for ref in want_rs.get("include_refs", []):
+            if ref not in include:
+                problems.append(f"{ref} missing from ref_name.include={include}")
+        if problems:
+            surfaces["main_ruleset"] = {"status": "drift", "detail": "; ".join(problems)}
+        else:
+            surfaces["main_ruleset"] = {"status": "clean", "live_rules": live_rules}
+
+    # 3. vulnerability / Dependabot alerts enablement (ADR-082's remediation channel)
+    want_va = bool(posture.get("vulnerability_alerts", {}).get("enabled"))
+    data, err = _gh_api_result(f"repos/{repo}/vulnerability-alerts")
+    if err is None:
+        live_va = True  # 204 No Content = enabled
+    elif err["classification"] == "absent" and "disabled" in err["detail"].lower():
+        live_va = False  # semantic 404: "Vulnerability alerts are disabled."
+    elif err["classification"] in ("scope", "absent"):
+        # A generic 404/403 here means the token lacks admin read (GitHub hides the
+        # surface) — indistinguishable from disabled, so report it honestly as a gap.
+        surfaces["vulnerability_alerts"] = {"status": "unavailable", "detail": err["detail"]}
+        scope_gaps.append("vulnerability-alerts (needs fine-grained Administration:read)")
+        live_va = None
+    else:
+        surfaces["vulnerability_alerts"] = {"status": "error", "detail": err["detail"]}
+        live_va = None
+    if live_va is not None:
+        if live_va == want_va:
+            surfaces["vulnerability_alerts"] = {"status": "clean", "enabled": live_va}
+        else:
+            surfaces["vulnerability_alerts"] = {
+                "status": "drift",
+                "documented": {"enabled": want_va},
+                "live": {"enabled": live_va},
+                "detail": f"documented posture enabled={want_va} but live enabled={live_va} "
+                "(one-click owner toggle: repo Settings → Advanced Security)",
+            }
+
+    statuses = [s["status"] for s in surfaces.values()]
+    if "drift" in statuses:
+        status = "drift"
+    elif "error" in statuses:
+        status = "error"
+    elif "unavailable" in statuses:
+        status = "unavailable"
+    else:
+        status = "clean"
+    result = {"status": status, "surfaces": surfaces}
+    if scope_gaps:
+        result["needs_owner"] = f"GitHub posture surface(s) unreadable with the current token: {'; '.join(scope_gaps)}. {PAT_FIX}."
+    return result
+
+
+def _is_bot_commit(c):
+    """True for commits committed by a [bot] identity (e.g. github-actions[bot] —
+    the ci-cd reconcile commits). GITHUB_TOKEN pushes structurally never trigger
+    push-event workflows (GitHub's recursive-workflow prevention), so expecting a
+    run for them would false-alarm on every merge-queue reconcile."""
+    for login in ((c.get("author") or {}).get("login"), (c.get("committer") or {}).get("login")):
+        if login and login.endswith("[bot]"):
+            return True
+    name = ((c.get("commit") or {}).get("committer") or {}).get("name", "")
+    return bool(name) and name.endswith("[bot]")
+
+
+def _commit_files(repo, sha):
+    """Changed-file paths for one commit; None (soft) if unreadable."""
+    data, err = _gh_api_result(f"repos/{repo}/commits/{sha}")
+    if err:
+        return None
+    return [f.get("filename", "") for f in data.get("files", [])]
+
+
+def check_github_push_runs(max_file_lookups=15):
+    """#1544 — the "push-event runs stopped queuing" detector.
+
+    Compares the last N commits on main against push-event workflow runs:
+
+      * STALLED (drift, ≥1): a trigger-matching commit OLDER than the grace
+        window, NEWER than the newest run-covered commit, with no push-event run
+        whose head_sha matches — the live "merges are landing, nothing queues"
+        state (six merges sat in exactly this state for ~3h on 2026-07-19).
+      * HISTORICAL GAP (drift at ≥ gap_cluster_threshold): trigger-matching
+        commits older than the newest covered commit that never got a run even
+        though runs resumed — the class where a site/-touching merge silently
+        missed its site-deploy (the superseded-skip trap). A SINGLE gap is
+        reported but not drift: a non-head commit of a multi-commit push
+        legitimately has no run of its own (only the push head gets runs).
+
+    Path-filter aware via PUSH_TRIGGER_GLOBS — commits touching only e.g.
+    handovers/ trigger nothing and are never counted. Commits committed by a
+    [bot] identity (the ci-cd reconcile commits, pushed with a workflow's
+    GITHUB_TOKEN) are exempt: GitHub deliberately never creates push-event runs
+    for GITHUB_TOKEN pushes (recursive-workflow prevention — ci-cd.yml documents
+    this and compensates in-workflow), verified live 2026-07-19 on two reconcile
+    commits. Commits younger than grace_minutes are never judged (runs may still
+    be queuing). Commits older than the fetched runs window are skipped
+    (coverage unknown, stated). All thresholds live in deploy/github_posture.json's
+    push_run_detector block. GET-only; fail-soft "unavailable" (never red) when
+    the token lacks Actions:read for /actions/runs."""
+    try:
+        cfg = _load_github_posture().get("push_run_detector", {})
+    except Exception as e:  # noqa: BLE001
+        return {"status": "error", "detail": f"read github_posture.json: {e}"}
+    grace_min = int(cfg.get("grace_minutes", 30))
+    lookback_days = int(cfg.get("lookback_days", 7))
+    max_commits = int(cfg.get("max_commits", 30))
+    cluster = int(cfg.get("gap_cluster_threshold", 2))
+
+    repo = _github_repo()
+    commits, err = _gh_api_result(f"repos/{repo}/commits?sha=main&per_page={max_commits}")
+    if err:
+        if err["classification"] == "scope":
+            return {
+                "status": "unavailable",
+                "detail": err["detail"],
+                "needs_owner": f"commits on main unreadable with the current token (needs Contents:read). {PAT_FIX}.",
+            }
+        return {"status": "error", "detail": err["detail"]}
+
+    runs_data, err = _gh_api_result(f"repos/{repo}/actions/runs?event=push&branch=main&per_page=100")
+    if err:
+        if err["classification"] == "scope":
+            return {
+                "status": "unavailable",
+                "detail": err["detail"],
+                "needs_owner": f"/actions/runs unreadable with the current token (needs Actions:read). {PAT_FIX}.",
+            }
+        return {"status": "error", "detail": err["detail"]}
+    runs = runs_data.get("workflow_runs", [])
+    covered_shas = {r.get("head_sha") for r in runs}
+    oldest_run_dt = None
+    if runs:
+        try:
+            oldest_run_dt = min(_parse_gh_date(r.get("created_at")) for r in runs if r.get("created_at"))
+        except Exception:  # noqa: BLE001
+            oldest_run_dt = None
+
+    now = datetime.now(timezone.utc)
+    window = []
+    bots_skipped = 0
+    for i, c in enumerate(commits or []):
+        try:
+            dt = _parse_gh_date(c["commit"]["committer"]["date"])
+        except Exception:  # noqa: BLE001
+            continue
+        if i > 0 and (now - dt).total_seconds() > lookback_days * 86400:
+            break  # past the lookback (the head commit is always considered)
+        if _is_bot_commit(c):
+            bots_skipped += 1  # GITHUB_TOKEN pushes never get push-event runs (GitHub rule)
+            continue
+        window.append({"sha": c["sha"], "date": dt, "age_min": (now - dt).total_seconds() / 60})
+
+    newest_covered_idx = next((i for i, w in enumerate(window) if w["sha"] in covered_shas), None)
+
+    stalled, gaps, notes = [], [], []
+    file_lookups = 0
+    for idx, w in enumerate(window):
+        if w["sha"] in covered_shas or w["age_min"] < grace_min:
+            continue
+        if oldest_run_dt is not None and w["date"] < oldest_run_dt:
+            notes.append(f"{w['sha'][:8]} predates the fetched runs window — coverage unknown, skipped")
+            continue
+        if file_lookups < max_file_lookups:
+            file_lookups += 1
+            files = _commit_files(repo, w["sha"])
+        else:
+            files = None
+        if files is None:
+            notes.append(f"{w['sha'][:8]} files unreadable/capped — conservatively treated as trigger-matching")
+            triggers = True
+        else:
+            triggers = any(_matches_push_trigger(p) for p in files)
+        if not triggers:
+            continue  # e.g. a handovers/-only wrap commit — zero runs is correct
+        entry = {"sha": w["sha"], "date": w["date"].isoformat(), "waiting_min": round(w["age_min"], 1)}
+        if newest_covered_idx is None or idx < newest_covered_idx:
+            stalled.append(entry)
+        else:
+            gaps.append(entry)
+
+    detail_parts = []
+    if stalled:
+        detail_parts.append(
+            f"push-event runs are NOT QUEUING: {len(stalled)} trigger-matching merge(s) on main newer than the last "
+            f"run-covered commit have zero workflow runs after the {grace_min}-min grace window (the #1544 class) — "
+            "check githubstatus.com + the Actions spending limit, and deploy manually from main until resolved"
+        )
+    if len(gaps) >= cluster:
+        detail_parts.append(
+            f"historical gap: {len(gaps)} trigger-matching merge(s) got zero push-event runs even though runs resumed — "
+            "their per-path deploys (site-deploy/docs-ci) never fired; verify the live surfaces are at HEAD"
+        )
+    status = "drift" if detail_parts else "clean"
+    result = {
+        "status": status,
+        "commits_checked": len(window),
+        "bot_commits_exempt": bots_skipped,
+        "runs_seen": len(runs),
+        "stalled": stalled,
+        "gap_commits": gaps,
+    }
+    if detail_parts:
+        result["detail"] = "; ".join(detail_parts)
+    if gaps and len(gaps) < cluster:
+        result["note"] = (
+            f"{len(gaps)} uncovered commit(s) below the cluster threshold ({cluster}) — could be non-head commits "
+            "of a multi-commit push (only the push head gets runs); reported, not alarmed"
+        )
+    if notes:
+        result["skipped"] = notes[:10]
+    return result
+
+
 # ── Assemble + persist ───────────────────────────────────────────────────────
 
 
@@ -468,6 +895,8 @@ def run_sweep():
         "oidc_iam": check_oidc_iam(),
         "doc_literals": check_doc_literals(),
         "site_sha_ancestry": check_site_sha_ancestry(),
+        "github_config": check_github_config(),
+        "github_push_runs": check_github_push_runs(),
     }
     statuses = [c.get("status") for c in checks.values()]
     if "drift" in statuses:
@@ -503,6 +932,8 @@ def _summary(status, checks):
         ("bucket_policy", "delete-protection gap"),
         ("doc_literals", "doc-literal drift"),
         ("site_sha_ancestry", "live site SHA not on main"),
+        ("github_config", "GitHub config diverges from documented posture"),
+        ("github_push_runs", "main-push workflow runs not queuing"),
     ):
         c = checks.get(key, {})
         if c.get("status") == "drift":
@@ -527,7 +958,7 @@ def print_summary(record):
     print(f"{icon} {record['status'].upper()}: {record['summary']}")
     for name, c in record["checks"].items():
         st = c.get("status")
-        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡"}.get(st, "·")
+        mark = {"clean": "🟢", "drift": "🔴", "error": "🟡", "unavailable": "⚪"}.get(st, "·")
         detail = ""
         if st == "drift":
             if name == "cfn_drift":
@@ -547,9 +978,18 @@ def print_summary(record):
                 detail = f" — {[(m['fact'], m['documented'], 'live', m['live']) for m in c.get('mismatches', [])]}"
             elif name == "site_sha_ancestry":
                 detail = f" — {c.get('detail', '')}"
+            elif name == "github_config":
+                bad = {k: v.get("detail", "") for k, v in c.get("surfaces", {}).items() if v.get("status") == "drift"}
+                detail = f" — {bad}"
+            elif name == "github_push_runs":
+                detail = f" — {c.get('detail', '')}"
         elif st == "error":
             detail = f" — {c.get('detail', '')}"
         print(f"   {mark} {name}: {st}{detail}")
+        # #1320 fail-soft honesty: a scope-gapped GitHub surface surfaces its
+        # needs-owner line (the exact PAT permission to add) — visible, never red.
+        if name in ("github_config", "github_push_runs") and c.get("needs_owner"):
+            print(f"      [needs-owner] {c['needs_owner']}")
 
 
 def main() -> int:

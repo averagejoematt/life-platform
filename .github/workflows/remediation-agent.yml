@@ -19,6 +19,12 @@ permissions:
   contents: write                   # push remediation branches
   pull-requests: write              # open PRs (uses the built-in GITHUB_TOKEN — no PAT)
   id-token: write                   # AWS OIDC
+  actions: read                     # drift sentinel's GitHub leg (#1320/#1544): read
+                                    # /actions/runs (push-run liveness) + the production
+                                    # environment. Administration-read surfaces (rulesets,
+                                    # vulnerability-alerts) are NOT grantable to GITHUB_TOKEN
+                                    # and fail soft to a needs-owner line unless the
+                                    # GH_POSTURE_TOKEN fine-grained PAT secret is added.
 
 concurrency:
   group: remediation
@@ -75,6 +81,15 @@ jobs:
         env:
           AWS_REGION: us-west-2
           S3_BUCKET: matthew-life-platform
+          # GitHub-side leg (#1320/#1544): GET-only gh api asserts of documented GitHub
+          # config + main-push run liveness. GITHUB_TOKEN covers commits/runs/environment;
+          # GH_POSTURE_TOKEN is the OPTIONAL owner-supplied fine-grained PAT (repo perms
+          # Administration:read + Actions:read + Contents:read) that unlocks the
+          # rulesets + vulnerability-alerts surfaces — empty until Matthew adds the
+          # secret; the sentinel fails soft to a labeled needs-owner line without it.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GH_POSTURE_TOKEN: ${{ secrets.GH_POSTURE_TOKEN }}
         run: |
           # Cron fires Mon/Wed/Fri; keep the sentinel weekly by running only on Mondays
           # (or any manual dispatch). date -u +%u == 1 → Monday UTC.

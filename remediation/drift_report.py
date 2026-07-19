@@ -13,6 +13,7 @@ auto) so the drift status lands in the ONE curated report:
     reports explicitly clean (loud empty state), a drifted/degraded week is loud. AC4:
     the report is never silent about drift.
 """
+
 from __future__ import annotations
 
 import json
@@ -59,7 +60,16 @@ def status_html(record):
     summary = record.get("summary", "")
     icon = {"clean": "🟢", "drift": "🔴", "degraded": "🟡"}.get(status, "·")
     label = {"clean": "in sync", "drift": "DRIFT", "degraded": "degraded"}.get(status, status)
-    return (
-        f"<h3>{icon} Infra drift sentinel ({label}, checked {date})</h3>"
-        f"<p>{summary}</p>"
-    )
+    html = f"<h3>{icon} Infra drift sentinel ({label}, checked {date})</h3>" f"<p>{summary}</p>"
+    # #1320 fail-soft honesty: a GitHub posture surface the current credential can't
+    # read surfaces ONCE as a single needs-owner line (naming the exact fine-grained
+    # PAT permission to add) — visible on every report, but never a red/drift signal.
+    gaps = []
+    for name in ("github_config", "github_push_runs"):
+        check = (record.get("checks") or {}).get(name) or {}
+        if check.get("needs_owner"):
+            gaps.append(check["needs_owner"])
+    if gaps:
+        joined = " ".join(sorted(set(gaps)))
+        html += f"<p><b>needs-owner (not an alarm):</b> {joined}</p>"
+    return html
