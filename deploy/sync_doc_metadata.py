@@ -151,7 +151,29 @@ def _auto_discover_endpoint_count() -> int | None:
     if not site_api_path.exists():
         return None
     try:
-        tree = ast.parse(site_api_path.read_text(encoding="utf-8"), filename=str(site_api_path))
+        paths = discover_endpoint_paths(site_api_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if paths is None:
+        return None
+    return len(paths) if len(paths) >= 50 else None
+
+
+def discover_endpoint_paths(source: str) -> set | None:
+    """The route-SET discoverer behind _auto_discover_endpoint_count (#1437), exposed
+    as a source-string function so the surface-drift gate (#1454) can diff the
+    enumerated route set between two git revisions of site_api_lambda.py (base via
+    `git show`, HEAD via the working tree) — same AST union, no reimplementation.
+
+    Returns the deduplicated union of ROUTES keys, _SIMPLE_ROUTES keys, and inline
+    `path == "..."` / `path.startswith("...")` literals inside lambda_handler, or
+    None if the source is unparseable, lambda_handler is missing, or ROUTES and
+    _SIMPLE_ROUTES are both empty (something structural broke — don't guess).
+    The count-side sanity floor (>= 50) stays in _auto_discover_endpoint_count:
+    it is a doc-literal safeguard, not a property of the set itself.
+    """
+    try:
+        tree = ast.parse(source)
     except Exception:
         return None
 
@@ -203,8 +225,7 @@ def _auto_discover_endpoint_count() -> int | None:
     if not routes and not simple_routes:
         return None  # ROUTES/_SIMPLE_ROUTES missing entirely — something's structurally wrong, don't guess
 
-    total = routes | simple_routes | inline
-    return len(total) if len(total) >= 50 else None
+    return routes | simple_routes | inline
 
 
 _ALARM_CONSTRUCTOR_ATTRS = ("Alarm", "create_alarm")  # cloudwatch.Alarm(...) and metric.create_alarm(...)
