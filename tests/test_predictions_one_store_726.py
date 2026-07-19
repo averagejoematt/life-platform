@@ -35,6 +35,15 @@ def _function_strings(path, func_name):
     raise AssertionError(f"{func_name} not found in {path}")
 
 
+def _function_names(path, func_name):
+    """All Name identifiers referenced inside func_name's body."""
+    tree = ast.parse(open(path).read())
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == func_name:
+            return {c.id for c in ast.walk(node) if isinstance(c, ast.Name)}
+    raise AssertionError(f"{func_name} not found in {path}")
+
+
 class TestOneStore:
     def test_mcp_get_predictions_reads_canonical_store_only(self):
         strings = _function_strings(os.path.join(_ROOT, "mcp", "tools_coach_intelligence.py"), "tool_get_predictions")
@@ -43,10 +52,17 @@ class TestOneStore:
         assert not any("coach_thread" in s for s in strings), "must NOT read the legacy coach_thread# store"
 
     def test_site_api_handle_predictions_reads_same_store(self):
-        strings = _function_strings(os.path.join(_ROOT, "lambdas", "web", "site_api_coach.py"), "handle_predictions")
+        path = os.path.join(_ROOT, "lambdas", "web", "site_api_coach.py")
+        strings = _function_strings(path, "handle_predictions")
         assert any("COACH#" in s for s in strings)
-        assert any("PREDICTION#" in s for s in strings)
         assert not any("coach_thread" in s for s in strings)
+        # #1527 moved the actual query into the shared concurrent-fetch helper;
+        # the PREDICTION#-store pin follows the indirection: the handler must
+        # route through the helper, and the helper must read PREDICTION#.
+        assert "_fetch_prediction_partition" in _function_names(path, "handle_predictions")
+        helper_strings = _function_strings(path, "_fetch_prediction_partition")
+        assert any("PREDICTION#" in s for s in helper_strings)
+        assert not any("coach_thread" in s for s in helper_strings)
 
 
 class TestGetPredictionsBehavior:
