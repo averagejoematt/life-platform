@@ -173,7 +173,25 @@ export function renderWrong(d) {
   const mr = (pr.refuted_recent || []).map((m) =>
     `<tr class="rd-flag"><td class="rd-name">${esc(String(m.date || "").slice(0, 10))}</td><td>${esc(m.coach)}</td><td>${esc(m.what)}</td></tr>`).join("");
   const misses = mr ? sec("Refuted predictions", `<table class="rd-tbl"><thead><tr><th>date</th><th>coach</th><th>the call</th></tr></thead><tbody>${mr}</tbody></table>`) : "";
-  return head + caught + ledger + misses + `<p class="correlative">${esc(d.note || "")}</p>`;
+  /* #1411 — authored priors the data hasn't confirmed. The character engine's
+     cross-pillar effects are re-fitted quarterly (lagged pairs, block-bootstrap
+     CI, BH-FDR); a prior tested with real n that failed to confirm is a
+     published finding here, with its honest n_eff + CI (ADR-104/105). */
+  const ef = d.effect_fits;
+  let fits = "";
+  if (ef && ef.available) {
+    const reasonTxt = (u) => (u.reason === "sign_mismatch" ? "confidently the WRONG direction" : "interval includes no-effect");
+    const fr = (ef.unconfirmed || []).map((u) =>
+      `<tr class="rd-flag"><td class="rd-name">${esc(u.name || "")}</td><td>${esc(reasonTxt(u))}</td><td class="num">${u.r != null ? fmt(u.r) : "—"}</td><td class="num">${Array.isArray(u.ci_95) ? `[${fmt(u.ci_95[0])}, ${fmt(u.ci_95[1])}]` : "—"}</td><td class="num">${u.n_eff != null ? fmt(u.n_eff) : "—"}</td></tr>`).join("");
+    const tally = `<p class="rd-archive">Latest quarterly fit (${esc(ef.as_of || "")}): ${fmt(ef.fitted)} of ${fmt(ef.tested)} effects earned "fitted"${ef.not_yet_tested ? `; ${fmt(ef.not_yet_tested)} still lack the data to be tested at all (that is "not yet", not "wrong")` : ""}.</p>`;
+    fits = sec("Authored priors the data hasn't confirmed — the character engine's cross-pillar effects",
+      (fr ? `<table class="rd-tbl"><thead><tr><th>effect</th><th>why it failed to confirm</th><th>lagged r</th><th>95% CI</th><th>n_eff</th></tr></thead><tbody>${fr}</tbody></table>` :
+        `<p class="rd-archive">Every effect with enough data to test earned its "fitted" badge in the latest quarterly fit.</p>`) + tally);
+  } else if (ef) {
+    fits = sec("Authored priors the data hasn't confirmed — the character engine's cross-pillar effects",
+      `<p class="rd-archive">${esc(ef.note || "The first quarterly effect fit has not run yet — every cross-pillar effect currently wears its authored-prior badge.")}</p>`);
+  }
+  return head + caught + ledger + misses + fits + `<p class="correlative">${esc(d.note || "")}</p>`;
 }
 
 // Cycle vs cycle — matched first-K-days windows across experiment restarts.

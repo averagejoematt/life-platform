@@ -319,19 +319,37 @@ def _effects_section(config: dict) -> str:
         for target, spec in e.get("targets", {}).items():
             label = "all pillars" if target == "_all" else target
             targets.append(f'{esc(label)} <span class="gx-fig">{esc(signed_pct(spec.get("value", 0)))}</span>')
+        # #1411 (ADR-105): the declared evidence status. The config can only ever
+        # declare the authored prior — "fitted" is earned from data by the
+        # quarterly re-fit and served LIVE (with n_eff + CI) on the character
+        # sheet and /api/character_config; this static rulebook shows the
+        # declaration, never a hand-written promotion.
+        status = e.get("fit_status", "authored-prior")
+        status_txt = "fitted from the data" if status == "fitted" else "authored prior"
         rows.append(
             [
                 f'<span class="rd-name">{esc(e.get("name", ""))}</span>',
                 f'<span class="gx-params">{esc(e.get("condition", ""))}</span>',
                 " · ".join(targets),
+                f'<span class="gx-params">{esc(status_txt)}</span>',
             ]
         )
     prose = (
         "<p class=\"rd-prose\">Pillars aren't independent — the engine models a small set of spillovers as multiplicative modifiers on the day's "
         "scores. Every active effect applies (they stack), and each is announced on the character sheet when live. Boosts raise the level a pillar "
         "converges to, but never the lived-day bar — a standing boost can't demand a day nobody can perform (see the gates above).</p>"
+        '<p class="rd-prose">These effects started life as <strong>authored priors</strong> — plausible physiology, written by hand, not measured. '
+        "Every quarter the engine re-fits each one against the lived data as a lagged driver&rarr;next-day-target relationship (moving-block "
+        "bootstrap 95% CI, false-discovery-rate corrected, autocorrelation-honest n). An effect earns the badge <em>fitted</em> only when its "
+        "interval excludes no-effect in the claimed direction — and can lose it again at the next fit. The live badge (with its n and interval) is "
+        'on <a href="/data/character/">the character sheet</a>; a prior that fails to confirm is published on <a href="/method/wrong/">the wrong '
+        "page</a> as a finding (#1411, ADR-105).</p>"
     )
-    return _sec("effects", "Cross-pillar effects", prose + _tbl(["effect", "condition", "modifier"], rows, "cross-pillar effects"))
+    return _sec(
+        "effects",
+        "Cross-pillar effects",
+        prose + _tbl(["effect", "condition", "modifier", "evidence status"], rows, "cross-pillar effects"),
+    )
 
 
 def _dark_section(config: dict) -> str:

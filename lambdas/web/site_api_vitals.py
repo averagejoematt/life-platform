@@ -551,12 +551,19 @@ def handle_character(date: str | None = None) -> dict:
                 # #590: the engine's designed cross-pillar couplings that are ACTIVE
                 # right now (rare gameplay thresholds — e.g. Sleep Drag). The home
                 # constellation lights these as directional overlay edges. Additive.
+                # #1411 (ADR-105): the fit badge rides along — fitted (n_eff + CI)
+                # or "authored prior — not yet confirmed". Pre-#1411 records carry
+                # no fit fields; the honest default is the authored prior.
                 "active_effects": [
                     {
                         "name": e.get("name"),
                         "emoji": e.get("emoji", ""),
                         "condition": e.get("condition", ""),
                         "targets": e.get("targets", {}),
+                        "fit_status": e.get("fit_status", "authored-prior"),
+                        "fit_n_eff": e.get("fit_n_eff"),
+                        "fit_ci_95": e.get("fit_ci_95"),
+                        "fit_badge": e.get("fit_badge") or "authored prior — not yet confirmed (n_eff=0)",
                     }
                     for e in (record.get("active_effects") or [])
                     if isinstance(e, dict)
@@ -653,8 +660,30 @@ def handle_character_config() -> dict:
         }
     leveling = {k: v for k, v in (cfg.get("leveling") or {}).items() if k in _CHAR_CONFIG_LEVELING_KEYS}
     tiers = [{"name": t.get("name"), "min_level": t.get("min_level"), "max_level": t.get("max_level")} for t in cfg.get("tiers") or []]
+    # #1411 (ADR-105): merge the latest quarterly effect fit so the sheet's
+    # mechanics panel wears the earned badge — fitted (n_eff + CI) or "authored
+    # prior — not yet confirmed". Fail-open to the declared authored default
+    # (the merge itself can never invent "fitted": that only comes from a
+    # stored fit record). Keys stay explicitly whitelisted.
+    try:
+        import effect_fitter
+
+        effect_fitter.merge_fit_into_config(cfg, effect_fitter.load_latest_fit(table, USER_ID))
+    except Exception as e:
+        logger.warning("character_config: effect fit merge failed: %s", e)
     effects = [
-        {"name": e.get("name"), "condition": e.get("condition"), "targets": e.get("targets")} for e in cfg.get("cross_pillar_effects") or []
+        {
+            "name": e.get("name"),
+            "condition": e.get("condition"),
+            "targets": e.get("targets"),
+            "fit_status": e.get("fit_status", "authored-prior"),
+            "fit_n_eff": e.get("fit_n_eff"),
+            "fit_ci_95": e.get("fit_ci_95"),
+            "fit_r": e.get("fit_r"),
+            "fit_badge": e.get("fit_badge") or "authored prior — not yet confirmed (n_eff=0)",
+            "fitted_at": e.get("fitted_at"),
+        }
+        for e in cfg.get("cross_pillar_effects") or []
     ]
     return _ok(
         {

@@ -35,6 +35,7 @@ from web.site_api_common import (
     EXPERIMENT_START,
     PT,
     STATUS_CACHE_TTL,
+    USER_ID,
     USER_PREFIX,
     _decimal_to_float,
     _error,
@@ -2225,6 +2226,51 @@ def handle_wrong() -> dict:
                     )
         recent_misses.sort(key=lambda m: m.get("date") or "", reverse=True)
 
+        # 3. #1411 (ADR-105): authored priors the data hasn't confirmed — the
+        # character engine's cross-pillar effects, quarterly-fitted as lagged
+        # pairs (block-bootstrap CI + BH-FDR). A prior TESTED with real n whose
+        # CI failed to exclude the null (or excluded it on the wrong side) is a
+        # published finding; a thin-data one is only "not yet tested" — the two
+        # are never conflated. Honest n_eff + CI ride on every row (ADR-104/105).
+        effect_fits = {
+            "available": False,
+            "note": "The first quarterly effect fit has not run yet — every cross-pillar effect currently wears its authored-prior badge.",
+        }
+        try:
+            import effect_fitter
+
+            latest_fit = effect_fitter.load_latest_fit(table, USER_ID)
+            if latest_fit:
+                unconfirmed, not_yet_tested = [], 0
+                for name, eff in (latest_fit.get("effects") or {}).items():
+                    if eff.get("status") == effect_fitter.STATUS_FITTED:
+                        continue
+                    if eff.get("reason") == "insufficient_n":
+                        not_yet_tested += 1
+                        continue
+                    unconfirmed.append(
+                        {
+                            "name": name,
+                            "status": eff.get("status"),
+                            "reason": eff.get("reason"),
+                            "n_eff": eff.get("n_eff"),
+                            "ci_95": eff.get("ci_95"),
+                            "r": eff.get("r"),
+                        }
+                    )
+                summary = latest_fit.get("summary") or {}
+                effect_fits = {
+                    "available": True,
+                    "as_of": latest_fit.get("as_of_date"),
+                    "tested": summary.get("tested"),
+                    "fitted": summary.get("fitted"),
+                    "unconfirmed": unconfirmed,
+                    "not_yet_tested": not_yet_tested,
+                    "method": latest_fit.get("method"),
+                }
+        except Exception as e:
+            logger.warning(f"[wrong] effect_fits stream failed (non-fatal): {e}")
+
         return _ok(
             {
                 # #1369: the header count is DERIVED (detailed + undetailed) and both
@@ -2239,11 +2285,14 @@ def handle_wrong() -> dict:
                     "recent": catches[:25],
                 },
                 "predictions": {"by_coach": ledger, "refuted_recent": recent_misses[:25]},
+                "effect_fits": effect_fits,  # #1411: null fits are findings, not footnotes
                 "note": (
                     "Uncurated. The validator audits every coach claim against the data it cites; "
                     "the evaluator scores every dated prediction. A thin refuted column right after "
                     "a reset means the slate is young, not that the model is right — inconclusive "
-                    "and expired are claims that could not be proven either."
+                    "and expired are claims that could not be proven either. The character engine's "
+                    "cross-pillar effects are re-fitted quarterly: an authored prior the data failed "
+                    "to confirm is published here, badge and all."
                 ),
             },
             cache_seconds=3600,

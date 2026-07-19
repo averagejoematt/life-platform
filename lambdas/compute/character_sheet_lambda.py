@@ -809,6 +809,17 @@ def lambda_handler(event, context):
 
     logger.info(f"[character] Config loaded — {len(config.get('pillars', {}))} pillars")
 
+    # ── #1411 (ADR-105): merge the latest quarterly effect fit into the config ──
+    # so every active effect the engine emits wears its earned badge (fitted with
+    # n_eff + CI, or "authored prior — not yet confirmed"). load_latest_fit never
+    # raises — an absent/unreadable fit degrades to the honest authored default.
+    import effect_fitter
+
+    latest_fit = effect_fitter.load_latest_fit(table, USER_ID)
+    effect_fitter.merge_fit_into_config(config, latest_fit)
+    if latest_fit:
+        logger.info(f"[character] Effect fit merged — {latest_fit.get('sk')} ({(latest_fit.get('summary') or {}).get('fitted', 0)} fitted)")
+
     # ── Assemble data ──
     data = assemble_data(yesterday_str)
 

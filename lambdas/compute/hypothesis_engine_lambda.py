@@ -1143,6 +1143,67 @@ def write_hypothesis_context_to_memory(active_hypotheses):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# #1411 — QUARTERLY CROSS-PILLAR EFFECT RE-FIT (fitted, not authored — ADR-105)
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _fetch_character_history(window_days):
+    """Daily character_sheet records for the fit window — deliberately WITHOUT a
+    phase filter: the fits measure driver→target physiology across the whole
+    cross-cycle history (archived prior-cycle rows included), the same rationale
+    as the CROSS_PHASE calibration ledger."""
+    from boto3.dynamodb.conditions import Key
+
+    start = (datetime.now(timezone.utc) - timedelta(days=window_days)).strftime("%Y-%m-%d")
+    pk = f"USER#{USER_ID}#SOURCE#character_sheet"
+    items, kwargs = [], {
+        "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").between(f"DATE#{start}", "DATE#~"),
+    }
+    while True:
+        resp = table.query(**kwargs)
+        items.extend(resp.get("Items", []))
+        lek = resp.get("LastEvaluatedKey")
+        if not lek:
+            return items
+        kwargs["ExclusiveStartKey"] = lek
+
+
+def refit_cross_pillar_effects(force=False):
+    """Quarterly re-fit of the character engine's cross-pillar effects (#1411),
+    piggybacked on this weekly cron. Deterministic end to end (stats_core,
+    fixed bootstrap seed — no LLM anywhere near a verdict, ADR-105). Every run
+    recomputes from scratch, so status moves in BOTH directions. Never fatal to
+    the hypothesis run."""
+    import effect_fitter
+
+    try:
+        latest = effect_fitter.load_latest_fit(table, USER_ID)
+        if not force and not effect_fitter.refit_due(latest):
+            return {"ran": False, "reason": "not_due", "last_fit": (latest or {}).get("sk")}
+
+        import character_engine
+
+        config = character_engine.load_character_config(s3, S3_BUCKET)
+        if not config:
+            logger.warning("[#1411] effect re-fit skipped: config load failed")
+            return {"ran": False, "reason": "config_load_failed"}
+
+        records = _fetch_character_history(effect_fitter.FIT_WINDOW_DAYS)
+        result = effect_fitter.fit_effects(records, config)
+        item = effect_fitter.build_fit_item(result, USER_ID)
+        table.put_item(Item=item)
+        summary = result["summary"]
+        logger.info(
+            f"[#1411] Effect re-fit stored ({item['sk']}): {summary['fitted']}/{summary['tested']} fitted "
+            f"over {result['n_days']} days — null fits publish to /api/wrong"
+        )
+        return {"ran": True, "sk": item["sk"], **summary}
+    except Exception as e:
+        logger.warning(f"[#1411] effect re-fit failed (non-fatal): {e}")
+        return {"ran": False, "reason": f"error: {e}"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # MAIN HANDLER
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1250,6 +1311,10 @@ def lambda_handler(event, context):
         active = [h for h in all_hypotheses_updated if h.get("status") in ("pending", "confirming", "confirmed")]
         write_hypothesis_context_to_memory(active)
 
+        # 6. #1411: quarterly cross-pillar effect re-fit (no-op when not due;
+        # event {"force_effect_refit": true} forces one for testing/backfill)
+        effect_refit = refit_cross_pillar_effects(force=bool(event.get("force_effect_refit")))
+
         summary = {
             "new_hypotheses": new_hypotheses_stored,
             "validation_rejected": validation_rejected,
@@ -1260,6 +1325,7 @@ def lambda_handler(event, context):
             "total_active": len(active),
             "data_complete_days": complete_days,
             "data_sufficient": is_sufficient,
+            "effect_refit": effect_refit,  # #1411 quarterly fit outcome
         }
         logger.info(f"Complete: {summary}")
         return {"statusCode": 200, "body": json.dumps(summary)}
