@@ -2160,6 +2160,14 @@ def site_api() -> list[iam.PolicyStatement]:
             actions=["ssm:GetParameter"],
             resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/budget-tier"],
         ),
+        # #1371 follow-up: /api/source_freshness stamps carried/carried_from_cycle
+        # provenance from the experiment-cycle param; without this read the payload
+        # fail-softs to experiment.cycle=null and chips say "a previous attempt".
+        iam.PolicyStatement(
+            sid="ExperimentCycleRead",
+            actions=["ssm:GetParameter"],
+            resources=[f"arn:aws:ssm:{REGION}:{ACCT}:parameter/life-platform/experiment-cycle"],
+        ),
     ]
 
 
