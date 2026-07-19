@@ -846,3 +846,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   outline: 2px solid var(--ember); outline-offset: 1px;
 }
 .supp-snp { margin-top: var(--sp-2); color: var(--ink-faint); }
+
+/* ── #1409: felt-reality calibration card (character sheet) ─────────────── */
+.ch-cal { display: grid; gap: var(--sp-2); margin: var(--sp-3) 0; }
+.ch-cal-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); }
+.ch-cal-row.is-unprobed, .ch-cal-row.is-uncal { color: var(--ink-faint); }
+.ch-cal-p { font-family: var(--font-sans); min-width: 7.5rem; }

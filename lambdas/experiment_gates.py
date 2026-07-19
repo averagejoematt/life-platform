@@ -54,3 +54,23 @@ def hypothesis_gates(current_n=None):
         "min_sample_days_for_check": HYPOTHESIS_MIN_SAMPLE_DAYS_FOR_CHECK,
         "current_n": current_n,
     }
+
+
+# ── Felt-reality calibration (site_api_data.handle_character_calibration, #1409) ─
+# Below this many probe-week pairs a pillar has no r at all — the card renders
+# the honest "uncalibrated (n=X)" state with the arming trigger instead. The
+# floor follows stats_core.pearson_r's noise argument: Fisher CI needs n-3 > 0
+# and r on fewer than 5 weekly pairs is coin-flip territory.
+FELT_CALIBRATION_MIN_WEEKS = 5
+# Below this the CONFIDENCE GRAMMAR downgrades: r renders as a point estimate
+# only — never a fabricated band (ADR-105 rule 1).
+FELT_CALIBRATION_CI_MIN_WEEKS = 8
+
+
+def felt_calibration_gates(current_n=None):
+    """The calibration-card zero-state payload block (same shape as the others)."""
+    return {
+        "min_weeks": FELT_CALIBRATION_MIN_WEEKS,
+        "ci_min_weeks": FELT_CALIBRATION_CI_MIN_WEEKS,
+        "current_n": current_n,
+    }

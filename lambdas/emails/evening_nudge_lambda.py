@@ -59,11 +59,19 @@ RITUAL_LABELS = {
     # so the title names it plainly; everywhere else the metric stays oblique
     # (intake_count) and the count lands in the private_intake partition only.
     "intake_count": ["0", "1", "2", "3", "4+"],
+    # #1409: the weekly felt-reality probe (Sunday nudge only) — WHO-5/SVS-derived
+    # 0-4 ordinals; ≤20s for all three. Framed over the WEEK, not the day.
+    "felt_vitality": ["Drained", "Low", "Okay", "Alive", "Vigorous"],
+    "felt_rest": ["Exhausted", "Under-slept", "Okay", "Rested", "Fresh"],
+    "felt_connection": ["Isolated", "Thin", "Some", "Connected", "Rich"],
 }
 RITUAL_METRIC_TITLES = {
     "connection": "Felt connected today?",
     "mood_valence": "Mood today?",
     "intake_count": "Drinks this evening?",
+    "felt_vitality": "This week: how alive did you feel?",
+    "felt_rest": "This week: how rested?",
+    "felt_connection": "This week: how connected to people?",
 }
 
 
@@ -154,11 +162,32 @@ def _check_evening_ritual(date_str: str) -> tuple[list[str], str]:
         missing_metrics.append("mood_valence")
     if intake is None:
         missing_metrics.append("intake_count")
+    # #1409: on Sundays (PT) the weekly felt-reality probe joins the ritual —
+    # three more taps, still no typing. Skippable by design: an unanswered
+    # Sunday is a coverage gap in the calibration ledger (n simply doesn't
+    # accrue), never a zero (ADR-104 behavioral-absence semantics).
+    missing_metrics.extend(_missing_felt_probe(date_str))
     if not missing_metrics:
         return [], f"Connection {int(connection)}/4 · Mood {int(mood_valence)}/4 · Intake {int(intake)}"
     if len(missing_metrics) < 3:
         return missing_metrics, f"Partially logged — {len(missing_metrics)} tap{'s' if len(missing_metrics) != 1 else ''} left"
     return missing_metrics, "Not logged yet"
+
+
+def _missing_felt_probe(date_str: str) -> list[str]:
+    """The weekly probe metrics still missing for date_str — empty unless it's
+    Sunday (PT). One probe per week, asked on the week's closing evening."""
+    from datetime import datetime as _dt
+
+    from ritual_link import FELT_PROBE_SOURCE, WEEKLY_PROBE_METRICS
+
+    try:
+        if _dt.strptime(date_str, "%Y-%m-%d").date().weekday() != 6:  # 6 = Sunday
+            return []
+    except (TypeError, ValueError):
+        return []
+    item = _fetch_date(FELT_PROBE_SOURCE, date_str)
+    return [m for m in sorted(WEEKLY_PROBE_METRICS) if not item or item.get(m) is None]
 
 
 def _get_ritual_secret() -> str | None:
