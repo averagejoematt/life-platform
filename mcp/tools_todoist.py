@@ -173,15 +173,7 @@ def get_todoist_day(date: str = None):
 # ── Write tools ────────────────────────────────────────────────────────────────────
 
 
-def update_todoist_task(
-    task_id: str,
-    due_string: str = None,
-    due_date: str = None,
-    content: str = None,
-    description: str = None,
-    priority: int = None,
-    project_id: str = None,
-):
+def update_todoist_task(args):
     """
     Update an existing Todoist task. Provide task_id plus any fields to change.
     due_string: Todoist natural language e.g. 'every! week', 'every! month', 'Mar 15 every! month'.
@@ -190,8 +182,25 @@ def update_todoist_task(
     due_date:   Hard date override YYYY-MM-DD (use for first-fire date when also setting recurrence via due_string).
     priority:   1=urgent, 2=high, 3=medium, 4=normal (Todoist uses 4=p1 internally but API accepts 1-4).
     Returns the updated task.
+
+    #1495: like every other tool in the registry, this takes a single `args`
+    dict — mcp.handler.handle_tools_call dispatches ALL tools positionally
+    (`fn(arguments)`), so a function written with named kwargs instead of a
+    single dict parameter gets the whole arguments dict bound to its first
+    named parameter (here, `task_id`). Same bug class as #1477
+    (mcp.registry.tool_list_available_tools).
     """
     try:
+        task_id = args.get("task_id")
+        if not task_id:
+            return {"error": "task_id is required"}
+        due_string = args.get("due_string")
+        due_date = args.get("due_date")
+        content = args.get("content")
+        description = args.get("description")
+        priority = args.get("priority")
+        project_id = args.get("project_id")
+
         payload = {}
         if content is not None:
             payload["content"] = content
@@ -220,15 +229,7 @@ def update_todoist_task(
         return {"error": str(e)}
 
 
-def create_todoist_task(
-    content: str,
-    project_id: str = None,
-    due_string: str = None,
-    due_date: str = None,
-    priority: int = 4,
-    description: str = None,
-    labels: list = None,
-):
+def create_todoist_task(args):
     """
     Create a new Todoist task.
     content:    Task name/title.
@@ -237,8 +238,25 @@ def create_todoist_task(
                 Always use 'every!' for recurring tasks (completion-based scheduling).
     due_date:   YYYY-MM-DD for a specific one-time date.
     priority:   1=urgent, 2=high, 3=medium, 4=normal.
+
+    #1495: like every other tool in the registry, this takes a single `args`
+    dict — mcp.handler.handle_tools_call dispatches ALL tools positionally
+    (`fn(arguments)`), so a function written with named kwargs instead of a
+    single dict parameter gets the whole arguments dict bound to its first
+    named parameter (here, `content`). Same bug class as #1477
+    (mcp.registry.tool_list_available_tools).
     """
     try:
+        content = args.get("content")
+        if not content:
+            return {"error": "content is required"}
+        project_id = args.get("project_id")
+        due_string = args.get("due_string")
+        due_date = args.get("due_date")
+        priority = args.get("priority", 4)
+        description = args.get("description")
+        labels = args.get("labels")
+
         payload = {"content": content, "priority": priority}
         if project_id:
             payload["project_id"] = project_id
@@ -263,13 +281,24 @@ def create_todoist_task(
         return {"error": str(e)}
 
 
-def close_todoist_task(task_id: str):
+def close_todoist_task(args):
     """
     Mark a Todoist task as complete (close/check off).
     For recurring tasks this advances to the next occurrence.
     For one-time tasks this removes it from active tasks.
+
+    #1495: like every other tool in the registry, this takes a single `args`
+    dict — mcp.handler.handle_tools_call dispatches ALL tools positionally
+    (`fn(arguments)`), so a function written with a single NAMED kwarg still
+    gets the whole arguments dict bound to it (here, `task_id` — a
+    single-parameter arity check alone would miss this; the parameter was
+    typed `task_id: str` but silently received the whole dict). Same bug
+    class as #1477 (mcp.registry.tool_list_available_tools).
     """
     try:
+        task_id = args.get("task_id")
+        if not task_id:
+            return {"error": "task_id is required"}
         _todoist_request("POST", f"/tasks/{task_id}/close")
         return {"closed": True, "task_id": task_id}
     except Exception as e:
