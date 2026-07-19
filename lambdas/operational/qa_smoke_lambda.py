@@ -740,6 +740,55 @@ def check_hero_weight_arithmetic():
 
 
 # ---------------------------------------------------------------------------
+# #1445: EMF summary metrics — emitted on EVERY run, including all-green
+# ---------------------------------------------------------------------------
+# Before this, qa-smoke only spoke by SENDING AN EMAIL, and only on a real
+# FAILURE — a green run and a run that never happened at all looked
+# identical from the outside (no metric, no heartbeat, nothing for the
+# remediation agent to see). This EMF line is CloudWatch-extracted into
+# LifePlatform/QaSmoke metrics regardless of outcome:
+#   PassCount / WarnCount / FailCount / PausedCount — per-run check tallies.
+#   RunCompleted=1 — the heartbeat target (monitoring_stack.py's
+#     qa-smoke-heartbeat fires BREACHING if this is absent for 2 straight
+#     days, i.e. the Lambda stopped running or died before reaching here).
+# monitoring_stack.py also alarms FailCount>=1 and WarnCount>=1 (both
+# digest-routed, matching this file's own "routine, not urgent" posture) —
+# a warnings-only run now surfaces in the next daily digest email even
+# though it never triggers this Lambda's own direct failure alert, and both
+# alarms are ordinary CloudWatch alarms the remediation agent's existing
+# `describe_alarms(StateValue="ALARM")` sweep already ingests as a source.
+QA_SMOKE_EMF_NAMESPACE = "LifePlatform/QaSmoke"
+
+
+def emf_summary_line(*, passed: int, warned: int, failed: int, paused: int, timestamp_ms: int) -> str:
+    """Build the EMF log line CloudWatch extracts to LifePlatform/QaSmoke metrics."""
+    doc = {
+        "_aws": {
+            "Timestamp": int(timestamp_ms),
+            "CloudWatchMetrics": [
+                {
+                    "Namespace": QA_SMOKE_EMF_NAMESPACE,
+                    "Dimensions": [[]],
+                    "Metrics": [
+                        {"Name": "PassCount"},
+                        {"Name": "WarnCount"},
+                        {"Name": "FailCount"},
+                        {"Name": "PausedCount"},
+                        {"Name": "RunCompleted"},
+                    ],
+                }
+            ],
+        },
+        "PassCount": int(passed),
+        "WarnCount": int(warned),
+        "FailCount": int(failed),
+        "PausedCount": int(paused),
+        "RunCompleted": 1,
+    }
+    return json.dumps(doc)
+
+
+# ---------------------------------------------------------------------------
 # Report builder
 # ---------------------------------------------------------------------------
 
@@ -836,6 +885,22 @@ def lambda_handler(event, context):
 
         fails = [c for c in all_checks if c.passed is False]
         warns = [c for c in all_checks if c.passed is None]
+        paused = [c for c in all_checks if c.paused]
+        passes = [c for c in all_checks if c.passed is True and not c.paused]
+
+        # #1445: emit the EMF summary on EVERY run — including all-green — so
+        # the nightly QA layer has a heartbeat and its warnings/failures are
+        # queryable metrics, not just the inside of an email nobody reads
+        # until it's a failure. See emf_summary_line()'s docstring above.
+        print(
+            emf_summary_line(
+                passed=len(passes),
+                warned=len(warns),
+                failed=len(fails),
+                paused=len(paused),
+                timestamp_ms=int(run_time.timestamp() * 1000),
+            )
+        )
 
         # 2026-05-28: only email on real FAILURES. Warnings (sporadic optional
         # sources with no record yesterday) are normal and were firing a yellow

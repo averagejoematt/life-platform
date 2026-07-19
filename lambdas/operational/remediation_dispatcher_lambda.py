@@ -58,7 +58,37 @@ DEDUPE_WINDOW_MIN = int(os.environ.get("DEDUPE_WINDOW_MIN", "30"))
 # Substrings — match if any is in the alarm name. Narrow on purpose: the daily
 # 07:45 PT sweep already handles routine ingestion-source errors / QA smoke /
 # freshness — those should NOT fire urgent dispatches and cost a workflow run.
-_DEFAULT_PATTERNS = "canary,dlq-depth,site-api-error,budget-tier,bedrock-throttle,slo-"
+#
+# #1444 (2026-07-18): reconciled against ACTUAL alarm->topic routing. This
+# Lambda is SNS-subscribed only to `life-platform-alerts` (the urgent topic,
+# see operational_stack.py's `local_alerts_topic.add_subscription(...)`) — it
+# never receives a digest-routed alarm's notification at all, so a pattern
+# that only matches a digest-topic alarm name is dead weight: it can never
+# actually fire. The old list was almost entirely dead this way — "canary"
+# and "dlq-depth" matched only digest alarms (life-platform-canary-*,
+# life-platform-dlq-depth-warning), "site-api-error" matched only the digest
+# `site-api-errors` alarm (ADR-050 routes all site-api alarms to digest), and
+# "bedrock-throttle" matched no alarm anywhere. Meanwhile genuinely urgent
+# alarms — ai-daily-spend-high, the ingest-consecutive-failures-* OAuth-death
+# class (the Whoop 49-failure incident), ingest-auth-unhealthy-24h,
+# ddb-throttled-requests, the DLQ alarms, and the alert-digest watchdog's own
+# errors/queue-age — matched nothing, so they sat on the fast topic but never
+# got the fast automated triage. tests/test_urgent_alarm_routing.py statically
+# derives the real urgent-topic alarm set from monitoring_stack.py and asserts
+# every pattern below matches >=1 of them — no more dead entries.
+_DEFAULT_PATTERNS = (
+    "slo-,"
+    "budget-tier,"
+    "ai-daily-spend,"
+    "ai-tokens-platform,"
+    "ingest-consecutive-failures,"
+    "ingest-auth-unhealthy,"
+    "ddb-throttled,"
+    "dlq,"
+    "alert-digest,"
+    "daily-brief-errors,"
+    "daily-brief-no-invocations"
+)
 URGENT_PATTERNS = tuple(p.strip().lower() for p in os.environ.get("URGENT_PATTERNS", _DEFAULT_PATTERNS).split(",") if p.strip())
 
 _sm = boto3.client("secretsmanager", region_name=REGION)
