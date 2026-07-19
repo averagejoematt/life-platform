@@ -27,21 +27,28 @@ from ritual_link import verify_ritual_token  # noqa: E402
 SECRET = "test-nudge-ritual-secret"
 
 
-def _set_ritual_record(monkeypatch, connection=None, mood_valence=None, intake_count=None):
+# Pinned dates, NOT pacific_today(): #1409 adds the weekly felt-probe metrics
+# to the missing-set on Sundays (PT), so wall-clock dates made these tests red
+# every Sunday (first fired genesis Sunday 2026-07-19, redding main CI). The
+# weekday cases pin a Saturday; the probe case pins a Sunday explicitly.
+SATURDAY = "2026-07-18"
+SUNDAY = "2026-07-19"
+
+
+def _set_ritual_record(monkeypatch, connection=None, mood_valence=None, intake_count=None, date=SATURDAY):
     rec = {}
     if connection is not None:
         rec["connection"] = connection
     if mood_valence is not None:
         rec["mood_valence"] = mood_valence
-    today = nudge.pacific_today()
-    store_items = [{"pk": nudge.USER_PREFIX + "evening_ritual", "sk": "DATE#" + today, **rec}] if rec else []
+    store_items = [{"pk": nudge.USER_PREFIX + "evening_ritual", "sk": "DATE#" + date, **rec}] if rec else []
     if intake_count is not None:
         # #1405: the intake count lives in its own Matthew-private partition.
-        store_items.append({"pk": nudge.USER_PREFIX + "private_intake", "sk": "DATE#" + today, "intake_count": intake_count})
+        store_items.append({"pk": nudge.USER_PREFIX + "private_intake", "sk": "DATE#" + date, "intake_count": intake_count})
     # query() always answers empty here — only get_item (keyed by pk/sk) is used.
     ft = FakeDdbTable(rows=[], store_items=store_items)
     monkeypatch.setattr(nudge, "table", ft)
-    return today
+    return date
 
 
 # ── _check_evening_ritual ────────────────────────────────────────────────────
@@ -68,6 +75,15 @@ def test_fully_logged_reports_both_values(monkeypatch):
     assert "3/4" in detail
     assert "1/4" in detail
     assert "Intake 2" in detail
+
+
+def test_sunday_adds_the_felt_probe_metrics(monkeypatch):
+    # #1409: on Sundays the three weekly probe taps join the ritual's missing-set
+    # (and the fully-logged weekday shape above is only "full" on a weekday).
+    today = _set_ritual_record(monkeypatch, connection=3, mood_valence=1, intake_count=2, date=SUNDAY)
+    missing, detail = nudge._check_evening_ritual(today)
+    assert missing == sorted(["felt_vitality", "felt_rest", "felt_connection"])
+    assert "3 taps left" in detail.lower()
 
 
 # ── link minting agrees with the site-api verifier ──────────────────────────

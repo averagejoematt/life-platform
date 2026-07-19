@@ -170,7 +170,8 @@ class TestProjectionCarriesEveryEmittedField:
 
 
 class TestFakeTableHonored:
-    def test_partition_table_returns_patched_fake(self, monkeypatch):
-        fake = FakeDdbTable()
+    def test_query_partition_routes_through_patched_fake(self, monkeypatch):
+        fake = FakeDdbTable(query_hook=lambda table, **kw: {"Items": []})
         monkeypatch.setattr(api, "table", fake)
-        assert api._partition_table() is fake
+        api._query_partition("COACH#sleep_coach", "PREDICTION#")
+        assert len(fake.query_calls) == 1  # the fake took the call — no real client involved

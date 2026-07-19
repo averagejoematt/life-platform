@@ -31,6 +31,7 @@ import boto3
 
 # #422: shared causality conventions (note parse + cross-page merge), bundled (#781).
 import habit_causality  # noqa: E402
+import stats_core  # #1372: Evidence Bar — sanctioned per-claim rigor readout (ADR-105)
 from boto3.dynamodb.conditions import Key
 from phase_filter import with_phase_filter  # ADR-058 / #946 / #1197
 from source_registry import (  # #392: canonical source classification (bundled lambdas/ tree)
@@ -1078,6 +1079,10 @@ def handle_discoveries() -> dict:
                 b = _LABELS.get(c.get("metric_b", ""), c.get("metric_b", ""))
                 r = c.get("r", 0)
                 direction = "positively" if r > 0 else "negatively"
+                # #1372 Evidence Bar: pass the stored FDR verdict through honestly —
+                # a legacy record with only the pre-FDR `significant` flag serves
+                # fdr_significant=None ("not checked"), never a fake pass.
+                fdr_flag = c.get("fdr_significant")
                 ai_findings.append(
                     {
                         "week": week,
@@ -1087,6 +1092,11 @@ def handle_discoveries() -> dict:
                         "n": c.get("n", 0),
                         "title": f"{a} × {b}: {direction} correlated",
                         "body": f"r={r:+.2f}, n={c.get('n', '?')} days. " f"FDR-corrected significant finding from {week}.",
+                        # #1372: per-claim rigor readout from the ONE sanctioned pure
+                        # function (stats_core.correlation_evidence, ADR-105).
+                        "evidence": stats_core.correlation_evidence(
+                            r, c.get("n", 0), fdr_significant=(bool(fdr_flag) if fdr_flag is not None else None)
+                        ),
                     }
                 )
     except Exception as e:

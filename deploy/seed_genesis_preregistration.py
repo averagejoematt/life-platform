@@ -55,7 +55,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 sys.path.insert(0, str(REPO_ROOT / "lambdas" / "coach"))
 sys.path.insert(0, str(REPO_ROOT / "lambdas" / "compute"))
+sys.path.insert(0, str(REPO_ROOT / "deploy"))
 
+import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
 from constants import EXPERIMENT_START_DATE  # noqa: E402
 from measurable_metrics import MEASURABLE_METRICS, infer_direction, normalize_metric_hint  # noqa: E402
 
@@ -427,6 +429,9 @@ def freeze(coaches_out, hypotheses):
     FROZEN_PATH.parent.mkdir(parents=True, exist_ok=True)
     FROZEN_PATH.write_text(json.dumps(frozen, indent=2) + "\n")
     print(f"FROZE pre-registration → {FROZEN_PATH}")
+    # #1378: hash-stamp the freeze the moment it happens — future genesis freezes are
+    # content-addressed from birth (stamped_at == freeze time, never backdated).
+    genesis_prereg_stamp.write_stamp()
     return frozen
 
 
@@ -619,6 +624,10 @@ def main():
         frozen = freeze(coaches_out, build_hypotheses(goals))
     else:
         print(f"Using FROZEN pre-registration from {FROZEN_PATH} (generated {frozen['generated_at']})")
+        # #1378: the write path is blocked on a tampered freeze — a hash mismatch
+        # means the frozen claims were edited after stamping, and that never ships.
+        stamp = genesis_prereg_stamp.require_valid_stamp(frozen)
+        print(f"Hash stamp verified: sha256 {stamp['sha256']} (stamped {stamp['stamped_at']})")
 
     records = build_prediction_records(frozen)
     hypotheses = frozen.get("hypotheses") or build_hypotheses(goals)

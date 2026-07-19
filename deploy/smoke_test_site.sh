@@ -18,6 +18,14 @@ QUICK="${1:-}"
 PASS=0
 FAIL=0
 
+# ── Cache-aware content reads (#1526) ─────────────────────────────────────────
+# Same-deploy content assertions must never race the CloudFront invalidation: on
+# 2026-07-19 (05:40 UTC) a stale-edge read of /coaching/ failed the brand-new
+# static-core guard and auto-rolled-back a HEALTHY deploy. Failed body assertions
+# now re-fetch within a shared bounded budget (common case: one fetch, zero
+# sleeps) — see the lib header for the full mechanism.
+source "$(dirname "$0")/lib/cache_aware_fetch.sh"
+
 check_status() {
   local label="$1"
   local url="$2"
@@ -198,13 +206,20 @@ echo ""
 
 if [[ "$QUICK" != "--quick" ]]; then
   echo "── Content markers (v4 structure) ───────────────────────"
+  # #1526: both checks take the page URL as a 4th arg — a failed needle re-fetches
+  # within the shared retry budget (cache_aware_fetch.sh) before it is allowed to
+  # fail the gate. Passing checks never sleep.
   check_body_contains() {
-    local label="$1" file="$2" needle="$3"
-    if grep -q "$needle" "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — expected to find: $needle"; FAIL=$((FAIL+1)); fi
+    local label="$1" file="$2" needle="$3" url="${4:-}"
+    _needle_present() { grep -q "$needle" "$1"; }
+    if [[ -n "$url" ]]; then assert_body_until "$url" "$file" _needle_present || true; fi
+    if _needle_present "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — expected to find: $needle"; FAIL=$((FAIL+1)); fi
   }
   check_body_not_contains() {
-    local label="$1" file="$2" needle="$3"
-    if grep -qi "$needle" "$file"; then echo "  ❌ $label — unexpectedly found: $needle"; FAIL=$((FAIL+1)); else echo "  ✅ $label"; PASS=$((PASS+1)); fi
+    local label="$1" file="$2" needle="$3" url="${4:-}"
+    _needle_absent() { ! grep -qi "$needle" "$1"; }
+    if [[ -n "$url" ]]; then assert_body_until "$url" "$file" _needle_absent || true; fi
+    if _needle_absent "$file"; then echo "  ✅ $label"; PASS=$((PASS+1)); else echo "  ❌ $label — unexpectedly found: $needle"; FAIL=$((FAIL+1)); fi
   }
 
   HOME_FILE=$(mktemp);   curl -s --max-time 15 "$BASE/" > "$HOME_FILE"
@@ -216,27 +231,27 @@ if [[ "$QUICK" != "--quick" ]]; then
   trap 'rm -f "$HOME_FILE" "$NOW_FILE" "$STORY_FILE" "$EVID_FILE" "$PIPE_FILE" "$SUB_FILE"' EXIT
 
   # Home: cinematic landing + the three doors + interactive constellation
-  check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"'
-  check_body_contains "Home: door · the cockpit"      "$HOME_FILE"  'the cockpit'
-  check_body_contains "Home: door · the story"        "$HOME_FILE"  'the story'
-  check_body_contains "Home: door · the data"         "$HOME_FILE"  'the data'
-  check_body_contains "Home: door · the protocols"    "$HOME_FILE"  'the protocols'
+  check_body_contains "Home: constellation hero"      "$HOME_FILE"  'class="constellation"' "$BASE/"
+  check_body_contains "Home: door · the cockpit"      "$HOME_FILE"  'the cockpit'           "$BASE/"
+  check_body_contains "Home: door · the story"        "$HOME_FILE"  'the story'             "$BASE/"
+  check_body_contains "Home: door · the data"         "$HOME_FILE"  'the data'              "$BASE/"
+  check_body_contains "Home: door · the protocols"    "$HOME_FILE"  'the protocols'         "$BASE/"
   # Cockpit: live data wiring
-  check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'
-  check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'
+  check_body_contains "Cockpit: data-bind targets"    "$NOW_FILE"   'data-bind'             "$BASE/cockpit/"
+  check_body_contains "Cockpit: loads cockpit.js module" "$NOW_FILE" 'assets/js/cockpit'    "$BASE/cockpit/"
   # Story hub: the writing surfaces
-  check_body_contains "Story: chronicle linked"       "$STORY_FILE" 'chronicle'
-  check_body_contains "Story: journal linked"         "$STORY_FILE" 'journal'
+  check_body_contains "Story: chronicle linked"       "$STORY_FILE" 'chronicle'             "$BASE/story/"
+  check_body_contains "Story: journal linked"         "$STORY_FILE" 'journal'               "$BASE/story/"
   # Evidence: registry + readout shell + the new live Pipeline-status topic
-  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  '__EVIDENCE_REGISTRY__'
-  check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'
-  check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'
-  check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness'
+  check_body_contains "Evidence: registry embedded"   "$EVID_FILE"  '__EVIDENCE_REGISTRY__' "$BASE/data/"
+  check_body_contains "Evidence: readout mount"       "$EVID_FILE"  'data-readout'          "$BASE/data/"
+  check_body_contains "Method: Pipeline-status topic" "$PIPE_FILE" 'Pipeline status'        "$BASE/method/pipeline/"
+  check_body_contains "Pipeline page: fetches /api/source_freshness" "$PIPE_FILE" 'source_freshness' "$BASE/method/pipeline/"
   # Subscribe form present
-  check_body_contains "Subscribe: form present"       "$SUB_FILE"   'subscribe'
+  check_body_contains "Subscribe: form present"       "$SUB_FILE"   'subscribe'             "$BASE/subscribe/"
   # Stale-copy guard (would have caught the v3 'Week 1 ships after April 1' regression)
-  check_body_not_contains "Home: no stale copy"       "$HOME_FILE"  'coming soon\|launching april\|lorem ipsum\|TODO'
-  check_body_not_contains "Cockpit: no stale copy"    "$NOW_FILE"   'coming soon\|launching april\|lorem ipsum\|TODO'
+  check_body_not_contains "Home: no stale copy"       "$HOME_FILE"  'coming soon\|launching april\|lorem ipsum\|TODO' "$BASE/"
+  check_body_not_contains "Cockpit: no stale copy"    "$NOW_FILE"   'coming soon\|launching april\|lorem ipsum\|TODO' "$BASE/cockpit/"
   echo ""
 
   # ── Static core / crawler view (#1395) ────────────────────────────────────────
@@ -249,16 +264,22 @@ if [[ "$QUICK" != "--quick" ]]; then
   # Page list derives from tests/qa_manifest.py (the ONE registry, #1426) — never a
   # hand list here.
   echo "── Static core (crawler/no-JS view, from qa_manifest) ────"
+  # #1526: THIS is the check that auto-rolled-back a healthy deploy on 2026-07-19 —
+  # it asserts content that ships in the same deploy, so it reads through the
+  # bounded cache-aware retry path, never straight off a possibly-stale edge.
+  _static_core_ok() { grep -q 'class="proof-static' "$1" && grep -qi 'as of' "$1"; }
   if SC_PATHS=$(python3 "$QA_MANIFEST" --emit static_core); then
+    SC_FILE=$(mktemp)
     while IFS= read -r sc_path; do
       [[ -z "$sc_path" ]] && continue
-      SC_BODY=$(curl -s --max-time 15 "$BASE$sc_path")
-      if echo "$SC_BODY" | grep -q 'class="proof-static' && echo "$SC_BODY" | grep -qi 'as of'; then
+      curl -s --max-time 15 "$BASE$sc_path" > "$SC_FILE" || true
+      if assert_body_until "$BASE$sc_path" "$SC_FILE" _static_core_ok; then
         echo "  ✅ static core + provenance present · $sc_path"; PASS=$((PASS + 1))
       else
         echo "  ❌ static core MISSING (blank crawler view) · $sc_path — expected a <noscript> proof-static block with an 'as of' stamp"; FAIL=$((FAIL + 1))
       fi
     done <<< "$SC_PATHS"
+    rm -f "$SC_FILE"
   else
     echo "  ❌ qa_manifest static_core emit failed — static-core guard did not run"; FAIL=$((FAIL + 1))
   fi
@@ -268,15 +289,21 @@ if [[ "$QUICK" != "--quick" ]]; then
   # The growth doors' og:title must carry a real number/date, never the old generic
   # "the measured life" boilerplate. Spot-check Home + /data/ + /protocols/.
   echo "── Data-driven OG tags (link-unfurl view) ───────────────"
+  # #1526: same same-deploy-content class as the static cores — cache-aware read.
+  _og_ok() { grep -oE '<meta property="og:title" content="[^"]*"' "$1" | head -1 | grep -qE '[0-9]'; }
   check_og_has_number() {
     local label="$1" path="$2"
-    local title
-    title=$(curl -s --max-time 15 "$BASE$path" | grep -oE '<meta property="og:title" content="[^"]*"' | head -1)
-    if echo "$title" | grep -qE '[0-9]'; then
+    local og_file title verdict
+    og_file=$(mktemp)
+    curl -s --max-time 15 "$BASE$path" > "$og_file" || true
+    verdict=0; assert_body_until "$BASE$path" "$og_file" _og_ok || verdict=1
+    title=$(grep -oE '<meta property="og:title" content="[^"]*"' "$og_file" | head -1 || true)
+    if [[ "$verdict" -eq 0 ]]; then
       echo "  ✅ $label — $title"; PASS=$((PASS + 1))
     else
       echo "  ❌ $label — og:title carries no number (generic boilerplate?): $title"; FAIL=$((FAIL + 1))
     fi
+    rm -f "$og_file"
   }
   check_og_has_number "Home og:title has a number"      "/"
   check_og_has_number "Data og:title has a number"      "/data/"

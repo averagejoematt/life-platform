@@ -3,6 +3,7 @@
   experiments (the /protocols/ door). Split out of evidence.js (#581) — no behavior change.
 */
 import { dumbbell, nDots } from "/assets/js/charts.js";
+import { evidenceBar } from "/assets/js/evidence_bar.js";
 import { domainIcon, icon } from "/assets/js/icons.js";
 import { esc, tryJSON, isBad, has, fmt, ttl, fig, figs, sec, empty, note, warmup, evClass, kvtable, postJSON, voteFollowRow, wireVoteButtons, wireFollowForms } from "/assets/js/evidence_shared.js";
 
@@ -62,8 +63,10 @@ export async function renderDiscoveries(d) {
     `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(t)}</h3>${badge ? `<span class="rd-badge">${esc(badge)}</span>` : ""}</header>${b ? `<p class="rd-why">${esc(b)}</p>` : ""}</article>`;
   // #551 — each found correlation carries its sample size as DOTS (the confidence grammar):
   // the reader sees how much data stands behind the finding. REAL overlapping-day n only.
+  // #1372 — plus the Evidence Bar: the served per-claim rigor score (n / CI width / FDR,
+  // composed by stats_core.correlation_evidence). Absent evidence renders nothing — honest.
   const findingCard = (f) =>
-    `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(f.title)}</h3></header>${f.body ? `<p class="rd-why">${esc(f.body)}</p>` : ""}${f.n ? `<p class="rd-meta label">evidence weight ${nDots(f.n, { unit: "overlapping days" })}</p>` : ""}</article>`;
+    `<article class="rd-card"><header class="rd-cardhead"><h3 class="rd-cardname">${esc(f.title)}</h3></header>${f.body ? `<p class="rd-why">${esc(f.body)}</p>` : ""}${f.n ? `<p class="rd-meta label">evidence weight ${nDots(f.n, { unit: "overlapping days" })}${f.evidence ? ` ${evidenceBar(f.evidence)}` : ""}</p>` : ""}</article>`;
   const fs = findings.length
     ? sec("Correlations found in the data", `<div class="rd-cards">${findings.map(findingCard).join("")}</div>`)
     : "";

@@ -138,9 +138,14 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Wait for CloudFront invalidation to settle
-        run: sleep 60   # invalidation propagates in ~30s; don't smoke a stale edge
-
+      # #1526: the fixed `sleep 60` that used to sit here was a guess and LOST the
+      # race on 2026-07-19 (05:40 UTC) — smoke read a stale edge and auto-rolled-back
+      # a healthy deploy. The wait is now deterministic where the credentials live:
+      # sync_site_to_s3.sh (inside the deploy-site job) blocks on
+      # `aws cloudfront wait invalidation-completed`, and smoke_test_site.sh's
+      # content assertions retry within a bounded propagation budget
+      # (deploy/lib/cache_aware_fetch.sh) as the second net. This job stays
+      # deliberately AWS-credential-free.
       - name: Run site smoke test (pure HTTP — no AWS access)
         run: |
           bash deploy/smoke_test_site.sh
