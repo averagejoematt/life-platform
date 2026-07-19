@@ -202,6 +202,7 @@ from web.site_api_vitals import (
     handle_achievements,
     handle_character,
     handle_character_config,
+    handle_character_receipt,
     handle_character_stats,
     handle_circadian,
     handle_genome_risks,
@@ -343,6 +344,7 @@ ROUTES = {
     "/api/vacation_fund": handle_vacation_fund,
     "/api/methods": handle_methods,  # #544: the auto-generated statistics registry (ADR-105)
     "/api/character": handle_character,
+    "/api/character_receipt": handle_character_receipt,  # #1373: progression receipts (dateless = latest; ?date/&verify below)
     "/api/status": handle_status,
     "/api/status/summary": handle_status_summary,
     # BS-07: new public endpoints
@@ -661,6 +663,17 @@ def lambda_handler(event, context):
     # morning's sheet. Dateless requests fall through to the ROUTES default.
     if path == "/api/character" and (event.get("queryStringParameters") or {}).get("date"):
         return handle_character(date=event["queryStringParameters"]["date"].strip())
+
+    # #1373: progression-receipt drill-down — ?date=YYYY-MM-DD picks the day,
+    # &verify=1 replays it against the live engine+config. Param-less requests
+    # fall through to the ROUTES default (latest current-cycle receipt).
+    if path == "/api/character_receipt":
+        _qs = event.get("queryStringParameters") or {}
+        if _qs.get("date") or _qs.get("verify"):
+            return handle_character_receipt(
+                date=(_qs.get("date") or "").strip() or None,
+                verify=str(_qs.get("verify") or "").lower() in ("1", "true"),
+            )
 
     # Phase 4 historical window (2026-06-29): /api/vitals?date=YYYY-MM-DD — the
     # cockpit as of a past date. Dateless requests fall through to the ROUTES default.

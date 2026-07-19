@@ -19,6 +19,10 @@
     "category": "write-path",
     "reason": "POST-only \u2014 votes on a challenge (write)"
   },
+  "/api/character_receipt": {
+    "category": "capture-failed",
+    "reason": "#1373: route lands in this PR \u2014 not yet deployed, so a live shape capture is impossible pre-merge. Post-deploy: run deploy/capture_api_schemas.py to snapshot the real shape and DROP this entry."
+  },
   "/api/experiment_follow": {
     "category": "write-path",
     "reason": "POST-only \u2014 follow/unfollow an experiment (write)"

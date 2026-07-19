@@ -11,6 +11,8 @@ import { preStart } from "/assets/js/coach_popover.js"; // #931 — the pre-star
 import { dfBody } from "/assets/js/evidence_datafigure.js";
 // #420: one share affordance — the character sheet's own linkable moment travels.
 import { shareMount } from "/assets/js/share.js";
+// #1373: receipt drill-down renderer — DOM-free module (testable, evidence_router precedent)
+import { wireReceipts } from "/assets/js/evidence_receipts.js";
 
 export const CH_ORDER = ["sleep", "movement", "nutrition", "metabolic", "mind", "relationships", "consistency"];
 
@@ -423,7 +425,11 @@ export async function renderCharacter(d) {
         if (lullStart && d > lullStart) { cls += " ch-tl-muted"; annot = ` <span class="label">· during the quiet stretch — recorded, not celebrated</span>`; }
         else annot = ` <span class="label">· earned before the quiet stretch</span>`;
       }
-      return `<li class="ch-tl-li${cls}"><span class="label">${esc(d)}</span><span class="ch-tl-ev">${isDown ? `<span class="ch-tl-dn label" aria-hidden="true">▾</span> ` : ""}${esc(e.event || "")}${annot}</span>${e.character_level != null ? `<span class="ch-tl-lv label">Lv ${esc(String(Math.round(e.character_level)))}</span>` : ""}</li>`;
+      /* #1373: every change carries its receipt — an audit-grade drill-down
+         (inputs, rule, delta, formula version, config hash, replay digest),
+         fetched on first open from /api/character_receipt?date=&verify=1. */
+      const rcpt = d ? `<details class="ch-rcpt" data-rcpt="${esc(d)}"><summary class="label">receipt</summary><div class="ch-feed-body" data-rcpt-body><p class="rd-archive">Pulling the receipt…</p></div></details>` : "";
+      return `<li class="ch-tl-li${cls}"><span class="label">${esc(d)}</span><span class="ch-tl-ev">${isDown ? `<span class="ch-tl-dn label" aria-hidden="true">▾</span> ` : ""}${esc(e.event || "")}${annot}</span>${e.character_level != null ? `<span class="ch-tl-lv label">Lv ${esc(String(Math.round(e.character_level)))}</span>` : ""}${rcpt}</li>`;
     }).join("")}</ul>`
     : `<p class="rd-archive">No level events yet this cycle — a level only moves after a sustained multi-day streak, so the first entries here are earned, not noise.</p>`;
   let heat = "";
@@ -564,6 +570,7 @@ export function chAnimate(scope) {
 
 export function wireCharacter() {
   chAnimate();
+  wireReceipts(); // #1373: lazy-load the audit receipt when a timeline entry is opened
 
   /* Time travel (P1.3) — the cockpit's day-slider grammar: drag from cycle-1
      genesis (Apr 1) to today; the hero + stat block redraw as of that date via

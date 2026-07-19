@@ -42,6 +42,7 @@ LIVE_FAMILIES = [
     ("USER#matthew#SOURCE#centenarian_progress", "WEEK#2026-W13"),
     ("USER#matthew#SOURCE#challenges", "CHALLENGE#5k-every-day"),
     ("USER#matthew#SOURCE#character_sheet", "DATE#2026-03-27"),
+    ("USER#matthew#SOURCE#character_receipt", "DATE#2026-07-20"),  # #1373: progression receipts
     ("USER#matthew#SOURCE#chronicle", "DATE#2026-02-22"),
     ("USER#matthew#SOURCE#chronicling", "DATE#2025-10-20"),
     ("USER#matthew#SOURCE#circadian", "DATE#2026-03-17"),

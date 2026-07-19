@@ -670,6 +670,73 @@ def handle_character_config() -> dict:
     )
 
 
+def handle_character_receipt(date: str | None = None, verify: bool = False) -> dict:
+    """
+    GET /api/character_receipt[?date=YYYY-MM-DD][&verify=1]
+    The audit-grade progression receipt for a compute day (#1373): contributing
+    input-row KEYS, engine formula version, config hash, per-pillar transition
+    inputs/outputs, and the deterministic replay digest. Read-only.
+
+    verify=1 replays the stored inputs server-side through the LIVE engine +
+    config (the same bundled character_engine the nightly compute runs) and
+    returns the provenance-labeled verdict — digest_match / config_drift /
+    engine_drift / field-level mismatches.
+
+    ADR-104: a date with no stored receipt answers available=false — receipts
+    are never fabricated for changes that predate the receipt system. Dated
+    reads include archived (prior-cycle) receipts deliberately, like
+    /api/character?date= — history is cross-cycle and the receipt's own
+    phase/cycle stamps ride along as provenance.
+    Cache: 900s latest / 86400s dated (the past is immutable).
+    """
+    if date and not _re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return _error(400, "date must be YYYY-MM-DD")
+    pk = f"{USER_PREFIX}character_receipt"
+    if date:
+        resp = table.get_item(Key={"pk": pk, "sk": f"DATE#{date}"})
+        item = resp.get("Item")
+    else:
+        resp = table.query(
+            **with_phase_filter(
+                {  # latest CURRENT-cycle receipt (ADR-058 — archived ones need ?date=)
+                    "KeyConditionExpression": Key("pk").eq(pk) & Key("sk").begins_with("DATE#"),
+                    "ScanIndexForward": False,
+                    "Limit": 1,
+                }
+            )
+        )
+        items = resp.get("Items", [])
+        item = items[0] if items else None
+    cache_s = 86400 if date else 900
+    if not item:
+        return _ok(
+            {
+                "available": False,
+                "date": date,
+                "reason": "no progression receipt recorded for this date — receipts began with #1373; earlier changes have no recorded inputs and are never back-fabricated (ADR-104)",
+            },
+            cache_seconds=cache_s,
+        )
+
+    receipt = _decimal_to_float({k: v for k, v in item.items() if k not in ("pk", "sk")})
+    body = {"available": True, "receipt": receipt, "replay": None}
+    if verify:
+        try:
+            import boto3 as _boto3
+            import character_engine as _ce
+            import progression_receipts as _pr
+
+            bucket = os.environ.get("S3_BUCKET", "matthew-life-platform")
+            s3 = _boto3.client("s3", region_name=S3_REGION)
+            cfg = json.loads(s3.get_object(Bucket=bucket, Key=f"config/{USER_ID}/character_sheet.json")["Body"].read())
+            body["replay"] = _pr.replay(item, cfg, engine=_ce)
+        except Exception as e:  # verify is best-effort; the receipt itself still serves
+            logger.warning("character_receipt: replay failed: %s", e)
+            body["replay"] = {"available": False, "reason": "replay unavailable (config load or engine error)"}
+        cache_s = 900  # a verify verdict is against the LIVE config — never cache it a day
+    return _ok(body, cache_seconds=cache_s)
+
+
 def handle_character_stats() -> dict:
     """
     GET /api/character_stats

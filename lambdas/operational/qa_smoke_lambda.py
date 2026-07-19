@@ -643,6 +643,64 @@ def check_reader_truth():
 # subject goes stale, before a reader can bet on a dead week.
 
 
+def check_receipt_replay():
+    """#1373: progression-receipt drift alarm (nightly leg).
+
+    Replays the last 7 stored character_receipt records through the LIVE
+    bundled engine + the LIVE S3 config:
+      - a mismatch with UNCHANGED config hash + engine version = real
+        nondeterminism (or a tampered receipt) → RED (the drift alarm);
+      - config/engine changed since a receipt was written → YELLOW (expected
+        exactly once after a deliberate change; new receipts re-baseline on
+        the next compute);
+      - all digests reproduce → green.
+    No receipts at all is YELLOW until the first post-#1373 compute lands.
+    """
+    c = Check("character:receipt_replay", "Character Receipts")
+    try:
+        import character_engine
+        import progression_receipts as pr
+
+        resp = table.query(
+            KeyConditionExpression=Key("pk").eq(USER_PREFIX + "character_receipt") & Key("sk").begins_with("DATE#"),
+            ScanIndexForward=False,
+            Limit=7,
+        )
+        items = [it for it in resp.get("Items", []) if not it.get("tombstone")]
+        if not items:
+            c.warn("no progression receipts stored yet — the first one lands on the next character-sheet compute (#1373)")
+            return [c]
+        config = character_engine.load_character_config(s3, S3_BUCKET)
+        if not config:
+            c.warn("character config unavailable from S3 — replay skipped this run")
+            return [c]
+        drifted, mismatched = [], []
+        for it in items:
+            date = str(it.get("date") or it.get("sk", "")).replace("DATE#", "")[:10]
+            verdict = pr.replay(it, config, engine=character_engine)
+            if verdict["verified"]:
+                continue
+            if verdict["config_drift"] or verdict["engine_drift"]:
+                drifted.append(date)
+            else:
+                mismatched.append(date)
+        if mismatched:
+            c.fail(
+                f"replay MISMATCH with unchanged config+engine on {mismatched} — deterministic replay no longer "
+                f"reproduces the stored digest; the progression math cannot be trusted until this is explained (#1373)"
+            )
+        elif drifted:
+            c.warn(
+                f"config/engine changed since receipt(s) {drifted} were written — expected once after a deliberate "
+                f"change; nightly computes re-baseline going forward"
+            )
+        else:
+            c.ok(f"{len(items)} receipt(s) replay clean against the live engine + config")
+    except Exception as e:
+        c.warn(f"receipt replay check errored: {e}")
+    return [c]
+
+
 def _iso_week_id(dt):
     iso = dt.isocalendar()
     return f"{iso[0]}-W{iso[1]:02d}"
@@ -882,6 +940,7 @@ def lambda_handler(event, context):
         all_checks += check_reader_truth()  # #1096: phase-aware narrative truth (Haiku, budget-aware, fail-soft)
         all_checks += check_predict_week_freshness()  # #1198: predict-the-week never live on a stale ISO week
         all_checks += check_hero_weight_arithmetic()  # #1225: home hero stat row reconciles + trend-honest
+        all_checks += check_receipt_replay()  # #1373: progression-receipt drift alarm (deterministic replay)
         # blog moved to /story/ in v4 — shown paused (not failed) so it's not forgotten.
         all_checks.append(
             Check("blog:links", "Blog Links").pause("Blog — paused (chronicle now lives at /story/ in v4); will return if revived")
