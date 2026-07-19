@@ -175,6 +175,104 @@ def check_apple_health_activity(table, now, sick_suppress):
     return msg, metrics
 
 
+# ── #1480: Notion journal channel dark >7d guard ────────────────────────────
+# The generic per-source loop above tolerates notion for 14 days (#746's lenient
+# evening-nudge threshold, deliberately loose for ad-hoc journaling) AND the
+# notion registry entry is `monitored: False` — which structurally excludes it
+# from checker_sources()/SOURCES entirely, so it never reaches the SNS/CloudWatch
+# paging path above at ANY staleness. That combination is the actual root cause
+# of "journal dark for weeks with no alarm." The journal is the SOT for
+# subjective data (enrichment → PERMA flourishing → the Mind pillar), and it's a
+# daily practice, not a monthly channel — this is a NEW, separate, tighter
+# ops-facing guard (not a change to the registry facet, which correctly serves
+# the lenient nudge/board surfaces elsewhere).
+NOTION_JOURNAL_DARK_ALERT_DAYS = int(os.environ.get("NOTION_JOURNAL_DARK_ALERT_DAYS", "7"))
+_NOTION_ALERT_STATE_SK = "ALERTSTATE#notion_journal_dark"  # #1480 episode sentinel
+
+
+def check_notion_journal_staleness(table, now, sick_suppress=False):
+    """Detect the Notion journal channel going dark >NOTION_JOURNAL_DARK_ALERT_DAYS.
+
+    Finds the latest journal entry across ALL templates (morning/evening/stressor/…
+    all share the DATE#{date}#journal#... sk prefix, so lexicographic ordering by
+    date still finds the truly latest date). Returns (alert_message_or_None,
+    metrics_dict) where metrics_dict feeds CloudWatch — mirrors
+    check_apple_health_activity's shape exactly.
+    """
+    pk = f"USER#{USER_ID}#SOURCE#notion"
+    metrics = {"dark_days": 0.0, "degraded": 0.0}
+    try:
+        resp = table.query(
+            KeyConditionExpression="pk = :pk AND begins_with(sk, :pfx)",
+            ExpressionAttributeValues={":pk": pk, ":pfx": "DATE#"},
+            ScanIndexForward=False,
+            Limit=1,
+            ProjectionExpression="sk",
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("notion journal staleness query failed (non-fatal): %s", e)
+        return None, metrics
+
+    items = resp.get("Items", [])
+    if not items:
+        # Never ingested, or every entry has since been deleted — maximally dark.
+        # There's no real last-entry date to compute a day count from, so don't
+        # invent one (no divide-by-zero, no false precision): use a large,
+        # honest sentinel for the CloudWatch metric and say so plainly in the
+        # message rather than claiming a fabricated day count.
+        metrics["dark_days"] = 9999.0
+        metrics["degraded"] = 1.0
+        if sick_suppress:
+            logger.info("Notion journal has no entries at all, but suppressed (sick day)")
+            return None, metrics
+        msg = (
+            "⚠️ Life Platform: Journal channel has no entries at all\n\n"
+            "The Notion journal (SOURCE#notion) has never ingested a record — or every\n"
+            "entry has since been deleted. The journal is the SOT for subjective data:\n"
+            "enrichment → PERMA flourishing → the Mind pillar all go quiet with it.\n\n"
+            "What to do:\n"
+            "  • Write a journal entry (any template), or run a journal-interview chat\n"
+            "    mode, which creates a Notion page via the MCP connector.\n"
+            "    See docs/coaching/CHAT_MODES.md.\n\n"
+            f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+        )
+        return msg, metrics
+
+    sk = items[0]["sk"]
+    last_date_str = sk.replace("DATE#", "")[:10]
+    try:
+        last_date = datetime.strptime(last_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        logger.warning("notion journal staleness: unparseable sk date %r", sk)
+        return None, metrics
+
+    dark_days = (now.date() - last_date).days
+    metrics["dark_days"] = float(dark_days)
+
+    if dark_days <= NOTION_JOURNAL_DARK_ALERT_DAYS:
+        return None, metrics
+
+    metrics["degraded"] = 1.0
+    if sick_suppress:
+        logger.info("Notion journal dark (%dd) but suppressed (sick day)", dark_days)
+        return None, metrics
+
+    msg = (
+        f"⚠️ Life Platform: Journal channel dark >{NOTION_JOURNAL_DARK_ALERT_DAYS} days\n\n"
+        f"No Notion journal entry in {dark_days} days (last entry {last_date_str}). The\n"
+        "journal is the SOT for subjective data — enrichment → PERMA flourishing → the\n"
+        "Mind pillar all go quiet with it. This is a daily practice, not a monthly\n"
+        "channel, so the generic per-source staleness tolerance (14 days, #746) is too\n"
+        "loose to catch this — hence this dedicated guard.\n\n"
+        "What to do:\n"
+        "  • Write a journal entry (any template), or run a journal-interview chat mode,\n"
+        "    which creates a Notion page via the MCP connector.\n"
+        "    See docs/coaching/CHAT_MODES.md.\n\n"
+        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return msg, metrics
+
+
 def _rec_date(it):
     """YYYY-MM-DD from an apple_health DATE# item's sk."""
     return str(it.get("sk", "")).replace("DATE#", "")[:10]
@@ -838,9 +936,60 @@ def lambda_handler(event, context):
     except Exception as _ah_e:
         logger.error("Apple Health activity-integrity check failed (non-fatal): %s", _ah_e)
 
+    # ── #1480: Notion journal channel dark >7d guard ──
+    # Same episode-dedup pattern as the Apple Health guard above: reuse the generic
+    # alert_episode_decision() pure function, a sentinel SK on the notion source's
+    # OWN pk (not a new partition, consistent with how the AH sentinel lives on the
+    # apple_health pk), and one open-alert + at most a daily reminder rather than a
+    # fresh SNS send every single run while the journal stays dark.
+    notion_degraded = False
+    notion_dark_days = 0.0
+    _notion_pk = f"USER#{USER_ID}#SOURCE#notion"
+    try:
+        notion_alert, notion_metrics = check_notion_journal_staleness(table, now, _sick_suppress)
+        notion_degraded = bool(notion_metrics.get("degraded"))
+        notion_dark_days = float(notion_metrics.get("dark_days", 0.0))
+        _n_prior = {}
+        try:
+            # ConsistentRead: the dedup verdict depends on the just-written state, so a
+            # stale replica read could re-fire the alert (same rationale as the AH guard).
+            _n_prior = (table.get_item(Key={"pk": _notion_pk, "sk": _NOTION_ALERT_STATE_SK}, ConsistentRead=True).get("Item")) or {}
+        except Exception as _se:
+            logger.warning("notion alert-state read failed (fail-open to send): %s", _se)
+        _n_should_send, _n_new_state, _n_kind = alert_episode_decision(_n_prior, notion_degraded, now)
+        try:
+            table.put_item(Item={"pk": _notion_pk, "sk": _NOTION_ALERT_STATE_SK, **_n_new_state})
+        except Exception as _we:
+            logger.error("notion alert-state write failed (non-fatal): %s", _we)
+        if notion_alert and _n_should_send:
+            try:
+                _subj = f"⚠️ Life Platform: Journal channel dark >{NOTION_JOURNAL_DARK_ALERT_DAYS} days"
+                if _n_kind == "reminder":
+                    _subj += " (ongoing)"
+                sns.publish(TopicArn=SNS_ARN, Subject=_subj, Message=notion_alert)
+                logger.info("Notion journal dark alert sent (episode=%s)", _n_kind)
+            except Exception as _ae:
+                logger.error("Notion journal dark alert SNS publish failed: %s", _ae)
+        elif notion_alert:
+            logger.info("Notion journal dark but alert held (episode=%s, no re-fire)", _n_kind)
+        try:
+            cw.put_metric_data(
+                Namespace="LifePlatform/Freshness",
+                MetricData=[
+                    {"MetricName": "NotionJournalDarkDays", "Value": notion_dark_days, "Unit": "Count"},
+                    {"MetricName": "NotionJournalDegraded", "Value": notion_metrics.get("degraded", 0.0), "Unit": "Count"},
+                ],
+            )
+        except Exception as _me:
+            logger.error("Notion journal metric emit failed (non-fatal): %s", _me)
+    except Exception as _n_e:
+        logger.error("Notion journal staleness check failed (non-fatal): %s", _n_e)
+
     return {
         "statusCode": 200,
         "apple_health_activity_degraded": ah_degraded,
+        "notion_journal_dark_days": notion_dark_days,
+        "notion_journal_degraded": notion_degraded,
         "stale_count": len(stale_sources),
         "stale_sources": [s[0] for s in stale_sources],
         "partial_count": len(partial_sources),
