@@ -14,7 +14,8 @@ Endpoints routed from this module (kept in sync by tests/test_site_api_data_spli
   /api/cycle_compare, /api/survival
   /api/device_agreement, /api/last_sync, /api/source_freshness, /api/presence
   /api/discoveries, /api/ledger, /api/what_changed
-  /api/experiments, /api/supplements, /api/vice_streaks, /api/fulfillment_ritual
+  /api/experiments, /api/supplements, /api/vice_streaks, /api/fulfillment_ritual,
+  /api/fulfillment_index
   /api/character_calibration (#1409 — felt-reality calibration ledger, aggregates only)
   /api/habits, /api/habit_streaks, /api/habit_registry
   /api/routine (#1066 — the prescribed training block, counts-only projection)
