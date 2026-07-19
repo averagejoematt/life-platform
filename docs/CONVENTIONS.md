@@ -1,14 +1,14 @@
 # CONVENTIONS — the load-bearing reflexes
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-10
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
 The single canonical home for the hard-won operational reflexes that keep a deploy
 from silently regressing production. Each one was learned from a real incident. When
 a rule here changes, it changes **here** — the project brief (`CLAUDE.md`) and the
 memory index point at this page rather than restating it, so a rule can't rot in one
 copy while another stays stale (the failure mode that motivated this page: a durable
-fact — the shared-layer version — drifted because it was hand-written in prose in two
-places instead of read from one source).
+fact — the version of the since-retired shared layer — drifted because it was
+hand-written in prose in two places instead of read from one source).
 
 **The meta-rule:** a fact that drifts (a version, a count) never appears here as a
 hand-typed literal — only as the command that discovers it, or a value a tool keeps in
@@ -362,6 +362,43 @@ AI powered down.** Four layers, each with a named owner-mechanism:
 **Adding a page:** flat in `docs/` if canonical (`specs/` dated spec, `archive/`
 superseded) → status header → one line in `docs/README.md` → checkers green. That is
 the entire process; anything more wouldn't get followed.
+
+### 8a. Eradicating a wrong fact — the corpus-wide ritual (#1347)
+
+**The failure mode:** #1254 (2026-07-18) fixed the claim that the cost-governor "runs
+hourly" <!-- drift-ok: quoting the #1254 incident this ritual generalizes from, not a live claim --> (true cadence: every 8h) on the 3 files its author happened to grep,
+guarded by a test that hardcoded those 3 literal paths. The same wrong fact was live
+in 2 more files (`docs/RUNBOOK.md`, `docs/ARCHITECTURE.md`) *the same day the fix
+merged* — the enumerated-file test structurally cannot see a copy it didn't
+enumerate, so "fixed" was true only at the 3 spots someone happened to look. #781 hit
+the identical shape a month earlier: the retired shared layer's old name survived as
+"shared-layer" (hyphen) and "Shared-layer" (capitalized, retired-concept name
+unchanged) — spellings the fix's own regex never tried.
+
+**The ritual, every time a wrong fact needs killing:**
+
+1. **Grep every phrasing before you fix anything** — `docs/` + `site/` + `lambdas/` +
+   `mcp/`, not just the file(s) where you first spotted it. Try the hyphen, the
+   underscore, the space, and the capitalized-sentence-initial form; a compound term
+   is not one string, it's a small family of strings. `grep -rniE` across all four
+   trees, read every hit, decide fix-vs-legitimately-historical for each.
+2. **Add (or harden) a GATE rule that matches the *pattern*, not the literal
+   locations** — `docs/_lint/tombstones.txt` for a retired-concept claim,
+   `scripts/check_doc_facts.py`'s proximity-scan shape (name-token + wrong-value-token
+   co-occurring on one line, ground-truthed from the same discoverer the rest of the
+   file uses, HISTORICAL-exempt) for a stale number/cadence/claim. **Never write a
+   test that hardcodes the N files you found** — enumeration is exactly the shape that
+   fails silently one file over. A rule earns its keep only by proof of two things:
+   it FLAGS a planted instance of the wrong phrasing (the #1189 non-vacuous-scan
+   lesson) and it stays QUIET on legitimate history (HISTORICAL framing, ledgers,
+   archives) — every scan in `check_doc_facts.py` and `check_doc_tombstones.py`
+   carries a paired `_is_not_vacuous` test proving both.
+3. **Fix every real hit the hardened rule surfaces**, not just the ones you already
+   knew about — the whole point is that the corpus-wide grep in step 1 and the
+   generalized rule in step 2 usually find MORE than the triggering report did.
+4. **Run the hardened gate on the pre-fix tree and show it RED** before committing
+   the fix — that's the proof the rule would have caught the original defect, not
+   just a plausible-looking regex.
 
 ---
 

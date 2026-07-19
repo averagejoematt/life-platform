@@ -30,16 +30,17 @@ import coach_traits  # #1113: authored trait scores for the immersive bios (bund
 from boto3.dynamodb.conditions import Key
 from phase_filter import singleton_visible, with_phase_filter  # ADR-058 / #946
 
-# CC-00/CC-09 shared-layer modules. Imported defensively so a site-api CODE deploy
-# that lands BEFORE the layer (with these modules) is published doesn't break the
-# whole handler — the coaches endpoints just serve shaped-empty 200s until the
-# layer catches up. (CI ships code, not the layer — see handover gotcha #1.)
+# CC-00/CC-09 modules — bundled into the site-api code package like every other
+# lambdas/ module (#781: one bundle, no separate layer, so there's no deploy-race
+# window for these to lag behind). Imported defensively anyway so a corrupted or
+# partial deploy can't break the whole handler — the coaches endpoints just serve
+# shaped-empty 200s if these modules are ever unavailable.
 try:
     import coach_stance
     import persona_registry
 
     _COACH_MODULES = True
-except Exception:  # pragma: no cover - exercised only during the layer-lag window
+except Exception:  # pragma: no cover - defensive guard, not expected in practice post-#781
     coach_stance = None
     persona_registry = None
     _COACH_MODULES = False
@@ -59,7 +60,7 @@ from web.site_api_common import (
 
 try:
     from constants import EXPERIMENT_BASELINE_WEIGHT_LBS
-except Exception:  # pragma: no cover - constants always present in layer
+except Exception:  # pragma: no cover - constants.py ships in every bundle (#781); defensive only
     EXPERIMENT_BASELINE_WEIGHT_LBS = 306.87
 
 # ── CC-00/01/02/09 — Coaches-as-Characters surfacing ─────────────────────────

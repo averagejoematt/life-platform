@@ -23,6 +23,17 @@ SCOPE:
   MCP_TOOL_AUDIT, and docs/{archive,specs,reviews,audits,v2-audits,rca,restart,
   briefs,site-reviews}/, handovers/, docs/_lint/ itself.
 
+VARIANT FORMS (#1347): a retired concept doesn't stay on one spelling. #781's
+"shared layer" survived as "shared-layer" (hyphen, no space) and "Shared-layer"
+(capitalized, sentence-initial in docstrings) — both slipped through the prior
+space-only, case-sensitive rule (RUNBOOK.md:1364, and 8 lambdas/ docstrings, found
+by the corpus-wide grep this issue codifies below). Rules now compile with
+re.IGNORECASE, and docs/_lint/tombstones.txt uses `[- ]` wherever a retired
+compound could plausibly be written with a hyphen instead of a space. When you
+retire a NEW concept: grep every phrasing (hyphen, space, and squashed — see
+docs/CONVENTIONS.md's "eradicating a wrong fact" ritual) before trusting the rule
+non-vacuous; a regex that matches only the one spelling you tested is not done.
+
 USAGE:
   python3 scripts/check_doc_tombstones.py          # exit 1 on any live hit
   python3 scripts/check_doc_tombstones.py --all    # include exempt files (advisory)
@@ -49,9 +60,13 @@ EXEMPT_FILES = {
 # Includes the "NOT/no/without the shared layer" and "X it replaces" framings
 # that source docstrings use to say a concept is gone (#781). Module-level so
 # tests can prove a planted stale line is NOT exempted (#1322 non-vacuity).
+# #1347: the shared-layer negation framings are hyphen-tolerant (`shared[- ]layer`)
+# so "imports no shared-layer modules" is exempted exactly like "imports no shared
+# layer modules" always was — the negation is legitimate history either spelling;
+# only the RULES below (also hyphen-tolerant now) decide what's a stale claim.
 RETIREMENT_LINE_RE = re.compile(
     r"retired|removed|superseded|no longer|banned|do (?:NOT|not)|never hand-roll|tombstone|was deleted"
-    r"|replaces?|replaced|no shared layer|without the shared layer|not the (?:retired )?shared layer",
+    r"|replaces?|replaced|no shared[- ]layer|without the shared[- ]layer|not the (?:retired )?shared[- ]layer",
     re.I,
 )
 EXEMPT_DIRS = (
@@ -70,13 +85,20 @@ EXEMPT_DIRS = (
 
 
 def _rules() -> list[tuple[re.Pattern, str]]:
+    """Parse docs/_lint/tombstones.txt into (compiled-regex, hint) pairs.
+
+    #1347: compiled case-insensitively — a retired concept is named the same
+    regardless of sentence-initial capitalization ("Shared-layer module" vs
+    "shared-layer module"), and a rules-file author writing a new pattern
+    shouldn't have to hand-roll a `[Ss]hared` character class to catch both.
+    """
     rules = []
     for line in RULES_FILE.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
         pattern, _, hint = line.partition("\t")
-        rules.append((re.compile(pattern.strip()), hint.strip() or "(no hint)"))
+        rules.append((re.compile(pattern.strip(), re.IGNORECASE), hint.strip() or "(no hint)"))
     return rules
 
 
