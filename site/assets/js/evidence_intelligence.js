@@ -242,28 +242,50 @@ export async function renderCorrelations(d) {
   return head + betsLine + tbl + (obj.methodology ? `<p class="rd-desc">${esc(obj.methodology)}</p>` : "") + note("Correlative only — Pearson r with Benjamini-Hochberg FDR control across all pairs. Never causal. p-values below 0.001 display as &lt;0.001.");
 }
 
+// One stat block (season OR career) — shared so the two cards render identically.
+function _calStatFigs(s) {
+  const cal = String(s.calibration || "").replace(/_/g, " ");
+  return figs([
+    fig(s.n, "graded forecasts", null, "calibration_score_pairs"),
+    s.brier != null && fig(fmt(s.brier), "Brier", null, "brier_score"),
+    s.brier_skill != null && fig(fmt(s.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
+    s.accuracy_pct != null && fig(fmt(s.accuracy_pct) + "%", "hit rate", null, "calibration_score_pairs"),
+    // #1370 honest badge: calibrated (reliability) ≠ skilled (beats base rate). A
+    // skill ≤ 0 surface reads the dignified state with its n, never "Well Calibrated".
+    s.calibration === "not_yet_skillful"
+      ? fig("Not Yet Skillful", `n=${s.n}, skill ≤ base rate`, null, "brier_skill_score")
+      : s.calibration && s.calibration !== "insufficient_data" && fig(ttl(cal), "calibration", null, "calibration_verdict"),
+  ]);
+}
+
 // Predictions — the coaches' forward calls, scored against measured outcomes.
 // Calibration scoreboard (#538) — every forecast graded against reality. Platform +
 // per-coach Brier, the reliability curve (stated confidence vs. what came true), and
 // the hypothesis engine's own ledger. The honesty moat, made legible.
+//
+// #1376: career (every cycle, the CROSS_PHASE calibration ledger + every
+// archived PREDICTION#) beside this season (current cycle only) — sports-card
+// pattern. A reset wipes the SEASON view honestly to zero; it must never wipe
+// the platform's actual track record out of sight along with it.
 export function renderCalibration(d) {
   const p = (d && d.platform) || {};
+  const life = p.lifetime || {};
   const coaches = (d && d.coaches) || [];
   const hyp = (d && d.hypotheses) || {};
-  if (!(p.n > 0))
+  const cycle = d && d.cycle;
+  // True zero state: nothing has ever graded, this cycle or any before it.
+  if (!(p.n > 0) && !(life.n > 0))
     return empty("No graded forecasts yet — the calibration ledger restarts at each genesis. Coaches log forward predictions with a stated confidence; a deterministic evaluator scores each against measured outcomes as its target date passes. Brier scores and the reliability curve fill in as the first calls come due — the platform grading its own predictions, in public.");
-  const cal = String(p.calibration || "").replace(/_/g, " ");
-  const head = figs([
-    fig(p.n, "graded forecasts", null, "calibration_score_pairs"),
-    p.brier != null && fig(fmt(p.brier), "platform Brier", null, "brier_score"),
-    p.brier_skill != null && fig(fmt(p.brier_skill), "skill vs base-rate", null, "brier_skill_score"),
-    p.accuracy_pct != null && fig(fmt(p.accuracy_pct) + "%", "hit rate", null, "calibration_score_pairs"),
-    // #1370 honest badge: calibrated (reliability) ≠ skilled (beats base rate). A
-    // skill ≤ 0 surface reads the dignified state with its n, never "Well Calibrated".
-    p.calibration === "not_yet_skillful"
-      ? fig("Not Yet Skillful", `n=${p.n}, skill ≤ base rate`, null, "brier_skill_score")
-      : p.calibration && p.calibration !== "insufficient_data" && fig(ttl(cal), "calibration (reliability)", null, "calibration_verdict"),
-  ]);
+
+  const seasonBody = p.n > 0
+    ? _calStatFigs(p)
+    : `<p class="cs-fresh">Fresh slate — career: n=${life.n}. Nothing has graded this cycle yet; the coaches' calls are already logged and resolve as their windows close.</p>`;
+  const careerBody = life.n > 0 ? _calStatFigs(life) : `<p class="cs-fresh">No graded forecasts in the archive yet.</p>`;
+  const pair = `<div class="cs-pair">` +
+    `<div class="cs-card"><h3 class="cs-h">This season${cycle ? ` · cycle ${esc(cycle)}` : ""}</h3>${seasonBody}</div>` +
+    `<div class="cs-card"><h3 class="cs-h">Career · every cycle</h3>${careerBody}</div>` +
+    `</div>`;
+
   const bins = p.reliability_bins || [];
   const relRows = bins
     .map(
@@ -273,22 +295,27 @@ export function renderCalibration(d) {
     .join("");
   const relTbl = bins.length
     ? sec(
-        "Reliability curve — stated confidence vs. what actually happened",
+        "Reliability curve — this season's stated confidence vs. what actually happened",
         `<table class="rd-tbl"><thead><tr><th>confidence band</th><th>n</th><th>said</th><th>came true</th></tr></thead><tbody>${relRows}</tbody></table>`,
       )
     : "";
   const cRows = coaches
-    .map(
-      (c) =>
-        `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}</td><td class="num">${c.n}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range">${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${c.calibration && c.calibration !== "insufficient_data" ? esc(ttl(String(c.calibration).replace(/_/g, " "))) : "—"}</td></tr>`,
-    )
+    .map((c) => {
+      const cl = c.lifetime || {};
+      const seasonN = c.n > 0 ? String(c.n) : "fresh slate";
+      const careerN = cl.n != null ? String(cl.n) : "—";
+      const calCell = c.calibration && c.calibration !== "insufficient_data"
+        ? esc(ttl(String(c.calibration).replace(/_/g, " ")))
+        : (cl.calibration && cl.calibration !== "insufficient_data" ? `career ${esc(ttl(String(cl.calibration).replace(/_/g, " ")))}` : "—");
+      return `<tr><td class="rd-name">${esc(c.coach_name || c.coach_id)}</td><td class="num">${seasonN}</td><td class="num">${careerN}</td><td class="num">${c.brier != null ? fmt(c.brier) : "—"}</td><td class="num rd-range">${c.accuracy_pct != null ? fmt(c.accuracy_pct) + "%" : "—"}</td><td>${calCell}</td></tr>`;
+    })
     .join("");
   const board = sec(
     "The scoreboard — by coach",
-    `<table class="rd-tbl"><thead><tr><th>coach</th><th>graded</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
+    `<table class="rd-tbl"><thead><tr><th>coach</th><th>season</th><th>career</th><th>Brier</th><th>hit rate</th><th>calibration</th></tr></thead><tbody>${cRows}</tbody></table>`,
   );
-  const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved, Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
-  return head + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.");
+  const hypLine = hyp && hyp.n > 0 ? note(`Hypothesis engine: ${hyp.n} resolved this season (career ${(hyp.lifetime && hyp.lifetime.n) || hyp.n}), Brier ${fmt(hyp.brier)}${hyp.calibration && hyp.calibration !== "insufficient_data" ? " (" + ttl(String(hyp.calibration).replace(/_/g, " ")) + ")" : ""}.`) : "";
+  return pair + relTbl + board + hypLine + note(d.disclosure || "Self-graded against the platform's own data — Brier 0 is perfect, 0.25 is the always-say-50% baseline, lower is better.");
 }
 
 export function renderPredictions(d) {

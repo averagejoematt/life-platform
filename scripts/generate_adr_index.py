@@ -60,6 +60,66 @@ _DATE_BODY_RE = re.compile(r"\*\*Date:?\*\*:?\s*(\d{4}-\d{2}-\d{2})")
 _DATE_ANY_RE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 _STATUS_BODY_RE = re.compile(r"\*\*Status:?\*\*:?\s*([^\n]+)")
 
+# --- Unmarked-supersession guard (#1343) --------------------------------
+# A record whose Status is a bare "Active" while a LATER record's own text names it
+# with "supersedes/amends/retires ADR-NNN" is a stale-status lie in the making — the
+# 2026-07-18 SDLC review found exactly this on ADR-013/ADR-027 (retired by ADR-131,
+# still reading "Active"). This is a structural check, not a string match on one pair:
+# it walks every record's body for the verb+number pattern and cross-checks the target.
+_SUPERSESSION_VERB_RE = re.compile(r"\b(?:supersede[sd]?|amend(?:s|ed)?|retire[sd]?)\s+ADR-(\d{3})", re.IGNORECASE)
+# Marker keywords that count as "the target record already says so" — either in its own
+# Status field or anywhere in its body (a **Superseded by:** / **Amended by:** note, or a
+# back-reference to the citing record's number).
+_MARKER_KEYWORDS_RE = re.compile(r"superseded|retired|amended|deprecated", re.IGNORECASE)
+_BARE_ACTIVE_RE = re.compile(r"^active\b", re.IGNORECASE)
+
+
+def _full_record_texts(src: str) -> dict[str, dict]:
+    """Untruncated status + full body per record number — the table-building `_records()`
+    truncates status to 40 chars for display, which is too short to search for marker
+    keywords reliably. This is the parallel full-text extraction for the guard below."""
+    matches = list(_HEADING_RE.finditer(src))
+    out: dict[str, dict] = {}
+    for i, m in enumerate(matches):
+        body_end = matches[i + 1].start() if i + 1 < len(matches) else len(src)
+        body = src[m.end() : body_end]
+        status_m = _STATUS_BODY_RE.search(body)
+        out[m.group(1)] = {
+            "status": (status_m.group(1).strip() if status_m else ""),
+            "body": body,
+            "title": m.group(2).strip() or "(untitled)",
+        }
+    return out
+
+
+def _find_unmarked_supersessions(src: str) -> list[str]:
+    """Returns one message per (citing record, target record) pair where the target's
+    Status is bare 'Active' and carries no marker, despite another record's body naming
+    it with supersedes/amends/retires. Order-independent — checks every pair, not just
+    numerically-later ones, since ADRs are occasionally amended out of number order."""
+    full = _full_record_texts(src)
+    flags = []
+    for source_num, rec in full.items():
+        for verb_m in _SUPERSESSION_VERB_RE.finditer(rec["body"]):
+            target_num = verb_m.group(1)
+            if target_num == source_num or target_num not in full:
+                continue
+            target = full[target_num]
+            status_is_bare_active = bool(_BARE_ACTIVE_RE.match(target["status"])) and not _MARKER_KEYWORDS_RE.search(target["status"])
+            if not status_is_bare_active:
+                continue
+            marker_in_target_body = bool(_MARKER_KEYWORDS_RE.search(target["body"])) or bool(
+                re.search(rf"ADR-{source_num}\b", target["body"])
+            )
+            if marker_in_target_body:
+                continue
+            verb_word = verb_m.group(0).split()[0]
+            flags.append(
+                f"ADR-{target_num} ({target['title'][:50]}) Status: Active, but ADR-{source_num} {verb_word} "
+                f"it and ADR-{target_num}'s own record carries no marker back"
+            )
+    return flags
+
 
 def _records(src: str) -> list[dict]:
     matches = list(_HEADING_RE.finditer(src))
@@ -145,6 +205,21 @@ def main():
     gaps = [f"ADR-{i:03d}" for i in range(lo, hi + 1) if f"{i:03d}" not in all_nums]
     if gaps:
         print(f"⚠️  unused ADR number(s) in the {lo:03d}–{hi:03d} sequence (skipped/merged — see #817): {', '.join(gaps)}")
+
+    # Unmarked-supersession guard (#1343): a record whose Status is bare "Active" while
+    # a later record's own text names it with supersedes/amends/retires, and the target
+    # carries no marker back. --check treats this as a hard error (a stale Status field
+    # is a wrong CURRENT claim on the platform's history file); other modes warn only,
+    # so `--apply`/dry-run still regenerate the index table around the problem.
+    supersession_flags = _find_unmarked_supersessions(src)
+    if supersession_flags:
+        prefix = "❌" if is_check else "⚠️ "
+        print(f"{prefix} {len(supersession_flags)} unmarked supersession(s) (#1343):")
+        for f in supersession_flags:
+            print(f"   {f}")
+        if is_check:
+            print("\nFix: mark the target record's Status field (e.g. 'Superseded by ADR-NNN') or add a body marker.")
+            sys.exit(1)
 
     table = _build_table(records)
     pre, rest = src.split(START_MARKER, 1)
