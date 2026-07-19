@@ -75,33 +75,15 @@ def _evidence_rows():
     return rows
 
 
-# ── Visual defs for the archive topics already in the Playwright sweep ────────
-# Exactly the pre-#1426 tests/visual_qa.py coverage (EVIDENCE_TOPICS +
-# METHOD_TOPICS + the /method/character/ explainer + the three protocols topic
-# pages). #1427 extends visual coverage to the rest — flipping a page in is a
+# ── Visual defs for the archive topics ────────────────────────────────────────
+# Every archive/readout page (the /data/ · /protocols/ · /method/ topic pages
+# generated from scripts/v4_build_evidence.REGISTRY) shares one template —
+# evidence.js always mounts content into a `[data-readout]` element, for every
+# mode (data/interactive/editorial) — verified by grep across the built site/
+# (#1427). So _readout_visual applies uniformly to ALL archive rows now, not
+# just the pre-#1426 hand-picked subset; flipping a page into the sweep is a
 # one-line visual= change here, not a new list anywhere.
 CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training", "character"}
-_VISUAL_EVIDENCE = {
-    "/data/vitals/",
-    "/data/physical/",
-    "/data/labs/",
-    "/data/glucose/",
-    "/data/sleep/",
-    "/data/training/",
-    "/data/nutrition/",
-    "/data/habits/",
-    "/data/character/",
-    "/method/board/",
-    "/method/pipeline/",
-    "/method/intelligence/",
-    "/method/predictions/",
-    "/method/scenarios/",
-    "/method/benchmarks/",
-    "/method/character/",
-    "/protocols/experiments/",
-    "/protocols/challenges/",
-    "/protocols/supplements/",
-}
 
 
 def _readout_visual(path: str, title: str) -> dict:
@@ -127,7 +109,7 @@ def _archive_entries():
                 "content_class": "live-data" if live else "narrative",
                 "api_deps": [endpoint] if (live and endpoint) else [],
                 "js_modules": ["evidence.js"],
-                "visual": _readout_visual(path, title) if path in _VISUAL_EVIDENCE else None,
+                "visual": _readout_visual(path, title),
                 "leak_scan": True,
                 "smoke": "200",
                 "unlisted": "unlisted" in flags,
@@ -261,7 +243,7 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": ["story.js"],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "build dispatches content"}]},
     },
     {
         "path": "/story/panel/",
@@ -270,7 +252,7 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": ["/panelcast/episodes.json"],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "panelcast content"}]},
     },
     {
         "path": "/story/timeline/",
@@ -279,7 +261,7 @@ _CURATED = [
         "content_class": "live-data",
         "api_deps": ["/api/timeline"],
         "js_modules": ["story.js"],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "timeline content"}]},
     },
     {
         "path": "/data/",
@@ -314,7 +296,10 @@ _CURATED = [
         "content_class": "live-data",
         "api_deps": [],
         "js_modules": ["evidence.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-readout]",
+            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "method readout rendered"}],
+        },
     },
     {
         "path": "/method/game/",
@@ -323,7 +308,12 @@ _CURATED = [
         "content_class": "generated",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "game explainer content"},
+                {"selector": ".gx-pillar", "min_count": 7, "desc": "7 pillar cards rendered"},
+            ]
+        },
     },
     {
         "path": "/method/registry/",
@@ -332,7 +322,12 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "methods registry content"},
+                {"selector": ".mr-stat", "min_count": 1, "desc": "registry stat entries rendered"},
+            ]
+        },
     },
     # ── Coaching door (promoted 2026-06-20) ──────────────────────────────────
     {
@@ -421,7 +416,10 @@ _CURATED = [
         "content_class": "live-data",
         "api_deps": ["/api/coach_team"],
         "js_modules": ["coaching.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "team roster/profile rendered (legacy slug)"}],
+        },
     },
     {
         "path": "/coaching/qa/",
@@ -430,7 +428,10 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": ["coaching.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "reader Q&A content rendered"}],
+        },
     },
     {
         "path": "/coaching/read/",
@@ -439,7 +440,10 @@ _CURATED = [
         "content_class": "narrative",
         "api_deps": [],
         "js_modules": ["coaching.js"],
-        "visual": None,
+        "visual": {
+            "wait_for": "[data-dx-read]",
+            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "the-read content rendered"}],
+        },
     },
     # ── Mind (redirect shell → /data/reading/) ───────────────────────────────
     {
@@ -467,7 +471,12 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {
+            "checks": [
+                {"selector": "main, article", "not_empty": True, "desc": "gear content"},
+                {"selector": ".gr-card", "min_count": 1, "desc": "gear cards rendered"},
+            ]
+        },
     },
     {
         "path": "/journal/essays/org-chart-of-one/",
@@ -476,7 +485,7 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, article, .post-body", "not_empty": True, "desc": "essay content"}]},
     },
     {
         "path": "/privacy/",
@@ -485,7 +494,7 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "privacy policy content"}]},
     },
     {
         "path": "/subscribe/",
@@ -494,7 +503,7 @@ _CURATED = [
         "content_class": "static",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "subscribe page content"}]},
     },
     {
         "path": "/subscribe/confirm/",
@@ -503,7 +512,10 @@ _CURATED = [
         "content_class": "utility",
         "api_deps": [],
         "js_modules": [],
-        "visual": None,
+        # Real content (JS renders a confirmed/expired/check-your-inbox state from
+        # the ?confirmed=/?error= query params — default state with no params is
+        # "Check your inbox"), so it earns a check despite tier-4 (#1427).
+        "visual": {"checks": [{"selector": "#cc-title, main", "not_empty": True, "desc": "confirm-state message rendered"}]},
     },
     {
         "path": "/404.html",
@@ -512,6 +524,8 @@ _CURATED = [
         "content_class": "utility",
         "api_deps": [],
         "js_modules": [],
+        # Error page — status-only is the right coverage (smoke already verifies the
+        # 200 on direct S3 fetch); no meaningful render behavior to check (#1427).
         "visual": None,
     },
     {
@@ -522,6 +536,8 @@ _CURATED = [
         "api_deps": [],
         "js_modules": [],
         "leak_scan": False,
+        # Pure meta-refresh redirect stub — no content to check; the target page
+        # (/subscribe/) is visually swept directly (#1427).
         "visual": None,
     },
 ]

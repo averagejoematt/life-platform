@@ -208,6 +208,39 @@ PAGE_BINDINGS = [
         "story_intent": "the honesty machinery made visible — the watchdog agents policing the platform's own AI, and a weekly readout of what they caught (#399)",
         "endpoints": [{"url": "/api/agent_activity", "role": "primary", "metrics": []}],
     },
+    # #1427: three more /story/ pages joined visual_qa.PAGES.
+    {
+        "path": "/story/build/",
+        "name": "Story · build dispatches",
+        "door": "story",
+        "narrative_order": 88,
+        "story_intent": "the build-in-public log — merged+deployed work only, never plans (#380/#736)",
+        "endpoints": [],  # editorial
+    },
+    {
+        "path": "/story/panel/",
+        "name": "Story · panelcast",
+        "door": "story",
+        "narrative_order": 89,
+        "story_intent": "the no-touch podcast pipeline made listenable — weekly episodes over the chronicle (ADR-135)",
+        "endpoints": [{"url": "/panelcast/episodes.json", "role": "primary", "metrics": []}],
+    },
+    {
+        "path": "/story/timeline/",
+        "name": "Story · timeline",
+        "door": "story",
+        "narrative_order": 90,
+        "story_intent": "the whole arc on one axis — every dispatch/chronicle/journal entry plotted against the experiment day",
+        "endpoints": [{"url": "/api/timeline", "role": "primary", "metrics": []}],
+    },
+    {
+        "path": "/journal/essays/org-chart-of-one/",
+        "name": "Essay · The Org Chart of One",
+        "door": "story",
+        "narrative_order": 96,
+        "story_intent": "a standalone published essay — the one-person-as-org-chart framing of the whole project",
+        "endpoints": [],  # editorial
+    },
     # Door 4 "The Coaching" (/coaching/) — promoted out of Story (2026-06-20). narrative_order
     # keeps it story-adjacent (7.x via 71-73 to avoid renumbering the evidence block at 10-22).
     {
@@ -268,6 +301,31 @@ PAGE_BINDINGS = [
         "narrative_order": 73,
         "story_intent": "the Third Wall — the AI's weekly read against Matthew's response",
         "endpoints": [{"url": "/api/field_notes", "role": "primary", "metrics": []}],
+    },
+    # #1427: three more /coaching/ pages joined visual_qa.PAGES.
+    {
+        "path": "/coaching/coaches/",
+        "name": "Coaching · The Team (legacy slug)",
+        "door": "coaching",
+        "narrative_order": 92,
+        "story_intent": "who the coaches are, at the pre-promotion URL — kept 200 for old links/bookmarks",
+        "endpoints": [{"url": "/api/coach_team", "role": "primary", "metrics": []}],
+    },
+    {
+        "path": "/coaching/qa/",
+        "name": "Coaching · Reader Q&A",
+        "door": "coaching",
+        "narrative_order": 93,
+        "story_intent": "reader questions put to the board, answered on the record",
+        "endpoints": [],  # editorial — moderated Q&A, not a live-data render
+    },
+    {
+        "path": "/coaching/read/",
+        "name": "Coaching · The Read",
+        "door": "coaching",
+        "narrative_order": 94,
+        "story_intent": "the coaching door's long-form explainer of what 'the read' means",
+        "endpoints": [],  # editorial
     },
     {
         "path": "/data/",
@@ -352,6 +410,27 @@ PAGE_BINDINGS.append(
         "endpoints": [],
     }
 )
+# #1427: the /method/ hub itself + /gear/ (footer "Technology" grouping) joined visual_qa.PAGES.
+PAGE_BINDINGS.append(
+    {
+        "path": "/method/",
+        "name": "Method hub",
+        "door": "method",
+        "narrative_order": 91,
+        "story_intent": "the browsable archive of how the machine is built — does the pipeline hold up",
+        "endpoints": [],  # the hub itself is a shell; topics carry the data
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/gear/",
+        "name": "The Gear",
+        "door": "method",
+        "narrative_order": 95,
+        "story_intent": "the literal input list — every device/app feeding the platform, generated from source_registry.py",
+        "endpoints": [],  # generated static page — no live fetch, the registry IS the data
+    }
+)
 # S2 protocols uplevel (2026-07): the three upleveled topic pages joined visual_qa.PAGES.
 PAGE_BINDINGS.append(
     {
@@ -386,6 +465,27 @@ PAGE_BINDINGS.append(
         "endpoints": [{"url": "/api/supplements", "role": "primary", "metrics": []}],
     }
 )
+# #1427: the two remaining archive-generated protocols topics joined visual_qa.PAGES.
+PAGE_BINDINGS.append(
+    {
+        "path": "/protocols/protocols/",
+        "name": "Protocols · protocols",
+        "door": "protocols",
+        "narrative_order": 86,
+        "story_intent": "the standing rules of the experiment — what's fixed, what's allowed to flex",
+        "endpoints": [{"url": EVIDENCE_PRIMARY.get("protocols", "/api/protocols"), "role": "primary", "metrics": []}],
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/protocols/discoveries/",
+        "name": "Protocols · discoveries",
+        "door": "protocols",
+        "narrative_order": 87,
+        "story_intent": "what changed the plan — the discoveries that fed back into the protocol",
+        "endpoints": [{"url": EVIDENCE_PRIMARY.get("discoveries", "/api/discoveries"), "role": "primary", "metrics": []}],
+    }
+)
 PAGE_BINDINGS.append(
     {
         "path": "/mind/",
@@ -397,6 +497,37 @@ PAGE_BINDINGS.append(
             {"url": "/api/reading_shelf", "role": "primary", "metrics": []},
             {"url": "/api/reading_overview", "role": "primary", "metrics": []},
         ],
+    }
+)
+# #1427: the standalone utility pages (no live-data door of their own) joined visual_qa.PAGES.
+PAGE_BINDINGS.append(
+    {
+        "path": "/privacy/",
+        "name": "Privacy",
+        "door": "utility",
+        "narrative_order": 97,
+        "story_intent": "the data-governance policy — what's collected, retained, and never made public",
+        "endpoints": [],  # editorial
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/subscribe/",
+        "name": "Subscribe",
+        "door": "utility",
+        "narrative_order": 98,
+        "story_intent": "the follow-by-email opt-in — the reader-engagement funnel's front door",
+        "endpoints": [],  # editorial + a client-side form; no page-render data fetch
+    }
+)
+PAGE_BINDINGS.append(
+    {
+        "path": "/subscribe/confirm/",
+        "name": "Subscribe · confirm",
+        "door": "utility",
+        "narrative_order": 99,
+        "story_intent": "the confirm-email landing state — confirmed/already/expired/invalid/check-your-inbox, driven by query params",
+        "endpoints": [],  # state comes from the confirm-link's own query params, not a fetch
     }
 )
 
