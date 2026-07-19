@@ -2,7 +2,7 @@
 
 > **Status:** log · **Owner:** Matthew · **Verified:** 2026-05-19
 
-Last updated: 2026-07-19 (all-nighter wrap — cache-race rollback row, hardening #1526; the 9-row backfill + genesis-eve-500 + 03:45-rollback rows landed earlier tonight via #1514/#1507)
+Last updated: 2026-07-19 (all-nighter wrap — cache-race rollback row, hardening #1526; the 9-row #1332 backfill + genesis-eve-500 + 03:45-rollback rows landed earlier tonight via #1514/#1507)
 
 > Tracks operational incidents, outages, and bugs that affected data flow or system behavior.
 > For full details on any incident, check the corresponding CHANGELOG entry or handover file.
