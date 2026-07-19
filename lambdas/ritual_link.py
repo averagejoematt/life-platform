@@ -19,7 +19,18 @@ secret. The site-api endpoint additionally windows how old `date` may be (see
 
 import hmac
 
-RITUAL_METRICS = ("connection", "mood_valence", "intake_count")
+RITUAL_METRICS = (
+    "connection",
+    "mood_valence",
+    "intake_count",
+    # #1409: the weekly felt-reality probe (Sunday nudge only — see
+    # evening_nudge_lambda). Three WHO-5/SVS-derived items, 0-4 ordinal,
+    # ≤20s total; they land in SOURCE#felt_probe and feed the per-pillar
+    # calibration card (/api/character_calibration).
+    "felt_vitality",
+    "felt_rest",
+    "felt_connection",
+)
 RITUAL_VALUE_MIN = 0
 RITUAL_VALUE_MAX = 4
 
@@ -30,6 +41,23 @@ RITUAL_VALUE_MAX = 4
 # (tests/test_intake_privacy_contract.py enforces both directions).
 PRIVATE_RITUAL_METRICS = frozenset({"intake_count"})
 PRIVATE_INTAKE_SOURCE = "private_intake"  # DDB: USER#matthew#SOURCE#private_intake / DATE#YYYY-MM-DD
+
+# #1409: the weekly felt-reality probe metrics — routed to their own partition
+# (never evening_ritual: the daily wellbeing aggregate must not mix cadences,
+# and the calibration engine reads exactly one probe per week). Item values are
+# Matthew-level self-report but NOT sensitive; the public read surface
+# (/api/character_calibration) still serves aggregates only (r/CI/n_eff),
+# following the ADR-124 C-floor posture.
+WEEKLY_PROBE_METRICS = frozenset({"felt_vitality", "felt_rest", "felt_connection"})
+FELT_PROBE_SOURCE = "felt_probe"  # DDB: USER#matthew#SOURCE#felt_probe / DATE#YYYY-MM-DD (the Sunday)
+
+# Probe item → character pillar it calibrates (character_engine pillar names).
+# The four unmapped pillars render an honest "unprobed" state on the card.
+PROBE_PILLAR_MAP = {
+    "felt_rest": "sleep",
+    "felt_vitality": "movement",
+    "felt_connection": "relationships",
+}
 
 
 def sign_ritual_token(secret: str, date_str: str, metric: str, value: int) -> str:

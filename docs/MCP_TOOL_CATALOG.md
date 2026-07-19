@@ -1,8 +1,8 @@
 # Life Platform — MCP Tool Catalog
 
-> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-11
+> **Status:** generated · **Owner:** Matthew · **Verified:** 2026-07-19
 
-**Version:** v8.6.0 | **Last updated:** 2026-07-19 | **Total tools:** 67
+**Version:** v8.6.0 | **Last updated:** 2026-07-19 | **Total tools:** 68
 
 > **GENERATED FILE — do not hand-edit the tables.** Regenerate via
 > `python3 scripts/generate_mcp_tool_catalog.py` (pure AST parse of `mcp/registry.py`;
@@ -16,7 +16,7 @@
 
 ---
 
-## All 64 Tools — by module
+## All 68 Tools — by module
 
 | Module | Tools |
 |---|---|
@@ -29,10 +29,10 @@
 | `mcp/tools_strength.py` | 1 |
 | `mcp/tools_nutrition.py` | 2 |
 | `mcp/tools_correlation.py` | 1 |
-| `mcp/tools_lifestyle.py` | 10 |
+| `mcp/tools_lifestyle.py` | 12 |
+| `mcp/tools_journal.py` | 2 |
 | `mcp/tools_labs.py` | 2 |
 | `mcp/tools_cgm.py` | 1 |
-| `mcp/tools_journal.py` | 1 |
 | `mcp/tools_sick_days.py` | 1 |
 | `mcp/tools_social.py` | 1 |
 | `mcp/tools_todoist.py` | 4 |
@@ -44,6 +44,7 @@
 | `mcp/registry.py` | 1 |
 | `mcp/tools_habits.py` | 2 |
 | `mcp/tools_coach_checkin.py` | 2 |
+| `mcp/tools_capture.py` | 1 |
 
 ### Training Notes (`mcp/tools_training_notes.py`)
 
@@ -116,15 +117,24 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `save_insight` | text, tags=[], source= | Save a new insight to the personal coaching log. Use whenever Claude or Matthew identifies something worth tracking and following up on — a hypothesis, a behavioural change to try, a pattern noticed, or a recommendation to act on. Returns the insight_id needed for update_insight_outcome. Use for: 'save this insight', 'track this idea', 'add this to the coaching log', 'remember to follow up on this'. |
+| `log_evening_intake` | count, date= | PRIVATE (#1405): log this evening's drinks count (0-4; 4 = four or more) to the Matthew-private intake ledger. One tap, no free text. Use for: 'log 2 drinks tonight', 'zero drinks yesterday' (pass date). |
+| `get_intake_response` | window_days= | PRIVATE (#1405): the intake→next-morning dose-response read. Lagged pairs vs HRV / recovery / REM with effective-n correction (Pyper-Peterman), p on n_eff, zero-vs-nonzero block-bootstrap CI, and dose bins (0/1/2+) once 15 nonzero evenings exist. Reports arming progress below the floors (ADR-105). Use for: 'what do drinks do to my HRV?', 'intake dose-response so far'. |
 | `get_insights` | status_filter=, limit= | List insights from the personal coaching log. Returns all insights newest-first with days_open calculated. Stale flag is set for open insights older than 14 days. Use for: 'what insights are open?', 'show my coaching log', 'what have I been meaning to act on?', 'any stale insights?', 'show me resolved insights'. |
 | `update_insight_outcome` | insight_id, outcome_notes=, status= | Close the loop on a saved insight — record what happened when you acted on it. Updates the insight's status and adds outcome notes. Use for: 'I tried the caffeine cutoff — it worked', 'mark this insight as resolved', 'update the outcome for insight X', 'close out this coaching log item'. |
-| `create_experiment` | name, hypothesis, start_date=, tags=[], notes=, library_id=, duration_tier=, experiment_type=, planned_duration_days=, design= | Start tracking a new N=1 experiment. An experiment is a specific protocol change (supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis and start date. The system will automatically compare before/after metrics when you call get_experiment_results. Board rules: one variable at a time, minimum 14 days, define success criteria upfront. Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', 'create experiment for cold plunge protocol', 'I want to test if X improves Y'. |
+| `create_experiment` | name, hypothesis, start_date=, tags=[], notes=, library_id=, duration_tier=, experiment_type=, planned_duration_days=, why_now=, priority=, hoped_outcome=, measurement=, evidence_links=[], source_hypothesis_id=, design= | Start tracking a new N=1 experiment. An experiment is a specific protocol change (supplement, diet shift, sleep hygiene tweak, training adjustment) with a hypothesis and start date. The system will automatically compare before/after metrics when you call get_experiment_results. Board rules: one variable at a time, minimum 14 days, define success criteria upfront. Use for: 'I'm starting creatine today', 'track my no-caffeine-after-10am experiment', 'create experiment for cold plunge protocol', 'I want to test if X improves Y'. |
 | `list_experiments` | status= | List all N=1 experiments with their status, duration, and whether minimum data threshold (14 days) has been met. Filter by status. Use for: 'what experiments am I running?', 'show active experiments', 'list completed experiments', 'any experiments ready to evaluate?'. |
 | `get_experiment_results` | experiment_id | Auto-compare before vs during metrics for an N=1 experiment. Automatically queries sleep, recovery, stress, body composition, nutrition, movement, and glucose metrics for both the pre-experiment baseline period and the experiment period. Reports deltas, % changes, and direction (improved/worsened). Board of Directors evaluates results against hypothesis. Use for: 'how is my creatine experiment going?', 'did cutting caffeine help my sleep?', 'show experiment results', 'evaluate my N=1', 'did this actually work?'. |
 | `end_experiment` | experiment_id, outcome=, status=, end_date=, grade=, compliance_pct=, reflection= | End an active N=1 experiment and record the outcome. Run get_experiment_results first to review the data. Status can be 'completed' (ran full course) or 'abandoned' (stopped early). Use for: 'end my creatine experiment', 'I'm stopping the no-caffeine experiment', 'mark experiment as completed', 'abandon experiment X'. |
 | `get_social_connection_trend` | start_date=, end_date= | Social connection quality trend from journal entries. Tracks enriched_social_quality (alone/surface/meaningful/deep) over time with rolling averages, streaks, and PERMA wellbeing model context. Correlates social quality with recovery, HRV, sleep, stress. Seligman: Relationships are the #1 predictor of sustained wellbeing. Use for: 'social connection trend', 'meaningful connections', 'PERMA score'. |
 | `get_field_notes` | week= | Retrieve the weekly Field Notes entry — AI Lab Notes (present/lookback/focus paragraphs) and any existing Matthew response. Defaults to current week if no week specified. Use for: 'show me this week's field notes', 'what did the AI say this week', 'read field notes for week 14', 'get my lab notebook'. |
 | `log_field_note_response` | week, notes, agreement=, disputed=[], added= | Write Matthew's response to the right page of a Field Notes entry. The AI Lab Notes must already exist for that week. Uses update_item to never overwrite AI fields. Use for: 'respond to field notes', 'write my side of the lab notebook', 'I disagree with the AI notes this week', 'add my response to week 14'. |
+
+### Journal & Mood (`mcp/tools_journal.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_flourishing_trend` | days=, ema_span= | EMA trends of the daily PERMA signals LLM-coded from the journal (#1403: values lived, gratitude, flow, growth signals, ownership, social quality — SOURCE#flourishing). Every payload carries model provenance and anti-rumination framing. Use for: 'how are my values trending?', 'flourishing signals this month', 'social quality trend'. |
+| `get_mood` | view=, start_date=, end_date=, days= | Unified mood and state-of-mind intelligence. 'trend' (default) = journal-derived mood, energy, and stress scores with 7-day rolling averages, trend direction. 'state_of_mind' = Apple Health How We Feel (HWF) valence data — objective emotional state tracking. Use for: 'how has my mood been?', 'mood trend', 'energy levels', 'stress trend', 'state of mind', 'emotional wellbeing', 'How We Feel data', 'mood vs training'. |
 
 ### Labs & Freshness (`mcp/tools_labs.py`)
 
@@ -138,12 +148,6 @@
 | Tool | Key Params | Description |
 |------|-----------|-------------|
 | `get_cgm` | view=, start_date=, end_date=, days= | Unified CGM (continuous glucose monitor) intelligence. 'dashboard' (default) = time-in-range (target >90%), variability (SD target <20), mean glucose, time above 140, fasting proxy, clinical flags, trend. Warmed nightly. 'fasting' = overnight nadir-based fasting glucose validation — avoids dawn phenomenon by using 2-5 AM nadir. Cross-validates CGM accuracy. Use for: 'glucose overview', 'blood sugar', 'time in range', 'CGM dashboard', 'am I pre-diabetic?', 'fasting glucose', 'glucose variability', 'metabolic health'. |
-
-### Journal & Mood (`mcp/tools_journal.py`)
-
-| Tool | Key Params | Description |
-|------|-----------|-------------|
-| `get_mood` | view=, start_date=, end_date=, days= | Unified mood and state-of-mind intelligence. 'trend' (default) = journal-derived mood, energy, and stress scores with 7-day rolling averages, trend direction. 'state_of_mind' = Apple Health How We Feel (HWF) valence data — objective emotional state tracking. Use for: 'how has my mood been?', 'mood trend', 'energy levels', 'stress trend', 'state of mind', 'emotional wellbeing', 'How We Feel data', 'mood vs training'. |
 
 ### Sick Days (`mcp/tools_sick_days.py`)
 
@@ -229,6 +233,12 @@
 | `get_coach_checkin_queue` | coach_id=, count= | #915: Up to 3 open check-in questions FROM Matthew's AI coaches — qualitative questions whose verbatim answers pair with (or explain the absence of) the quantitative data. Open questions persist: re-calls return the SAME queue; fresh questions are generated (Bedrock, in the asking coach's persona, grounded in live presence/adaptive-mode/manual-source context) only when the queue is empty. Ask conversationally, one at a time, then call log_coach_checkin. Skipping is always valid with zero penalty — never nag. Use for: 'what do my coaches want to know?', 'coach check-in', periodic qualitative catch-ups. |
 | `log_coach_checkin` | checkin_id, coach_id=, answer=, skip=, tags=[] | #915: Record Matthew's answer to a coach check-in question VERBATIM (his words, never a paraphrase — ADR-104), or an explicit skip (always valid, zero penalty). The answer becomes durable qualitative context stored with the coach's records. Use after get_coach_checkin_queue, once Matthew has responded (or declined). |
 
+### mcp.tools_capture (`mcp/tools_capture.py`)
+
+| Tool | Key Params | Description |
+|------|-----------|-------------|
+| `get_capture_queues` | — | #1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — this call is read-only and fast). (2) habit_reflection — missed-needing-why / completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), not the note text. (4) evening_intake — logged tonight? + dose-response arming progress (#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. (6) freshness_flags — stale sources only, name + days_dark. Each section fails soft independently: a broken sub-query never blocks the other five, it just reports {status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, journal interview, speak-to-the-coaches, open check-in) instead of calling the six underlying tools separately. Skip-without-penalty framing — nothing here is a nag. |
+
 ---
 
 ## Warmer Coverage (nightly pre-compute)
@@ -254,19 +264,3 @@ filter; the `get_daily_snapshot` dispatcher applies the same filter via
 `mcp.core._apply_phase_filter`. To access pre-genesis data, pass
 `include_pilot=True` (most tools accept this keyword via the args dict). See
 `lambdas/phase_filter.py::with_phase_filter()`.
-
-
-### Phase-filter behavior (ADR-058)
-
-The following tools default to `phase=experiment`-only results and hide
-phase=pilot records:
-
-- `get_date_range`, `find_days`, `get_aggregated_summary`, `search_activities`,
-  `get_field_stats`, `compare_periods`, `get_weekly_summary` — route through
-  `mcp.core.query_source` which applies the filter.
-- `get_latest`, `get_daily_summary` — apply the filter directly.
-- `get_daily_snapshot`, `get_longitudinal_summary` — dispatch to the above.
-
-To access pre-genesis data, pass `include_pilot=True`. Most tools accept this
-keyword via the args dict. See `lambdas/phase_filter.py::with_phase_filter()`
-for the underlying mechanism.

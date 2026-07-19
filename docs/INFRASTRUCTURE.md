@@ -3,7 +3,7 @@
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
 
 > Quick-reference for all URLs, IDs, and configuration. No secrets stored here.
-> Last updated: 2026-07-19 (v8.6.0 — 94 Lambdas, 21 active secrets, 67 MCP tools, ~75 alarms)
+> Last updated: 2026-07-19 (v8.6.0 — 94 Lambdas, 21 active secrets, 68 MCP tools, ~75 alarms)
 
 ---
 
@@ -59,7 +59,7 @@ Dashboard and Buddy passwords are stored in **Secrets Manager** (not here).
 | Function URL (remote) | `<not committed — SEC-02 #780; read live: aws lambda get-function-url-config --function-name life-platform-mcp --region us-west-2>` |
 | Auth (remote) | OAuth 2.1 auto-approve + HMAC Bearer via `life-platform/mcp-api-key` secret (auto-rotates every 90 days) |
 | Auth (local) | `mcp_bridge.py` → `.config.json` → Function URL |
-| Tools | **67** across **23** tool modules (`mcp/tools_*.py`) |
+| Tools | **68** across **24** tool modules (`mcp/tools_*.py`) |
 | Cache warmer | 14 warm-steps pre-computed nightly (warmer config) |
 
 ---
