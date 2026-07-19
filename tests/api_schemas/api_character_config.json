@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T18:22:28.856185+00:00",
+  "captured_at": "2026-07-19T19:19:21.199516+00:00",
   "fetch_path": "/api/character_config",
   "is_prefix_sample": false,
   "path": "/api/character_config",
@@ -27,6 +27,28 @@
           {
             "keys": {
               "condition": {
+                "type": "string"
+              },
+              "fit_badge": {
+                "type": "string"
+              },
+              "fit_ci_95": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "fit_n_eff": {
+                "type": "number"
+              },
+              "fit_r": {
+                "type": "number"
+              },
+              "fit_status": {
+                "type": "string"
+              },
+              "fitted_at": {
                 "type": "string"
               },
               "name": {
@@ -67,6 +89,28 @@
               "condition": {
                 "type": "string"
               },
+              "fit_badge": {
+                "type": "string"
+              },
+              "fit_ci_95": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "fit_n_eff": {
+                "type": "number"
+              },
+              "fit_r": {
+                "type": "number"
+              },
+              "fit_status": {
+                "type": "string"
+              },
+              "fitted_at": {
+                "type": "string"
+              },
               "name": {
                 "type": "string"
               },
@@ -92,6 +136,28 @@
           {
             "keys": {
               "condition": {
+                "type": "string"
+              },
+              "fit_badge": {
+                "type": "string"
+              },
+              "fit_ci_95": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "fit_n_eff": {
+                "type": "number"
+              },
+              "fit_r": {
+                "type": "number"
+              },
+              "fit_status": {
+                "type": "string"
+              },
+              "fitted_at": {
                 "type": "string"
               },
               "name": {
@@ -121,6 +187,28 @@
               "condition": {
                 "type": "string"
               },
+              "fit_badge": {
+                "type": "string"
+              },
+              "fit_ci_95": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "fit_n_eff": {
+                "type": "number"
+              },
+              "fit_r": {
+                "type": "number"
+              },
+              "fit_status": {
+                "type": "string"
+              },
+              "fitted_at": {
+                "type": "string"
+              },
               "name": {
                 "type": "string"
               },
@@ -146,6 +234,24 @@
           {
             "keys": {
               "condition": {
+                "type": "string"
+              },
+              "fit_badge": {
+                "type": "string"
+              },
+              "fit_ci_95": {
+                "type": "null"
+              },
+              "fit_n_eff": {
+                "type": "integer"
+              },
+              "fit_r": {
+                "type": "null"
+              },
+              "fit_status": {
+                "type": "string"
+              },
+              "fitted_at": {
                 "type": "string"
               },
               "name": {
@@ -565,6 +671,26 @@
                       "target": {
                         "type": "integer"
                       },
+                      "target_provenance": {
+                        "keys": {
+                          "method": {
+                            "type": "string"
+                          },
+                          "metric": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "window_days": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
                       "weight": {
                         "type": "number"
                       }
@@ -784,6 +910,36 @@
                       "target_pct": {
                         "type": "number"
                       },
+                      "target_provenance": {
+                        "keys": {
+                          "bounds": {
+                            "items": {
+                              "type": "number"
+                            },
+                            "length_sample": 2,
+                            "type": "array"
+                          },
+                          "clamped": {
+                            "type": "boolean"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "metric": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "window_days": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
                       "weight": {
                         "type": "number"
                       }
@@ -794,6 +950,26 @@
                     "keys": {
                       "target_hours": {
                         "type": "number"
+                      },
+                      "target_provenance": {
+                        "keys": {
+                          "method": {
+                            "type": "string"
+                          },
+                          "metric": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "window_days": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
                       },
                       "weight": {
                         "type": "number"
@@ -824,6 +1000,26 @@
                     "keys": {
                       "target_pct": {
                         "type": "number"
+                      },
+                      "target_provenance": {
+                        "keys": {
+                          "method": {
+                            "type": "string"
+                          },
+                          "metric": {
+                            "type": "string"
+                          },
+                          "n": {
+                            "type": "integer"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "window_days": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
                       },
                       "weight": {
                         "type": "number"
