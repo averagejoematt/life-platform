@@ -32,6 +32,7 @@ _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _TESTS_DIR not in sys.path:
     sys.path.insert(0, _TESTS_DIR)  # for `import visual_ai_qa`
 
+import boto3  # noqa: E402
 import budget_guard  # noqa: E402  (lambdas/ on sys.path via conftest)
 import reader_truth_qa as rtq  # noqa: E402
 import visual_ai_qa  # noqa: E402
@@ -72,6 +73,46 @@ def _fake_invoke(payload, calls=None):
         return {"content": [{"type": "text", "text": json.dumps(payload)}]}
 
     return invoke
+
+
+# ── #1440: QAPausedByBudget metric emission (ADR-104 applied to QA itself) ─────
+
+
+class _CW:
+    """Fake CloudWatch client — records put_metric_data calls (auth_breaker's pattern)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def put_metric_data(self, **kw):
+        self.calls.append(kw)
+
+
+def _patch_cw(monkeypatch):
+    cw = _CW()
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: cw)
+    return cw
+
+
+def test_emit_budget_pause_metric_puts_qa_paused_by_budget(monkeypatch):
+    cw = _patch_cw(monkeypatch)
+    rtq.emit_budget_pause_metric("qa_smoke", 1)
+    assert cw.calls, "emit_budget_pause_metric must call put_metric_data"
+    call = cw.calls[-1]
+    assert call["Namespace"] == "LifePlatform/QA"
+    assert call["MetricData"][0]["MetricName"] == "QAPausedByBudget"
+    assert call["MetricData"][0]["Value"] == 1.0
+
+
+def test_emit_budget_pause_metric_is_fail_soft(monkeypatch):
+    """A CloudWatch outage must never raise — the QA pass is already degrading."""
+
+    class _Boom:
+        def put_metric_data(self, **kw):
+            raise RuntimeError("cloudwatch down")
+
+    monkeypatch.setattr(boto3, "client", lambda *a, **k: _Boom())
+    rtq.emit_budget_pause_metric("qa_smoke", 1)  # must not raise
 
 
 # ── phase context (derived from EXPERIMENT_START_DATE — no wall-clock literals) ──
@@ -235,6 +276,29 @@ def test_harness_budget_skip_is_explicit_and_makes_no_ai_call(tmp_path, monkeypa
     assert any("budget tier 1" in w for w in results[0]["warnings"])  # honest skip, never silent green
 
 
+def test_harness_budget_skip_returns_explicit_status_and_emits_metric(tmp_path, monkeypatch):
+    """#1440 acceptance: the CI/local harness's budget pause (1) emits the
+    QAPausedByBudget CloudWatch metric and (2) returns a status the caller can
+    render as SKIPPED-BY-BUDGET instead of silently blending into "passed"."""
+    cw = _patch_cw(monkeypatch)
+    results = _harness_results(tmp_path, "anything")
+    _patch_harness(monkeypatch, _HIGH_VERDICT, tier=2)
+    status = visual_ai_qa.assess_reader_truth(results)
+
+    assert status == {"status": "skipped_by_budget", "tier": 2}
+
+    assert cw.calls, "a budget-tier pause must emit a CloudWatch metric (#1440)"
+    call = cw.calls[-1]
+    assert call["Namespace"] == "LifePlatform/QA"
+    assert call["MetricData"][0]["MetricName"] == "QAPausedByBudget"
+
+    # AC2: the warning text is explicitly tagged, not just "skipped".
+    assert any(w.startswith("SKIPPED-BY-BUDGET:") for w in results[0]["warnings"])
+    # AC2: a paused pass must never render as PASS *by way of a fake success verdict*
+    # — no ai_verdict/truth_findings were fabricated for the paused run.
+    assert "truth_findings" not in results[0]
+
+
 # ── nightly qa_smoke check (#1096) ────────────────────────────────────────────
 
 import bedrock_client  # noqa: E402
@@ -293,6 +357,31 @@ def test_qa_smoke_budget_tier_pauses_explicitly(monkeypatch):
         assert len(checks) == 1 and checks[0].paused is True
         assert f"budget tier {tier}" in checks[0].message  # explicit skip state, no silent green
         assert not any(c.passed is False for c in checks)
+
+
+def test_qa_smoke_budget_tier_pause_emits_qa_paused_metric(monkeypatch):
+    """#1440 acceptance: the nightly hook's budget pause emits QAPausedByBudget.
+
+    This is the ONLY guaranteed signal for a pause-only night — qa_smoke's own
+    lambda_handler emails nothing when there are zero real FAILUREs (a lone ⏸
+    pause never trips the "not fails" branch), so without the metric (feeding
+    the qa-paused-by-budget CloudWatch alarm, routed to_digest=True in
+    monitoring_stack.py) a budget pause would leave no trace outside raw logs.
+    """
+
+    def must_not_call(body, model_name=None):
+        raise AssertionError("Bedrock must not be called while budget-paused")
+
+    cw = _patch_cw(monkeypatch)
+    _patch_smoke(monkeypatch, tier=2, invoke=must_not_call)
+    checks = qa_smoke_lambda.check_reader_truth()
+
+    assert len(checks) == 1 and checks[0].paused is True
+    assert cw.calls, "a budget-tier pause must emit a CloudWatch metric (#1440)"
+    call = cw.calls[-1]
+    assert call["Namespace"] == "LifePlatform/QA"
+    assert call["MetricData"][0]["MetricName"] == "QAPausedByBudget"
+    assert call["MetricData"][0]["Value"] == 1.0
 
 
 def test_qa_smoke_fetch_failures_warn_softly(monkeypatch):

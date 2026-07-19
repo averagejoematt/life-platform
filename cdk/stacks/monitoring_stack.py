@@ -28,6 +28,11 @@ Covers:
       compute-pipeline-stale            LifePlatform ComputePipelineStaleness Max >= 1, 86400s (digest)
       hae-webhook-no-invocations-24h    AWS/Lambda Invocations < 1, 86400s, BREACHING (digest)
     18 redundant/dead orphan alarms retired via deploy/cloudwatch_retire_orphans.sh.
+
+  #1440 (ADR-104 applied to QA itself): budget-tier pause visibility for the
+  reader-truth AI QA pass (both the CI/local harness and the nightly qa_smoke
+  hook — lambdas/reader_truth_qa.emit_budget_pause_metric()):
+    qa-paused-by-budget    LifePlatform/QA QAPausedByBudget Sum >= 1, 86400s (digest)
 """
 
 from aws_cdk import (
@@ -263,6 +268,27 @@ class MonitoringStack(Stack):
             "OverallAlarm",
             86400,
             "Maximum",
+            1,
+            GTE,
+            to_digest=True,
+        )
+
+        # #1440: a budget-tier pause of the reader-truth AI QA pass (either hook —
+        # tests/visual_ai_qa.assess_reader_truth on CI/local, or the nightly
+        # qa_smoke_lambda.check_reader_truth — both call
+        # reader_truth_qa.emit_budget_pause_metric(), dimension-less) must be
+        # visible even on a day nothing else fails. qa_smoke's own email only
+        # fires on a real FAILURE (a lone ⏸ pause sends nothing), so this alarm is
+        # the only guaranteed surface for a pause-only day — it lands in the SAME
+        # daily digest every other alarm here uses. ADR-104 applied to QA itself:
+        # a paused check must never be indistinguishable from a passing one.
+        _alarm(
+            "QaPausedByBudget",
+            "qa-paused-by-budget",
+            "LifePlatform/QA",
+            "QAPausedByBudget",
+            86400,
+            "Sum",
             1,
             GTE,
             to_digest=True,
