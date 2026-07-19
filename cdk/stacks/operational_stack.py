@@ -298,6 +298,21 @@ class OperationalStack(Stack):
         )
         local_alerts_topic.add_subscription(sns_subs.LambdaSubscription(dispatcher_lambda))
 
+        # #1444: the alerts topic's ONLY IaC-declared subscriber was this Lambda —
+        # the human email leg existed only as a manual (console) subscription,
+        # invisible to IaC and at risk of silently vanishing on any topic
+        # recreation. Codify it so an urgent alarm always has a human fast path
+        # even when the dispatcher itself is the thing that's broken.
+        # Live check (2026-07-18, `aws sns list-subscriptions-by-topic
+        # --topic-arn arn:aws:sns:us-west-2:205930651321:life-platform-alerts`):
+        # a CONFIRMED manual email subscription to this same address already
+        # exists. On first deploy of this construct, `cdk import` it (the same
+        # CDK-managed-via-import pattern core_stack.py already uses for the
+        # alerts/digest topics themselves) rather than letting `cdk deploy`
+        # create a second, separately-pending subscription to the same inbox.
+        alerts_email = self.node.try_get_context("alerts_email") or "awsdev@mattsusername.com"
+        local_alerts_topic.add_subscription(sns_subs.EmailSubscription(alerts_email))
+
         # ── 4. Pip Audit — every Monday
         create_platform_lambda(
             self,
