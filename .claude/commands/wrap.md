@@ -212,6 +212,26 @@ parked defect gets independently re-discovered (and re-paid-for) by a later revi
   Matthew can make (not a backlog item), tag it `not-work — <one-clause reason>` instead
   of inventing an issue for it.
 
+### (e5) Stash + hook hygiene gate — a wrap gate, same shape as (d)/(e)/(e2)/(e3)/(e4) (#1326)
+
+The stash stack and the installed pre-commit hook are both **local, untracked**
+state that git never refreshes on `pull`/`merge` — a stale entry in either can sit
+invisible for weeks (2026-07-18: a stash from several merges back sat on the
+shared stack while 3+ concurrent worktrees were active — the documented
+stash-pop-race incident class; the installed hook kept calling a script #818
+deleted, fail-open via `[[ -f ]]`, so its doc-sync half silently no-oped).
+
+- Run `git stash list`. It **must print nothing**, or every entry must be
+  explained (inspected via `git stash show -p stash@{N}` and either dropped or
+  intentionally kept with a one-line reason). Memory rule: stash is BANNED in
+  concurrent sessions — if you didn't put it there this session, inspect and
+  drop it, don't leave it for the next session to trip over.
+- Run `python3 deploy/session_postflight.py` and confirm the `hook freshness`
+  line is 🟢. If 🔴 (stale or not installed), run `bash scripts/install_hooks.sh`
+  and re-check before closing the wrap.
+- The handover carries one line either way: `**Stash/hooks:** clean` or
+  `**Stash/hooks:** <what was found + what you did about it>`.
+
 ### (f) Commit the wrap
 
 Stage the repo-tracked wrap artifacts only (memory-dir changes from step (c) are outside
