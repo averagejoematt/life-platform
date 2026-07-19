@@ -19,6 +19,12 @@ at all gets the canonical footer inserted before `</body>`. Home's live "updated
 or variant) and preserved via `site_footer(with_asof=True)`. Pages with NO doors nav —
 the `/mind/` and `/subscribe.html` redirect stubs — are untouched by construction.
 
+Loop-forward close (#1468): every doors-nav page also gets a canonical `.loop-forward`
+"next station on the loop" CTA inserted immediately before the footer, keyed off the SAME
+detected door as the nav — see `v4_chrome.loop_forward` for the mapping and why it's the
+right signal. This is what makes "zero dead-end pages" a structural guarantee rather than
+a per-generator opt-in: any page with a doors nav gets one, full stop.
+
   python3 scripts/v4_apply_chrome.py            # rewrite in place, print summary
   python3 scripts/v4_apply_chrome.py --check    # exit 1 if any page would change (CI)
 
@@ -48,6 +54,7 @@ FOOT_RE = re.compile(r'<footer class="site-foot".*?</footer>', re.DOTALL)
 # subscribe, subscribe/confirm). On a doors-nav page these are converted to the
 # canonical footer; the regexes stay so a hand-authored regression gets re-flattened.
 VARIANT_FOOT_RE = re.compile(r'<footer class="(?:story-foot|dx-foot-bar)".*?</footer>', re.DOTALL)
+LOOP_FWD_RE = re.compile(r'<aside class="loop-forward".*?</aside>', re.DOTALL)
 CURRENT_RE = re.compile(r'<a href="([^"]+)"[^>]*aria-current="page"')
 FOLLOW_RE = re.compile(r'class="nav-follow"')
 ASOF_RE = re.compile(r'data-bind="asof"')
@@ -64,6 +71,15 @@ def iter_html_files(root: str):
                 yield os.path.join(dirpath, name)
 
 
+def url_path(rel: str) -> str:
+    """Map a site/-relative file path to its viewer URL path (mirrors S3/CloudFront)."""
+    if rel == "index.html":
+        return "/"
+    if rel.endswith("/index.html"):
+        return "/" + rel[: -len("index.html")]
+    return "/" + rel
+
+
 def detect_nav_state(nav_html: str):
     """Return (current_door, with_follow) for an existing doors nav."""
     m = CURRENT_RE.search(nav_html)
@@ -72,9 +88,9 @@ def detect_nav_state(nav_html: str):
     return current_door, with_follow
 
 
-def rewrite(html: str):
-    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted)."""
-    nav_changed = foot_changed = gained_icons = foot_converted = False
+def rewrite(html: str, self_path: str | None = None):
+    """Return (new_html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed)."""
+    nav_changed = foot_changed = gained_icons = foot_converted = lf_changed = False
     door = None
     follow = False
 
@@ -89,6 +105,24 @@ def rewrite(html: str):
             nav_changed = True
             gained_icons = "ico-door" not in old_nav
             html = html[: nav_m.start()] + new_nav + html[nav_m.end() :]
+
+    # #1468: the loop-forward close, keyed off the same detected door. Every doors-nav
+    # page gets exactly one, inserted immediately before the footer (whichever form the
+    # footer takes below) so no chrome-bearing page can be a dead end.
+    if nav_m:
+        new_lf = v4_chrome.loop_forward(door, self_path=self_path)
+        lf_m = LOOP_FWD_RE.search(html)
+        if lf_m:
+            if lf_m.group(0) != new_lf:
+                lf_changed = True
+                html = html[: lf_m.start()] + new_lf + html[lf_m.end() :]
+        else:
+            anchor_m = FOOT_RE.search(html) or VARIANT_FOOT_RE.search(html)
+            insert_at = anchor_m.start() if anchor_m else html.rfind("</body>")
+            if insert_at == -1:
+                raise RuntimeError("chrome-bearing page has no footer/</body> — refusing to guess the loop-forward insert point")
+            html = html[:insert_at] + new_lf + html[insert_at:]
+            lf_changed = True
 
     foot_m = FOOT_RE.search(html)
     if foot_m:
@@ -113,7 +147,7 @@ def rewrite(html: str):
             html = html[:body_at] + v4_chrome.site_footer() + "\n" + html[body_at:]
         foot_changed = foot_converted = True
 
-    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted
+    return html, nav_changed, foot_changed, door, follow, gained_icons, foot_converted, lf_changed
 
 
 def main() -> int:
@@ -125,6 +159,7 @@ def main() -> int:
     foot_changed = []
     foot_converted = []
     gained_icons = []
+    lf_changed = []
     by_door: dict[str | None, int] = {}
     follow_count = 0
     total = 0
@@ -134,12 +169,12 @@ def main() -> int:
         if '<nav class="doors"' not in original and '<footer class="site-foot"' not in original:
             continue
         total += 1
-        new, nc, fc, door, follow, gi, conv = rewrite(original)
+        rel = os.path.relpath(path, SITE_ROOT)
+        new, nc, fc, door, follow, gi, conv, lf = rewrite(original, self_path=url_path(rel))
         if '<nav class="doors"' in original:
             by_door[door] = by_door.get(door, 0) + 1
             if follow:
                 follow_count += 1
-        rel = os.path.relpath(path, SITE_ROOT)
         if nc:
             nav_changed.append(rel)
         if fc:
@@ -148,6 +183,8 @@ def main() -> int:
             foot_converted.append(rel)
         if gi:
             gained_icons.append(rel)
+        if lf:
+            lf_changed.append(rel)
         if new != original and not args.check:
             with open(path, "w", encoding="utf-8") as fh:
                 fh.write(new)
@@ -155,6 +192,7 @@ def main() -> int:
     print(f"Scanned {total} chrome-bearing pages under {SITE_ROOT} (legacy excluded).")
     print(f"  nav rewritten:    {len(nav_changed)}")
     print(f"  footer rewritten: {len(foot_changed)}")
+    print(f"  loop-forward inserted/rewritten: {len(lf_changed)}")
     print(f"  variant/missing footers converted to canonical: {len(foot_converted)}")
     for rel in foot_converted:
         print(f"      + {rel}")
@@ -166,7 +204,7 @@ def main() -> int:
         print(f"      {door if door is not None else '(none)':<12} {by_door[door]}")
     print(f"  follow-pill pages (detected & preserved): {follow_count}")
 
-    if args.check and (nav_changed or foot_changed):
+    if args.check and (nav_changed or foot_changed or lf_changed):
         print("\nCHECK FAILED: chrome is out of sync with v4_chrome.py — run without --check.", file=sys.stderr)
         return 1
     return 0

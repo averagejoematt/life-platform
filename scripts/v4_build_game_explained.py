@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT / "lambdas"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import character_engine as ce  # noqa: E402
-from v4_chrome import doors_nav, site_footer  # noqa: E402  — shared doors nav + footer (#1009)
+from v4_chrome import doors_nav, loop_forward, site_footer  # noqa: E402  — shared doors nav/close/footer (#1009, #1468)
 from v4_kit import loop_ribbon  # noqa: E402  — shared .loop-ribbon (#578)
 
 CONFIG_PATH = ROOT / "config" / "character_sheet.json"
@@ -459,6 +459,7 @@ def render(config: dict) -> str:
       {provenance}
     </div>
   </main>
+  {loop_forward("/data/", self_path="/method/game/")}
   {site_footer()}
   {MOTION_SCRIPT}
 </body>

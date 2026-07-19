@@ -1,19 +1,22 @@
-"""Shared site chrome — the doors nav + the footer — from ONE source (#1009).
+"""Shared site chrome — the doors nav, the loop-forward close, and the footer — from
+ONE source (#1009, extended #1468).
 
 The doors nav and the `.site-foot` footer are the platform's chrome: they appear on
 every v4 page. Historically each `v4_build_*` generator hand-wrote its own copy, so the
 markup drifted (icon-less navs on 5 pages, a richer coaching-column footer on the
 coaching section, per-section base labels, a stray `/gear/` link). This module is the
-single source of truth for both, so a chrome edit is a one-file change and
+single source of truth for all three, so a chrome edit is a one-file change and
 `v4_apply_chrome.py` can re-flatten every page to it.
 
-Three axes of per-page chrome variation are DELIBERATE and are parameters here — nothing
+Four axes of per-page chrome variation are DELIBERATE and are parameters here — nothing
 else varies:
   * `current_door` — the door the page lives under, marked `aria-current="page"`
     (one of "/cockpit/" "/data/" "/coaching/" "/protocols/" "/story/", or None).
   * `with_follow` — the "follow" pill, present on the 15 reader-facing pages.
   * `with_asof` (footer) — the live `data-bind="asof"` "updated YYYY-MM-DD" stamp in the
     footer base line; home only (story.js binds it from /api stats metadata, #1104).
+  * `loop_forward`'s own `current_door` reuses the SAME detected door as the nav — see
+    its docstring for why that's the right signal (not the `loop_ribbon` short-key one).
 
 The byte layout matches the canonical nav/footer that ships on the ~51 dominant pages
 exactly (HTML-entity apostrophes via `html.escape`, `&amp;`, single-line, no stray
@@ -125,4 +128,57 @@ def site_footer(with_asof: bool = False) -> str:
         '<a href="/story/about/">About</a>'
         '<a href="/privacy/">Privacy</a></div>'
         f'</nav><p class="sf-base label"><span>averagejoematt</span>{asof}<a href="/">← home</a></p></footer>'
+    )
+
+
+# ── The loop-forward close (#1468) ─────────────────────────────────────────────
+#
+# The journey audit (docs/design/JOURNEYS.md) found every door's exit was the mega-menu
+# footer — a directory, not a DECISION. Every page now closes with one deliberate
+# "next station on the loop" before the footer: a single forward link that advances the
+# causal loop (data → coaching → protocols → story → cockpit, cycling — the same order
+# `loop_ribbon` draws) plus one constant return trigger (follow by email — the
+# north-star's return mechanism for all four audiences). Consistency is the point: one
+# shape, everywhere, so no page is a dead end and no page improvises its own close.
+#
+# Keyed by the SAME `current_door` the doors nav already carries (href form), not
+# `loop_ribbon`'s short key — Method/registry/game pages nav-highlight "/data/" (they're
+# a deeper cut of the Data door, not a fifth door of their own; SITE_MAP_AND_INTENT.md),
+# so their loop-forward correctly proposes Coaching next, matching what a reader who came
+# for credibility would want next. `/gear/`, `/privacy/`, home, and the utility pages
+# carry no current door — they fall to DEFAULT_NEXT (start the loop at the cockpit).
+NEXT_STATION = {
+    "/cockpit/": ("/data/", "the data", "See what's driving today's read"),
+    "/data/": ("/coaching/", "the coaching", "See what the AI team makes of it"),
+    "/coaching/": ("/protocols/", "the protocols", "See what levers get pulled next"),
+    "/protocols/": ("/story/", "the story", "Follow whether it moved anything"),
+    "/story/": ("/cockpit/", "the cockpit", "Check today's live read"),
+}
+DEFAULT_NEXT = ("/cockpit/", "the cockpit", "Start with today's live read")
+
+RETURN_TRIGGER = ("/subscribe/", "follow by email", "for the next entry")
+# The two pages the universal return trigger would self-link on — swap to a neutral
+# "back into the loop" trigger there instead (#1468 audit finding).
+_RETURN_SELF_SWAP = {"/subscribe/", "/subscribe/confirm/"}
+
+
+def loop_forward(current_door: str | None, self_path: str | None = None) -> str:
+    """The canonical closing "next station on the loop" CTA (#1468).
+
+    `current_door` is the same value passed to `doors_nav()` for this page. `self_path`
+    is this page's own viewer path (e.g. "/subscribe/") — only used to avoid the return
+    trigger linking to the page the reader is already on.
+    """
+    href, label, hook = NEXT_STATION.get(current_door, DEFAULT_NEXT)
+    if self_path in _RETURN_SELF_SWAP:
+        return_bit = '<a href="/">keep exploring the loop</a>'
+    else:
+        r_href, r_label, r_hook = RETURN_TRIGGER
+        return_bit = f'<a href="{r_href}">{r_label}</a> {r_hook}'
+    return (
+        '<aside class="loop-forward" aria-label="Continue the loop">'
+        f'<p class="lf-next"><span class="label">next on the loop</span> '
+        f'<a href="{href}">{_esc(label)}</a> — {_esc(hook)}</p>'
+        f'<p class="lf-return"><span class="label">or come back</span> {return_bit}</p>'
+        "</aside>"
     )
