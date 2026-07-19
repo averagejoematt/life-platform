@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/forecast",
   "is_prefix_sample": false,
   "path": "/api/forecast",
@@ -21,6 +21,73 @@
       },
       "available": {
         "type": "boolean"
+      },
+      "confidence": {
+        "type": "number"
+      },
+      "coverage": {
+        "keys": {
+          "coverage_pct": {
+            "type": "number"
+          },
+          "h1": {
+            "keys": {
+              "coverage_pct": {
+                "type": "number"
+              },
+              "n_covered": {
+                "type": "number"
+              },
+              "n_resolved": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "h7": {
+            "keys": {
+              "coverage_pct": {
+                "type": "number"
+              },
+              "n_covered": {
+                "type": "number"
+              },
+              "n_resolved": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "n_covered": {
+            "type": "number"
+          },
+          "n_resolved": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "date": {
+        "type": "string"
+      },
+      "forecasts": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "framing": {
+        "type": "string"
+      },
+      "model": {
+        "type": "string"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "resolutions_today": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
       }
     },
     "type": "object"

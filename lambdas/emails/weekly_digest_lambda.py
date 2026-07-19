@@ -2013,6 +2013,19 @@ def record_email_send(table, lambda_name):
         logger.info(f"[status-tracking] Non-fatal write failure: {e}")
 
 
+def _gate_telemetry(data, profile, real_subscribers):
+    """PROD-MON-06 gate readout inputs (pure). A wiped/genesis week stores the
+    source key WITH value None — `.get(k, {})` does not guard an existing-None
+    key (the 2026-07-19 Sunday-digest DLQ crash: this.withings was None the
+    morning after a reset; recurs every future reset without the `or {}`)."""
+    return {
+        "real_subscribers": real_subscribers,
+        "current_weight": ((data.get("this") or {}).get("withings") or {}).get("weight_latest"),
+        "start_weight": profile.get("journey_start_weight_lbs", 0),
+        "goal_weight": profile.get("goal_weight_lbs", 185),
+    }
+
+
 def lambda_handler(event, context):
     logger.info("Weekly Digest v4.0 starting...")
     result = gather_all()
@@ -2029,16 +2042,14 @@ def lambda_handler(event, context):
     # PROD-MON-06 (#360): gate telemetry — add subscriber count + weight progress
     # so build_html can render the private gate readout at the top of the digest.
     _real_subs = _count_real_subscribers()
-    _cur_w = (data.get("this") or {}).get("withings", {}).get("weight_latest")
-    _start_w = profile.get("journey_start_weight_lbs", 0)
-    _goal_w = profile.get("goal_weight_lbs", 185)
-    data["_gate"] = {
-        "real_subscribers": _real_subs,
-        "current_weight": _cur_w,
-        "start_weight": _start_w,
-        "goal_weight": _goal_w,
-    }
-    logger.info("Gate telemetry: subs=%s weight=%s start=%s goal=%s", _real_subs, _cur_w, _start_w, _goal_w)
+    data["_gate"] = _gate_telemetry(data, profile, _real_subs)
+    logger.info(
+        "Gate telemetry: subs=%s weight=%s start=%s goal=%s",
+        _real_subs,
+        data["_gate"]["current_weight"],
+        data["_gate"]["start_weight"],
+        data["_gate"]["goal_weight"],
+    )
 
     if hasattr(logger, "set_date"):
         logger.set_date(dates.get("this_end", ""))  # OBS-1

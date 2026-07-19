@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/source_freshness",
   "is_prefix_sample": false,
   "path": "/api/source_freshness",
@@ -32,6 +32,41 @@
       },
       "sources": {
         "items": [
+          {
+            "keys": {
+              "age_hours": {
+                "type": "number"
+              },
+              "category": {
+                "type": "string"
+              },
+              "desc": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "is_behavioral": {
+                "type": "boolean"
+              },
+              "label": {
+                "type": "string"
+              },
+              "last_update": {
+                "type": "string"
+              },
+              "last_update_ts": {
+                "type": "string"
+              },
+              "stale_hours": {
+                "type": "integer"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
           {
             "keys": {
               "age_hours": {
