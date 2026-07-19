@@ -569,6 +569,7 @@ def test_governor_cadence_surface_includes_the_1254_files_and_beyond():
         "docs/RUNBOOK.md",  # #1347: found beyond the 3 enumerated files
         "docs/ARCHITECTURE.md",  # #1347: found beyond the 3 enumerated files
         "site/journal/essays/org-chart-of-one/index.html",  # #1347: found beyond them
+        "docs/COST_TRACKER.md",  # #1354: the canonical cost ledger — number-exempt, but cadence-policed
     ):
         assert expected in surface, f"{expected} missing from the governor-cadence scan surface"
     # site/legacy/ is the deliberately frozen historical mirror — excluded, same as
@@ -653,3 +654,76 @@ def test_verified_advisory_is_warn_only():
         [ROOT / "docs" / "ONBOARDING.md", ROOT / "docs" / "OPERATOR_GUIDE.md"], today=date(2026, 7, 19)
     )
     assert live_warns == [], "the #1348 refresh should have bumped both Day-1 stamps:\n" + "\n".join(live_warns)
+
+
+def test_governor_cadence_every_nh_class_is_not_vacuous():
+    """#1354 (per the #1189 vacuous-scan lesson): the second stale-cadence class
+    COST_TRACKER.md carried — a governor-naming line claiming a SPECIFIC wrong
+    'every Nh' cadence ('Cadence: every 4h', true when written on 2026-06-08,
+    orphaned by the 2026-06-16 4h→8h cron change). The scan must FLAG the wrong-N
+    claim, PASS the true '8h' phrasings (digit and spelled-hours forms), EXEMPT
+    HISTORICAL framing, and stay silent when ground truth is undiscoverable."""
+    facts = _load("scripts/check_doc_facts.py")
+    d = Path(tempfile.mkdtemp())
+
+    # the exact COST_TRACKER.md:74 defect class — must be caught.
+    bad = d / "stale.md"
+    bad.write_text(
+        "**Cadence: every 4h** — the cost-governor polls Cost Explorer on this schedule.\n"
+        "cost_governor_lambda checks spend every 4 hours and writes the tier.\n"
+    )
+    hits = facts._governor_cadence_hits([bad], 8)
+    assert len(hits) == 2, f"expected both wrong-N spellings flagged, got {len(hits)}:\n" + "\n".join(hits)
+    assert all("every 8h" in h for h in hits)
+
+    # the true cadence — both forms must pass.
+    good = d / "ok.md"
+    good.write_text("life-platform-cost-governor (every 8h) projects month-end spend.\n" "The cost governor checks in every 8 hours.\n")
+    assert facts._governor_cadence_hits([good], 8) == []
+
+    # HISTORICAL framing narrating the old cadence — must NOT be flagged.
+    hist = d / "hist.md"
+    hist.write_text("cost-governor CE polling was hourly, then every 4h, now every 8h.\n")
+    assert facts._governor_cadence_hits([hist], 8) == []
+
+    # undiscoverable / genuinely-hourly ground truth — nothing to police.
+    assert facts._governor_cadence_hits([bad], None) == []
+    assert facts._governor_cadence_hits([bad], 1) == []
+
+
+def test_cost_tracker_freshness_gate_is_not_vacuous():
+    """#1354 (per the #1189 vacuous-scan lesson): the COST_TRACKER.md Verified-stamp
+    freshness ceiling (45d) must FLAG a stale stamp, FLAG a missing stamp, PASS a
+    fresh one, and honor the NEWEST stamp when several exist (header + close-ritual
+    footer — the doc legitimately carries both)."""
+    facts = _load("scripts/check_doc_facts.py")
+    assert facts.COST_TRACKER_VERIFIED_MAX_AGE_DAYS == 45
+    d = Path(tempfile.mkdtemp())
+
+    stale = d / "stale.md"
+    stale.write_text("**Verified:** 2026-06-01\n")
+    hits = facts._cost_tracker_hits(stale, today=date(2026, 7, 19))
+    assert hits, "COST_TRACKER freshness scan is VACUOUS — did not flag a 48d-stale stamp"
+    assert any("stale" in h for h in hits)
+
+    missing = d / "missing.md"
+    missing.write_text("# Cost Tracker\nno stamp here\n")
+    assert facts._cost_tracker_hits(missing, today=date(2026, 7, 19)), "missing Verified stamp not flagged"
+
+    fresh = d / "fresh.md"
+    fresh.write_text("**Verified:** 2026-07-19\n")
+    assert facts._cost_tracker_hits(fresh, today=date(2026, 7, 19)) == []
+
+    # multiple stamps: the NEWEST governs (old header + fresh footer must pass...)
+    multi = d / "multi.md"
+    multi.write_text("**Verified:** 2026-01-01\n...\n**Verified:** 2026-07-19\n")
+    assert facts._cost_tracker_hits(multi, today=date(2026, 7, 19)) == []
+    # (...and 46 days later the same doc trips the ceiling.)
+    assert facts._cost_tracker_hits(multi, today=date(2026, 9, 3))
+
+
+def test_cost_tracker_freshness_clean_on_current_tree():
+    """After the #1354 rewrite, docs/COST_TRACKER.md carries a fresh Verified stamp."""
+    facts = _load("scripts/check_doc_facts.py")
+    hits = facts._cost_tracker_hits(facts.COST_TRACKER_PATH)
+    assert hits == [], "docs/COST_TRACKER.md trips the #1354 freshness gate:\n" + "\n".join(hits)

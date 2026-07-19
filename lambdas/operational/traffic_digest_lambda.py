@@ -29,6 +29,7 @@ traffic has crossed the surge-mode threshold (ADR-133, #739).
 import gzip
 import hashlib
 import io
+import json
 import logging
 import os
 import urllib.parse
@@ -218,7 +219,7 @@ def aggregate(records):
     }
 
 
-def build_html(agg, start_date, end_date):
+def build_html(agg, start_date, end_date, green_html=""):
     def rows(pairs, label):
         if not pairs:
             return f'<tr><td colspan="2" style="color:#888;padding:6px 0">No {label} this week.</td></tr>'
@@ -256,8 +257,221 @@ def build_html(agg, start_date, end_date):
 <h2 style="font-size:16px;margin-top:24px">Where they came from</h2>
 <table style="width:100%;border-collapse:collapse">{rows(agg['top_referrers'], 'external referrers')}</table>
 {watched_block(agg.get('watched_pages', []))}
+{green_html}
 <p style="color:#888;font-size:12px;margin-top:24px">From first-party CloudFront access logs — aggregate only, no cookies, no tracking, IPs hashed-then-discarded. {agg['returning_visitors']} of {agg['unique_visitors']} visitors returned on a second day.</p>
 </body></html>"""
+
+
+# ── Weekly green report (#1446) ──────────────────────────────────────────────
+# Positive-confirmation QA rollup for the Monday ops email: before this, a green
+# week produced ZERO signal, so absence-of-email did double duty for "healthy"
+# and "broken reporter". Everything below is deterministic (no LLM), reads only
+# what exists, and labels what it cannot read with an honest "not collected"
+# line (ADR-104: never fabricate a rollup number). Every fetch is fail-soft —
+# a missing data source must never crash the email.
+
+GREEN_REPORT_DAYS = 7
+QA_SMOKE_NAMESPACE = "LifePlatform/QaSmoke"  # qa_smoke_lambda.emf_summary_line (#1445)
+BUDGET_NAMESPACE = "LifePlatform/Budget"  # cost_governor_lambda._emit_metrics
+QA_PAUSE_NAMESPACE = "LifePlatform/QA"  # reader_truth_qa.emit_budget_pause_metric (#1440)
+BUDGET_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
+
+# Honest-absence reasons for the sources this Lambda deliberately cannot read.
+# The only GitHub credential in Secrets Manager is the repository_dispatch PAT
+# (life-platform/github-dispatch-token, Contents scope only) — it cannot list
+# Actions runs (needs Actions:read) or read billing minutes (needs Plan:read),
+# so pretending to try would just be a 403 dressed as telemetry.
+_VISUAL_QA_ABSENT = (
+    "not collected — visual-qa verdicts live in GitHub Actions run history; this Lambda holds no "
+    "Actions-scoped token (the dispatch PAT is Contents-only by design, #1446)"
+)
+_ACTIONS_MINUTES_ABSENT = (
+    "not collected — Actions minutes need a billing-scoped GitHub token this Lambda deliberately does not hold (#1446)"
+)
+
+_TIER_LABELS = {
+    0: "all AI normal",
+    1: "internal/dev AI paused",
+    2: "internal + reader narratives paused",
+    3: "hard cutoff — all AI paused",
+}
+
+
+def load_coverage_stats(path=None):
+    """Read the bundle-staged qa_coverage_stats.json (build_bundle.stage_qa_coverage).
+
+    Returns (stats_dict, None) or (None, honest_reason). The file sits at the
+    bundle root, one level above this operational/ package — same convention
+    as food_vocabulary.json.
+    """
+    p = path or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "qa_coverage_stats.json")
+    try:
+        with open(p, encoding="utf-8") as f:
+            stats = json.load(f)
+        if not isinstance(stats, dict) or not stats.get("pages_total"):
+            return None, "coverage snapshot present but malformed — rebuild the bundle (deploy/build_bundle.py)"
+        return stats, None
+    except FileNotFoundError:
+        return None, "coverage snapshot not in this bundle — deployed pre-#1446 or the build-time emitter failed"
+    except Exception as e:
+        return None, f"coverage snapshot unreadable ({str(e)[:80]})"
+
+
+def _daily_sums(cw, namespace, metric, stat, start, end):
+    """One metric's daily datapoints over the window → list of floats (may be empty)."""
+    resp = cw.get_metric_data(
+        MetricDataQueries=[
+            {
+                "Id": "m0",
+                "MetricStat": {
+                    "Metric": {"Namespace": namespace, "MetricName": metric, "Dimensions": []},
+                    "Period": 86400,
+                    "Stat": stat,
+                },
+                "ReturnData": True,
+            }
+        ],
+        StartTime=start,
+        EndTime=end,
+    )
+    results = (resp or {}).get("MetricDataResults") or []
+    return [float(v) for v in ((results[0].get("Values") if results else None) or [])]
+
+
+def collect_green_report(now=None):
+    """Gather the rollup inputs. Each source is fetched fail-soft: on any error
+    the source's dict carries an `error` string and the section renders an
+    honest 'not collected' line instead of a fabricated number (ADR-104)."""
+    now = now or datetime.now(timezone.utc)
+    start = now - timedelta(days=GREEN_REPORT_DAYS)
+    report = {"window_days": GREEN_REPORT_DAYS}
+
+    # 1. Nightly qa-smoke sweep verdicts (EMF metrics, #1445)
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        runs = _daily_sums(cw, QA_SMOKE_NAMESPACE, "RunCompleted", "Sum", start, now)
+        fails = _daily_sums(cw, QA_SMOKE_NAMESPACE, "FailCount", "Sum", start, now)
+        warns = _daily_sums(cw, QA_SMOKE_NAMESPACE, "WarnCount", "Sum", start, now)
+        paused = _daily_sums(cw, QA_SMOKE_NAMESPACE, "PausedCount", "Sum", start, now)
+        days_with_runs = sum(1 for v in runs if v > 0)
+        days_with_failures = sum(1 for v in fails if v > 0)
+        report["qa_smoke"] = {
+            "days_with_runs": days_with_runs,
+            "days_with_failures": days_with_failures,
+            "green_days": max(days_with_runs - days_with_failures, 0),
+            "failed_checks": int(sum(fails)),
+            "warned_checks": int(sum(warns)),
+            "paused_checks": int(sum(paused)),
+        }
+    except Exception as e:
+        report["qa_smoke"] = {"error": f"CloudWatch read failed ({str(e)[:120]})"}
+
+    # 2. Coverage stats — derived from tests/qa_manifest.py at bundle time (#1426)
+    stats, reason = load_coverage_stats()
+    report["coverage"] = stats if stats else {"error": reason}
+
+    # 3. Budget tier + QA budget pauses (ADR-063/125, #1440)
+    budget = {}
+    try:
+        ssm = boto3.client("ssm", region_name=REGION)
+        val = ((ssm.get_parameter(Name=BUDGET_TIER_PARAM) or {}).get("Parameter") or {}).get("Value")
+        budget["tier"] = int(val) if val is not None else None
+    except Exception as e:
+        budget["tier_error"] = f"SSM read failed ({str(e)[:120]})"
+    try:
+        cw = boto3.client("cloudwatch", region_name=REGION)
+        tiers = _daily_sums(cw, BUDGET_NAMESPACE, "BudgetTier", "Maximum", start, now)
+        budget["tier_max_7d"] = int(max(tiers)) if tiers else None
+        pauses = _daily_sums(cw, QA_PAUSE_NAMESPACE, "QAPausedByBudget", "Sum", start, now)
+        budget["qa_pauses_7d"] = int(sum(pauses))
+    except Exception as e:
+        budget["metrics_error"] = f"CloudWatch read failed ({str(e)[:120]})"
+    report["budget"] = budget
+
+    # 4 + 5. GitHub-side sources — honest absence, never a guess (see constants above).
+    report["visual_qa"] = {"error": _VISUAL_QA_ABSENT}
+    report["actions_minutes"] = {"error": _ACTIONS_MINUTES_ABSENT}
+    return report
+
+
+def _gr_row(label, text, tone="ok"):
+    color = {"ok": "#1a7f37", "warn": "#9a6700", "bad": "#b42318", "muted": "#6e665a"}.get(tone, "#221e17")
+    return (
+        f'<p style="margin:6px 0"><span style="font-family:monospace;font-size:12px;color:#6e665a">{label}</span><br>'
+        f'<span style="color:{color};font-size:13px">{text}</span></p>'
+    )
+
+
+def build_green_report_html(report):
+    """Render the green-report section. Must render sanely with partial or
+    missing data — every sub-dict may be absent, None, or error-shaped (the
+    genesis-week present-None class: keys PRESENT, values None, memory:
+    reference_genesis_week_present_none — hence `(d.get(k) or {})` guards
+    throughout, never bare indexing). Must never raise: a crash here would
+    take the whole Monday ops email down with it."""
+    report = report or {}
+    window = report.get("window_days") or GREEN_REPORT_DAYS
+    parts = [f'<h2 style="font-size:16px;margin-top:28px">Weekly green report — QA estate, last {window} days</h2>']
+
+    # Nightly qa-smoke sweep
+    qa = report.get("qa_smoke") or {}
+    runs = qa.get("days_with_runs")
+    if qa.get("error") or runs is None:
+        reason = qa.get("error") or "no qa-smoke rollup in this run"
+        parts.append(_gr_row("nightly qa-smoke", f"not collected — {reason}", "muted"))
+    else:
+        fail_days = qa.get("days_with_failures") or 0
+        text = (
+            f"{runs}/{window} nightly runs completed · {qa.get('green_days') or 0} green · {fail_days} with failures "
+            f"({qa.get('failed_checks') or 0} failing checks) · {qa.get('warned_checks') or 0} warnings · "
+            f"{qa.get('paused_checks') or 0} paused checks"
+        )
+        tone = "bad" if fail_days else ("warn" if runs < window else "ok")
+        parts.append(_gr_row("nightly qa-smoke", text, tone))
+
+    # Coverage (derived from the #1426 manifest at bundle time)
+    cov = report.get("coverage") or {}
+    if cov.get("error") or not cov.get("pages_total"):
+        reason = cov.get("error") or "no coverage snapshot in this run"
+        parts.append(_gr_row("qa surface coverage", f"not collected — {reason}", "muted"))
+    else:
+        tiers = ", ".join(f"{k.replace('tier', 'T')}:{v}" for k, v in sorted((cov.get("pages_by_tier") or {}).items()))
+        text = (
+            f"{cov.get('pages_total')} pages registered ({tiers or 'tiers n/a'}) · visual sweep {cov.get('pages_with_visual') or 0} pages "
+            f"({cov.get('visual_defs') or 0} defs) · {cov.get('static_core_pages') or 0} static-core · "
+            f"{cov.get('leak_scan_pages') or 0} leak-scan · {cov.get('api_endpoints_declared') or 0} API endpoints declared "
+            f"— derived from {cov.get('source') or 'the QA manifest'} at last deploy"
+        )
+        parts.append(_gr_row("qa surface coverage", text, "ok"))
+
+    # Budget pauses
+    b = report.get("budget") or {}
+    bits = []
+    tier = b.get("tier")
+    if tier is not None:
+        bits.append(f"tier now {tier} ({_TIER_LABELS.get(tier, 'unknown tier')})")
+    else:
+        bits.append(f"current tier not collected — {b.get('tier_error') or 'no reading in this run'}")
+    tier_max = b.get("tier_max_7d")
+    pauses = b.get("qa_pauses_7d")
+    if b.get("metrics_error") or (tier_max is None and pauses is None):
+        bits.append(f"7-day history not collected — {b.get('metrics_error') or 'no readings in this run'}")
+    else:
+        bits.append(f"7-day max tier {tier_max if tier_max is not None else 'n/a (no datapoints)'}")
+        bits.append(f"{pauses if pauses is not None else 'n/a'} QA budget pause(s)")
+    any_pause = (tier or 0) > 0 or (tier_max or 0) > 0 or (pauses or 0) > 0
+    tone = "muted" if tier is None else ("warn" if any_pause else "ok")
+    parts.append(_gr_row("budget (ADR-063)", " · ".join(bits), tone))
+
+    # GitHub-side sources — honest absence lines
+    parts.append(_gr_row("visual-qa (CI)", (report.get("visual_qa") or {}).get("error") or _VISUAL_QA_ABSENT, "muted"))
+    parts.append(_gr_row("actions minutes", (report.get("actions_minutes") or {}).get("error") or _ACTIONS_MINUTES_ABSENT, "muted"))
+
+    parts.append(
+        '<p style="color:#888;font-size:12px;margin:8px 0 0">Deterministic rollup — every number read live from '
+        "CloudWatch/SSM or derived from the QA manifest; anything unreadable says so instead of guessing (ADR-104).</p>"
+    )
+    return "".join(parts)
 
 
 def _load_logs(s3, start_dt):
@@ -283,7 +497,7 @@ def _load_logs(s3, start_dt):
     return texts, object_count
 
 
-def _emit_no_logs_alert(s3, cw, start_dt, now):
+def _emit_no_logs_alert(s3, cw, start_dt, now, green_html=""):
     """Send a loud email + CloudWatch metric when the log source is empty."""
     cw.put_metric_data(
         Namespace="LifePlatform/Traffic",
@@ -300,6 +514,7 @@ in <code>s3://{LOG_BUCKET}/{LOG_PREFIX}</code> for the window
 <code>aws cloudfront get-distribution-config --id E3S424OXQZ8NBE --query DistributionConfig.Logging</code></p>
 <p>If logging is off, re-enable it via CDK (it is now declared in web_stack.py)
 and run <code>cdk deploy LifePlatformWeb</code>.</p>
+{green_html}
 </body></html>"""
     try:
         boto3.client("sesv2", region_name=REGION).send_email(
@@ -329,9 +544,21 @@ def lambda_handler(event, context):
 
         texts, object_count = _load_logs(s3, start_dt)
 
+        # #1446: the weekly green report rides this email in ALL branches — a
+        # green week must produce positive signal, so the rollup is built
+        # fail-soft up front and appended to whichever email goes out.
+        try:
+            green_html = build_green_report_html(collect_green_report(now))
+        except Exception as e:
+            logger.warning("green report failed (fail-soft, #1446): %s", e)
+            green_html = (
+                '<h2 style="font-size:16px;margin-top:28px">Weekly green report</h2>'
+                f'<p style="color:#6e665a;font-size:13px">not collected — rollup builder error (fail-soft): {str(e)[:160]}</p>'
+            )
+
         if object_count == 0:
             # No log objects at all — logging is likely disabled, not just a quiet week.
-            _emit_no_logs_alert(s3, cw, start_dt, now)
+            _emit_no_logs_alert(s3, cw, start_dt, now, green_html)
             return {"statusCode": 200, "body": "no log objects — alert sent"}
 
         records = []
@@ -361,20 +588,25 @@ def lambda_handler(event, context):
         except Exception as e:
             logger.warning("traffic digest: PutMetricData failed (non-fatal): %s", e)
 
-        if agg["page_views"] == 0:
-            logger.info("no human page views in window (logs present, genuinely quiet) — skipping email")
-            return {"statusCode": 200, "body": "quiet week — no email"}
+        # #1446: a quiet week no longer suppresses the email — the green report IS
+        # the positive confirmation the Monday ops email exists to deliver. The
+        # traffic numbers honestly show 0.
+        quiet = agg["page_views"] == 0
+        if quiet:
+            logger.info("no human page views in window (logs present, genuinely quiet) — sending green report anyway (#1446)")
 
-        html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"))
+        html = build_html(agg, start_dt.strftime("%b %d"), now.strftime("%b %d"), green_html)
+        subject = (
+            "Weekly ops — quiet traffic week · QA green report"
+            if quiet
+            else f"Weekly traffic — {agg['page_views']} views, {agg['unique_visitors']} visitors · green report"
+        )
         boto3.client("sesv2", region_name=REGION).send_email(
             FromEmailAddress=EMAIL_SENDER,
             Destination={"ToAddresses": [EMAIL_RECIPIENT]},
             Content={
                 "Simple": {
-                    "Subject": {
-                        "Data": f"Weekly traffic — {agg['page_views']} views, {agg['unique_visitors']} visitors",
-                        "Charset": "UTF-8",
-                    },
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
                     "Body": {"Html": {"Data": html, "Charset": "UTF-8"}},
                 }
             },

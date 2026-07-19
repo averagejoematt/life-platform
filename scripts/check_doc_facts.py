@@ -598,10 +598,27 @@ GOVERNOR_COMPOUND_RE = re.compile(r"cost[-_ ]governor", re.I)
 GOVERNOR_BARE_RE = re.compile(r"\bgovernor\b", re.I)
 GOVERNOR_CONTEXT_RE = re.compile(r"\b(?:month-end|budget|spend|ceiling|tier)\b", re.I)
 HOURLY_CLAIM_RE = re.compile(r"\bhourly\b|\bevery\s+hour\b", re.I)
+# #1354: the second stale-cadence class COST_TRACKER.md carried — a WRONG "every Nh"
+# claim ("Cadence: every 4h", written when 4h was true, orphaned by the 2026-06-16
+# 4h→8h cron change). Same shape as the hourly rule: a governor-naming line claiming
+# a specific every-N-hours cadence that disagrees with the CDK cron is stale.
+EVERY_NH_CLAIM_RE = re.compile(r"\bevery\s+(\d{1,2})\s*h(?:ours?|rs?)?\b", re.I)
 _GOVERNOR_CRON_STEP_RE = re.compile(r"cron\(\d+\s+0/(\d+)")
 GOVERNOR_SOURCE_DIRS = (ROOT / "lambdas", ROOT / "mcp")
 SITE_DIR = ROOT / "site"
 SITE_EXEMPT_DIRS = ("site/legacy/",)
+# #1354: docs/COST_TRACKER.md sits in EXEMPT_FILES for the *number* scans (a cost
+# ledger is allowed to state history), but it is the CANONICAL cost doc — its live
+# operational claims (how often the governor runs) are exactly the class #1254/#1347
+# police, and the blanket exemption is how "cost-governor (hourly)" survived at
+# COST_TRACKER.md:59 while the identical claim was eradicated corpus-wide (#1347).
+# The cadence scan is line-level and HISTORICAL-exempt, so including the ledger here
+# still lets it narrate its own history ("was hourly", "hourly → 4h → 8h").
+COST_TRACKER_PATH = ROOT / "docs" / "COST_TRACKER.md"
+# #1354 acceptance: the canonical cost doc must be re-verified from live Cost
+# Explorer at least every 45 days — a doc whose Verified: stamp is older is exactly
+# the "ends 'Jun 2026 MTD ~8d'" staleness the 2026-07-18 SDLC review found.
+COST_TRACKER_VERIFIED_MAX_AGE_DAYS = 45
 
 
 def _governor_cadence_hours(cdk_map: dict) -> int | None:
@@ -622,6 +639,10 @@ def _scan_governor_surface() -> list[Path]:
     exposed so the regression test can assert the surface includes the exact files
     #1254 enumerated and the ones this issue found beyond them."""
     out = list(_scan_files())
+    # #1354: the canonical cost ledger is number-exempt (EXEMPT_FILES) but its live
+    # governor-cadence claims are policed like everywhere else.
+    if COST_TRACKER_PATH.exists():
+        out.append(COST_TRACKER_PATH)
     for d in GOVERNOR_SOURCE_DIRS:
         if d.exists():
             out += sorted(d.rglob("*.py"))
@@ -660,13 +681,58 @@ def _governor_cadence_hits(files, step_hours: int | None) -> list[str]:
         for lineno, line in enumerate(doc.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
             if HISTORICAL.search(line):
                 continue
-            if _line_names_the_governor(line) and HOURLY_CLAIM_RE.search(line):
+            if not _line_names_the_governor(line):
+                continue
+            if HOURLY_CLAIM_RE.search(line):
                 hits.append(
                     f"{rel}:{lineno}: cost-governor cadence claims hourly, CDK schedule is every {step_hours}h "
                     f"({GOVERNOR_FUNCTION_NAME}, #1254/#1347)\n"
                     f"      | {line.strip()[:160]}"
                 )
+                continue
+            # #1354: a SPECIFIC every-Nh claim that disagrees with the CDK cron (the
+            # "Cadence: every 4h" class — true when written, orphaned by a cron change).
+            for mo in EVERY_NH_CLAIM_RE.finditer(line):
+                if int(mo.group(1)) != step_hours:
+                    hits.append(
+                        f"{rel}:{lineno}: cost-governor cadence claims every {mo.group(1)}h, CDK schedule is "
+                        f"every {step_hours}h ({GOVERNOR_FUNCTION_NAME}, #1254/#1347/#1354)\n"
+                        f"      | {line.strip()[:160]}"
+                    )
+                    break
     return hits
+
+
+def _cost_tracker_hits(doc_path: Path, today=None) -> list[str]:
+    """COST_TRACKER.md freshness ceiling (#1354). The canonical cost doc must carry a
+    '**Verified:** YYYY-MM-DD' stamp no older than COST_TRACKER_VERIFIED_MAX_AGE_DAYS —
+    the numbers in it are Cost Explorer snapshots, and a 41-day-stale doc was carrying
+    5 wrong load-bearing numbers (cadence, tier bands, alarm count, non-AI floor,
+    monthly actuals) when the 2026-07-18 SDLC review audited it. Multiple Verified
+    stamps may exist (header + close-ritual footer); the NEWEST governs. `today` is
+    injectable (a `datetime.date`) so the regression test never depends on wall-clock —
+    the live gate (today=None from main()) uses the real date. Mirrors
+    _data_governance_hits, the sibling per-doc freshness gate (#1351)."""
+    import datetime as _dt
+
+    if not doc_path.exists():
+        return []
+    today = today or _dt.date.today()
+    text = doc_path.read_text(encoding="utf-8")
+    stamps = VERIFIED_HEADER_RE.findall(text)
+    if not stamps:
+        return ["docs/COST_TRACKER.md: no '**Verified:** YYYY-MM-DD' stamp found (#1354)"]
+    try:
+        newest = max(_dt.date.fromisoformat(s) for s in stamps)
+    except ValueError:
+        return [f"docs/COST_TRACKER.md: unparseable Verified stamp among {stamps!r} (#1354)"]
+    age_days = (today - newest).days
+    if age_days > COST_TRACKER_VERIFIED_MAX_AGE_DAYS:
+        return [
+            f"docs/COST_TRACKER.md: Verified stamp is {age_days}d stale ({newest}, today {today}) — "
+            f"re-verify from live Cost Explorer within {COST_TRACKER_VERIFIED_MAX_AGE_DAYS}d (#1354)"
+        ]
+    return []
 
 
 def _scan_files() -> list[Path]:
@@ -770,6 +836,10 @@ def main():
     # #1351: DATA_GOVERNANCE.md-specific fact checks (repo visibility, deletion-lambda
     # status, Verified-header freshness).
     hits += _data_governance_hits(DATA_GOVERNANCE_PATH)
+
+    # #1354: COST_TRACKER.md-specific freshness ceiling — the canonical cost doc must
+    # be re-verified from live Cost Explorer within 45 days of its Verified: stamp.
+    hits += _cost_tracker_hits(COST_TRACKER_PATH)
 
     # de-dupe (multiple patterns can flag the same number on one line)
     seen, uniq = set(), []

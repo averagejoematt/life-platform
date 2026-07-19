@@ -1,0 +1,65 @@
+# Advisory-failure issue filer (#1447) — the ONE reusable step every advisory
+# scheduled workflow appends as its last step with `if: always()`.
+#
+# Maps job.status → scripts/advisory_failure_issue.py mode:
+#   failure   → --mode file     (create the deduped auto-filed issue, or comment
+#                                the new run link on the existing open one —
+#                                one open issue per workflow, never duplicates)
+#   success   → --mode recover  (comment + auto-close the open auto-filed issue
+#                                if there is one; no-op otherwise)
+#   cancelled → skip entirely
+#
+# Close policy (documented here + in the script docstring + docs/RUNBOOK.md):
+# an auto-filed issue auto-closes on the next green run of the SAME workflow
+# (scheduled or workflow_dispatch). Closing it by hand without fixing just means
+# the next failure files a fresh one.
+#
+# The calling workflow must have checked out the repo (all advisory workflows
+# do) and must grant `issues: write` in its permissions block. The script is
+# stdlib-only, so no setup-python/pip step is required — the runner's system
+# python3 is enough even when the workflow's own setup steps were what failed.
+
+name: Advisory failure issue
+description: >-
+  On failure, file or update ONE deduped auto-filed GitHub issue for this
+  advisory scheduled workflow (ADR-099-shaped body: what failed, run link,
+  first-failure timestamp); on success, comment + auto-close it (#1447).
+inputs:
+  workflow-slug:
+    description: Stable slug identifying the workflow — the dedup key (e.g. visual-qa-standalone). Never change it once issues exist.
+    required: true
+  workflow-name:
+    description: Human-readable workflow name for the issue title.
+    required: true
+  job-status:
+    description: Pass ${{ job.status }} from the caller.
+    required: true
+  github-token:
+    description: Pass ${{ secrets.GITHUB_TOKEN }} (needs issues:write in the caller's permissions block).
+    required: true
+  failure-summary:
+    description: Optional one-paragraph what-failed context for the issue body / repeat comment.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: File or resolve the advisory failure issue
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        JOB_STATUS: ${{ inputs.job-status }}
+        WORKFLOW_SLUG: ${{ inputs.workflow-slug }}
+        WORKFLOW_NAME: ${{ inputs.workflow-name }}
+        FAILURE_SUMMARY: ${{ inputs.failure-summary }}
+      run: |
+        case "$JOB_STATUS" in
+          failure) MODE=file ;;
+          success) MODE=recover ;;
+          *) echo "job status '$JOB_STATUS' — nothing to file or resolve"; exit 0 ;;
+        esac
+        python3 "$GITHUB_WORKSPACE/scripts/advisory_failure_issue.py" \
+          --mode "$MODE" \
+          --workflow-slug "$WORKFLOW_SLUG" \
+          --workflow-name "$WORKFLOW_NAME" \
+          --summary "$FAILURE_SUMMARY"

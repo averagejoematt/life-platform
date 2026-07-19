@@ -254,6 +254,41 @@ if [[ "$QUICK" != "--quick" ]]; then
   check_body_not_contains "Cockpit: no stale copy"    "$NOW_FILE"   'coming soon\|launching april\|lorem ipsum\|TODO' "$BASE/cockpit/"
   echo ""
 
+  # ── Static-page structural checks (#1429) ─────────────────────────────────────
+  # The static long-tail (/404, /subscribe/confirm/, /privacy/, the essays, …) has
+  # no API dep and no deploy-time visual gate — it can silently break or leak
+  # placeholder content between reviews. Each page must contain its declared
+  # structural marker (expected title/selector) and NO template-leak token. Page
+  # list + markers derive from tests/qa_manifest.py (content_class static/utility
+  # — the ONE registry, #1426), never a hand list. The 404 row fetches a
+  # nonexistent URL: CloudFront serves the 404 page's BODY with HTTP status 404,
+  # so this asserts body structure, never a 200 (the status sweep above already
+  # asserts the 404 itself). Same-deploy content ⇒ cache-aware reads (#1526).
+  echo "── Static pages (structural, from qa_manifest) ───────────"
+  source "$(dirname "$0")/lib/structural_checks.sh"
+  if STRUCT_ROWS=$(python3 "$QA_MANIFEST" --emit structural); then
+    ST_FILE=$(mktemp)
+    while IFS='|' read -r st_path st_name st_marker; do
+      [[ -z "$st_path" ]] && continue
+      STRUCT_MARKER="$st_marker"
+      curl -s --max-time 15 "$BASE$st_path" > "$ST_FILE" || true
+      if assert_body_until "$BASE$st_path" "$ST_FILE" struct_marker_ok; then
+        echo "  ✅ structural marker present · $st_name ($st_path)"; PASS=$((PASS + 1))
+      else
+        echo "  ❌ structural marker MISSING · $st_name ($st_path) — expected body to contain: $st_marker"; FAIL=$((FAIL + 1))
+      fi
+      if assert_body_until "$BASE$st_path" "$ST_FILE" leak_tokens_absent; then
+        echo "  ✅ no template-leak tokens · $st_name"; PASS=$((PASS + 1))
+      else
+        echo "  ❌ template-leak token in body · $st_name ($st_path) — matched: $LEAK_TOKEN_PATTERN"; FAIL=$((FAIL + 1))
+      fi
+    done <<< "$STRUCT_ROWS"
+    rm -f "$ST_FILE"
+  else
+    echo "  ❌ qa_manifest structural emit failed — static-page structural checks did not run"; FAIL=$((FAIL + 1))
+  fi
+  echo ""
+
   # ── Static core / crawler view (#1395) ────────────────────────────────────────
   # THE growth-surface guard: every page the manifest marks static_core:true must
   # ship a NON-EMPTY build-time <noscript> static core (class "proof-static") carrying
