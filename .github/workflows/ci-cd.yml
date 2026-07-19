@@ -1320,6 +1320,15 @@ jobs:
             -v --tb=short -m integration 2>&1
           echo "I23 complete"
 
+      - name: I24 — EventBridge rule parity (every ENABLED rule is CDK-managed, #1257)
+        # Catches the #1257 class: a hand-created (or console-clicked) EventBridge
+        # rule that double-schedules a Lambda CDK already schedules, invisible to
+        # `cdk diff` because CDK never owned it.
+        run: |
+          python3 -m pytest tests/test_integration_aws.py::test_i24_eventbridge_rule_lambda_targets_are_cdk_managed \
+            -v --tb=short -m integration 2>&1
+          echo "I24 complete"
+
   # ════════════════════════════════════════════════════════════════
   # Job 6: Auto-rollback on smoke failure (TB7-25)
   # Fires when smoke-test fails AFTER a successful deploy.

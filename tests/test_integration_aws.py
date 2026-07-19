@@ -1491,6 +1491,211 @@ def test_i23_alert_digest_consumer_and_queue_are_watched():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# I24 — EventBridge rule parity: every ENABLED rule targeting a life-platform
+# Lambda must be CDK-governed (#1257 regression guard)
+# Root cause of: #1257 — two hand-created rules (pipeline-health-check-daily,
+# subscriber-onboarding-daily, created by the legacy pre-CDK setup scripts
+# deploy/setup_pipeline_health_check.sh / deploy/setup_subscriber_onboarding.sh,
+# now tombstoned) double-scheduled lambdas CDK ALREADY scheduled — invisible to
+# `cdk diff` (CDK never owned them) and only caught by a manual /fullreview
+# live-vs-code audit. This closes the gap permanently: this test doesn't just
+# assert the two known offenders are gone (they are, verified this session),
+# it catches ANY future hand-created/console-clicked rule targeting one of our
+# Lambdas.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Functions legitimately schedule-governed OUTSIDE cdk/stacks/*.py's
+# create_platform_lambda / events.Rule declarations. Empty today — every
+# EventBridge → Lambda schedule in this platform is CDK-owned (either the
+# schedule= shortcut or the documented "manual events.Rule escape hatch"
+# pattern in operational_stack.py). Add an entry here — with the issue/ADR
+# that authorizes the exception — rather than weakening the assertion below.
+EVENTBRIDGE_RULE_EXEMPTIONS: set[str] = set()
+
+
+def _cdk_scheduled_lambda_names(stacks_dir=None):
+    """Statically discover every Lambda function_name that CDK associates with
+    an EventBridge schedule, by parsing cdk/stacks/*.py.
+
+    This is the pre-synth source of truth — the same precedent as
+    deploy/sync_doc_metadata.py's AST-based lambda/alarm counters: parsing the
+    stack declarations directly is dependency-free and fast (no `npx cdk
+    synth`, no Node toolchain, no live AWS lookup needed to build the CDK side
+    of the comparison), and the declarations ARE what `cdk synth` renders into
+    AWS::Events::Rule resources — walking them is equivalent for this purpose.
+
+    Two patterns are recognized (both are load-bearing per operational_stack.py's
+    own comments — do not collapse to just one):
+      1. create_platform_lambda(..., function_name="x", schedule=<anything>) —
+         the schedule= shortcut auto-creates + attaches the Rule. The schedule
+         value itself may be a plain string, an f-string, or a variable (e.g.
+         ingestion_stack.py's whoop ingestion uses schedule=f"cron(0 {INGEST_HOURLY} ...)"))
+         — only presence (not the literal cron) matters here.
+      2. A manual `events.Rule(...)` + `<rule>.add_target(targets.LambdaFunction(<var>))`
+         where <var> was assigned by a create_platform_lambda(...) call earlier
+         in the SAME file — the "manual events.Rule escape hatch" documented at
+         operational_stack.py (used for ships-disabled and secondary/staggered
+         schedules on top of a Lambda's primary one).
+    """
+    import ast as _ast
+
+    stacks_dir = stacks_dir or os.path.join(ROOT, "cdk", "stacks")
+    scheduled = set()
+
+    def _is_create_platform_lambda_call(node):
+        return isinstance(node, _ast.Call) and (
+            (isinstance(node.func, _ast.Name) and node.func.id == "create_platform_lambda")
+            or (isinstance(node.func, _ast.Attribute) and node.func.attr == "create_platform_lambda")
+        )
+
+    def _has_non_none_kwarg(call, name):
+        for kw in call.keywords:
+            if kw.arg == name:
+                return not (isinstance(kw.value, _ast.Constant) and kw.value.value is None)
+        return False
+
+    for fname in sorted(os.listdir(stacks_dir)):
+        if not fname.endswith(".py"):
+            continue
+        path = os.path.join(stacks_dir, fname)
+        with open(path) as f:
+            try:
+                tree = _ast.parse(f.read(), filename=path)
+            except SyntaxError:
+                continue
+
+        # Module-level string constants (e.g. mcp_stack.py's
+        # MCP_FUNCTION_NAME = "life-platform-mcp"), so function_name=SOME_CONST
+        # resolves the same as function_name="literal".
+        module_consts = {}
+        for node in tree.body:
+            if (
+                isinstance(node, _ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(node.targets[0], _ast.Name)
+                and isinstance(node.value, _ast.Constant)
+                and isinstance(node.value.value, str)
+            ):
+                module_consts[node.targets[0].id] = node.value.value
+
+        def _resolve_function_name(call):
+            for kw in call.keywords:
+                if kw.arg != "function_name":
+                    continue
+                if isinstance(kw.value, _ast.Constant) and isinstance(kw.value.value, str):
+                    return kw.value.value
+                if isinstance(kw.value, _ast.Name) and kw.value.id in module_consts:
+                    return module_consts[kw.value.id]
+            return None
+
+        var_to_function_name = {}  # per-file scope
+
+        # Pass 1: every create_platform_lambda call — record var->function_name
+        # (for pattern 2), and if schedule= is also present, it's DIRECTLY
+        # scheduled (pattern 1).
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Assign) and _is_create_platform_lambda_call(node.value):
+                fn_name = _resolve_function_name(node.value)
+                if not fn_name:
+                    continue
+                if _has_non_none_kwarg(node.value, "schedule"):
+                    scheduled.add(fn_name)
+                for target in node.targets:
+                    if isinstance(target, _ast.Name):
+                        var_to_function_name[target.id] = fn_name
+            elif _is_create_platform_lambda_call(node):
+                # Not assigned to a simple Name (e.g. passed straight into
+                # another expression) — schedule= still counts directly.
+                fn_name = _resolve_function_name(node)
+                if fn_name and _has_non_none_kwarg(node, "schedule"):
+                    scheduled.add(fn_name)
+
+        # Pass 2: manual add_target(targets.LambdaFunction(<var>)) calls.
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Call) and isinstance(node.func, _ast.Attribute) and node.func.attr == "add_target":
+                for arg in node.args:
+                    if (
+                        isinstance(arg, _ast.Call)
+                        and isinstance(arg.func, _ast.Attribute)
+                        and arg.func.attr == "LambdaFunction"
+                        and arg.args
+                        and isinstance(arg.args[0], _ast.Name)
+                    ):
+                        var_name = arg.args[0].id
+                        if var_name in var_to_function_name:
+                            scheduled.add(var_to_function_name[var_name])
+
+    return scheduled
+
+
+@pytest.mark.integration
+def test_i24_eventbridge_rule_lambda_targets_are_cdk_managed():
+    """I24: every ENABLED EventBridge rule targeting a life-platform Lambda must
+    be governed by CDK (#1257).
+
+    #1257: two hand-created rules (pipeline-health-check-daily,
+    subscriber-onboarding-daily) double-scheduled lambdas CDK already
+    scheduled — invisible to `cdk diff` because CDK never owned them, caught
+    only by /fullreview's live-vs-code audit (both rules are gone as of this
+    session's AWS cleanup). This test is the standing guard: any FUTURE
+    hand-created (or console-clicked) rule targeting one of our Lambdas is
+    caught the next time this runs, instead of waiting for the next manual audit.
+
+    Fix: cdk-import the rule (give CDK ownership), delete it if it's a
+    duplicate of a CDK-managed schedule, or — if it's a deliberate, documented
+    exception — add the target function name to EVENTBRIDGE_RULE_EXEMPTIONS
+    with a comment citing the issue/ADR that authorizes it.
+    """
+    boto3 = _get_boto3()
+    eb = boto3.client("events", region_name=REGION)
+    lc = boto3.client("lambda", region_name=REGION)
+
+    known_functions = set()
+    try:
+        paginator = lc.get_paginator("list_functions")
+        for page in paginator.paginate():
+            for fn in page.get("Functions", []):
+                known_functions.add(fn["FunctionName"])
+    except Exception as e:
+        pytest.skip(f"I24 SKIP: could not list Lambda functions: {e}")
+
+    cdk_scheduled = _cdk_scheduled_lambda_names()
+
+    offenders = []
+    try:
+        rule_paginator = eb.get_paginator("list_rules")
+        for page in rule_paginator.paginate():
+            for rule in page.get("Rules", []):
+                if rule.get("State") != "ENABLED":
+                    continue
+                rule_name = rule["Name"]
+                try:
+                    targets_resp = eb.list_targets_by_rule(Rule=rule_name)
+                except Exception:
+                    continue
+                for target in targets_resp.get("Targets", []):
+                    arn = target.get("Arn", "")
+                    if ":function:" not in arn:
+                        continue
+                    fn_name = arn.rsplit(":function:", 1)[-1].split(":")[0]
+                    if fn_name not in known_functions:
+                        continue  # not one of ours (or a cross-account/region target)
+                    if fn_name in cdk_scheduled or fn_name in EVENTBRIDGE_RULE_EXEMPTIONS:
+                        continue
+                    offenders.append(f"{rule_name} (ENABLED) → {fn_name}: not CDK-scheduled and not exempted")
+    except Exception as e:
+        pytest.skip(f"I24 SKIP: could not list EventBridge rules: {e}")
+
+    assert not offenders, (
+        f"I24 FAIL: {len(offenders)} ENABLED EventBridge rule(s) target a life-platform Lambda "
+        f"outside CDK's ownership (the #1257 class):\n" + "\n".join(f"  ❌ {o}" for o in offenders) + "\n\n"
+        "Fix: cdk-import the rule, delete it if it duplicates a CDK-managed schedule, "
+        "or add the function name to EVENTBRIDGE_RULE_EXEMPTIONS in tests/test_integration_aws.py "
+        "with a comment citing the issue/ADR that authorizes the exception."
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Standalone runner
 # ══════════════════════════════════════════════════════════════════════════════
 
