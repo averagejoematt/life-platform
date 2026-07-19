@@ -1,0 +1,889 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/character_config",
+  "is_prefix_sample": false,
+  "path": "/api/character_config",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "available": {
+        "type": "boolean"
+      },
+      "cross_pillar_effects": {
+        "items": [
+          {
+            "keys": {
+              "condition": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "targets": {
+                "keys": {
+                  "mind": {
+                    "keys": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "movement": {
+                    "keys": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "condition": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "targets": {
+                "keys": {
+                  "metabolic": {
+                    "keys": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "condition": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "targets": {
+                "keys": {
+                  "consistency": {
+                    "keys": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "condition": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "targets": {
+                "keys": {
+                  "_all": {
+                    "keys": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "condition": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "targets": {
+                "keys": {
+                  "mind": {
+                    "keys": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 6,
+        "type": "array"
+      },
+      "leveling": {
+        "keys": {
+          "daily_xp_decay": {
+            "type": "integer"
+          },
+          "ema_lambda": {
+            "type": "number"
+          },
+          "ema_window_days": {
+            "type": "integer"
+          },
+          "level_change_min_coverage": {
+            "type": "number"
+          },
+          "level_down_streak_days": {
+            "type": "integer"
+          },
+          "level_step_bands": {
+            "items": {
+              "keys": {
+                "min_delta": {
+                  "type": "integer"
+                },
+                "step": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 2,
+            "type": "array"
+          },
+          "level_step_threshold": {
+            "type": "integer"
+          },
+          "level_up_streak_days": {
+            "type": "integer"
+          },
+          "neglect_decay": {
+            "keys": {
+              "floor": {
+                "type": "integer"
+              },
+              "min_behavioral_share": {
+                "type": "number"
+              },
+              "n_grace_days": {
+                "type": "integer"
+              },
+              "persistent_down_streak": {
+                "type": "boolean"
+              },
+              "rate": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "tier_down_streak_days": {
+            "type": "integer"
+          },
+          "tier_streak_overrides": {
+            "keys": {
+              "Discipline": {
+                "keys": {
+                  "down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_up": {
+                    "type": "integer"
+                  },
+                  "up": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "Elite": {
+                "keys": {
+                  "down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_up": {
+                    "type": "integer"
+                  },
+                  "up": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "Foundation": {
+                "keys": {
+                  "down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_up": {
+                    "type": "integer"
+                  },
+                  "up": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "Mastery": {
+                "keys": {
+                  "down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_up": {
+                    "type": "integer"
+                  },
+                  "up": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "Momentum": {
+                "keys": {
+                  "down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_down": {
+                    "type": "integer"
+                  },
+                  "tier_boundary_up": {
+                    "type": "integer"
+                  },
+                  "up": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "tier_up_streak_days": {
+            "type": "integer"
+          },
+          "xp_buffer_threshold": {
+            "type": "integer"
+          },
+          "xp_debt_cap": {
+            "type": "integer"
+          },
+          "xp_per_level": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "pillars": {
+        "keys": {
+          "consistency": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "cross_pillar_variance": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "data_completeness": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "streak_maintenance": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "task_follow_through": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "weekend_weekday_stability": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "metabolic": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "blood_pressure": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "cgm_glucose_control": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "lab_biomarkers": {
+                    "keys": {
+                      "decay_period_days": {
+                        "type": "integer"
+                      },
+                      "expiry_days": {
+                        "type": "integer"
+                      },
+                      "floor_pct": {
+                        "type": "number"
+                      },
+                      "full_value_days": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "resting_heart_rate": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "mind": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "journal_consistency": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "reading_practice": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_days_week": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "state_of_mind_valence": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "stress_management": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "t0_habit_compliance": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "t1_habit_compliance": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "values_alignment": {
+                    "keys": {
+                      "description": {
+                        "type": "string"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "vice_control": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "movement": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "daily_steps": {
+                    "keys": {
+                      "target": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "movement_diversity": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_types": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "progressive_overload": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "strength_sessions": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_days_week": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "training_frequency": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_sessions_week": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "training_load_balance": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "zone2_adequacy": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_minutes": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "nutrition": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "body_composition_progress": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "calorie_adherence": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "tolerance_pct": {
+                        "type": "number"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "consistency": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "protein_distribution": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_meals": {
+                        "type": "integer"
+                      },
+                      "threshold_grams": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "protein_total": {
+                    "keys": {
+                      "behavioral": {
+                        "type": "boolean"
+                      },
+                      "target_grams": {
+                        "type": "integer"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "relationships": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "interaction_quality": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "social_interaction_frequency": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "social_mood_correlation": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "sleep": {
+            "keys": {
+              "components": {
+                "keys": {
+                  "deep_sleep_pct": {
+                    "keys": {
+                      "target_pct": {
+                        "type": "number"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "duration_vs_target": {
+                    "keys": {
+                      "target_hours": {
+                        "type": "number"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "efficiency": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "onset_consistency": {
+                    "keys": {
+                      "weight": {
+                        "type": "number"
+                      },
+                      "window_days": {
+                        "type": "integer"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "rem_pct": {
+                    "keys": {
+                      "target_pct": {
+                        "type": "number"
+                      },
+                      "weight": {
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              },
+              "ema_lambda": {
+                "type": "number"
+              },
+              "weight": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "tiers": {
+        "items": {
+          "keys": {
+            "max_level": {
+              "type": "integer"
+            },
+            "min_level": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 5,
+        "type": "array"
+      },
+      "updated_at": {
+        "type": "string"
+      },
+      "xp_bands": {
+        "items": {
+          "keys": {
+            "min_raw_score": {
+              "type": "integer"
+            },
+            "xp": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 5,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

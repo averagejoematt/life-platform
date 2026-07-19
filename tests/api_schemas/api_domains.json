@@ -1,0 +1,287 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/domains",
+  "is_prefix_sample": false,
+  "path": "/api/domains",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "domains": {
+        "items": [
+          {
+            "keys": {
+              "data_sources": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "experiment_tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 5,
+                "type": "array"
+              },
+              "habit_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              },
+              "protocols": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "supplement_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "data_sources": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 4,
+                "type": "array"
+              },
+              "experiment_tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 6,
+                "type": "array"
+              },
+              "habit_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              },
+              "protocols": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "supplement_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 1,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "data_sources": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "experiment_tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 6,
+                "type": "array"
+              },
+              "habit_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 4,
+                "type": "array"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              },
+              "protocols": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "supplement_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "data_sources": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "experiment_tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "habit_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 4,
+                "type": "array"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              },
+              "protocols": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "supplement_names": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "data_sources": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "experiment_tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "habit_names": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 4,
+                "type": "array"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "order": {
+                "type": "integer"
+              },
+              "protocols": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              },
+              "supplement_names": {
+                "items": null,
+                "length_sample": 0,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 5,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

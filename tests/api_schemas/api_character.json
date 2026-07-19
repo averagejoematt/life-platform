@@ -1,0 +1,85 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/character",
+  "is_prefix_sample": false,
+  "path": "/api/character",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "character": {
+        "keys": {
+          "as_of_date": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer"
+          },
+          "pre_experiment": {
+            "type": "boolean"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "tier_emoji": {
+            "type": "string"
+          },
+          "xp_total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "days_until_start": {
+        "type": "integer"
+      },
+      "pillars": {
+        "items": {
+          "keys": {
+            "emoji": {
+              "type": "string"
+            },
+            "level": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            },
+            "raw_score": {
+              "type": "integer"
+            },
+            "tier": {
+              "type": "string"
+            },
+            "xp_delta": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 7,
+        "type": "array"
+      },
+      "pre_start": {
+        "type": "boolean"
+      },
+      "start_date": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

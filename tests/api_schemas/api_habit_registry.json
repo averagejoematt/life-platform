@@ -1,0 +1,116 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/habit_registry",
+  "is_prefix_sample": false,
+  "path": "/api/habit_registry",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "count": {
+        "type": "integer"
+      },
+      "groups": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 10,
+        "type": "array"
+      },
+      "habits": {
+        "items": [
+          {
+            "keys": {
+              "frequency": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "scheduled_today": {
+                "type": "boolean"
+              },
+              "taxonomy": {
+                "keys": {
+                  "derived": {
+                    "type": "boolean"
+                  },
+                  "group": {
+                    "type": "string"
+                  },
+                  "time_of_day": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "frequency": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "scheduled_today": {
+                "type": "boolean"
+              },
+              "taxonomy": {
+                "keys": {
+                  "derived": {
+                    "type": "boolean"
+                  },
+                  "group": {
+                    "type": "null"
+                  },
+                  "time_of_day": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 59,
+        "type": "array"
+      },
+      "source": {
+        "type": "string"
+      },
+      "taxonomy_derived": {
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

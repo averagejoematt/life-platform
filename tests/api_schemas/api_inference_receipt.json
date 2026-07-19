@@ -1,0 +1,102 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/inference_receipt",
+  "is_prefix_sample": false,
+  "path": "/api/inference_receipt",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ai_month_to_date_usd": {
+        "type": "number"
+      },
+      "as_of": {
+        "type": "string"
+      },
+      "budget_ceiling_usd": {
+        "type": "number"
+      },
+      "budget_surge_active": {
+        "type": "boolean"
+      },
+      "budget_tier": {
+        "type": "integer"
+      },
+      "features": {
+        "items": {
+          "keys": {
+            "lambda": {
+              "type": "string"
+            },
+            "month_input_tokens": {
+              "type": "integer"
+            },
+            "month_output_tokens": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 22,
+        "type": "array"
+      },
+      "models": {
+        "items": {
+          "keys": {
+            "model": {
+              "type": "string"
+            },
+            "month": {
+              "keys": {
+                "est_cost_usd": {
+                  "type": "number"
+                },
+                "input_tokens": {
+                  "type": "integer"
+                },
+                "output_tokens": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "today": {
+              "keys": {
+                "est_cost_usd": {
+                  "type": "number"
+                },
+                "input_tokens": {
+                  "type": "integer"
+                },
+                "output_tokens": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 5,
+        "type": "array"
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

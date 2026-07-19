@@ -1,0 +1,122 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/mind_overview",
+  "is_prefix_sample": false,
+  "path": "/api/mind_overview",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "meditation": {
+        "keys": {
+          "avg_session_min": {
+            "type": "null"
+          },
+          "daily": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "sessions_30d": {
+            "type": "integer"
+          },
+          "total_minutes_30d": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mind": {
+        "keys": {
+          "avg_valence": {
+            "type": "null"
+          },
+          "depth_counts": {
+            "keys": {
+              "deep": {
+                "type": "integer"
+              },
+              "meaningful": {
+                "type": "integer"
+              },
+              "surface": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "energy_level": {
+            "type": "null"
+          },
+          "journal_entries_30d": {
+            "type": "integer"
+          },
+          "meaningful_pct": {
+            "type": "integer"
+          },
+          "mind_pillar": {
+            "type": "null"
+          },
+          "mood_entries_count": {
+            "type": "integer"
+          },
+          "resist_rate_pct": {
+            "type": "null"
+          },
+          "resisted_90d": {
+            "type": "integer"
+          },
+          "total_interactions_30d": {
+            "type": "integer"
+          },
+          "total_temptations_90d": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "mood_trend": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "vice_streaks": {
+        "items": {
+          "keys": {
+            "current_streak": {
+              "type": "integer"
+            },
+            "holding": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 6,
+        "type": "array"
+      },
+      "vice_timeline": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

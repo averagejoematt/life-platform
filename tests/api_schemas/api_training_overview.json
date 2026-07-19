@@ -1,0 +1,198 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/training_overview",
+  "is_prefix_sample": false,
+  "path": "/api/training_overview",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "breathwork": {
+        "keys": {
+          "avg_session_min": {
+            "type": "null"
+          },
+          "sessions_30d": {
+            "type": "integer"
+          },
+          "total_minutes_30d": {
+            "type": "number"
+          },
+          "weekly_trend": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "cardio_sessions": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "daily_modality_minutes_30d": {
+        "items": {
+          "keys": {
+            "breathwork_min": {
+              "type": "integer"
+            },
+            "cycling_min": {
+              "type": "integer"
+            },
+            "date": {
+              "type": "string"
+            },
+            "hiking_min": {
+              "type": "integer"
+            },
+            "other_min": {
+              "type": "integer"
+            },
+            "soccer_min": {
+              "type": "integer"
+            },
+            "strength_min": {
+              "type": "integer"
+            },
+            "stretching_min": {
+              "type": "integer"
+            },
+            "total_min": {
+              "type": "integer"
+            },
+            "walking_min": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 1,
+        "type": "array"
+      },
+      "modality_breakdown": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "muscle_volume": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "training": {
+        "keys": {
+          "active_modalities": {
+            "type": "integer"
+          },
+          "avg_daily_steps": {
+            "type": "null"
+          },
+          "avg_strain": {
+            "type": "null"
+          },
+          "strength_sessions_30d": {
+            "type": "integer"
+          },
+          "top_activities": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "total_distance_mi": {
+            "type": "integer"
+          },
+          "total_minutes_30d": {
+            "type": "integer"
+          },
+          "weekly_avg": {
+            "type": "null"
+          },
+          "whoop_workout_count": {
+            "type": "integer"
+          },
+          "workouts_30d": {
+            "type": "integer"
+          },
+          "workouts_90d": {
+            "type": "integer"
+          },
+          "z2_pct": {
+            "type": "null"
+          },
+          "z2_target_min": {
+            "type": "integer"
+          },
+          "z2_trailing_7d_min": {
+            "type": "integer"
+          },
+          "z2_weekly_avg_min": {
+            "type": "null"
+          }
+        },
+        "type": "object"
+      },
+      "training_blueprint": {
+        "type": "null"
+      },
+      "walking": {
+        "keys": {
+          "avg_daily_steps": {
+            "type": "null"
+          },
+          "avg_daily_steps_n": {
+            "type": "integer"
+          },
+          "avg_daily_steps_reason": {
+            "type": "string"
+          },
+          "avg_pace_min_per_mi": {
+            "type": "null"
+          },
+          "daily_steps_trend": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "total_miles_30d": {
+            "type": "integer"
+          },
+          "total_rucks_30d": {
+            "type": "integer"
+          },
+          "total_walks_30d": {
+            "type": "integer"
+          },
+          "z2_minutes_walking": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "weekly_trend": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "whoop_workouts": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

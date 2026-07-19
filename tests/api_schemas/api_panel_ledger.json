@@ -1,0 +1,54 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/panel_ledger",
+  "is_prefix_sample": false,
+  "path": "/api/panel_ledger",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "disclosure": {
+        "type": "string"
+      },
+      "episode_count": {
+        "type": "integer"
+      },
+      "ledger": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "open_bet": {
+        "type": "null"
+      },
+      "record": {
+        "keys": {
+          "lost": {
+            "type": "integer"
+          },
+          "open": {
+            "type": "integer"
+          },
+          "won": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

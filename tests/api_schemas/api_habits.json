@@ -1,0 +1,110 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/habits",
+  "is_prefix_sample": false,
+  "path": "/api/habits",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "as_of_date": {
+        "type": "string"
+      },
+      "best_day": {
+        "type": "null"
+      },
+      "causality_captured": {
+        "type": "integer"
+      },
+      "cross_page_days": {
+        "type": "integer"
+      },
+      "cross_page_signals": {
+        "keys": {
+          "mind": {
+            "type": "string"
+          },
+          "movement": {
+            "type": "string"
+          },
+          "nutrition": {
+            "type": "string"
+          },
+          "recovery": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "current_streak": {
+        "type": "integer"
+      },
+      "day_of_week_avgs": {
+        "items": {
+          "type": "null"
+        },
+        "length_sample": 7,
+        "type": "array"
+      },
+      "days_tracked": {
+        "type": "integer"
+      },
+      "days_window": {
+        "keys": {
+          "end": {
+            "type": "string"
+          },
+          "n_days": {
+            "type": "integer"
+          },
+          "start": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "group_90d_avgs": {
+        "keys": {},
+        "type": "object"
+      },
+      "history": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "keystone_correlations": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "keystone_group": {
+        "type": "null"
+      },
+      "keystone_group_pct": {
+        "type": "null"
+      },
+      "per_habit": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "worst_day": {
+        "type": "null"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,29 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/scenarios",
+  "is_prefix_sample": false,
+  "path": "/api/scenarios",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "available": {
+        "type": "boolean"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

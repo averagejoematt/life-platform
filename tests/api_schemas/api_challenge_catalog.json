@@ -1,0 +1,162 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/challenge_catalog",
+  "is_prefix_sample": false,
+  "path": "/api/challenge_catalog",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "categories": {
+        "items": {
+          "keys": {
+            "color": {
+              "type": "string"
+            },
+            "icon": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 6,
+        "type": "array"
+      },
+      "challenges": {
+        "items": [
+          {
+            "keys": {
+              "board_quote": {
+                "type": "string"
+              },
+              "board_recommender": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "difficulty": {
+                "type": "integer"
+              },
+              "duration_days": {
+                "type": "integer"
+              },
+              "evidence_summary": {
+                "type": "string"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "one_liner": {
+                "type": "string"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "votes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "board_quote": {
+                "type": "string"
+              },
+              "board_recommender": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string"
+              },
+              "difficulty": {
+                "type": "integer"
+              },
+              "duration_days": {
+                "type": "null"
+              },
+              "evidence_summary": {
+                "type": "string"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "one_liner": {
+                "type": "string"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "votes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 82,
+        "type": "array"
+      },
+      "total_challenges": {
+        "type": "integer"
+      },
+      "total_votes": {
+        "type": "integer"
+      },
+      "updated": {
+        "type": "string"
+      },
+      "version": {
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

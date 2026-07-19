@@ -1,0 +1,331 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/predictions",
+  "is_prefix_sample": false,
+  "path": "/api/predictions",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "by_coach": {
+        "keys": {
+          "explorer": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "glucose": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "labs": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "mind": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "nutrition": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "physical": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "sleep": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "training": {
+            "keys": {
+              "confirmed": {
+                "type": "integer"
+              },
+              "decided": {
+                "type": "integer"
+              },
+              "expired": {
+                "type": "integer"
+              },
+              "hit_rate_pct": {
+                "type": "null"
+              },
+              "inconclusive": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "integer"
+              },
+              "refuted": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "overall": {
+        "keys": {
+          "accuracy_pct": {
+            "type": "null"
+          },
+          "confirmed": {
+            "type": "integer"
+          },
+          "decided": {
+            "type": "integer"
+          },
+          "expired": {
+            "type": "integer"
+          },
+          "inconclusive": {
+            "type": "integer"
+          },
+          "pending": {
+            "type": "integer"
+          },
+          "refuted": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "predictions": {
+        "items": {
+          "keys": {
+            "coach_id": {
+              "type": "string"
+            },
+            "coach_name": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "number"
+            },
+            "date": {
+              "type": "string"
+            },
+            "eval_type": {
+              "type": "string"
+            },
+            "metric": {
+              "type": "null"
+            },
+            "outcome_notes": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "subdomain": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 16,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

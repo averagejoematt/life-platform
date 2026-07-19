@@ -1,0 +1,46 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/habit_streaks",
+  "is_prefix_sample": false,
+  "path": "/api/habit_streaks",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "habit_streaks": {
+        "keys": {
+          "aggregate_streak": {
+            "type": "integer"
+          },
+          "as_of_date": {
+            "type": "string"
+          },
+          "tier0_done": {
+            "type": "integer"
+          },
+          "tier0_pct": {
+            "type": "integer"
+          },
+          "tier0_total": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

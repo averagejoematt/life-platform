@@ -1,0 +1,210 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/discoveries",
+  "is_prefix_sample": false,
+  "path": "/api/discoveries",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "active_hypotheses": {
+        "items": [
+          {
+            "keys": {
+              "active_since": {
+                "type": "string"
+              },
+              "carried_over": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string"
+              },
+              "duration_days": {
+                "type": "integer"
+              },
+              "evidence_against": {
+                "items": {
+                  "keys": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "evidence_for": {
+                "items": {
+                  "keys": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "metrics": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "protocol_kind": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "active_since": {
+                "type": "string"
+              },
+              "carried_over": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string"
+              },
+              "duration_days": {
+                "type": "integer"
+              },
+              "evidence_against": {
+                "items": {
+                  "keys": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "null"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "evidence_for": {
+                "items": {
+                  "keys": {
+                    "summary": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "metrics": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "protocol": {
+                "type": "string"
+              },
+              "protocol_kind": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 4,
+        "type": "array"
+      },
+      "ai_findings": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "inner_life": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

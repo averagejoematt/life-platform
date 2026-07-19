@@ -1,0 +1,536 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/genome_risks",
+  "is_prefix_sample": false,
+  "path": "/api/genome_risks",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "genome": {
+        "keys": {
+          "categories": {
+            "keys": {
+              "antioxidant": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 2,
+                "type": "array"
+              },
+              "caffeine": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "cancer_risk": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "cardiovascular": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "exercise": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 6,
+                "type": "array"
+              },
+              "immune": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 9,
+                "type": "array"
+              },
+              "lipids": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 10,
+                "type": "array"
+              },
+              "longevity": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 20,
+                "type": "array"
+              },
+              "metabolism": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 20,
+                "type": "array"
+              },
+              "miscellaneous": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 5,
+                "type": "array"
+              },
+              "nutrient_metabolism": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 19,
+                "type": "array"
+              },
+              "other": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "sleep": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 6,
+                "type": "array"
+              },
+              "statin_response": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "taste": {
+                "items": {
+                  "keys": {
+                    "evidence": {
+                      "type": "string"
+                    },
+                    "gene": {
+                      "type": "string"
+                    },
+                    "implications": {
+                      "type": "string"
+                    },
+                    "interventions": {
+                      "items": null,
+                      "length_sample": 0,
+                      "type": "array"
+                    },
+                    "risk_level": {
+                      "type": "string"
+                    },
+                    "rsid": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "length_sample": 7,
+                "type": "array"
+              }
+            },
+            "type": "object"
+          },
+          "risk_summary": {
+            "keys": {
+              "favorable": {
+                "type": "integer"
+              },
+              "mixed": {
+                "type": "integer"
+              },
+              "neutral": {
+                "type": "integer"
+              },
+              "unfavorable": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "total_snps": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

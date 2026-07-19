@@ -1,0 +1,146 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/coach_team",
+  "is_prefix_sample": false,
+  "path": "/api/coach_team",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "all_same_stage": {
+        "type": "boolean"
+      },
+      "as_of_weight_lbs": {
+        "type": "number"
+      },
+      "current_stage": {
+        "type": "null"
+      },
+      "disclosure": {
+        "type": "string"
+      },
+      "dispute": {
+        "type": "null"
+      },
+      "huddle": {
+        "items": {
+          "keys": {
+            "calibration": {
+              "keys": {
+                "brier": {
+                  "type": "null"
+                },
+                "calibration": {
+                  "type": "string"
+                },
+                "scored_n": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "emoji": {
+              "type": "string"
+            },
+            "graduation_gate": {
+              "type": "string"
+            },
+            "headline": {
+              "type": "string"
+            },
+            "held_since": {
+              "type": "null"
+            },
+            "name": {
+              "type": "string"
+            },
+            "persona_id": {
+              "type": "string"
+            },
+            "read_of_him": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "stage_id": {
+              "type": "string"
+            },
+            "watch": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 8,
+        "type": "array"
+      },
+      "lead": {
+        "keys": {
+          "color": {
+            "type": "string"
+          },
+          "emoji": {
+            "type": "string"
+          },
+          "expertise": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 4,
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "persona_id": {
+            "type": "string"
+          },
+          "philosophy": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "short_bio": {
+            "type": "string"
+          },
+          "staff_focus": {
+            "items": {
+              "type": "string"
+            },
+            "length_sample": 3,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "team_focus": {
+        "items": {
+          "type": "string"
+        },
+        "length_sample": 8,
+        "type": "array"
+      },
+      "tensions": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,236 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/experiments",
+  "is_prefix_sample": false,
+  "path": "/api/experiments",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "experiments": {
+        "items": [
+          {
+            "keys": {
+              "difficulty": {
+                "type": "string"
+              },
+              "evidence_citation": {
+                "type": "string"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "planned_duration_days": {
+                "type": "integer"
+              },
+              "result_summary": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "null"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 5,
+                "type": "array"
+              },
+              "votes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "difficulty": {
+                "type": "string"
+              },
+              "evidence_citation": {
+                "type": "string"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "planned_duration_days": {
+                "type": "integer"
+              },
+              "result_summary": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "null"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 4,
+                "type": "array"
+              },
+              "votes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "difficulty": {
+                "type": "string"
+              },
+              "evidence_citation": {
+                "type": "string"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "planned_duration_days": {
+                "type": "integer"
+              },
+              "result_summary": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "votes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          {
+            "keys": {
+              "difficulty": {
+                "type": "string"
+              },
+              "evidence_citation": {
+                "type": "string"
+              },
+              "evidence_tier": {
+                "type": "string"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string"
+              },
+              "pillar": {
+                "type": "string"
+              },
+              "planned_duration_days": {
+                "type": "integer"
+              },
+              "result_summary": {
+                "type": "string"
+              },
+              "source_url": {
+                "type": "null"
+              },
+              "status": {
+                "type": "string"
+              },
+              "tags": {
+                "items": {
+                  "type": "string"
+                },
+                "length_sample": 3,
+                "type": "array"
+              },
+              "votes": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "length_sample": 67,
+        "type": "array"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

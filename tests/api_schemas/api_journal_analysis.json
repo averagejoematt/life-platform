@@ -1,0 +1,55 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/journal_analysis",
+  "is_prefix_sample": false,
+  "path": "/api/journal_analysis",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "daily_themes": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "date_range": {
+        "keys": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "sentiment_trend": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "top_themes": {
+        "items": null,
+        "length_sample": 0,
+        "type": "array"
+      },
+      "total_analyzed": {
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

@@ -1,0 +1,191 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/vitals_depth",
+  "is_prefix_sample": false,
+  "path": "/api/vitals_depth",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "deferred": {
+        "items": {
+          "keys": {
+            "panel": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "length_sample": 2,
+        "type": "array"
+      },
+      "fitness_age": {
+        "keys": {
+          "as_of": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "basis_vo2max": {
+            "type": "number"
+          },
+          "citation": {
+            "type": "string"
+          },
+          "estimate": {
+            "type": "integer"
+          },
+          "method": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "range_high": {
+            "type": "integer"
+          },
+          "range_low": {
+            "type": "integer"
+          },
+          "scope": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "vo2max": {
+        "keys": {
+          "as_of": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "current": {
+            "type": "number"
+          },
+          "delta": {
+            "type": "number"
+          },
+          "first": {
+            "type": "number"
+          },
+          "low": {
+            "type": "number"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "peak": {
+            "type": "number"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "keys": {
+                "date": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 287,
+            "type": "array"
+          },
+          "source": {
+            "type": "string"
+          },
+          "trend": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "walking_hr": {
+        "keys": {
+          "as_of": {
+            "type": "string"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "avg": {
+            "type": "number"
+          },
+          "current": {
+            "type": "number"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "n_total": {
+            "type": "integer"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "series": {
+            "items": {
+              "keys": {
+                "date": {
+                  "type": "string"
+                },
+                "max_hr": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 51,
+            "type": "array"
+          },
+          "source": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "window_days": {
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}

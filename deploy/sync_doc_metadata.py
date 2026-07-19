@@ -44,6 +44,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import endpoint_registry  # noqa: E402 — the shared /api/* enumerator (#1436)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # AUTO-DISCOVERY — derive counts from source files (no AWS calls needed)
@@ -142,6 +144,14 @@ def _auto_discover_endpoint_count() -> int | None:
     13 _SIMPLE_ROUTES + ~23 inline)", a naive un-deduplicated sum; the actual
     deduplicated union (verified 2026-07-18) is 115.
 
+    The AST walk itself lives in `deploy/endpoint_registry.py::discover_endpoint_records`
+    (#1436) — extracted so the completeness-gate test (which needs the actual SET of
+    paths, not just a count) and this doc-sync counter share one walk and can never
+    drift from each other: one AST walk, two consumers. This function stays a thin
+    wrapper that resolves the file path off THIS module's `ROOT` (so tests that
+    monkeypatch `sync_doc_metadata.ROOT` to a fixture tree keep working unchanged) and
+    applies the same soft-failure contract as the other discoverers in this file.
+
     Returns None (manual PLATFORM_FACTS fallback) if the file is unreadable/
     unparseable, `lambda_handler` isn't found, ROUTES/_SIMPLE_ROUTES are both empty
     (something structural broke), or the discovered count is suspiciously low
@@ -151,60 +161,25 @@ def _auto_discover_endpoint_count() -> int | None:
     if not site_api_path.exists():
         return None
     try:
-        tree = ast.parse(site_api_path.read_text(encoding="utf-8"), filename=str(site_api_path))
+        source = site_api_path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(site_api_path))
+    except Exception:
+        return None
+    if not any(isinstance(n, ast.FunctionDef) and n.name == "lambda_handler" for n in ast.walk(tree)):
+        return None
+
+    try:
+        records = endpoint_registry.discover_endpoint_records(source=source, path=site_api_path)
     except Exception:
         return None
 
-    routes: set = set()
-    simple_routes: set = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
-            for target in node.targets:
-                if not isinstance(target, ast.Name):
-                    continue
-                if target.id == "ROUTES":
-                    routes.update(k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str))
-                elif target.id == "_SIMPLE_ROUTES":
-                    simple_routes.update(k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str))
-
-    handler_fn = None
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "lambda_handler":
-            handler_fn = node
-            break
-    if handler_fn is None:
-        return None
-
-    inline: set = set()
-    for node in ast.walk(handler_fn):
-        if (
-            isinstance(node, ast.Compare)
-            and isinstance(node.left, ast.Name)
-            and node.left.id == "path"
-            and len(node.ops) == 1
-            and isinstance(node.ops[0], ast.Eq)
-            and len(node.comparators) == 1
-            and isinstance(node.comparators[0], ast.Constant)
-            and isinstance(node.comparators[0].value, str)
-        ):
-            inline.add(node.comparators[0].value)
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr == "startswith"
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "path"
-            and len(node.args) == 1
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            inline.add(node.args[0].value)
-
-    if not routes and not simple_routes:
+    has_routes = any("routes" in r.mechanisms for r in records.values())
+    has_simple_routes = any("simple_routes" in r.mechanisms for r in records.values())
+    if not has_routes and not has_simple_routes:
         return None  # ROUTES/_SIMPLE_ROUTES missing entirely — something's structurally wrong, don't guess
 
-    total = routes | simple_routes | inline
-    return len(total) if len(total) >= 50 else None
+    total = len(records)
+    return total if total >= endpoint_registry.SANITY_FLOOR else None
 
 
 _ALARM_CONSTRUCTOR_ATTRS = ("Alarm", "create_alarm")  # cloudwatch.Alarm(...) and metric.create_alarm(...)

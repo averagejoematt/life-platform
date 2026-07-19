@@ -1,0 +1,135 @@
+{
+  "captured_at": "2026-07-19T03:40:30.723631+00:00",
+  "fetch_path": "/api/ledger",
+  "is_prefix_sample": false,
+  "path": "/api/ledger",
+  "shape": {
+    "keys": {
+      "_meta": {
+        "keys": {
+          "cache_seconds": {
+            "type": "integer"
+          },
+          "generated_at": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "by_cause": {
+        "keys": {
+          "earned_causes": {
+            "items": {
+              "keys": {
+                "badge_color": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "short_description": {
+                  "type": "string"
+                },
+                "total_usd": {
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "why_i_care": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
+            "type": "array"
+          },
+          "reluctant_causes": {
+            "items": {
+              "keys": {
+                "badge_color": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "is_active": {
+                  "type": "boolean"
+                },
+                "joke_note": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "short_description": {
+                  "type": "string"
+                },
+                "total_usd": {
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "length_sample": 1,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "by_event": {
+        "keys": {
+          "earned": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          },
+          "reluctant": {
+            "items": null,
+            "length_sample": 0,
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "totals": {
+        "keys": {
+          "bounty_count": {
+            "type": "number"
+          },
+          "punishment_count": {
+            "type": "number"
+          },
+          "total_bounties_usd": {
+            "type": "number"
+          },
+          "total_donated_usd": {
+            "type": "number"
+          },
+          "total_punishments_usd": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "status": 200
+}
