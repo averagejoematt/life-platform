@@ -24,11 +24,17 @@ on:
       # #1432: the JS module-graph import gate — a change to it must re-run itself.
       - 'scripts/import_site_js_graph.mjs'
       - 'scripts/site_js_loader.mjs'
+      # #1431: the JS unit-test harness — a change to it (or the dev-only
+      # package.json that names it) must re-run the gate against itself.
+      - 'tests/js/**'
+      - 'package.json'
   push:
     branches: [main]
     paths:
       - 'site/**'
       - 'scripts/v4_*.py'
+      - 'tests/js/**'
+      - 'package.json'
 
 permissions:
   contents: read
@@ -88,6 +94,24 @@ jobs:
       # ────────────────────────────────────────────────────────────────
       - name: JS module-graph import gate (#1432 — real import(), not node --check)
         run: node scripts/import_site_js_graph.mjs
+
+      # ────────────────────────────────────────────────────────────────
+      # JS unit-test harness (#1431) — the first front-end unit tests. #1432's
+      # import gate above proves every module PARSES; it says nothing about
+      # BEHAVIOR (a chart can parse clean and still draw a lying trend line,
+      # a formatter can silently mis-round). This exercises the pure
+      # functions in charts.js (scales/paths/the >=4-points honesty rule),
+      # evidence.js's router mapping (evidence_router.js, split out for
+      # testability — no behavior change), and the shared formatters
+      # (evidence_shared.js) — all ~40 pages' worth of blast radius. Node's
+      # built-in node:test runner: zero production dependency, the
+      # dev-only package.json at repo root names it (CLAUDE.md "No
+      # framework/deps" — the SITE stays framework-free; this harness never
+      # ships). GitHub-hosted runners ship Node, so no setup-node/npm-install
+      # step is needed — same assumption the import-graph gate above makes.
+      # ────────────────────────────────────────────────────────────────
+      - name: JS unit tests (#1431 — charts.js, evidence.js router, formatters)
+        run: node --test
 
   # ════════════════════════════════════════════════════════════════
   # Render + accuracy gate (#408) — shift-left QA on site PRs.
