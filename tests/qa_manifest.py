@@ -28,6 +28,13 @@ Entry fields
   leak_scan      include in restart_verify_rendered token grep (default True
                  for every real HTML page; False only for pure redirects)
   smoke          expected HTTP status for the status sweep (default "200")
+  structural     #1429 (static/utility pages only): {"marker": <fixed string the
+                 live body must contain — an expected title/selector fragment>,
+                 "fetch_path": <optional viewer-path override — the 404 page is
+                 asserted via a nonexistent URL, where CloudFront serves the body
+                 with status 404>}. REQUIRED on every static/utility 200 page
+                 (structural_rows() raises otherwise) so a new static page can't
+                 land outside the smoke's structural gate.
 
 Archive-topic entries (the /data/ · /protocols/ · /method/ readout pages) are
 GENERATED from scripts/v4_build_evidence.REGISTRY + PILLARS at import time so
@@ -35,10 +42,12 @@ they can never drift from the live build — same trick site_review_bindings
 uses for its primary endpoints.
 
 Emitters (for the bash smoke script and ad-hoc use):
-    python3 tests/qa_manifest.py --emit paths   # every page path
-    python3 tests/qa_manifest.py --emit smoke   # "path|name|expected_status"
-    python3 tests/qa_manifest.py --emit leak    # leak-scan page paths
-    python3 tests/qa_manifest.py --check        # internal consistency self-check
+    python3 tests/qa_manifest.py --emit paths       # every page path
+    python3 tests/qa_manifest.py --emit smoke       # "path|name|expected_status"
+    python3 tests/qa_manifest.py --emit leak        # leak-scan page paths
+    python3 tests/qa_manifest.py --emit static_core # pages that must ship a static core
+    python3 tests/qa_manifest.py --emit structural  # "fetch_path|name|marker" (#1429)
+    python3 tests/qa_manifest.py --check            # internal consistency self-check
 
 No third-party deps. Importable by tests/* (sibling) and deploy/* scripts
 (insert REPO_ROOT/tests on sys.path).
@@ -221,6 +230,7 @@ _CURATED = [
         "api_deps": [],
         "js_modules": [],
         "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}]},
+        "structural": {"marker": 'class="ph-title"'},
     },
     {
         "path": "/story/attempts/",
@@ -487,6 +497,7 @@ _CURATED = [
                 {"selector": ".gr-card", "min_count": 1, "desc": "gear cards rendered"},
             ]
         },
+        "structural": {"marker": 'class="gr-card"'},
     },
     {
         "path": "/journal/essays/org-chart-of-one/",
@@ -496,6 +507,7 @@ _CURATED = [
         "api_deps": [],
         "js_modules": [],
         "visual": {"checks": [{"selector": "main, article, .post-body", "not_empty": True, "desc": "essay content"}]},
+        "structural": {"marker": 'class="post-header__title"'},
     },
     {
         "path": "/privacy/",
@@ -505,6 +517,7 @@ _CURATED = [
         "api_deps": [],
         "js_modules": [],
         "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "privacy policy content"}]},
+        "structural": {"marker": 'class="policy-title"'},
     },
     {
         "path": "/subscribe/",
@@ -514,6 +527,7 @@ _CURATED = [
         "api_deps": [],
         "js_modules": [],
         "visual": {"checks": [{"selector": "main, article", "not_empty": True, "desc": "subscribe page content"}]},
+        "structural": {"marker": 'class="sub-title"'},
     },
     {
         "path": "/subscribe/confirm/",
@@ -526,6 +540,7 @@ _CURATED = [
         # the ?confirmed=/?error= query params — default state with no params is
         # "Check your inbox"), so it earns a check despite tier-4 (#1427).
         "visual": {"checks": [{"selector": "#cc-title, main", "not_empty": True, "desc": "confirm-state message rendered"}]},
+        "structural": {"marker": 'id="cc-title"'},
     },
     {
         "path": "/404.html",
@@ -537,6 +552,11 @@ _CURATED = [
         # Error page — status-only is the right coverage (smoke already verifies the
         # 200 on direct S3 fetch); no meaningful render behavior to check (#1427).
         "visual": None,
+        # #1429: assert the body CloudFront actually serves on a missing path (it
+        # arrives with HTTP status 404 — the structural check reads the body and
+        # never requires a 200; the status itself is asserted by the existing
+        # nonexistent-page check in smoke_test_site.sh).
+        "structural": {"marker": '<h1 class="nf-h">404</h1>', "fetch_path": "/nonexistent-page-xyz/"},
     },
     {
         "path": "/subscribe.html",
@@ -624,6 +644,39 @@ def static_core_paths():
     return [p["path"] for p in MANIFEST if p.get("static_core")]
 
 
+# #1429: the static long-tail = every real 200 page of these classes. Redirect
+# stubs (smoke != 200, or leak_scan=False meta-refresh shells) have no body of
+# their own to assert.
+STRUCTURAL_CLASSES = {"static", "utility"}
+
+
+def _structural_eligible(p):
+    return p["content_class"] in STRUCTURAL_CLASSES and p["smoke"] == "200" and p["leak_scan"]
+
+
+def structural_rows():
+    """deploy/smoke_test_site.sh — 'fetch_path|name|marker' for the static long-tail (#1429).
+
+    The page LIST derives from content_class (never a hand list — the #1454
+    surface-drift rule); the marker is per-page data declared in THE registry,
+    like the visual defs. Every eligible page MUST declare one: a new static
+    page landing without a structural marker raises here, which reds both the
+    smoke's emit call and tests/test_smoke_structural.py — by design.
+    """
+    rows, missing = [], []
+    for p in MANIFEST:
+        if not _structural_eligible(p):
+            continue
+        s = p.get("structural") or {}
+        if not s.get("marker"):
+            missing.append(p["path"])
+            continue
+        rows.append(f"{s.get('fetch_path', p['path'])}|{p['name']}|{s['marker']}")
+    if missing:
+        raise AssertionError(f"static/utility pages missing a structural marker (#1429 — add structural= to the manifest entry): {missing}")
+    return rows
+
+
 def site_files():
     """Every page-shaped file under site/ (repo truth for the completeness gate)."""
     site = os.path.join(_REPO, "site")
@@ -687,7 +740,7 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "coverage"])
+    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core", "structural", "coverage"])
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -716,6 +769,9 @@ def main():
     elif args.emit == "static_core":
         for p in static_core_paths():
             print(p)
+    elif args.emit == "structural":
+        for row in structural_rows():
+            print(row)
     elif args.emit == "coverage":
         # sort_keys so the emitted bytes are deterministic (bundle-hash stability, #1446)
         print(json.dumps(coverage_stats(), indent=2, sort_keys=True))

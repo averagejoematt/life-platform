@@ -64,6 +64,7 @@ env:
 permissions:
   id-token: write   # OIDC token for AWS (Bedrock vision QA + SNS notify)
   contents: read
+  issues: write     # advisory-failure issue filing (#1447)
 
 jobs:
   visual-qa:
@@ -134,3 +135,22 @@ jobs:
             --subject "Life Platform standalone visual-QA FAILED" \
             --message "$MESSAGE" \
             --region ${{ env.AWS_REGION }} || echo "::warning::SNS publish failed — the run failure is still visible in Actions"
+
+      # #1447 — a red here is advisory (gates nothing), so make it a tracked
+      # work item: file/update ONE deduped auto-filed issue on failure, and
+      # auto-close it on the next green run. Runs last, always.
+      - name: File/resolve advisory failure issue (#1447)
+        if: always()
+        uses: ./.github/actions/advisory-failure-issue
+        with:
+          workflow-slug: visual-qa-standalone
+          workflow-name: Visual QA (standalone)
+          job-status: ${{ job.status }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          failure-summary: >-
+            The daily live-site sweep (Playwright deterministic + reader-truth,
+            plus the Sunday/manual full-surface AI-vision pass and the accuracy
+            gate) failed against https://averagejoematt.com. Screenshots + report
+            are attached to the run as the visual-qa-standalone-screenshots
+            artifact. This run gates nothing and rolls back nothing — investigate
+            and fix forward.

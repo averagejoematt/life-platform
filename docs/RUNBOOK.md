@@ -1500,6 +1500,35 @@ The fine-grained PAT in `life-platform/github-dispatch-token` expires every 90 d
 
 ---
 
+## Advisory Scheduled Workflows — auto-filed failure issues (#1447)
+
+The three advisory scheduled workflows — **Visual QA (standalone)** (`visual-qa.yml`, daily),
+**Golden-brief eval** (`golden-brief-eval.yml`, weekly Mon), **Fresh-Eyes Discovery**
+(`fresh-eyes.yml`, weekly Sun) — gate nothing, so before #1447 a red run just sat in the
+Actions history (the silent-failure class from the 2026-07-11 ~26h-unnoticed incident,
+`docs/INCIDENT_LOG.md`). Each now ends with the shared composite action
+`.github/actions/advisory-failure-issue` (`if: always()`), backed by
+`scripts/advisory_failure_issue.py` (stdlib-only; dedup logic offline-tested in
+`tests/test_advisory_failure_issue.py`):
+
+- **On failure** it files a GitHub issue labeled `auto-filed` + `area:infra` with an
+  ADR-099-shaped body (what failed, run link, first-failure timestamp) — **one open issue
+  per workflow**: a repeat failure comments the new run link on the existing open issue
+  instead of filing a duplicate. Dedup key = an HTML-comment marker
+  (`<!-- advisory-failure: <slug> -->`) in the issue body, stable across title edits.
+- **On recovery (close policy):** the next green run of the *same* workflow — scheduled or
+  `workflow_dispatch` — comments the recovery run link and **auto-closes** the issue. You
+  can also close it by hand after fixing (e.g. to tidy up before the next cron fire), but
+  closing without fixing just means the next failure files a fresh issue.
+- A filing failure in file mode reds the (already-red) step visibly; in recover mode it
+  only warns — a filing hiccup never reds a green advisory run.
+
+Adding a new advisory scheduled workflow? Append the same composite-action step with a new
+stable `workflow-slug` (never rename a slug once issues exist) and grant `issues: write`
+in that workflow's `permissions` block.
+
+---
+
 ## Hevy Routine Write-Loop Operations (ADR-066)
 
 The Hevy routine write-loop ships with two layers of safety gates. Operator actions documented here are configuration-only; no code redeploy is required to flip any gate.
