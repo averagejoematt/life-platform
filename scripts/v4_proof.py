@@ -214,8 +214,17 @@ def load_coaching_read() -> dict:
             )
         text = str(wp.get("text") or "").strip()
         if not text and not coaches:
-            # dashboard responded but carries no readable content — fall through to snapshot
-            return _snapshot().get("coaching_read", {})
+            # dashboard responded but carries no readable content — fall through to
+            # the snapshot; if THAT is empty too (the Day-1 window: post-genesis,
+            # board's first read not computed yet, snapshot cleared by the reset
+            # curation), return a dated awaiting-first-read marker so the page
+            # still ships an honest static core instead of a blank crawler view
+            # (found by #1528's live sweep — the missing block reds the
+            # static-core smoke guard and auto-rolls-back the next deploy).
+            snap = _snapshot().get("coaching_read", {})
+            if snap:
+                return snap
+            return {"as_of": _today(), "source": "live-empty"}
         # honest stamp: prefer the priority's own generation date, else the payload's
         generated = str(wp.get("generated_at") or d.get("_meta", {}).get("generated_at") or "")
         return {
@@ -227,7 +236,13 @@ def load_coaching_read() -> dict:
             "as_of": generated[:10] or _today(),
             "source": "live",
         }
-    return _snapshot().get("coaching_read", {})
+    # No live content at all (dashboard empty-shaped or unreachable): snapshot,
+    # else the same dated awaiting-first-read marker as above — a static_core:true
+    # page must never build a blank crawler view (#1528).
+    snap = _snapshot().get("coaching_read", {})
+    if snap:
+        return snap
+    return {"as_of": _today(), "source": "live-empty"}
 
 
 def load_chronicle_pending() -> dict:
@@ -446,7 +461,22 @@ def coaching_read_block_html(read: dict) -> str:
     priority = str(wp.get("text") or "").strip()
     coaches = read.get("coaches") or []
     if not priority and not coaches:
-        return ""
+        # Day-1 / early-cycle window (found by #1528's live sweep): the experiment
+        # is running but the board hasn't published its first read of this run yet
+        # (coach computes land after Day 1's numbers exist). The honest static
+        # core is that fact, dated — never a fabricated read, and never "" (a
+        # blank crawler view that the static-core smoke guard rightly reds on a
+        # static_core:true page, auto-rolling-back an otherwise healthy deploy).
+        return (
+            '<noscript><section class="proof-static dx-prose" aria-label="The coaching — awaiting the first read">'
+            f'<p class="label">The coaching — as of {_esc(read.get("as_of", ""))}</p>'
+            "<p>The cycle is under way, but the board hasn't published its first read of this run's data yet — "
+            "each coach reads only this cycle's numbers, and the first take lands once the daily computes have "
+            "something real to argue about.</p>"
+            '<p>Meanwhile: <a href="/coaching/team/">who the coaches are</a> · '
+            '<a href="/coaching/scorecard/">how their calls get graded</a>.</p>'
+            "</section></noscript>"
+        )
     as_of = read.get("as_of", "")
 
     lines = [
