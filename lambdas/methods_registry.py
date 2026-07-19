@@ -218,6 +218,34 @@ REGISTRY = {
         "ef546176a048",
         used_by="experiment_design.py (evaluate_design).",
     ),
+    "start_point_randomization_test": _entry(
+        "start_point_randomization_test",
+        "Start-point randomization test (SCED)",
+        stats_core.start_point_randomization_test,
+        "Randomization inference",
+        "For every candidate start k the pre-declared window could have produced: "
+        "T(k) = mean(post_k) - mean(pre_k), washout excluded identically at each; "
+        "one-sided p = #{T(k) at least as extreme as the observed split} / k_valid",
+        "The full daily series of the pre-registered criterion metric, from baseline_days "
+        "before the declared window's first candidate through the experiment's end — one "
+        "continuous series, so every candidate start sees the same data.",
+        "Only valid when the start was actually DRAWN at random from the frozen window "
+        "(experiment_design.draw_start_date) — applied to a hand-picked start it is decorative, "
+        "not inferential. Exact under the randomization performed, so no independence assumption "
+        "is needed (the autocorrelation objection to parametric tests on N=1 daily series does "
+        "not apply), but resolution is capped at p = 1/k: a 7-14 day window can never report "
+        "below 1/7-1/14, which is a granularity floor, not high precision. Candidates with a "
+        "thin arm (< 5 points after gaps) are excluded and reported in n_excluded; a pure "
+        "pre-existing linear trend scores p ≈ 1 by construction — the coincident-trend "
+        "confound the design exists to defeat.",
+        "ce658c9d7d25",
+        min_n=2,
+        used_by=(
+            "experiment_design.randomization_test — the end_experiment close-path analysis for "
+            "randomized-start designs (#1413); reported on /data/ experiment cards next to the "
+            "effect + CI, and in the analysis summary sentence."
+        ),
+    ),
     "ewma_fit": _entry(
         "ewma_fit",
         "EWMA fit (simple exponential smoothing)",
