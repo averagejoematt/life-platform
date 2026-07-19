@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/observatory_week",
   "is_prefix_sample": false,
   "path": "/api/observatory_week",
@@ -20,10 +20,7 @@
         "type": "object"
       },
       "as_of_date": {
-        "type": "null"
-      },
-      "days_until_start": {
-        "type": "integer"
+        "type": "string"
       },
       "domain": {
         "type": "string"
@@ -32,19 +29,84 @@
         "type": "string"
       },
       "notable": {
-        "type": "null"
-      },
-      "period": {
-        "type": "null"
-      },
-      "pre_start": {
-        "type": "boolean"
-      },
-      "start_date": {
         "type": "string"
       },
+      "period": {
+        "keys": {
+          "end": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "summary": {
-        "type": "null"
+        "keys": {
+          "best_efficiency": {
+            "type": "integer"
+          },
+          "highlight": {
+            "keys": {
+              "detail": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "lowlight": {
+            "keys": {
+              "detail": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "primary": {
+            "keys": {
+              "delta": {
+                "type": "number"
+              },
+              "delta_label": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "sparkline": {
+                "items": {
+                  "type": "number"
+                },
+                "length_sample": 1,
+                "type": "array"
+              },
+              "trend": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
       },
       "time_travel": {
         "type": "boolean"

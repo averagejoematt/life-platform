@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/character",
   "is_prefix_sample": false,
   "path": "/api/character",
@@ -42,9 +42,6 @@
         },
         "type": "object"
       },
-      "days_until_start": {
-        "type": "integer"
-      },
       "pillars": {
         "items": {
           "keys": {
@@ -74,9 +71,6 @@
       },
       "pre_start": {
         "type": "boolean"
-      },
-      "start_date": {
-        "type": "string"
       }
     },
     "type": "object"

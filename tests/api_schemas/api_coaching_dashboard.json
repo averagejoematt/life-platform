@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/coaching-dashboard",
   "is_prefix_sample": false,
   "path": "/api/coaching-dashboard",
@@ -77,10 +77,10 @@
             "type": "string"
           },
           "generated_at": {
-            "type": "null"
+            "type": "string"
           },
           "text": {
-            "type": "null"
+            "type": "string"
           }
         },
         "type": "object"
