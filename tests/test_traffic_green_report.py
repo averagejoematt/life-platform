@@ -63,6 +63,7 @@ FULL_REPORT = {
         "api_endpoints_declared": 48,
     },
     "budget": {"tier": 0, "tier_max_7d": 0, "qa_pauses_7d": 0},
+    "qa_level": {"level": "standard"},  # #1452: the QA-depth dial rides the report
     "visual_qa": {"error": td._VISUAL_QA_ABSENT},
     "actions_minutes": {"error": td._ACTIONS_MINUTES_ABSENT},
 }

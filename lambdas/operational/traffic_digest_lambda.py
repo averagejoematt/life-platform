@@ -275,6 +275,7 @@ QA_SMOKE_NAMESPACE = "LifePlatform/QaSmoke"  # qa_smoke_lambda.emf_summary_line 
 BUDGET_NAMESPACE = "LifePlatform/Budget"  # cost_governor_lambda._emit_metrics
 QA_PAUSE_NAMESPACE = "LifePlatform/QA"  # reader_truth_qa.emit_budget_pause_metric (#1440)
 BUDGET_TIER_PARAM = os.environ.get("BUDGET_TIER_PARAM", "/life-platform/budget-tier")
+QA_LEVEL_PARAM = os.environ.get("QA_LEVEL_PARAM", "/life-platform/qa-level")
 
 # Honest-absence reasons for the sources this Lambda deliberately cannot read.
 # The only GitHub credential in Secrets Manager is the repository_dispatch PAT
@@ -294,6 +295,18 @@ _TIER_LABELS = {
     1: "internal/dev AI paused",
     2: "internal + reader narratives paused",
     3: "hard cutoff — all AI paused",
+}
+
+# #1452: the QA-depth dial (SSM /life-platform/qa-level). Label + report tone per
+# level — lean/off must read LOUD (warn/bad): a dialed-down estate can never be
+# mistaken for a fully-swept green week. Deploy-gating QA is exempt from the dial
+# by construction (tests/test_qa_level_dial.py), so "off" here means only the
+# standalone/scheduled sweeps are dark.
+_QA_LEVEL_LABELS = {
+    "full": ("full — AI-vision on every standalone fire", "ok"),
+    "standard": ("standard — daily deterministic + Sunday full AI-vision (the default)", "ok"),
+    "lean": ("lean — standalone sweeps run deterministic-only, WebKit weekly skipped", "warn"),
+    "off": ("OFF — standalone/scheduled QA sweeps skipped (deploy-gating QA still runs)", "bad"),
 }
 
 
@@ -388,7 +401,20 @@ def collect_green_report(now=None):
         budget["metrics_error"] = f"CloudWatch read failed ({str(e)[:120]})"
     report["budget"] = budget
 
-    # 4 + 5. GitHub-side sources — honest absence, never a guess (see constants above).
+    # 4. QA-depth dial (#1452 E3) — fail-soft. An account where the param was never
+    # created is level "standard" BY DEFINITION (the workflows fail open to
+    # standard), so ParameterNotFound is a reading, not an error.
+    try:
+        ssm = boto3.client("ssm", region_name=REGION)
+        val = ((ssm.get_parameter(Name=QA_LEVEL_PARAM) or {}).get("Parameter") or {}).get("Value")
+        report["qa_level"] = {"level": val}
+    except Exception as e:
+        if "ParameterNotFound" in str(type(e).__name__) or "ParameterNotFound" in str(e):
+            report["qa_level"] = {"level": "standard", "note": "param unset — fail-open default"}
+        else:
+            report["qa_level"] = {"error": f"SSM read failed ({str(e)[:120]})"}
+
+    # 5 + 6. GitHub-side sources — honest absence, never a guess (see constants above).
     report["visual_qa"] = {"error": _VISUAL_QA_ABSENT}
     report["actions_minutes"] = {"error": _ACTIONS_MINUTES_ABSENT}
     return report
@@ -462,6 +488,19 @@ def build_green_report_html(report):
     any_pause = (tier or 0) > 0 or (tier_max or 0) > 0 or (pauses or 0) > 0
     tone = "muted" if tier is None else ("warn" if any_pause else "ok")
     parts.append(_gr_row("budget (ADR-063)", " · ".join(bits), tone))
+
+    # QA-depth dial (#1452) — lean/off render loud (warn/bad tone), never buried
+    ql = report.get("qa_level") or {}
+    level = ql.get("level")
+    if level in _QA_LEVEL_LABELS:
+        label, tone = _QA_LEVEL_LABELS[level]
+        note = f" ({ql.get('note')})" if ql.get("note") else ""
+        parts.append(_gr_row("qa depth dial (#1452)", f"{label}{note}", tone))
+    elif level:
+        parts.append(_gr_row("qa depth dial (#1452)", f"unrecognized level '{level}' — workflows fail open to standard", "warn"))
+    else:
+        reason = ql.get("error") or "no reading in this run"
+        parts.append(_gr_row("qa depth dial (#1452)", f"not collected — {reason}", "muted"))
 
     # GitHub-side sources — honest absence lines
     parts.append(_gr_row("visual-qa (CI)", (report.get("visual_qa") or {}).get("error") or _VISUAL_QA_ABSENT, "muted"))
