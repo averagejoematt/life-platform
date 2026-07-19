@@ -238,7 +238,12 @@
       "Bash(unzip -l /tmp/siteapi.zip)",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('platform:', {k:d['platform'].get\\(k\\) for k in \\('mcp_tools','data_sources','lambdas'\\)}\\); print\\('vitals:', {k:d['vitals'].get\\(k\\) for k in \\('recovery_pct','recovery_status','sleep_hours'\\)}\\)\")",
       "Bash(python3 scripts/check_main_green.py)",
-      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\)['platform']; print\\({k:p[k] for k in \\('mcp_tools','data_sources','lambdas'\\)}\\)\")"
+      "Bash(python3 -c \"import json,sys; p=json.load\\(sys.stdin\\)['platform']; print\\({k:p[k] for k in \\('mcp_tools','data_sources','lambdas'\\)}\\)\")",
+      "Bash(python3 -c \"import json,sys; c=json.load\\(sys.stdin\\); m=c['pillars']['mind']['components']; print\\('values_alignment live:', 'values_alignment' in m, 'sum:', round\\(sum\\(v['weight'] for v in m.values\\(\\)\\),3\\)\\)\")",
+      "Bash(python3 -m pytest tests/ -q --collect-only)",
+      "Bash(python3 -m pytest tests/test_sync_doc_metadata_check.py tests/test_platform_stats_truth.py tests/test_qa_manifest.py -q)",
+      "Bash(node scripts/import_site_js_graph.mjs)",
+      "Bash(node --check scripts/import_site_js_graph.mjs)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -17,11 +17,7 @@
 | Smoke (post-deploy) | `tests/smoke_test_site.sh` + `qa-smoke` Lambda | ~30s | Yes, after each deploy |
 | Manual | Browser checks, MCP tool dispatch | Variable | No |
 
-<<<<<<< HEAD
-**Total tests:** 4047 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
-=======
-**Total tests:** 4047 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
->>>>>>> origin/main
+**Total tests:** 4196 `def test_` functions (auto-synced by `deploy/sync_doc_metadata.py`; do not hand-edit this number).
 
 ---
 

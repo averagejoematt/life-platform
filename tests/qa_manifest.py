@@ -143,6 +143,7 @@ _CURATED = [
     {
         "path": "/",
         "name": "Home (constellation)",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": ["/api/journey", "/api/character"],
@@ -167,6 +168,7 @@ _CURATED = [
     {
         "path": "/cockpit/",
         "name": "Cockpit",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": ["/api/character", "/api/pulse", "/api/journey"],
@@ -184,6 +186,7 @@ _CURATED = [
     {
         "path": "/story/",
         "name": "Story hub",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "narrative",
         "api_deps": ["/journal/posts.json"],
@@ -281,6 +284,7 @@ _CURATED = [
     {
         "path": "/data/",
         "name": "Data hub",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": [],
@@ -293,6 +297,7 @@ _CURATED = [
     {
         "path": "/protocols/",
         "name": "Protocols hub",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": [],
@@ -333,6 +338,7 @@ _CURATED = [
     {
         "path": "/coaching/",
         "name": "Coaching hub (My Team)",
+        "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
         "api_deps": ["/api/coaches", "/api/coach_team"],
@@ -535,6 +541,11 @@ def _build():
         p.setdefault("leak_scan", True)
         p.setdefault("smoke", "200")
         p.setdefault("unlisted", False)
+        # #1395: does this page ship a build-time <noscript> static core (headline
+        # numbers + "as of" provenance) so the no-JS / crawler / link-unfurl view is
+        # real content, not a blank shell? True only for the growth-surface pages
+        # (Home + the doors); deploy/smoke_test_site.sh asserts it per page.
+        p.setdefault("static_core", False)
     seen = {}
     for p in pages:
         if p["path"] in seen:
@@ -549,17 +560,25 @@ PAGES_BY_PATH = {p["path"]: p for p in MANIFEST}
 
 # ── Consumer facets ───────────────────────────────────────────────────────────
 def visual_pages():
-    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage."""
+    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage.
+
+    Each entry carries `tier` (from its parent manifest entry, #1428) so the
+    sweep can restrict the AI-vision layer to a tier subset (deploy-time =
+    tier 1 only) without touching which pages the deterministic Playwright
+    checks cover — that stays the full set, unchanged.
+    """
     out = []
     for p in MANIFEST:
         if p.get("visual"):
             d = dict(p["visual"])
             d["path"] = p["path"]
             d["name"] = p["name"]
+            d["tier"] = p["tier"]
             out.append(d)
         for var in p.get("visual_variants", []) or []:
             d = dict(var)
             d["path"] = p["path"] + d.pop("fragment", "")
+            d["tier"] = p["tier"]
             out.append(d)
     return out
 
@@ -572,6 +591,11 @@ def leak_scan_paths():
 def smoke_rows():
     """deploy/smoke_test_site.sh — 'path|name|expected_status' per page."""
     return [f"{p['path']}|{p['name']}|{p['smoke']}" for p in MANIFEST]
+
+
+def static_core_paths():
+    """deploy/smoke_test_site.sh — pages that MUST ship a build-time static core (#1395)."""
+    return [p["path"] for p in MANIFEST if p.get("static_core")]
 
 
 def site_files():
@@ -610,7 +634,7 @@ def self_check():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--emit", choices=["paths", "smoke", "leak"])
+    ap.add_argument("--emit", choices=["paths", "smoke", "leak", "static_core"])
     ap.add_argument("--check", action="store_true")
     args = ap.parse_args()
     if args.check:
@@ -635,6 +659,9 @@ def main():
             print(row)
     elif args.emit == "leak":
         for p in leak_scan_paths():
+            print(p)
+    elif args.emit == "static_core":
+        for p in static_core_paths():
             print(p)
     else:
         ap.print_help()

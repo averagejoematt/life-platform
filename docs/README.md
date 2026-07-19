@@ -48,7 +48,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Full system design (the 9 stacks, ingest→store→serve; counts auto-synced) |
 | [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | The AWS account by the numbers |
 | [DEPENDENCY_GRAPH.md](DEPENDENCY_GRAPH.md) | What calls what; single points of failure |
-| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 67 MCP tools by domain (generated — never hand-edit) |
+| [MCP_TOOL_CATALOG.md](MCP_TOOL_CATALOG.md) | All 68 MCP tools by domain (generated — never hand-edit) |
 | [MCP_TOOL_AUDIT.md](MCP_TOOL_AUDIT.md) | The tool-removal ledger (#395 prune ratchet) |
 | [API.md](API.md) | Site-API endpoints |
 | [engines/](engines/) | The algorithm pages: [SCORING](engines/SCORING.md) · [CHARACTER](engines/CHARACTER.md) · [READINESS](engines/READINESS.md) · [HYPOTHESIS](engines/HYPOTHESIS.md) · [COACH_STANCE](engines/COACH_STANCE.md) |
@@ -78,7 +78,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | Doc | |
 |---|---|
 | [PLATFORM_NORTH_STAR.md](PLATFORM_NORTH_STAR.md) | The durable why — purpose, thesis, audiences, success bar |
-| [DECISIONS.md](DECISIONS.md) | **ADRs (001–135)** — every significant decision with rationale; index auto-generated |
+| [DECISIONS.md](DECISIONS.md) | **ADRs (001–136)** — every significant decision with rationale; index auto-generated |
 | [CONVENTIONS.md](CONVENTIONS.md) | **The load-bearing reflexes** (one-bundle rule #781, deploy-from-main, squash-drift, CI gate ordering, asset-staging trap) + drift-discovery commands |
 | [CONTINUITY.md](CONTINUITY.md) | What lives outside `docs/` and how a human reads/exports it |
 | [PHASE_TAXONOMY.md](PHASE_TAXONOMY.md) | What resets vs. persists at experiment restart (ADR-077) |
@@ -88,6 +88,7 @@ folder hierarchy, is how you navigate. Every page carries a status header
 | [MANAGED_WHERE_LEDGER.md](MANAGED_WHERE_LEDGER.md) | Out-of-IaC resources — what's managed where |
 | [SITE_MAP_AND_INTENT.md](SITE_MAP_AND_INTENT.md) · [DESIGN_SYSTEM_V5.md](DESIGN_SYSTEM_V5.md) · [SITE_UPLEVEL_PLAYBOOK.md](SITE_UPLEVEL_PLAYBOOK.md) | The v5 site brief (intent · standards · change discipline) |
 | [design/PORTRAIT_RUNBOOK.md](design/PORTRAIT_RUNBOOK.md) | Coach-portrait style bible + commissioning gate (ADR-106) |
+| [design/DESIGN_PARTNER_BRIEF.md](design/DESIGN_PARTNER_BRIEF.md) | The design-session contract + Slop Litmus v1 — synced into the v5 design project as BRIEF.md (#1464) |
 | [COST_TRACKER.md](COST_TRACKER.md) | The $85 budget (surge $100 — ADR-133) + real run-rate |
 | [RESERVED_CONCURRENCY.md](RESERVED_CONCURRENCY.md) | Concurrency strategy |
 | [A11Y_BASELINE.md](A11Y_BASELINE.md) | Accessibility baseline (pre-v4 audit) |

@@ -65,11 +65,48 @@ moment someone actually looked at it.
 
 ## Verification checklist (per change)
 - Python: `py_compile` + `black --check --line-length 140` (the format gate **reds main** otherwise) + `flake8`.
-- JS: `node --check`. CSS: brace-balance.
+- JS: full-parse via `node scripts/import_site_js_graph.mjs` (#1432 — `node --check` alone can MISS a
+  real SyntaxError buried in a function body, see the gotcha above) + the unit tests, `node --test`
+  (#1431 — see "JS unit-test harness" below). CSS: brace-balance.
 - Render: screenshot the changed page (desktop + mobile); confirm no content stuck hidden, no overflow.
 - Tests: the relevant subset **creds-blanked** (some pass locally on ambient creds but fail in CI on
   `NoCredentialsError`). Memory: `reference_ci_masking_and_creds`.
 - Live: `bash deploy/smoke_test_site.sh`; `curl /version.json` == git HEAD.
+
+## JS unit-test harness (#1431)
+
+The site ships zero JS dependencies (CLAUDE.md "No framework/deps") — the test harness respects
+that by staying **dev-only**: a `package.json` at repo root (never referenced by anything that
+ships) names Node's **built-in `node:test` runner**, zero npm packages installed. Run the whole
+suite with `node --test` from the repo root (auto-discovers everything under `tests/js/`), or
+`npm run test:js`.
+
+- **Where tests live:** `tests/js/<module>.test.mjs`, one file per `site/assets/js/*.js` module
+  under test. `tests/js/support/loader.mjs` is a shared side-effect import that registers
+  `scripts/site_js_loader.mjs` (the same module-resolution hook the #1432 import-graph gate uses)
+  so a test file can `import` a site module by its real root-relative-import path, unmodified.
+- **Static vs. dynamic import:** if the module under test has a top-level `import "/assets/js/…"`
+  of its own (e.g. `charts.js` imports `svgtype.js`), import it **dynamically** —
+  `const { fn } = await import("../../site/assets/js/foo.js");` — AFTER the static
+  `import "./support/loader.mjs";` line. Node resolves an entire *static* import graph before
+  evaluating any of it, so a static import of a module with its own root-relative import would try
+  to resolve before the loader hook has registered. `tests/js/charts.test.mjs` has the worked
+  example + the full comment.
+- **What's covered so far (the first tranche, #1431):** `charts.js`'s pure chart functions
+  (scales/paths/formatting, including the >=4-points-to-draw-a-trend honesty rule), the
+  `evidence.js` router mapping (split into `site/assets/js/evidence_router.js` specifically so
+  it's testable without triggering evidence.js's DOM-wiring side effects at import time — no
+  behavior change, same pattern `evidence_shared.js` used at #581), and the shared formatters in
+  `evidence_shared.js`.
+- **Adding tests for the next module:** prefer testing a module's **pure functions** (data in,
+  string/value out — most of `charts.js`, `evidence_shared.js`, and any future `evidence_*.js`
+  renderer fit this). A module that's mostly DOM wiring (event listeners, `querySelector` chains)
+  is a poor unit-test target — that's what `tests/visual_qa.py` / `tests/pr_render_gate.py`
+  (a real Playwright browser) already cover; don't reach for a DOM shim to force it into
+  `node:test`. If a module mixes the two, consider splitting the pure logic out (as
+  `evidence_router.js` did) rather than shimming a fake DOM.
+- **CI gate:** `.github/workflows/v4-gate.yml`'s `site-gate` job runs `node --test` right after
+  the #1432 import-graph gate, on every `site/**`-touching PR and push to main.
 
 ## Deploy surface (when authorized)
 1. **Site** — `bash deploy/sync_site_to_s3.sh` (+ explicit `aws s3 sync site/assets/fonts/` if fonts changed). Content-hashes + invalidates + rolls the SW version.

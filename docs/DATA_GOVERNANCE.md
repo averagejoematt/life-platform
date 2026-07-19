@@ -1,8 +1,10 @@
 # Data Governance — PII Classification + Retention Policy
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-05-19
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-18
 
-Phase 7 (2026-05-16, refreshed 2026-05-19 post-V2): single source of truth for what data exists, who can see it, and how long it's kept.
+Phase 7 (2026-05-16, refreshed 2026-07-18 — #1351 current-truth pass: repo visibility,
+delete-lambda status, current data classes, subscriber-retention readiness #1350):
+single source of truth for what data exists, who can see it, and how long it's kept.
 
 This document covers two cross-cutting concerns:
 1. **PII Classification** (P7.4) — what's personally identifiable and what's safe to expose
@@ -39,6 +41,9 @@ Visible at `averagejoematt.com` to anyone:
 - Activity GPS traces, workout details
 - Sick day records, supplement logs
 - Reading retention/recall (ADR-097): `retentionScore`, all `RECALL#` spaced-retrieval prompts + performance, the cognitive-reserve/longevity framing, reading×biometric correlations, session `moodSnapshot`/`location`, and reading-calibration internals. **Private by default, owner's toggle, owner's eyes** — a bad retention week is never reachable from a public surface (spec §10, enforced server-side in `reading_visibility.project_public`). NB: the *public* reading projection (current/finished shelf, public takeaways, input streak) is Tier 1.
+- Private intake ledger (#1405): `USER#matthew#SOURCE#private_intake` — Matthew-private evening intake count, feeding `intake_response.py`'s dose-response analysis (n_eff / block-bootstrap CI). Classed `RAW_TIMESERIES` (ADR-077, never wiped); explicitly `NEVER public-served` (`lambdas/phase_taxonomy.py`) — MCP-only (`get_intake_response`), never a site endpoint.
+- Flourishing PERMA projection (#1403): `USER#matthew#SOURCE#flourishing` — daily provenance-stamped PERMA projection over journal enrichment (`flourishing.py`). Raw daily row is owner-only; it feeds the Character Sheet's Relationships pillar component and the Mind pillar's `values_alignment` sub-score, both surfaced only as the Tier 0 aggregate pillar tier (never the raw daily score).
+- Felt-reality calibration probe (#1409): `USER#matthew#SOURCE#felt_probe` — weekly Sunday one-tap self-report (0–4 × 3 axes). Raw taps are owner-only; `/api/character_calibration` serves only the deterministic r/CI/n_eff calibration aggregate (no item-level values, per `tests/test_felt_probe_1409.py`).
 
 ### Tier 3 — Never exposed (system internal)
 - OAuth refresh tokens, API keys, secrets
@@ -78,9 +83,11 @@ Per typical health-data definitions, the following fields are **PII** regardless
 | Coach threads | `COACH#{coach_id}` | **Forever** | Coaching memory |
 | Reading library (ADR-097) | `BOOK#{bookId}`, `READING#{bookId\|REC\|PROFILE\|IDEA#…}` | **Forever** | Durable identity data (CROSS_PHASE); private fields gated server-side |
 | Sick days | `USER#matthew#SOURCE#sick_days` | **Forever** | Analysis context |
+| Private intake / flourishing / felt-probe (2026-07 additions) | `USER#matthew#SOURCE#{private_intake,flourishing,felt_probe}` | **Forever** | RAW_TIMESERIES class (ADR-077, `phase_taxonomy.py`) — logged/derived owner facts; #1405, #1403, #1409 |
 | Rate limit counters | `RATE#{endpoint}#{ip_hash}` | **2 hours (DDB TTL)** | Auto-expire via `ttl` attribute (P1.7) |
 | Auth failure markers | `USER#matthew#SOURCE#{src}` `sk=AUTH_FAILURE` | **24 hours (DDB TTL)** | Circuit breaker; auto-expire (P3.6) |
 | Health check results | `USER#matthew#SOURCE#health_check` | **Forever** | Operational audit trail |
+| **Subscriber emails** (#1350 — third-party PII) | `USER#matthew#SOURCE#subscribers` `sk=EMAIL#{sha256(email)}` | **UNSIGNED — owner signs per #1350** | Decision options for Matthew to pick ONE: **(A)** keep forever — today's de facto posture, plaintext `email` field never purged; **(B)** purge N days after `unsubbed_at`; **(C)** anonymize N days after `unsubbed_at` (redact `email`, keep the hash/status/timestamps for aggregate analytics). Purge/anonymize is implemented and one-command-ready: `python3 deploy/subscriber_retention_purge.py --window-days N --mode {purge,anonymize} --apply` (omit `--apply` for a dry run); only `status=unsubscribed` rows are ever touched by it. A single subscriber can also be deleted on request, independent of any retention window, via `delete_user_data_lambda`'s `{"subscriber_email": "...", "confirm": "DELETE"}` event shape. **To sign:** replace the "UNSIGNED" cell above with the chosen option + a day-count window, e.g. `**Anonymize, 180 days post-unsubscribe**` — `tests/test_data_governance_retention_coverage.py` requires a signed row to still name a window. |
 
 ### Warm tier (S3)
 
@@ -132,11 +139,12 @@ No Glacier or deep-archive tier is in use today. Could be added if compliance de
 
 ### Export
 - `lambdas/data_export_lambda.py` exists; on-demand only. Generates a snapshot of all DDB partitions + S3 archive references.
-- **Audit P7.1 still outstanding** — verify output format covers all current source partitions (now 19, up from earlier estimates).
+- Census derives from `phase_taxonomy.SOURCE_CLASS` (#498/X-10), not a hand count — every non-`SYSTEM_STATE` source is covered automatically as new sources are added (86 sources as of 2026-07-18). The prior "audit P7.1 still outstanding" concern (a hand-maintained count that would silently drift) is resolved structurally by that dynamic derivation.
 
 ### Deletion
-- `lambdas/delete_user_data_lambda.py` scaffolded; not yet wired to a request-driven trigger. The Phase 6 multi-user roll-out (formally deferred per ADR-057) is the gating context.
-- Today: manual procedure documented below remains the operative process.
+- `lambdas/delete_user_data_lambda.py` is **implemented, CDK-deployed** (`life-platform-delete-user-data`, `cdk/stacks/operational_stack.py`), **alarmed** (`life-platform-delete-user-data-errors`), and **unit-tested** (`tests/test_delete_user_data.py`). It wipes a user's DDB items + S3 objects + per-user Secrets Manager entries in one call, writes an audit record to `USER#admin#SOURCE#deletion_log`, and refuses protected users (`matthew`/`admin`/`system`) in code.
+- **#1350 addition:** a second event shape (`{"subscriber_email": "...", "confirm": "DELETE"}`) deletes ONE subscriber row — the shape the generic `user_id` path structurally cannot reach, since subscriber rows live under the owner's pk namespace (`USER#matthew#SOURCE#subscribers`), not a per-user pk.
+- **Trigger:** manual invocation only (`aws lambda invoke`, below) — there is no self-service request-driven web form. That gap (a public delete-my-data page) is real but distinct from "not yet wired"; the underlying capability exists, deployed, and tested. The Phase 6 multi-user roll-out (formally deferred per ADR-057) is the context for whether a self-service form is ever built.
 
 ### Access
 - Matthew accesses everything via MCP (Claude Desktop) or `dash.averagejoematt.com`.
@@ -144,37 +152,47 @@ No Glacier or deep-archive tier is in use today. Could be added if compliance de
 
 ---
 
-## Manual Delete Procedure (today, until P7.3 ships)
+## Delete Procedure (today — via the deployed Lambda)
 
-For a clean wipe of a user's data:
+For a clean wipe of a test user's data, or a single subscriber's data, invoke
+`life-platform-delete-user-data` directly. It performs the DDB scan+batch-delete,
+S3 prefix cleanup, and per-user Secrets Manager deletion in one call — no separate
+manual steps.
 
 ```bash
+# ── Generic user wipe (never matthew/admin/system — refused in code) ──
 USER_ID=test_user_to_delete
 
-# 1. Find every partition for this user
-aws dynamodb scan --table-name life-platform \
-  --filter-expression "begins_with(pk, :p)" \
-  --expression-attribute-values "{\":p\":{\"S\":\"USER#${USER_ID}#\"}}" \
-  --projection-expression "pk,sk" > /tmp/user_items.json
+# 1. Dry run — counts what WOULD be deleted, deletes nothing
+aws lambda invoke --function-name life-platform-delete-user-data \
+  --payload "{\"user_id\":\"${USER_ID}\",\"dry_run\":true}" \
+  --cli-binary-format raw-in-base64-out /tmp/plan.json && cat /tmp/plan.json
 
-# 2. Delete each item (batches of 25)
-# (script not yet written; tracked as P7.3)
+# 2. Real delete — requires the explicit confirm string
+aws lambda invoke --function-name life-platform-delete-user-data \
+  --payload "{\"user_id\":\"${USER_ID}\",\"confirm\":\"DELETE\"}" \
+  --cli-binary-format raw-in-base64-out /tmp/result.json && cat /tmp/result.json
 
-# 3. S3 prefixes
-aws s3 rm s3://matthew-life-platform/raw/${USER_ID}/ --recursive
-aws s3 rm s3://matthew-life-platform/uploads/${USER_ID}/ --recursive
-aws s3 rm s3://matthew-life-platform/dashboard/${USER_ID}/ --recursive
-aws s3 rm s3://matthew-life-platform/generated/${USER_ID}/ --recursive
+# ── Single subscriber (#1350) — narrower: touches ONE EMAIL# row only ──
+EMAIL=person@example.com
 
-# 4. Secrets (per-user, only if Phase 6 multi-user shipped)
-aws secretsmanager delete-secret --secret-id life-platform/${USER_ID}/whoop \
-  --recovery-window-in-days 7
-# repeat for each per-user OAuth secret
+aws lambda invoke --function-name life-platform-delete-user-data \
+  --payload "{\"subscriber_email\":\"${EMAIL}\",\"dry_run\":true}" \
+  --cli-binary-format raw-in-base64-out /tmp/sub_plan.json && cat /tmp/sub_plan.json
 
-# 5. CloudTrail confirmation
+aws lambda invoke --function-name life-platform-delete-user-data \
+  --payload "{\"subscriber_email\":\"${EMAIL}\",\"confirm\":\"DELETE\"}" \
+  --cli-binary-format raw-in-base64-out /tmp/sub_result.json && cat /tmp/sub_result.json
+
+# ── CloudTrail confirmation ──
 # Wait ≤24h for CloudTrail to record the deletions; archive the trail entries
-# as the audit trail of the deletion event.
+# as the audit trail of the deletion event (in addition to the Lambda's own
+# USER#admin#SOURCE#deletion_log audit record).
 ```
+
+For the RETENTION-WINDOW bulk purge/anonymize of already-unsubscribed subscriber
+rows (distinct from the single-subscriber delete above), see `deploy/subscriber_retention_purge.py`
+and the "Subscriber emails" retention row (#1350) — gated on Matthew signing a window.
 
 ---
 
@@ -182,7 +200,7 @@ aws secretsmanager delete-secret --secret-id life-platform/${USER_ID}/whoop \
 
 - **GDPR**: not a GDPR data subject (US-based, no EU users)
 - **HIPAA**: not a covered entity (not a healthcare provider; data is self-tracked)
-- **CCPA**: technically applicable if California user added; delete-account flow (P7.3) is the gap
+- **CCPA**: technically applicable if California user added; delete-account flow (P7.3) is implemented (`delete_user_data_lambda`, both full-user and single-subscriber shapes, #1350) — the remaining gap is a self-service web form (manual `aws lambda invoke` only today)
 - **SOC2 / ISO 27001**: not pursued; would require formal access-control + audit-trail processes
 
 If any of these become relevant (e.g., onboarding a second user from CA, sale of the platform, clinician handoff), Phases 6 + 7 of the audit plan address the remaining gaps. Phase 6 (multi-user / Cognito) was formally deferred in ADR-057 — see that ADR for re-open triggers.
@@ -201,10 +219,13 @@ If any of these become relevant (e.g., onboarding a second user from CA, sale of
 | 2026-05-17 | Phase 6 multi-user / delete-user-data flow formally deferred | ADR-057 |
 | 2026-05-19 | Doc re-verified post V2 closure; data_export + delete_user_data lambdas confirmed present | This commit |
 | 2026-07-08 | `mcp-audit/` retention set: IA at 30d, expire at 90d — classed with `cloudtrail/` audit logs; `apply_s3_lifecycle.sh` made the declarative full-config source of truth | #886 |
+| 2026-07-13 | Repo flipped PRIVATE (was public since inception) — closes the `docs/coaching/` exposure this doc's own scope note had flagged OPEN | [[project_repo_visibility]] |
+| 2026-07-18 | #1351 current-truth pass: repo-visibility + delete-lambda claims corrected, data-export census note updated (dynamic, not a hand count), 2026-07 data classes (private_intake #1405, flourishing #1403, felt_probe #1409) added, Manual Delete Procedure rewritten around the deployed lambda; `scripts/check_doc_facts.py` now polices repo-visibility/delete-lambda-status/Verified-freshness claims on this doc | #1351 |
+| 2026-07-18 | #1350 code half: "Raj directive" never-delete comment replaced with a pointer to this doc's (unsigned) retention row; `deploy/subscriber_retention_purge.py` purge/anonymize implementation + `delete_user_data_lambda` single-subscriber deletion shipped, one-command-ready pending Matthew's window sign-off | #1350 |
 
 ---
 
-**Verified:** 2026-05-19
+**Verified:** 2026-07-18
 
 
 ## Editorial guardrails (public surfaces) — canonical home
@@ -226,8 +247,9 @@ deprecated doc). On ANY public surface (site, OG images, RSS, podcasts, build be
 `deploy/pii_surface_guard.py` scans the **published site surface (`site/`) only**. The
 repo's `docs/coaching/` files carry Tier-2 owner-only data (real biometrics, training
 calibration) — their intended privacy control is **repo visibility**, NOT the guard.
-⚠️ **As of 2026-07-10 the repo is still PUBLIC and this exposure is OPEN** — the owner
-has committed to flipping it private; until that happens, `docs/coaching/` is
-world-readable and this note must not be read as assurance. Wiki-panel finding 2026-07-10: treat repo visibility as a load-bearing
-privacy control; never flip this repo public again without first relocating or
-redacting `docs/coaching/`.
+✅ **The repo has been PRIVATE since 2026-07-13** — `docs/coaching/` is no longer
+world-readable; the exposure this note used to flag (public 2026-05 through 2026-07-13)
+is closed. Wiki-panel finding 2026-07-10 (before the flip) still stands as the
+governing rule going forward: treat repo visibility as a load-bearing privacy control;
+never flip this repo public again without first relocating or redacting
+`docs/coaching/`.

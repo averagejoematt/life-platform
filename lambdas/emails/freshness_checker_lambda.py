@@ -762,6 +762,8 @@ def lambda_handler(event, context):
     # Phase 2.6 (2026-05-16): also monitor manually-rotated secrets (Anthropic + 3rd-party
     # API tokens) at a longer 120-day threshold. These don't auto-refresh and need human
     # rotation; surfacing staleness lets the operator schedule rotation proactively.
+    # #1329 (2026-07-19): this list is mirrored in remediation/agent.py's
+    # MANUAL_ROTATION_SECRETS — keep both in sync if a secret is added/removed here.
     OAUTH_SECRETS = [
         "life-platform/whoop",
         "life-platform/withings",
@@ -835,27 +837,21 @@ def lambda_handler(event, context):
             except Exception as _sns_e:
                 logger.error("OAuth alert SNS publish failed: %s", _sns_e)
 
-        # Phase 2.6: manual-rotation staleness alert (separate from OAuth)
+        # Phase 2.6 → #1329 (2026-07-19): manual-rotation staleness NO LONGER SNS-publishes
+        # here. It used to page the raw daily digest on every run once a secret crossed
+        # MANUAL_ROTATION_STALE_DAYS — life-platform/ai-keys crossed the threshold
+        # ~2026-07-06 and re-fired daily for 12+ consecutive days with zero action
+        # (#1329 evidence), training the channel into noise. The condition is now routed
+        # to the remediation agent instead (`remediation/agent.py::stale_secret_signals` /
+        # `stale_secret_escalations`, zero new cadence — it already runs Mon/Wed/Fri),
+        # which surfaces it as a persistent tracked item in the curated needs-human email
+        # until the secret is rotated. This log line + the ManualRotationStaleCount metric
+        # below are the only local signal now; see docs/SECRETS_ROTATION.md "Monitoring".
         if manual_stale:
             stale_list = "\n".join([f"  - {name}: {days} days since last rotation" for name, days in manual_stale])
-            try:
-                sns.publish(
-                    TopicArn=SNS_ARN,
-                    Subject=f"⚠️ Life Platform: {len(manual_stale)} secret(s) due for manual rotation",
-                    Message=(
-                        f"⚠️ Life Platform: Manual Rotation Reminder\n\n"
-                        f"The following secrets have not been rotated in over {MANUAL_ROTATION_STALE_DAYS} days.\n"
-                        f"These are manually-rotated (no auto-rotation API available):\n\n"
-                        f"{stale_list}\n\n"
-                        f"Action: rotate via the source provider's portal, then update via\n"
-                        f"`aws secretsmanager put-secret-value --secret-id <name> --secret-string ...`\n\n"
-                        f"See docs/SECRETS_ROTATION.md for per-secret procedures.\n\n"
-                        f"Checked at: {now.strftime('%Y-%m-%d %H:%M UTC')}"
-                    ),
-                )
-                logger.info("Manual rotation alert sent for %d secret(s)", len(manual_stale))
-            except Exception as _sns_e:
-                logger.error("Manual rotation alert SNS publish failed: %s", _sns_e)
+            logger.warning(
+                "Manual-rotation secret(s) stale (%d) — routed to remediation agent, not SNS:\n%s", len(manual_stale), stale_list
+            )
 
         # Emit CloudWatch metric for OAuth + manual-rotation token staleness
         cw.put_metric_data(

@@ -155,6 +155,8 @@ def signal_descriptors(signals):
         out.append({"kind": "drift", "id": "weekly-drift"})
     if signals.get("urgent"):
         out.append({"kind": "urgent", "id": "repository-dispatch"})
+    for s in signals.get("secrets_stale", []) or []:
+        out.append({"kind": "secret_rotation", "id": s.get("name", "?"), "age_days": s.get("age_days")})
     return out
 
 
@@ -319,6 +321,104 @@ def aged_alarm_escalations(signals, now=None):
     return out
 
 
+# ── Manual-rotation secret staleness escalation (#1329) ─────────────────────
+# freshness-checker's manual-rotation staleness check (MANUAL_ROTATION_SECRETS /
+# MANUAL_ROTATION_STALE_DAYS in lambdas/emails/freshness_checker_lambda.py) used to
+# SNS-publish this RAW to the daily alert digest every single run once a secret
+# crossed its threshold — life-platform/ai-keys crossed 120 days ~2026-07-06 and
+# re-fired daily for 12+ consecutive days with zero action (#1329 evidence:
+# LastChangedDate 2026-03-08, 132 days at filing). A channel that pages daily for
+# an unactionable-same-message alert trains the operator to ignore it. #1329's
+# fix: freshness-checker no longer SNS-publishes that alert (still emits the
+# ManualRotationStaleCount CloudWatch metric for dashboards); this agent picks up
+# the same Secrets Manager DescribeSecret read (read-only, zero new cadence — the
+# agent already runs Mon/Wed/Fri) and surfaces any manual-rotation secret past its
+# stale threshold as a NAMED needs-human line, deterministic and independent of the
+# LLM turn budget — mirroring the alarm-aging backstop (#1204) above. Secrets are a
+# denylisted path for the LLM (remediation/prompt.md "Hard rules" — never auto-fix,
+# never edit secret/auth files), so this is surfacing-only; rotation stays human
+# (gate:owner).
+#
+# Regression guard (#1329's defined recurrence condition): a stale-secret alert is
+# "recurring" once its ACTIVE age — how long it's been past the rotation SLA, i.e.
+# age_days - MANUAL_ROTATION_STALE_DAYS, not how long since the secret was set —
+# exceeds STALE_SECRET_NO_ISSUE_DAYS with no linked tracking issue. The platform has
+# no issue-linking mechanism for secrets (the curated needs-human email IS the
+# tracking surface, by design — no new machinery), so "no linked issue" is
+# structural: every stale secret past the recurrence window keeps recurring here,
+# every curated run, until its LastChangedDate advances (rotated).
+
+MANUAL_ROTATION_SECRETS = [
+    "life-platform/ai-keys",
+    "life-platform/site-api-ai-key",
+    "life-platform/eightsleep-client",
+    "life-platform/notion",
+    "life-platform/todoist",
+    "life-platform/ingestion-keys",
+]
+MANUAL_ROTATION_STALE_DAYS = int(os.environ.get("MANUAL_ROTATION_STALE_DAYS", "120"))
+STALE_SECRET_NO_ISSUE_DAYS = 7  # #1329: active-age threshold that defines "recurrence"
+
+_sm = boto3.client("secretsmanager", region_name=REGION)
+
+
+def stale_secret_signals(now=None, sm_client=None):
+    """Deterministic Secrets Manager read (no LLM, DescribeSecret only — never
+    GetSecretValue, this agent never sees key material): which
+    MANUAL_ROTATION_SECRETS are past MANUAL_ROTATION_STALE_DAYS since
+    LastChangedDate. Fail-soft per secret (a describe_secret hiccup or a missing
+    IAM grant on one secret must not blank the whole list — logs and continues)."""
+    now_dt = now or datetime.now(timezone.utc)
+    sm = sm_client or _sm
+    out = []
+    for name in MANUAL_ROTATION_SECRETS:
+        try:
+            meta = sm.describe_secret(SecretId=name)
+            last_changed = meta.get("LastChangedDate")
+            if not last_changed:
+                continue
+            age_days = (now_dt - last_changed.replace(tzinfo=timezone.utc)).days
+            if age_days > MANUAL_ROTATION_STALE_DAYS:
+                out.append({"name": name, "age_days": age_days})
+        except Exception as e:
+            print(f"[warn] describe_secret {name}: {e}")
+    return out
+
+
+def stale_secret_escalations(signals, now=None):
+    """Return `(secret_name, needs_human_item)` tuples for every manual-rotation
+    secret whose active age (days past the rotation SLA) exceeds
+    STALE_SECRET_NO_ISSUE_DAYS — the #1329 defined recurrence condition. Pure and
+    deterministic: fires every run off `signals["secrets_stale"]`, regardless of
+    what the LLM triage concluded, so the reminder can never go silently missing
+    the way the raw daily SNS both over-fired AND (once someone muted the topic)
+    could under-fire."""
+    out = []
+    for s in signals.get("secrets_stale", []) or []:
+        name = s.get("name", "?")
+        age_days = s.get("age_days", 0)
+        active_age = age_days - MANUAL_ROTATION_STALE_DAYS
+        if active_age <= STALE_SECRET_NO_ISSUE_DAYS:
+            continue  # freshly crossed the threshold — let the LLM triage see it first
+        rotate_hint = " — one-command prep: `bash deploy/rotate_ai_keys.sh`" if name == "life-platform/ai-keys" else ""
+        out.append(
+            (
+                name,
+                {
+                    "issue": f"Secret '{name}' is {age_days}d since last rotation ({active_age}d past the "
+                    f"{MANUAL_ROTATION_STALE_DAYS}d manual-rotation SLA) — active >{STALE_SECRET_NO_ISSUE_DAYS}d "
+                    "with no linked tracking issue, the #1329 defined recurrence condition. Previously this paged "
+                    "raw daily SNS (#1329 evidence: 12+ consecutive unactioned days); now routed here as a "
+                    "persistent tracked item instead.",
+                    "action": f"Rotate {name} per docs/SECRETS_ROTATION.md{rotate_hint}. Rotation is human-only "
+                    "(gate:owner) — this line recurs every curated Mon/Wed/Fri run until the secret's "
+                    "LastChangedDate advances.",
+                },
+            )
+        )
+    return out
+
+
 # ── Signal gathering (deterministic, no LLM) ────────────────────────────────
 
 
@@ -351,7 +451,7 @@ def _coherence_findings():
 def gather_signals(event_payload):
     """Collect the last 24h of technical signals into a structured dict."""
     since = datetime.now(timezone.utc) - timedelta(hours=24)
-    signals = {"alarms": [], "ci_failures": [], "dlq": [], "coherence": None, "drift": None, "urgent": None}
+    signals = {"alarms": [], "ci_failures": [], "dlq": [], "coherence": None, "drift": None, "urgent": None, "secrets_stale": []}
 
     # CloudWatch alarms currently in ALARM + recent transitions
     try:
@@ -411,6 +511,14 @@ def gather_signals(event_payload):
     # loosened-policy" class). Only surfaces as actionable when there is real drift; the
     # clean/degraded status still renders on the report via drift_report.status_html.
     signals["drift"] = drift_report.as_signal(drift_report.read_latest(_s3, LOG_BUCKET))
+
+    # Manual-rotation secret staleness (#1329) — replaces the raw daily SNS the
+    # freshness-checker used to publish; deterministic backstop below (main()) turns
+    # any hit into a NAMED needs-human line, zero new cadence (agent already Mon/Wed/Fri).
+    try:
+        signals["secrets_stale"] = stale_secret_signals(now=datetime.now(timezone.utc))
+    except Exception as e:
+        print(f"[warn] stale_secret_signals: {e}")
 
     # Event-driven urgent payload (from repository_dispatch)
     if event_payload:
@@ -595,6 +703,7 @@ def main():
         or signals["coherence"]
         or signals["drift"]
         or signals["urgent"]
+        or signals.get("secrets_stale")  # .get: older test doubles/fixtures predate this key (#1329)
     ):
         print("no actionable signals — clean run")
         if mode != "auto":  # in auto, automerge.py sends the single final email
@@ -639,6 +748,12 @@ def main():
     existing_nh = report.get("needs_human", []) or []
     existing_text = " ".join(str(i.get("issue", "")) + " " + str(i.get("action", "")) for i in existing_nh if isinstance(i, dict))
     for name, item in aged_alarm_escalations(signals):
+        if name not in existing_text:
+            report.setdefault("needs_human", []).append(item)
+            existing_text += " " + name
+    # #1329: same deterministic-backstop shape, for manual-rotation secret staleness —
+    # replaces the raw daily SNS with a persistent tracked item in this curated email.
+    for name, item in stale_secret_escalations(signals):
         if name not in existing_text:
             report.setdefault("needs_human", []).append(item)
             existing_text += " " + name

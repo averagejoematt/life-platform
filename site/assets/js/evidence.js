@@ -13,6 +13,7 @@ import { stampGenesis } from "/assets/js/coach_popover.js"; // #949 — the cros
 import { domainIcon } from "/assets/js/icons.js";
 import { mountAsk } from "/assets/js/ask.js";
 import { esc, getJSON, tryJSON, isBad, sec, empty, note } from "/assets/js/evidence_shared.js";
+import { indexRegistry, resolveSlugFromPath } from "/assets/js/evidence_router.js";
 import { enhanceProvenance } from "/assets/js/provenance_popover.js";
 import { renderSupplements, renderLabs, renderPhysical, renderTraining } from "/assets/js/evidence_body.js";
 import { wireCharacter, renderCharacter, renderBadges } from "/assets/js/evidence_character.js";
@@ -32,13 +33,12 @@ const REG = window.__EVIDENCE_REGISTRY__ || [];
 
 // BYSLUG keeps EVERY entry — an unlisted topic's direct URL (/data/ledger/) must
 // still route + render. Only the menu surfaces below use the LISTED view (#1109).
-const BYSLUG = Object.fromEntries(REG.map((t) => [t.slug, t]));
-
 // #1109: entries flagged `unlisted` in the build registry are deliberately off the
 // tile rail, the group tabs and the "all N topics" count — footer/direct-URL only.
-const LISTED = REG.filter((t) => !t.unlisted);
-
-const GROUPS = [...new Set(LISTED.map((t) => t.group))];
+// Indexing is a pure function split into evidence_router.js (#1431) — no behavior
+// change, just so the router mapping is unit-testable without evidence.js's DOM
+// side effects (initTheme/buildTabs/renderCenter all run at import time below).
+const { BYSLUG, LISTED, GROUPS } = indexRegistry(REG);
 
 // v5: one engine serves three archive pillars (/data/, /protocols/, /method/).
 // The builder sets the route base + door label per page; defaults keep the
@@ -61,7 +61,7 @@ function coachRefreshNote(generatedAt, paused) {
 
 const DOORTITLE = window.__ARCHIVE_TITLE__ || "Evidence";
 
-const slugFromPath = () => { const seg = location.pathname.split("/").filter(Boolean); return seg.length ? seg[seg.length - 1] : ""; };
+const slugFromPath = () => resolveSlugFromPath(location.pathname);
 
 const RENDERERS = {
   vitals: renderPulse, autonomic: renderAutonomic, zone2: renderZone2, supplements: renderSupplements, labs: renderLabs, physical: renderPhysical, training: renderTraining, nutrition: renderNutrition, glucose: renderGlucose, sleep: renderSleep, mind: renderMind, reading: renderReading, vices: renderVices, ledger: renderLedger, discoveries: renderDiscoveries, biology: renderGenome, challenges: renderChallenges, protocols: renderProtocols, experiments: renderExperiments, habits: renderHabits, board: renderBoard, platform: renderPlatform, cost: renderCost, data: renderData, pipeline: renderPipeline, results: renderResults, tools: renderTools, ask: renderAsk, cycles: renderCycles, inference: renderInference, wrong: renderWrong, survival: renderSurvival, postmortems: renderPostmortems, mirror: renderMirror, explorer: renderExplorer, verify: renderVerify, intelligence: renderCorrelations, predictions: renderPredictions, calibration: renderCalibration, benchmarks: renderBenchmarks, character: renderCharacter, badges: renderBadges, scenarios: renderScenarios };

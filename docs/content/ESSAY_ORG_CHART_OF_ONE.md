@@ -73,9 +73,10 @@ first: roughly one narrative in ten (11 of 112 across 14 days) contained a hard 
 contradiction (ADR-104, `docs/DECISIONS.md`). That measurement is *published on the
 site*, which tells you the org's other rule: failures are inventory, not embarrassment.
 
-Even spending is an org-chart problem. An hourly governor projects month-end cost and
-degrades AI features in tiers as the projection climbs — and after the one month we
-breached the ceiling ($79.80 in June 2026, caused by my own dev sessions, not by
+Even spending is an org-chart problem. A governor checks in every 8 hours, projects
+month-end cost, and degrades AI features in tiers as the projection climbs — and
+after the one month we breached the ceiling ($79.80 in June 2026, caused by my own
+dev sessions, not by
 readers), the degradation *order* was inverted so that reader-facing AI is the last
 thing sacrificed (`lambdas/budget_guard.py`: "readers degrade LAST"). The postmortem
 conclusion wasn't "spend less"; it was "the org was protecting the wrong stakeholder."

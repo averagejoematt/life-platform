@@ -17,8 +17,13 @@ SHARED_LAYER_VERSION	retired by #781/ADR-131 — there is no layer version; see 
 # the old "in the shared layer" / "shared layer module" / "(shared layer)" rules —
 # #781 left 35+ stale "part of the shared Lambda layer" claims that matched NONE of
 # those narrower patterns (found in the 2026-07-13 doc-truth audit).
-shared (?:Lambda )?layer	retired (#781/ADR-131) — shared code is bundled per function (deploy/build_bundle.py); say "bundled lambdas/ tree". If the line describes the retirement, phrase it "retired/no/without the shared layer".
-deployed as (a )?Lambda Layer	the shared layer is retired (#781); dependency layers (garth/Pillow) are the only layers
+# #1347: hyphen-tolerant + case-insensitive (`_rules()` now compiles every rule with
+# re.IGNORECASE). "(shared-layer module)" (RUNBOOK.md:1364) and "Shared-layer module"
+# (several lambdas/ docstrings) matched NEITHER the space-only nor the lowercase-only
+# prior pattern — the same drift class as #1254, found one file over the day #1254
+# merged. `[- ]` covers both the hyphen and the space spelling of the same compound.
+shared[- ](?:Lambda[- ])?layer	retired (#781/ADR-131) — shared code is bundled per function (deploy/build_bundle.py); say "bundled" or "bundled lambdas/ tree" module. If the line describes the retirement, phrase it "retired/no/without the shared layer".
+deployed[- ]as (?:a )?Lambda[- ]Layer	the shared layer is retired (#781); dependency layers (garth/Pillow) are the only layers
 \(WAF\)	WAF was removed 2026-06 — rate limiting is in-Lambda (DynamoDB counters)
 WAF block	WAF was removed 2026-06
 WAF rule	WAF was removed 2026-06

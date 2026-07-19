@@ -1,6 +1,6 @@
 # Readiness Score
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#970 helper consolidation — formulas unchanged. 2026-07-13: shared-layer docstring reword only, #781 — no logic change)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#970 helper consolidation — formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change)
 > **Sources of truth:** `lambdas/compute/daily_metrics_compute_lambda.py` (`compute_readiness`, :280-320), `mcp/tools_health.py` (`tool_get_readiness_score`), `lambdas/training_load.py`, `lambdas/personal_baselines.py` (`readiness_hrv_score`, :184-199)
 
 ## Purpose

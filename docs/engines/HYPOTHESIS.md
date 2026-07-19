@@ -1,6 +1,6 @@
 # Hypothesis Engine
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#970: its query_range now the paginated digest_utils implementation — the silent 1MB truncation class is gone; formulas unchanged. 2026-07-13: shared-layer docstring reword only, #781 — no logic change)
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-13 (post-#970: its query_range now the paginated digest_utils implementation — the silent 1MB truncation class is gone; formulas unchanged. 2026-07-13: docstring reword only, now that the shared layer is retired by #781 — no logic change)
 > **Sources of truth:** `lambdas/compute/hypothesis_engine_lambda.py` (v2, #530/ADR-105), `lambdas/stats_core.py`
 
 ## Purpose

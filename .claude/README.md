@@ -9,7 +9,7 @@ The single source of project instructions loaded into every session: architectur
 
 **2. The knowledge base — [`/docs/`](../docs/)**
 Designed so an agent can answer "why" without guessing:
-- **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…135). Reversible, dated, with context + consequences.
+- **ADRs** — every non-trivial decision is recorded in [`docs/DECISIONS.md`](../docs/DECISIONS.md) (ADR-001…136). Reversible, dated, with context + consequences.
 - **Reference** — `ARCHITECTURE.md`, `SCHEMA.md` (authoritative data model), `RUNBOOK.md`, `INFRASTRUCTURE.md`, `MONITORING.md`, `SECURITY.md`, `COST_TRACKER.md`.
 - **[`docs/TAG_CODES.md`](../docs/TAG_CODES.md)** — decodes the internal tag alphabet (ADR/PG/SIMP/IC/SEC/…) so commits and comments are traceable to the decision that motivated them.
 - **`handovers/`** — end-of-session state hand-offs so the next session resumes with full context.
@@ -32,7 +32,7 @@ stop re-improvising briefs from memory prose (#796).
 **4. Automation the agent relies on**
 - **Doc-sync pre-commit hook** (`scripts/install_hooks.sh` → `deploy/sync_doc_metadata.py`) — auto-updates doc headers (tool/Lambda/secret/alarm counts, version) on every commit, so docs can't silently drift from code.
 - **Self-healing remediation agent** (`.github/workflows/remediation-agent.yml`, ADR-064/065) — Claude on a schedule via GitHub Actions + Bedrock: triages alarms/CI/DLQ, auto-fixes the provably-safe class behind a deterministic merge gate, opens PRs for the rest. Read-only AWS role; the gate (not the model) holds merge authority.
-- **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 67 tools that let Claude query the live platform data directly during a session.
+- **MCP server** (`mcp/`, `mcp_bridge.py`, `.mcp.json`) — 68 tools that let Claude query the live platform data directly during a session.
 
 **5. Verification — Claude checks its own work**
 - `tests/visual_qa.py` — a Playwright browser sweep after deploys.

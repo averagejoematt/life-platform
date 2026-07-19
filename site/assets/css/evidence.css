@@ -71,6 +71,17 @@ body { min-height: 100svh; display: flex; flex-direction: column; }
 .fig .fig-v { font-family: var(--font-mono); font-weight: var(--weight-med); font-size: var(--fs-data-lg); line-height: 1; }
 .fig .fig-k { color: var(--ink-faint); }
 
+/* #1376 — career-vs-season sports card: this cycle beside every cycle ever, so
+   a reset never reads as "the record vanished." Same bordered-card idiom as
+   .supp-grid; stacks to one column under 761px (mobile verified @390). */
+.cs-pair { display: grid; gap: var(--bento-gap); margin-top: var(--sp-4); }
+@media (min-width: 761px) { .cs-pair { grid-template-columns: 1fr 1fr; } }
+.cs-card { border: var(--border-hair); border-radius: var(--radius); background: var(--surface); padding: var(--sp-4); }
+.cs-card .figs { padding: var(--sp-3) 0 0; gap: clamp(1rem, 0.6rem + 2vw, 2rem); }
+.cs-h { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label);
+  text-transform: uppercase; color: var(--ink-faint); font-weight: var(--weight-reg); }
+.cs-fresh { margin-top: var(--sp-2); color: var(--ink-muted); }
+
 .dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--sp-2) var(--sp-5); padding: var(--sp-4) 0; border-top: var(--border-hair); }
 .dl dt { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink-faint); }
 .dl dd { font-family: var(--font-mono); font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
@@ -846,3 +857,9 @@ table.readout-tbl tr:hover td { background: color-mix(in oklch, var(--ink) 4%, t
   outline: 2px solid var(--ember); outline-offset: 1px;
 }
 .supp-snp { margin-top: var(--sp-2); color: var(--ink-faint); }
+
+/* ── #1409: felt-reality calibration card (character sheet) ─────────────── */
+.ch-cal { display: grid; gap: var(--sp-2); margin: var(--sp-3) 0; }
+.ch-cal-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; padding: var(--sp-2) var(--sp-3); border: var(--border-hair); border-radius: var(--radius-sm); }
+.ch-cal-row.is-unprobed, .ch-cal-row.is-uncal { color: var(--ink-faint); }
+.ch-cal-p { font-family: var(--font-sans); min-width: 7.5rem; }

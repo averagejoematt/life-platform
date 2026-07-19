@@ -2,7 +2,7 @@
 
 > **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-12
 
-Last updated: 2026-07-19 (v8.6.0 — 67 MCP tools, 34-module package, 94 Lambdas, 20 data sources)
+Last updated: 2026-07-19 (v8.6.0 — 68 MCP tools, 35-module package, 94 Lambdas, 20 data sources)
 
 **Ground truth (point-in-time values are drift — run the command instead):**
 - Lambda functions defined (CDK): 94 — re-derive via `python3 deploy/sync_doc_metadata.py` (AST discoverers)
@@ -1360,8 +1360,8 @@ See ADR-058/077 in `docs/DECISIONS.md` for the design rationale.
 
 The monthly AWS budget — **$85 base** (ADR-133 amendment 2026-07-08; was $75), floating to **$100 in reader-traffic surge mode** (ADR-133) — is enforced by a two-component system:
 
-- **`life-platform-cost-governor`** Lambda (hourly) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
-- **`lambdas/budget_guard.py`** (shared-layer module) — calling code uses `allow(feature)` to gate AI by tier.
+- **`life-platform-cost-governor`** Lambda (every 8h — `cron(0 0/8 * * ? *)`, `cdk/stacks/operational_stack.py`) — projects month-end spend, writes tier 0–3 to SSM `/life-platform/budget-tier`.
+- **`lambdas/budget_guard.py`** (bundled module, #781) — calling code uses `allow(feature)` to gate AI by tier.
 
 **Tier behavior** (priority: protect daily brief longest):
 

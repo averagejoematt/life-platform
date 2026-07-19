@@ -6,6 +6,9 @@ from mcp.config import RAW_DAY_LIMIT, SOURCES
 
 # BENCH-1: cut-benchmarking & regain firewall (PRIVATE, view-dispatched).
 from mcp.tools_benchmark import tool_get_benchmark
+
+# #1478: one-call session opener aggregating six pending-capture surfaces.
+from mcp.tools_capture import tool_get_capture_queues
 from mcp.tools_cgm import tool_get_cgm
 
 # #915: ad-hoc coach check-in loop — coaches ask, Matthew answers verbatim.
@@ -1866,6 +1869,32 @@ TOOLS = {
                     "tags": {"type": "array", "items": {"type": "string"}, "description": "Optional topic tags (max 5)."},
                 },
                 "required": ["checkin_id"],
+            },
+        },
+    },
+    # #1478: one-call session opener aggregating six pending-capture surfaces.
+    "get_capture_queues": {
+        "fn": tool_get_capture_queues,
+        "schema": {
+            "name": "get_capture_queues",
+            "description": (
+                "#1478: The canonical SESSION OPENER — one call instead of 4-6. Aggregates every pending "
+                "manual-capture surface: (1) coach_checkin — up to 3 persisted open coach questions (coach + "
+                "context_reason); never generates fresh ones (that stays get_coach_checkin_queue's job — "
+                "this call is read-only and fast). (2) habit_reflection — missed-needing-why / "
+                "completed-needing-driver COUNTS. (3) field_note — this week's status (generated? responded?), "
+                "not the note text. (4) evening_intake — logged tonight? + dose-response arming progress "
+                "(#1405, Matthew-private). (5) reading_recalls — due spaced-retrieval prompt count. "
+                "(6) freshness_flags — stale sources only, name + days_dark. Each section fails soft "
+                "independently: a broken sub-query never blocks the other five, it just reports "
+                "{status: 'unavailable'}. Use this FIRST at the start of any chat mode (workout debrief, "
+                "journal interview, speak-to-the-coaches, open check-in) instead of calling the six "
+                "underlying tools separately. Skip-without-penalty framing — nothing here is a nag."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
             },
         },
     },
