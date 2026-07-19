@@ -1143,16 +1143,21 @@ jobs:
   # verdict) now BLOCKS the pipeline. The rollback job's `needs` excludes
   # visual-qa, so a gate failure blocks but never triggers an auto-rollback.
   # The deterministic layer was verified green against live prod on
-  # 2026-06-05 (17 pages, 0 failures) before gating. NB: the AI-vision layer
-  # self-skips (warning, not failure) when bedrock:InvokeModel is absent on
-  # github-actions-deploy-role (re-run deploy/setup_github_oidc.sh to grant)
-  # or when the budget guard is at tier 3 — so it cannot false-block. It was
-  # not yet tuned under load; watch the first AI-active runs after a budget
-  # reset and relax thresholds in tests/visual_ai_qa.py if it over-fires.
+  # 2026-06-05 (17 pages, 0 failures) before gating; it still runs over the
+  # FULL page set here — nothing below narrows it.
+  # #1428: --ai-qa-max-tier 1 restricts the AI-VISION layer (not the
+  # deterministic checks) to the 6 tier-1 flagship doors at deploy time — the
+  # full-surface AI pass moved to the weekly standalone schedule
+  # (visual-qa.yml) to keep Haiku spend bounded. NB: the AI-vision layer
+  # self-skips (SKIPPED-BY-BUDGET warning, not failure) when
+  # bedrock:InvokeModel is absent on github-actions-deploy-role (re-run
+  # deploy/setup_github_oidc.sh to grant) or when the budget guard is at tier
+  # >= 1 (internal QA pauses first, ADR-125) — so it cannot false-block.
   # #749: the SAME sweep is also runnable standalone — .github/workflows/
-  # visual-qa.yml (workflow_dispatch + daily 20:07 UTC) — so the reader-facing
-  # net fires even when this pipeline copy is skipped (red upstream job, or a
-  # push with nothing to deploy). Keep the two step lists in sync.
+  # visual-qa.yml (workflow_dispatch + full AI-vision on the weekly Sunday
+  # run) — so the reader-facing net fires even when this pipeline copy is
+  # skipped (red upstream job, or a push with nothing to deploy). Keep the
+  # step lists in sync across ci-cd.yml / site-deploy.yml / visual-qa.yml.
   # ════════════════════════════════════════════════════════════════
   visual-qa:
     name: Visual + AI-vision QA
@@ -1182,7 +1187,9 @@ jobs:
 
       - name: Run visual + AI-vision QA sweep
         run: |
-          python3 tests/visual_qa.py --screenshot --ai-qa --reader-truth
+          # #1428: AI-vision restricted to tier-1 (the 6 flagship doors) at deploy
+          # time; the deterministic sweep + --reader-truth are unaffected (full surface).
+          python3 tests/visual_qa.py --screenshot --ai-qa --ai-qa-max-tier 1 --reader-truth
 
       - name: Accuracy gate (per-page resolves + no impossible numbers)
         run: |

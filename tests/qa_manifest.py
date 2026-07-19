@@ -560,17 +560,25 @@ PAGES_BY_PATH = {p["path"]: p for p in MANIFEST}
 
 # ── Consumer facets ───────────────────────────────────────────────────────────
 def visual_pages():
-    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage."""
+    """tests/visual_qa.py PAGES — order-stable, identical to pre-#1426 coverage.
+
+    Each entry carries `tier` (from its parent manifest entry, #1428) so the
+    sweep can restrict the AI-vision layer to a tier subset (deploy-time =
+    tier 1 only) without touching which pages the deterministic Playwright
+    checks cover — that stays the full set, unchanged.
+    """
     out = []
     for p in MANIFEST:
         if p.get("visual"):
             d = dict(p["visual"])
             d["path"] = p["path"]
             d["name"] = p["name"]
+            d["tier"] = p["tier"]
             out.append(d)
         for var in p.get("visual_variants", []) or []:
             d = dict(var)
             d["path"] = p["path"] + d.pop("fragment", "")
+            d["tier"] = p["tier"]
             out.append(d)
     return out
 
