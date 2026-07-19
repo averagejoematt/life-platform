@@ -1,8 +1,8 @@
 # Secrets Rotation Procedures
 
-> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-11
+> **Status:** canonical · **Owner:** Matthew · **Verified:** 2026-07-19
 
-Last updated: 2026-07-11 (#935 — Whoop re-auth script moved to `setup/setup_whoop_auth.py`, callback-server flow)
+Last updated: 2026-07-19 (#1329 — manual-rotation staleness routed to the remediation agent's curated needs-human email instead of raw daily SNS; one-command `deploy/rotate_ai_keys.sh` prep. Prior: #935 — Whoop re-auth script moved to `setup/setup_whoop_auth.py`, callback-server flow)
 
 Phase 2.6 (2026-05-16): single source of truth for how each Life Platform secret is rotated. Used by both the operator (manual rotations) and the freshness checker (staleness alerts).
 
@@ -95,6 +95,19 @@ These services don't expose a rotation API. Procedure:
 
 ### `ai-keys` (Anthropic — daily-brief, weekly digests, coaching)
 
+**One-command prep (#1329):** `bash deploy/rotate_ai_keys.sh` wraps steps 3–4 below —
+reads the current secret, merges in the new key (preserving any other fields),
+`put-secret-value`s it, then re-reads it back the same way the consumer lambdas
+parse it (`{"anthropic_api_key": "..."}`) to confirm it landed. It does NOT call the
+Anthropic console (step 1–2, human) and does NOT revoke the old key (step 5, human,
+irreversible) — the rotation act itself stays gate:owner. Usage:
+```bash
+bash deploy/rotate_ai_keys.sh              # prompts for the new key (hidden input)
+bash deploy/rotate_ai_keys.sh sk-ant-...   # or pass it as an argument
+bash deploy/rotate_ai_keys.sh --dry-run    # print the plan, touch nothing
+```
+
+Manual procedure (what the script automates):
 1. Log into https://console.anthropic.com/settings/keys
 2. Generate a new key — copy it once (it's only shown once)
 3. Update Secrets Manager:
@@ -107,6 +120,18 @@ These services don't expose a rotation API. Procedure:
    ```
 4. Verify next Anthropic call succeeds — check CloudWatch metric `LifePlatform/AI AnthropicAPISuccess` for daily-brief
 5. **Revoke the old key** in the Anthropic console
+
+**Who actually reads this secret (verified 2026-07-19, #1329):** most Claude inference
+migrated to Bedrock/IAM auth (ADR-062) and never touches this secret at all
+(`bedrock_client.py`). A handful of lambdas still call the Anthropic API directly and
+read `life-platform/ai-keys` (cached per-container, not via the 15-min `secret_cache.py`
+TTL): `field_notes_lambda.py`, `ai_expert_analyzer_lambda.py`,
+`daily_insight_compute_lambda.py`, `partner_email_lambda.py`, `monday_compass_lambda.py`,
+`data_reconciliation_lambda.py`, `pipeline_health_check_lambda.py`. Each caches the key
+in a per-container global for the container's lifetime (NOT the 15-min `secret_cache.py`
+TTL — these lambdas fetch raw via `secretsmanager.get_secret_value` directly), so a
+rotation reaches a given warm container only at its next cold start. If you need it live
+sooner, force a redeploy of the affected function(s) to bust the warm containers.
 
 ### `site-api-ai-key` (Anthropic — `/api/ask`, `/api/board_ask`)
 
@@ -148,8 +173,20 @@ This is a single secret containing keys for multiple sources (Notion + Habitify 
 ## Monitoring
 
 The `freshness-checker` Lambda (runs daily at 9:45 AM PT) checks the `LastChangedDate` of every monitored secret:
-- **OAuth secrets** stale >60 days → urgent alert (single email)
-- **Manual-rotation secrets** stale >120 days → digest alert (batched into daily 8 AM PT digest)
+- **OAuth secrets** stale >60 days → urgent alert (single email, unchanged)
+- **Manual-rotation secrets** stale >120 days → **routed to the self-healing remediation
+  agent (#1329, 2026-07-19), NOT raw SNS.** Before #1329, freshness-checker SNS-published
+  this straight to the daily digest on every run once a secret crossed the threshold —
+  `life-platform/ai-keys` crossed it ~2026-07-06 and re-fired for 12+ consecutive days
+  with zero action, training the channel into noise. Now the checker only logs +
+  emits the `ManualRotationStaleCount` metric; `remediation/agent.py::stale_secret_signals`
+  reads the same `DescribeSecret` data (read-only, `secretsmanager:DescribeSecret` only —
+  the agent never sees key material) and `stale_secret_escalations` surfaces any secret
+  whose *active* staleness (days past the SLA) exceeds 7 days as a NAMED, persistent line
+  in the agent's Mon/Wed/Fri curated needs-human email — zero new cadence, deterministic
+  (independent of the LLM triage), and it keeps recurring every run until the secret is
+  actually rotated (`LastChangedDate` advances). See `remediation/agent.py` §"Manual-
+  rotation secret staleness escalation (#1329)".
 
 Metrics emitted to CloudWatch namespace `LifePlatform/Freshness`:
 - `OAuthTokenStaleCount` — count of OAuth secrets past threshold
@@ -171,4 +208,4 @@ If a secret is leaked:
 
 ---
 
-**Verified:** 2026-07-11 (#935 Whoop re-auth procedure; prior full sweep 2026-05-19 V2 audit)
+**Verified:** 2026-07-19 (#1329 — manual-rotation staleness routed to the remediation agent's curated email instead of raw SNS; `deploy/rotate_ai_keys.sh` one-command prep; prior: #935 Whoop re-auth procedure, full sweep 2026-05-19 V2 audit)

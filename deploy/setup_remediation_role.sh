@@ -67,7 +67,14 @@ PERM=$(cat <<JSON
    "Resource":"arn:aws:sqs:${REGION}:${ACCOUNT}:life-platform-ingestion-dlq"},
  {"Sid":"SSM","Effect":"Allow","Action":"ssm:GetParameter",
    "Resource":"arn:aws:ssm:${REGION}:${ACCOUNT}:parameter/life-platform/*"},
- {"Sid":"SES","Effect":"Allow","Action":["ses:SendEmail","sesv2:SendEmail"],"Resource":"*"}
+ {"Sid":"SES","Effect":"Allow","Action":["ses:SendEmail","sesv2:SendEmail"],"Resource":"*"},
+ {"Sid":"SecretsDescribe","Effect":"Allow","Action":"secretsmanager:DescribeSecret",
+   "Resource":["arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/ai-keys*",
+               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/site-api-ai-key*",
+               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/eightsleep-client*",
+               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/notion*",
+               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/todoist*",
+               "arn:aws:secretsmanager:${REGION}:${ACCOUNT}:secret:life-platform/ingestion-keys*"]}
 ]}
 JSON
 )
