@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-19T05:51:54.378264+00:00",
+  "captured_at": "2026-07-19T18:22:28.856185+00:00",
   "fetch_path": "/api/pulse",
   "is_prefix_sample": false,
   "path": "/api/pulse",
@@ -25,9 +25,6 @@
             "type": "string"
           },
           "day_number": {
-            "type": "integer"
-          },
-          "days_until_start": {
             "type": "integer"
           },
           "generated_at": {
@@ -117,9 +114,6 @@
                   "as_of": {
                     "type": "string"
                   },
-                  "delta_1d": {
-                    "type": "integer"
-                  },
                   "hrv_ms": {
                     "type": "number"
                   },
@@ -168,9 +162,6 @@
                 "keys": {
                   "as_of": {
                     "type": "string"
-                  },
-                  "delta_1d": {
-                    "type": "number"
                   },
                   "hours": {
                     "type": "number"
@@ -228,41 +219,9 @@
             "type": "integer"
           },
           "since_yesterday": {
-            "items": [
-              {
-                "keys": {
-                  "delta": {
-                    "type": "integer"
-                  },
-                  "signal": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              {
-                "keys": {
-                  "delta": {
-                    "type": "number"
-                  },
-                  "signal": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            ],
-            "length_sample": 2,
+            "items": null,
+            "length_sample": 0,
             "type": "array"
-          },
-          "start_date": {
-            "type": "string"
           },
           "status": {
             "type": "string"
