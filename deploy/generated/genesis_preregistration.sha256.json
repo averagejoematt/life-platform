@@ -1,0 +1,12 @@
+{
+  "artifact": "genesis_preregistration.json",
+  "genesis": "2026-07-19",
+  "algorithm": "sha256",
+  "sha256": "475152049978967bae94e122d0e0744915cc6d876f89cdd6fc5619f43cb5ed4f",
+  "frozen_generated_at": "2026-07-18T22:02:16.279383+00:00",
+  "stamped_at": "2026-07-19T06:56:51.022453+00:00",
+  "stamp_note": "Claims frozen 2026-07-18T22:02:16.279383+00:00; hash stamped later, 2026-07-19T06:56:51.022453+00:00. Both moments are recorded \u2014 a stamp is never backdated. The hash covers the frozen file exactly as it stood when stamped.",
+  "public_artifact_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-07-19.json",
+  "public_stamp_url": "https://averagejoematt.com/experiments/prereg/genesis-2026-07-19.sha256.json",
+  "verify": "curl -s https://averagejoematt.com/experiments/prereg/genesis-2026-07-19.json | shasum -a 256"
+}

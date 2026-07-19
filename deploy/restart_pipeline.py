@@ -61,7 +61,9 @@ Steps (each can be skipped with --skip-<name>):
           it reads SSM /life-platform/experiment-cycle, so it MUST run after the
           step-6 cycle bump (post-verify satisfies that). --skip-prologue-fix to skip.
        b. seed_genesis_preregistration.py — opt-in --with-preregistration (re-lands
-          the FROZEN #976 pre-registration after the wipe).
+          the FROZEN #976 pre-registration after the wipe; a fresh freeze is
+          SHA-256-stamped at freeze time and a re-land is verified against its
+          stamp — #1378, deploy/genesis_prereg_stamp.py).
        c. dedup_source_records.py --source <name> per --dedup-source (repeatable) —
           raw-timeseries duplicate DATE# rows (the eightsleep UTC-rollover class).
    14. --close-cycle: append one line to docs/restart/RESET_LOG.md
@@ -70,6 +72,10 @@ DELIBERATELY NOT FOLDED (#1092 — each exclusion verified, not an omission):
   - publish_genesis_preregistration.py — a PERMANENT PUBLIC AI artifact; stays
     attended under the prereg/frozen-artifact dry-run-review posture. The pipeline
     prints it as a clearly-labeled attended next step instead.
+  - genesis_prereg_stamp.py --apply, build_genesis_predict_week.py --apply,
+    send_prereg_lock_email.py --apply (#1378) — public S3/SES surfaces on the same
+    attended posture; printed as labeled next steps (the email is eve-only and
+    refuses to send on any other Pacific date).
   - deploy/restart_verify.py — the POST-genesis Monday health check (asserts
     day_n >= 1, a genesis weigh-in, a post-genesis character sheet); folding it
     would structurally fail at reset time. Run it Monday morning.
@@ -1158,6 +1164,15 @@ def main():
         print("  •  python3 deploy/seed_genesis_preregistration.py --apply   # NOT run (pass --with-preregistration to fold it in)")
     print("  •  ATTENDED (deliberately never folded — permanent public AI artifact, dry-run-review posture):")
     print("     python3 deploy/publish_genesis_preregistration.py           # review the dry-run output, THEN --apply")
+    print("     python3 deploy/genesis_prereg_stamp.py --apply              # #1378: publish the frozen file + its SHA-256 stamp publicly")
+    print("                                                                 #   (the seeder stamps at freeze time; this uploads the copy)")
+    print("  •  GENESIS-EVE engagement, attended (#1378):")
+    print(
+        "     python3 deploy/build_genesis_predict_week.py --apply        # predict-the-week vs the FROZEN targets (week_id = upload week)"
+    )
+    print(
+        '     python3 deploy/send_prereg_lock_email.py --apply            # the one "predictions lock tonight" email (eve-only; refuses late)'
+    )
     print("  •  git status / commit the regenerated files (constants, configs, CYCLE_GENESES, RESET_LOG.md) from MAIN")
     print(
         "  •  Monday morning (post-genesis): python3 deploy/restart_verify.py   # deliberately not folded — it asserts post-genesis state"

@@ -48,6 +48,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "deploy"))
 sys.path.insert(0, str(REPO_ROOT / "lambdas"))
 
+import genesis_prereg_stamp  # noqa: E402  (#1378 — the content-hash seal on the freeze)
 import restart_leadin_pages as leadin  # noqa: E402  (render/manifest machinery — reused, not copied)
 from constants import EXPERIMENT_START_DATE  # noqa: E402
 
@@ -97,7 +98,38 @@ def _pretty_date(iso: str) -> str:
     return datetime.strptime(iso, "%Y-%m-%d").strftime("%B %-d, %Y")
 
 
-def build_body_markdown(goals: dict, frozen: dict) -> str:
+def seal_lines(stamp: dict) -> list:
+    """The #1378 verification seal — the content hash, printed on the page itself,
+    with the one-line command any reader can run to check it. Honest about time:
+    when the stamp postdates the freeze, BOTH dates are stated (never backdated)."""
+    url = stamp["public_artifact_url"]
+    frozen_day = _pretty_date(stamp["frozen_generated_at"][:10])
+    stamped_day = _pretty_date(stamp["stamped_at"][:10])
+    if frozen_day == stamped_day:
+        dates_sentence = f"Claims frozen and fingerprinted {frozen_day}."
+    else:
+        dates_sentence = (
+            f"Claims frozen {frozen_day}; fingerprint stamped {stamped_day}. Both dates are stated "
+            "because a receipt that hides its own timeline is not a receipt."
+        )
+    return [
+        "---",
+        (
+            "**The seal.** A plan on the record is only as good as its tamper-proofing, so the frozen "
+            "record behind this page — every prediction above and the formal hypotheses, byte for byte — "
+            f'is published as <a href="{url}">a public, content-addressed artifact</a>, and its SHA-256 '
+            "fingerprint is printed here in the open:"
+        ),
+        f"> <code>{stamp['sha256']}</code>",
+        (
+            f"{dates_sentence} Check it from any terminal: <code>curl -s {url} | shasum -a 256</code>. "
+            "If even one character of the record were edited after the freeze, the fingerprint would "
+            "stop matching this page."
+        ),
+    ]
+
+
+def build_body_markdown(goals: dict, frozen: dict, stamp: dict = None) -> str:
     """The installment body, in the exact markdown dialect markdown_to_html renders
     (paragraphs, blockquotes, ---, **bold**, *italics*, *signature* closer)."""
     t = goals["targets"]
@@ -177,6 +209,10 @@ def build_body_markdown(goals: dict, frozen: dict) -> str:
             "board</a>, and it updates as each window closes. Check it at the two-week mark. Check it again "
             "at four. The numbers on that page, not this essay, are the record."
         ),
+    ]
+    if stamp:
+        lines += seal_lines(stamp)
+    lines += [
         "The first weigh-in is tomorrow. From here on, the data does the talking.",
         "*Elena Voss, the day before Day 1*",
     ]
@@ -202,10 +238,10 @@ def _current_cycle():
         return None
 
 
-def build_chronicle_record(goals: dict, frozen: dict, cycle=None) -> dict:
+def build_chronicle_record(goals: dict, frozen: dict, cycle=None, stamp: dict = None) -> dict:
     """The chronicle DDB record — publish_to_journal/store_installment field shape,
     pre-genesis flavor (phase=experiment, week_number 0, no editorial image)."""
-    body_md = build_body_markdown(goals, frozen)
+    body_md = build_body_markdown(goals, frozen, stamp)
     body_html = leadin.markdown_to_html(body_md)
     post_date = (date.fromisoformat(EXPERIMENT_START_DATE) - timedelta(days=1)).isoformat()
     n_preds = sum(len(b["predictions"]) for b in frozen["coaches"].values())
@@ -230,6 +266,11 @@ def build_chronicle_record(goals: dict, frozen: dict, cycle=None) -> dict:
         "pre_registration": True,  # #976 provenance
         "pre_registered_at": frozen["generated_at"],
     }
+    if stamp:
+        # #1378 provenance — the content hash the page prints, queryable alongside it.
+        item["prereg_sha256"] = stamp["sha256"]
+        item["prereg_artifact_url"] = stamp["public_artifact_url"]
+        item["prereg_hash_stamped_at"] = stamp["stamped_at"]
     if cycle is not None:
         item["cycle"] = cycle
     return item
@@ -251,13 +292,17 @@ def main():
         )
     goals = json.loads(GOALS_PATH.read_text())
 
+    # #1378: the publish path is blocked on a tampered freeze — the page carries the
+    # content hash, so the hash must match the frozen file before anything renders.
+    stamp = genesis_prereg_stamp.require_valid_stamp(frozen)
+
     # The presentation rule — checked over every frozen claim AND the full body.
     for coach_id, block in frozen["coaches"].items():
         for pred in block["predictions"]:
             hits = banned_language_issues(pred["claim_natural"])
             if hits:
                 raise SystemExit(f"presentation rule violation in {coach_id} claim ({hits}): {pred['claim_natural']!r}")
-    record = build_chronicle_record(goals, frozen)
+    record = build_chronicle_record(goals, frozen, stamp=stamp)
     hits = (
         banned_language_issues(record["content_markdown"])
         + banned_language_issues(record["title"])
@@ -272,6 +317,7 @@ def main():
         f"Frozen predictions referenced: {sum(len(b['predictions']) for b in frozen['coaches'].values())} "
         f"(frozen {frozen['generated_at']})"
     )
+    print(f"Seal: sha256 {stamp['sha256']} (stamped {stamp['stamped_at']}) — printed on the page (#1378)")
 
     if not args.apply:
         print("\n--- body markdown ---\n")
