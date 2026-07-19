@@ -1485,14 +1485,18 @@ def _run_design_analysis(existing, design, end_date):
     metric = (design_f.get("criterion") or {}).get("metric", "")
     source, field, _label = experiment_design.DESIGN_METRICS[metric]
 
-    def _dated_values(start, end):
-        """date → value over [start, end] (last record wins on a duplicate date)."""
-        items = query_source(source, start, end)
-        if source == "whoop":
+    def _dated_values(start, end, metric_source=None, metric_field=None):
+        """date → value over [start, end] (last record wins on a duplicate date).
+        Defaults to the criterion metric; #1410's control series pass their own
+        source/field (from DESIGN_METRICS) through the same fetch path."""
+        src = metric_source or source
+        fld = metric_field or field
+        items = query_source(src, start, end)
+        if src == "whoop":
             items = [normalize_whoop_sleep(i) for i in items]
         out = {}
         for it in items:
-            v = _extract_metric(it, field)
+            v = _extract_metric(it, fld)
             date = str(it.get("sk", ""))[5:15]  # sk = "DATE#YYYY-MM-DD..."
             if v is not None and len(date) == 10:
                 out[date] = v
@@ -1517,6 +1521,23 @@ def _run_design_analysis(existing, design, end_date):
             rand = experiment_design.randomization_test(design_f, dated, existing.get("start_date", ""), end_date)
             if rand is not None:
                 stats["randomization"] = rand
+
+    # #1410: a design that froze a counterfactual spec closes with the ghost —
+    # observed vs the BSTS-lite forecast of "had the experiment never started",
+    # or a stated refusal (bad pre-fit / thin data). The spec comes from the
+    # frozen design; every number from experiment_design/bsts_lite — the LLM
+    # narration layer only ever reads the precomputed block (ADR-062/105).
+    if design_f.get("counterfactual") is not None:
+        cf_start_date = existing.get("start_date", "")
+        cf_series_start = experiment_design.counterfactual_series_start(design_f, cf_start_date)
+        dated_criterion = _dated_values(cf_series_start, end_date)
+        dated_controls = {}
+        for cm in design_f["counterfactual"].get("controls") or []:
+            c_src, c_field, _cl = experiment_design.DESIGN_METRICS[cm]
+            dated_controls[cm] = _dated_values(cf_series_start, end_date, metric_source=c_src, metric_field=c_field)
+        stats["counterfactual"] = experiment_design.counterfactual_analysis(
+            design_f, dated_criterion, dated_controls, cf_start_date, end_date
+        )
 
     return {
         "windows": windows,

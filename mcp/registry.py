@@ -929,6 +929,34 @@ TOOLS = {
                                 },
                                 "required": ["window_start", "window_end"],
                             },
+                            "counterfactual": {
+                                "type": "object",
+                                "description": (
+                                    "#1410 the Ghost: OPTIONAL BSTS-lite synthetic-control counterfactual, frozen at "
+                                    "pre-registration (no post-hoc spec shopping). Declares control metric slugs the "
+                                    "intervention should NOT move (0-3, from the criterion metric list, never the "
+                                    "criterion itself), the pre-fit window, and the pre-fit MAPE gate. At close, "
+                                    "end_experiment fits the ghost on the pre-period and reports effect = observed − "
+                                    "counterfactual with a widening 95% CI — or a stated refusal when the pre-fit MAPE "
+                                    "exceeds the frozen gate. Example: {controls: ['resting_heart_rate'], pre_days: 28, "
+                                    "mape_gate_pct: 15}."
+                                ),
+                                "properties": {
+                                    "controls": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                        "description": "0-3 control metric slugs (DESIGN_METRICS, ≠ the criterion metric).",
+                                    },
+                                    "pre_days": {
+                                        "type": "integer",
+                                        "description": "Pre-period window in days, 14-120 (default 28).",
+                                    },
+                                    "mape_gate_pct": {
+                                        "type": "number",
+                                        "description": "Pre-fit MAPE gate percent, 1-50 (default 15) — worse pre-fit ⇒ no ghost.",
+                                    },
+                                },
+                            },
                         },
                         "required": ["baseline_days", "criterion", "stopping_rule"],
                     },
