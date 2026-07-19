@@ -169,6 +169,8 @@
   --fs-emblem-level: 8px;    /* .emblem-level — tier emblem "LEVEL" caption */
   --fs-arch-at:      13px;   /* .arch-svg .at — architecture-diagram box title */
   --fs-att-sm:       11px;   /* .att-svg ticks/labels/marks — attempts overlay (#1375) */
+  --fs-ld-lab:       10.5px; /* .loop-dial .ld-lab — home loop-dial station labels (#1469) */
+  --fs-ld-verb:      9.5px;  /* .loop-dial .ld-verb — home loop-dial arc verbs (#1469) */
   --fs-att-death:    13px;   /* .att-svg .att-death — attempts overlay collapse mark (#1375) */
   --fs-arch-as:      9.5px;  /* .arch-svg .as — architecture-diagram box subtitle */
 
@@ -1369,7 +1371,7 @@ html { scroll-padding-top: calc(var(--sp-7) + var(--sp-2)); }
      .page-hero was removed too (2026-07-05, #588): it's the always-above-fold
      orientation banner + the cross-document View-Transition morph target — capturing
      it mid-fade flashed a blank hero on arrival. It paints instantly. */
-  html.mo .hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat,
+  html.mo .hero, html.mo .ev-head, html.mo .dx-head, html.mo .beat, html.mo .verse,
   html.mo .loop, html.mo .rd-sec, html.mo .two-voice, html.mo .coach-daily, html.mo .coach-progress,
   html.mo .coach-report, html.mo .coach-stance, html.mo .team-lead, html.mo .team-focus,
   html.mo .team-tension, html.mo .team-huddle, html.mo .supp, html.mo .cap-card,

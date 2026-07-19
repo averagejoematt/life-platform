@@ -42,47 +42,27 @@ body { overflow-x: hidden; }
    live day-counter. Adds dimension/premium-feel without touching the palette or contrast. */
 .hero::before { content: ""; position: absolute; z-index: -1; inset: -6% -4% auto -4%; height: 130%; pointer-events: none;
   background: radial-gradient(54% 46% at 67% 30%, var(--ember-wash), transparent 72%); }
-.hero-daycount .hd-num { text-shadow: 0 0 24px var(--ember-soft); }
-.hero-grid { display: grid; gap: clamp(1.5rem, 1rem + 4vw, 4rem); align-items: center; }
-@media (min-width: 901px) { .hero-grid { grid-template-columns: 1.1fr 0.9fr; } }
+/* #1469 — the claim tightened so the fold belongs to the loop dial below it. */
+.hero-claim { padding-bottom: var(--sp-5); }
 
 .kicker { color: var(--ember); }
-/* The central day-of-experiment counter (the review's "central number"). */
-.hero-daycount { margin: var(--sp-3) 0 var(--sp-2); display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap; }
-.hero-daycount .hd-num { font-size: var(--fs-data-xl); line-height: 1; color: var(--ember); font-variant-numeric: tabular-nums; }
-.hero-daycount .hd-cap { font-family: var(--font-mono); font-size: var(--fs-label); letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--ink-faint); }
 .hero-day { color: var(--ink-muted); margin: var(--sp-2) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
 /* P2.1 — the live proof line paired with genesis, up in the hero. */
 .hero-proof { color: var(--ember); font-family: var(--font-mono); font-size: var(--fs-small); margin: var(--sp-1) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--ember); }
 /* The quiet-stretch line — muted ink on a hairline rule, never red, never a banner. */
 .hero-quiet { color: var(--ink-muted); font-family: var(--font-mono); font-size: var(--fs-small); margin: var(--sp-1) 0 0; padding-left: var(--sp-2); border-left: 2px solid var(--rule); }
+/* #1469 — the claim register: --fs-h1 (not --fs-display) so the loop dial owns the fold. */
 .hero-h {
   font-family: var(--font-serif); font-weight: var(--weight-med);
-  font-size: var(--fs-display); line-height: 1.02; letter-spacing: -0.015em;
-  margin-top: var(--sp-3); max-width: 16ch;
+  font-size: var(--fs-h1); line-height: 1.05; letter-spacing: -0.015em;
+  margin-top: var(--sp-3); max-width: 22ch;
 }
 .hero-h em { font-style: italic; color: var(--ink); }
 .hero-elena {
   font-family: var(--font-serif); font-style: italic; font-size: var(--fs-quote);
   line-height: 1.45; color: var(--ink-muted); margin-top: var(--sp-5); max-width: 40ch;
 }
-.hero-sub { margin-top: var(--sp-4); color: var(--ink-muted); max-width: 46ch; }
-/* #732 — the protagonist above the fold: who, the prior-attempts arc, the stakes. */
-.hero-who { margin-top: var(--sp-4); color: var(--ink-muted); max-width: 46ch; }
-.hero-who strong { color: var(--ink); font-weight: var(--weight-med); }
-/* The provisional finish line — machine-voice, contract-like, quietly underlined in ember. */
-.hero-finish {
-  margin-top: var(--sp-4); max-width: 46ch; font-family: var(--font-mono); font-size: var(--fs-small);
-  color: var(--ink); padding-left: var(--sp-3); border-left: 2px solid var(--ember-line);
-}
-.hero-finish .hf-label { display: block; color: var(--ember); margin-bottom: var(--sp-1); }
-.hero-finish .hf-note { color: var(--ink-faint); }
-.hero-finish a { color: var(--ink-muted); }
-.hero-for {
-  margin-top: var(--sp-4); max-width: 46ch; color: var(--ink-muted);
-  padding-left: var(--sp-3); border-left: 2px solid var(--ember-line);
-}
-.hero-for em { font-style: normal; color: var(--ember); }
+.hero-sub { margin-top: var(--sp-4); color: var(--ink-muted); font-size: var(--fs-body-lg); max-width: 52ch; }
 .hero-cta { margin-top: var(--sp-5); }
 .cta {
   display: inline-block; font-family: var(--font-mono); font-size: var(--fs-small);
@@ -93,6 +73,82 @@ body { overflow-x: hidden; }
 .cta:active { border-color: var(--ember); opacity: 0.8; }
 .cta-quiet { color: var(--ink-faint); border-color: var(--rule); }
 .cta-quiet:hover { color: var(--ink-muted); }
+
+/* ── #1469 variant A "the loop, drawn live" — the loop stage ──────────────────
+   The measuring rule bent into the loop: tick ring + four door-icon stations +
+   verbs on the arcs + the live day counter at the hub. Scroll drives the focus
+   ([data-focus] on the stage → the current station and its outgoing arc take
+   the ember accent, FLAT — "you are here" state, not glow). The hub day counter
+   is the screen's ONE glow: it is the page's one truly-live signal (earned-glow
+   rule, DESIGN_SYSTEM_V5 §7). Everything renders fully with JS off. */
+.stage { max-width: var(--container); margin-inline: auto; padding: 0 var(--gutter) var(--sp-7); }
+.stage-grid { display: grid; gap: clamp(2rem, 4vw, 5rem); }
+.dial-wrap { max-width: 420px; margin-inline: auto; width: 100%; }
+@media (min-width: 901px) {
+  .stage-grid { grid-template-columns: minmax(320px, 460px) 1fr; }
+  .dial-wrap { position: sticky; top: clamp(1rem, 6vh, 4rem); align-self: start; max-width: 460px; margin-inline: 0; }
+}
+.dial { position: relative; width: 100%; margin: 0; }
+/* aspect-ratio reserves the dial's box before render — the fold must not shift (CLS). */
+.dial svg { display: block; width: 100%; height: auto; aspect-ratio: 1; overflow: visible; }
+.ld-tickring { stroke: var(--tick); opacity: 0.5; }
+.seg { stroke: var(--rule-strong); fill: none; transition: stroke var(--dur) var(--ease-out); }
+.seg-head { fill: var(--rule-strong); stroke: none; transition: fill var(--dur) var(--ease-out); }
+/* stations: ink at rest; the sprite <use> icons ride currentColor on the group */
+.st { color: var(--ink-muted); transition: color var(--dur) var(--ease-out); }
+.st .st-ring { fill: var(--surface); stroke: var(--rule-strong); transition: stroke var(--dur) var(--ease-out); }
+.st .ld-lab { fill: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-ld-lab); /* floored >=11px effective by svgtype.js (#1210/#1469) */
+  letter-spacing: 0.16em; text-transform: uppercase; transition: fill var(--dur) var(--ease-out); }
+.ld-verb { fill: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-ld-verb); /* floored >=11px effective by svgtype.js (#1210/#1469) */
+  letter-spacing: 0.14em; }
+/* the focused station + its outgoing arc take the flat ember accent ("you are HERE").
+   [data-focus="all"] = the reduced-motion static state: the whole loop reads lit. */
+[data-focus="data"] .st-data, [data-focus="coaching"] .st-coaching,
+[data-focus="protocols"] .st-protocols, [data-focus="story"] .st-story,
+[data-focus="all"] .st { color: var(--ember); }
+[data-focus="data"] .st-data .st-ring, [data-focus="coaching"] .st-coaching .st-ring,
+[data-focus="protocols"] .st-protocols .st-ring, [data-focus="story"] .st-story .st-ring,
+[data-focus="all"] .st .st-ring { stroke: var(--ember); }
+[data-focus="data"] .st-data .ld-lab, [data-focus="coaching"] .st-coaching .ld-lab,
+[data-focus="protocols"] .st-protocols .ld-lab, [data-focus="story"] .st-story .ld-lab,
+[data-focus="all"] .st .ld-lab { fill: var(--ember); }
+[data-focus="data"] .seg-data, [data-focus="coaching"] .seg-coaching,
+[data-focus="protocols"] .seg-protocols, [data-focus="story"] .seg-story,
+[data-focus="all"] .seg { stroke: var(--ember); }
+[data-focus="data"] .sh-data, [data-focus="coaching"] .sh-coaching,
+[data-focus="protocols"] .sh-protocols, [data-focus="story"] .sh-story,
+[data-focus="all"] .seg-head { fill: var(--ember); }
+/* the hub: the ONLY glow on the screen — the live day counter (same treatment the
+   shipped .hd-num carried; it binds dayNum and ticks daily). */
+.dial-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  gap: var(--sp-1); pointer-events: none; }
+.dial-center .dc-num { font-size: var(--fs-data-xl); line-height: 1; color: var(--ember);
+  text-shadow: 0 0 24px var(--ember-soft); }
+.dial-center .dc-sub { max-width: 16ch; margin-inline: auto; line-height: 1.5; }
+.dial-caption { margin-top: var(--sp-3); color: var(--ink-faint); font-family: var(--font-mono); font-size: var(--fs-small); max-width: 44ch; }
+.dial-caption a { color: var(--ink-muted); }
+.dial-caption a:hover { color: var(--ember); }
+
+/* the verses — scroll-stepped teaching; min-height only where the dial is sticky */
+.verses { display: flex; flex-direction: column; }
+.verse { display: flex; flex-direction: column; justify-content: center; gap: var(--sp-3);
+  padding: var(--sp-6) 0; border-bottom: var(--border-hair); }
+@media (min-width: 901px) { .verse { min-height: 56vh; } }
+.verse:last-child { border-bottom: none; }
+.verse h2 { font-family: var(--font-serif); font-weight: var(--weight-med); font-size: var(--fs-h2); line-height: 1.1; max-width: 20ch; }
+.verse p { color: var(--ink-muted); max-width: 46ch; }
+.verse p strong { color: var(--ink); font-weight: var(--weight-med); }
+.verse .vgo { font-family: var(--font-mono); font-size: var(--fs-small); color: var(--ink);
+  text-decoration: none; border-bottom: 1px solid var(--ember-line); align-self: flex-start; padding-bottom: 2px; }
+.verse .vgo:hover { border-bottom-color: var(--ember); }
+.verse .vgo:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: var(--radius-xs); }
+.verse-close { gap: var(--sp-4); }
+.verse-close .hero-elena { margin-top: 0; }
+.verse-close a:not(.cta):not(.vgo) { color: var(--ink-muted); }
+.cta-row { display: flex; gap: var(--sp-5); flex-wrap: wrap; margin-top: var(--sp-2); }
+
+/* the constellation's below-fold home (#1469) — the figure itself is unchanged */
+.beat-constellation .constellation { margin-top: var(--sp-5); max-width: 520px; }
 
 /* ── The constellation v2 (#590) — edges are MEASURED co-movement ─────────────
    Single-accent identity held: positive coupling (move together) is ember + solid,
@@ -887,12 +943,8 @@ body { overflow-x: hidden; }
 .sc-call-m { font-family: var(--font-mono); color: var(--ink-faint); }
 @media (max-width: 600px) { .sc-tiles { grid-template-columns: repeat(2, 1fr); } }
 
-/* ── #407: the loop teaser above the fold + the constellation scale ───────── */
-.hero-loop { margin-top: var(--sp-4); display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-2); color: var(--ink-faint); }
-.hero-loop a { color: var(--ink-muted); text-decoration: none; border-bottom: 1px solid var(--rule); padding-bottom: 1px; transition: color var(--dur-fast), border-color var(--dur-fast); }
-.hero-loop a:hover { color: var(--ember); border-color: var(--ember-line); }
-.hl-arrow, .hl-loop { color: var(--ink-faint); }
-.hl-sep { color: var(--ink-faint); opacity: 0.7; }  /* #578: sets "the now" apart from the four loop stages */
+/* ── #407→#1469: the loop teaser line retired (the fold dial teaches the loop);
+   the constellation scale legend stays. ── */
 .const-legend { display: inline-flex; align-items: center; gap: var(--sp-1); margin-right: var(--sp-2); color: var(--ink-faint); white-space: nowrap; }
 .cl-dot { display: inline-block; border-radius: 50%; background: var(--ink-faint); }
 .cl-dot.cl-sm { width: 5px; height: 5px; }

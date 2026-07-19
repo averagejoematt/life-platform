@@ -124,7 +124,11 @@ def _archive_entries():
 _CURATED = [
     {
         "path": "/",
-        "name": "Home (constellation)",
+        # #1469 (variant A "the loop, drawn live"): the fold is now the loop dial —
+        # a code-drawn SVG with the four door stations + the live day counter at the
+        # hub; the constellation moved below the fold but keeps its section (and these
+        # constellation checks stay true of the page).
+        "name": "Home (loop dial)",
         "static_core": True,  # #1395: ships a <noscript> static core (headline numbers + as-of)
         "tier": 1,
         "content_class": "live-data",
@@ -133,6 +137,11 @@ _CURATED = [
         "visual": {
             "wait_for": ".constellation svg",
             "checks": [
+                {
+                    "selector": ".loop-dial .st",
+                    "min_count": 4,
+                    "desc": "the 4 loop-dial stations drawn in the fold (#1469)",
+                },
                 {
                     "selector": ".constellation svg a, .constellation svg .node",
                     "min_count": 7,

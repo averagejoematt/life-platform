@@ -20,8 +20,9 @@ def test_okay_beat_present_and_high_on_the_page():
     beats — family gets their answer near the top, not buried."""
     assert 'class="beat beat-okay"' in HOME
     assert "Is he okay this week?" in HOME
-    # High: before the loop beat and before the dispatches/chronicle beat.
-    assert HOME.find("beat-okay") < HOME.find("beat-loop")
+    # High: before the constellation beat (#1469 — it replaced the retired
+    # beat-loop card row) and before the dispatches/chronicle beat.
+    assert HOME.find("beat-okay") < HOME.find("beat-constellation")
     assert HOME.find("beat-okay") < HOME.find("beat-dispatches")
 
 

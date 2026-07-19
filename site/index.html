@@ -56,59 +56,136 @@
     <nav class="doors" aria-label="Doors"><a href="/cockpit/" title="Today&#x27;s live instrument — your daily numbers, read back to you"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-cockpit"></use></svg>the cockpit</a><a href="/data/" title="Every source the platform reads — trends now and over time"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-data"></use></svg>the data</a><a href="/coaching/" title="The AI team &amp; their arguments — stances, track records, disagreements"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-coaching"></use></svg>the coaching</a><a href="/protocols/" title="The levers — supplements, experiments, challenges, discoveries"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-protocols"></use></svg>the protocols</a><a href="/story/" title="The writing &amp; the why — chronicle, journal, timeline, about"><svg class="ico ico-door" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/assets/icons/icons.svg#i-door-story"></use></svg>the story</a><a href="/subscribe/" class="nav-follow" aria-label="Follow the experiment">follow</a><button class="theme-toggle" type="button" aria-label="Toggle light and dark"><span class="theme-dot" aria-hidden="true"></span></button></nav>
   </header>
 
-  <!-- ── HERO: the relational constellation ──────────────────────────────── -->
-  <section class="hero" aria-label="Introduction">
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <p class="kicker label">a measured life · proof, not promises</p>
-        <p class="hero-daycount"><span class="hd-num num" data-bind="dayNum" data-countup>··</span> <span class="hd-cap" data-bind="dayCap">days into the experiment</span></p>
-        <p class="hero-day label" data-bind="genesisStamp" hidden></p>
-        <p class="hero-proof" data-bind="hero-proof" hidden></p>
-        <p class="hero-quiet" data-bind="hero-quiet" hidden></p>
-        <h1 class="hero-h">An honest documentary of an <em>ordinary</em> life, rebuilt with AI.</h1>
-        <!-- #407: the loop, taught before the fold — the four doors in one glance,
-             directly under the claim. The full diagram below keeps the roles. -->
-        <p class="hero-loop label" aria-label="The loop, watched live from the now: the data feeds the coaching, the coaching shapes the protocols, the protocols move the data, the story narrates it">
-          <a href="/cockpit/">the now</a><span class="hl-sep" aria-hidden="true">·</span><a href="/data/">the data</a><span class="hl-arrow" aria-hidden="true">→</span><a href="/coaching/">the coaching</a><span class="hl-arrow" aria-hidden="true">→</span><a href="/protocols/">the protocols</a><span class="hl-arrow" aria-hidden="true">→</span><a href="/story/">the story</a><span class="hl-loop" aria-hidden="true">↻</span>
-        </p>
-        <p class="hero-sub">Every metric. Every setback. The down weeks shown, not hidden — because that's what makes an experiment of one believable.</p>
-        <!-- #732: the protagonist, static and above the fold — who, the arc of prior
-             attempts, the stakes. #1087: purpose leads the fold; the 185/90d stake stays
-             falsifiable but is demoted from "the finish line" to the first hard checkpoint.
-             A cold curl of / must answer "why this exists, why this person, what's at stake". -->
-        <!-- #949: the start weight binds to the live baseline (/api/journey) — never a
-             hand-coded literal that strands on the next reset. The static fallback makes
-             no number claim; JS writes "N lbs" once a baseline exists, or the weigh-in
-             framing pre-start. -->
-        <p class="hero-who">The ordinary life is <strong>Matthew's</strong> — a regular guy who has made this climb sixteen times before, and sixteen times watched it collapse. This isn't a weight-loss site. It's an experiment in whether he can actually be okay — satisfied, connected, present, not watching his own life like an extra — using the one thing willpower never gave him: <strong>evidence</strong>. He owns a drawer of devices that measured everything and changed nothing. This time, every number he generates gets read by an AI coaching board, examined from every angle, and published either way.</p>
-        <p class="hero-who">Weight comes first only because it's the most visible thing the last slump left him, and it's measurable enough to keep him honest. This attempt starts at <strong data-bind="hero-start">the Day&#8209;1 weigh&#8209;in</strong>, aimed at <strong>185&nbsp;lbs</strong>. The scale is an instrument, not the finish line. The finish line is a life he doesn't need numbers to want to be in.</p>
-        <p class="hero-finish"><span class="hf-label label">the first hard checkpoint</span> 185 lbs, held for 90 consecutive days — or this checkpoint failed, on the record. <span class="hf-note">Falsifiable on purpose: <a href="/method/survival/">the model tracks the odds</a>, collapses included. Hitting the number was never the point — it's proof the loop works. The real experiment — can data plus honest coaching move mood, connection, presence, sleep, the whole life — runs underneath, measured the same way.</span></p>
-        <p class="hero-for">For anyone who's tired of transformation theater and wants to watch a <em>real one</em> happen — slowly, honestly, in public.</p>
-        <!-- #386: the day-specific AI line (can itself read as a down-signal on quiet days)
-             is sequenced AFTER the transformation hook + the "down weeks shown, not hidden"
-             framing has landed — so a newcomer meets the site's honesty ethos before meeting
-             a live, possibly-ambiguous data remark. Content unchanged, never softened. -->
-        <p class="hero-elena" data-bind="elena">No million-dollar lab. Just the wearables already on his body, and a model that reads the numbers back to him every morning.</p>
-        <p class="hero-cta"><a href="#arc" class="cta">Follow the arc ↓</a></p>
+  <!-- ── HERO (#1469 variant A "the loop, drawn live"): the claim, then the fold
+       belongs to one device — the measuring rule bent into the causal loop, four
+       door-icon stations on it, the live day counter at the hub. Four scroll
+       verses light their station in sequence, so the reader's scroll position IS
+       their position on the loop. The constellation (a pillar-correlation
+       instrument, not a loop teacher) moved to its own beat below the fold.
+       Matthew picked this variant from rendered screenshots, 2026-07-19. ── -->
+  <section class="hero hero-claim" aria-label="Introduction">
+    <p class="kicker label">a measured life · proof, not promises</p>
+    <h1 class="hero-h">An honest documentary of an <em>ordinary</em> life, rebuilt with AI.</h1>
+    <p class="hero-sub">One regular guy, the wearables he already owns, and an AI board reading every
+      number he produces — published either way, down weeks shown, not hidden. The whole site is one
+      feedback loop. Scroll it once and you know how everything here works.</p>
+    <p class="hero-day label" data-bind="genesisStamp" hidden></p>
+    <p class="hero-proof" data-bind="hero-proof" hidden></p>
+    <p class="hero-quiet" data-bind="hero-quiet" hidden></p>
+  </section>
+
+  <!-- The loop stage: the dial is code-drawn inline SVG on the design tokens; the
+       station icons come from the shared sprite (icons.js vocabulary, §8.1). The
+       scroll choreography is additive state — with JS off (or reduced motion) every
+       element renders; nothing is hidden behind motion. #949: no hand-coded start
+       weight — the close verse binds the live baseline. -->
+  <section class="stage" data-stage data-focus="data" aria-label="The loop, station by station">
+    <div class="stage-grid">
+      <div class="dial-wrap">
+        <figure class="dial" aria-label="The causal loop this site runs on: the data feeds the coaching, the coaching proposes the protocols, the protocols shift the data, and the story narrates all of it. The live day counter sits at the hub.">
+          <svg class="loop-dial" viewBox="0 0 440 440" aria-hidden="true" focusable="false">
+            <!-- the measuring rule, bent into the loop -->
+            <circle class="ld-tickring" cx="220" cy="220" r="186" fill="none" stroke-width="7" stroke-dasharray="1.3 11.69"/>
+            <!-- four quarter arcs, clockwise; .seg-X leaves station X -->
+            <g stroke-width="1.6">
+              <path class="seg seg-data" d="M258.7 64.8 A160 160 0 0 1 375.2 181.3"/>
+              <path class="seg seg-coaching" d="M375.2 258.7 A160 160 0 0 1 258.7 375.2"/>
+              <path class="seg seg-protocols" d="M181.3 375.2 A160 160 0 0 1 64.8 258.7"/>
+              <path class="seg seg-story" d="M64.8 181.3 A160 160 0 0 1 181.3 64.8"/>
+              <path class="seg-head sh-data" d="M375.2 181.3 L376.7 170.6 L368.9 172.6 Z"/>
+              <path class="seg-head sh-coaching" d="M375.2 181.3 L376.7 170.6 L368.9 172.6 Z" transform="rotate(90 220 220)"/>
+              <path class="seg-head sh-protocols" d="M375.2 181.3 L376.7 170.6 L368.9 172.6 Z" transform="rotate(180 220 220)"/>
+              <path class="seg-head sh-story" d="M375.2 181.3 L376.7 170.6 L368.9 172.6 Z" transform="rotate(270 220 220)"/>
+            </g>
+            <!-- the verbs ride the arcs -->
+            <text class="ld-verb" x="330" y="114" text-anchor="middle">reads</text>
+            <text class="ld-verb" x="330" y="340" text-anchor="middle">proposes</text>
+            <text class="ld-verb" x="110" y="340" text-anchor="middle">shifts</text>
+            <text class="ld-verb" x="110" y="114" text-anchor="middle">narrates</text>
+            <!-- the four stations — door icons from the shared sprite -->
+            <g class="st st-data">
+              <circle class="st-ring" cx="220" cy="60" r="27" stroke-width="1.5"/>
+              <use href="/assets/icons/icons.svg#i-door-data" x="208" y="48" width="24" height="24"/>
+              <text class="ld-lab" x="220" y="20" text-anchor="middle">the data</text>
+            </g>
+            <g class="st st-coaching">
+              <circle class="st-ring" cx="380" cy="220" r="27" stroke-width="1.5"/>
+              <use href="/assets/icons/icons.svg#i-door-coaching" x="368" y="208" width="24" height="24"/>
+              <text class="ld-lab" x="380" y="266" text-anchor="middle">the coaching</text>
+            </g>
+            <g class="st st-protocols">
+              <circle class="st-ring" cx="220" cy="380" r="27" stroke-width="1.5"/>
+              <use href="/assets/icons/icons.svg#i-door-protocols" x="208" y="368" width="24" height="24"/>
+              <text class="ld-lab" x="220" y="426" text-anchor="middle">the protocols</text>
+            </g>
+            <g class="st st-story">
+              <circle class="st-ring" cx="60" cy="220" r="27" stroke-width="1.5"/>
+              <use href="/assets/icons/icons.svg#i-door-story" x="48" y="208" width="24" height="24"/>
+              <text class="ld-lab" x="60" y="266" text-anchor="middle">the story</text>
+            </g>
+          </svg>
+          <!-- the hub: the page's ONE glow — the live day counter (binds dayNum, ticks daily) -->
+          <div class="dial-center">
+            <span class="label">day</span>
+            <span class="dc-num num" data-bind="dayNum" data-countup>··</span>
+            <span class="label dc-sub" data-bind="dayCap">measured in public</span>
+          </div>
+        </figure>
+        <p class="dial-caption">The measuring rule, bent into the loop the site runs on. Every station
+          is a door you can walk through — and <a href="/cockpit/">the cockpit</a> is today's slice of
+          all four at once.</p>
       </div>
 
-      <figure class="constellation" aria-label="The seven pillars and how they pull on each other">
-        <svg viewBox="0 0 360 360" role="group" aria-describedby="constellation-desc">
-          <g data-edges></g>
-          <g data-nodes></g>
-        </svg>
-        <figcaption id="constellation-desc" class="label">
-          <!-- #590: edges are MEASURED co-movement, not a hand-drawn guess. #407: node size = score. -->
-          <span class="const-legend" aria-hidden="true"><i class="cl-dot cl-sm"></i>low<i class="cl-dot cl-lg"></i>high</span>
-          Seven areas of life — he calls them <strong>pillars</strong> — each scored <strong>out of 100</strong>; node size
-          tracks the score (small = low, a young experiment starts low, not broken). The lines show how two pillars
-          <strong>actually move together</strong> in the measured data<span data-bind="const-window"></span>: a
-          <span class="cn-key cn-key-pos">solid ember line</span> means they <strong>rise and fall together</strong>,
-          a <span class="cn-key cn-key-neg">dashed line</span> means they <strong>trade off</strong>; thin or faint lines
-          mean the pattern is weak, or there's only a few days of data behind it. A pillar with no lines hasn't shown
-          a clear pattern with the others yet. <strong>Tap a pillar to open its evidence.</strong>
-        </figcaption>
-      </figure>
+      <div class="verses">
+        <article class="verse" data-station="data">
+          <p class="label">station 01 · the data — reads</p>
+          <h2>Every day writes its own numbers.</h2>
+          <p>Sleep, training, glucose, weight, mood — pulled raw from the devices he already wears.
+            Every source is named, and a gap shows as a gap, never a guess.</p>
+          <a class="vgo" href="/data/">walk into the data →</a>
+        </article>
+        <article class="verse" data-station="coaching">
+          <p class="label">station 02 · the coaching — proposes</p>
+          <h2>An AI board reads them — and disagrees.</h2>
+          <p>Coaches with different philosophies read the same day and argue about what it means,
+            in public. Every call gets scored later, so the track records are real.</p>
+          <a class="vgo" href="/coaching/">meet the coaching →</a>
+        </article>
+        <article class="verse" data-station="protocols">
+          <p class="label">station 03 · the protocols — shifts</p>
+          <h2>The arguments become experiments.</h2>
+          <p>Supplements, protocols, challenges — each one a falsifiable bet that a specific change
+            moves a specific number. The ones that fail stay on the page.</p>
+          <a class="vgo" href="/protocols/">see the protocols →</a>
+        </article>
+        <article class="verse" data-station="story">
+          <p class="label">station 04 · the story — narrates</p>
+          <h2>And every week gets written down.</h2>
+          <p>A chronicle, a podcast, his own journal — what the loop actually did, published on the
+            good weeks and the bad ones alike.</p>
+          <a class="vgo" href="/story/">read the story →</a>
+        </article>
+        <article class="verse verse-close" data-station="data">
+          <p class="label">the loop closes · protocols shift the data</p>
+          <h2>That's the whole site — and it's running now.</h2>
+          <!-- #732/#1087 compressed: the protagonist and the stakes still answer a cold
+               curl of / — who, the prior attempts, the falsifiable checkpoint. -->
+          <p>The ordinary life is <strong>Matthew's</strong> — sixteen prior climbs, sixteen collapses,
+            and a drawer of devices that measured everything and changed nothing. What's different this
+            time is the loop above: every number read, argued over, and published either way.</p>
+          <!-- #949: the start weight binds to the live baseline (/api/journey) — never a
+               hand-coded literal that strands on the next reset. -->
+          <p>This attempt starts at <strong data-bind="hero-start">the Day&#8209;1 weigh&#8209;in</strong>,
+            aimed at <strong>185&nbsp;lbs</strong> held for 90 consecutive days — or the checkpoint
+            fails, on the record. <a href="/method/survival/">The model tracks the odds</a>, collapses
+            included. The scale is an instrument, not the finish line.</p>
+          <p class="hero-elena" data-bind="elena">No million-dollar lab. Just the wearables already on his body, and a model that reads the numbers back to him every morning.</p>
+          <p class="cta-row">
+            <a class="cta" href="/cockpit/">Start with today in the cockpit →</a>
+            <a class="cta cta-quiet" href="/subscribe/">Follow the experiment</a>
+          </p>
+        </article>
+      </div>
     </div>
     <div class="scroll-rule" aria-hidden="true"><span></span></div>
   </section>
@@ -158,21 +235,30 @@
       <p class="nu-line label" data-home-unlocked hidden></p>
     </section>
 
-    <!-- The loop: what this site IS, in one screen — the through-line every door serves. -->
-    <section class="beat beat-loop" aria-label="What this is">
-      <div class="imark-rail" data-imark aria-hidden="true"></div>
-      <p class="beat-kicker label">what this is · the loop</p>
-      <h2 class="beat-h">One feedback loop, documented in public.</h2>
-      <div class="loop">
-        <a class="loop-node" href="/data/"><span class="ln-name">The Data</span><span class="ln-role">Every source — the body, the mind — now and over time.</span></a>
-        <span class="loop-arrow" aria-hidden="true">→</span>
-        <a class="loop-node" href="/coaching/"><span class="ln-name">The Coaching</span><span class="ln-role">AI coaches read the data and offer different takes on it.</span></a>
-        <span class="loop-arrow" aria-hidden="true">→</span>
-        <a class="loop-node" href="/protocols/"><span class="ln-name">The Protocols</span><span class="ln-role">The levers — what gets changed to move the data.</span></a>
-        <span class="loop-arrow" aria-hidden="true">→</span>
-        <a class="loop-node" href="/story/"><span class="ln-name">The Story</span><span class="ln-role">The human journey — chronicle, podcast, journal.</span></a>
-      </div>
-      <p class="beat-note">The protocols shift the data; the data feeds the coaching; the story narrates all of it — week by week. <a href="/cockpit/">Today's slice lives in the cockpit →</a></p>
+    <!-- #1469: the old .beat-loop card row is gone — the loop is taught once, properly,
+         by the fold dial above. The constellation (formerly the hero figure) lives here
+         instead: it is a pillar-correlation instrument, not a loop teacher. Markup is
+         unchanged so story.js drawConstellation + the qa_manifest visual checks hold. -->
+    <section class="beat beat-constellation" aria-label="The seven pillars and how they pull on each other">
+      <p class="beat-kicker label">the pillars · measured co-movement</p>
+      <h2 class="beat-h">Seven areas of one life, pulling on each other.</h2>
+      <figure class="constellation" aria-label="The seven pillars and how they pull on each other">
+        <svg viewBox="0 0 360 360" role="group" aria-describedby="constellation-desc">
+          <g data-edges></g>
+          <g data-nodes></g>
+        </svg>
+        <figcaption id="constellation-desc" class="label">
+          <!-- #590: edges are MEASURED co-movement, not a hand-drawn guess. #407: node size = score. -->
+          <span class="const-legend" aria-hidden="true"><i class="cl-dot cl-sm"></i>low<i class="cl-dot cl-lg"></i>high</span>
+          Seven areas of life — he calls them <strong>pillars</strong> — each scored <strong>out of 100</strong>; node size
+          tracks the score (small = low, a young experiment starts low, not broken). The lines show how two pillars
+          <strong>actually move together</strong> in the measured data<span data-bind="const-window"></span>: a
+          <span class="cn-key cn-key-pos">solid ember line</span> means they <strong>rise and fall together</strong>,
+          a <span class="cn-key cn-key-neg">dashed line</span> means they <strong>trade off</strong>; thin or faint lines
+          mean the pattern is weak, or there's only a few days of data behind it. A pillar with no lines hasn't shown
+          a clear pattern with the others yet. <strong>Tap a pillar to open its evidence.</strong>
+        </figcaption>
+      </figure>
     </section>
 
     <!-- P2.1 — the waveform LEADS the arc (the most shareable, least-braggy proof), right under
