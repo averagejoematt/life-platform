@@ -249,6 +249,27 @@ globalThis.window = {
 // exempted — explicitly included.
 const CLASSIC_SCRIPTS = new Set(["agents.js", "motion.js"]);
 
+// A module's DEFERRED callbacks (setTimeout ticks, settled fetch .then chains
+// against the shim) can throw AFTER its import promise resolved — those arrive
+// as process-level uncaught errors, not import rejections, and killed the gate
+// on main 29c521f2 (story.js renderWall hitting a null shim element, an
+// environment-timing artifact CI's Node hit but local runs missed). The gate's
+// contract is explicit: ONLY SyntaxError blocks; runtime noise from the minimal
+// shim is a warning. Trap both channels accordingly.
+let asyncWarnings = 0;
+for (const channel of ["uncaughtException", "unhandledRejection"]) {
+  process.on(channel, (err) => {
+    if (err instanceof SyntaxError) {
+      console.error(`  FAIL  (async) — SyntaxError: ${err.message}`);
+      process.exit(1);
+    }
+    asyncWarnings++;
+    const name = (err && err.constructor && err.constructor.name) || "Error";
+    const msg = (err && err.message) || String(err);
+    console.log(`  warn  (async ${channel}) — ${name}: ${msg} (non-fatal: shim runtime noise, not a parse error)`);
+  });
+}
+
 async function main() {
   if (!fs.existsSync(JS_DIR)) {
     console.error(`❌ site JS directory not found: ${JS_DIR}`);
