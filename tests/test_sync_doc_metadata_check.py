@@ -275,3 +275,116 @@ def test_restart_url_count_fact_is_recomputed_as_sum(monkeypatch):
     assert facts["restart_page_count"] == 35
     assert facts["restart_endpoint_count"] == 8
     assert facts["restart_url_count"] == 43
+
+
+# ── #1437: AST-discovered site-api endpoint count ───────────────────────────────
+
+
+def test_endpoint_count_discovers_real_count_from_site_api():
+    """Against the real lambdas/web/site_api_lambda.py: comfortably past the sanity
+    floor and (verified 2026-07-18) an order of magnitude past the docs' stale
+    "60+" — this is exactly the drift class #1437 exists to kill."""
+    count = sync._auto_discover_endpoint_count()
+    assert count is not None
+    assert count >= 100, f"endpoint count ({count}) suspiciously low vs. the known ~115 live count"
+
+
+def test_endpoint_count_dedupes_across_all_three_mechanisms(tmp_path, monkeypatch):
+    """A path registered in ROUTES (as a None placeholder), reserved again in
+    _SIMPLE_ROUTES, AND checked again inline must count ONCE — not three times.
+
+    Exercises the real shipped `_auto_discover_endpoint_count()` (not a reimplementation)
+    against a synthetic fixture padded past the >=50 sanity floor: 55 unique ROUTES
+    entries (3 of them None placeholders standing in for _SIMPLE_ROUTES/inline dispatch:
+    verify_subscriber, board_ask, predictions), one genuinely-new path only in
+    _SIMPLE_ROUTES (nudge — verify_subscriber there is a dup of the ROUTES placeholder),
+    and two genuinely-new paths only checked inline (healthz via `==`, `/api/coach/` via
+    `.startswith(...)` — board_ask/predictions there are dups of ROUTES placeholders).
+    Expected unique total: 55 + 1 + 2 = 58 — which would be 55 + 2 + 4 = 61 if the three
+    mechanisms' raw entries were naively summed instead of deduplicated.
+    """
+    fake_web = tmp_path / "lambdas" / "web"
+    fake_web.mkdir(parents=True)
+    routes_entries = "\n".join(f'    "/api/path{i}": handle_path{i},' for i in range(52))
+    routes_entries += (
+        '\n    "/api/verify_subscriber": None,  # dispatched via _SIMPLE_ROUTES below'
+        '\n    "/api/board_ask": None,  # inline-checked below too'
+        '\n    "/api/predictions": None,  # inline-checked below too'
+    )
+    (fake_web / "site_api_lambda.py").write_text(
+        f"ROUTES = {{\n{routes_entries}\n}}\n"
+        "\n"
+        "_SIMPLE_ROUTES = {\n"
+        '    "/api/verify_subscriber": ({"GET"}, _handle_verify_subscriber),\n'
+        '    "/api/nudge": ({"POST"}, _handle_nudge),  # new, not in ROUTES\n'
+        "}\n"
+        "\n"
+        "def lambda_handler(event, context):\n"
+        '    path = event.get("rawPath")\n'
+        '    if path == "/api/board_ask":\n'
+        "        return _forward()\n"
+        '    if path == "/api/predictions":\n'
+        "        return handle_predictions(event)\n"
+        '    if path == "/api/healthz":  # new, not in ROUTES or _SIMPLE_ROUTES\n'
+        "        return _health()\n"
+        '    if path.startswith("/api/coach/"):  # new prefix route\n'
+        "        return handle_coach(event)\n"
+        "    return ROUTES.get(path)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+
+    count = sync._auto_discover_endpoint_count()
+    assert count == 58, f"expected 55 ROUTES-registered + 1 new-in-_SIMPLE_ROUTES + 2 new-inline = 58 unique, got {count}"
+
+
+def test_endpoint_count_sanity_floor_rejects_tiny_fixture(tmp_path, monkeypatch):
+    """A truncated/broken site_api_lambda.py (too few routes) falls back to None
+    rather than reporting a suspiciously small "real" count."""
+    fake_site_api = tmp_path / "lambdas" / "web"
+    fake_site_api.mkdir(parents=True)
+    (fake_site_api / "site_api_lambda.py").write_text(
+        "ROUTES = {\n"
+        '    "/api/vitals": handle_vitals,\n'
+        "}\n"
+        "\n"
+        "_SIMPLE_ROUTES = {}\n"
+        "\n"
+        "def lambda_handler(event, context):\n"
+        '    path = event.get("rawPath")\n'
+        "    return ROUTES.get(path)\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    assert sync._auto_discover_endpoint_count() is None
+
+
+def test_endpoint_count_none_when_lambda_handler_missing(tmp_path, monkeypatch):
+    """A file with ROUTES but no lambda_handler def can't be trusted — fall back."""
+    fake_site_api = tmp_path / "lambdas" / "web"
+    fake_site_api.mkdir(parents=True)
+    (fake_site_api / "site_api_lambda.py").write_text('ROUTES = {"/api/vitals": handle_vitals}\n', encoding="utf-8")
+    monkeypatch.setattr(sync, "ROOT", tmp_path)
+    assert sync._auto_discover_endpoint_count() is None
+
+
+def test_endpoint_count_docs_match_discovered_value():
+    """CLAUDE.md and docs/ONBOARDING.md must quote the SAME endpoint count the
+    AST discoverer finds — this is the literal that used to say a stale "60+"
+    against a real count over 100 (#1437). Mirrors the rule --check enforces,
+    but asserts it directly against repo HEAD so a future non-doc-sync edit to
+    either file can't quietly reintroduce a mismatched number."""
+    import re as _re
+
+    count = sync._auto_discover_endpoint_count()
+    assert count is not None
+
+    claude_md = (sync.ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+    m = _re.search(r"with ~(\d+) endpoints including", claude_md)
+    assert m, "CLAUDE.md's Site API Lambda bullet no longer matches the expected 'with ~N endpoints including' shape"
+    assert int(m.group(1)) == count
+
+    onboarding_md = (sync.ROOT / "docs" / "ONBOARDING.md").read_text(encoding="utf-8")
+    m2 = _re.search(r"site-api Lambda \(~(\d+) endpoints, primarily read-only — ADR-037\)", onboarding_md)
+    assert m2, "docs/ONBOARDING.md's site-api line no longer matches the expected shape"
+    assert int(m2.group(1)) == count
