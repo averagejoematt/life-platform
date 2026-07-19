@@ -72,31 +72,21 @@ echo "$(date)"
 echo "============================================================"
 echo ""
 
-# ── v4 pages (HTTP 200) ───────────────────────────────────────────────────────
-echo "── v4 pages (HTTP 200) ───────────────────────────────────"
-check_status "Home"                 "$BASE/"
-check_status "Cockpit (/cockpit/)"      "$BASE/cockpit/"
-check_status "Story hub"            "$BASE/story/"
-check_status "Evidence hub"         "$BASE/data/"
-check_status "Subscribe"            "$BASE/subscribe/"
-# Story sub-pages
-check_status "Story · chronicle"    "$BASE/story/chronicle/"
-check_status "Story · journal"      "$BASE/story/journal/"
-check_status "Coaching · lab-notes" "$BASE/coaching/lab-notes/"
-check_status "Coaching · by-coach"  "$BASE/coaching/by-coach/"
-check_status "Story · timeline"     "$BASE/story/timeline/"
-check_status "Story · attempts"     "$BASE/story/attempts/"
-check_status "Story · about"        "$BASE/story/about/"
-# Evidence topics (sample across groups)
-check_status "Evidence · vitals"    "$BASE/data/vitals/"
-check_status "Evidence · glucose"   "$BASE/data/glucose/"
-check_status "Evidence · sleep"     "$BASE/data/sleep/"
-check_status "Evidence · labs"      "$BASE/data/labs/"
-check_status "Evidence · board"     "$BASE/method/board/"
-check_status "Evidence · platform"  "$BASE/method/platform/"
-check_status "Evidence · data"      "$BASE/method/data/"
-check_status "Evidence · pipeline"  "$BASE/method/pipeline/"
-check_status "Methods registry"     "$BASE/method/registry/"
+# ── v4 pages (HTTP status) — derived from THE page registry (#1426) ───────────
+# tests/qa_manifest.py is the ONE page list; this block sweeps every registered
+# page at its expected status. Adding a page = one manifest entry, never a new
+# check_status line here (the old hand list sampled 22 pages; this is all ~80).
+echo "── v4 pages (HTTP status, from qa_manifest) ──────────────"
+QA_MANIFEST="$(dirname "$0")/../tests/qa_manifest.py"
+if MANIFEST_ROWS=$(python3 "$QA_MANIFEST" --emit smoke); then
+  while IFS='|' read -r page_path page_name page_status; do
+    [[ -z "$page_path" ]] && continue
+    check_status "$page_name" "$BASE$page_path" "$page_status"
+  done <<< "$MANIFEST_ROWS"
+else
+  echo "  ❌ qa_manifest emit failed — page sweep did not run"
+  FAIL=$((FAIL + 1))
+fi
 # Trailing slash so the #1209 bare-path normalizer (301 /x -> /x/) doesn't intercept —
 # a genuinely missing page must 404 at the origin directly, not via a redirect hop.
 check_status "404 page"             "$BASE/nonexistent-page-xyz/" "404"

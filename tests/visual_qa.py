@@ -73,240 +73,16 @@ try {
 } catch (e) {}
 """
 
-# Topics whose readout is expected to include at least one inline-SVG chart.
-# (Others are tables/cards — and even chart topics legitimately show an honest
-# "N readings so far" text instead of a chart when data is sparse, per
-# site/assets/js/charts.js's >=4-points rule — so missing-chart is a WARNING.)
-CHART_TOPICS = {"vitals", "physical", "glucose", "sleep", "training", "character"}
-# /data/ door topics — the body + mind/accountability readouts.
-EVIDENCE_TOPICS = [
-    "vitals",
-    "physical",
-    "labs",
-    "glucose",
-    "sleep",
-    "training",
-    "nutrition",
-    "habits",
-    "character",
-]
-# /method/ door topics — "how it holds up" + "the machine" (footer-tier in the v5 IA).
-# These were 404ing under /data/ because the harness used the wrong base path
-# (truth audit C1, 2026-06-27); they are live at /method/<slug>/.
-METHOD_TOPICS = [
-    "board",
-    "pipeline",
-    "intelligence",
-    "predictions",
-    "scenarios",
-    "benchmarks",
-]
+# ── Page definitions — derived from THE page registry (tests/qa_manifest.py, #1426).
+# The sweep's coverage facet is every manifest entry carrying a `visual` def (or
+# `visual_variants` for deep-link sweeps). Adding a page to the sweep = setting
+# `visual=` on its manifest entry — there is NO page list in this file anymore.
+# Derivation verified identical to the pre-#1426 hand list (36 entries, same
+# paths + checks); tests/test_qa_manifest.py gates the derivation from drifting.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from qa_manifest import visual_pages  # noqa: E402
 
-# ── Page definitions (v4 surfaces) ────────────────────────────────────────────
-PAGES = [
-    {
-        "path": "/",
-        "name": "Home (constellation)",
-        "wait_for": ".constellation svg",
-        "checks": [
-            {
-                "selector": ".constellation svg a, .constellation svg .node",
-                "min_count": 7,
-                "desc": "7 pillar nodes drawn in the constellation",
-            },
-            {
-                "selector": "a[href='/cockpit/'], a[href='/story/'], a[href='/data/']",
-                "min_count": 2,
-                "desc": "the three door links present",
-            },
-        ],
-        "charts": [".constellation svg"],
-    },
-    {
-        "path": "/cockpit/",
-        "name": "Cockpit",
-        "wait_for": "[data-bind='level']",
-        "checks": [
-            {"selector": "[data-bind='level']", "not_empty": True, "desc": "character level rendered"},
-            {"selector": ".row", "min_count": 1, "desc": "at least one pillar row"},
-            {"selector": ".site-foot-cols .sf-col", "min_count": 4, "desc": "footer mega-menu (4 columns) present (CC-05)"},
-        ],
-        "interact": {"click": ".row", "expect": ".pillar-detail", "desc": "pillar disclosure opens with the Day-Grade Replay detail"},
-    },
-    {
-        "path": "/story/",
-        "name": "Story hub",
-        "wait_for": "[data-dx-tabs], [data-dx-read]",
-        "checks": [
-            {
-                "selector": "[data-dx-tabs], [data-dx-list]",
-                "min_count": 1,
-                "desc": "dispatches reader (chronicle/journal/lab-notes tabs) rendered",
-            },
-            {"selector": "a[href='/data/'], a[href='/cockpit/']", "min_count": 1, "desc": "door links present"},
-        ],
-    },
-    {
-        "path": "/story/chronicle/",
-        "name": "Story · chronicle",
-        "checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "chronicle content"}],
-    },
-    {
-        "path": "/story/journal/",
-        "name": "Story · journal",
-        "checks": [{"selector": "main, [data-readout], article", "not_empty": True, "desc": "journal content"}],
-    },
-    {
-        "path": "/story/about/",
-        "name": "Story · about",
-        "checks": [{"selector": "main, article", "not_empty": True, "desc": "about content"}],
-    },
-    {
-        "path": "/story/attempts/",
-        "name": "Story · the attempts (#1375)",
-        "checks": [
-            {"selector": "[data-att-figs]", "not_empty": True, "desc": "attempt headline figures"},
-            {"selector": "[data-att-log]", "not_empty": True, "desc": "expedition log cards"},
-            {"selector": ".att-svg", "not_empty": False, "desc": "same-day-axis overlay SVG"},
-        ],
-    },
-    {
-        "path": "/story/agents/",
-        "name": "Story · the agents",
-        "checks": [{"selector": "[data-roster], .agent-card, [data-feed]", "not_empty": True, "desc": "agent roster + feed"}],
-    },
-    # NB: "The Coaches" + "AI lab notes" moved to their own door /coaching/ (2026-06-20);
-    # their page defs now live in the PAGES.extend([...]) Coaching block below.
-    {
-        "path": "/data/",
-        "name": "Data hub",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "data readout rendered"}],
-    },
-    {
-        "path": "/protocols/",
-        "name": "Protocols hub",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "protocols readout rendered"}],
-    },
-    # S2 protocols uplevel (2026-07): the three upleveled topic pages get their own defs.
-    {
-        "path": "/protocols/experiments/",
-        "name": "Protocols · experiments",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "experiments readout rendered"}],
-    },
-    {
-        "path": "/protocols/challenges/",
-        "name": "Protocols · challenges",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "challenges readout rendered"}],
-    },
-    {
-        "path": "/protocols/supplements/",
-        "name": "Protocols · supplements",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "supplements readout rendered"}],
-    },
-    {
-        "path": "/method/character/",
-        "name": "Method · character explainer",
-        "wait_for": "[data-readout]",
-        "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": "character explainer rendered"}],
-    },
-]
-# Evidence live-data topics — readout must render; chart topics get a soft chart check + crop.
-for _slug in EVIDENCE_TOPICS:
-    PAGES.append(
-        {
-            "path": f"/data/{_slug}/",
-            "name": f"Evidence · {_slug}",
-            "wait_for": "[data-readout]",
-            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
-            "charts": ["[data-readout] svg"] if _slug in CHART_TOPICS else [],
-        }
-    )
-# Method-tier topics live under /method/<slug>/, not /data/.
-for _slug in METHOD_TOPICS:
-    PAGES.append(
-        {
-            "path": f"/method/{_slug}/",
-            "name": f"Method · {_slug}",
-            "wait_for": "[data-readout]",
-            "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{_slug} readout rendered"}],
-        }
-    )
-
-# Door 4 "The Coaching" (/coaching/) — promoted out of Story (2026-06-20). Master-detail
-# like the Story door, over /api/coaches · /api/coach_team · /api/coach/<id> · /api/field_notes.
-# Checks stay lenient (reader not-empty) so honest empty-states before data accrues don't FAIL.
-PAGES.extend(
-    [
-        {
-            "path": "/coaching/",
-            "name": "Coaching hub (My Team)",
-            "wait_for": "[data-dx-tabs]",
-            "checks": [
-                {"selector": "[data-dx-tabs], [data-dx-list]", "min_count": 1, "desc": "coaching tabs + roster rendered"},
-                {"selector": "[data-dx-read]", "not_empty": True, "desc": "team/coach readout rendered"},
-            ],
-        },
-        {
-            "path": "/coaching/by-coach/#training_coach",
-            "name": "Coaching · By Coach (read-on-data, deep-link)",
-            "wait_for": "[data-dx-read]",
-            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "coach read + domain data rendered"}],
-        },
-        {
-            # #1112 — the head coach (Eli Marsh) at lead tier: the lead header must
-            # mount (config-authored, independent of engine data) alongside the
-            # standard dossier sections (honest-empty pre-data).
-            "path": "/coaching/by-coach/#eli_marsh",
-            "name": "Coaching · By Coach (head coach, lead tier)",
-            "wait_for": "[data-dx-read]",
-            "checks": [
-                {"selector": ".coach-head--lead", "min_count": 1, "desc": "lead-tier header rendered for the head coach"},
-                {"selector": "[data-dx-read] .team-lead", "min_count": 1, "desc": "running-the-program block rendered"},
-            ],
-        },
-        {
-            "path": "/coaching/scorecard/",
-            "name": "Coaching · Scorecard (graded track record)",
-            "wait_for": "[data-dx-read]",
-            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "scorecard tiles + per-coach record rendered"}],
-        },
-        {
-            "path": "/coaching/team/",
-            "name": "Coaching · The Team (roster/config)",
-            "wait_for": "[data-dx-read]",
-            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "team roster/profile rendered"}],
-        },
-        {
-            "path": "/coaching/lab-notes/",
-            "name": "Coaching · AI lab notes",
-            "wait_for": "[data-dx-read]",
-            "checks": [{"selector": "[data-dx-read]", "not_empty": True, "desc": "lab-notes readout rendered"}],
-        },
-    ]
-)
-
-# The Mind pillar (reading, ADR-097) — consolidated into the Data door (#298/#299);
-# /mind/ now 301s to /data/reading/ at the edge (#313). Follow the redirect and
-# assert the READING readout renders in the archive chrome (the old standalone
-# .ph-title/.shelf-block/.round-wrap selectors died with the standalone page —
-# they red-flagged the first full run after the consolidation). Checks stay
-# lenient: an honest empty shelf is an invitation, not a failure.
-PAGES.append(
-    {
-        "path": "/mind/",
-        "name": "Mind → /data/reading (redirect + readout)",
-        "wait_for": ".ev-app",
-        "checks": [
-            {"selector": ".ev-tile", "min_count": 3, "desc": "archive tiles render after the redirect"},
-            {"selector": ".readout, .ev-main", "min_count": 1, "desc": "the reading readout mounts"},
-        ],
-    }
-)
+PAGES = visual_pages()
 
 # Text that should never be visible (stuck/placeholder states).
 _EMPTY_SENTINELS = ("", "—", "...", "··", "•", "Loading", "LOADING", "Loading…")
@@ -619,9 +395,13 @@ def _svg_text_floor_findings(page, width):
         return []
 
 
-def _write_step_summary(path, passed, failed, warns, results):
+def _write_step_summary(path, passed, failed, warns, results, reader_truth_status=None):
     """Append a Markdown summary to $GITHUB_STEP_SUMMARY (CI job summary)."""
     lines = [f"## Visual + AI-vision QA — {passed} passed, {failed} failed, {warns} warnings\n"]
+    # #1440: a budget-tier pause must render as its own line in the CI summary —
+    # never silently absent, never indistinguishable from a clean run.
+    if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
+        lines.append(f"⏸ **Reader-truth QA: SKIPPED-BY-BUDGET** (tier {reader_truth_status['tier']}) — not run, not a pass.\n")
     for r in results:
         v = r.get("ai_verdict") or {}
         if r["status"] == "FAIL" or r.get("warnings") or v.get("severity") in ("med", "high"):
@@ -959,6 +739,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
         assess_results(results)  # mutates results in place: adds ai_verdict + may add issues
 
     # ── optional phase-aware reader-truth QA over the captured prose (#1095) ──
+    reader_truth_status = None
     if reader_truth:
         try:
             from visual_ai_qa import assess_reader_truth
@@ -966,13 +747,18 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
             sys.path.insert(0, os.path.dirname(__file__))
             from visual_ai_qa import assess_reader_truth
         print("\n── Reader-truth QA (phase-aware, Claude / Bedrock) ──")
-        assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
+        reader_truth_status = assess_reader_truth(results)  # mutates results: truth_findings + high → FAIL
 
     passed = sum(1 for r in results if r["status"] == "PASS")
     failed = sum(1 for r in results if r["status"] == "FAIL")
     warns = sum(len(r.get("warnings", [])) for r in results)
     print(f"\n{'=' * 56}")
     print(f"Visual QA: {passed} passed, {failed} failed, {warns} warning(s) across {len(results)} pages")
+    # #1440: a budget-tier pause of the reader-truth pass must read as its own
+    # explicit state, never blend into "passed" — this is the one line a human
+    # or a CI summary skim is guaranteed to see regardless of page-level warnings.
+    if reader_truth_status and reader_truth_status.get("status") == "skipped_by_budget":
+        print(f"Reader-truth QA: SKIPPED-BY-BUDGET (tier {reader_truth_status['tier']}) — not run, not a pass")
     if save_screenshots:
         print(f"Screenshots: {screenshot_dir}/")
 
@@ -983,6 +769,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
                 "passed": passed,
                 "failed": failed,
                 "warnings": warns,
+                "reader_truth_status": reader_truth_status,
                 "results": results,
             },
             f,
@@ -991,7 +778,7 @@ def run_sweep(pages=None, save_screenshots=False, screenshot_dir=None, ai_qa=Fal
 
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
-        _write_step_summary(summary_path, passed, failed, warns, results)
+        _write_step_summary(summary_path, passed, failed, warns, results, reader_truth_status)
 
     return failed == 0
 

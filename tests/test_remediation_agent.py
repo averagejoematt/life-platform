@@ -276,6 +276,53 @@ def test_prompt_instructs_incremental_report_and_ack_skip():
     assert "exact alarm name" in src
 
 
+# ── #1228: orphan_functions triage must be region-aware ──────────────────────
+
+
+def test_build_prompt_carries_region_aware_orphan_triage_rule():
+    """#1228: the agent dismissed a live us-west-2 `orphan_functions` signal
+    (email-subscriber) as a FALSE POSITIVE because the function name is
+    "defined in web_stack.py" — without checking that web_stack.py deploys to
+    us-east-1, a DIFFERENT region than the one the drift sentinel found the
+    live orphan in. The assembled triage prompt (prompt.md + the taxonomy doc,
+    via the REAL build_prompt code path the agent actually runs) must carry an
+    explicit rule forbidding exactly that class of dismissal — grepping a
+    function name into ANY stack file is not grounds for Bucket D unless that
+    stack's deploy region matches the orphan's region."""
+    signals = {
+        "alarms": [],
+        "ci_failures": [],
+        "dlq": {},
+        "coherence": None,
+        "drift": {
+            "status": "drift",
+            "flagging": {"orphan_functions": {"status": "drift", "orphans": ["email-subscriber"]}},
+        },
+        "urgent": None,
+    }
+    prompt = agent.build_prompt("shadow", signals)
+    low = prompt.lower()
+
+    assert "orphan_functions" in prompt  # the signal itself made it into the prompt
+    assert "region" in low
+    # The rule must name the exact #1228 mistake as forbidden: a cross-region
+    # stack definition clearing a same-region live orphan.
+    assert "cross-region" in low or "different region" in low
+    assert "false positive" in low
+    assert "1228" in prompt  # traceable to the incident that motivated the rule
+
+
+def test_taxonomy_forbids_cross_region_false_positive_dismissal():
+    """The rubric doc itself (not just the assembled prompt) states the rule —
+    REMEDIATION_TAXONOMY.md is read by a human too, not only fed to the agent."""
+    src = open(os.path.join(os.path.dirname(__file__), "..", "docs", "REMEDIATION_TAXONOMY.md")).read()
+    assert "orphan_functions" in src
+    assert "STACKS" in src  # points at the region mapping the triage must consult
+    low = src.lower()
+    assert "cross-region" in low or "different region" in low
+    assert "never" in low and "bucket d" in low
+
+
 # ── #1201: the loop must fail loudly when triage doesn't complete ────────────
 
 

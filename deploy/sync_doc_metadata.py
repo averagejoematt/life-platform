@@ -103,6 +103,110 @@ def _auto_discover_lambda_count() -> int | None:
         return None
 
 
+def _auto_discover_endpoint_count() -> int | None:
+    """Count DISTINCT public API endpoint paths served by the site-api Lambda (#1437).
+
+    lambdas/web/site_api_lambda.py registers routes through three mechanisms that
+    grew independently over time, so no single dict/list is the full picture:
+      1. The `ROUTES` dict — the primary GET dispatch table (`ROUTES.get(path)` at
+         the bottom of `lambda_handler`). Some entries map to `None`: a placeholder
+         that reserves the path while the real dispatch lives in mechanism #2 or #3
+         (each has an inline comment, e.g. "# POST routes handled specially in
+         lambda_handler" or "served by the separate AI lambda").
+      2. The `_SIMPLE_ROUTES` dict — the P4.5 scoped router for (mostly POST)
+         "simple delegate" routes: `{path: (allowed_methods, handler_fn)}`, checked
+         before ROUTES in `lambda_handler`.
+      3. Inline `if path == "/api/...":` / `if path.startswith("/api/coach/"):`
+         branches inside `lambda_handler` itself — routes complex enough (query-param
+         parsing, multi-step DDB logic, a dynamic sub-path) that they never got
+         extracted into a table.
+
+    A path can legitimately appear in more than one mechanism — e.g. a ROUTES entry
+    mapped to `None` whose real handler is an inline `if path == ...` a few hundred
+    lines down, or a POST path sitting in both ROUTES-as-placeholder AND
+    _SIMPLE_ROUTES. That's not multiple endpoints, it's one path registered twice
+    for two different bookkeeping reasons, so this function AST-parses the module
+    (not import — site_api_lambda.py pulls in boto3/AWS clients inappropriate to
+    load at doc-sync time) and takes the UNION of: every string key in the ROUTES
+    dict (regardless of value), every string key in the _SIMPLE_ROUTES dict, and
+    every literal path compared inside `lambda_handler` via `path == "..."` or
+    `path.startswith("...")` — so each distinct route is counted exactly once.
+    `/api/coach/` (a startswith prefix covering per-coach detail pages) counts as
+    ONE path, matching how the other two mechanisms count a route once regardless
+    of how many concrete URLs it actually serves.
+
+    This is the same class of drift `_auto_discover_tool_count` fixed for the MCP
+    registry: CLAUDE.md / docs/ONBOARDING.md hand-typed "60+ endpoints" long after
+    reality moved on. Trust THIS function's live count over any doc, including the
+    filing issue's own back-of-envelope estimate — #1437 quoted "~118 (101 ROUTES +
+    13 _SIMPLE_ROUTES + ~23 inline)", a naive un-deduplicated sum; the actual
+    deduplicated union (verified 2026-07-18) is 115.
+
+    Returns None (manual PLATFORM_FACTS fallback) if the file is unreadable/
+    unparseable, `lambda_handler` isn't found, ROUTES/_SIMPLE_ROUTES are both empty
+    (something structural broke), or the discovered count is suspiciously low
+    (<50) — the sanity floor mirroring the other discoverers in this file.
+    """
+    site_api_path = ROOT / "lambdas" / "web" / "site_api_lambda.py"
+    if not site_api_path.exists():
+        return None
+    try:
+        tree = ast.parse(site_api_path.read_text(encoding="utf-8"), filename=str(site_api_path))
+    except Exception:
+        return None
+
+    routes: set = set()
+    simple_routes: set = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Dict):
+            for target in node.targets:
+                if not isinstance(target, ast.Name):
+                    continue
+                if target.id == "ROUTES":
+                    routes.update(k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str))
+                elif target.id == "_SIMPLE_ROUTES":
+                    simple_routes.update(k.value for k in node.value.keys if isinstance(k, ast.Constant) and isinstance(k.value, str))
+
+    handler_fn = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "lambda_handler":
+            handler_fn = node
+            break
+    if handler_fn is None:
+        return None
+
+    inline: set = set()
+    for node in ast.walk(handler_fn):
+        if (
+            isinstance(node, ast.Compare)
+            and isinstance(node.left, ast.Name)
+            and node.left.id == "path"
+            and len(node.ops) == 1
+            and isinstance(node.ops[0], ast.Eq)
+            and len(node.comparators) == 1
+            and isinstance(node.comparators[0], ast.Constant)
+            and isinstance(node.comparators[0].value, str)
+        ):
+            inline.add(node.comparators[0].value)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "startswith"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "path"
+            and len(node.args) == 1
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            inline.add(node.args[0].value)
+
+    if not routes and not simple_routes:
+        return None  # ROUTES/_SIMPLE_ROUTES missing entirely — something's structurally wrong, don't guess
+
+    total = routes | simple_routes | inline
+    return len(total) if len(total) >= 50 else None
+
+
 _ALARM_CONSTRUCTOR_ATTRS = ("Alarm", "create_alarm")  # cloudwatch.Alarm(...) and metric.create_alarm(...)
 
 
@@ -675,6 +779,25 @@ def _auto_discover_restart_url_counts() -> tuple[int, int] | None:
                 if isinstance(target, ast.Name) and target.id in ("PAGES", "JSON_ENDPOINTS"):
                     if all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in node.value.elts):
                         counts[target.id] = len(node.value.elts)
+    if "PAGES" not in counts:
+        # #1426: PAGES is no longer a literal — it derives from THE page registry
+        # (tests/qa_manifest.py leak_scan facet). Count via the emitter subprocess
+        # so discovery stays import-side-effect-free in this module.
+        import subprocess
+
+        try:
+            out = subprocess.run(
+                [sys.executable, str(ROOT / "tests" / "qa_manifest.py"), "--emit", "leak"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=True,
+            )
+            n = len([ln for ln in out.stdout.splitlines() if ln.strip()])
+            if n:
+                counts["PAGES"] = n
+        except Exception:
+            pass
     pages = counts.get("PAGES")
     endpoints = counts.get("JSON_ENDPOINTS")
     if pages is None or endpoints is None or pages < 10 or endpoints < 3:
@@ -995,6 +1118,15 @@ def _apply_auto_discovered(facts: dict) -> dict:
             print(f"  [auto] alarm_count: {facts.get('alarm_count')} → {alarm_count} (from CDK stacks, #795)")
         facts["alarm_count"] = alarm_count
 
+    endpoint_count = _auto_discover_endpoint_count()
+    if endpoint_count is not None:
+        if facts.get("endpoint_count") != endpoint_count:
+            print(
+                f"  [auto] endpoint_count: {facts.get('endpoint_count')} → {endpoint_count} "
+                "(ROUTES + _SIMPLE_ROUTES + inline path checks in lambdas/web/site_api_lambda.py, dedup, #1437)"
+            )
+        facts["endpoint_count"] = endpoint_count
+
     module_count = _auto_discover_module_count()
     if module_count is not None:
         facts["module_count"] = module_count
@@ -1093,6 +1225,7 @@ PLATFORM_FACTS = {
     "secret_count": 21,  # live-verified 2026-07-10 via `aws secretsmanager list-secrets` (not auto-discovered — update after secret add/delete)
     "account_concurrency_limit": 100,  # live-verified 2026-07-18 via `aws lambda get-account-settings` (#1328; raised from 10 by AWS case 177921309700709 — update after any quota change)
     "alarm_count": 71,  # fallback: auto-discovered from cdk/stacks/*.py when parseable (#795, _auto_discover_alarm_count); 113→65 on #790 (ADR-116); 65→67 on #809 (site-api-ai-errors + recursive-loop adopted into CDK); 67→69 on #1229 (alert-digest Errors + queue-age alarms); 69→71 on #1328 (serve-stack Throttles alarms)
+    "endpoint_count": 115,  # fallback: AST-derived from site_api_lambda.py (#1437) — ROUTES + _SIMPLE_ROUTES + inline, deduped
     "data_sources": 20,  # google_calendar retired (ADR-030); hevy active (ADR-060)
     "cdk_stacks": 9,
     "test_count": 3644,  # fallback: `def test_` count across tests/*.py (_count_test_functions)
@@ -1268,6 +1401,16 @@ RULES = [
         r"Record dated on or after EXPERIMENT_START_DATE \(currently \d{4}-\d{2}-\d{2}\)",
         "Record dated on or after EXPERIMENT_START_DATE (currently {experiment_genesis})",
     ),
+    # #1437: the site-api Lambda's public endpoint count — hand-typed "60+ endpoints"
+    # was ~2x under reality (~118 estimate / 115 AST-derived vs. docs' stale 60+).
+    # Pattern matches BOTH the old "60+" shape and this rule's own "~115" output so
+    # re-running --apply/--check after a prior sync stays idempotent (see #wiki-pr1:
+    # a rule whose pattern can't match its own prior output is silent drift-in-waiting).
+    (
+        "CLAUDE.md",
+        r"with ~?\d+\+? endpoints including",
+        "with ~{endpoint_count} endpoints including",
+    ),
     (
         "docs/RUNBOOK.md",
         r"hard gate over the \d+-URL v4 surface",
@@ -1351,6 +1494,11 @@ RULES = [
         "docs/ONBOARDING.md",
         r"exposes \d+ tools that Claude calls",
         "exposes {tool_count} tools that Claude calls",
+    ),
+    (
+        "docs/ONBOARDING.md",
+        r"site-api Lambda \(~?\d+\+? endpoints, primarily read-only — ADR-037\)",
+        "site-api Lambda (~{endpoint_count} endpoints, primarily read-only — ADR-037)",
     ),
     # ── OPERATOR_GUIDE.md ────────────────────────────────────────────────────
     (

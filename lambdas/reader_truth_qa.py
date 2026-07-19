@@ -39,6 +39,43 @@ DEFAULT_MODEL = os.environ.get("READER_TRUTH_MODEL", "claude-haiku-4-5-20251001"
 # budget_guard._FEATURE_CUTOFF key — internal QA band, pauses at tier >= 1 (ADR-125).
 BUDGET_FEATURE = "reader_truth_qa"
 
+# #1440 (ADR-104 applied to the QA system itself): a budget-tier pause of this AI
+# QA pass must never look like a pass. Both hooks below call emit_budget_pause_metric()
+# when they pause on budget_guard.allow(BUDGET_FEATURE) — a daily CloudWatch alarm on
+# this metric (monitoring_stack.py, to_digest=True) routes into the SAME digest
+# pipeline every other alarm uses (→ life-platform-alerts-digest topic →
+# alert_digest_lambda's batched email), so a paused day surfaces even when nothing
+# else about the run failed and no other email would otherwise be sent.
+_QA_PAUSE_NAMESPACE = "LifePlatform/QA"
+_QA_PAUSE_METRIC = "QAPausedByBudget"
+
+
+def emit_budget_pause_metric(source: str, tier: int) -> None:
+    """Emit the QAPausedByBudget CloudWatch metric for a budget-tier pause.
+
+    `source` identifies which hook paused ("visual_ai_qa" — the CI/local
+    Playwright harness; "qa_smoke" — the nightly Lambda) for the caller's own
+    log line only; the metric itself carries no dimensions so ONE alarm
+    (monitoring_stack.py) catches a pause fired by either hook.
+
+    Fail-soft by design, matching this module's posture everywhere else: a
+    metrics-emission hiccup must never break (or further degrade) a QA pass
+    that is already paused. boto3 is imported lazily so the module stays
+    stdlib-importable everywhere (including the CI harness, which may run
+    under a read-only diagnosis role or with no AWS creds at all — see
+    infra/iam/README.md; the emit there is genuinely best-effort).
+    """
+    try:
+        import boto3
+
+        boto3.client("cloudwatch", region_name=os.environ.get("AWS_REGION", "us-west-2")).put_metric_data(
+            Namespace=_QA_PAUSE_NAMESPACE,
+            MetricData=[{"MetricName": _QA_PAUSE_METRIC, "Value": 1.0, "Unit": "Count"}],
+        )
+    except Exception as e:
+        print(f"  ⚠ {_QA_PAUSE_METRIC} metric emit failed (non-fatal) [{source}, tier {tier}]: {str(e)[:140]}")
+
+
 # The four rubric categories (#1095). parse/normalize coerce anything else to "other".
 CATEGORIES = (
     "temporal_contradiction",
