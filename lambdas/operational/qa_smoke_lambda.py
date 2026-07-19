@@ -576,6 +576,12 @@ def check_reader_truth():
 
         if not budget_guard.allow(reader_truth_qa.BUDGET_FEATURE):
             tier = budget_guard.current_tier()
+            # #1440: emit the QAPausedByBudget metric — a daily CloudWatch alarm on
+            # it (monitoring_stack.py, to_digest=True) reaches the alerts-digest
+            # email even on a day where check_reader_truth is the ONLY paused/failed
+            # check (lambda_handler only emails on a real FAILURE; a pause alone
+            # would otherwise never leave CloudWatch Logs).
+            reader_truth_qa.emit_budget_pause_metric("qa_smoke", tier)
             return [verdict.pause(f"Reader Truth AI skipped — budget tier {tier} (internal QA pauses first, ADR-125)")]
     except Exception as e:
         # Import/SSM blip: same fail-open posture as budget_guard itself — but if

@@ -1710,9 +1710,24 @@ def operational_qa_smoke() -> list[iam.PolicyStatement]:
     #1096: + Bedrock invoke (the nightly "Reader Truth" Haiku pass) and the
     budget-tier SSM read so budget_guard.allow("reader_truth_qa") gates it for
     real (without the grant, the guard's fail-open would silently report tier 0).
+
+    #1440: + cloudwatch:PutMetricData. check_reader_truth() now calls
+    reader_truth_qa.emit_budget_pause_metric() on a budget-tier pause (the
+    QAPausedByBudget metric that feeds the new digest alarm). The emit lives in
+    the SHARED lambdas/reader_truth_qa.py module (not this file), so the AST-scan
+    #1196 lockstep gate (tests/test_put_metric_data_grant_lockstep.py) can't
+    auto-detect it as an emitter — same documented exception as ai_calls/
+    bedrock_client/retry_utils. Granted by hand here per the #1440 IAM check;
+    without it the emit fails AccessDenied, fail-soft, same failure class #1196
+    guards against for directly-wired emitters.
     """
     return [
         _bedrock_statement(),
+        iam.PolicyStatement(
+            sid="CloudWatchMetrics",
+            actions=["cloudwatch:PutMetricData"],
+            resources=["*"],  # PutMetricData only accepts "*"
+        ),
         iam.PolicyStatement(
             sid="SSMBudgetTier",
             actions=["ssm:GetParameter"],
