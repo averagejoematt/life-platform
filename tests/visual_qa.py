@@ -207,10 +207,18 @@ def _check_stale_text(page):
                 if (s.pattern.test(body)) {
                     const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
                     while (w.nextNode()) {
-                        if (s.pattern.test(w.currentNode.textContent)) {
+                        const txt = w.currentNode.textContent;
+                        if (s.pattern.test(txt)) {
+                            // "coming soon" on /gear/ is sanctioned, permanent-until-launched
+                            // affiliate-program copy (v4_build_gear.py — the page's own
+                            // disclosure explains it), not stuck pre-launch placeholder text.
+                            // Both occurrences carry "affiliate" in the same text node, so
+                            // that's the discriminator — the genuine "site launching April"
+                            // class has no reason to mention affiliates (#1427).
+                            if (s.desc === 'Pre-launch copy still visible' && /affiliate/i.test(txt)) continue;
                             const el = w.currentNode.parentElement;
                             if (el && el.offsetParent !== null && el.offsetHeight > 0) {
-                                issues.push({text: w.currentNode.textContent.trim().slice(0, 60), desc: s.desc});
+                                issues.push({text: txt.trim().slice(0, 60), desc: s.desc});
                                 break;
                             }
                         }
