@@ -209,19 +209,22 @@ still valid; the bot is the net under it, not a replacement for pre-merge hygien
 1. **Non-whitelisted dirty path** — a generator wrote outside its declared output.
    Do NOT widen the whitelist reflexively; inspect the generator diff, fix main
    manually (`git pull` → run the generator → review → push).
-2. **Push rejected** — branch protection blocks the `github-actions[bot]` push
-   (this repo is a **personal/User-owned** repo, so `enforce_admins:false` lets
-   Matthew bypass but the bot is not an admin). NB the classic-protection PR-bypass
-   list (`bypass_pull_request_allowances`) is **organization-only** — it does not
-   exist on a personal repo, so you cannot add the app there. The one-time fix
-   applied 2026-07-13 (#1173): turn OFF "Require a pull request before merging" on
-   `main` (`gh api -X DELETE repos/<owner>/<repo>/branches/main/protection/required_pull_request_reviews`)
-   — near-vacuous here anyway (0 required approvals, admins already bypass, no
-   required status checks), so its only effect was blocking the reconcile bot.
-   Alternative if the PR rule must stay: push with a Matthew-owned PAT (admin →
-   bypasses), but a PAT push **retriggers** a duplicate `push` run (the default
-   `GITHUB_TOKEN` deliberately does not). Or a concurrent human push raced it
-   twice — the queued run reconciles next.
+2. **Push rejected** — as of 2026-07-13 (#1173) "Require a pull request before
+   merging" was turned OFF on `main` entirely
+   (`gh api -X DELETE repos/<owner>/<repo>/branches/main/protection/required_pull_request_reviews`),
+   and classic branch protection on `main` is now **absent** —
+   `gh api repos/<owner>/<repo>/branches/main/protection` returns 404
+   "Branch not protected" (verified live, not residual). The only control on
+   `main` is the minimal **ruleset** added 2026-07-18 (#1325,
+   `main-block-force-push-and-deletion`, id `19162901`) — it blocks
+   **non-fast-forward pushes and branch deletion only**: no required checks, no
+   PR rule, `enforcement: active`, `bypass_actors: []`. A normal (fast-forward,
+   non-deleting) push from `github-actions[bot]` — including the reconcile bot's
+   commit and a squash-merge — is unaffected; only a force-push or a delete of
+   `main` is rejected. If the reconcile push is ever rejected, it means someone
+   force-pushed or the ruleset was misconfigured — check
+   `gh api repos/<owner>/<repo>/rulesets/19162901` before assuming a PR-gate
+   problem (there isn't one).
 3. **A generator crashed** — same failure the test suite would have shown; fix the
    generator like any red test. Reproduce locally: run the generators from repo root
    on a clean main checkout; `git status` must end clean (they are idempotent).
@@ -376,6 +379,8 @@ These values change and must **never** be hand-written in docs or memory. Read t
 | MCP tool count | `deploy/sync_doc_metadata.py::_auto_discover_tool_count` — the top-level keys in `TOOLS` in `mcp/registry.py`. **Do not** `grep -c '"name":'` — it over-counts nested schema fields |
 | Test count | `PLATFORM_STATS["test_count"]` in `lambdas/web/site_api_common.py`, auto-bumped by the sync + the pre-commit hook |
 | Live site build | `curl -s https://averagejoematt.com/version.json` → compare `build` to `git rev-parse --short HEAD`; a mismatch means the viewer's device is stale |
+| `main` classic branch protection | `gh api repos/<owner>/<repo>/branches/main/protection` → must 404 "Branch not protected" (removed 2026-07-13, #1173; a 200 here means protection was re-added out of band — reconcile the doc, don't assume this table is wrong) |
+| `main` ruleset posture | `gh api repos/<owner>/<repo>/rulesets` → must show exactly `main-block-force-push-and-deletion` (id `19162901`) with `rules: [deletion, non_fast_forward]` only, `enforcement: active`, no `pull_request`/`required_status_checks` rule (#1325). Full record: `gh api repos/<owner>/<repo>/rulesets/19162901` |
 
 The pre-commit hook (`scripts/install_hooks.sh` — run once after cloning) runs
 `deploy/sync_doc_metadata.py --apply` directly and auto-stages every target file it
