@@ -442,6 +442,7 @@ def _og_source_hits(files, truth: int) -> list[str]:
     return hits
 
 
+<<<<<<< HEAD
 # ── #1351: DATA_GOVERNANCE.md fact gate (repo visibility, deletion-lambda status,
 # Verified-header freshness) ──────────────────────────────────────────────────
 # The compliance-answer doc misstated a load-bearing privacy control in BOTH
@@ -509,6 +510,105 @@ def _data_governance_hits(doc_path: Path, today=None) -> list[str]:
                 hits.append(
                     f"docs/DATA_GOVERNANCE.md: Verified header is {age_days}d stale ({mo.group(1)}, today {today}) — "
                     f"re-verify within {DATA_GOVERNANCE_VERIFIED_MAX_AGE_DAYS}d (#1351)"
+=======
+# ── #1254/#1347: cost-governor cadence proximity scan (corpus-wide) ───────────
+# #1254 fixed the "the governor runs hourly" claim (true cadence: every 8h, per the
+# CDK cron `cron(0 0/8 * * ? *)`) on 3 ENUMERATED files, guarded by a test that
+# hardcodes those 3 literal paths (tests/test_cost_governor_cadence_docs.py). That
+# guard structurally cannot catch the identical wrong fact "one file over" — and it
+# WAS one file over: docs/RUNBOOK.md:1363 and docs/ARCHITECTURE.md:89 still said
+# "(hourly)" the same day #1254 merged (found by the 2026-07-18 SDLC review, #1347).
+#
+# This rule generalizes #1254's guard into the same "known-fact proximity" shape as
+# the other scans in this file: ANY line that names the cost-governor (however it's
+# spelled — hyphen, underscore, or space) AND claims an hourly-family cadence is
+# stale, UNLESS the CDK schedule really is hourly (then there's nothing to police —
+# ground truth is read from the CDK, never hand-typed) or the line is HISTORICAL.
+#
+# SURFACE: docs (the _scan_files() surface), lambdas/mcp source (docstrings/comments
+# — where #1254's 2 of 3 enumerated files lived), and published site/**/*.html EXCEPT
+# site/legacy/ (the frozen pre-v4 mirror, #1254's 3rd enumerated file — site/method/
+# cost/index.html — lived here too). site/legacy/ is exempt for the same reason
+# CHANGELOG/DECISIONS are: it is a deliberately preserved historical snapshot, never
+# linked from the live UI (docs/CONVENTIONS.md, "Public Website" section).
+GOVERNOR_FUNCTION_NAME = "life-platform-cost-governor"
+# The compound spelling ("cost-governor"/"cost_governor"/"cost governor") is unambiguous
+# on its own. Reader-facing prose (the published essay) instead says bare "governor" —
+# unambiguous only alongside its cost-cadence context ("month-end", "budget", "spend",
+# "ceiling", "tier"); a bare "governor" with none of those nearby is some other sense of
+# the word and must NOT be policed by a fact gate about spend cadence.
+GOVERNOR_COMPOUND_RE = re.compile(r"cost[-_ ]governor", re.I)
+GOVERNOR_BARE_RE = re.compile(r"\bgovernor\b", re.I)
+GOVERNOR_CONTEXT_RE = re.compile(r"\b(?:month-end|budget|spend|ceiling|tier)\b", re.I)
+HOURLY_CLAIM_RE = re.compile(r"\bhourly\b|\bevery\s+hour\b", re.I)
+_GOVERNOR_CRON_STEP_RE = re.compile(r"cron\(\d+\s+0/(\d+)")
+GOVERNOR_SOURCE_DIRS = (ROOT / "lambdas", ROOT / "mcp")
+SITE_DIR = ROOT / "site"
+SITE_EXEMPT_DIRS = ("site/legacy/",)
+
+
+def _governor_cadence_hours(cdk_map: dict) -> int | None:
+    """Hours between cost-governor runs, parsed from its own CDK cron (the same
+    `_cdk_cron_map()` the #1205 cron-diff rule uses — one CDK read, two gates).
+    Returns None if the function or an `N/step` hour field isn't found, in which
+    case the caller must treat ground truth as undiscoverable (fail loud, never
+    silently skip — the #1189 vacuous-scan lesson)."""
+    cron = cdk_map.get(GOVERNOR_FUNCTION_NAME)
+    if not cron:
+        return None
+    m = _GOVERNOR_CRON_STEP_RE.search(cron)
+    return int(m.group(1)) if m else None
+
+
+def _scan_governor_surface() -> list[Path]:
+    """Docs + lambdas/mcp source + published site HTML (site/legacy/ excepted) —
+    exposed so the regression test can assert the surface includes the exact files
+    #1254 enumerated and the ones this issue found beyond them."""
+    out = list(_scan_files())
+    for d in GOVERNOR_SOURCE_DIRS:
+        if d.exists():
+            out += sorted(d.rglob("*.py"))
+    if SITE_DIR.exists():
+        for p in sorted(SITE_DIR.rglob("*.html")):
+            rel = str(p.relative_to(ROOT))
+            if any(rel.startswith(d) for d in SITE_EXEMPT_DIRS):
+                continue
+            out.append(p)
+    return out
+
+
+def _line_names_the_governor(line: str) -> bool:
+    """True if `line` names the cost-governor — either the unambiguous compound
+    spelling, or a bare "governor" alongside its cost-cadence context (the shape
+    reader-facing prose uses: "An hourly governor projects month-end cost…")."""
+    if GOVERNOR_COMPOUND_RE.search(line):
+        return True
+    return bool(GOVERNOR_BARE_RE.search(line) and GOVERNOR_CONTEXT_RE.search(line))
+
+
+def _governor_cadence_hits(files, step_hours: int | None) -> list[str]:
+    """Live line(s) claiming the cost-governor runs hourly when the CDK schedule
+    disagrees. `step_hours` None or 1 means there's nothing to police (undiscoverable,
+    or an hourly schedule really would be true) — exposed so the regression test can
+    plant a violation in a scratch file and prove the rule bites (the #1189
+    non-vacuous-scan lesson), independent of live discovery."""
+    if not step_hours or step_hours <= 1:
+        return []
+    hits = []
+    for doc in files:
+        try:
+            rel = doc.relative_to(ROOT)
+        except ValueError:
+            rel = doc  # scratch file outside the repo (the non-vacuous test)
+        for lineno, line in enumerate(doc.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            if HISTORICAL.search(line):
+                continue
+            if _line_names_the_governor(line) and HOURLY_CLAIM_RE.search(line):
+                hits.append(
+                    f"{rel}:{lineno}: cost-governor cadence claims hourly, CDK schedule is every {step_hours}h "
+                    f"({GOVERNOR_FUNCTION_NAME}, #1254/#1347)\n"
+                    f"      | {line.strip()[:160]}"
+>>>>>>> origin/main
                 )
     return hits
 
@@ -592,7 +692,17 @@ def main():
 
     # #1205: no live doc quotes a cron that disagrees with the CDK schedule (the compute
     # cron table is the highest-stakes operational claim — it drifted 2 months stale).
-    hits += _cron_hits(_scan_files(), _cdk_cron_map())
+    cdk_map = _cdk_cron_map()
+    hits += _cron_hits(_scan_files(), cdk_map)
+
+    # #1254/#1347: no live doc/source/site line claims the cost-governor runs hourly —
+    # generalized past #1254's 3-enumerated-file test to the whole corpus (docs +
+    # lambdas/mcp + published site HTML), ground-truthed from the SAME CDK cron map.
+    governor_step = _governor_cadence_hours(cdk_map)
+    if governor_step is None:
+        print(f"error: could not discover the cost-governor's cron schedule ({GOVERNOR_FUNCTION_NAME})", file=sys.stderr)
+        sys.exit(2)
+    hits += _governor_cadence_hits(_scan_governor_surface(), governor_step)
 
     # #1260: no og card hardcodes a "N data sources" count that disagrees with the registry.
     registry_n = _registry_source_count()
@@ -624,7 +734,7 @@ def main():
     print(
         f"✅ doc + source facts OK — no live doc/source states a stale count/budget "
         f"({len(_scan_files())} docs + {len(_scan_source_files())} source files + "
-        f"{len(_scan_og_files())} og cards scanned)."
+        f"{len(_scan_og_files())} og cards + {len(_scan_governor_surface())} governor-surface files scanned)."
     )
 
 

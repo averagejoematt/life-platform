@@ -19,7 +19,8 @@ storytelling. This module is the deterministic core that fixes that:
     ("criterion X · result Y [CI, n]"); narration may quote it, never replace it.
 
 Pure (stdlib + stats_core only, no boto3): callers own the data fetch and the write.
-Shared-layer module — imported flat (`import experiment_design`) from mcp/ and lambdas/.
+Bundled module (#781 — ships in every function's code bundle, no separate layer);
+imported flat (`import experiment_design`) from mcp/ and lambdas/.
 """
 
 from datetime import datetime, timedelta
