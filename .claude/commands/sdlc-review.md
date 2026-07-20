@@ -50,7 +50,9 @@ for this ritual), Cost Explorer, CloudWatch describe/get, SSM get, S3 get/list.
 3. Pull the open backlog (`gh issue list --state open`) → the do-not-refile list. Load the
    latest `docs/reviews/sdlc_review_grades_*.json` if one exists — reuse its rubric anchors
    (extend, never silently redefine) and diff grades mechanically. Also load the latest
-   `fullreview_grades_*.json` to avoid re-litigating artifact-review ground.
+   `fullreview_grades_*.json` to avoid re-litigating artifact-review ground. Also load
+   `docs/TESTING.md` § "QA Strategy Scorecard" — the baseline/target/current record the
+   quarterly QA re-grade folded into Phase 3 diffs against.
 4. Write the **shared context block** every lens brief carries verbatim: platform paragraph,
    ground truth, the three axes, the evidence rule, the do-not-refile list, and any seeded
    hypotheses (each assigned to exactly ONE owner lens; other lenses may cite but not file).
@@ -122,13 +124,24 @@ findings_refuted}}`) — this file is the comparability mechanism for the next r
   what gate to add. An SDLC review that doesn't strengthen the SDLC just schedules the next one.
 - **Parked register**: gated/won't-do items → the report + the one `parked-register` issue
   (#423), never filed as stories.
+- **QA-strategy scorecard re-grade (quarterly, #1451)** — a checklist step, not a separate
+  ritual: re-grade the 8-axis QA scorecard (deploy gating, render breadth, FE unit tests, API
+  contracts, AI-content QA, monitoring, mobile/cross-browser, a11y) against current reality
+  using the rubric in `docs/TESTING.md` § "QA Strategy Scorecard" — cite evidence per axis
+  (same evidence rule as the lens findings above), diff against that doc's Current column, and
+  note deltas (improved / flat / regressed). Fold the re-graded table + deltas into this run's
+  `docs/reviews/SDLC_REVIEW_<date>.md` as a labeled subsection. Update the Current column in
+  `docs/TESTING.md` in this same PR so the next re-grade diffs against this run.
 
 ## Phase 4 — Disposition
 
 - File via the `issue-filer` agent per ADR-099: one epic per lens with ≥3 confirmed findings,
   scored stories (score line, Now/Next/Later by tercile), `area:*` mapping (most SDLC findings
   → `area:claude-workflow`, `area:infra`, `area:security`, or `area:docs`), privacy discipline
-  regardless of repo visibility. Update the month's `BACKLOG_MANIFEST_*.json`.
+  regardless of repo visibility. Update the month's `BACKLOG_MANIFEST_*.json`. Any QA-scorecard
+  axis that regressed, or sits ≥2 quarters short of target with no evidence of movement, files
+  a story the same way (`type:story`, `area:claude-workflow`, `review:qa-strategy-<date>`,
+  linked to epic #1425) — see the checklist in Phase 3.
 - Implementation is NOT this ritual's job — the filed backlog feeds /uplevel and
   worktree-implementer sessions. Ship only with explicit in-session authorization.
 - Wrap per the wrap convention (build beat or explicit none, handover, ci-cd conclusions).
