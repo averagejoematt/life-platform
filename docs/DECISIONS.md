@@ -1496,6 +1496,51 @@ in-Lambda (`rate_limiter.py`), not WAF-based, per the same 2026-06 removal — s
 "Rate limiting is DynamoDB-backed" convention. This note amends the record rather than rewriting
 the original (wrong) rationale above, per ADR discipline.
 
+**Addendum (2026-07-20, #1353) — blast-radius re-measurement for the P6 line:** the
+"~4 FTE-weeks" Multi-user/Cognito estimate above predates any measurement of the actual
+blast radius. Measured fresh on 2026-07-20:
+
+```bash
+grep -r "USER#matthew" lambdas/ mcp/ | wc -l                              # → 92 literals
+grep -rl "USER#matthew" lambdas/ mcp/ | wc -l                             # → 61 files
+grep -r "USER#matthew" lambdas/ mcp/ | grep -iE "USER_ID|user_id" | wc -l # → 0 parameterized
+```
+
+92 bare `USER#matthew` partition-key literals across 61 files, zero of which co-occur
+with a `USER_ID`/`user_id` parameter at the same construction site — every write/read
+key is hardcoded, not templated. (The 2026-07-18 SDLC review recorded 82/56 two days
+earlier; the rise to 92/61 is itself evidence the number moves — this addendum states
+its measurement date and the exact command rather than a bare point estimate, so it can
+be re-run instead of re-trusted.)
+
+Other blast-radius facts the original estimate didn't itemize:
+- **Secrets are per-source, not per-user** (`lambdas/secret_cache.py` caches by secret
+  ID, e.g. `life-platform/whoop` — there is no per-tenant secret namespace). A second
+  user needs a second full credential set wired through Secrets Manager, not a config row.
+- **The raw S3 zone is three-generation fractured** (X-9/#498, `lambdas/source_registry.py`):
+  most sources write `raw/matthew/{source}/...`, legacy todoist/weather write
+  `raw/{source}/...` with **no user segment at all**, and hevy is flat UUID-keyed.
+  Multi-tenancy needs every source's `raw_layout` facet re-derived, not one path-prefix change.
+- **The public product is single-persona by construction** — the site, chronicle, and
+  coaching narratives are written for "Matthew," not a generic user record; there is no
+  tenant-scoping layer at the product surface, only (partially) at the data layer.
+
+**Honest re-estimate:** the DynamoDB key schema is already `USER#{id}`-shaped, so the
+**data-plane lift is M** (parameterize the ~92 literal call sites + per-source secrets +
+the fractured raw layout) — smaller than "~4 FTE-weeks" implied once isolated to schema
+mechanics alone. But the **product-plane lift is L**: a single-persona site, chronicle,
+and coaching voice needs a real identity/tenancy layer (auth, per-user scoping at every
+read/write boundary, a UI that isn't written in one voice) that the original estimate
+never itemized. This addendum supersedes the bare "~4 FTE-weeks" figure at the record —
+the deferral posture itself (revisit only when a second real user is on the horizon)
+still holds; only the sizing under it was stale.
+
+No automated regression guard is added here: `scripts/check_doc_facts.py` deliberately
+exempts `docs/DECISIONS.md` from its stale-number scan (an ADR ledger states dated
+history, it isn't a live-synced surface — see the gate's `EXEMPT_FILES`). Re-run the
+three commands above against the live tree to check this addendum rather than trusting
+the numbers in it indefinitely.
+
 ---
 
 **Verified:** 2026-05-19
