@@ -113,6 +113,15 @@ def _readout_visual(path: str, title: str) -> dict:
     d = {
         "wait_for": "[data-readout]",
         "checks": [{"selector": "[data-readout]", "not_empty": True, "desc": f"{slug} readout rendered"}],
+        # CLS paydown (#1474): the archive shell now paints its crumb/title/blurb +
+        # a designed readout skeleton server-side and reserves the tabs + Day-N-stamp
+        # lines, so the async fill no longer shifts layout. Measured before→after
+        # (route-mocked, 1280px): /data topics 0.46→0.0 (returning) / 0.14 (first
+        # visit — the one-time data-door intro card); /method,/protocols ~0.0. The
+        # data door carries that first-visit intro card, so it keeps more headroom
+        # than the intro-less method/protocols doors. These lock the gain; the global
+        # CLS_BUDGET (0.75) still covers pages not yet reworked.
+        "cls_budget": 0.30 if path.startswith("/data/") else 0.15,
     }
     if slug in CHART_TOPICS and path.startswith("/data/"):
         d["charts"] = ["[data-readout] svg"]

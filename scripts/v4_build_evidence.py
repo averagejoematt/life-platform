@@ -802,6 +802,43 @@ def registry_json(groups):
     return out
 
 
+# Per-slug metadata for the server-side skeleton pre-fill (#1474).
+SLUG_META = {slug: (title, blurb, mode) for (slug, title, blurb, _g, mode, *_r) in REGISTRY}
+
+
+def skeleton_readout_html() -> str:
+    """Server-side twin of evidence.js's skeletonReadout() (#1019) — byte-for-byte
+    the same anatomy (4 stat blocks · chart · two prose lines), baked into the
+    generated shell so the FIRST paint reserves the readout's vertical space
+    (#1474 CLS paydown). evidence.js re-assigns the identical markup on load, so
+    the swap is a no-op reflow; the empty→content shift (measured ~0.46 on /data/*)
+    is gone. Styles: .sk/.sk-b in evidence.css — a designed shimmer, reduced-motion
+    aware, never a generic gray box."""
+    stats = '<span class="sk-b sk-stat"></span>' * 4
+    return (
+        '<div class="sk" role="status" aria-label="Loading">'
+        f'<div class="sk-stats" aria-hidden="true">{stats}</div>'
+        '<span class="sk-b sk-chart" aria-hidden="true"></span>'
+        '<span class="sk-b sk-line" aria-hidden="true"></span>'
+        '<span class="sk-b sk-line sk-line--short" aria-hidden="true"></span></div>'
+    )
+
+
+def prefill_main(start_slug: str, door: str) -> dict:
+    """Build-time-known content for the ev-main region so the async shell paints
+    with its crumb/title/blurb/readout already in place (#1474). evidence.js
+    overwrites each with identical content on load → no layout shift. The readout
+    skeleton is baked only for data-mode start slugs (editorial/interactive slugs
+    render their own body synchronously, no async gap to reserve)."""
+    title, blurb, mode = SLUG_META.get(start_slug, ("", "", "data"))
+    return {
+        "crumb": f"{esc(door)} / {esc(start_slug)}",
+        "title": esc(title),
+        "blurb": esc(blurb),
+        "readout": skeleton_readout_html() if mode == "data" else "",
+    }
+
+
 # Shared footer — the single source of truth is v4_chrome.site_footer() (#1009).
 FOOTER = site_footer()
 
@@ -840,6 +877,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
     # Empty proof must leave the topic shells byte-identical (no stray blank line — it
     # would needlessly diff all ~48 topic pages and could conflict across concurrent PRs).
     proof_slot = f"{proof}\n    " if proof else ""
+    pf = prefill_main(start_slug, pillar["door"])
     return f"""<!DOCTYPE html>
 <html lang="en" data-door="{pillar["door"]}">
 <head>
@@ -870,7 +908,7 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
   <main id="ev" class="ev-app">
     <div class="page-hero">
       <p class="ph-kicker label">{pillar["kicker"]}</p>
-      <p class="hero-day label" data-bind="genesisStamp" hidden></p>
+      <p class="hero-day label" data-bind="genesisStamp" data-reserve-line></p>
       <h1 class="ph-title">{esc(pillar["h1"])}</h1>
       <p class="ph-promise">{esc(pillar["lede"])}</p>
       {loop_ribbon(pillar["door"])}
@@ -879,10 +917,10 @@ def shell(start_slug: str, canonical: str, title: str, desc: str, pillar, proof:
     <div class="ev-layout">
       <aside class="ev-side" data-side aria-label="Topics"></aside>
       <section class="ev-main" data-main>
-        <p class="ev-crumbs" data-crumb></p>
-        <h2 class="topic-h1" data-title></h2>
-        <p class="topic-lede" data-blurb></p>
-        <div class="readout" data-readout></div>
+        <p class="ev-crumbs" data-crumb>{pf["crumb"]}</p>
+        <h2 class="topic-h1" data-title>{pf["title"]}</h2>
+        <p class="topic-lede" data-blurb>{pf["blurb"]}</p>
+        <div class="readout" data-readout>{pf["readout"]}</div>
         <p class="deeper" data-deeper></p>
       </section>
     </div>

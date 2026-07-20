@@ -82,9 +82,13 @@ SITE_URL = os.environ.get("QA_SITE_URL", "https://averagejoematt.com")
 # See docs/DESIGN_SYSTEM_V5.md "Performance budget" for the full writeup — update
 # both places if the numbers move.
 LCP_BUDGET_MS = 2500  # ~2.2x the observed baseline max (1136ms)
-CLS_BUDGET = 0.75  # ~1.2x the observed baseline max (0.614); the high current
-# baseline is async data-render shifting layout as "··" placeholders resolve —
-# a known characteristic, not something this issue fixes (see docs note).
+CLS_BUDGET = 0.75  # global ceiling ~1.2x the 2026-07-05 baseline max (0.614). Pages
+# that have paid down their shift set a TIGHTER per-page `cls_budget` in the manifest
+# (#1474): the archive readout pages (/data,/method,/protocols) reserve their async
+# space with designed skeleton states, dropping from the 0.46-0.67 baseline to ~0
+# (returning) / ~0.14 (first visit, the one-time intro card) — see qa_manifest
+# _readout_visual + docs/DESIGN_SYSTEM_V5.md §9. The global stays here for the pages
+# not yet reworked (e.g. the cockpit's bespoke motion reveal).
 JS_BYTES_SOFT_BUDGET = 550_000  # ~1.35x the observed baseline max (408KB); soft
 # (warning only) — the site's largest page type (data/method/protocols, which
 # share evidence.js) sets the ceiling other page types have plenty of room under.
@@ -586,8 +590,13 @@ def capture_page(context, page_def, screenshot_dir, save_screenshots=False, capt
         perf_result["cls"] = round(cls, 4) if cls is not None else None
         if lcp_ms and lcp_ms > LCP_BUDGET_MS:
             issues.append(f"LCP {lcp_ms:.0f}ms exceeds budget {LCP_BUDGET_MS}ms")
-        if cls is not None and cls > CLS_BUDGET:
-            issues.append(f"CLS {cls:.3f} exceeds budget {CLS_BUDGET}")
+        # Per-page CLS budget override (#1474): a page that has PAID DOWN its shift
+        # (designed skeleton states reserving async space) locks the gain with a
+        # tighter budget than the global ceiling, so the improvement can't silently
+        # regress. Pages without an override keep CLS_BUDGET.
+        cls_budget = page_def.get("cls_budget", CLS_BUDGET)
+        if cls is not None and cls > cls_budget:
+            issues.append(f"CLS {cls:.3f} exceeds budget {cls_budget}")
 
         _scroll_and_reveal(page)
 

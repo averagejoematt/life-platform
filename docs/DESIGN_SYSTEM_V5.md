@@ -366,17 +366,31 @@ changes enough that the headroom stops making sense, and update this section to 
 | Metric | Observed baseline (33 pages) | Enforced budget | Gate |
 |---|---|---|---|
 | LCP | 72ms – 1136ms (p90 984ms) | **2500ms** | hard fail (`issues`) |
-| CLS | 0.059 – 0.614 (p90 0.570) | **0.75** | hard fail (`issues`) |
+| CLS | 0.059 – 0.614 (p90 0.570) | **0.75** global / **per-page overrides** | hard fail (`issues`) |
 | Total JS / page | 119KB – 408KB | **550KB** | soft (`warnings` only) |
 
 Budgets carry headroom over the observed max (LCP ~2.2x, CLS ~1.2x, JS ~1.35x) so ordinary
 CI-runner network jitter doesn't flake the gate — the point is catching a real regression (a
 newly-added render-blocking script, a runaway layout shift from a new widget), not chasing a
-"good" Core Web Vitals score. **The current CLS baseline is already high** (0.5-0.6 on most
-`/data/`, `/method/`, `/coaching/` pages) — the known cause is this site's async
-data-render pattern (`··` placeholders resolving to real numbers/charts after the API responds),
-not a font or layout bug. Lowering it is real future work, not something this issue fixes; the
-budget here exists to stop it from getting *worse*, not to certify it's good today.
+"good" Core Web Vitals score. `CLS_BUDGET` (0.75) is the **global ceiling**; a page that has paid
+down its shift sets a tighter **per-page `cls_budget`** in `tests/qa_manifest.py` so the gain
+can't silently regress (`tests/visual_qa.py` reads the override).
+
+**CLS paydown — the archive readout pages (#1474).** The 0.5-0.6 CLS on the `/data/`, `/method/`,
+`/protocols/` pages was this site's async data-render pattern: the shared evidence shell shipped an
+*empty* `[data-readout]` (plus empty crumb/title/blurb, an un-reserved section-tabs row, and a
+JS-revealed Day-N stamp), so the whole readout region reflowed when `evidence.js` filled it after
+first paint. Fixed by giving those async regions **designed skeleton states that reserve their space
+from the first paint**, not gray boxes: the generator (`scripts/v4_build_evidence.py`) bakes the
+existing #1019 `.sk` readout skeleton and the build-time-known crumb/title/blurb into the server
+HTML, and `evidence.css` reserves the tabs row + the Day-N-stamp line (both tokenized, both
+reduced-motion-safe via the `.sk-b` pulse). `evidence.js` then re-writes identical content into the
+reserved boxes — a no-op reflow. **Measured before→after** (route-mocked APIs, headless Chromium,
+1280px): `/data/*` **0.46 → 0.00** for a returning visitor and **0.14** on a first-ever visit (the
+one-time data-door intro card, out of scope here); `/data/` hub **0.67 → 0.00**; `/method/*` and
+`/protocols/*` **~0.46 → ~0.00**. The per-page budgets (0.30 data / 0.15 method+protocols) lock it.
+The cockpit's own `··` readouts (a bespoke, motion-reveal page, CLS ~0.26) are a tracked follow-up
+and still ride the global ceiling.
 
 **Font subsetting.** `scripts/v4_vendor_fonts.py` now keeps only the Google Fonts **latin**
 subset (the site is English-only; a browser's `unicode-range` selection never fetched the
